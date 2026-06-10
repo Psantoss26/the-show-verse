@@ -7,6 +7,7 @@ import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
+import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Heart,
@@ -48,7 +49,7 @@ function toItemsArray(value) {
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
-  hidden: { opacity: 1, y: 0 },
+  hidden: { opacity: 0, y: 40 },
   visible: {
     opacity: 1,
     y: 0,
@@ -68,7 +69,7 @@ const staggerContainer = {
 };
 
 const scaleIn = {
-  hidden: { opacity: 1, scale: 1 },
+  hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
     scale: 1,
@@ -596,12 +597,13 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         transition={{ duration: 0.3 }}
         className="relative group/poster w-full h-full"
       >
-        <img
+        <NextImage
           src={buildImg(posterPath, "w342")}
           alt={movie.title || movie.name}
-          className={`w-full ${boxClass} object-cover rounded-lg transition-all duration-300 group-hover/poster:shadow-2xl group-hover/poster:shadow-white/10`}
+          fill
+          sizes="(min-width:1280px) 210px, (min-width:768px) 190px, 140px"
+          className="object-cover rounded-lg transition-all duration-300 group-hover/poster:shadow-2xl group-hover/poster:shadow-white/10"
           loading="lazy"
-          decoding="async"
         />
         <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/poster:opacity-100 transition-opacity duration-300" />
       </motion.div>
@@ -615,20 +617,22 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       transition={{ duration: 0.4 }}
       className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900 shadow-lg`}
     >
-      <img
+      <NextImage
         src={buildImg(posterPath, "w342")}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110"
+        fill
+        sizes="33vw"
+        className="object-cover blur-xl opacity-35 scale-110"
         loading="lazy"
-        decoding="async"
       />
-      <img
+      <NextImage
         src={buildImg(posterPath, "w342")}
         alt={movie.title || movie.name}
-        className="absolute inset-0 w-full h-full object-contain"
+        fill
+        sizes="33vw"
+        className="object-contain"
         loading="lazy"
-        decoding="async"
       />
     </motion.div>
   );
@@ -955,15 +959,16 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         )}
 
         {!showTrailer && bgSrc && (
-          <img
+          <NextImage
             key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+            fill
+            sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
+            className={`object-cover transition-opacity duration-200 ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
             loading="eager"
-            decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
             onError={() => {
@@ -1041,24 +1046,26 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               )}
 
               <span className="inline-flex items-center gap-1.5">
-                <img
+                <NextImage
                   src="/logo-TMDb.png"
                   alt="TMDb"
                   className="h-3 w-auto"
+                  width={36}
+                  height={12}
                   loading="lazy"
-                  decoding="async"
                 />
                 <span className="font-medium">{ratingOf(movie)}</span>
               </span>
 
               {typeof extras?.imdbRating === "number" && (
                 <span className="inline-flex items-center gap-1.5">
-                  <img
+                  <NextImage
                     src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"
+                    width={34}
+                    height={16}
                     loading="lazy"
-                    decoding="async"
                   />
                   <span className="font-medium">
                     {extras.imdbRating.toFixed(1)}
@@ -1451,15 +1458,16 @@ function InlinePreviewCardAnticipated({
         )}
 
         {!showTrailer && bgSrc && (
-          <img
+          <NextImage
             key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+            fill
+            sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
+            className={`object-cover transition-opacity duration-200 ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
             loading="eager"
-            decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
             onError={() => {
@@ -1965,7 +1973,7 @@ function Row({
   return (
     <motion.div
       ref={rowRef}
-      initial={false}
+      initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
       className="relative group"
@@ -2293,7 +2301,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   return (
     <motion.div
       ref={rowRef}
-      initial={false}
+      initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
       className="relative group"
@@ -2346,12 +2354,13 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
                 >
                   <Link href={href}>
                     <div className="w-full h-full">
-                      <img
+                      <NextImage
                         src={poster}
                         alt={m.title || m.name || ""}
+                        width={342}
+                        height={513}
                         className={`w-full ${posterBoxClass} object-cover rounded-lg`}
                         loading="lazy"
-                        decoding="async"
                       />
                       <div className="mt-2 flex items-center gap-2 text-[11px] text-neutral-300">
                         {type === "tv" ? (
@@ -2418,10 +2427,10 @@ const AnticipatedSection = memo(function AnticipatedSection({
 
   return (
     <motion.div
-      initial={false}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial="hidden"
+      whileInView="visible"
+      variants={fadeInUp}
       viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     >
       {/* Título con selector */}
       <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
@@ -2643,16 +2652,14 @@ function TopRatedHero({
   return (
     <motion.div
       ref={heroRef}
-      initial={false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
       className="relative group mb-10 sm:mb-14"
     >
       {/* Título de la sección con selector Películas / Series */}
       <motion.div
-        initial={false}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        variants={scaleIn}
         className="mb-5 px-1 sm:px-0"
       >
         <div className="flex items-center gap-2 mb-1.5">
@@ -2733,7 +2740,7 @@ function TopRatedHero({
                 1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 },
               }}
             >
-              {items.map((movie) => {
+              {items.map((movie, index) => {
                 const heroBackdrop =
                   heroBackdrops !== null
                     ? (heroBackdrops[movie.id] ?? null)
@@ -2763,27 +2770,31 @@ function TopRatedHero({
                   <SwiperSlide key={movie.id} className={slideClass}>
                     <Link href={`/details/${mediaType}/${movie.id}`}>
                       <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
-                        <img
+                        <NextImage
                           src={buildImg(heroBackdrop, "w780")}
                           alt=""
                           aria-hidden="true"
-                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110"
+                          fill
+                          sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                          className="object-cover blur-2xl opacity-35 scale-110"
                           loading="lazy"
-                          decoding="async"
                         />
-                        <img
+                        <NextImage
                           src={buildImg(heroBackdrop, "w1280")}
-                          srcSet={`${buildImg(heroBackdrop, "w780")} 780w, ${buildImg(
-                            heroBackdrop,
-                            "w1280",
-                          )} 1280w, ${buildImg(heroBackdrop, "original")} 2400w`}
                           sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                           alt={movie.title || movie.name}
-                          className={`absolute inset-0 w-full h-full rounded-xl ${
+                          fill
+                          className={`rounded-xl ${
                             isMobile ? "object-contain" : "object-cover"
                           } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
-                          loading="lazy"
-                          decoding="async"
+                          {...(index === 0
+                            ? { priority: true, fetchPriority: "high" }
+                            : {
+                                loading:
+                                  index < (isMobile ? 1 : 3)
+                                    ? "eager"
+                                    : "lazy",
+                              })}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
                       </motion.div>
@@ -3107,7 +3118,12 @@ export default function MainDashboardClient({ initialData }) {
   }
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black">
+    <motion.div
+      className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black"
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
+    >
       <TopRatedHero
         movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
         tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
@@ -3119,7 +3135,7 @@ export default function MainDashboardClient({ initialData }) {
       <motion.div
         className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
         variants={staggerContainer}
-        initial={false}
+        initial="hidden"
         animate="visible"
       >
         {/* Trakt: Más esperadas con selector Películas/Series */}
@@ -3248,6 +3264,6 @@ export default function MainDashboardClient({ initialData }) {
         />
 
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

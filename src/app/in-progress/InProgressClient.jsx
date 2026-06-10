@@ -469,7 +469,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
 // ----------------------------
 // CIRCULAR PROGRESS GAUGE (SVG)
 // ----------------------------
-function CircularProgress({ pct, colors, size = 52 }) {
+function CircularProgress({ pct, colors, size = 52, customText }) {
   const strokeWidth = 3.5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -505,7 +505,9 @@ function CircularProgress({ pct, colors, size = 52 }) {
       </svg>
       {/* Center text */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-[11px] font-black ${colors.text}`}>{pct}%</span>
+        <span className={`text-[11px] font-black ${colors.text}`}>
+          {customText !== undefined ? customText : `${pct}%`}
+        </span>
       </div>
     </div>
   );
@@ -678,8 +680,15 @@ const InProgressCard = memo(function InProgressCard({
   viewMode = "cards",
   activeTab = "inprogress",
 }) {
+  const itemType =
+    item.type === "movie" ||
+    item.media_type === "movie" ||
+    item.detailsHref?.includes("/movie/")
+      ? "movie"
+      : "tv";
   const title = item.title_es || item.title || "Sin título";
-  const href = item.detailsHref || `/details/tv/${item.tmdbId}`;
+  const href =
+    item.detailsHref || `/details/${itemType}/${item.tmdbId || item.id}`;
   const colors = getProgressColor(item.pct);
   const nextEpCode = item.nextEpisode
     ? formatEpCode(item.nextEpisode.season, item.nextEpisode.number)
@@ -939,19 +948,28 @@ const InProgressCard = memo(function InProgressCard({
 
             {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
             <div className="absolute top-3 right-3">
-              <div className="rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                {activeTab === "completed" ? (
-                  item.user_rating ? (
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-yellow-500/15 border-2 border-yellow-400 flex items-center justify-center">
-                      <span className="text-sm sm:text-base font-black font-mono text-yellow-400">
-                        {item.user_rating}
-                      </span>
-                    </div>
-                  ) : null
-                ) : (
-                  <CircularProgress pct={item.pct} colors={colors} size={40} />
-                )}
-              </div>
+              {activeTab === "completed" && !item.user_rating ? null : (
+                <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
+                  {activeTab === "completed" ? (
+                    <CircularProgress
+                      pct={Number(item.user_rating || 0) * 10}
+                      colors={{
+                        stroke: "#facc15",
+                        trail: "rgba(250,204,21,0.15)",
+                        text: "text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] !font-mono !text-[13px]",
+                      }}
+                      size={40}
+                      customText={item.user_rating}
+                    />
+                  ) : (
+                    <CircularProgress
+                      pct={item.pct}
+                      colors={colors}
+                      size={40}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Next episode badge - solid dark bg */}
