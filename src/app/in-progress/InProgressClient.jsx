@@ -1680,7 +1680,7 @@ export default function InProgressClient() {
                       activeColor="green"
                       groupId="inprogress-header-actions"
                       title="Sincronizar"
-                      className="!border-white/20 hover:!border-white/40"
+                      className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
                     >
                       <RotateCcw
                         className={`w-5 h-5 ${currentLoading || auth.loading ? "animate-spin" : ""}`}
@@ -1700,7 +1700,7 @@ export default function InProgressClient() {
                       activeColor="red"
                       groupId="inprogress-header-actions"
                       title="Desconectar"
-                      className="!text-red-400 hover:!text-red-300 !border-red-500/30 hover:!border-red-500/50"
+                      className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
                     >
                       <LogOut className="w-5 h-5" />
                     </LiquidButton>
