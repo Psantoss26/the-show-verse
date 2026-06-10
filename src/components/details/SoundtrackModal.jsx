@@ -205,7 +205,7 @@ export default function SoundtrackModal({
       />
 
       <div
-        className="relative flex w-full max-w-[460px] flex-col overflow-hidden rounded-[3rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-300 ease-out"
+        className="relative flex w-full max-w-[460px] flex-col overflow-hidden rounded-[3rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}
@@ -232,7 +232,10 @@ export default function SoundtrackModal({
                   title={`Escuchar en ${selectedTrack?.source || "la web"}`}
                   aria-label={`Escuchar ${selectedTrack?.trackName || title || "soundtrack"} en ${selectedTrack?.source || "la web"}`}
                 >
-                  <SourceLinkIcon source={selectedTrack?.source} className="h-5 w-5" />
+                  <SourceLinkIcon
+                    source={selectedTrack?.source}
+                    className="h-5 w-5"
+                  />
                 </a>
               ) : (
                 <div className="w-11 h-11" />
@@ -245,11 +248,12 @@ export default function SoundtrackModal({
                 <div className="text-[10px] font-semibold text-white/40 mt-1">
                   {currentIndex + 1} DE {trackQueue.length}
                 </div>
-                {playableTracks.length > 0 && playableTracks.length < trackQueue.length && (
-                  <div className="text-[10px] font-semibold text-white/30 mt-0.5">
-                    {playableTracks.length} con preview
-                  </div>
-                )}
+                {playableTracks.length > 0 &&
+                  playableTracks.length < trackQueue.length && (
+                    <div className="text-[10px] font-semibold text-white/30 mt-0.5">
+                      {playableTracks.length} con preview
+                    </div>
+                  )}
               </div>
 
               <button
@@ -310,7 +314,9 @@ export default function SoundtrackModal({
                     <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
                       <div
                         className="h-full bg-gradient-to-r from-white/60 to-white rounded-full transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                        style={{ width: `${(progress / (duration || 1)) * 100}%` }}
+                        style={{
+                          width: `${(progress / (duration || 1)) * 100}%`,
+                        }}
                       />
                     </div>
                     <input
@@ -344,7 +350,10 @@ export default function SoundtrackModal({
                         : "border-white/20 bg-white/10 text-zinc-200 hover:bg-white/20"
                     }`}
                   >
-                    <SourceLinkIcon source={selectedTrack?.source} className="h-4 w-4" />
+                    <SourceLinkIcon
+                      source={selectedTrack?.source}
+                      className="h-4 w-4"
+                    />
                     Escuchar en {selectedTrack?.source || "la web"}
                   </a>
                 )}
@@ -367,7 +376,11 @@ export default function SoundtrackModal({
                 onClick={togglePlay}
                 disabled={!selectedHasPreview}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
-                aria-label={selectedHasPreview ? "Reproducir o pausar preview" : "Preview no disponible"}
+                aria-label={
+                  selectedHasPreview
+                    ? "Reproducir o pausar preview"
+                    : "Preview no disponible"
+                }
               >
                 {isPlaying && selectedHasPreview ? (
                   <Pause className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
@@ -424,8 +437,7 @@ export default function SoundtrackModal({
           <div className="flex h-[340px] flex-col items-center justify-center gap-3 text-center text-zinc-400 p-6">
             <Music2 className="h-12 w-12 opacity-25" />
             <p className="text-sm">
-              {error ||
-                "No se encontraron canciones para este título."}
+              {error || "No se encontraron canciones para este título."}
             </p>
           </div>
         )}
