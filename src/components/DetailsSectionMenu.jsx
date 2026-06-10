@@ -28,7 +28,7 @@ export default function DetailsSectionMenu({
       return {
         focusRing: "focus-visible:ring-emerald-500/50",
         activeBg:
-          "from-emerald-500/15 via-emerald-400/8 to-teal-500/12 border-emerald-500/20",
+          "bg-black/20 from-emerald-500/40 via-white/10 to-emerald-500/10 shadow-[0_10px_30px_-10px_rgba(52,211,153,0.5)]",
         iconActive:
           "text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.6)]",
         badgeBg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -39,7 +39,7 @@ export default function DetailsSectionMenu({
     return {
       focusRing: "focus-visible:ring-yellow-500/50",
       activeBg:
-        "from-yellow-500/15 via-yellow-400/8 to-orange-500/12 border-yellow-500/20",
+        "bg-black/20 from-yellow-500/40 via-white/10 to-yellow-500/10 shadow-[0_10px_30px_-10px_rgba(250,204,21,0.5)]",
       iconActive: "text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.6)]",
       badgeBg: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
       indicator:
@@ -165,27 +165,43 @@ export default function DetailsSectionMenu({
                             ].join(" ")}
                             aria-label={item.label}
                           >
-                            {active && (
+                            {active && !shouldReduceMotion && (
                               <>
                                 <motion.div
+                                  layoutId={`detailsMenuIndicatorBg-${colorScheme}`}
                                   aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br shadow-lg border ${colors.activeBg}`}
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg border border-white/5 ${colors.activeBg}`}
                                   initial={false}
-                                  animate={{ opacity: 1, scale: 1 }}
                                   transition={{
-                                    duration: shouldReduceMotion ? 0 : 0.16,
-                                    ease: "easeOut",
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 30,
+                                    mass: 1,
                                   }}
                                 />
                                 <motion.span
+                                  layoutId={`detailsMenuIndicatorLine-${colorScheme}`}
                                   aria-hidden="true"
                                   className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
                                   initial={false}
-                                  animate={{ opacity: 1, scaleX: 1 }}
                                   transition={{
-                                    duration: shouldReduceMotion ? 0 : 0.16,
-                                    ease: "easeOut",
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 30,
+                                    mass: 1,
                                   }}
+                                />
+                              </>
+                            )}
+                            {active && shouldReduceMotion && (
+                              <>
+                                <div
+                                  aria-hidden="true"
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg border border-white/5 ${colors.activeBg}`}
+                                />
+                                <span
+                                  aria-hidden="true"
+                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
                                 />
                               </>
                             )}
