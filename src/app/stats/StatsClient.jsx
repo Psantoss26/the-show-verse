@@ -66,10 +66,7 @@ function readProfileSessionCache(key) {
 function writeProfileSessionCache(key, data) {
   if (typeof window === "undefined" || !data) return;
   try {
-    window.sessionStorage.setItem(
-      key,
-      JSON.stringify({ t: Date.now(), data }),
-    );
+    window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }));
   } catch {}
 }
 
@@ -298,13 +295,9 @@ const COLOR_STYLES = {
 };
 
 const PROFILE_GLASS_SURFACE =
-  "relative isolate overflow-hidden border border-white/15 bg-white/[0.028] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.055),0_24px_70px_-48px_rgba(0,0,0,0.88)] backdrop-blur-2xl";
-const PROFILE_GLASS_HOVER =
-  "transition-all duration-300 hover:border-indigo-300/35 hover:bg-white/[0.05] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),inset_0_-1px_0_rgba(255,255,255,0.08),0_30px_82px_-52px_rgba(99,102,241,0.58)]";
+  "relative isolate overflow-hidden bg-black/40 bg-gradient-to-br from-white/15 via-transparent to-black/60 backdrop-blur-[60px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu";
+const PROFILE_GLASS_HOVER = "transition-all duration-300 hover:bg-black/50";
 const PROFILE_GLASS_PANEL = `${PROFILE_GLASS_SURFACE} ${PROFILE_GLASS_HOVER}`;
-const PROFILE_BACKGROUND_STYLE = {
-  backgroundImage: 'url("/fluid-liquid-8k-43.jpg")',
-};
 
 // -----------------------------------------------------------------------------
 // DATA HELPERS
@@ -404,7 +397,6 @@ function KPICard({
       transition={{ delay, duration: 0.5 }}
       className={`${PROFILE_GLASS_PANEL} group rounded-3xl p-4 sm:p-6`}
     >
-      <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.10),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.055),transparent_42%)] opacity-80" />
       <div
         className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}
       >
@@ -451,26 +443,18 @@ function ProfilePageBackground({ variant = "indigo" }) {
   const isConnect = variant === "connect";
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden">
-      <div
-        className="absolute -inset-8 bg-cover bg-center opacity-95 blur-2xl saturate-150 contrast-125 brightness-110"
-        style={PROFILE_BACKGROUND_STYLE}
-      />
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-18 saturate-125 contrast-110"
-        style={PROFILE_BACKGROUND_STYLE}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.18),transparent_40%),linear-gradient(180deg,rgba(5,5,8,0.14)_0%,rgba(5,5,8,0.30)_46%,rgba(5,5,8,0.54)_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.22),rgba(0,0,0,0.02)_48%,rgba(0,0,0,0.30))]" />
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {isConnect ? (
         <>
-          <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-emerald-500/8 rounded-full blur-[120px] mix-blend-screen" />
-          <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-500/8 rounded-full blur-[150px] mix-blend-screen" />
+          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-sky-700/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
         </>
       ) : (
         <>
-          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/8 rounded-full blur-[120px] mix-blend-screen" />
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/8 rounded-full blur-[120px] mix-blend-screen" />
+          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-indigo-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-purple-700/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
         </>
       )}
     </div>
@@ -484,7 +468,7 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
     <div className="flex items-center justify-between gap-4 mb-6">
       <div className="flex items-center gap-3">
         <div
-          className={`rounded-xl border border-white/10 p-2 ${styles.iconBg} ${styles.iconText} shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-xl`}
+          className={`relative isolate overflow-hidden rounded-xl p-2 bg-black/40 bg-gradient-to-br from-white/10 via-transparent to-black/60 backdrop-blur-[50px] shadow-lg transform-gpu ${styles.iconText}`}
         >
           <Icon className="w-5 h-5" />
         </div>
@@ -690,7 +674,9 @@ function CustomTooltip({ active, payload, label, formatter }) {
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
     return (
-      <div className={`${PROFILE_GLASS_SURFACE} min-h-[172px] rounded-[2rem] p-5 sm:p-6`}>
+      <div
+        className={`${PROFILE_GLASS_SURFACE} min-h-[172px] rounded-[2rem] p-5 sm:p-6`}
+      >
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/15 via-zinc-900/30 to-transparent" />
         <div className="relative z-10 space-y-3 pt-8">
           <div className="h-4 w-36 rounded-lg bg-zinc-800/70 animate-pulse" />
@@ -804,7 +790,9 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
               </div>
             </div>
           </div>
-          <p className="mt-1 text-sm font-medium text-zinc-500">@{user.username}</p>
+          <p className="mt-1 text-sm font-medium text-zinc-500">
+            @{user.username}
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
             {user.location && (
               <span className="flex items-center gap-1">
@@ -879,7 +867,9 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
             </div>
             {actionButtons("shrink-0")}
           </div>
-          <p className="mt-2 text-sm font-medium text-zinc-500">@{user.username}</p>
+          <p className="mt-2 text-sm font-medium text-zinc-500">
+            @{user.username}
+          </p>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
             {user.location && (
               <span className="flex items-center gap-1">
@@ -941,7 +931,7 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
                   {active && (
                     <motion.span
                       layoutId="profileSectionActiveBg"
-                      className="absolute inset-0 rounded-[1.45rem] border border-indigo-500/25 bg-gradient-to-br from-indigo-500/18 via-indigo-400/10 to-violet-500/14 shadow-[0_8px_24px_-18px_rgba(99,102,241,0.95),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                      className="absolute inset-0 rounded-[1.45rem] bg-white/10 shadow-md border border-white/5"
                       initial={{ opacity: 0, scale: 0.96 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.96 }}
@@ -996,10 +986,18 @@ function ProfileUnifiedCard({
   const [loadingScores, setLoadingScores] = useState(false);
 
   // Extract media properties safely
-  const media = type === "movie" ? (item?.movie || item) : type === "show" ? (item?.show || item) : item;
+  const media =
+    type === "movie"
+      ? item?.movie || item
+      : type === "show"
+        ? item?.show || item
+        : item;
   const tmdbId = media?.ids?.tmdb || media?.tmdbId || media?.id;
   const title = media?.title || media?.name || "Sin título";
-  const year = media?.year || (media?.release_date ? media.release_date.slice(0, 4) : "") || (media?.first_air_date ? media.first_air_date.slice(0, 4) : "");
+  const year =
+    media?.year ||
+    (media?.release_date ? media.release_date.slice(0, 4) : "") ||
+    (media?.first_air_date ? media.first_air_date.slice(0, 4) : "");
   const episodeSeason = item?.episode?.season;
   const episodeNumber = item?.episode?.number;
   const isEpisodeCard =
@@ -1009,7 +1007,10 @@ function ProfileUnifiedCard({
 
   // Extract TMDb score
   const tmdbScore =
-    item?.episode?.vote_average || media?.vote_average || item?.vote_average || null;
+    item?.episode?.vote_average ||
+    media?.vote_average ||
+    item?.vote_average ||
+    null;
 
   // Extract first genre
   const firstGenre = media?.genres?.[0]?.name || media?.genres?.[0] || null;
@@ -1033,7 +1034,13 @@ function ProfileUnifiedCard({
 
   // Load scores on hover if not in cache
   const handleHover = useCallback(async () => {
-    if (type === "person" || loadingScores || (imdbScore && traktScore) || !tmdbId) return;
+    if (
+      type === "person" ||
+      loadingScores ||
+      (imdbScore && traktScore) ||
+      !tmdbId
+    )
+      return;
 
     setLoadingScores(true);
 
@@ -1129,7 +1136,11 @@ function ProfileUnifiedCard({
             <span className="text-emerald-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
               {Number(tmdbScore).toFixed(1)}
             </span>
-            <img src="/logo-TMDb.png" alt="" className="w-auto h-2 sm:h-2.5 opacity-100" />
+            <img
+              src="/logo-TMDb.png"
+              alt=""
+              className="w-auto h-2 sm:h-2.5 opacity-100"
+            />
           </div>
         )}
         {imdbScore && (
@@ -1137,15 +1148,25 @@ function ProfileUnifiedCard({
             <span className="text-yellow-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
               {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
             </span>
-            <img src="/logo-IMDb.svg" alt="" className="w-auto h-2.5 sm:h-3 opacity-100" />
+            <img
+              src="/logo-IMDb.svg"
+              alt=""
+              className="w-auto h-2.5 sm:h-3 opacity-100"
+            />
           </div>
         )}
         {traktScore && (
           <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
             <span className="text-pink-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
-              {typeof traktScore === "number" ? traktScore.toFixed(1) : traktScore}
+              {typeof traktScore === "number"
+                ? traktScore.toFixed(1)
+                : traktScore}
             </span>
-            <img src="/logo-Trakt.png" alt="" className="w-auto h-2 sm:h-2.5 opacity-100" />
+            <img
+              src="/logo-Trakt.png"
+              alt=""
+              className="w-auto h-2 sm:h-2.5 opacity-100"
+            />
           </div>
         )}
       </div>
@@ -1195,7 +1216,8 @@ function ProfileUnifiedCard({
     rose: "rgba(244, 63, 94, 0.4)",
   };
 
-  const hoverBorderColor = borderColorStyles[sectionColor] || borderColorStyles.indigo;
+  const hoverBorderColor =
+    borderColorStyles[sectionColor] || borderColorStyles.indigo;
   const shadowColorStyles = {
     emerald: "16, 185, 129",
     yellow: "234, 179, 8",
@@ -1204,7 +1226,8 @@ function ProfileUnifiedCard({
     purple: "168, 85, 247",
     rose: "244, 63, 94",
   };
-  const hoverShadowRgb = shadowColorStyles[sectionColor] || shadowColorStyles.indigo;
+  const hoverShadowRgb =
+    shadowColorStyles[sectionColor] || shadowColorStyles.indigo;
   const hoverShadowColor = [
     `0 18px 48px -24px rgba(${hoverShadowRgb}, 0.72)`,
     `0 10px 24px -18px rgba(${hoverShadowRgb}, 0.58)`,
@@ -1224,7 +1247,6 @@ function ProfileUnifiedCard({
           y: -6,
           zIndex: 300,
           boxShadow: hoverShadowColor,
-          borderColor: hoverBorderColor,
         }}
         whileTap={{ y: -2 }}
         transition={{ type: "spring", stiffness: 360, damping: 26 }}
@@ -1275,7 +1297,8 @@ function ProfileUnifiedCard({
                 <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
                   {year}
                   {firstGenre && ` • ${firstGenre}`}
-                  {item.episode && ` • T${item.episode.season}:E${item.episode.number}`}
+                  {item.episode &&
+                    ` • T${item.episode.season}:E${item.episode.number}`}
                 </p>
               ) : (
                 count !== undefined && (
@@ -1457,7 +1480,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 if (!res.ok) return;
                 const json = await res.json();
                 if (ignore || !json?.user) return;
-                setProfileData((prev) => ({ ...(prev || {}), user: json.user }));
+                setProfileData((prev) => ({
+                  ...(prev || {}),
+                  user: json.user,
+                }));
                 writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
                   user: json.user,
                 });
@@ -1672,7 +1698,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
   if (notConnected) {
     return (
-      <div className="min-h-screen bg-[#050505] text-zinc-100 pb-20 selection:bg-emerald-500/30">
+      <div className="min-h-screen bg-black text-zinc-100 pb-20 selection:bg-emerald-500/30">
         <ProfilePageBackground variant="connect" />
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -1701,7 +1727,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`${PROFILE_GLASS_SURFACE} max-w-md w-full flex flex-col items-center justify-center py-12 rounded-3xl text-center px-4 border-dashed`}
+              className={`${PROFILE_GLASS_SURFACE} max-w-md w-full flex flex-col items-center justify-center py-12 rounded-3xl text-center px-4`}
             >
               <div className="mb-6">
                 <img
@@ -1736,7 +1762,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pb-20 text-zinc-100 selection:bg-emerald-500/30">
+    <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
@@ -1768,10 +1794,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.25 }}
           >
-            <ProfileSectionTabs
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-            />
+            <ProfileSectionTabs viewMode={viewMode} setViewMode={setViewMode} />
           </motion.div>
         ) : null}
 
@@ -1835,7 +1858,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 {/* Secondary KPIs */}
                 {stats && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
+                    <div
+                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                    >
                       <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
                         <Star className="w-5 h-5" />
                       </div>
@@ -1848,7 +1873,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
+                    <div
+                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                    >
                       <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
                         <MessageSquare className="w-5 h-5" />
                       </div>
@@ -1861,7 +1888,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
+                    <div
+                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                    >
                       <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
                         <Users className="w-5 h-5" />
                       </div>
@@ -1874,7 +1903,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         </div>
                       </div>
                     </div>
-                    <div className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}>
+                    <div
+                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                    >
                       <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
                         <Heart className="w-5 h-5" />
                       </div>
@@ -1906,7 +1937,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ProfileCardScroller>
                       {recentHistory.slice(0, 15).map((item, idx) => (
-                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                        <ProfileCardScrollerItem
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                        >
                           <ProfileUnifiedCard
                             item={item}
                             type={item.type}
@@ -1934,7 +1967,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ProfileCardScroller>
                       {recentRatings.slice(0, 15).map((item, idx) => (
-                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                        <ProfileCardScrollerItem
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                        >
                           <ProfileUnifiedCard
                             item={item}
                             type={item.type}
@@ -1964,7 +1999,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ProfileCardScroller>
                       {watchlist.slice(0, 15).map((item, idx) => (
-                        <ProfileCardScrollerItem key={`${item.type}-${item.tmdbId}-${idx}`}>
+                        <ProfileCardScrollerItem
+                          key={`${item.type}-${item.tmdbId}-${idx}`}
+                        >
                           <ProfileUnifiedCard
                             item={item}
                             type={item.type}
@@ -1999,7 +2036,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={stats.monthlyData}
-                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                            margin={{
+                              top: 10,
+                              right: 10,
+                              left: -20,
+                              bottom: 0,
+                            }}
                           >
                             <defs>
                               <linearGradient
@@ -2142,7 +2184,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             .filter((item) => item?.movie?.poster_path)
                             .slice(0, 15)
                             .map((item, idx) => (
-                              <ProfileCardScrollerItem key={item.movie?.ids?.tmdb || idx}>
+                              <ProfileCardScrollerItem
+                                key={item.movie?.ids?.tmdb || idx}
+                              >
                                 <ProfileUnifiedCard
                                   item={item}
                                   type="movie"
@@ -2175,7 +2219,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             .filter((item) => item?.show?.poster_path)
                             .slice(0, 15)
                             .map((item, idx) => (
-                              <ProfileCardScrollerItem key={item.show?.ids?.tmdb || idx}>
+                              <ProfileCardScrollerItem
+                                key={item.show?.ids?.tmdb || idx}
+                              >
                                 <ProfileUnifiedCard
                                   item={item}
                                   type="show"
@@ -2341,7 +2387,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 {/* Genres & Ratings row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Genres - Radar */}
-                  <motion.div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
+                  <motion.div
+                    className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}
+                  >
                     <SectionTitle
                       icon={Target}
                       title="Gustos por Género"
@@ -2385,7 +2433,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
 
                   {/* Ratings - Bar */}
-                  <motion.div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
+                  <motion.div
+                    className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}
+                  >
                     <SectionTitle
                       icon={Award}
                       title="Tus Puntuaciones"
