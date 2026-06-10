@@ -462,7 +462,7 @@ export default function Navbar() {
               <Link
                 href="/lists"
                 className={iconLinkClass("/lists", "purple")}
-                title="Listas"
+                aria-label="Listas"
               >
                 <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
@@ -470,7 +470,7 @@ export default function Navbar() {
               <Link
                 href="/calendar"
                 className={iconLinkClass("/calendar", "amber")}
-                title="Calendario"
+                aria-label="Calendario"
               >
                 <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
               </Link>
@@ -478,7 +478,7 @@ export default function Navbar() {
               <Link
                 href="/in-progress"
                 className={iconLinkClass("/in-progress", "green")}
-                title="En Progreso"
+                aria-label="En Progreso"
               >
                 <Play
                   className="w-5 h-5 transition-transform duration-200 group-hover:scale-110"
@@ -493,7 +493,7 @@ export default function Navbar() {
                   <Link
                     href="/favorites"
                     className={iconLinkClass("/favorites", "red")}
-                    title="Favoritas"
+                    aria-label="Favoritas"
                   >
                     <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
@@ -501,7 +501,7 @@ export default function Navbar() {
                   <Link
                     href="/watchlist"
                     className={iconLinkClass("/watchlist", "blue")}
-                    title="Pendientes"
+                    aria-label="Pendientes"
                   >
                     <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
                   </Link>
@@ -544,7 +544,6 @@ export default function Navbar() {
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
-              title="Menú"
               aria-label="Abrir menú"
             >
               <MenuIcon className="w-6 h-6" />
@@ -570,7 +569,6 @@ export default function Navbar() {
             <button
               onClick={() => setShowMobileSearch(true)}
               className="p-2 rounded-full transition-colors text-white hover:bg-white/10"
-              title="Buscar"
               aria-label="Buscar"
             >
               <SearchIcon className="w-6 h-6 text-white" />

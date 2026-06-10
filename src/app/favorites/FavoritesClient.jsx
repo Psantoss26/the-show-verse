@@ -1337,9 +1337,9 @@ function GroupingDropdownContent({
 
 function SubGroupDivider({ title, count }) {
   return (
-    <div className="flex items-center gap-3 py-1.5 sm:py-2">
+    <div className="sticky top-[206px] lg:top-[224px] z-[45] flex items-center gap-3 py-1.5 sm:py-2 -mx-2 px-2 sm:mx-0 sm:px-0">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/40 to-red-500/15" />
-      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-3 py-1 text-xs sm:text-sm">
+      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-black/60 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-lg px-3 py-1 text-xs sm:text-sm border border-white/5">
         <span className="relative z-10 truncate font-black uppercase tracking-wide text-red-100 drop-shadow-sm">
           {title}
         </span>
@@ -1476,12 +1476,12 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
 
   return (
     <motion.div
-      className="my-4 sm:my-8"
+      className="sticky top-[130px] lg:top-[136px] z-[50] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl bg-black/60 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-xl border border-white/10">
         <div className="relative z-10 px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
