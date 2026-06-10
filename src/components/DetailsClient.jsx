@@ -10059,43 +10059,64 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8"
                       >
-                        {collectionData.items.map((m) => (
-                          <SwiperSlide key={m.id}>
-                            <Link
-                              href={`/details/movie/${m.id}`}
-                              className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                              aria-label={m.title}
-                            >
-                              <div className="aspect-[2/3] overflow-hidden relative">
-                                {m.poster_path ? (
-                                  <img
-                                    src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                                    alt={m.title}
-                                    className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.06]"
-                                    loading="lazy"
-                                    decoding="async"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                                    <ImageOff className="w-10 h-10 opacity-60" />
-                                  </div>
-                                )}
+                        {collectionData.items.map((m) => {
+                          const colYear = m.release_date
+                            ? m.release_date.slice(0, 4)
+                            : "";
+                          const enableHover =
+                            supportsHover && !isMobileViewport;
+                          const colCardClass = enableHover
+                            ? "mt-3 block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                            : "mt-3 block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
+                          const colImageClass = enableHover
+                            ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                            : "w-full h-full object-cover";
+                          const colOverlayClass = enableHover
+                            ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                            : "absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80";
+                          const colFooterInfoClass = enableHover
+                            ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                            : "absolute bottom-0 left-0 right-0 p-3 pb-4";
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-                                <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 transition-all duration-300 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100">
-                                  <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                                    {m.title}
-                                  </p>
-                                  {m.release_date ? (
-                                    <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                                      {m.release_date?.slice(0, 4)}
+                          return (
+                            <SwiperSlide key={m.id}>
+                              <Link
+                                href={`/details/movie/${m.id}`}
+                                className={colCardClass}
+                                aria-label={m.title}
+                              >
+                                <div className="aspect-[2/3] overflow-hidden relative">
+                                  {m.poster_path ? (
+                                    <img
+                                      src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                                      alt={m.title}
+                                      className={colImageClass}
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
+                                      <ImageOff className="w-10 h-10 opacity-60" />
+                                    </div>
+                                  )}
+
+                                  <div className={colOverlayClass} />
+
+                                  <div className={colFooterInfoClass}>
+                                    <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
+                                      {m.title}
                                     </p>
-                                  ) : null}
+                                    {colYear && (
+                                      <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                                        {colYear}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
-                          </SwiperSlide>
-                        ))}
+                              </Link>
+                            </SwiperSlide>
+                          );
+                        })}
                       </DetailsArrowCarousel>
                     ) : (
                       <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
