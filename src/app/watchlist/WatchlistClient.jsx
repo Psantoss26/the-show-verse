@@ -2539,6 +2539,7 @@ export default function WatchlistClient() {
                       activeColor="blue"
                       groupId="watchlist-header-actions"
                       title="Sincronizar lista"
+                      className="!bg-white/10 !bg-gradient-to-br !from-white/30 !via-white/10 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/20"
                     >
                       <RotateCcw
                         className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
@@ -2566,7 +2567,7 @@ export default function WatchlistClient() {
                       activeColor="red"
                       groupId="watchlist-header-actions"
                       title="Desconectar cuenta TMDb"
-                      className="!text-red-400 hover:!text-red-300"
+                      className="!text-red-400 hover:!text-red-300 !bg-white/10 !bg-gradient-to-br !from-white/30 !via-white/10 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/20"
                     >
                       <LogOut className="w-5 h-5" />
                     </LiquidButton>
