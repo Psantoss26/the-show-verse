@@ -654,7 +654,7 @@ function InlineDropdown({
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300 lg:min-w-[145px]"
+        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[145px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none border border-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="h-4 w-4 shrink-0 text-emerald-400" />}
@@ -681,7 +681,7 @@ function InlineDropdown({
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
                 style={menuStyle}
-                className="sv-scroll max-h-[min(360px,calc(100vh-96px))] overflow-y-auto rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl"
+                className="sv-scroll max-h-[min(360px,calc(100vh-96px))] overflow-y-auto rounded-2xl border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2"
               >
                 {children({ close: () => setOpen(false) })}
               </motion.div>
@@ -698,10 +698,10 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
         active
-          ? "bg-zinc-800 text-white"
-          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+          ? "bg-white/10 text-white font-bold"
+          : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
       <span className="font-medium">{children}</span>
@@ -2278,7 +2278,12 @@ export default function ActorDetails({
   }, [sectionItems, menuH]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-teal-800/25 blur-[120px] sm:blur-[150px]" />
+      </div>
       <div
         ref={contentTopRef}
         className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24"
@@ -2452,7 +2457,7 @@ export default function ActorDetails({
                   return (
                     <div
                       key={item.label}
-                      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur-sm"
+                      className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 p-4 sm:p-5"
                     >
                       <div
                         className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tones[item.tone]} to-transparent blur-2xl opacity-80`}
@@ -2483,8 +2488,8 @@ export default function ActorDetails({
 
             {mostPopularCredit && (
               <FadeIn delay={0.2} className="mb-5">
-                <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
+                <div className="flex items-center gap-3 rounded-[2rem] bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 backdrop-blur-lg shadow-lg border border-emerald-500/20 p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
                     <Star className="h-5 w-5 fill-emerald-300" />
                   </div>
                   <div className="min-w-0">
@@ -2503,7 +2508,7 @@ export default function ActorDetails({
             )}
 
             <FadeIn delay={0.24}>
-              <div className="p-5 rounded-2xl bg-white/5 border border-white/5 relative">
+              <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 relative">
                 <p
                   className={`text-zinc-200 text-base leading-relaxed text-justify whitespace-pre-line ${
                     !showFullBio && bio.length > 420
@@ -2607,7 +2612,7 @@ export default function ActorDetails({
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-xs font-bold text-zinc-200"
+                        className="px-4 py-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-md shadow-sm hover:from-white/15 hover:to-white/10 transition text-xs font-bold text-zinc-200 hover:text-white"
                         title="Limpiar filtros"
                       >
                         Limpiar
@@ -2625,7 +2630,7 @@ export default function ActorDetails({
                           value={q}
                           onChange={(e) => setQ(e.target.value)}
                           placeholder="Buscar por título o rol..."
-                          className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:outline-none focus:border-emerald-500/50"
+                          className="h-11 w-full rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 text-white"
                         />
                         {q && (
                           <button
@@ -2641,10 +2646,10 @@ export default function ActorDetails({
                       <button
                         type="button"
                         onClick={() => setMobileFiltersOpen((v) => !v)}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 ${
                           mobileFiltersOpen
-                            ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
-                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                            ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                            : "text-zinc-200 hover:text-white hover:bg-white/10 hover:border-white/20"
                         }`}
                         aria-label="Filtros"
                       >
@@ -2695,7 +2700,7 @@ export default function ActorDetails({
                           value={q}
                           onChange={(e) => setQ(e.target.value)}
                           placeholder="Buscar por título o rol..."
-                          className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-emerald-500/50 focus:outline-none"
+                          className="h-11 w-full rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 text-white"
                         />
                         {q && (
                           <button
@@ -2768,7 +2773,7 @@ export default function ActorDetails({
                       ))}
                     </div>
                   ) : (
-                    <div className="py-16 text-center border border-dashed border-white/10 rounded-3xl bg-white/5">
+                    <div className="py-16 text-center border border-dashed border-white/10 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <Film className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
                       <p className="text-zinc-400">
                         No se encontraron créditos con estos filtros.
@@ -2816,7 +2821,7 @@ export default function ActorDetails({
                       ))}
                     </ActorRowCarousel>
                   ) : (
-                    <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.04] px-6 py-12 text-center">
+                    <div className="rounded-[2rem] border border-dashed border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-6 py-12 text-center">
                       <Trophy className="mx-auto mb-3 h-12 w-12 text-zinc-600" />
                       <p className="font-semibold text-zinc-300">
                         No hay premios públicos disponibles para esta persona.
@@ -2878,7 +2883,7 @@ export default function ActorDetails({
                     icon={User}
                   />
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
+                    <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 space-y-4">
                       <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
                         Información
                       </h3>
@@ -2908,7 +2913,7 @@ export default function ActorDetails({
                       </div>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-zinc-900/45 border border-white/5 space-y-4">
+                    <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 space-y-4">
                       <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
                         Enlaces & Alias
                       </h3>
