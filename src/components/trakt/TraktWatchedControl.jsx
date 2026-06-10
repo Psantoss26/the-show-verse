@@ -61,18 +61,18 @@ export default function TraktWatchedControl({
       {(labelHighlight || labelSub) && (
         <span
           className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap 
-            bg-[#0d1f16]/95 border border-emerald-500/50 rounded-[5px] 
-            px-1 py-[2px] flex items-center justify-center gap-1
-            shadow-[0_2px_8px_rgba(16,185,129,0.3)] pointer-events-none z-20 backdrop-blur-md"
+            bg-black/40 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-lg
+            px-1.5 py-[3px] flex items-center justify-center gap-1
+            shadow-2xl pointer-events-none z-20 backdrop-blur-xl"
         >
           {labelHighlight && (
-            <span className="text-[10px] font-black text-white leading-none">
+            <span className="text-[10px] font-black text-white leading-none drop-shadow-md">
               {labelHighlight}
             </span>
           )}
           {labelSub && (
             <span
-              className={`${labelHighlight ? "text-[9px]" : "text-[10px]"} font-bold tracking-tight text-emerald-400 uppercase leading-none opacity-95`}
+              className={`${labelHighlight ? "text-[9px]" : "text-[10px]"} font-bold tracking-tight text-emerald-400 uppercase leading-none drop-shadow-md`}
             >
               {labelSub}
             </span>
