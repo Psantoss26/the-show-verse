@@ -439,7 +439,7 @@ function GroupDivider({ title, count, total, stats }) {
   return (
     <motion.div
       ref={ref}
-      className="sticky top-[130px] lg:top-[136px] z-[50] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
+      className="sticky top-[130px] lg:top-[136px] z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -453,14 +453,16 @@ function GroupDivider({ title, count, total, stats }) {
           <div
             className={`bg-gradient-to-b from-amber-500 to-orange-600 shadow-[0_0_15px_rgba(245,158,11,0.3)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
           />
-          <div className="min-w-0 flex-1">
+          <div
+            className={`min-w-0 flex-1 transition-all duration-300 ${isSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
+          >
             <h2
               className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md transition-all duration-300 ${isSticky ? "text-sm sm:text-base" : "text-base sm:text-2xl"}`}
             >
               {title}
             </h2>
             <div
-              className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "mt-0 text-[9px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+              className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
             >
               <span className="text-zinc-300 font-bold">{count}</span>
               <span>títulos</span>
@@ -1357,25 +1359,34 @@ export default function BibliotecaClient() {
       }
     }
 
-    // Sort group keys
-    const entries = [...groups.entries()];
+    const entries = Array.from(groups.entries()).map(([key, items]) => {
+      const stats = createLibraryGroupStats();
+      for (const item of items) {
+        addLibraryGroupStats(stats, item);
+      }
+      finalizeLibraryGroupStats(stats);
+
+      return { key, label: key, items, stats };
+    });
+
+    // Sort groups
     if (groupBy === "resolution") {
       entries.sort((a, b) => {
-        const ia = RESOLUTION_ORDER.indexOf(a[0]);
-        const ib = RESOLUTION_ORDER.indexOf(b[0]);
+        const ia = RESOLUTION_ORDER.indexOf(a.key);
+        const ib = RESOLUTION_ORDER.indexOf(b.key);
         return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
       });
     } else if (groupBy === "year") {
       entries.sort((a, b) => {
-        const na = Number.parseInt(b[0]) || 0;
-        const nb = Number.parseInt(a[0]) || 0;
-        return na - nb;
+        const na = Number.parseInt(a.key) || 0;
+        const nb = Number.parseInt(b.key) || 0;
+        return nb - na;
       });
     } else if (groupBy === "decade") {
       entries.sort((a, b) => {
-        const na = Number.parseInt(b.key) || 0;
-        const nb = Number.parseInt(a.key) || 0;
-        return na - nb;
+        const na = Number.parseInt(a.key) || 0;
+        const nb = Number.parseInt(b.key) || 0;
+        return nb - na;
       });
     } else {
       entries.sort((a, b) => b.items.length - a.items.length);
@@ -1732,7 +1743,7 @@ export default function BibliotecaClient() {
                 stats={group.stats}
               />
               <motion.div
-                key={`group-grid-${groupTitle}-${viewMode}-${imageMode}`}
+                key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                 className={getItemsGridClass(true)}
                 {...contentMotionProps}
               >
@@ -1961,7 +1972,7 @@ export default function BibliotecaClient() {
 
         {/* ====== FILTERS ====== */}
         <motion.div
-          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
+          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
