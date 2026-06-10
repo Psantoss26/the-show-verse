@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Loader2, Check } from "lucide-react";
 
 /**
  * LiquidButton: Botón con efecto de gotas/cristal líquido
@@ -17,6 +18,8 @@ export default function LiquidButton({
   loading = false,
   groupId = "default",
   fillPercentage,
+  playsCount,
+  progressPercent,
   ...props
 }) {
   const buttonRef = useRef(null);
@@ -509,7 +512,7 @@ export default function LiquidButton({
       className={`
         relative overflow-hidden
         w-12 h-12 rounded-full
-        flex items-center justify-center
+        flex items-center justify-center text-white
         backdrop-blur-[50px]
         ${
           disabled
@@ -598,7 +601,44 @@ export default function LiquidButton({
         )}
 
       <div className="relative z-10 flex items-center justify-center">
-        {children}
+        {loading ? (
+          <Loader2 className="w-6 h-6 animate-spin" />
+        ) : playsCount > 0 ? (
+          <span
+            className={`font-black leading-none translate-y-[1px] ${
+              String(playsCount).length === 1
+                ? "text-2xl"
+                : "text-xl tracking-tighter"
+            }`}
+          >
+            {playsCount}
+          </span>
+        ) : progressPercent ? (
+          (() => {
+            if (progressPercent === "100%") {
+              return <Check className="w-7 h-7 stroke-[3px]" />;
+            }
+            const numberPart = progressPercent.replace("%", "");
+            const fontSizeClass =
+              numberPart.length >= 3
+                ? "text-lg tracking-tighter"
+                : numberPart.length === 2
+                  ? "text-xl tracking-tight"
+                  : "text-2xl";
+            return (
+              <div className="flex items-baseline leading-none translate-y-[1px] gap-[1px]">
+                <span className={`font-black ${fontSizeClass} drop-shadow-md`}>
+                  {numberPart}
+                </span>
+                <span className="font-bold text-xs text-white drop-shadow-sm">
+                  %
+                </span>
+              </div>
+            );
+          })()
+        ) : (
+          children
+        )}
       </div>
 
       <style jsx>{`
