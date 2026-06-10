@@ -67,12 +67,12 @@ function awardResultLabel(result) {
 
 function awardResultClass(result) {
   if (result === "winner") {
-    return "border-yellow-400/30 bg-yellow-400/15 text-yellow-100";
+    return "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]";
   }
   if (result === "nominee") {
-    return "border-sky-300/20 bg-sky-300/10 text-sky-100";
+    return "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]";
   }
-  return "border-white/10 bg-white/10 text-zinc-200";
+  return "text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]";
 }
 
 const genderLabel = (g) => {
@@ -140,7 +140,10 @@ function cleanAwardTitle(name) {
 
 function getAwardInitials(name) {
   const words = cleanAwardTitle(name || "Premio")
-    .replace(/\b(awards?|award|film|prize|academy|guild|of|the|and|de|la|premios?|premio)\b/gi, " ")
+    .replace(
+      /\b(awards?|award|film|prize|academy|guild|of|the|and|de|la|premios?|premio)\b/gi,
+      " ",
+    )
     .trim()
     .split(/\s+/)
     .filter(Boolean);
@@ -157,7 +160,8 @@ function formatAwardGroupName(name) {
   if (!raw) return "Premio";
 
   const n = raw.toLowerCase();
-  if (/academy awards?|oscars?|óscars?|oscar|óscar/.test(n)) return "Premios Oscar";
+  if (/academy awards?|oscars?|óscars?|oscar|óscar/.test(n))
+    return "Premios Oscar";
   if (/golden\s+globes?/.test(n)) return "Globos de Oro";
   if (/bafta/.test(n)) return "Premios BAFTA";
   if (/emmy/.test(n)) return "Premios Emmy";
@@ -251,7 +255,8 @@ const knownForFallbackScore = (item) => {
   const voteScore = Math.log10(voteCount + 1) * 8;
   const popularityScore = Math.sqrt(Math.max(popularity, 0)) * 7;
   const mediaScore = isMovie ? 18 : Math.min(episodeCount, 30) * 0.9;
-  const guestPenalty = !isMovie && episodeCount > 0 && episodeCount < 6 ? 0.2 : 1;
+  const guestPenalty =
+    !isMovie && episodeCount > 0 && episodeCount < 6 ? 0.2 : 1;
 
   return (
     (popularityScore + voteScore + voteAverage * 1.5 + roleScore + mediaScore) *
@@ -424,7 +429,7 @@ async function fetchWikidataAwards(wikidataId) {
   const labelParams = new URLSearchParams({
     action: "wbgetentities",
     ids: Array.from(entityIds).join("|"),
-    props: "labels",
+    props: "labels|claims",
     languages: "es|en",
     format: "json",
     origin: "*",
@@ -436,11 +441,21 @@ async function fetchWikidataAwards(wikidataId) {
   const entities = labelJson?.entities || {};
 
   return normalized
-    .map((item) => ({
-      ...item,
-      award: entityLabel(entities[item.awardId], item.awardId),
-      work: item.workId ? entityLabel(entities[item.workId], "") : "",
-    }))
+    .map((item) => {
+      const awardEntity = entities[item.awardId];
+      const imageClaim =
+        awardEntity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+      const imageUrl = imageClaim
+        ? `https://commons.wikimedia.org/wiki/Special:FilePath/${imageClaim.replace(/ /g, "_")}`
+        : null;
+
+      return {
+        ...item,
+        award: entityLabel(awardEntity, item.awardId),
+        work: item.workId ? entityLabel(entities[item.workId], "") : "",
+        groupImageUrl: imageUrl,
+      };
+    })
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === "winner" ? -1 : 1;
       return (b.year || 0) - (a.year || 0);
@@ -546,10 +561,7 @@ function InlineDropdown({
     if (!open) return;
     const onDown = (e) => {
       const target = e.target;
-      if (
-        ref.current?.contains(target) ||
-        menuRef.current?.contains(target)
-      ) {
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
         return;
       }
       setOpen(false);
@@ -1091,92 +1103,92 @@ function AwardCard({ item }) {
   const result = item?.status === "winner" ? "winner" : "nominee";
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      whileHover={{
-        y: -7,
-        boxShadow:
-          "0 22px 46px -24px rgba(234,179,8,0.7), 0 18px 32px -28px rgba(0,0,0,0.95)",
-      }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ type: "spring", stiffness: 360, damping: 26 }}
-      className="group relative z-0 block overflow-hidden rounded-xl border border-transparent bg-neutral-800/80 shadow-lg transition-all duration-300 hover:z-[60] hover:border-yellow-500/60"
-    >
-      <div className="relative flex aspect-[2/3] flex-col overflow-hidden bg-black">
-        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 p-2 sm:flex">
+    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
+      <div
+        className="aspect-[2/3] overflow-hidden relative flex flex-col"
+        style={{ background: visual.background }}
+      >
+        <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)] pointer-events-none" />
+        <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
+
+        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 px-3 py-2 sm:flex">
           <span
-            className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
+            className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${awardResultClass(
               result,
             )}`}
           >
+            {result === "winner" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
+            )}
+            {result === "nominee" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+            )}
+            {result !== "winner" && result !== "nominee" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+            )}
             {awardResultLabel(result)}
           </span>
           {item?.year && (
-            <span className="rounded-md border border-white/10 bg-black/45 px-1.5 py-0.5 text-[9px] font-extrabold text-zinc-200 backdrop-blur-md">
+            <span className="text-[10px] font-black tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] transition-all">
               {item.year}
             </span>
           )}
         </div>
 
-        <div
-          className="relative flex min-h-0 flex-[1.28] items-center justify-center overflow-hidden p-3 sm:flex-[1.12] sm:p-6"
-          style={{ background: visual.background }}
-        >
-          <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
-          <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-          <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-
-          <div className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/45 p-1 backdrop-blur-md sm:bottom-3 sm:right-3 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5">
-            {result === "winner" ? (
-              <Trophy className="h-full w-full text-yellow-300" />
-            ) : (
-              <Award className="h-full w-full text-sky-200" />
-            )}
+        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
+          <div
+            className={`max-w-[95%] rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] truncate backdrop-blur-sm sm:max-w-[82%] sm:px-2 sm:text-[11px] ${visual.accent}`}
+          >
+            {visual.label}
           </div>
 
-          <div className="absolute inset-x-2 bottom-8 text-center sm:inset-x-4 sm:bottom-14">
-            <div
-              className={`text-base font-black tracking-[0.14em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] sm:text-2xl sm:tracking-[0.18em] ${visual.accent}`}
-            >
-              {visual.label}
+          {item?.groupImageUrl ? (
+            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+              <img
+                src={item.groupImageUrl}
+                alt=""
+                className="h-full w-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)] rounded-lg"
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
             </div>
-            <div className="mt-1 hidden text-[9px] font-bold uppercase tracking-[0.18em] text-white/55 line-clamp-1 sm:block">
-              {groupLabel}
+          ) : (
+            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+              {result === "winner" ? (
+                <Trophy className="h-16 w-16 sm:h-20 sm:w-20 text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+              ) : (
+                <Award className="h-16 w-16 sm:h-20 sm:w-20 text-sky-200 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+              )}
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="flex min-h-0 flex-[0.72] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2 py-2 sm:flex-[0.9] sm:px-3 sm:py-3">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end px-2 py-2 sm:px-3 sm:py-3 z-20">
           <div className="sm:hidden">
-            <p className="line-clamp-2 text-center text-[10px] font-extrabold leading-tight text-white">
+            <p className="text-center text-[10px] font-extrabold leading-tight text-white line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {awardTitle}
             </p>
-            <p className="mt-1 line-clamp-1 text-center text-[9px] font-bold leading-tight text-yellow-400">
+            <p className="mt-1 text-center text-[9px] font-bold leading-tight text-yellow-400 line-clamp-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {groupLabel}
             </p>
           </div>
-
           <div className="hidden sm:block">
-            <p className="line-clamp-2 text-sm font-extrabold leading-tight text-white">
+            <p className="text-white font-extrabold text-sm leading-tight line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               {awardTitle}
             </p>
-            <p className="mt-1 line-clamp-1 text-xs font-bold leading-tight text-yellow-400">
+            <p className="mt-1 text-yellow-400 text-xs font-bold leading-tight line-clamp-1 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               {groupLabel}
             </p>
-            {item.work ? (
-              <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-300">
+            {item.work && (
+              <p className="mt-1 text-gray-200 text-xs leading-tight line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                 {item.work}
-              </p>
-            ) : (
-              <p className="mt-1 line-clamp-2 text-xs leading-tight text-gray-400">
-                Reconocimiento registrado en Wikidata
               </p>
             )}
           </div>
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 
@@ -1287,10 +1299,10 @@ export default function ActorDetails({
   const initialExternalIds = actorDetails?.external_ids || null;
   const hasInitialExtra = Boolean(
     actorDetails?.combined_credits ||
-      actorDetails?.external_ids ||
-      actorDetails?.images ||
-      actorDetails?.tagged_images ||
-      actorDetails?.translations,
+    actorDetails?.external_ids ||
+    actorDetails?.images ||
+    actorDetails?.tagged_images ||
+    actorDetails?.translations,
   );
 
   // UI States
@@ -1318,7 +1330,9 @@ export default function ActorDetails({
   );
   const [awardsErr, setAwardsErr] = useState("");
   const [tmdbKnownFor, setTmdbKnownFor] = useState(() =>
-    (initialKnownFor || []).map(normalizeKnownForItem).filter((item) => item?.poster_path),
+    (initialKnownFor || [])
+      .map(normalizeKnownForItem)
+      .filter((item) => item?.poster_path),
   );
   const [watchedCredits, setWatchedCredits] = useState([]);
 
@@ -1510,7 +1524,9 @@ export default function ActorDetails({
       fetchJson(endpoints.images),
       fetchJson(endpoints.tagged),
       fetchJson(endpoints.translations),
-      endpoints.knownFor ? fetchJson(endpoints.knownFor) : Promise.resolve(null),
+      endpoints.knownFor
+        ? fetchJson(endpoints.knownFor)
+        : Promise.resolve(null),
     ]);
 
     const [ex, cc, im, tg, tr, kf] = settled;
@@ -1698,7 +1714,7 @@ export default function ActorDetails({
       .sort()
       .map((d) => ({ value: d, label: d }));
   }, [creditsAll]);
- 
+
   const yearOptions = useMemo(() => {
     const set = new Set(creditsAll.map((c) => c.year).filter((y) => y > 0));
     return Array.from(set)
@@ -1849,11 +1865,11 @@ export default function ActorDetails({
       facebook: ex?.facebook_id
         ? `https://www.facebook.com/${ex.facebook_id}`
         : null,
-      youtube: youtubeId ? (
-        `https://www.youtube.com/${
-          youtubeId.startsWith("@") ? youtubeId : `channel/${youtubeId}`
-        }`
-      ) : null,
+      youtube: youtubeId
+        ? `https://www.youtube.com/${
+            youtubeId.startsWith("@") ? youtubeId : `channel/${youtubeId}`
+          }`
+        : null,
       tiktok: tiktokId ? `https://www.tiktok.com/@${tiktokId}` : null,
     };
   }, [externalIds, actorDetails, tmdbUrl]);
@@ -2365,7 +2381,9 @@ export default function ActorDetails({
                             </span>
                           ) : null}
                         </div>
-                        <Icon className={`h-5 w-5 shrink-0 ${tones[item.tone].split(" ")[1]}`} />
+                        <Icon
+                          className={`h-5 w-5 shrink-0 ${tones[item.tone].split(" ")[1]}`}
+                        />
                       </div>
                     </div>
                   );
@@ -2385,7 +2403,9 @@ export default function ActorDetails({
                     </p>
                     <p className="truncate text-sm font-bold text-white">
                       {mostPopularCredit.title || mostPopularCredit.name}
-                      {mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}
+                      {mostPopularCredit.year
+                        ? ` · ${mostPopularCredit.year}`
+                        : ""}
                     </p>
                   </div>
                 </div>
@@ -2732,10 +2752,7 @@ export default function ActorDetails({
                     />
                     <ActorRowCarousel>
                       {photos.map((p) => (
-                        <PhotoCard
-                          key={p.file_path}
-                          image={p}
-                        />
+                        <PhotoCard key={p.file_path} image={p} />
                       ))}
                     </ActorRowCarousel>
                   </section>
@@ -2754,10 +2771,7 @@ export default function ActorDetails({
                     />
                     <ActorRowCarousel variant="wide">
                       {taggedImages.results.map((t) => (
-                        <TaggedMediaCard
-                          key={t.file_path}
-                          image={t}
-                        />
+                        <TaggedMediaCard key={t.file_path} image={t} />
                       ))}
                     </ActorRowCarousel>
                   </section>
