@@ -844,16 +844,12 @@ const InProgressCard = memo(function InProgressCard({
 
             {/* Overlay con gradientes - desktop hover */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              {/* Top gradient con badge y porcentaje */}
+              {/* Top gradient con porcentaje */}
               <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                 {activeTab === "completed" ? (
                   <CheckCircle2 className="w-6 h-6 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
                 ) : (
-                  <span
-                    className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${colors.bg} ${colors.text} ${colors.border}`}
-                  >
-                    {colors.label}
-                  </span>
+                  <div />
                 )}
 
                 {activeTab !== "completed" && (
