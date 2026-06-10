@@ -1029,7 +1029,7 @@ function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-yellow-500/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 sm:p-6">
+    <div className="relative isolate overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-yellow-500/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu p-5 sm:p-6">
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
 
       <div className="relative z-10">
@@ -9350,7 +9350,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="relative p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+                          <div className="relative isolate overflow-hidden p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu">
                             {data.tagline && (
                               <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                                 “{data.tagline}”
@@ -9554,7 +9554,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="relative p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+                    <div className="relative isolate overflow-hidden p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu">
                       {data.tagline && (
                         <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
                           "{data.tagline}"
