@@ -879,118 +879,118 @@ export default function SeasonDetailsClient({
     watchedBusy,
   ]);
 
-  const toggleSeasonWatched = useCallback(async (watchedAt) => {
-    if (trakt.loading || watchedBusy || Number(seasonNumber) <= 0) return;
+  const toggleSeasonWatched = useCallback(
+    async (watchedAt) => {
+      if (trakt.loading || watchedBusy || Number(seasonNumber) <= 0) return;
 
-    let connected = !!trakt.connected;
-    if (!connected) {
-      const latest = await reloadSeasonTraktState();
-      connected = !!latest?.connected;
-    }
+      let connected = !!trakt.connected;
+      if (!connected) {
+        const latest = await reloadSeasonTraktState();
+        connected = !!latest?.connected;
+      }
 
-    if (!connected) {
-      window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
-      return;
-    }
-
-    const nextWatched = watchedAt !== undefined
-      ? watchedAt !== null
-      : !seasonFullyWatched;
-    setWatchedBusy(true);
-
-    try {
-      const res = await traktSetSeasonWatched({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        watched: nextWatched,
-        watchedAt: watchedAt || undefined,
-      });
-
-      traktRequestIdRef.current += 1;
-      invalidateTraktGetCache({
-        tmdbId: Number(showId),
-        traktId: res?.traktId ?? trakt.traktId ?? undefined,
-      });
-      applyShowWatchedPayload({
-        connected: true,
-        found: res?.found !== false,
-        traktId: res?.traktId ?? trakt.traktId ?? null,
-        watchedBySeason: res?.watchedBySeason,
-      });
-    } catch (error) {
-      const needsReauth = /401|unauthorized/i.test(error?.message || "");
-      if (needsReauth) {
+      if (!connected) {
         window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
         return;
       }
-      await reloadSeasonTraktState({ background: true });
-    } finally {
-      setWatchedBusy(false);
-    }
-  }, [
-    trakt.loading,
-    trakt.connected,
-    trakt.traktId,
-    watchedBusy,
-    seasonFullyWatched,
-    seasonNumber,
-    reloadSeasonTraktState,
-    showId,
-    applyShowWatchedPayload,
-  ]);
+
+      const nextWatched =
+        watchedAt !== undefined ? watchedAt !== null : !seasonFullyWatched;
+      setWatchedBusy(true);
+
+      try {
+        const res = await traktSetSeasonWatched({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          watched: nextWatched,
+          watchedAt: watchedAt || undefined,
+        });
+
+        traktRequestIdRef.current += 1;
+        invalidateTraktGetCache({
+          tmdbId: Number(showId),
+          traktId: res?.traktId ?? trakt.traktId ?? undefined,
+        });
+        applyShowWatchedPayload({
+          connected: true,
+          found: res?.found !== false,
+          traktId: res?.traktId ?? trakt.traktId ?? null,
+          watchedBySeason: res?.watchedBySeason,
+        });
+      } catch (error) {
+        const needsReauth = /401|unauthorized/i.test(error?.message || "");
+        if (needsReauth) {
+          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
+          return;
+        }
+        await reloadSeasonTraktState({ background: true });
+      } finally {
+        setWatchedBusy(false);
+      }
+    },
+    [
+      trakt.loading,
+      trakt.connected,
+      trakt.traktId,
+      watchedBusy,
+      seasonFullyWatched,
+      seasonNumber,
+      reloadSeasonTraktState,
+      showId,
+      applyShowWatchedPayload,
+    ],
+  );
 
   // Toggle individual episode watched (para el modal)
-  const toggleEpisodeWatched = useCallback(async (sn, en) => {
-    if (!trakt?.connected) return;
-    if (episodeBusyKey) return;
+  const toggleEpisodeWatched = useCallback(
+    async (sn, en) => {
+      if (!trakt?.connected) return;
+      if (episodeBusyKey) return;
 
-    const key = `S${sn}E${en}`;
-    setEpisodeBusyKey(key);
+      const key = `S${sn}E${en}`;
+      setEpisodeBusyKey(key);
 
-    const currentlyWatched = !!watchedBySeasonRef.current?.[sn]?.includes(en);
-    const next = !currentlyWatched;
+      const currentlyWatched = !!watchedBySeasonRef.current?.[sn]?.includes(en);
+      const next = !currentlyWatched;
 
-    // Optimistic update
-    const optimistic = { ...watchedBySeasonRef.current };
-    const episodes = new Set(optimistic?.[sn] || []);
-    if (next) episodes.add(en);
-    else episodes.delete(en);
-    optimistic[sn] = Array.from(episodes).sort((a, b) => a - b);
-    setWatchedBySeason(optimistic);
+      // Optimistic update
+      const optimistic = { ...watchedBySeasonRef.current };
+      const episodes = new Set(optimistic?.[sn] || []);
+      if (next) episodes.add(en);
+      else episodes.delete(en);
+      optimistic[sn] = Array.from(episodes).sort((a, b) => a - b);
+      setWatchedBySeason(optimistic);
 
-    try {
-      const r = await traktSetEpisodeWatched({
-        tmdbId: Number(showId),
-        season: sn,
-        episode: en,
-        watched: next,
-        watchedAt: null,
-      });
-      invalidateTraktGetCache({
-        tmdbId: Number(showId),
-        traktId: trakt.traktId ?? undefined,
-      });
+      try {
+        const r = await traktSetEpisodeWatched({
+          tmdbId: Number(showId),
+          season: sn,
+          episode: en,
+          watched: next,
+          watchedAt: null,
+        });
+        invalidateTraktGetCache({
+          tmdbId: Number(showId),
+          traktId: trakt.traktId ?? undefined,
+        });
 
-      if (r?.watchedBySeason) {
-        setWatchedBySeason(normalizeWatchedBySeason(r.watchedBySeason) || {});
-      } else {
-        const fresh = await traktGetShowWatched({ tmdbId: Number(showId) });
-        setWatchedBySeason(
-          normalizeWatchedBySeason(fresh?.watchedBySeason) || {},
-        );
+        if (r?.watchedBySeason) {
+          setWatchedBySeason(normalizeWatchedBySeason(r.watchedBySeason) || {});
+        } else {
+          const fresh = await traktGetShowWatched({ tmdbId: Number(showId) });
+          setWatchedBySeason(
+            normalizeWatchedBySeason(fresh?.watchedBySeason) || {},
+          );
+        }
+      } catch {
+        // Rollback
+        setWatchedBySeason(watchedBySeasonRef.current);
+      } finally {
+        setEpisodeBusyKey("");
       }
-    } catch {
-      // Rollback
-      setWatchedBySeason(watchedBySeasonRef.current);
-    } finally {
-      setEpisodeBusyKey("");
-    }
-  }, [
-    trakt?.connected,
-    trakt.traktId,
-    episodeBusyKey,
-    showId,
-  ]);
+    },
+    [trakt?.connected, trakt.traktId, episodeBusyKey, showId],
+  );
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -1039,14 +1039,15 @@ export default function SeasonDetailsClient({
           <button
             type="button"
             onClick={() => router.back()}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
+            title="Volver"
+            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
           >
-            <ArrowLeft className="w-4 h-4" /> Volver
+            <ArrowLeft className="w-4 h-4" />
           </button>
 
           <Link
             href={`/details/tv/${showId}`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
+            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
           </Link>
@@ -1287,7 +1288,7 @@ export default function SeasonDetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                      <div className="relative p-5 sm:p-6 rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl">
                         <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
                           {season?.overview?.trim() ||
                             "No hay descripción disponible."}

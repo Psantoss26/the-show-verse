@@ -950,87 +950,96 @@ export default function EpisodeDetailsClient({
     }
   }, [showId, seasonNumber, episodeNumber, episodePlaysLoaded]);
 
-  const handleEpisodeAddPlay = useCallback(async (watchedAt) => {
-    setWatchedBusy(true);
-    try {
-      await traktAddEpisodePlay({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        episode: Number(episodeNumber),
-        watchedAt,
-      });
-      // Recargar historial después de añadir
-      setEpisodePlaysLoaded(false);
-      const json = await traktGetEpisodePlays({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        episode: Number(episodeNumber),
-      });
-      setEpisodePlays({
-        plays: json?.plays ?? 0,
-        history: Array.isArray(json?.history) ? json.history : [],
-        lastWatchedAt: json?.lastWatchedAt ?? null,
-      });
-      setEpisodePlaysLoaded(true);
-    } catch (e) {
-      console.error("Error adding episode play:", e);
-    } finally {
-      setWatchedBusy(false);
-    }
-  }, [showId, seasonNumber, episodeNumber]);
+  const handleEpisodeAddPlay = useCallback(
+    async (watchedAt) => {
+      setWatchedBusy(true);
+      try {
+        await traktAddEpisodePlay({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+          watchedAt,
+        });
+        // Recargar historial después de añadir
+        setEpisodePlaysLoaded(false);
+        const json = await traktGetEpisodePlays({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+        });
+        setEpisodePlays({
+          plays: json?.plays ?? 0,
+          history: Array.isArray(json?.history) ? json.history : [],
+          lastWatchedAt: json?.lastWatchedAt ?? null,
+        });
+        setEpisodePlaysLoaded(true);
+      } catch (e) {
+        console.error("Error adding episode play:", e);
+      } finally {
+        setWatchedBusy(false);
+      }
+    },
+    [showId, seasonNumber, episodeNumber],
+  );
 
-  const handleEpisodeUpdatePlay = useCallback(async (historyId, watchedAt) => {
-    setWatchedBusy(true);
-    try {
-      // Remove old + add new
-      await traktRemoveWatchPlay({ historyId });
-      await traktAddEpisodePlay({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        episode: Number(episodeNumber),
-        watchedAt,
-      });
-      setEpisodePlaysLoaded(false);
-      const json = await traktGetEpisodePlays({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        episode: Number(episodeNumber),
-      });
-      setEpisodePlays({
-        plays: json?.plays ?? 0,
-        history: Array.isArray(json?.history) ? json.history : [],
-        lastWatchedAt: json?.lastWatchedAt ?? null,
-      });
-      setEpisodePlaysLoaded(true);
-    } catch (e) {
-      console.error("Error updating episode play:", e);
-    } finally {
-      setWatchedBusy(false);
-    }
-  }, [showId, seasonNumber, episodeNumber]);
+  const handleEpisodeUpdatePlay = useCallback(
+    async (historyId, watchedAt) => {
+      setWatchedBusy(true);
+      try {
+        // Remove old + add new
+        await traktRemoveWatchPlay({ historyId });
+        await traktAddEpisodePlay({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+          watchedAt,
+        });
+        setEpisodePlaysLoaded(false);
+        const json = await traktGetEpisodePlays({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+        });
+        setEpisodePlays({
+          plays: json?.plays ?? 0,
+          history: Array.isArray(json?.history) ? json.history : [],
+          lastWatchedAt: json?.lastWatchedAt ?? null,
+        });
+        setEpisodePlaysLoaded(true);
+      } catch (e) {
+        console.error("Error updating episode play:", e);
+      } finally {
+        setWatchedBusy(false);
+      }
+    },
+    [showId, seasonNumber, episodeNumber],
+  );
 
-  const handleEpisodeRemovePlay = useCallback(async (historyId) => {
-    setWatchedBusy(true);
-    try {
-      await traktRemoveWatchPlay({ historyId });
-      setEpisodePlaysLoaded(false);
-      const json = await traktGetEpisodePlays({
-        tmdbId: Number(showId),
-        season: Number(seasonNumber),
-        episode: Number(episodeNumber),
-      });
-      setEpisodePlays({
-        plays: json?.plays ?? 0,
-        history: Array.isArray(json?.history) ? json.history : [],
-        lastWatchedAt: json?.lastWatchedAt ?? null,
-      });
-      setEpisodePlaysLoaded(true);
-    } catch (e) {
-      console.error("Error removing episode play:", e);
-    } finally {
-      setWatchedBusy(false);
-    }
-  }, [showId, seasonNumber, episodeNumber]);
+  const handleEpisodeRemovePlay = useCallback(
+    async (historyId) => {
+      setWatchedBusy(true);
+      try {
+        await traktRemoveWatchPlay({ historyId });
+        setEpisodePlaysLoaded(false);
+        const json = await traktGetEpisodePlays({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+        });
+        setEpisodePlays({
+          plays: json?.plays ?? 0,
+          history: Array.isArray(json?.history) ? json.history : [],
+          lastWatchedAt: json?.lastWatchedAt ?? null,
+        });
+        setEpisodePlaysLoaded(true);
+      } catch (e) {
+        console.error("Error removing episode play:", e);
+      } finally {
+        setWatchedBusy(false);
+      }
+    },
+    [showId, seasonNumber, episodeNumber],
+  );
 
   // Toggle watched para el episodio
   const toggleEpisodeWatched = useCallback(async () => {
@@ -1140,21 +1149,22 @@ export default function EpisodeDetailsClient({
           <button
             type="button"
             onClick={() => router.back()}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
+            title="Volver"
+            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
           >
-            <ArrowLeft className="w-4 h-4" /> Volver
+            <ArrowLeft className="w-4 h-4" />
           </button>
 
           <Link
             href={`/details/tv/${showId}/season/${seasonNumber}`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
+            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             Temporada {seasonNumber}
           </Link>
 
           <Link
             href={`/details/tv/${showId}`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
+            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
           >
             <MonitorPlay className="w-4 h-4" /> {showName}
           </Link>
@@ -1387,7 +1397,7 @@ export default function EpisodeDetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="p-5 rounded-2xl bg-white/5 border border-white/5">
+                      <div className="relative p-5 sm:p-6 rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl">
                         <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
                           {episode?.overview?.trim() ||
                             "No hay descripción disponible."}
@@ -1557,25 +1567,25 @@ export default function EpisodeDetailsClient({
           </AnimatedSection>
         )}
 
-      {/* Modal de historial de visionados del episodio */}
-      <TraktWatchedModal
-        open={episodePlaysOpen}
-        onClose={() => {
-          setEpisodePlaysOpen(false);
-          invalidateTraktGetCache({
-            tmdbId: Number(showId),
-            traktId: trakt.traktId ?? undefined,
-          });
-          void reloadEpisodeTraktState({ background: true });
-        }}
-        plays={episodePlays.plays}
-        history={episodePlays.history}
-        onAddPlay={handleEpisodeAddPlay}
-        onUpdatePlay={handleEpisodeUpdatePlay}
-        onRemovePlay={handleEpisodeRemovePlay}
-        busy={watchedBusy}
-      />
-    </div>
+        {/* Modal de historial de visionados del episodio */}
+        <TraktWatchedModal
+          open={episodePlaysOpen}
+          onClose={() => {
+            setEpisodePlaysOpen(false);
+            invalidateTraktGetCache({
+              tmdbId: Number(showId),
+              traktId: trakt.traktId ?? undefined,
+            });
+            void reloadEpisodeTraktState({ background: true });
+          }}
+          plays={episodePlays.plays}
+          history={episodePlays.history}
+          onAddPlay={handleEpisodeAddPlay}
+          onUpdatePlay={handleEpisodeUpdatePlay}
+          onRemovePlay={handleEpisodeRemovePlay}
+          busy={watchedBusy}
+        />
+      </div>
     </div>
   );
 }

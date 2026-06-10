@@ -6,13 +6,13 @@ export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
 
   return (
     <div
-      className={`flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5 h-full ${className}`}
+      className={`relative overflow-hidden flex items-start gap-3 p-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg h-full ${className}`}
     >
-      <div className="p-2 rounded-lg shrink-0 bg-white/5 text-zinc-400 mt-0.5">
+      <div className="relative z-10 p-2 rounded-lg shrink-0 bg-black/20 text-zinc-400 mt-0.5">
         <Icon className="w-4 h-4" />
       </div>
 
-      <div className="flex flex-col min-w-0 flex-1">
+      <div className="relative z-10 flex flex-col min-w-0 flex-1">
         <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">
           {label}
         </span>
