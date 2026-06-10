@@ -270,31 +270,46 @@ function BackdropGlyph({ className = "" }) {
   );
 }
 
-// ================== UI COMPONENTS ==================
-
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
 
   useEffect(() => {
     if (!open) return;
+    const updateMenuSize = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const availableBelow = window.innerHeight - rect.bottom - 12;
+      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
+    };
+
+    updateMenuSize();
+    const frame = window.requestAnimationFrame(updateMenuSize);
     const onDown = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    window.addEventListener("resize", updateMenuSize);
+    window.addEventListener("scroll", updateMenuSize, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("resize", updateMenuSize);
+      window.removeEventListener("scroll", updateMenuSize, true);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-full shrink-0">
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-300"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none border border-white/10"
       >
         <div className="flex items-center gap-2 min-w-0">
           {Icon && <Icon className="w-4 h-4 text-amber-500 shrink-0" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider shrink-0">
+          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider shrink-0 hidden sm:inline">
             {label}:
           </span>
           <span className="font-semibold text-white truncate">
@@ -302,7 +317,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -312,9 +327,12 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-52 max-h-72 rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl overflow-y-auto p-1 sv-scroll"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2 sv-scroll"
+            style={{ maxHeight: `${menuMaxHeight}px` }}
           >
-            {children({ close: () => setOpen(false) })}
+            <div className="space-y-1">
+              {children({ close: () => setOpen(false) })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -327,11 +345,11 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-lg text-left text-sm transition flex items-center justify-between
-        ${active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"}`}
+      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between
+        ${active ? "bg-white/10 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"}`}
     >
       <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />}
+      {active && <CheckCircle2 className="w-4 h-4 text-amber-500" />}
     </button>
   );
 }
@@ -1949,9 +1967,9 @@ export default function BibliotecaClient() {
           transition={{ duration: 0.4, delay: 0.5 }}
         >
           {/* Mobile: search + toggle */}
-          <div className="flex gap-2 lg:hidden">
+          <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 z-10 pointer-events-none" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -1962,16 +1980,16 @@ export default function BibliotecaClient() {
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl border transition-all ${mobileFiltersOpen ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"}`}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 ${mobileFiltersOpen ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:text-white hover:bg-white/10 hover:border-white/20"}`}
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
@@ -2008,9 +2026,9 @@ export default function BibliotecaClient() {
           </AnimatePresence>
 
           {/* Desktop filters */}
-          <div className="hidden lg:flex gap-3 w-full items-stretch">
-            <div className="relative flex-[1.8] min-w-[280px]">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <div className="hidden lg:flex gap-3 relative z-10">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 z-10 pointer-events-none" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -2021,17 +2039,18 @@ export default function BibliotecaClient() {
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
                 >
-                  <X className="w-3.5 h-3.5 text-zinc-500" />
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
 
-            <div className="flex-1 min-w-[150px]">{renderTypeDropdown()}</div>
-            <div className="flex-1 min-w-[150px]">{renderResDropdown()}</div>
-            <div className="flex-1 min-w-[150px]">{renderSortDropdown()}</div>
-            <div className="flex-1 min-w-[150px]">{renderGroupDropdown()}</div>
+            {renderTypeDropdown()}
+            {renderResDropdown()}
+            {renderSortDropdown()}
+            {renderGroupDropdown()}
+
             <div className="shrink-0">{renderViewToggle()}</div>
             {viewMode !== "list" && (
               <div className="shrink-0">{renderImageToggle()}</div>

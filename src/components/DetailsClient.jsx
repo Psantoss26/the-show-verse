@@ -9844,20 +9844,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const recCardClass = enableHover
-                            ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                            : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";
+                            ? "mt-3 block group relative bg-neutral-900 rounded-xl overflow-hidden border border-white/10 hover:border-yellow-400 hover:shadow-[0_0_25px_-5px_rgba(250,204,21,0.5)] hover:z-10 transition-all duration-300 hover:-translate-y-1"
+                            : "mt-3 block relative bg-neutral-900 rounded-xl overflow-hidden border border-white/5";
                           const recImageClass = enableHover
-                            ? "w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
+                            ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
                           const recOverlayClass = enableHover
-                            ? "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300"
-                            : "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0";
+                            ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                            : "absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80";
                           const recHeaderInfoClass = enableHover
-                            ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                            ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-500 ease-out -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
                             : "hidden";
                           const recFooterInfoClass = enableHover
-                            ? "absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "hidden";
+                            ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                            : "absolute bottom-0 left-0 right-0 p-3 pb-4";
 
                           return (
                             <SwiperSlide key={rec.id}>
@@ -9890,17 +9890,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   />
 
                                   <div className={recHeaderInfoClass}>
-                                    <div>
-                                      <span
-                                        className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                                          isMovie
-                                            ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                                            : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                                        }`}
-                                      >
-                                        {isMovie ? "PELÍCULA" : "SERIE"}
-                                      </span>
-                                    </div>
+                                    <div />
 
                                     {(tmdbScore || imdbScore != null) && (
                                       <div className="flex flex-col items-end gap-1">
@@ -9938,12 +9928,30 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                   <div className={recOverlayClass} />
 
+                                  <div
+                                    className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+                                      enableHover
+                                        ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
+                                        : ""
+                                    } ${
+                                      isMovie
+                                        ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                                        : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                                    }`}
+                                  >
+                                    {isMovie ? (
+                                      <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                                    ) : (
+                                      <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                                    )}
+                                  </div>
+
                                   <div className={recFooterInfoClass}>
-                                    <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-2">
+                                    <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
                                       {recTitle}
                                     </p>
                                     {recYear && (
-                                      <p className="text-yellow-500 text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+                                      <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
                                         {recYear}
                                       </p>
                                     )}
