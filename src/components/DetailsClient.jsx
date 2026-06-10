@@ -10768,11 +10768,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleCopyImageUrl(filePath);
                                               }
                                             }}
-                                            className="group/link absolute bottom-2 right-2 z-10 flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
+                                            className="group/link absolute bottom-0 right-0 z-20 p-2 sm:p-2.5 rounded-tl-2xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
                                             aria-label="Copiar URL"
                                           >
-                                            <LinkIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                            <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
+                                            <LinkIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                                            <div className="pointer-events-none absolute bottom-full mb-2 right-0 z-[100] scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
                                               Copiar URL
                                             </div>
                                           </div>
