@@ -1339,7 +1339,7 @@ function SubGroupDivider({ title, count }) {
   return (
     <div className="sticky top-[206px] lg:top-[224px] z-[45] flex items-center gap-3 py-1.5 sm:py-2 -mx-2 px-2 sm:mx-0 sm:px-0">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500/40 to-red-500/15" />
-      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-black/60 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-lg px-3 py-1 text-xs sm:text-sm border border-white/5">
+      <div className="relative overflow-hidden inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-3 py-1 text-xs sm:text-sm">
         <span className="relative z-10 truncate font-black uppercase tracking-wide text-red-100 drop-shadow-sm">
           {title}
         </span>
@@ -1422,29 +1422,44 @@ function BackdropGlyph({ className = "" }) {
   );
 }
 
-function StatBox({ label, value, icon: Icon, imgSrc, colorClass }) {
+function StatBox({
+  label,
+  value,
+  icon: Icon,
+  imgSrc,
+  colorClass,
+  horizontal = false,
+}) {
   return (
-    <div className="flex flex-col items-start min-w-0">
-      <div className="flex items-center gap-1.5 mb-1 opacity-75 min-w-0">
+    <div
+      className={`flex min-w-0 transition-all duration-300 ${horizontal ? "flex-row items-center gap-1.5 sm:gap-2" : "flex-col items-start"}`}
+    >
+      <div
+        className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
+      >
         {imgSrc ? (
           <img
             src={imgSrc}
             alt={label}
-            className="w-auto h-3 sm:h-3.5 object-contain opacity-85 shrink-0"
+            className={`w-auto object-contain opacity-85 shrink-0 transition-all duration-300 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
           />
         ) : Icon ? (
           <Icon
-            className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${colorClass}`}
+            className={`shrink-0 transition-all duration-300 ${colorClass} ${horizontal ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-3 h-3 sm:w-3.5 sm:h-3.5"}`}
           />
         ) : null}
 
-        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
-          {label}
-        </span>
+        {!horizontal && (
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+            {label}
+          </span>
+        )}
       </div>
 
       <div className="flex items-baseline gap-1.5 min-w-0">
-        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight leading-none truncate">
+        <span
+          className={`font-black text-white tabular-nums tracking-tight leading-none truncate transition-all duration-300 ${horizontal ? "text-sm sm:text-base" : "text-lg sm:text-xl"}`}
+        >
           {value}
         </span>
       </div>
@@ -1473,25 +1488,51 @@ function CardSkeleton({ mode = "poster" }) {
 
 function GroupDivider({ title, stats, count, total, groupBy }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  const [isSticky, setIsSticky] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!ref.current) return;
+      const top = ref.current.getBoundingClientRect().top;
+      const isLg = window.innerWidth >= 1024;
+      const threshold = isLg ? 136 : 130;
+      setIsSticky(top <= threshold + 1);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <motion.div
+      ref={ref}
       className="sticky top-[130px] lg:top-[136px] z-[50] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-black/60 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-xl border border-white/10">
-        <div className="relative z-10 px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
+      <div
+        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
+      >
+        <div
+          className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+        >
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-            <div className="w-1 sm:w-1.5 h-8 sm:h-12 bg-gradient-to-b from-red-500 to-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0" />
+            <div
+              className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
+            />
 
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base sm:text-2xl font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md">
+            <div className="min-w-0 flex-1 transition-all duration-300">
+              <h2
+                className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md transition-all duration-300 ${isSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
+              >
                 {title}
               </h2>
 
-              <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-sm text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2">
+              <div
+                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 mt-0 text-[10px] sm:text-xs w-max pointer-events-none" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+              >
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
                 <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
@@ -1508,6 +1549,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
                   label="IMDb"
                   value={formatAvg(stats.imdb.avg)}
                   imgSrc="/logo-IMDb.svg"
+                  horizontal={isSticky}
                 />
               )}
             {stats?.trakt?.avg != null &&
@@ -1517,6 +1559,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
                   label="Trakt"
                   value={formatAvg(stats.trakt.avg)}
                   imgSrc="/logo-Trakt.png"
+                  horizontal={isSticky}
                 />
               )}
             {stats?.tmdb?.avg != null &&
@@ -1526,18 +1569,22 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
                   label="TMDb"
                   value={formatAvg(stats.tmdb.avg)}
                   imgSrc="/logo-TMDb.png"
+                  horizontal={isSticky}
                 />
               )}
 
             {stats?.my?.avg != null &&
               typeof stats.my.avg === "number" &&
               !Number.isNaN(stats.my.avg) && (
-                <div className="sm:pl-4 sm:border-l border-white/10">
+                <div
+                  className={`transition-all duration-300 border-white/10 ${isSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
+                >
                   <StatBox
                     label="Tu media"
                     value={formatAvg(stats.my.avg)}
                     icon={Star}
                     colorClass="text-amber-400 fill-amber-400"
+                    horizontal={isSticky}
                   />
                 </div>
               )}
