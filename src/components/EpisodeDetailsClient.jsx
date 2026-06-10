@@ -1259,6 +1259,7 @@ export default function EpisodeDetailsClient({
                     value={vote?.toFixed(1)}
                     sub={voteCount ? formatCountShort(voteCount) : undefined}
                     href={tmdbEpisodeUrl}
+                    tooltip={tmdbEpisodeUrl ? "Ver en TMDb" : "TMDb"}
                   />
 
                   {/* Trakt (móvil sin sufijo / desktop con %) */}
@@ -1272,6 +1273,7 @@ export default function EpisodeDetailsClient({
                           : undefined
                       }
                       href={tScoreboard.traktUrl}
+                      tooltip={tScoreboard.traktUrl ? "Ver en Trakt" : "Trakt"}
                     />
                   )}
 
@@ -1286,6 +1288,7 @@ export default function EpisodeDetailsClient({
                           : undefined
                       }
                       href={imdbUrl || undefined}
+                      tooltip={imdbUrl ? "Ver en IMDb" : "IMDb"}
                     />
                   )}
                 </div>

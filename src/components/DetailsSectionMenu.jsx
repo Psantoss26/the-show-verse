@@ -163,7 +163,6 @@ export default function DetailsSectionMenu({
                               "whitespace-nowrap",
                               active ? "" : "hover:bg-white/5",
                             ].join(" ")}
-                            title={item.label}
                             aria-label={item.label}
                           >
                             {active && (

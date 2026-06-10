@@ -1145,6 +1145,7 @@ export default function SeasonDetailsClient({
                         : undefined
                     }
                     href={tmdbSeasonUrl}
+                    tooltip={tmdbSeasonUrl ? "Ver en TMDb" : "TMDb"}
                   />
 
                   {/* Trakt (móvil sin sufijo / desktop con %) */}
@@ -1158,6 +1159,7 @@ export default function SeasonDetailsClient({
                           : undefined
                       }
                       href={tScoreboard.traktUrl}
+                      tooltip={tScoreboard.traktUrl ? "Ver en Trakt" : "Trakt"}
                     />
                   )}
 
@@ -1172,6 +1174,7 @@ export default function SeasonDetailsClient({
                           : undefined
                       }
                       href={imdbUrl || undefined}
+                      tooltip={imdbUrl ? "Ver en IMDb" : "IMDb"}
                     />
                   )}
                 </div>

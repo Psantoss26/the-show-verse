@@ -64,7 +64,8 @@ export default function VideoModal({ open, onClose, video }) {
               {video.name || "Tráiler Oficial"}
             </h3>
             <div className="flex items-center gap-2 text-xs font-medium text-white/50 uppercase tracking-wider mt-1">
-              <span className="bg-white/10 border border-white/5 px-1.5 py-0.5 rounded text-white/80 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
                 {video.type || "Video"}
               </span>
               <span>•</span>

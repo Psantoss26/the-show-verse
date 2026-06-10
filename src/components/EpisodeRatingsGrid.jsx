@@ -3,7 +3,13 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, WrapText, ArrowUpDown, BarChart3, Info } from "lucide-react";
+import {
+  LayoutGrid,
+  WrapText,
+  ArrowUpDown,
+  BarChart3,
+  Info,
+} from "lucide-react";
 
 /* =======================
    Hooks (perf / mobile)
@@ -95,7 +101,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
       top = rTop + rH + GAP;
     }
 
-    setCoords({ top, left });
+    setCoords({ top: Math.round(top), left: Math.round(left) });
   }, [activeData, anchorRect, enabled]);
 
   if (!enabled) return null;
@@ -111,17 +117,17 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
         opacity: anchorRect && coords.top > 0 ? 1 : 0,
       }}
     >
-      <div className="bg-black text-white px-3 py-2 rounded-md shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
-        <div className="font-semibold text-[13px] mb-1 leading-snug text-balance">
+      <div className="bg-black/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-lg shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
+        <div className="font-bold text-sm mb-1 leading-snug text-balance drop-shadow-sm">
           {activeData.titleText}
         </div>
 
-        <div className="text-[11px] text-emerald-300 mb-2 font-medium">
+        <div className="text-xs text-emerald-400 mb-1.5 font-bold drop-shadow-sm">
           {activeData.seasonInfo}
         </div>
 
         {activeData.votesText && (
-          <div className="text-[11px] font-medium text-zinc-400">
+          <div className="text-[11px] font-semibold text-zinc-400">
             {activeData.votesText}
           </div>
         )}
@@ -163,10 +169,12 @@ export default function EpisodeRatingsGrid({
 
   const ensureSpanishEpisodeTitle = useCallback(
     async (tooltipData) => {
-      if (!showId || !tooltipData?.titleKey || !tooltipData?.routeTarget) return;
+      if (!showId || !tooltipData?.titleKey || !tooltipData?.routeTarget)
+        return;
       const { titleKey, routeTarget } = tooltipData;
 
-      if (episodeTitleCache.has(titleKey)) return episodeTitleCache.get(titleKey);
+      if (episodeTitleCache.has(titleKey))
+        return episodeTitleCache.get(titleKey);
       if (episodeTitleInFlightRef.current.has(titleKey)) {
         return episodeTitleInFlightRef.current.get(titleKey);
       }
@@ -388,9 +396,7 @@ export default function EpisodeRatingsGrid({
               isUnaired,
               source:
                 ep.source ||
-                (seriesGraphRating != null
-                  ? "seriesgraph"
-                  : null) ||
+                (seriesGraphRating != null ? "seriesgraph" : null) ||
                 (imdbRating != null
                   ? "imdb"
                   : tmdbRating != null
@@ -717,12 +723,14 @@ export default function EpisodeRatingsGrid({
     if (!tooltipEnabled) return null;
     if (!ep || ep.isUnaired) return null;
 
-    const hasData =
-      ep.seriesGraphRating != null ||
-      ep.displayRating != null;
+    const hasData = ep.seriesGraphRating != null || ep.displayRating != null;
     if (!hasData) return null;
 
-    const routeTarget = resolveEpisodeRouteTarget(ep, seasonNumber, episodeNumber);
+    const routeTarget = resolveEpisodeRouteTarget(
+      ep,
+      seasonNumber,
+      episodeNumber,
+    );
     const titleKey = routeTarget
       ? `${routeTarget.seasonNumber}:${routeTarget.episodeNumber}`
       : `${seasonNumber}:${episodeNumber}`;
@@ -809,7 +817,7 @@ export default function EpisodeRatingsGrid({
             }
           }
         : undefined,
-      title: clickable ? "Ver detalles del episodio" : undefined,
+      ariaLabel: clickable ? "Ver detalles del episodio" : undefined,
       clickable,
     };
   };
@@ -878,8 +886,14 @@ export default function EpisodeRatingsGrid({
                 const tooltipData = isUpcoming
                   ? null
                   : buildTooltipData(ep, s.season_number, epNum);
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
-                  cellProps(ep, s.season_number, epNum);
+                const {
+                  role,
+                  tabIndex,
+                  onClick,
+                  onKeyDown,
+                  ariaLabel,
+                  clickable,
+                } = cellProps(ep, s.season_number, epNum);
 
                 return (
                   <td
@@ -889,24 +903,24 @@ export default function EpisodeRatingsGrid({
                     {isBlank ? (
                       <div className={SZ.cell} aria-hidden="true" />
                     ) : (
-                    <div
-                      onMouseEnter={
-                        tooltipEnabled
-                          ? (e) =>
-                              tooltipData && handleMouseEnter(e, tooltipData)
-                          : undefined
-                      }
-                      onMouseLeave={
-                        tooltipEnabled ? handleMouseLeave : undefined
-                      }
-                    >
                       <div
-                        role={role}
-                        tabIndex={tabIndex}
-                        onClick={onClick}
-                        onKeyDown={onKeyDown}
-                        title={title}
-                        className={`
+                        onMouseEnter={
+                          tooltipEnabled
+                            ? (e) =>
+                                tooltipData && handleMouseEnter(e, tooltipData)
+                            : undefined
+                        }
+                        onMouseLeave={
+                          tooltipEnabled ? handleMouseLeave : undefined
+                        }
+                      >
+                        <div
+                          role={role}
+                          tabIndex={tabIndex}
+                          onClick={onClick}
+                          onKeyDown={onKeyDown}
+                          aria-label={ariaLabel}
+                          className={`
                           ${bgClass} ${textClass}
                           ${SZ.cell}
                           rounded-[5px]
@@ -919,10 +933,10 @@ export default function EpisodeRatingsGrid({
                           ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
                           transition duration-150
                         `}
-                      >
-                        {val ?? "—"}
+                        >
+                          {val ?? "—"}
+                        </div>
                       </div>
-                    </div>
                     )}
                   </td>
                 );
@@ -954,7 +968,9 @@ export default function EpisodeRatingsGrid({
                     key={`avg-s${s.season_number}`}
                     className="p-0 pt-1 text-center align-bottom"
                   >
-                    <div className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}>
+                    <div
+                      className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}
+                    >
                       <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
                         {val ?? "—"}
                       </span>
@@ -1050,8 +1066,14 @@ export default function EpisodeRatingsGrid({
                 const tooltipData = isUpcoming
                   ? null
                   : buildTooltipData(ep, s.season_number, epNum);
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
-                  cellProps(ep, s.season_number, epNum);
+                const {
+                  role,
+                  tabIndex,
+                  onClick,
+                  onKeyDown,
+                  ariaLabel,
+                  clickable,
+                } = cellProps(ep, s.season_number, epNum);
 
                 return (
                   <td
@@ -1061,24 +1083,24 @@ export default function EpisodeRatingsGrid({
                     {isBlank ? (
                       <div className={SZ.cell} aria-hidden="true" />
                     ) : (
-                    <div
-                      onMouseEnter={
-                        tooltipEnabled
-                          ? (e) =>
-                              tooltipData && handleMouseEnter(e, tooltipData)
-                          : undefined
-                      }
-                      onMouseLeave={
-                        tooltipEnabled ? handleMouseLeave : undefined
-                      }
-                    >
                       <div
-                        role={role}
-                        tabIndex={tabIndex}
-                        onClick={onClick}
-                        onKeyDown={onKeyDown}
-                        title={title}
-                        className={`
+                        onMouseEnter={
+                          tooltipEnabled
+                            ? (e) =>
+                                tooltipData && handleMouseEnter(e, tooltipData)
+                            : undefined
+                        }
+                        onMouseLeave={
+                          tooltipEnabled ? handleMouseLeave : undefined
+                        }
+                      >
+                        <div
+                          role={role}
+                          tabIndex={tabIndex}
+                          onClick={onClick}
+                          onKeyDown={onKeyDown}
+                          aria-label={ariaLabel}
+                          className={`
                           ${bgClass} ${textClass}
                           rounded-[5px]
                           ${SZ.cell}
@@ -1091,10 +1113,10 @@ export default function EpisodeRatingsGrid({
                           transition duration-150
                           select-none
                         `}
-                      >
-                        {val ?? "—"}
+                        >
+                          {val ?? "—"}
+                        </div>
                       </div>
-                    </div>
                     )}
                   </td>
                 );
@@ -1108,7 +1130,9 @@ export default function EpisodeRatingsGrid({
                     const val = format1(avg);
 
                     return (
-                      <div className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}>
+                      <div
+                        className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}
+                      >
                         <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
                           {val ?? "—"}
                         </span>
@@ -1169,8 +1193,14 @@ export default function EpisodeRatingsGrid({
                   ? null
                   : buildTooltipData(ep, s.season_number, ep.episodeNumber);
 
-                const { role, tabIndex, onClick, onKeyDown, title, clickable } =
-                  cellProps(ep, s.season_number, ep.episodeNumber);
+                const {
+                  role,
+                  tabIndex,
+                  onClick,
+                  onKeyDown,
+                  ariaLabel,
+                  clickable,
+                } = cellProps(ep, s.season_number, ep.episodeNumber);
 
                 return (
                   <div
@@ -1188,7 +1218,7 @@ export default function EpisodeRatingsGrid({
                       tabIndex={tabIndex}
                       onClick={onClick}
                       onKeyDown={onKeyDown}
-                      title={title}
+                      aria-label={ariaLabel}
                       className={`
                         ${bgClass} ${textClass}
                         rounded-[5px]
@@ -1405,7 +1435,9 @@ function LegendPopover({ open, setOpen }) {
                 key={l}
                 className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-100"
               >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full ${c}`} />
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full ${c}`}
+                />
                 {l}
               </span>
             ))}

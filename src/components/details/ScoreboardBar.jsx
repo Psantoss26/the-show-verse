@@ -20,6 +20,7 @@ function CompactBadge({
   suffix,
   sub,
   href,
+  tooltip,
 }) {
   const inner = (
     <div className="flex items-center gap-2">
@@ -43,7 +44,13 @@ function CompactBadge({
   );
 
   const baseClass =
-    "shrink-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 hover:bg-white/10 hover:border-white/20 transition";
+    "relative group/badge shrink-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 hover:bg-white/10 hover:border-white/20 transition";
+
+  const tooltipEl = tooltip ? (
+    <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/badge:scale-100 group-hover/badge:opacity-100 group-hover/badge:delay-[2000ms]">
+      {tooltip}
+    </div>
+  ) : null;
 
   return href ? (
     <a
@@ -51,23 +58,32 @@ function CompactBadge({
       target="_blank"
       rel="noreferrer"
       className={baseClass}
-      title="Abrir enlace"
+      aria-label={tooltip || "Abrir enlace"}
     >
       {inner}
+      {tooltipEl}
     </a>
   ) : (
-    <div className={baseClass}>{inner}</div>
+    <div className={baseClass} aria-label={tooltip}>
+      {inner}
+      {tooltipEl}
+    </div>
   );
 }
 
 function MiniStat({ icon: Icon, value, tooltip }) {
   return (
     <div
-      className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-zinc-300"
-      title={tooltip}
+      className="relative group/ministat flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-zinc-300"
+      aria-label={tooltip}
     >
       <Icon className="h-4 w-4 text-zinc-400" />
       <span className="font-bold text-white">{value}</span>
+      {tooltip && (
+        <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/ministat:scale-100 group-hover/ministat:opacity-100 group-hover/ministat:delay-[2000ms]">
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -100,12 +116,15 @@ function StarRating10({ rating, loading, connected, onConnect, onRate }) {
                 onMouseEnter={() => setHover(v)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => clickStar(v)}
-                className="p-0.5"
-                title={!connected ? "Conectar Trakt" : `Puntuar ${v}/10`}
+                className="p-0.5 relative group/starbtn"
+                aria-label={!connected ? "Conectar Trakt" : `Puntuar ${v}/10`}
               >
                 <StarIcon
                   className={`h-4 w-4 transition ${active ? "text-yellow-400 fill-yellow-400" : "text-white/25"}`}
                 />
+                <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/starbtn:scale-100 group-hover/starbtn:opacity-100 group-hover/starbtn:delay-[2000ms]">
+                  {!connected ? "Conectar Trakt" : `Puntuar ${v}/10`}
+                </div>
               </button>
             );
           })}
@@ -293,7 +312,7 @@ export default function ScoreboardBar({
   const imdbHref = imdb?.id ? `https://www.imdb.com/title/${imdb.id}` : null;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
+    <div className="relative w-full overflow-visible rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
       <div
         className="
           py-3
@@ -301,7 +320,7 @@ export default function ScoreboardBar({
           pr-[calc(1.25rem+env(safe-area-inset-right))]
           sm:px-4
           flex items-center gap-3 sm:gap-4
-          overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+          overflow-x-auto sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
         "
       >
         {/* A) Ratings */}
@@ -322,6 +341,7 @@ export default function ScoreboardBar({
                 : null
             }
             href={tmdb?.href}
+            tooltip={tmdb?.href ? "Ver en TMDb" : "TMDb"}
           />
 
           {traktCommunityPct != null ? (
@@ -336,6 +356,7 @@ export default function ScoreboardBar({
                       : null
                   }
                   href={traktUrl}
+                  tooltip={traktUrl ? "Ver en Trakt" : "Trakt"}
                 />
               </div>
               <div className="hidden sm:block">
@@ -349,6 +370,7 @@ export default function ScoreboardBar({
                       : null
                   }
                   href={traktUrl}
+                  tooltip={traktUrl ? "Ver en Trakt" : "Trakt"}
                 />
               </div>
             </>
@@ -363,6 +385,7 @@ export default function ScoreboardBar({
               }
               sub={imdb?.votes ? `${formatVoteCount(imdb.votes)} votes` : null}
               href={imdbHref}
+              tooltip={imdbHref ? "Ver en IMDb" : "IMDb"}
             />
           ) : null}
         </div>
@@ -384,10 +407,10 @@ export default function ScoreboardBar({
 
       {/* Footer stats (si hay) */}
       {!tScoreboard.loading && tScoreboard?.stats ? (
-        <div className="border-t border-white/5 bg-black/10">
+        <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
           <div
             className="
-              overflow-x-auto
+              overflow-x-auto sm:overflow-visible
               [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
               py-2
               pl-[calc(1rem+env(safe-area-inset-left))]
