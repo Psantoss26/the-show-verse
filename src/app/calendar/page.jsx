@@ -117,54 +117,52 @@ function EpisodeCard({ item, viewMode }) {
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-xl transition duration-300 hover:-translate-y-0.5 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:shadow-[0_20px_25px_-5px_rgba(168,85,247,0.15)]"
+      className="group block overflow-hidden rounded-xl transition-transform duration-500 hover:scale-[1.03] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:shadow-[0_20px_25px_-5px_rgba(168,85,247,0.15)]"
     >
       <div className="relative aspect-[16/9] overflow-hidden bg-zinc-900">
         <TmdbBackdrop
           path={show?.backdrop_path}
           fallbackPath={show?.poster_path}
           alt={title}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10" />
 
-        {viewMode !== "day" && validAiredDate && (
+        {(isWatchlist || isFavorite) && (
           <div
-            className={`absolute left-2 top-2 rounded-lg px-2 py-1 shadow-lg backdrop-blur-md border border-white/10 ${
-              isToday(validAiredDate)
-                ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold"
-                : "bg-black/40 bg-gradient-to-br from-white/10 to-white/5 text-white"
+            className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 flex items-center gap-1.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${
+              isFavorite
+                ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
+                : "bg-sky-500/15 border-sky-500/30 text-sky-300"
             }`}
           >
-            <div className="text-[9px] font-bold uppercase leading-none">
+            {isWatchlist && (
+              <Bookmark className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            )}
+            {isFavorite && (
+              <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />
+            )}
+          </div>
+        )}
+
+        {viewMode !== "day" && validAiredDate && (
+          <div
+            className={`absolute top-0 right-0 z-20 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm text-center ${
+              isToday(validAiredDate)
+                ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-400"
+                : "bg-white/5 border-white/10 text-zinc-200"
+            }`}
+          >
+            <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none mb-0.5 opacity-90">
               {format(validAiredDate, "EEE", { locale: es })}
             </div>
-            <div className="mt-0.5 text-base font-black leading-none">
+            <div className="text-sm sm:text-base font-black leading-none drop-shadow-md">
               {format(validAiredDate, "d")}
             </div>
           </div>
         )}
 
-        <div className="absolute right-2 top-2 flex gap-1.5">
-          {isWatchlist && (
-            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
-              <Bookmark className="h-3 w-3" />
-              Pendiente
-            </span>
-          )}
-          {isFavorite && (
-            <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-rose-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
-              <Heart className="h-3 w-3 fill-current" />
-              Favorita
-            </span>
-          )}
-        </div>
-
         <div className="absolute inset-x-0 bottom-0 p-3">
-          <div className="mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-purple-200 backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg border border-white/10">
-            <Tv2 className="h-3 w-3" />
-            Episodio
-          </div>
           <h3 className="line-clamp-1 text-sm font-black leading-tight text-white drop-shadow-md">
             {title}
           </h3>
@@ -1010,16 +1008,16 @@ export default function CalendarPage() {
                             {/* Badge Fecha (siempre visible en vistas semana/mes) */}
                             {dateBadgeInfo && (
                               <div
-                                className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-1 rounded-lg backdrop-blur-md shadow-lg border border-white/10 ${
+                                className={`absolute top-0 right-0 z-20 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm text-center ${
                                   dateBadgeInfo.isToday
-                                    ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold"
-                                    : "bg-black/40 bg-gradient-to-br from-white/10 to-white/5 text-white"
+                                    ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-400"
+                                    : "bg-white/5 border-white/10 text-zinc-200"
                                 }`}
                               >
-                                <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none">
+                                <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider leading-none mb-0.5 opacity-90">
                                   {dateBadgeInfo.dayName}
                                 </div>
-                                <div className="text-sm sm:text-base font-black leading-none mt-0.5">
+                                <div className="text-sm sm:text-base font-black leading-none drop-shadow-md">
                                   {dateBadgeInfo.dayNum}
                                 </div>
                               </div>

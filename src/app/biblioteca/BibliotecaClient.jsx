@@ -35,7 +35,7 @@ import LiquidButton from "@/components/LiquidButton";
 
 // ================== CONSTANTS ==================
 
-const CACHE_KEY_PREFIX = "showverse:plex-library:v5";
+const CACHE_KEY_PREFIX = "showverse:plex-library:v6";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos - coincide con revalidación del servidor
 const DEFAULT_FETCH_LIMIT = 2000;
 const EXPANDED_FETCH_LIMIT = 10000;
@@ -85,16 +85,6 @@ const cardVariants = {
   },
 };
 
-function preloadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) return resolve(false);
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = src;
-  });
-}
-
 function getCacheKey(limit) {
   return `${CACHE_KEY_PREFIX}:limit:${Number(limit) || DEFAULT_FETCH_LIMIT}`;
 }
@@ -102,6 +92,12 @@ function getCacheKey(limit) {
 function buildTmdbImage(path, size = "w1280") {
   if (!path) return null;
   return `https://image.tmdb.org/t/p/${size}${path}`;
+}
+
+function uniqueImageCandidates(candidates) {
+  return Array.from(
+    new Set(candidates.filter((src) => typeof src === "string" && src.trim())),
+  );
 }
 
 // ================== TMDB IMAGE CACHE (nivel módulo, igual que Favoritos/Pendientes) ==================
@@ -234,6 +230,14 @@ function getResolutionStyle(resolution) {
 function getResolutionTextColor(resolution) {
   const style = getResolutionStyle(resolution);
   return style.split(" ").find((c) => c.startsWith("text-")) || "text-zinc-300";
+}
+
+function formatResolutionLabel(res) {
+  if (!res) return null;
+  if (res === "1080p") return "HD";
+  if (res === "1440p") return "2K";
+  if (res === "2160p" || res === "4K") return "4K";
+  return res;
 }
 
 // ================== SVG GLYPHS ==================
@@ -373,7 +377,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2 sv-scroll"
+            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2 sv-scroll"
           >
             <div className="space-y-1">
               {children({ close: () => setOpen(false) })}
@@ -588,12 +592,13 @@ function LibraryMediaCard({
   imageMode = "poster",
   posterSrc = null,
   backdropSrc = null,
+  posterPending = false,
+  backdropPending = false,
   animated = true,
 }) {
   const title = item?.title || "Sin título";
   const year = item?.year ? String(item.year) : "";
   const isMovie = item?.type === "movie";
-  const typeLabel = isMovie ? "PELÍCULA" : "SERIE";
   const primaryRes = item?.primaryResolution || null;
   const duration = formatDuration(item?.durationMs);
   const canOpen = Boolean(
@@ -613,10 +618,21 @@ function LibraryMediaCard({
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
   const aspectRatio =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
-  const imageSrc =
-    effectiveImageMode === "backdrop"
-      ? backdropSrc || posterSrc
-      : posterSrc || backdropSrc;
+  const waitForPosterArtwork =
+    posterPending || (!posterSrc && backdropPending);
+  const waitForBackdropArtwork =
+    backdropPending || (!backdropSrc && posterPending);
+  const posterCandidates = waitForPosterArtwork
+    ? uniqueImageCandidates([posterSrc, backdropSrc])
+    : uniqueImageCandidates([posterSrc, backdropSrc, item?.thumb, item?.art]);
+  const backdropCandidates = waitForBackdropArtwork
+    ? uniqueImageCandidates([backdropSrc, posterSrc])
+    : uniqueImageCandidates([backdropSrc, posterSrc, item?.art, item?.thumb]);
+  const imageCandidates =
+    effectiveImageMode === "backdrop" ? backdropCandidates : posterCandidates;
+  const imageCandidateKey = imageCandidates.join("|");
+  const [imageIndex, setImageIndex] = useState(0);
+  const imageSrc = imageCandidates[imageIndex] || null;
   const addedAtLabel = formatEpoch(item?.addedAt);
 
   const animDelay =
@@ -629,19 +645,9 @@ function LibraryMediaCard({
     totalItems <= 120 &&
     (viewMode === "compact" || viewMode === "grid");
 
-  const [imgReady, setImgReady] = useState(false);
-
   useEffect(() => {
-    setImgReady(false);
-    if (!imageSrc) return;
-    let abort = false;
-    preloadImage(imageSrc).then((ok) => {
-      if (!abort && ok) setImgReady(true);
-    });
-    return () => {
-      abort = true;
-    };
-  }, [imageSrc]);
+    setImageIndex(0);
+  }, [imageCandidateKey]);
 
   const openItem = () => {
     if (!canOpen) return;
@@ -650,11 +656,7 @@ function LibraryMediaCard({
 
   const renderMedia = () => (
     <div className="relative w-full h-full">
-      <div
-        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
-          imgReady && imageSrc ? "opacity-0" : "opacity-100"
-        }`}
-      >
+      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
         {isMovie ? (
           <Film className="w-8 h-8 text-zinc-700" />
         ) : (
@@ -664,13 +666,19 @@ function LibraryMediaCard({
 
       {imageSrc && (
         <img
+          key={imageSrc}
           src={imageSrc}
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            imgReady ? "opacity-100" : "opacity-0"
-          }`}
+          onError={() => {
+            setImageIndex((prev) =>
+              prev < imageCandidates.length - 1
+                ? prev + 1
+                : imageCandidates.length,
+            );
+          }}
+          className="absolute inset-0 w-full h-full object-cover"
         />
       )}
     </div>
@@ -683,7 +691,7 @@ function LibraryMediaCard({
         initial={shouldAnimate ? undefined : false}
       >
         <article
-          className={`block bg-zinc-900/30 border border-white/5 rounded-xl transition-colors duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/30 hover:bg-zinc-900/60 shadow-lg" : ""}`}
+          className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
           onClick={openItem}
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -710,7 +718,7 @@ function LibraryMediaCard({
                     <span
                       className={`font-bold ${getResolutionTextColor(primaryRes)}`}
                     >
-                      {primaryRes}
+                      {formatResolutionLabel(primaryRes)}
                     </span>
                   </>
                 )}
@@ -730,7 +738,7 @@ function LibraryMediaCard({
       >
         <div className="block">
           <motion.article
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
             whileHover={
               canOpen && enableHoverLift
                 ? {
@@ -749,7 +757,7 @@ function LibraryMediaCard({
             }
             style={{
               transformOrigin: "center center",
-              borderColor: "rgba(255, 255, 255, 0.05)",
+              borderColor: "rgba(39, 39, 42, 0.8)",
             }}
             onClick={openItem}
           >
@@ -767,32 +775,19 @@ function LibraryMediaCard({
                 <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
               )}
             </div>
-            {/* Overlay con gradientes */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              {/* Top gradient con tipo y ratings */}
-              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div />
-
-                <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                  {primaryRes && (
-                    <div
-                      className={`flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] px-1.5 py-0.5 rounded-md border ${getResolutionStyle(primaryRes)}`}
-                    >
-                      <span className="text-[10px] font-black font-mono tracking-tight">
-                        {primaryRes}
-                      </span>
-                    </div>
-                  )}
-                  {duration && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-zinc-300 text-[10px] font-bold tracking-tight">
-                        {duration}
-                      </span>
-                    </div>
-                  )}
-                </div>
+            {primaryRes && (
+              <div
+                className={`absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
+                  primaryRes,
+                )}`}
+              >
+                <span className="flex items-center justify-center h-4 px-0.5 sm:h-[18px] text-[10px] sm:text-[11px] font-black tracking-widest drop-shadow-sm leading-none">
+                  {formatResolutionLabel(primaryRes)}
+                </span>
               </div>
-
+            )}
+            {/* Overlay con gradientes */}
+            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
               {/* Bottom gradient con título y año */}
               <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <div className="flex items-end justify-between gap-3">
@@ -802,7 +797,6 @@ function LibraryMediaCard({
                     </h3>
                     <p className="text-amber-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
                       {year}
-                      {item?.sectionTitle ? ` • ${item.sectionTitle}` : ""}
                     </p>
                   </div>
                 </div>
@@ -821,7 +815,7 @@ function LibraryMediaCard({
     >
       <div className="block">
         <article
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-amber-900/20 transition-all ${canOpen ? "cursor-pointer" : ""}`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-amber-900/20 transition-[border-color,box-shadow] duration-300 ${canOpen ? "cursor-pointer hover:border-amber-500/30" : ""}`}
           onClick={openItem}
         >
           {renderMedia()}
@@ -839,6 +833,17 @@ function LibraryMediaCard({
               <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
             )}
           </div>
+          {primaryRes && (
+            <div
+              className={`absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
+                primaryRes,
+              )}`}
+            >
+              <span className="flex items-center justify-center h-4 px-0.5 sm:h-[18px] text-[10px] sm:text-[11px] font-black tracking-widest drop-shadow-sm leading-none">
+                {formatResolutionLabel(primaryRes)}
+              </span>
+            </div>
+          )}
 
           {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
@@ -852,41 +857,10 @@ function LibraryMediaCard({
             <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
               {title}
             </h5>
-            {primaryRes && (
-              <div
-                className={`mt-0.5 text-[10px] font-semibold ${getResolutionTextColor(primaryRes)}`}
-              >
-                {primaryRes}
-              </div>
-            )}
           </div>
 
           {/* Overlay con gradientes */}
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            {/* Top gradient con tipo y ratings */}
-            <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <div />
-
-              <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                {primaryRes && (
-                  <div
-                    className={`flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)] px-1.5 py-0.5 rounded-md border ${getResolutionStyle(primaryRes)}`}
-                  >
-                    <span className="text-[10px] font-black font-mono tracking-tight">
-                      {primaryRes}
-                    </span>
-                  </div>
-                )}
-                {duration && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-zinc-300 text-[10px] font-bold tracking-tight">
-                      {duration}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
+          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
             {/* Bottom gradient con título y año */}
             <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
               <div className="flex items-end justify-between gap-3">
@@ -896,7 +870,6 @@ function LibraryMediaCard({
                   </h3>
                   <p className="text-amber-500 text-xs font-bold mt-0.5 drop-shadow-md">
                     {year}
-                    {item?.sectionTitle ? ` • ${item.sectionTitle}` : ""}
                   </p>
                 </div>
               </div>
@@ -1416,7 +1389,7 @@ export default function BibliotecaClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-6" : ""}`;
   }
 
-  function resolvePosterSrc(item) {
+  function getTmdbArtworkState(item, kind) {
     const tmdbType =
       item?.tmdbType === "movie"
         ? "movie"
@@ -1427,55 +1400,36 @@ export default function BibliotecaClient() {
 
     if (tmdbType && Number.isFinite(tmdbId) && tmdbId > 0) {
       const key = String(tmdbId);
-      const map = localizedPosterMap[tmdbType];
+      const map =
+        kind === "backdrop"
+          ? localizedBackdropMap[tmdbType]
+          : localizedPosterMap[tmdbType];
       const fetched = map != null && key in map;
 
       if (!fetched) {
-        // TMDB aún no ha cargado: mostrar placeholder (null) en lugar de URL de Plex
-        // que puede no ser accesible desde el navegador en despliegues remotos
-        return null;
+        return { src: null, pending: true };
       }
 
-      // TMDB ya respondió: usar solo imagen TMDB si existe
       const localizedPath = map[key];
-      if (localizedPath) return buildTmdbImage(localizedPath, "w500");
-      return null;
-    }
-
-    // Sin tmdbId no se muestra imagen (solo TMDB)
-    return null;
-  }
-
-  function resolveBackdropSrc(item) {
-    const tmdbType =
-      item?.tmdbType === "movie"
-        ? "movie"
-        : item?.tmdbType === "tv"
-          ? "tv"
-          : null;
-    const tmdbId = Number(item?.tmdbId || 0);
-
-    if (tmdbType && Number.isFinite(tmdbId) && tmdbId > 0) {
-      const key = String(tmdbId);
-      const map = localizedBackdropMap[tmdbType];
-      const fetched = map != null && key in map;
-
-      if (!fetched) {
-        // TMDB aún no ha cargado: mostrar placeholder en lugar de URL de Plex
-        return null;
+      if (localizedPath) {
+        return {
+          src: buildTmdbImage(
+            localizedPath,
+            kind === "backdrop" ? "w1280" : "w500",
+          ),
+          pending: false,
+        };
       }
-
-      // TMDB ya respondió: usar solo imagen TMDB si existe
-      const localizedPath = map[key];
-      if (localizedPath) return buildTmdbImage(localizedPath, "w1280");
-      return null;
+      return { src: null, pending: false };
     }
 
-    // Sin tmdbId no se muestra imagen (solo TMDB)
-    return null;
+    return { src: null, pending: false };
   }
 
   function renderCard(item, index = 0, totalItems = 0) {
+    const posterArtwork = getTmdbArtworkState(item, "poster");
+    const backdropArtwork = getTmdbArtworkState(item, "backdrop");
+
     return (
       <LibraryMediaCard
         key={item.id}
@@ -1484,8 +1438,10 @@ export default function BibliotecaClient() {
         totalItems={totalItems}
         viewMode={viewMode}
         imageMode={imageMode}
-        posterSrc={resolvePosterSrc(item)}
-        backdropSrc={resolveBackdropSrc(item)}
+        posterSrc={posterArtwork.src}
+        backdropSrc={backdropArtwork.src}
+        posterPending={posterArtwork.pending}
+        backdropPending={backdropArtwork.pending}
         animated={shouldAnimateCards}
       />
     );
