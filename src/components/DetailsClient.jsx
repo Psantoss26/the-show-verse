@@ -645,12 +645,12 @@ function awardResultLabel(result) {
 
 function awardResultClass(result) {
   if (result === "winner") {
-    return "border-yellow-400/30 bg-yellow-400/15 text-yellow-100";
+    return "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]";
   }
   if (result === "nominee") {
-    return "border-sky-300/20 bg-sky-300/10 text-sky-100";
+    return "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]";
   }
-  return "border-white/10 bg-white/10 text-zinc-200";
+  return "text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]";
 }
 
 function flattenAwardItems(details) {
@@ -1103,74 +1103,76 @@ function AwardCard({ item }) {
   const groupLabel = formatAwardGroupName(item?.groupName);
 
   return (
-    <article className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
-      <div className="aspect-[2/3] overflow-hidden relative flex flex-col bg-black">
-        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 p-2 sm:flex">
+    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
+      <div
+        className="aspect-[2/3] overflow-hidden relative flex flex-col"
+        style={{ background: visual.background }}
+      >
+        <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)] pointer-events-none" />
+        <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
+
+        <div className="absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-2 px-3 py-2 sm:flex">
           <span
-            className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${awardResultClass(
+            className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${awardResultClass(
               item?.result,
             )}`}
           >
+            {item?.result === "winner" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
+            )}
+            {item?.result === "nominee" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+            )}
+            {item?.result !== "winner" && item?.result !== "nominee" && (
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+            )}
             {awardResultLabel(item?.result)}
           </span>
           {item?.year && (
-            <span className="rounded-md border border-white/10 bg-black/45 px-1.5 py-0.5 text-[9px] font-extrabold text-zinc-200 backdrop-blur-md">
+            <span className="text-[10px] font-black tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] transition-all">
               {item.year}
             </span>
           )}
         </div>
 
-        <div
-          className="relative flex min-h-0 flex-[1.28] items-center justify-center overflow-hidden p-3 sm:flex-[1.12] sm:p-6"
-          style={{ background: visual.background }}
-        >
-          <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_48%,transparent_52%)]" />
-          <div className="absolute inset-x-5 top-12 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-          <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-
-          <div className="absolute inset-x-0 inset-y-0 flex flex-col items-center justify-center px-3 pt-8 text-center sm:px-4 sm:pt-10">
-            <div
-              className={`max-w-[82%] rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] line-clamp-1 backdrop-blur-sm sm:text-[11px] ${visual.accent}`}
-            >
-              {visual.label}
-            </div>
-
-            {item?.groupImageUrl && (
-              <div className="mt-3 flex h-16 w-16 items-center justify-center rounded-xl border border-white/10 bg-black/55 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md sm:mt-4 sm:h-[4.5rem] sm:w-[4.5rem] sm:p-2.5">
-                <img
-                  src={item.groupImageUrl}
-                  alt=""
-                  className="h-full w-full object-contain"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-            )}
-
-            <div className="mt-3 hidden max-w-[88%] text-[9px] font-extrabold uppercase leading-snug tracking-[0.11em] text-white/75 drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] line-clamp-2 sm:block">
-              {groupLabel}
-            </div>
+        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
+          <div
+            className={`max-w-[95%] rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] truncate backdrop-blur-sm sm:max-w-[82%] sm:px-2 sm:text-[11px] ${visual.accent}`}
+          >
+            {visual.label}
           </div>
+
+          {item?.groupImageUrl && (
+            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+              <img
+                src={item.groupImageUrl}
+                alt=""
+                className="h-full w-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)] rounded-lg"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex min-h-0 flex-[0.72] flex-col justify-end border-t border-white/10 bg-gradient-to-t from-black via-black to-neutral-950 px-2 py-2 sm:flex-[0.9] sm:px-3 sm:py-3">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end px-2 py-2 sm:px-3 sm:py-3 z-20">
           <div className="sm:hidden">
-            <p className="text-center text-[10px] font-extrabold leading-tight text-white line-clamp-2">
+            <p className="text-center text-[10px] font-extrabold leading-tight text-white line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {categoryLabel}
             </p>
-            <p className="mt-1 text-center text-[9px] font-bold leading-tight text-yellow-400 line-clamp-1">
+            <p className="mt-1 text-center text-[9px] font-bold leading-tight text-yellow-400 line-clamp-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {groupLabel}
             </p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-white font-extrabold text-sm leading-tight line-clamp-2">
+            <p className="text-white font-extrabold text-sm leading-tight line-clamp-2 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               {categoryLabel}
             </p>
-            <p className="mt-1 text-yellow-400 text-xs font-bold leading-tight line-clamp-1">
+            <p className="mt-1 text-yellow-400 text-xs font-bold leading-tight line-clamp-1 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               {groupLabel}
             </p>
             {people.length > 0 && (
-              <p className="mt-1 text-gray-300 text-xs leading-tight line-clamp-2">
+              <p className="mt-1 text-gray-200 text-xs leading-tight line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                 {people.join(", ")}
               </p>
             )}
@@ -9841,7 +9843,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // En móvil, deshabilitar hover para mostrar solo las imágenes
                           const enableHover =
                             supportsHover && !isMobileViewport;
-
                           const recCardClass = enableHover
                             ? "mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                             : "mt-3 block relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-white/5";

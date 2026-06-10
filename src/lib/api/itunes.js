@@ -3,6 +3,9 @@ import { norm, containsAny, sigTokens, SOUNDTRACK_WORDS, BAD_MATCH_WORDS } from 
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
 const MAX_TRACKS = 40;
+const MAX_ALBUMS = 4;
+const MIN_ALBUM_SCORE = 0;
+const MIN_ALBUM_TRACKS = 3;
 const QUERY_TIMEOUT_MS = 7000;
 
 function fetchJson(url) {
@@ -69,10 +72,9 @@ function nameMatches(name, queryTitleNorm, querySigTokens) {
   return hits / querySigTokens.length >= 0.66;
 }
 
-function findBestAlbum(albums, queryTitleNorm) {
-  let best = null;
-  let bestScore = -Infinity;
+function scoreAlbums(albums, queryTitleNorm) {
   const querySigToks = sigTokens(queryTitleNorm);
+  const scored = [];
 
   for (const album of albums) {
     const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
@@ -88,13 +90,20 @@ function findBestAlbum(albums, queryTitleNorm) {
     if (name.includes("cast recording")) score -= 25;
     if (containsAny(name, BAD_MATCH_WORDS)) score -= 20;
 
-    if (score > bestScore) {
-      bestScore = score;
-      best = album;
+    const trackCount = Number(album.trackCount ?? 0);
+    if (trackCount < MIN_ALBUM_TRACKS) continue;
+    if (trackCount >= 10) score += 4;
+
+    const nameTokens = name.split(" ");
+    if (nameTokens.includes("ep")) score -= 15;
+    if (nameTokens.includes("single")) score -= 15;
+
+    if (score >= MIN_ALBUM_SCORE) {
+      scored.push({ album, score });
     }
   }
 
-  return best;
+  return scored.sort((a, b) => b.score - a.score);
 }
 
 export async function searchITunes(ctx, country = "US") {
@@ -114,20 +123,23 @@ export async function searchITunes(ctx, country = "US") {
 
   const queryTitleNorm = norm(ctx.originalTitle || ctx.titles[0] || "");
 
-  const matchedAlbum = findBestAlbum(albums, queryTitleNorm);
+  const ranked = scoreAlbums(albums, queryTitleNorm);
+  const topAlbums = ranked.slice(0, MAX_ALBUMS).map((r) => r.album);
 
-  if (!matchedAlbum) {
+  if (topAlbums.length === 0) {
     return { tracks: [], query };
   }
 
   let allTracks = [];
-  try {
-    const tracks = await lookupAlbumTracks(matchedAlbum.collectionId, country);
-    for (const t of tracks) {
-      allTracks.push(normalizeTrack(t, matchedAlbum));
+  for (const album of topAlbums) {
+    try {
+      const tracks = await lookupAlbumTracks(album.collectionId, country);
+      for (const t of tracks) {
+        allTracks.push(normalizeTrack(t, album));
+      }
+    } catch {
+      continue;
     }
-  } catch {
-    // fall through
   }
 
   const deduped = dedupeTracks(allTracks);
