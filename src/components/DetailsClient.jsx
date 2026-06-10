@@ -8650,7 +8650,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {(limitedProviders && limitedProviders.length > 0) ||
             (isBackdropPoster && externalLinks.length > 0) ? (
               <StaggerContainer
-                className="flex flex-row flex-nowrap justify-center items-center gap-3 w-full px-1 py-2 overflow-x-auto [scrollbar-width:none]"
+                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-2"
                 staggerDelay={0.05}
               >
                 {/* Providers - Solo si hay plataformas */}
@@ -8736,8 +8736,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               ? "noreferrer"
                               : undefined
                           }
-                          title={p.provider_name}
-                          className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
+                          aria-label={p.provider_name}
+                          className="group/provider relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
                         >
                           <img
                             src={
@@ -8749,18 +8749,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ? `https://image.tmdb.org/t/p/original${p.logo_path}`
                                     : p.logo_path
                             }
-                            alt={p.provider_name}
+                            alt=""
                             className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
                             onError={(e) => {
                               e.target.style.display = "none";
                             }}
                           />
                           {isPlexProvider && (
-                            <div
-                              className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black"
-                              title="Disponible en tu servidor local"
-                            />
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" />
                           )}
+                          <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
+                            {isPlexProvider
+                              ? "Disponible en tu servidor local"
+                              : p.provider_name}
+                          </div>
                         </motion.a>
                       );
                     })}
@@ -8793,17 +8795,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             }}
                             target="_blank"
                             rel="noreferrer"
-                            title={link.label}
-                            className="relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
+                            aria-label={link.label}
+                            className="group/extlink relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
                           >
                             <img
                               src={link.icon}
-                              alt={link.label}
+                              alt=""
                               className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
                               onError={(e) => {
                                 e.target.style.display = "none";
                               }}
                             />
+                            <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/extlink:scale-100 group-hover/extlink:opacity-100 group-hover/extlink:delay-[2000ms]">
+                              {link.label}
+                            </div>
                           </motion.a>
                         );
                       })}
@@ -8844,28 +8849,37 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <>
                     <span className="text-white text-[10px]">●</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest ${
                         data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          ? "text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.6)]"
+                          : "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]"
                       }`}
                     >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${data.status === "Ended" || data.status === "Canceled" ? "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.8)]" : "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"}`}
+                      />
                       {data.status}
                     </span>
                   </>
                 )}
 
                 {/* Géneros */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {data.genres?.slice(0, 3).map((g) => (
-                    <span
-                      key={g.id}
-                      className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 text-zinc-400 bg-white/5"
-                    >
-                      {g.name}
-                    </span>
-                  ))}
-                </div>
+                {data.genres?.length > 0 && (
+                  <>
+                    <span className="text-white text-[10px]">●</span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {data.genres.slice(0, 3).map((g) => (
+                        <span
+                          key={g.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
+                          {g.name}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </FadeIn>
 
@@ -9021,7 +9035,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+              <div className="relative w-full overflow-visible rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                 <div
                   className="
       py-3
@@ -9029,7 +9043,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       pr-[calc(1.25rem+env(safe-area-inset-right))]
       sm:px-4
       flex items-center gap-3 sm:gap-4
-      overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+      overflow-x-auto sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
     "
                 >
                   {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
@@ -9049,6 +9063,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       value={data.vote_average?.toFixed(1)}
                       sub={formatCountShort(data.vote_count)}
                       href={tmdbDetailUrl}
+                      tooltip={tmdbDetailUrl ? "Ver en TMDb" : "TMDb"}
                     />
 
                     {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
@@ -9072,6 +9087,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 )
                             : undefined
                         }
+                        tooltip={trakt?.traktUrl ? "Ver en Trakt" : "Trakt"}
                       />
                     )}
 
@@ -9094,6 +9110,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               `/api/trakt/auth/start?next=/details/${type}/${id}`,
                             )
                           }
+                          tooltip="Ver en Trakt"
                         />
                       )}
 
@@ -9109,6 +9126,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? `https://www.imdb.com/title/${resolvedImdbId}`
                             : undefined
                         }
+                        tooltip={resolvedImdbId ? "Ver en IMDb" : "IMDb"}
                       />
                     )}
 
@@ -9127,6 +9145,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 : null
                           }
                           suffix="%"
+                          tooltip="Rotten Tomatoes"
                         />
                       </div>
                     )}
@@ -9139,6 +9158,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           logo="/logo-Metacritic.png"
                           value={Math.round(extras.mcScore)}
                           suffix="/100"
+                          tooltip="Metacritic"
                         />
                       </div>
                     )}
@@ -9236,11 +9256,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {Object.values(tScoreboard?.stats || {}).some(
                   (v) => typeof v === "number",
                 ) && (
-                  <div className="border-t border-white/5 bg-black/10">
+                  <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
                     {/* Scroller con padding + safe-area para que no se recorte en bordes */}
                     <div
                       className="
-        overflow-x-auto
+        overflow-x-auto sm:overflow-visible
         [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
         py-2
         pl-[calc(1rem+env(safe-area-inset-left))]
@@ -10044,7 +10064,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <Link
                               href={`/details/movie/${m.id}`}
                               className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                              title={m.title}
+                              aria-label={m.title}
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {m.poster_path ? (
@@ -10152,7 +10172,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             px-3 rounded-xl border transition-all duration-300
             border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
             text-sm text-zinc-200 hover:border-white/30 hover:bg-black/30"
-                                  title="Resolución"
                                   aria-label="Resolución"
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
@@ -10236,7 +10255,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {activeImagesTab !== "background" && (
                                 <div
                                   className="flex rounded-xl p-1 border h-10 md:h-11 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-                                  title="Idioma"
                                   aria-label="Idioma"
                                 >
                                   <button
@@ -10275,7 +10293,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
         border transition-all duration-300 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
         hover:border-white/30 hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
-                              title="Filtros"
                               aria-label="Filtros"
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
@@ -10288,7 +10305,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
         border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
         text-red-400 hover:border-red-500/50 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                              title="Restaurar valores por defecto"
                               aria-label="Restaurar valores por defecto"
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
@@ -10325,7 +10341,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
-                                      title="Portada"
+                                      aria-label="Portada"
                                     >
                                       <ImageIcon className="w-4 h-4" />
                                     </button>
@@ -10342,7 +10358,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
-                                      title="Vista previa"
+                                      aria-label="Vista previa"
                                     >
                                       <Eye className="w-4 h-4" />
                                     </button>
@@ -10359,7 +10375,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
-                                      title="Fondo"
+                                      aria-label="Fondo"
                                     >
                                       <Layers className="w-4 h-4" />
                                     </button>
@@ -10376,7 +10392,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       className="h-10 w-full inline-flex items-center justify-between gap-2
                   px-3 rounded-xl border transition text-sm
                   border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-black/30"
-                                      title="Resolución"
                                       aria-label="Resolución"
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10675,7 +10690,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
                             : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
                         }`}
-                                          title="Seleccionar"
+                                          aria-label="Seleccionar"
                                           style={{
                                             WebkitTapHighlightColor:
                                               "transparent",
@@ -10735,7 +10750,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             }}
                                             className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
                           opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
-                                            title="Copiar URL"
+                                            aria-label="Copiar URL"
                                           >
                                             <LinkIcon size={14} />
                                           </div>
@@ -10846,7 +10861,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     <button
                                       type="button"
                                       onClick={() => openVideo(v)}
-                                      title={v.name || "Ver vídeo"}
+                                      aria-label={v.name || "Ver vídeo"}
                                       className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
@@ -10872,26 +10887,28 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
 
                                         {/* Propiedades debajo, alineadas a la izquierda */}
-                                        <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
-                                          <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
-                                            {/* Label de Oficial - Agregado shrink-0 */}
+                                        <div className="mt-3 flex items-center gap-3 w-full overflow-hidden">
+                                          <div className="flex items-center gap-3 flex-nowrap overflow-x-auto no-scrollbar pb-1">
+                                            {/* Label de Oficial */}
                                             {v.official && (
-                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center gap-0.5">
-                                                <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)] animate-pulse" />
                                                 OFFICIAL
                                               </span>
                                             )}
 
-                                            {/* Label de Tipo (Trailer, Teaser, etc) - Agregado shrink-0 */}
+                                            {/* Label de Tipo (Trailer, Teaser, etc) */}
                                             {v.type && (
-                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
                                                 {v.type}
                                               </span>
                                             )}
 
-                                            {/* Label de Idioma - Agregado shrink-0 */}
+                                            {/* Label de Idioma */}
                                             {v.iso_639_1 && (
-                                              <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                                 {v.iso_639_1}
                                               </span>
                                             )}
@@ -10999,7 +11016,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => openSoundtrack(track.id)}
-                                  title={track.trackName || "Reproducir música"}
+                                  aria-label={
+                                    track.trackName || "Reproducir música"
+                                  }
                                   className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
                                 >
                                   <div className="relative z-10 aspect-video overflow-hidden">
@@ -11029,13 +11048,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       {track.artistName}
                                     </div>
 
-                                    <div className="mt-3 flex items-center gap-1.5 w-full overflow-hidden">
-                                      <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-200">
+                                    <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
+                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                                         {track.previewUrl
                                           ? "Preview"
                                           : "Spotify"}
                                       </span>
-                                      <span className="shrink-0 whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-zinc-300">
+                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                         {track.source || "Spotify"}
                                       </span>
                                     </div>
@@ -11233,7 +11254,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   onFocus={() => prefetchSeasonDetails(sn)}
                                   onTouchStart={() => prefetchSeasonDetails(sn)}
                                   className="group relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:-translate-y-1 hover:border-yellow-500/50 hover:bg-black/30 hover:shadow-2xl text-left w-full"
-                                  title={`Ver ${titleSeason}`}
+                                  aria-label={`Ver ${titleSeason}`}
                                 >
                                   {/* Fondo decorativo del número de temporada */}
                                   <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10 z-0">
@@ -11276,7 +11297,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             );
                                           }}
                                           className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                          title="Ver temporada en IMDb"
+                                          aria-label="Ver temporada en IMDb"
                                         >
                                           <ExternalLink className="h-4 w-4" />
                                         </a>
@@ -11589,7 +11610,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             "Usuario"}
                                         </span>
                                         {user?.vip && (
-                                          <span className="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
+                                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
                                             VIP
                                           </span>
                                         )}

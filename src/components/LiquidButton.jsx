@@ -506,11 +506,11 @@ export default function LiquidButton({
       onMouseLeave={handleMouseLeave}
       onMouseMove={handleMouseMove}
       disabled={disabled || loading}
-      title={title}
+      aria-label={title}
       data-liquid-button="true"
       data-group-id={groupId}
       className={`
-        relative overflow-hidden
+        relative group/liquid
         w-12 h-12 rounded-full
         flex items-center justify-center text-white
         backdrop-blur-[50px]
@@ -538,67 +538,70 @@ export default function LiquidButton({
       }}
       {...props}
     >
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{
-          opacity:
-            isHovered || active
-              ? 0.8
-              : isExploding
-                ? 1
-                : Math.max(0.3, proximityGlow),
-          transition: "opacity 0.3s",
-        }}
-      />
-
-      {(isHovered || active || proximityGlow > 0.3 || isExploding) &&
-        !disabled && (
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              background: `linear-gradient(135deg, 
-              ${toRgba(currentColors.secondary, 0.2)} 0%, 
-              transparent 40%, 
-              ${toRgba(currentColors.rgb, 0.1)} 60%, 
-              transparent 100%)`,
-              animation: isExploding
-                ? "liquidExplosionFlash 0.3s ease-out"
-                : "liquidShine 3s ease-in-out infinite",
-              opacity: isExploding
-                ? 1
-                : isHovered || active
+      {/* Capa interna con recorte circular para los efectos líquidos */}
+      <div className="absolute inset-0 overflow-hidden rounded-full pointer-events-none">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{
+            opacity:
+              isHovered || active
+                ? 0.8
+                : isExploding
                   ? 1
-                  : proximityGlow,
-            }}
-          />
-        )}
+                  : Math.max(0.3, proximityGlow),
+            transition: "opacity 0.3s",
+          }}
+        />
 
-      {(isHovered || active || proximityGlow > 0.2 || isExploding) &&
-        !disabled && (
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              border: `2px solid ${primaryColor}`,
-              opacity: 0.3 + proximityGlow * 0.4 + (isExploding ? 0.3 : 0),
-              animation: "liquidPulse 2s ease-in-out infinite",
-            }}
-          />
-        )}
+        {(isHovered || active || proximityGlow > 0.3 || isExploding) &&
+          !disabled && (
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                background: `linear-gradient(135deg, 
+                ${toRgba(currentColors.secondary, 0.2)} 0%, 
+                transparent 40%, 
+                ${toRgba(currentColors.rgb, 0.1)} 60%, 
+                transparent 100%)`,
+                animation: isExploding
+                  ? "liquidExplosionFlash 0.3s ease-out"
+                  : "liquidShine 3s ease-in-out infinite",
+                opacity: isExploding
+                  ? 1
+                  : isHovered || active
+                    ? 1
+                    : proximityGlow,
+              }}
+            />
+          )}
 
-      {/* Efecto de relleno estilo batería */}
-      {fillPercentage !== undefined &&
-        fillPercentage !== null &&
-        fillPercentage > 0 && (
-          <div
-            className="absolute bottom-0 left-0 w-full pointer-events-none transition-all duration-1000 ease-out z-0"
-            style={{
-              height: `${Math.min(100, Math.max(0, fillPercentage))}%`,
-              background: `linear-gradient(to top, ${toRgba(currentColors.rgb, 0.4)}, ${toRgba(currentColors.rgb, 0.15)})`,
-              boxShadow: `0 -2px 10px ${toRgba(currentColors.secondary, 0.3)}`,
-            }}
-          />
-        )}
+        {(isHovered || active || proximityGlow > 0.2 || isExploding) &&
+          !disabled && (
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                border: `2px solid ${primaryColor}`,
+                opacity: 0.3 + proximityGlow * 0.4 + (isExploding ? 0.3 : 0),
+                animation: "liquidPulse 2s ease-in-out infinite",
+              }}
+            />
+          )}
+
+        {/* Efecto de relleno estilo batería */}
+        {fillPercentage !== undefined &&
+          fillPercentage !== null &&
+          fillPercentage > 0 && (
+            <div
+              className="absolute bottom-0 left-0 w-full pointer-events-none transition-all duration-1000 ease-out z-0"
+              style={{
+                height: `${Math.min(100, Math.max(0, fillPercentage))}%`,
+                background: `linear-gradient(to top, ${toRgba(currentColors.rgb, 0.4)}, ${toRgba(currentColors.rgb, 0.15)})`,
+                boxShadow: `0 -2px 10px ${toRgba(currentColors.secondary, 0.3)}`,
+              }}
+            />
+          )}
+      </div>
 
       <div className="relative z-10 flex items-center justify-center">
         {loading ? (
@@ -642,6 +645,12 @@ export default function LiquidButton({
           children
         )}
       </div>
+
+      {title && (
+        <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/liquid:scale-100 group-hover/liquid:opacity-100 group-hover/liquid:delay-[2000ms]">
+          {title}
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes liquidShine {

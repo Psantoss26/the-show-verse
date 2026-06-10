@@ -17,9 +17,16 @@ export function CompactBadge({
   hideSubOnMobile = false,
   logoClassName = "",
   animateOnMount = true,
+  tooltip,
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
+
+  const titleText =
+    tooltip ||
+    (sub
+      ? `${label || ""} ${value ?? ""} ${suffix || ""} · ${sub}`.trim()
+      : undefined);
 
   return (
     <MotionComp
@@ -37,11 +44,11 @@ export function CompactBadge({
           : undefined
       }
       className={`
-        flex items-center gap-2.5 group select-none min-w-0
+        relative flex items-center gap-2.5 group group/badge select-none min-w-0
         ${isInteractive ? "cursor-pointer" : ""}
         ${className}
       `}
-      title={sub ? `${label || ""} ${value ?? ""} · ${sub}`.trim() : undefined}
+      aria-label={titleText}
     >
       <span className="grid h-6 w-6 shrink-0 place-items-center">
         <img
@@ -87,6 +94,12 @@ export function CompactBadge({
           )}
         </div>
       </div>
+
+      {titleText && (
+        <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/badge:scale-100 group-hover/badge:opacity-100 group-hover/badge:delay-[2000ms]">
+          {titleText}
+        </div>
+      )}
     </MotionComp>
   );
 }
@@ -122,10 +135,9 @@ export function ExternalLinkButton({
         if (onClick) return onClick(e);
         window.open(finalHref, "_blank", "noopener,noreferrer");
       }}
-      title={title}
       aria-label={title}
       className={[
-        "relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10",
+        "group/extlink relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10",
         disabled ? "opacity-0 pointer-events-none" : "",
         className,
       ].join(" ")}
@@ -150,6 +162,10 @@ export function ExternalLinkButton({
           <span className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
         </span>
       )}
+
+      <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/extlink:scale-100 group-hover/extlink:opacity-100 group-hover/extlink:delay-[2000ms]">
+        {title}
+      </div>
     </motion.button>
   );
 }
@@ -160,8 +176,8 @@ export function MiniStat({ icon: Icon, value, tooltip }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="flex items-center gap-2 group shrink-0"
-      title={tooltip}
+      className="relative flex items-center gap-2 group group/ministat shrink-0"
+      aria-label={tooltip}
     >
       <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
         <Icon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
@@ -169,6 +185,11 @@ export function MiniStat({ icon: Icon, value, tooltip }) {
       <span className="text-xs font-semibold text-zinc-400 font-mono tracking-tight group-hover:text-zinc-300">
         {value}
       </span>
+      {tooltip && (
+        <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/ministat:scale-100 group-hover/ministat:opacity-100 group-hover/ministat:delay-[2000ms]">
+          {tooltip}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -283,17 +304,20 @@ export function ActionShareButton({ title, text, url }) {
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="group inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300 p-2 sm:px-3 sm:py-2 bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-      title={copied ? "¡Enlace copiado!" : "Compartir"}
+      className="group/share inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300 p-2 sm:px-3 sm:py-2 bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200 relative"
+      aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
     >
       {copied ? (
-        <Check className="w-4 h-4 transition-transform group-hover:scale-110" />
+        <Check className="w-4 h-4 transition-transform group-hover/share:scale-110" />
       ) : (
-        <Share2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+        <Share2 className="w-4 h-4 transition-transform group-hover/share:scale-110" />
       )}
       <span className="hidden sm:block text-sm font-medium">
         {copied ? "Copiado" : "Compartir"}
       </span>
+      <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/share:scale-100 group-hover/share:opacity-100 group-hover/share:delay-[2000ms] sm:hidden">
+        {copied ? "¡Enlace copiado!" : "Compartir"}
+      </div>
     </motion.button>
   );
 }
