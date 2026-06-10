@@ -9035,7 +9035,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative w-full overflow-visible rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
+                <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu mb-6">
                 <div
                   className="
       py-3
@@ -10157,7 +10157,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                               {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
-                              <div className="flex items-center rounded-xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                              <div className="flex isolate transform-gpu items-center rounded-xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                 {["posters", "backdrops", "background"].map(
                                   (tab) => (
                                     <button
@@ -10189,7 +10189,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
-                                  className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
+                                  className="h-10 md:h-11 inline-flex isolate transform-gpu items-center justify-between gap-2 min-w-[150px]
             px-3 rounded-xl transition-all duration-300
             bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
             text-sm text-zinc-200 hover:bg-black/30"
@@ -10233,7 +10233,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         duration: 0.14,
                                         ease: "easeOut",
                                       }}
-                                      className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                                      className="absolute isolate left-0 top-full z-[9999] mt-2 w-full rounded-2xl
                 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                     >
                                       <div className="py-1">
@@ -10275,7 +10275,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {/* Idioma (sin label) */}
                               {activeImagesTab !== "background" && (
                                 <div
-                                  className="flex rounded-xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                                  className="flex isolate transform-gpu rounded-xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   aria-label="Idioma"
                                 >
                                   <button
@@ -10311,7 +10311,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 setArtworkControlsOpen((v) => !v);
                                 setResMenuOpen(false);
                               }}
-                              className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
+                              className="sm:hidden inline-flex isolate items-center justify-center w-10 h-10 rounded-xl
         transition-all duration-300 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
         hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
                               aria-label="Filtros"
@@ -10323,8 +10323,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <button
                               type="button"
                               onClick={handleResetArtwork}
-                              className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
-        transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
+                              className="inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
+        transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transform-gpu
         text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                               aria-label="Restaurar valores por defecto"
                               style={{ WebkitTapHighlightColor: "transparent" }}
@@ -10348,7 +10348,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Todo en una sola fila con iconos */}
                                 <div className="flex items-center gap-2">
                                   {/* Tabs con iconos - compacto */}
-                                  <div className="flex rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                                  <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -10410,7 +10410,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     <button
                                       type="button"
                                       onClick={() => setResMenuOpen((v) => !v)}
-                                      className="h-10 w-full inline-flex items-center justify-between gap-2
+                                      className="h-10 w-full inline-flex isolate transform-gpu items-center justify-between gap-2
                   px-3 rounded-xl transition text-sm
                   bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
                                       aria-label="Resolución"
@@ -10461,7 +10461,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             duration: 0.14,
                                             ease: "easeOut",
                                           }}
-                                          className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                                          className="absolute isolate left-0 top-full z-[9999] mt-2 w-full rounded-2xl
                       bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                         >
                                           <div className="py-1">
@@ -10502,7 +10502,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                   {/* Idioma móvil - compacto */}
                                   {activeImagesTab !== "background" && (
-                                    <div className="flex rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                                    <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                       <button
                                         type="button"
                                         onClick={() => setLangES((v) => !v)}
@@ -10811,13 +10811,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: 4 }).map((_, index) => (
                                 <div
                                   key={index}
-                                  className="relative rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg animate-pulse"
+                                  className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
                                   aria-hidden="true"
                                 >
                                   <div className="relative z-10 aspect-video bg-white/5">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-14 h-14 rounded-full bg-white/10 border border-white/10" />
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
                                     </div>
                                   </div>
 
@@ -10859,12 +10859,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <DetailsArrowCarousel
                               spaceBetween={12}
                               slidesPerView={2}
-                              breakpoints={{
-                                640: { slidesPerView: 2, spaceBetween: 16 },
-                                768: { slidesPerView: 3, spaceBetween: 16 },
-                                1024: { slidesPerView: 4, spaceBetween: 16 },
-                                1280: { slidesPerView: 4, spaceBetween: 16 },
-                              }}
+                        breakpoints={{ 640: { slidesPerView: 2, spaceBetween: 16 }, 768: { slidesPerView: 3, spaceBetween: 16 }, 1024: { slidesPerView: 4, spaceBetween: 16 }, 1280: { slidesPerView: 4, spaceBetween: 16 } }}
                               className="pb-2"
                             >
                               {videos.slice(0, 20).map((v) => {
@@ -10883,8 +10878,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     <button
                                       type="button"
                                       onClick={() => openVideo(v)}
-                                      aria-label={v.name || "Ver vídeo"}
-                                      className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transition-all hover:border-yellow-500/30 group"
+                                  aria-label={v.name || 'Ver vídeo'}
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
                                         <img
@@ -10894,8 +10889,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                          <div className="w-14 h-14 rounded-full bg-black/55 border border-white/15 flex items-center justify-center transition-transform hover:scale-105">
-                                            <Play className="w-7 h-7 text-yellow-300 translate-x-[1px]" />
+                                          <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform hover:scale-105 backdrop-blur-md">
+                                            <Play className="w-7 h-7 text-yellow-200 translate-x-[1px]" />
                                           </div>
                                         </div>
                                       </div>
@@ -10979,14 +10974,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         />
 
                         {soundtrackLoading && (
-                          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                            {Array.from({ length: 4 }).map((_, index) => (
+                          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                            {Array.from({ length: 5 }).map((_, index) => (
                               <div
                                 key={index}
-                                className="relative rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] animate-pulse"
+                                className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
                                 aria-hidden="true"
                               >
-                                <div className="relative z-10 aspect-video bg-white/5">
+                                <div className="relative z-10 aspect-square bg-white/5">
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
                                   </div>
@@ -11003,7 +10998,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         {!soundtrackLoading &&
                           soundtrackResolved &&
                           soundtrackTracks.length === 0 && (
-                            <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] p-5 text-sm text-zinc-400">
+                            <div className="relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu p-5 text-sm text-zinc-400">
                               <div className="relative z-10">
                                 {soundtrackError ||
                                   "No se encontraron canciones de Spotify para este título."}
@@ -11025,12 +11020,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <DetailsArrowCarousel
                             spaceBetween={12}
                             slidesPerView={2}
-                            breakpoints={{
-                              640: { slidesPerView: 2, spaceBetween: 16 },
-                              768: { slidesPerView: 3, spaceBetween: 16 },
-                              1024: { slidesPerView: 4, spaceBetween: 16 },
-                              1280: { slidesPerView: 4, spaceBetween: 16 },
-                            }}
+                          breakpoints={{ 640: { slidesPerView: 2, spaceBetween: 16 }, 768: { slidesPerView: 3, spaceBetween: 16 }, 1024: { slidesPerView: 4, spaceBetween: 16 }, 1280: { slidesPerView: 5, spaceBetween: 16 } }}
                             className="pb-2"
                           >
                             {soundtrackTracks.slice(0, 12).map((track) => (
@@ -11038,22 +11028,30 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => openSoundtrack(track.id)}
-                                  aria-label={
-                                    track.trackName || "Reproducir música"
-                                  }
-                                  className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
+                                aria-label={track.trackName || 'Reproducir música'}
+                                  className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
                                 >
-                                  <div className="relative z-10 aspect-video overflow-hidden">
+                                  <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
+                                    {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
                                     <img
                                       src={
                                         track.artworkUrl || "/placeholder.png"
                                       }
                                       alt=""
-                                      className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                      className="absolute inset-0 w-full h-full object-cover opacity-30 blur-xl transform-gpu scale-110"
+                                      aria-hidden="true"
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform hover:scale-105 backdrop-blur-md">
+                                    {/* Portada completa sin recortes */}
+                                    <img
+                                      src={
+                                        track.artworkUrl || "/placeholder.png"
+                                      }
+                                      alt=""
+                                      className="absolute inset-0 w-full h-full object-contain transform-gpu transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md">
                                         <Music2 className="w-7 h-7 text-yellow-200" />
                                       </div>
                                     </div>
@@ -11113,9 +11111,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={Sparkles}
                         />
 
-                        <div className="mt-3 sm:mt-4 relative overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.8)]">
+                        <div className="mt-3 sm:mt-4 relative isolate overflow-hidden rounded-[2rem] border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
                           {/* Header del bloque */}
-                          <div className="relative z-10 flex items-center justify-between border-b border-white/10 bg-white/5 px-6 py-4">
+                          <div className="relative z-10 flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
                                 <img
@@ -11143,7 +11141,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* Sin mostrar error, directamente el contenido */}
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                               {/* Columna Positiva */}
-                              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-5">
+                              <div className="relative isolate overflow-hidden rounded-2xl border border-emerald-500/5 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5">
                                 <div className="mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
                                     <ThumbsUp className="h-4 w-4" />
@@ -11173,7 +11171,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
 
                               {/* Columna Negativa */}
-                              <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-transparent p-5">
+                              <div className="relative isolate overflow-hidden rounded-2xl border border-rose-500/5 bg-gradient-to-br from-rose-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5">
                                 <div className="mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
                                     <ThumbsDown className="h-4 w-4" />
@@ -11275,7 +11273,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   onMouseEnter={() => prefetchSeasonDetails(sn)}
                                   onFocus={() => prefetchSeasonDetails(sn)}
                                   onTouchStart={() => prefetchSeasonDetails(sn)}
-                                  className="group relative overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:-translate-y-1 hover:border-yellow-500/50 hover:bg-black/30 hover:shadow-2xl text-left w-full"
+                                  className="group relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:-translate-y-1 hover:border-yellow-500/30 hover:bg-white/5 hover:shadow-2xl text-left w-full"
                                   aria-label={`Ver ${titleSeason}`}
                                 >
                                   {/* Fondo decorativo del número de temporada */}
@@ -11448,7 +11446,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return (
                               <div
                                 key={r.id}
-                                className="relative flex flex-col p-6 overflow-hidden rounded-2xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-3xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-white/30 gap-4"
+                                className="relative isolate flex flex-col p-6 overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-white/10 gap-4"
                               >
                                 <div className="relative z-10 flex items-center gap-4">
                                   <img
@@ -11551,10 +11549,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </div>
                       </div>
 
-                      <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]">
+                      <div className="relative isolate overflow-hidden rounded-[2rem] border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
                         {/* Filtros estilo Tabs Modernos */}
-                        <div className="relative z-10 flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
-                          <div className="flex items-center rounded-xl p-1 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                        <div className="relative z-10 flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
+                          <div className="flex isolate transform-gpu items-center rounded-xl p-1 border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm">
                             {[
                               { id: "likes30", label: "Top 30 Días" },
                               { id: "likesAll", label: "Top Histórico" },
@@ -11611,7 +11609,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   key={String(
                                     c?.id || `${user?.username}-${created}`,
                                   )}
-                                  className="group relative flex gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/20 shadow-sm"
+                                  className="group relative flex gap-4 rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/10 shadow-sm"
                                 >
                                   {/* Avatar */}
                                   <div className="shrink-0">
@@ -11691,7 +11689,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SectionTitle title="Listas" icon={ListVideo} />
 
                           {/* Selector de Listas */}
-                          <div className="flex items-center rounded-xl p-1 border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                          <div className="flex isolate transform-gpu items-center rounded-xl p-1 border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm">
                             {["popular", "trending"].map((tab) => (
                               <button
                                 key={tab}
@@ -11758,8 +11756,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
                                   className={[
-                                    "group relative flex flex-col overflow-hidden rounded-3xl border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all duration-500",
-                                    "hover:border-indigo-500/50 hover:shadow-[0_0_40px_-5px_rgba(99,102,241,0.4)] hover:bg-black/30",
+                                  "group relative isolate flex flex-col overflow-hidden rounded-3xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
+                                    "hover:border-indigo-500/30 hover:bg-white/5",
                                     disabled
                                       ? "pointer-events-none opacity-60"
                                       : "",
