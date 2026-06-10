@@ -478,20 +478,20 @@ function StatCard({
   loading = false,
 }) {
   return (
-    <div className="relative overflow-hidden w-full h-full rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
       <div
-        className={`relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 shadow-sm border border-white/10 ${colorClass}`}
+        className={`relative z-10 p-1 sm:p-1.5 md:p-2 rounded-full bg-white/5 mb-1 shadow-sm border border-white/10 ${colorClass}`}
       >
-        <Icon className="w-4 h-4 md:w-5 md:h-5" />
+        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
       </div>
-      <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
+      <div className="relative z-10 text-sm sm:text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
         {loading ? (
-          <span className="inline-block h-6 md:h-8 w-10 md:w-14 rounded-lg bg-white/10 animate-pulse" />
+          <span className="inline-block h-4 w-8 sm:h-6 sm:w-10 md:h-8 md:w-14 rounded-lg bg-white/10 animate-pulse" />
         ) : (
           value
         )}
       </div>
-      <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
+      <div className="relative z-10 text-[8px] sm:text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wide text-center leading-tight">
         {label}
       </div>
     </div>
@@ -2399,7 +2399,7 @@ export default function HistoryClient() {
             {/* Solo estadísticas a la derecha */}
             {auth.connected && historyLoaded && (
               <motion.div
-                className="grid grid-cols-2 lg:flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -2408,7 +2408,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.5 }}
-                  className="flex w-full lg:w-[140px] lg:flex-none"
+                  className="w-full min-w-0"
                 >
                   <StatCard
                     label="Cargados"
@@ -2422,7 +2422,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.6 }}
-                  className="flex w-full lg:w-[140px] lg:flex-none"
+                  className="w-full min-w-0"
                 >
                   <StatCard
                     label="Títulos Únicos"
@@ -2436,7 +2436,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.7 }}
-                  className="flex w-full lg:w-[140px] lg:flex-none"
+                  className="w-full min-w-0"
                 >
                   <StatCard
                     label="Películas"
@@ -2450,7 +2450,7 @@ export default function HistoryClient() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.8 }}
-                  className="flex w-full lg:w-[140px] lg:flex-none"
+                  className="w-full min-w-0"
                 >
                   <StatCard
                     label="Episodios"
