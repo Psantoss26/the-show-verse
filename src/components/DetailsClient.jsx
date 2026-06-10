@@ -10718,7 +10718,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                         >
                                           <div
-                                            className={`w-full ${aspect} bg-black/40`}
+                                            className={`relative w-full ${aspect} bg-black/40`}
                                           >
                                             <img
                                               src={imgSrc}
@@ -10735,6 +10735,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               className="w-full h-full object-cover transition-transform duration-700 transform-gpu
                             group-hover:scale-[1.08]"
                                             />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                           </div>
 
                                           {isActive && (
@@ -10742,11 +10743,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           )}
 
                                           {resText && (
-                                            <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <span
-                                                className="text-[10px] font-bold tracking-wide px-2 py-1 rounded-full
-                            bg-black/70 border border-white/15 text-zinc-100"
-                                              >
+                                            <div className="absolute bottom-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 z-10 pointer-events-none">
+                                              <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                                 {resText}
                                               </span>
                                             </div>
@@ -10769,11 +10768,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleCopyImageUrl(filePath);
                                               }
                                             }}
-                                            className="absolute bottom-2 right-2 p-1.5 bg-black/60 rounded-lg text-white
-                          opacity-0 group-hover:opacity-100 hover:bg-black transition-opacity"
+                                            className="group/link absolute bottom-2 right-2 z-10 flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
                                             aria-label="Copiar URL"
                                           >
-                                            <LinkIcon size={14} />
+                                            <LinkIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                            <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
+                                              Copiar URL
+                                            </div>
                                           </div>
                                         </div>
                                       </SwiperSlide>
