@@ -10157,7 +10157,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                               {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
-                              <div className="flex items-center rounded-xl p-1 border w-fit h-10 md:h-11 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                              <div className="flex items-center rounded-xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                 {["posters", "backdrops", "background"].map(
                                   (tab) => (
                                     <button
@@ -10190,9 +10190,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
                                   className="h-10 md:h-11 inline-flex items-center justify-between gap-2 min-w-[150px]
-            px-3 rounded-xl border transition-all duration-300
-            border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
-            text-sm text-zinc-200 hover:border-white/30 hover:bg-black/30"
+            px-3 rounded-xl transition-all duration-300
+            bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
+            text-sm text-zinc-200 hover:bg-black/30"
                                   aria-label="Resolución"
                                   style={{
                                     WebkitTapHighlightColor: "transparent",
@@ -10233,8 +10233,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         duration: 0.14,
                                         ease: "easeOut",
                                       }}
-                                      className="absolute left-0 top-full z-[9999] mt-2 w-44 rounded-2xl
-                border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
+                                      className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
+                bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                     >
                                       <div className="py-1">
                                         {[
@@ -10275,7 +10275,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {/* Idioma (sin label) */}
                               {activeImagesTab !== "background" && (
                                 <div
-                                  className="flex rounded-xl p-1 border h-10 md:h-11 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                                  className="flex rounded-xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   aria-label="Idioma"
                                 >
                                   <button
@@ -10312,8 +10312,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 setResMenuOpen(false);
                               }}
                               className="sm:hidden inline-flex items-center justify-center w-10 h-10 rounded-xl
-        border transition-all duration-300 border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
-        hover:border-white/30 hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
+        transition-all duration-300 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
+        hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
                               aria-label="Filtros"
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
@@ -10324,8 +10324,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               type="button"
                               onClick={handleResetArtwork}
                               className="inline-flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
-        border transition-all border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
-        text-red-400 hover:border-red-500/50 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+        transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
+        text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                               aria-label="Restaurar valores por defecto"
                               style={{ WebkitTapHighlightColor: "transparent" }}
                             >
@@ -10348,7 +10348,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 {/* Todo en una sola fila con iconos */}
                                 <div className="flex items-center gap-2">
                                   {/* Tabs con iconos - compacto */}
-                                  <div className="flex rounded-xl p-1 border h-10 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                                  <div className="flex rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -10411,8 +10411,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => setResMenuOpen((v) => !v)}
                                       className="h-10 w-full inline-flex items-center justify-between gap-2
-                  px-3 rounded-xl border transition text-sm
-                  border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:border-white/30 hover:bg-black/30"
+                  px-3 rounded-xl transition text-sm
+                  bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
                                       aria-label="Resolución"
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -10462,7 +10462,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             ease: "easeOut",
                                           }}
                                           className="absolute left-0 top-full z-[9999] mt-2 w-full rounded-2xl
-                      border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
+                      bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
                                         >
                                           <div className="py-1">
                                             {[
@@ -10502,7 +10502,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                   {/* Idioma móvil - compacto */}
                                   {activeImagesTab !== "background" && (
-                                    <div className="flex rounded-xl p-1 border h-10 items-center border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                                    <div className="flex rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                       <button
                                         type="button"
                                         onClick={() => setLangES((v) => !v)}
