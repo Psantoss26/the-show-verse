@@ -31,6 +31,7 @@ import {
   ChevronRight,
   LogOut,
   RotateCcw,
+  MonitorPlay,
 } from "lucide-react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -1013,9 +1014,6 @@ function ProfileUnifiedCard({
     item?.vote_average ||
     null;
 
-  // Extract first genre
-  const firstGenre = media?.genres?.[0]?.name || media?.genres?.[0] || null;
-
   // Resolve links
   let href = "#";
   const mediaType = (type || item.type) === "movie" ? "movie" : "tv";
@@ -1174,39 +1172,9 @@ function ProfileUnifiedCard({
     );
   };
 
-  // Render top left badge
-  const renderTopLeft = () => {
-    if (rank !== undefined) {
-      return (
-        <span className="rounded-md border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-yellow-300 shadow-sm backdrop-blur-md">
-          #{rank}
-        </span>
-      );
-    }
-    const itemType = type || item.type;
-    if (itemType === "movie") {
-      return (
-        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-sky-500/30 bg-sky-500/20 text-sky-300 shadow-sm backdrop-blur-md">
-          PELÍCULA
-        </span>
-      );
-    }
-    if (itemType === "show" || itemType === "tv") {
-      return (
-        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/20 text-purple-300 shadow-sm backdrop-blur-md">
-          SERIE
-        </span>
-      );
-    }
-    if (type === "person" && role) {
-      return (
-        <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-white/10 bg-white/5 text-zinc-300 shadow-sm backdrop-blur-md">
-          {role === "actor" ? "ACTOR" : "DIRECTOR"}
-        </span>
-      );
-    }
-    return null;
-  };
+  const itemType = type || item.type;
+  const isMedia =
+    itemType === "movie" || itemType === "show" || itemType === "tv";
 
   const shadowColorStyles = {
     emerald: "16, 185, 129",
@@ -1265,9 +1233,30 @@ function ProfileUnifiedCard({
           </div>
         )}
 
+        {isMedia && rank === undefined && (
+          <div
+            className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 ${
+              itemType === "movie"
+                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+            }`}
+          >
+            {itemType === "movie" ? (
+              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            ) : (
+              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            )}
+          </div>
+        )}
+
+        {rank !== undefined && (
+          <div className="absolute top-0 left-0 z-20 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 bg-yellow-500/15 border-yellow-500/30 text-yellow-400 font-black text-[11px] sm:text-xs text-center">
+            #{rank}
+          </div>
+        )}
+
         {/* Top hover overlay badges */}
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <div>{renderTopLeft()}</div>
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
           <div>{renderTopRight()}</div>
         </div>
 
@@ -1284,11 +1273,10 @@ function ProfileUnifiedCard({
 
               {/* Subtitle depending on card context */}
               {type !== "person" ? (
-                <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
+                <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md line-clamp-1">
                   {year}
-                  {firstGenre && ` • ${firstGenre}`}
                   {item.episode &&
-                    ` • T${item.episode.season}:E${item.episode.number}`}
+                    `${year ? " • " : ""}T${String(item.episode.season).padStart(2, "0")} · E${String(item.episode.number).padStart(2, "0")}`}
                 </p>
               ) : (
                 count !== undefined && (

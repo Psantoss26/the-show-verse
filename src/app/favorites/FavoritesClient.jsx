@@ -36,6 +36,7 @@ import {
   MoreHorizontal,
   RotateCcw,
   LogOut,
+  MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 
@@ -1699,24 +1700,10 @@ function FavoriteCard({
                 </h4>
               </div>
               <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
-                <span
-                  className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${
-                    type === "movie"
-                      ? "bg-sky-500/10 text-sky-500"
-                      : "bg-purple-500/10 text-purple-500"
-                  }`}
-                >
-                  {type === "movie" ? "PELÍCULA" : "SERIE"}
-                </span>
-                {year && (
-                  <>
-                    <span>•</span>
-                    <span>{year}</span>
-                  </>
-                )}
+                {year && <span>{year}</span>}
                 {rating && (
                   <>
-                    <span>•</span>
+                    {year && <span>•</span>}
                     <span className="flex items-center gap-1">
                       <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                       {rating}
@@ -1752,21 +1739,26 @@ function FavoriteCard({
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            <div
+              className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                type === "movie"
+                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+              }`}
+            >
+              {type === "movie" ? (
+                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              ) : (
+                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              )}
+            </div>
             {/* Overlay con gradientes */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
               {/* Top gradient con tipo y ratings */}
               <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <span
-                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                    type === "movie"
-                      ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                      : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                  }`}
-                >
-                  {type === "movie" ? "PELÍCULA" : "SERIE"}
-                </span>
+                <div />
 
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1 pointer-events-auto">
                   {rating && (
                     <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                       <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
@@ -1845,24 +1837,28 @@ function FavoriteCard({
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          <div
+            className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+              type === "movie"
+                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+            }`}
+          >
+            {type === "movie" ? (
+              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            ) : (
+              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            )}
+          </div>
           {/* Mobile overlay - bottom only */}
           <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
-            <div className="flex items-center gap-2 mb-1 -ml-0.5">
-              <span
-                className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                  type === "movie"
-                    ? "bg-sky-500/20 text-sky-200"
-                    : "bg-purple-500/20 text-purple-200"
-                }`}
-              >
-                {type === "movie" ? "Cine" : "TV"}
-              </span>
-              {year && (
+            {year && (
+              <div className="flex items-center gap-2 mb-1 -ml-0.5">
                 <span className="text-[10px] text-zinc-300/80 font-medium">
                   {year}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
               {title}
             </h5>
@@ -1874,20 +1870,12 @@ function FavoriteCard({
             )}
           </div>
           {/* Overlay con gradientes */}
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
             {/* Top gradient con tipo y ratings */}
             <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <span
-                className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-sm backdrop-blur-md ${
-                  type === "movie"
-                    ? "bg-sky-500/20 text-sky-300 border-sky-500/30"
-                    : "bg-purple-500/20 text-purple-300 border-purple-500/30"
-                }`}
-              >
-                {type === "movie" ? "PELÍCULA" : "SERIE"}
-              </span>
+              <div />
 
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 pointer-events-auto">
                 {rating && (
                   <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                     <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">

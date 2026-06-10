@@ -26,6 +26,7 @@ import {
   LogOut,
   SlidersHorizontal,
   ChevronsUpDown,
+  MonitorPlay,
 } from "lucide-react";
 
 import {
@@ -1436,13 +1437,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
         </div>
 
         <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
-          <span
-            className={`font-bold uppercase tracking-wider text-[9px] px-1 rounded-sm ${type === "movie" ? "bg-sky-500/10 text-sky-500" : "bg-purple-500/10 text-purple-500"}`}
-          >
-            {type === "movie" ? "PELÍCULA" : "SERIE"}
-          </span>
-          <span>•</span>
-
           {/* Para series: si hay título de episodio, lo mostramos; si no, el año */}
           <span className="truncate max-w-[260px]">
             {type === "show" && epMeta?.title ? epMeta.title : year}
@@ -1610,15 +1604,24 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       {/* Poster Image */}
       <Poster entry={entry} className="w-full h-full" />
 
+      <div
+        className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+          type === "movie"
+            ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+            : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+        }`}
+      >
+        {type === "movie" ? (
+          <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+        ) : (
+          <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+        )}
+      </div>
+
       {/* Desktop: Hover overlay with information */}
-      <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
         <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
           <div className="flex items-center gap-2 mb-1 -ml-0.5">
-            <span
-              className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${type === "movie" ? "bg-sky-500/40 text-sky-100" : "bg-purple-500/40 text-purple-100"}`}
-            >
-              {type === "movie" ? "Película" : "Serie"}
-            </span>
             <span className="text-[8px] text-zinc-300/90 font-medium">
               {dayMonth}
             </span>
@@ -1635,17 +1638,6 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           )}
         </div>
       </div>
-
-      {/* Mobile: Compact badge indicator - solo en editMode */}
-      {(!isMobile || editMode) && (
-        <div className="absolute top-2 left-2 z-10 lg:hidden">
-          <span
-            className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded backdrop-blur-md ${type === "movie" ? "bg-sky-500/50 text-sky-50" : "bg-purple-500/50 text-purple-50"}`}
-          >
-            {type === "movie" ? "M" : "S"}
-          </span>
-        </div>
-      )}
 
       {/* Delete button - appears on hover o en editMode mobile */}
       {!confirmDel && (!isMobile || editMode) && (
@@ -1768,15 +1760,6 @@ const HistoryGridCard = memo(function HistoryGridCard({
   const InfoContent = (
     <>
       <div className="flex items-center gap-2 mb-1 -ml-0.5">
-        <span
-          className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-            type === "movie"
-              ? "bg-sky-500/20 text-sky-200"
-              : "bg-purple-500/20 text-purple-200"
-          }`}
-        >
-          {type === "movie" ? "Cine" : "TV"}
-        </span>
         <span className="text-[10px] text-zinc-300/80 font-medium">
           {dayMonth}
         </span>
@@ -1811,6 +1794,20 @@ const HistoryGridCard = memo(function HistoryGridCard({
     >
       <Poster entry={entry} className="w-full h-full" />
 
+      <div
+        className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+          type === "movie"
+            ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+            : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+        }`}
+      >
+        {type === "movie" ? (
+          <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+        ) : (
+          <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+        )}
+      </div>
+
       {/* MÓVIL: banda inferior - solo en editMode */}
       {(!isMobile || editMode) && (
         <div
@@ -1835,17 +1832,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
         ].join(" ")}
       >
         <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-          {/* En desktop mostramos badge + título episodio en la misma línea (como ya tenías) */}
           <div className="flex items-center gap-2 mb-1 -ml-0.5">
-            <span
-              className={`text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                type === "movie"
-                  ? "bg-sky-500/30 text-sky-200"
-                  : "bg-purple-500/30 text-purple-200"
-              }`}
-            >
-              {type === "movie" ? "Cine" : "TV"}
-            </span>
             <span className="text-[10px] text-zinc-300 font-medium">
               {dayMonth}
             </span>

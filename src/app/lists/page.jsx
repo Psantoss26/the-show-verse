@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   Film,
   Tv,
+  MonitorPlay,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import ListPosterCard from "@/components/lists/ListPosterCard";
@@ -733,17 +734,22 @@ const ListItemCard = memo(function ListItemCard({
           </div>
         )}
 
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <span
-            className={
-              mediaType === "tv"
-                ? "rounded-md border border-purple-500/30 bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-purple-300 shadow-sm backdrop-blur-md"
-                : "rounded-md border border-sky-500/30 bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-sky-300 shadow-sm backdrop-blur-md"
-            }
-          >
-            {mediaType === "tv" ? "SERIE" : "PELÍCULA"}
-          </span>
+        <div
+          className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 ${
+            mediaType === "movie"
+              ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+              : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+          }`}
+        >
+          {mediaType === "movie" ? (
+            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          ) : (
+            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          )}
+        </div>
 
+        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3 opacity-0 transition-all duration-500 ease-out transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <div />
           <div className="flex flex-col items-end gap-1">
             {tmdbScore ? (
               <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
@@ -774,16 +780,14 @@ const ListItemCard = memo(function ListItemCard({
           </div>
         </div>
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100" />
 
-        <div className="absolute bottom-0 left-0 right-0 z-10 p-3 opacity-0 transition-all duration-300 transform-gpu translate-y-3 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white drop-shadow-md sm:text-sm">
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-3 pb-4 opacity-0 transition-all duration-500 ease-out transform-gpu translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <h3 className="line-clamp-2 text-xs font-extrabold leading-tight text-white drop-shadow-sm sm:text-sm">
             {title}
           </h3>
           {year ? (
-            <p
-              className={`mt-0.5 text-[10px] font-bold drop-shadow-md ${accentStyle.textClass}`}
-            >
+            <p className="mt-0.5 text-zinc-300 group-hover:text-purple-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
               {year}
             </p>
           ) : null}
@@ -891,6 +895,8 @@ function normalizeTraktItemsToCards(items) {
         it?.season?.title ||
         "Elemento";
 
+      const traktYear = it?.movie?.year || it?.show?.year || null;
+
       return {
         id: t.id,
         media_type: t.media_type,
@@ -899,8 +905,12 @@ function normalizeTraktItemsToCards(items) {
         poster_path: t.poster_path || null,
         backdrop_path: t.backdrop_path || null,
         vote_average: t.vote_average || null,
-        release_date: t.release_date || null,
-        first_air_date: t.first_air_date || null,
+        release_date:
+          t.release_date ||
+          (t.media_type === "movie" && traktYear ? `${traktYear}-01-01` : null),
+        first_air_date:
+          t.first_air_date ||
+          (t.media_type === "tv" && traktYear ? `${traktYear}-01-01` : null),
       };
     })
     .filter(Boolean);

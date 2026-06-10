@@ -32,6 +32,8 @@ import {
   Bookmark,
   Heart,
   Tv2,
+  Film,
+  MonitorPlay,
 } from "lucide-react";
 
 import {
@@ -973,18 +975,24 @@ export default function CalendarPage() {
                               className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                             />
 
+                            <div
+                              className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${
+                                isMovie
+                                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                              }`}
+                            >
+                              {isMovie ? (
+                                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                              ) : (
+                                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                              )}
+                            </div>
+
                             {/* Overlay en hover */}
-                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end">
                               {/* Badge Tipo en hover - Esquina superior derecha */}
-                              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                                <span
-                                  className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md shadow-sm backdrop-blur-md bg-black/40 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 ${
-                                    isMovie ? "text-sky-300" : "text-purple-300"
-                                  }`}
-                                >
-                                  {isMovie ? "PELÍCULA" : "SERIE"}
-                                </span>
-                              </div>
+                              <div />
 
                               {/* Info Bottom en hover */}
                               <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
