@@ -365,16 +365,13 @@ export default function TraktEpisodesWatchedModal({
   const tmdbImg = (path, size = "w300") =>
     path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 
-  const openAddPlayDialog = useCallback(
-    (mode = "play") => {
-      setAddPlayError("");
-      setAddPlayMode(mode);
-      setAddPlayPreset("just_finished");
-      setAddPlayOtherValue(toLocalDatetimeInput(new Date().toISOString()));
-      setAddPlayOpen(true);
-    },
-    [],
-  );
+  const openAddPlayDialog = useCallback((mode = "play") => {
+    setAddPlayError("");
+    setAddPlayMode(mode);
+    setAddPlayPreset("just_finished");
+    setAddPlayOtherValue(toLocalDatetimeInput(new Date().toISOString()));
+    setAddPlayOpen(true);
+  }, []);
 
   // Init
   useEffect(() => {
@@ -711,7 +708,9 @@ export default function TraktEpisodesWatchedModal({
       const runStartMs = currentRewatchStartedAt
         ? new Date(currentRewatchStartedAt).getTime()
         : Number.NaN;
-      const watchedAtMs = watchedAt ? new Date(watchedAt).getTime() : Number.NaN;
+      const watchedAtMs = watchedAt
+        ? new Date(watchedAt).getTime()
+        : Number.NaN;
       if (
         next &&
         Number.isFinite(runStartMs) &&
@@ -1765,10 +1764,14 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px]"
+                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl"
                 role="dialog"
                 aria-modal="true"
-                aria-label={addPlayMode === "rewatch" ? "Crear rewatch" : "Añadir visionado"}
+                aria-label={
+                  addPlayMode === "rewatch"
+                    ? "Crear rewatch"
+                    : "Añadir visionado"
+                }
               >
                 <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
                   <div>
@@ -1848,22 +1851,21 @@ export default function TraktEpisodesWatchedModal({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {(
-                      addPlayMode === "rewatch"
-                        ? [
-                            { id: "just_finished", label: "Hoy" },
-                            { id: "other_date", label: "Otra fecha" },
-                          ]
-                        : [
-                            { id: "just_finished", label: "Just finished" },
-                            {
-                              id: "release_date",
-                              label: "Release date",
-                              disabled: !showReleaseDate,
-                            },
-                            { id: "unknown", label: "Unknown date" },
-                            { id: "other_date", label: "Other date" },
-                          ]
+                    {(addPlayMode === "rewatch"
+                      ? [
+                          { id: "just_finished", label: "Hoy" },
+                          { id: "other_date", label: "Otra fecha" },
+                        ]
+                      : [
+                          { id: "just_finished", label: "Just finished" },
+                          {
+                            id: "release_date",
+                            label: "Release date",
+                            disabled: !showReleaseDate,
+                          },
+                          { id: "unknown", label: "Unknown date" },
+                          { id: "other_date", label: "Other date" },
+                        ]
                     ).map((opt) => (
                       <button
                         key={opt.id}
@@ -1968,7 +1970,7 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px]"
+                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Historial de visionados"

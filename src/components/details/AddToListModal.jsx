@@ -101,7 +101,7 @@ export default function AddToListModal(props) {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[3rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] animate-in zoom-in-95 duration-300 ease-out">
+      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[3rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out">
         {/* Header */}
         <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 border-b border-white/10 shrink-0">
           <div>

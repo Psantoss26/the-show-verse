@@ -185,7 +185,7 @@ export default function StarRating({
             />
 
             <div
-              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] backdrop-blur-[50px] animate-in zoom-in-95 duration-300 ease-out"
+              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
               role="dialog"
               aria-modal="true"
               aria-label="Puntuación del usuario"
@@ -204,7 +204,7 @@ export default function StarRating({
                 </button>
               </div>
 
-              <div className="px-6 pb-8 space-y-8">
+              <div className="px-6 pt-8 pb-8 space-y-8">
                 <div className="flex flex-col items-center justify-center gap-4">
                   <div className="relative flex items-center justify-center">
                     <Star
