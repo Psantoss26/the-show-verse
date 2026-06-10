@@ -163,7 +163,7 @@ export default function StarRating({
                 ? "text-xl"
                 : fmt(rating) === "10"
                   ? "text-xl tracking-tighter -translate-x-[1px]"
-                  : "text-lg tracking-tighter"
+                  : "text-xl tracking-tighter"
             }`}
           >
             {fmt(rating)}
