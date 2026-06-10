@@ -170,7 +170,7 @@ export default function DetailsSectionMenu({
                                 <motion.div
                                   layoutId={`detailsMenuIndicatorBg-${colorScheme}`}
                                   aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg border border-white/5 ${colors.activeBg}`}
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg ${colors.activeBg}`}
                                   initial={false}
                                   transition={{
                                     type: "spring",
@@ -197,7 +197,7 @@ export default function DetailsSectionMenu({
                               <>
                                 <div
                                   aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg border border-white/5 ${colors.activeBg}`}
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg ${colors.activeBg}`}
                                 />
                                 <span
                                   aria-hidden="true"
