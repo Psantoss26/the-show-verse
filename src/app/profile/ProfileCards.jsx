@@ -52,7 +52,7 @@ export function PosterCard({
       title={item.title}
     >
       <div
-        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/20 border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/30 ${border} transition-all duration-300`}
+        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src && !err ? (
           <img
@@ -109,7 +109,7 @@ export function RankedPosterCard({ item, rank, type, accentColor = "yellow" }) {
   return (
     <Link href={href} className="group relative block w-full" title={title}>
       <div
-        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
+        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src ? (
           <img
@@ -156,7 +156,7 @@ export function WatchlistCard({ item }) {
       className="group relative block w-full"
       title={item.title}
     >
-      <div className="relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/20 border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/30 group-hover:border-indigo-500/50 transition-all duration-300">
+      <div className="relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 group-hover:border-indigo-500/50 transition-all duration-300">
         {src ? (
           <img
             src={src}
@@ -197,7 +197,7 @@ export function PersonCard({ person, accentColor = "yellow" }) {
       className="group relative block w-full"
     >
       <div
-        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/20 border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/30 ${border} transition-all duration-300`}
+        className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src ? (
           <img

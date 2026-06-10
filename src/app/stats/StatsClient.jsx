@@ -295,8 +295,9 @@ const COLOR_STYLES = {
 };
 
 const PROFILE_GLASS_SURFACE =
-  "relative isolate overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.7)] transform-gpu";
-const PROFILE_GLASS_HOVER = "transition-all duration-300 hover:bg-black/40";
+  "relative isolate overflow-hidden bg-black/40 bg-gradient-to-br from-white/20 via-transparent to-black/60 backdrop-blur-[60px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.9)] transform-gpu";
+const PROFILE_GLASS_HOVER =
+  "transition-all duration-300 hover:bg-black/50 hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,1)]";
 const PROFILE_GLASS_PANEL = `${PROFILE_GLASS_SURFACE} ${PROFILE_GLASS_HOVER}`;
 
 // -----------------------------------------------------------------------------
@@ -398,7 +399,7 @@ function KPICard({
       className={`${PROFILE_GLASS_PANEL} group rounded-3xl p-4 sm:p-6`}
     >
       <div
-        className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${styles.iconText}`}
+        className={`absolute top-0 right-0 p-3 opacity-20 transition-opacity ${styles.iconText}`}
       >
         <Icon className="h-16 w-16 translate-x-4 -translate-y-4 rotate-12 transform sm:h-24 sm:w-24" />
       </div>
@@ -1207,17 +1208,6 @@ function ProfileUnifiedCard({
     return null;
   };
 
-  const borderColorStyles = {
-    emerald: "rgba(16, 185, 129, 0.4)",
-    yellow: "rgba(234, 179, 8, 0.4)",
-    indigo: "rgba(99, 102, 241, 0.4)",
-    blue: "rgba(59, 130, 246, 0.4)",
-    purple: "rgba(168, 85, 247, 0.4)",
-    rose: "rgba(244, 63, 94, 0.4)",
-  };
-
-  const hoverBorderColor =
-    borderColorStyles[sectionColor] || borderColorStyles.indigo;
   const shadowColorStyles = {
     emerald: "16, 185, 129",
     yellow: "234, 179, 8",
@@ -1264,7 +1254,7 @@ function ProfileUnifiedCard({
             onError={() => setErr(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-neutral-900 text-zinc-600">
+          <div className="flex h-full w-full items-center justify-center text-zinc-500">
             {type === "person" ? (
               <Users className="h-8 w-8 opacity-60" />
             ) : type === "movie" || item.type === "movie" ? (
