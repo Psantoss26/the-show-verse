@@ -11111,9 +11111,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={Sparkles}
                         />
 
-                        <div className="mt-3 sm:mt-4 relative isolate overflow-hidden rounded-[2rem] border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
+                        <div className="mt-3 sm:mt-4 relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
                           {/* Header del bloque */}
-                          <div className="relative z-10 flex items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4">
+                          <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
                                 <img
@@ -11446,7 +11446,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return (
                               <div
                                 key={r.id}
-                                className="relative isolate flex flex-col p-6 overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-white/10 gap-4"
+                                className="relative isolate flex flex-col p-6 overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-white/5 gap-4"
                               >
                                 <div className="relative z-10 flex items-center gap-4">
                                   <img
@@ -11497,62 +11497,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* ===================================================== */}
                     {/* Trakt: comentarios */}
                     <section className="mb-10">
-                      <div className="mb-2 flex items-center justify-between gap-4">
-                        {/* Mantiene SectionTitle (mismo tamano), pero sin mb interno aqui */}
-                        <SectionTitle
-                          title="Comentarios"
-                          icon={MessageSquareIcon}
-                          className="mb-0"
-                        />
+                      <SectionTitle
+                        title="Comentarios"
+                        icon={MessageSquareIcon}
+                      />
 
-                        {/* Bloque derecho centrado al titulo */}
-                        <div className="flex items-center gap-2 h-10 md:h-11 transform-gpu -translate-y-[3px] md:-translate-y-[10px]">
-                          <a
-                            href={
-                              trakt?.traktUrl
-                                ? `${trakt.traktUrl}/comments`
-                                : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5
-        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider text-zinc-300 transition
-        hover:border-yellow-500/50 hover:bg-yellow-500/10 hover:text-yellow-400"
-                            style={{ WebkitTapHighlightColor: "transparent" }}
-                          >
-                            <span className="hidden sm:inline">
-                              Ver en Trakt
-                            </span>
-                            {tComments.total > 0 && (
-                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white">
-                                {tComments.total}
-                              </span>
-                            )}
-                            <ExternalLink className="h-3 w-3 opacity-50 transition group-hover:opacity-100" />
-                          </a>
-
-                          <a
-                            href={
-                              trakt?.traktUrl
-                                ? `${trakt.traktUrl}/comments`
-                                : `https://trakt.tv/search?query=${encodeURIComponent(title)}`
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-2 rounded-full bg-white text-black
-        px-4 h-10 md:h-11 text-xs font-bold uppercase tracking-wider transition hover:bg-zinc-200"
-                            style={{ WebkitTapHighlightColor: "transparent" }}
-                          >
-                            <Plus className="h-3 w-3" />
-                            <span className="hidden sm:inline">Escribir</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      <div className="relative isolate overflow-hidden rounded-[2rem] border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
+                      <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
                         {/* Filtros estilo Tabs Modernos */}
-                        <div className="relative z-10 flex items-center justify-between border-b border-white/5 bg-white/5 px-4 py-3">
-                          <div className="flex isolate transform-gpu items-center rounded-xl p-1 border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm">
+                        <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-4 py-3">
+                          <div className="flex items-center gap-2">
                             {[
                               { id: "likes30", label: "Top 30 Días" },
                               { id: "likesAll", label: "Top Histórico" },
@@ -11562,10 +11515,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={t.id}
                                 type="button"
                                 onClick={() => setTCommentsTab(t.id)}
-                                className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center ${
+                                className={`relative isolate transform-gpu rounded-xl px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center border ${
                                   tCommentsTab === t.id
-                                    ? "bg-white/10 text-white shadow-md"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                    ? "border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm text-white"
+                                    : "border-transparent bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
                                 }`}
                               >
                                 {t.label}
@@ -11609,7 +11562,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   key={String(
                                     c?.id || `${user?.username}-${created}`,
                                   )}
-                                  className="group relative flex gap-4 rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/10 shadow-sm"
+                                  className="group relative flex gap-4 rounded-2xl border border-transparent bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/5 shadow-sm"
                                 >
                                   {/* Avatar */}
                                   <div className="shrink-0">
