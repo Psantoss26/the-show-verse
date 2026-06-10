@@ -187,12 +187,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                   href={`/details/${item.media_type}/${item.id}`}
                   onClick={handleResultClick}
                 >
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group"
-                  >
+                  <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
                     <div className="relative flex-shrink-0">
                       <img
                         src={
@@ -226,7 +221,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                         )}
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 </Link>
               ))}
             </div>

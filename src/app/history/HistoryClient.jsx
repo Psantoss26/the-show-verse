@@ -1605,7 +1605,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       <Poster entry={entry} className="w-full h-full" />
 
       <div
-        className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+        className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
           type === "movie"
             ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
             : "bg-purple-500/15 border-purple-500/30 text-purple-300"
@@ -1795,7 +1795,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
       <Poster entry={entry} className="w-full h-full" />
 
       <div
-        className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+        className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
           type === "movie"
             ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
             : "bg-purple-500/15 border-purple-500/30 text-purple-300"
