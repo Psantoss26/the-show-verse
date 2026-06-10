@@ -1,4 +1,4 @@
-import { norm, containsAny, SOUNDTRACK_WORDS, BAD_MATCH_WORDS } from "@/lib/api/soundtrack-utils";
+import { norm, containsAny, sigTokens, SOUNDTRACK_WORDS, BAD_MATCH_WORDS } from "@/lib/api/soundtrack-utils";
 
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
@@ -62,13 +62,21 @@ async function lookupAlbumTracks(collectionId, country) {
     .filter((r) => r.wrapperType === "track" && r.kind === "song");
 }
 
+function nameMatches(name, queryTitleNorm, querySigTokens) {
+  if (name.includes(queryTitleNorm)) return true;
+  if (querySigTokens.length < 2) return false;
+  const hits = querySigTokens.filter((t) => name.includes(t)).length;
+  return hits / querySigTokens.length >= 0.66;
+}
+
 function findBestAlbum(albums, queryTitleNorm) {
   let best = null;
   let bestScore = -Infinity;
+  const querySigToks = sigTokens(queryTitleNorm);
 
   for (const album of albums) {
     const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
-    if (!name.includes(queryTitleNorm)) continue;
+    if (!nameMatches(name, queryTitleNorm, querySigToks)) continue;
 
     let score = 0;
 

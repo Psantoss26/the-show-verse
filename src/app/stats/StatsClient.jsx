@@ -295,8 +295,8 @@ const COLOR_STYLES = {
 };
 
 const PROFILE_GLASS_SURFACE =
-  "relative isolate overflow-hidden bg-black/40 bg-gradient-to-br from-white/15 via-transparent to-black/60 backdrop-blur-[60px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu";
-const PROFILE_GLASS_HOVER = "transition-all duration-300 hover:bg-black/50";
+  "relative isolate overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.7)] transform-gpu";
+const PROFILE_GLASS_HOVER = "transition-all duration-300 hover:bg-black/40";
 const PROFILE_GLASS_PANEL = `${PROFILE_GLASS_SURFACE} ${PROFILE_GLASS_HOVER}`;
 
 // -----------------------------------------------------------------------------

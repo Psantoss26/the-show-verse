@@ -23,7 +23,7 @@ export function norm(v) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/&/g, " and ")
-    .replace(/[''`´]/g, "")
+    .replace(/['\u2018\u2019\u02bc\u02bb`´]/g, "")
     .replace(/[^a-z0-9]+/gi, " ")
     .toLowerCase()
     .trim()
