@@ -138,6 +138,44 @@ function cleanAwardTitle(name) {
     .trim();
 }
 
+function commonsFilePath(fileName) {
+  const clean = String(fileName || "").trim();
+  if (!clean) return null;
+  return `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(clean)}`;
+}
+
+function fallbackAwardImageUrl(name) {
+  const n = cleanAwardTitle(name).toLowerCase();
+  if (/\bacademy\b|oscar|óscar/.test(n)) {
+    return commonsFilePath("Academy Award for Best Foreign Language Film.svg");
+  }
+  if (/golden\s+globes?|globos?\s+de\s+oro/.test(n)) {
+    return commonsFilePath("Golden Globe icon (gold).svg");
+  }
+  if (/cannes|palme|palma\s+de\s+oro/.test(n)) {
+    return commonsFilePath("Palme d'Or gold silhouette.svg");
+  }
+  if (/emmy/.test(n)) {
+    return commonsFilePath("Emmy gold silhouette.svg");
+  }
+  return null;
+}
+
+function entityImageFileName(entity) {
+  return entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value || null;
+}
+
+function relatedAwardEntityIds(entity) {
+  const out = new Set();
+  for (const prop of ["P361", "P279", "P31"]) {
+    for (const claim of entity?.claims?.[prop] || []) {
+      const id = wikidataEntityIdFromSnak(claim?.mainsnak);
+      if (id) out.add(id);
+    }
+  }
+  return out;
+}
+
 function getAwardInitials(name) {
   const words = cleanAwardTitle(name || "Premio")
     .replace(
@@ -162,7 +200,7 @@ function formatAwardGroupName(name) {
   const n = raw.toLowerCase();
   if (/academy awards?|oscars?|óscars?|oscar|óscar/.test(n))
     return "Premios Oscar";
-  if (/golden\s+globes?/.test(n)) return "Globos de Oro";
+  if (/golden\s+globes?|globos?\s+de\s+oro/.test(n)) return "Globos de Oro";
   if (/bafta/.test(n)) return "Premios BAFTA";
   if (/emmy/.test(n)) return "Premios Emmy";
   if (/screen\s+actors\s+guild|sag/.test(n)) {
@@ -200,7 +238,7 @@ function getAwardVisual(name) {
     };
   }
 
-  if (/golden\s+globes?/.test(n)) {
+  if (/golden\s+globes?|globos?\s+de\s+oro/.test(n)) {
     return {
       label: "GLOBOS",
       background:
@@ -440,18 +478,44 @@ async function fetchWikidataAwards(wikidataId) {
   const labelJson = await labelRes.json().catch(() => ({}));
   const entities = labelJson?.entities || {};
 
+  const relatedIds = new Set();
+  for (const item of normalized) {
+    const awardEntity = entities[item.awardId];
+    for (const id of relatedAwardEntityIds(awardEntity)) {
+      if (!entities[id]) relatedIds.add(id);
+    }
+  }
+
+  if (relatedIds.size > 0) {
+    const relatedParams = new URLSearchParams({
+      action: "wbgetentities",
+      ids: Array.from(relatedIds).join("|"),
+      props: "labels|claims",
+      languages: "es|en",
+      format: "json",
+      origin: "*",
+    });
+    const relatedRes = await fetch(wikidataUrl(relatedParams), {
+      cache: "force-cache",
+    });
+    const relatedJson = await relatedRes.json().catch(() => ({}));
+    Object.assign(entities, relatedJson?.entities || {});
+  }
+
   return normalized
     .map((item) => {
       const awardEntity = entities[item.awardId];
-      const imageClaim =
-        awardEntity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
-      const imageUrl = imageClaim
-        ? `https://commons.wikimedia.org/wiki/Special:FilePath/${imageClaim.replace(/ /g, "_")}`
-        : null;
+      const awardName = entityLabel(awardEntity, item.awardId);
+      const relatedImageClaim = Array.from(relatedAwardEntityIds(awardEntity))
+        .map((id) => entityImageFileName(entities[id]))
+        .find(Boolean);
+      const imageClaim = entityImageFileName(awardEntity) || relatedImageClaim;
+      const imageUrl =
+        commonsFilePath(imageClaim) || fallbackAwardImageUrl(awardName);
 
       return {
         ...item,
-        award: entityLabel(awardEntity, item.awardId),
+        award: awardName,
         work: item.workId ? entityLabel(entities[item.workId], "") : "",
         groupImageUrl: imageUrl,
       };
@@ -1101,9 +1165,27 @@ function AwardCard({ item }) {
   const visual = getAwardVisual(awardTitle);
   const groupLabel = formatAwardGroupName(awardTitle);
   const result = item?.status === "winner" ? "winner" : "nominee";
+  const imageCandidates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [item?.groupImageUrl, fallbackAwardImageUrl(awardTitle)].filter(
+            (src) => typeof src === "string" && src.trim(),
+          ),
+        ),
+      ),
+    [awardTitle, item?.groupImageUrl],
+  );
+  const [imageIndex, setImageIndex] = useState(0);
+  const imageCandidateKey = imageCandidates.join("|");
+  const imageSrc = imageCandidates[imageIndex] || null;
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [imageCandidateKey]);
 
   return (
-    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
+    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-md border border-transparent hover:border-yellow-500/30 lg:hover:shadow-yellow-900/20 transition-all duration-300">
       <div
         className="aspect-[2/3] overflow-hidden relative flex flex-col"
         style={{ background: visual.background }}
@@ -1142,15 +1224,23 @@ function AwardCard({ item }) {
             {visual.label}
           </div>
 
-          {item?.groupImageUrl ? (
+          {imageSrc ? (
             <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
               <img
-                src={item.groupImageUrl}
+                key={imageSrc}
+                src={imageSrc}
                 alt=""
                 className="h-full w-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)] rounded-lg"
                 loading="lazy"
                 decoding="async"
                 referrerPolicy="no-referrer"
+                onError={() => {
+                  setImageIndex((prev) =>
+                    prev < imageCandidates.length - 1
+                      ? prev + 1
+                      : imageCandidates.length,
+                  );
+                }}
               />
             </div>
           ) : (

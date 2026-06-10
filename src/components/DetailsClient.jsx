@@ -1103,7 +1103,7 @@ function AwardCard({ item }) {
   const groupLabel = formatAwardGroupName(item?.groupName);
 
   return (
-    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1">
+    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-md border border-transparent hover:border-yellow-500/30 lg:hover:shadow-yellow-900/20 transition-all duration-300">
       <div
         className="aspect-[2/3] overflow-hidden relative flex flex-col"
         style={{ background: visual.background }}
@@ -9763,7 +9763,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
-                              className="mt-3 block group relative bg-neutral-900 rounded-xl overflow-hidden border border-white/10 hover:border-yellow-400 hover:shadow-[0_0_25px_-5px_rgba(250,204,21,0.5)] hover:z-10 transition-all duration-300 hover:-translate-y-1"
+                              className="mt-3 block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {actor.profile_path ? (
@@ -9844,8 +9844,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const recCardClass = enableHover
-                            ? "mt-3 block group relative bg-neutral-900 rounded-xl overflow-hidden border border-white/10 hover:border-yellow-400 hover:shadow-[0_0_25px_-5px_rgba(250,204,21,0.5)] hover:z-10 transition-all duration-300 hover:-translate-y-1"
-                            : "mt-3 block relative bg-neutral-900 rounded-xl overflow-hidden border border-white/5";
+                            ? "mt-3 block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                            : "mt-3 block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
                           const recImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
