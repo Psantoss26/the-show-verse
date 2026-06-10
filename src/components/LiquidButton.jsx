@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Eye } from "lucide-react";
 
 /**
  * LiquidButton: Botón con efecto de gotas/cristal líquido
@@ -616,7 +616,9 @@ export default function LiquidButton({
         ) : progressPercent ? (
           (() => {
             if (progressPercent === "100%") {
-              return <Check className="w-7 h-7 stroke-[3px]" />;
+              return (
+                <Eye className="w-7 h-7 stroke-[2.5px] text-emerald-300 drop-shadow-md" />
+              );
             }
             const numberPart = progressPercent.replace("%", "");
             const fontSizeClass =
