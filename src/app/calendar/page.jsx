@@ -117,7 +117,7 @@ function EpisodeCard({ item, viewMode }) {
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-xl transition-transform duration-500 hover:scale-[1.03] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:shadow-[0_20px_25px_-5px_rgba(168,85,247,0.15)]"
+      className="group block overflow-hidden rounded-lg transition-transform duration-500 hover:scale-[1.03] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:shadow-[0_20px_25px_-5px_rgba(168,85,247,0.15)]"
     >
       <div className="relative aspect-[16/9] overflow-hidden bg-zinc-900">
         <TmdbBackdrop
@@ -966,7 +966,7 @@ export default function CalendarPage() {
                           href={href}
                           className="group relative block animate-in fade-in zoom-in-95 duration-500"
                         >
-                          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg sm:rounded-xl shadow-md transition-all duration-500 group-hover:shadow-[0_20px_25px_-5px_rgba(234,179,8,0.15)] group-hover:scale-[1.03] z-0 group-hover:z-10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg">
+                          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md sm:rounded-lg shadow-md transition-all duration-500 group-hover:shadow-[0_20px_25px_-5px_rgba(234,179,8,0.15)] group-hover:scale-[1.03] z-0 group-hover:z-10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg">
                             <TmdbPoster
                               path={posterPath}
                               alt={title}
@@ -974,7 +974,7 @@ export default function CalendarPage() {
                             />
 
                             <div
-                              className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${
+                              className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${
                                 isMovie
                                   ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
                                   : "bg-purple-500/15 border-purple-500/30 text-purple-300"

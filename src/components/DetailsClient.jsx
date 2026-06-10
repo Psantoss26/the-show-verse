@@ -9021,7 +9021,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
+              <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]">
                 <div
                   className="
       py-3
@@ -9517,7 +9517,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <FadeIn delay={0.24} className="mt-8 w-full">
+          <FadeIn delay={0.24} className="mt-6 w-full">
             {/* --- MENÚ DE NAVEGACIÓN --- */}
             <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
               {[
@@ -9929,7 +9929,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className={recOverlayClass} />
 
                                   <div
-                                    className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+                                    className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
                                       enableHover
                                         ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
                                         : ""

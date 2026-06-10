@@ -618,8 +618,7 @@ function LibraryMediaCard({
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
   const aspectRatio =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
-  const waitForPosterArtwork =
-    posterPending || (!posterSrc && backdropPending);
+  const waitForPosterArtwork = posterPending || (!posterSrc && backdropPending);
   const waitForBackdropArtwork =
     backdropPending || (!backdropSrc && posterPending);
   const posterCandidates = waitForPosterArtwork
@@ -763,7 +762,7 @@ function LibraryMediaCard({
           >
             {renderMedia()}
             <div
-              className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+              className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
                 isMovie
                   ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
                   : "bg-purple-500/15 border-purple-500/30 text-purple-300"
@@ -821,7 +820,7 @@ function LibraryMediaCard({
           {renderMedia()}
 
           <div
-            className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+            className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
               isMovie
                 ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
                 : "bg-purple-500/15 border-purple-500/30 text-purple-300"
