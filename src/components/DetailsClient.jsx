@@ -645,12 +645,12 @@ function awardResultLabel(result) {
 
 function awardResultClass(result) {
   if (result === "winner") {
-    return "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]";
+    return "text-yellow-400";
   }
   if (result === "nominee") {
-    return "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]";
+    return "text-sky-300";
   }
-  return "text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]";
+  return "text-zinc-300";
 }
 
 function flattenAwardItems(details) {
@@ -1129,7 +1129,7 @@ function AwardCard({ item }) {
             {awardResultLabel(item?.result)}
           </span>
           {item?.year && (
-            <span className="text-[10px] font-black tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)] transition-all">
+            <span className="text-[10px] font-black tracking-widest text-zinc-300 transition-all">
               {item.year}
             </span>
           )}
@@ -10744,7 +10744,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                           {resText && (
                                             <div className="absolute bottom-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 z-10 pointer-events-none">
-                                              <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                              <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                                 {resText}
                                               </span>
@@ -10811,7 +10811,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: 4 }).map((_, index) => (
                                 <div
                                   key={index}
-                                  className="relative rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] animate-pulse"
+                                  className="relative rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg animate-pulse"
                                   aria-hidden="true"
                                 >
                                   <div className="relative z-10 aspect-video bg-white/5">
@@ -10884,7 +10884,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => openVideo(v)}
                                       aria-label={v.name || "Ver vídeo"}
-                                      className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/20 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all hover:border-yellow-500/50 hover:bg-black/30 group"
+                                      className="relative w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transition-all hover:border-yellow-500/30 group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
                                         <img
@@ -10913,7 +10913,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           <div className="flex items-center gap-3 flex-nowrap overflow-x-auto no-scrollbar pb-1">
                                             {/* Label de Oficial */}
                                             {v.official && (
-                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-yellow-400">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)] animate-pulse" />
                                                 OFFICIAL
                                               </span>
@@ -10921,7 +10921,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                             {/* Label de Tipo (Trailer, Teaser, etc) */}
                                             {v.type && (
-                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-sky-300">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
                                                 {v.type}
                                               </span>
@@ -10929,7 +10929,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                             {/* Label de Idioma */}
                                             {v.iso_639_1 && (
-                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                                 {v.iso_639_1}
                                               </span>
@@ -11071,13 +11071,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
 
                                     <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
-                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]">
+                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                                         {track.previewUrl
                                           ? "Preview"
                                           : "Spotify"}
                                       </span>
-                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300">
                                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                         {track.source || "Spotify"}
                                       </span>
