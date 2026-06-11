@@ -242,7 +242,7 @@ function getSoundtrackSourceBadge(source) {
 
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v10";
+const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v11";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
@@ -1887,9 +1887,7 @@ export default function DetailsClient({
 
       try {
         const payload = await promise;
-        const normalized = Array.isArray(payload?.tracks)
-          ? payload.tracks
-          : [];
+        const normalized = Array.isArray(payload?.tracks) ? payload.tracks : [];
         const spotifyConfigured = Boolean(payload?.spotifyConfigured);
         const spotifyActive = payload?.spotifyActive !== false;
         const spotifyRateLimited = Boolean(payload?.spotifyRateLimited);
@@ -1984,7 +1982,11 @@ export default function DetailsClient({
   }, [id, endpointType]);
 
   useEffect(() => {
-    if (!soundtrackSearchQuery || soundtrackResolved || soundtrackTracks.length) {
+    if (
+      !soundtrackSearchQuery ||
+      soundtrackResolved ||
+      soundtrackTracks.length
+    ) {
       return undefined;
     }
 
@@ -4391,6 +4393,7 @@ export default function DetailsClient({
       minHistoryEntries = null,
       expectedHistoryEntries = null,
       force = false,
+      background = false,
     } = {}) => {
       if (endpointType !== "movie") {
         return reloadTraktStatus({ force });
@@ -4407,7 +4410,7 @@ export default function DetailsClient({
         }
 
         latest = await loadTraktMovieWatched({
-          background: attempt > 0,
+          background: background || attempt > 0,
           force: force && attempt === 0,
         });
         const latestHistory = normalizeTraktHistoryEntries(latest?.history);
@@ -4442,6 +4445,20 @@ export default function DetailsClient({
       return latest;
     },
     [endpointType, loadTraktMovieWatched, reloadTraktStatus],
+  );
+
+  const confirmMovieTraktStatusInBackground = useCallback(
+    (options = {}) => {
+      void confirmMovieTraktStatus({ ...options, background: true }).catch(
+        (error) => {
+          console.warn(
+            "[DetailsClient] background Trakt status confirmation failed:",
+            error?.message || error,
+          );
+        },
+      );
+    },
+    [confirmMovieTraktStatus],
   );
 
   useEffect(() => {
@@ -5240,13 +5257,26 @@ export default function DetailsClient({
           history: optimisticHistory,
         });
       });
-      await confirmMovieTraktStatus({
+      setTraktBusy("");
+      confirmMovieTraktStatusInBackground({
         expectedWatched: next,
         expectedHistoryEntries: next ? 1 : 0,
       });
     } finally {
       setTraktBusy("");
     }
+  };
+
+  const pickMutationHistoryId = (payload, fallback = null) => {
+    if (payload?.historyId != null) return payload.historyId;
+    if (payload?.id != null) return payload.id;
+    if (Array.isArray(payload?.ids) && payload.ids[0] != null) {
+      return payload.ids[0];
+    }
+    if (Array.isArray(payload?.result?.ids) && payload.result.ids[0] != null) {
+      return payload.result.ids[0];
+    }
+    return fallback;
   };
 
   // Agrega un nuevo visionado (play) con fecha especifica al historial de Trakt
@@ -5258,11 +5288,12 @@ export default function DetailsClient({
       const prevHistoryLength = normalizeTraktHistoryEntries(
         trakt.history,
       ).length;
-      await traktAddWatchPlay({
+      const result = await traktAddWatchPlay({
         type: traktType,
         tmdbId: id,
         watchedAt: yyyyMmDd,
       });
+      const optimisticId = pickMutationHistoryId(result, `temp-${Date.now()}`);
       invalidateTraktGetCache({
         tmdbId: id,
         traktId: traktResolvedIdRef.current ?? undefined,
@@ -5275,14 +5306,15 @@ export default function DetailsClient({
           lastWatchedAt: optimisticIso,
           history: [
             {
-              id: `temp-${Date.now()}`,
+              id: optimisticId,
               watched_at: optimisticIso,
             },
             ...(Array.isArray(prev.history) ? prev.history : []),
           ],
         }),
       );
-      await confirmMovieTraktStatus({
+      setTraktBusy("");
+      confirmMovieTraktStatusInBackground({
         expectedWatched: true,
         expectedHistoryEntries: prevHistoryLength + 1,
       });
@@ -5300,12 +5332,13 @@ export default function DetailsClient({
       const prevHistoryLength = normalizeTraktHistoryEntries(
         trakt.history,
       ).length;
-      await traktUpdateWatchPlay({
+      const result = await traktUpdateWatchPlay({
         type: traktType,
         tmdbId: id,
         historyId,
         watchedAt: yyyyMmDd,
       });
+      const nextHistoryId = pickMutationHistoryId(result, historyId);
       invalidateTraktGetCache({
         tmdbId: id,
         traktId: traktResolvedIdRef.current ?? undefined,
@@ -5318,6 +5351,7 @@ export default function DetailsClient({
             String(entry.id) === String(historyId)
               ? {
                   ...entry,
+                  id: nextHistoryId,
                   watched_at: optimisticIso,
                   watchedAt: optimisticIso,
                 }
@@ -5325,7 +5359,8 @@ export default function DetailsClient({
           ),
         }),
       );
-      await confirmMovieTraktStatus({
+      setTraktBusy("");
+      confirmMovieTraktStatusInBackground({
         expectedWatched: true,
         expectedHistoryEntries: Math.max(1, prevHistoryLength),
       });
@@ -5357,7 +5392,8 @@ export default function DetailsClient({
           ),
         }),
       );
-      await confirmMovieTraktStatus({
+      setTraktBusy("");
+      confirmMovieTraktStatusInBackground({
         expectedWatched: expectedHistoryLength > 0,
         expectedHistoryEntries: expectedHistoryLength,
       });
@@ -11112,150 +11148,171 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       (soundtrackLoading ||
                         soundtrackResolved ||
                         soundtrackTracks.length > 0) && (
-                      <section className="mt-2 mb-10">
-                        <SectionTitle
-                          title="Soundtrack y música"
-                          icon={Music2}
-                        />
+                        <section className="mt-2 mb-10">
+                          <SectionTitle
+                            title="Soundtrack y música"
+                            icon={Music2}
+                          />
 
-                        {soundtrackLoading && (
-                          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                            {Array.from({ length: 5 }).map((_, index) => (
-                              <div
-                                key={index}
-                                className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
-                                aria-hidden="true"
-                              >
-                                <div className="relative z-10 aspect-square bg-white/5">
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
+                          {soundtrackLoading && (
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                              {Array.from({ length: 5 }).map((_, index) => (
+                                <div
+                                  key={index}
+                                  className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
+                                  aria-hidden="true"
+                                >
+                                  <div className="relative z-10 aspect-square bg-white/5">
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
+                                    </div>
+                                  </div>
+                                  <div className="relative z-10 flex flex-col shrink-0 h-[164px] p-4 w-full">
+                                    <div className="h-4 w-3/4 rounded bg-white/10" />
+                                    <div className="mt-2 h-3 w-1/2 rounded bg-white/10" />
+                                    <div className="mt-3 h-3 w-1/3 rounded bg-white/10" />
                                   </div>
                                 </div>
-                                <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
-                                  <div className="h-4 w-3/4 rounded bg-white/10" />
-                                  <div className="mt-3 h-3 w-1/2 rounded bg-white/10" />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {!soundtrackLoading &&
-                          soundtrackResolved &&
-                          soundtrackTracks.length === 0 && (
-                            <div className="relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu p-5 text-sm text-zinc-400">
-                              <div className="relative z-10">
-                                {soundtrackError ||
-                                  "No se encontraron canciones de Spotify para este título."}
-                                {soundtrackSpotifySearchUrl && (
-                                  <a
-                                    href={soundtrackSpotifySearchUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="ml-2 font-bold text-yellow-300 hover:text-yellow-200"
-                                  >
-                                    Buscar en Spotify
-                                  </a>
-                                )}
-                              </div>
+                              ))}
                             </div>
                           )}
 
-                        {soundtrackTracks.length > 0 && (
-                          <DetailsArrowCarousel
-                            spaceBetween={12}
-                            slidesPerView={2}
-                            breakpoints={{
-                              640: { slidesPerView: 2, spaceBetween: 16 },
-                              768: { slidesPerView: 3, spaceBetween: 16 },
-                              1024: { slidesPerView: 4, spaceBetween: 16 },
-                              1280: { slidesPerView: 5, spaceBetween: 16 },
-                            }}
-                            className="pb-2"
-                          >
-                            {soundtrackTracks.map((track) => {
-                              const sourceBadge = getSoundtrackSourceBadge(
-                                track.source,
-                              );
+                          {!soundtrackLoading &&
+                            soundtrackResolved &&
+                            soundtrackTracks.length === 0 && (
+                              <div className="relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu p-5 text-sm text-zinc-400">
+                                <div className="relative z-10">
+                                  {soundtrackError ||
+                                    "No se encontraron canciones de Spotify para este título."}
+                                  {soundtrackSpotifySearchUrl && (
+                                    <a
+                                      href={soundtrackSpotifySearchUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ml-2 font-bold text-yellow-300 hover:text-yellow-200"
+                                    >
+                                      Buscar en Spotify
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
-                              return (
-                                <SwiperSlide key={track.id} className="h-full">
-                                  <button
-                                    type="button"
-                                    onClick={() => openSoundtrack(track.id)}
-                                    aria-label={
-                                      track.trackName || "Reproducir música"
-                                    }
-                                    className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
+                          {soundtrackTracks.length > 0 && (
+                            <DetailsArrowCarousel
+                              spaceBetween={12}
+                              slidesPerView={2}
+                              breakpoints={{
+                                640: { slidesPerView: 2, spaceBetween: 16 },
+                                768: { slidesPerView: 3, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 16 },
+                                1280: { slidesPerView: 5, spaceBetween: 16 },
+                              }}
+                              className="pb-2"
+                            >
+                              {soundtrackTracks.map((track) => {
+                                const sourceBadge = getSoundtrackSourceBadge(
+                                  track.source,
+                                );
+
+                                return (
+                                  <SwiperSlide
+                                    key={track.id}
+                                    className="h-full"
                                   >
-                                  <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
-                                    {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
-                                    <img
-                                      src={
-                                        track.artworkUrl || "/placeholder.png"
+                                    <button
+                                      type="button"
+                                      onClick={() => openSoundtrack(track.id)}
+                                      aria-label={
+                                        track.trackName || "Reproducir música"
                                       }
-                                      alt=""
-                                      loading="lazy"
-                                      decoding="async"
-                                      fetchPriority="low"
-                                      className="absolute inset-0 w-full h-full object-cover opacity-30 blur-xl transform-gpu scale-110"
-                                      aria-hidden="true"
-                                    />
-                                    {/* Portada completa sin recortes */}
-                                    <img
-                                      src={
-                                        track.artworkUrl || "/placeholder.png"
-                                      }
-                                      alt=""
-                                      loading="lazy"
-                                      decoding="async"
-                                      fetchPriority="low"
-                                      className="absolute inset-0 w-full h-full object-contain transform-gpu transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                      <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md">
-                                        <Music2 className="w-7 h-7 text-yellow-200" />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 items-start w-full">
-                                    <div className="w-full min-h-[22px]">
-                                      <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
-                                        {track.trackName}
-                                      </div>
-                                    </div>
-
-                                    <div className="mt-2 line-clamp-1 text-xs font-medium text-zinc-400">
-                                      {track.artistName}
-                                    </div>
-
-                                    <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
-                                      <span
-                                        className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${sourceBadge.textClass}`}
-                                      >
-                                        <span
-                                          className={`w-1.5 h-1.5 rounded-full ${sourceBadge.dotClass}`}
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
+                                    >
+                                      <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
+                                        {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
+                                        <img
+                                          src={
+                                            track.artworkUrl ||
+                                            "/placeholder.png"
+                                          }
+                                          alt=""
+                                          loading="lazy"
+                                          decoding="async"
+                                          fetchPriority="low"
+                                          className="absolute inset-0 w-full h-full object-cover opacity-30 blur-xl transform-gpu scale-110"
+                                          aria-hidden="true"
                                         />
-                                        {sourceBadge.label}
-                                      </span>
-                                    </div>
+                                        {/* Portada completa sin recortes */}
+                                        <img
+                                          src={
+                                            track.artworkUrl ||
+                                            "/placeholder.png"
+                                          }
+                                          alt=""
+                                          loading="lazy"
+                                          decoding="async"
+                                          fetchPriority="low"
+                                          className="absolute inset-0 w-full h-full object-contain transform-gpu transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                          <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md">
+                                            <Music2 className="w-7 h-7 text-yellow-200" />
+                                          </div>
+                                        </div>
+                                      </div>
 
-                                    <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
-                                      <span className="font-semibold text-zinc-200">
-                                        {track.collectionName || "Soundtrack"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  </button>
-                                </SwiperSlide>
-                              );
-                            })}
-                          </DetailsArrowCarousel>
-                        )}
-                      </section>
-                    )}
+                                      <div className="relative z-10 flex flex-col shrink-0 h-[164px] p-4 items-start w-full overflow-hidden">
+                                        <div className="w-full h-[40px] sm:h-[44px] mb-1.5">
+                                          <div
+                                            className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-2"
+                                            title={track.trackName}
+                                          >
+                                            {track.trackName}
+                                          </div>
+                                        </div>
+
+                                        <div className="w-full">
+                                          <div
+                                            className="truncate text-xs font-medium text-zinc-400"
+                                            title={track.artistName}
+                                          >
+                                            {track.artistName}
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
+                                          <span
+                                            className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${sourceBadge.textClass}`}
+                                          >
+                                            <span
+                                              className={`w-1.5 h-1.5 rounded-full ${sourceBadge.dotClass}`}
+                                            />
+                                            {sourceBadge.label}
+                                          </span>
+                                        </div>
+
+                                        <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2 w-full overflow-hidden">
+                                          <span
+                                            className="font-semibold text-zinc-200 truncate"
+                                            title={
+                                              track.collectionName ||
+                                              "Soundtrack"
+                                            }
+                                          >
+                                            {track.collectionName ||
+                                              "Soundtrack"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  </SwiperSlide>
+                                );
+                              })}
+                            </DetailsArrowCarousel>
+                          )}
+                        </section>
+                      )}
                   </AnimatedSection>
                 </section>
 

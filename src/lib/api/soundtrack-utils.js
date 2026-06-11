@@ -10,7 +10,8 @@ export const BAD_MATCH_WORDS = [
   "karaoke", "tribute", "cover", "covers", "remix", "remixes",
   "music box", "lullaby", "lofi", "lo-fi", "workout", "ringtone",
   "in the style of", "piano tribute", "trailer music", "piano versions",
-  "made famous by", "as made famous",
+  "made famous by", "as made famous", "unofficial", "performed by",
+  "tribute co", "the hit co", "hit co", "popcorn buckets",
 ];
 
 export const GENERIC_WORDS = new Set([

@@ -67,9 +67,10 @@ export async function POST(request) {
         // ✅ op: add => añade UN nuevo visionado (no borra los anteriores)
         if (op === 'add') {
             const watchedAtIso = normalizeWatchedAt(watchedAt)
-            await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+            const result = await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+            const historyId = Array.isArray(result?.ids) ? result.ids[0] : null
 
-            const res = NextResponse.json({ ok: true })
+            const res = NextResponse.json({ ok: true, historyId, result })
             if (refreshedTokens) setTraktCookies(res, refreshedTokens)
             return res
         }
@@ -78,9 +79,10 @@ export async function POST(request) {
         if (op === 'update') {
             const watchedAtIso = normalizeWatchedAt(watchedAt)
             await traktRemoveHistoryEntries(token, { ids: [historyId] })
-            await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+            const result = await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+            const nextHistoryId = Array.isArray(result?.ids) ? result.ids[0] : null
 
-            const res = NextResponse.json({ ok: true })
+            const res = NextResponse.json({ ok: true, historyId: nextHistoryId, result })
             if (refreshedTokens) setTraktCookies(res, refreshedTokens)
             return res
         }
@@ -102,11 +104,19 @@ export async function POST(request) {
 
             if (op === 'add') {
                 const watchedAtIso = normalizeWatchedAt(watchedAt)
-                await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+                const result = await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+                const historyId = Array.isArray(result?.ids) ? result.ids[0] : null
+                const res = NextResponse.json({ ok: true, historyId, result })
+                setTraktCookies(res, refreshedTokens)
+                return res
             } else if (op === 'update') {
                 const watchedAtIso = normalizeWatchedAt(watchedAt)
                 await traktRemoveHistoryEntries(token, { ids: [historyId] })
-                await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+                const result = await traktAddToHistory(token, { type, tmdbId, watchedAtIso })
+                const nextHistoryId = Array.isArray(result?.ids) ? result.ids[0] : null
+                const res = NextResponse.json({ ok: true, historyId: nextHistoryId, result })
+                setTraktCookies(res, refreshedTokens)
+                return res
             } else if (op === 'remove') {
                 await traktRemoveHistoryEntries(token, { ids: [historyId] })
             }
