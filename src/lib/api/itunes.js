@@ -172,7 +172,11 @@ function hasDisallowedTitleSuffix(name, releaseDate, ctx) {
           if (!matches) return false;
 
           const nextToken = nameTokens[index + titleTokens.length] ?? "";
-          return /^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken);
+          if (!nextToken) return false;
+          if (/^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken)) return true;
+
+          const allowedSoundtrackToken = /^(complete|music|official|original|score|soundtrack|ost)$/.test(nextToken);
+          return !allowedSoundtrackToken;
         });
       });
     });
@@ -184,6 +188,7 @@ function isStrictSoundtrackAlbumName(name) {
     /official/.test(name) ||
     /soundtrack/.test(name) ||
     /original motion picture/.test(name) ||
+    /music from (the )?(motion picture|film|movie)/.test(name) ||
     /banda sonora/.test(name) ||
     /score/.test(name)
   );
