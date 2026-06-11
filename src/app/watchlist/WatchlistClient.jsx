@@ -1050,14 +1050,14 @@ function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
-  const [transitioningThreshold, setTransitioningThreshold] = useState(132);
+  const [transitioningThreshold, setTransitioningThreshold] = useState(128);
 
   useEffect(() => {
     if (mobileFiltersOpen) {
-      setTransitioningThreshold(244);
+      setTransitioningThreshold(232);
     } else {
       const timer = setTimeout(() => {
-        setTransitioningThreshold(132);
+        setTransitioningThreshold(128);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -1080,7 +1080,7 @@ function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }
     <motion.div
       ref={ref}
       className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
-        mobileFiltersOpen ? "top-[244px]" : "top-[132px]"
+        mobileFiltersOpen ? "top-[232px]" : "top-[128px]"
       }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -2689,7 +2689,7 @@ export default function WatchlistClient() {
         {/* Filters */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-20 z-[70] space-y-2 mb-2 lg:mb-6 transition-all duration-300"
+          className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -2733,14 +2733,15 @@ export default function WatchlistClient() {
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
             } lg:hidden overflow-hidden ${
-              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 top-full z-10" : "relative z-10"
+              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 z-10" : "relative z-10"
             }`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
+              top: (filtersSticky && mobileFiltersOpen) ? "calc(100% + 4px)" : undefined,
             }}
           >
             <div className="min-h-0">
-              <div className="space-y-2 pt-1 pb-1">
+              <div className="space-y-1 pt-1 pb-1">
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <InlineDropdown
