@@ -9,6 +9,7 @@ import {
   useCallback,
   startTransition,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -26,9 +27,7 @@ import {
   X,
   Filter,
   SlidersHorizontal,
-  LayoutList,
-  Grid3x3,
-  LayoutGrid,
+  Layers,
   Layers3,
   MoreHorizontal,
   RotateCcw,
@@ -1046,7 +1045,14 @@ function StatBox({
   );
 }
 
-function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }) {
+function GroupDivider({
+  title,
+  stats,
+  count,
+  total,
+  groupBy,
+  mobileFiltersOpen,
+}) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
@@ -1165,37 +1171,65 @@ function InlineDropdown({
   children,
 }) {
   const [open, setOpen] = useState(false);
-  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    const updateMenuSize = () => {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const availableBelow = window.innerHeight - rect.bottom - 12;
-      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
-    };
-
-    updateMenuSize();
-    const frame = window.requestAnimationFrame(updateMenuSize);
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    window.addEventListener("resize", updateMenuSize);
-    window.addEventListener("scroll", updateMenuSize, true);
     return () => {
-      window.cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("resize", updateMenuSize);
-      window.removeEventListener("scroll", updateMenuSize, true);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
@@ -1221,24 +1255,30 @@ function InlineDropdown({
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
-            style={{
-              maxHeight: `${menuMaxHeight}px`,
-              scrollbarWidth: "thin",
-              scrollbarGutter: "stable",
-              overscrollBehavior: "contain",
-            }}
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -2733,224 +2773,229 @@ export default function WatchlistClient() {
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
             } lg:hidden overflow-hidden ${
-              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 z-10" : "relative z-10"
+              filtersSticky && mobileFiltersOpen
+                ? "absolute left-0 right-0 z-10"
+                : "relative z-10"
             }`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top: (filtersSticky && mobileFiltersOpen) ? "calc(100% + 4px)" : undefined,
+              top:
+                filtersSticky && mobileFiltersOpen
+                  ? "calc(100% + 4px)"
+                  : undefined,
             }}
           >
             <div className="min-h-0">
               <div className="space-y-1 pt-1 pb-1">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Tipo"
-                        valueLabel={
-                          typeFilter === "all"
-                            ? "Todo"
-                            : typeFilter === "movies"
-                              ? "Películas"
-                              : "Series"
-                        }
-                        icon={Filter}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={typeFilter === "all"}
-                              onClick={() => {
-                                setTypeFilter("all");
-                                close();
-                              }}
-                            >
-                              Todo
-                            </DropdownItem>
-                            <DropdownItem
-                              active={typeFilter === "movies"}
-                              onClick={() => {
-                                setTypeFilter("movies");
-                                close();
-                              }}
-                            >
-                              Películas
-                            </DropdownItem>
-                            <DropdownItem
-                              active={typeFilter === "shows"}
-                              onClick={() => {
-                                setTypeFilter("shows");
-                                close();
-                              }}
-                            >
-                              Series
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Agrupar"
-                        valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
-                        mobileValueLabel={getCompactGroupingValueLabel(
-                          groupBy,
-                          subGroupBy,
-                        )}
-                        compactMobile
-                        icon={Layers3}
-                      >
-                        {({ close }) => (
-                          <GroupingDropdownContent
-                            groupBy={groupBy}
-                            subGroupBy={subGroupBy}
-                            onGroupChange={handleGroupChange}
-                            onSubGroupChange={handleSubGroupChange}
-                            close={close}
-                          />
-                        )}
-                      </InlineDropdown>
-                    </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Tipo"
+                      valueLabel={
+                        typeFilter === "all"
+                          ? "Todo"
+                          : typeFilter === "movies"
+                            ? "Películas"
+                            : "Series"
+                      }
+                      icon={Filter}
+                    >
+                      {({ close }) => (
+                        <>
+                          <DropdownItem
+                            active={typeFilter === "all"}
+                            onClick={() => {
+                              setTypeFilter("all");
+                              close();
+                            }}
+                          >
+                            Todo
+                          </DropdownItem>
+                          <DropdownItem
+                            active={typeFilter === "movies"}
+                            onClick={() => {
+                              setTypeFilter("movies");
+                              close();
+                            }}
+                          >
+                            Películas
+                          </DropdownItem>
+                          <DropdownItem
+                            active={typeFilter === "shows"}
+                            onClick={() => {
+                              setTypeFilter("shows");
+                              close();
+                            }}
+                          >
+                            Series
+                          </DropdownItem>
+                        </>
+                      )}
+                    </InlineDropdown>
                   </div>
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Agrupar"
+                      valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
+                      mobileValueLabel={getCompactGroupingValueLabel(
+                        groupBy,
+                        subGroupBy,
+                      )}
+                      compactMobile
+                      icon={Layers3}
+                    >
+                      {({ close }) => (
+                        <GroupingDropdownContent
+                          groupBy={groupBy}
+                          subGroupBy={subGroupBy}
+                          onGroupChange={handleGroupChange}
+                          onSubGroupChange={handleSubGroupChange}
+                          close={close}
+                        />
+                      )}
+                    </InlineDropdown>
+                  </div>
+                </div>
 
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Orden"
-                        valueLabel={
-                          sortBy === "title-asc"
-                            ? "A-Z"
-                            : sortBy === "title-desc"
-                              ? "Z-A"
-                              : sortBy === "rating-desc"
-                                ? "Mejor"
-                                : sortBy === "rating-asc"
-                                  ? "Peor"
-                                  : sortBy === "added-desc"
-                                    ? "Reciente"
-                                    : sortBy === "added-asc"
-                                      ? "Antiguo"
-                                      : "A-Z"
-                        }
-                        icon={ArrowUpDown}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={sortBy === "title-asc"}
-                              onClick={() => {
-                                setSortBy("title-asc");
-                                close();
-                              }}
-                            >
-                              Título A-Z
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "title-desc"}
-                              onClick={() => {
-                                setSortBy("title-desc");
-                                close();
-                              }}
-                            >
-                              Título Z-A
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "rating-desc"}
-                              onClick={() => {
-                                setSortBy("rating-desc");
-                                close();
-                              }}
-                            >
-                              Valoración ↓
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "rating-asc"}
-                              onClick={() => {
-                                setSortBy("rating-asc");
-                                close();
-                              }}
-                            >
-                              Valoración ↑
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "added-desc"}
-                              onClick={() => {
-                                setSortBy("added-desc");
-                                close();
-                              }}
-                            >
-                              Añadido reciente
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "added-asc"}
-                              onClick={() => {
-                                setSortBy("added-asc");
-                                close();
-                              }}
-                            >
-                              Añadido antiguo
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <div className="flex-1 flex gap-2">
-                      <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                        <button
-                          onClick={() => setViewMode("list")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "list"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <LayoutList className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setViewMode("compact")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "compact"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <Grid3x3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setViewMode("grid")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "grid"
-                              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <LayoutGrid className="w-4 h-4" />
-                        </button>
-                      </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Orden"
+                      valueLabel={
+                        sortBy === "title-asc"
+                          ? "A-Z"
+                          : sortBy === "title-desc"
+                            ? "Z-A"
+                            : sortBy === "rating-desc"
+                              ? "Mejor"
+                              : sortBy === "rating-asc"
+                                ? "Peor"
+                                : sortBy === "added-desc"
+                                  ? "Reciente"
+                                  : sortBy === "added-asc"
+                                    ? "Antiguo"
+                                    : "A-Z"
+                      }
+                      icon={ArrowUpDown}
+                    >
+                      {({ close }) => (
+                        <>
+                          <DropdownItem
+                            active={sortBy === "title-asc"}
+                            onClick={() => {
+                              setSortBy("title-asc");
+                              close();
+                            }}
+                          >
+                            Título A-Z
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "title-desc"}
+                            onClick={() => {
+                              setSortBy("title-desc");
+                              close();
+                            }}
+                          >
+                            Título Z-A
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "rating-desc"}
+                            onClick={() => {
+                              setSortBy("rating-desc");
+                              close();
+                            }}
+                          >
+                            Valoración ↓
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "rating-asc"}
+                            onClick={() => {
+                              setSortBy("rating-asc");
+                              close();
+                            }}
+                          >
+                            Valoración ↑
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "added-desc"}
+                            onClick={() => {
+                              setSortBy("added-desc");
+                              close();
+                            }}
+                          >
+                            Añadido reciente
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "added-asc"}
+                            onClick={() => {
+                              setSortBy("added-asc");
+                              close();
+                            }}
+                          >
+                            Añadido antiguo
+                          </DropdownItem>
+                        </>
+                      )}
+                    </InlineDropdown>
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
-                        onClick={() =>
-                          setImageMode(
-                            imageMode === "poster" ? "backdrop" : "poster",
-                          )
-                        }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                          imageMode === "backdrop"
-                            ? "text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                            : "text-zinc-200 hover:bg-black/30"
+                        onClick={() => setViewMode("list")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "list"
+                            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
-                        title={
-                          imageMode === "poster"
-                            ? "Cambiar a Backdrop"
-                            : "Cambiar a Poster"
-                        }
                       >
-                        {imageMode === "poster" ? (
-                          <PosterGlyph className="w-4 h-4" />
-                        ) : (
-                          <BackdropGlyph className="w-4 h-4" />
-                        )}
+                        <Layers className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("compact")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "compact"
+                            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <AllGlyph className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "grid"
+                            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <PosterGlyph className="w-4 h-4" />
                       </button>
                     </div>
+                    <button
+                      onClick={() =>
+                        setImageMode(
+                          imageMode === "poster" ? "backdrop" : "poster",
+                        )
+                      }
+                      className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                        imageMode === "backdrop"
+                          ? "text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                          : "text-zinc-200 hover:bg-black/30"
+                      }`}
+                      title={
+                        imageMode === "poster"
+                          ? "Cambiar a Backdrop"
+                          : "Cambiar a Poster"
+                      }
+                    >
+                      {imageMode === "poster" ? (
+                        <PosterGlyph className="w-4 h-4" />
+                      ) : (
+                        <BackdropGlyph className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
+                </div>
               </div>
             </div>
           </div>
@@ -3128,7 +3173,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <LayoutList className="w-4 h-4" />
+                <Layers className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
@@ -3138,7 +3183,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <Grid3x3 className="w-4 h-4" />
+                <AllGlyph className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
