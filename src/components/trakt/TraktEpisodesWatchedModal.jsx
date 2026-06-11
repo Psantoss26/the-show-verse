@@ -778,7 +778,7 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               onClick={onClose}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-              title="Cerrar"
+              aria-label="Cerrar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -915,7 +915,7 @@ export default function TraktEpisodesWatchedModal({
                       ? "bg-purple-500/15 text-purple-100 border-purple-300/25"
                       : "bg-white/10 text-white/85 border-white/15"
                   }`}
-                  title={
+                  aria-label={
                     isRewatchView
                       ? "Vista rewatch (independiente)"
                       : "Vista global"
@@ -933,7 +933,7 @@ export default function TraktEpisodesWatchedModal({
             type="button"
             onClick={onClose}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-            title="Cerrar (Esc)"
+            aria-label="Cerrar (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1179,7 +1179,7 @@ export default function TraktEpisodesWatchedModal({
                 type="button"
                 onClick={() => setViewMenuOpen((v) => !v)}
                 disabled={!isConnected}
-                title="Cambiar vista (Global o Rewatch por visionado)"
+                aria-label="Cambiar vista (Global o Rewatch por visionado)"
                 className={`h-10 xl:h-11 w-full inline-flex items-center gap-2 rounded-xl border px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
                   !isConnected
                     ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
@@ -1246,7 +1246,7 @@ export default function TraktEpisodesWatchedModal({
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                title="Vista lista"
+                aria-label="Vista lista"
                 className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "list"
                     ? "bg-white/15 text-white shadow"
@@ -1258,7 +1258,7 @@ export default function TraktEpisodesWatchedModal({
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                title="Vista tabla"
+                aria-label="Vista tabla"
                 className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "table"
                     ? "bg-white/15 text-white shadow"
@@ -1278,7 +1278,7 @@ export default function TraktEpisodesWatchedModal({
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-black/30 border-white/10 text-white/50 hover:border-white/20 hover:bg-white/10 hover:text-white"
               }`}
-              title={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
+              aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
             >
               <Filter className="w-4 h-4" />
               <span className="hidden xl:inline">
@@ -1296,7 +1296,7 @@ export default function TraktEpisodesWatchedModal({
                   ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
                   : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
               }`}
-              title={
+              aria-label={
                 !isConnected
                   ? "Conecta Trakt"
                   : "Añadir un play completo o crear un rewatch vacío"
@@ -1321,7 +1321,7 @@ export default function TraktEpisodesWatchedModal({
                   ? "opacity-50 cursor-not-allowed bg-black/25 border-white/10 text-white/30"
                   : "bg-black/30 border-white/10 text-white/75 hover:border-white/20 hover:bg-white/10"
               }`}
-              title={
+              aria-label={
                 !isConnected
                   ? "Conecta Trakt"
                   : rewatchItems.length === 0
@@ -1350,7 +1350,7 @@ export default function TraktEpisodesWatchedModal({
                     : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40"
                 }
                 ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
-              title={
+              aria-label={
                 !isConnected
                   ? "Conecta Trakt"
                   : isRewatchView
@@ -1620,7 +1620,7 @@ export default function TraktEpisodesWatchedModal({
                                       : "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                                     : "text-zinc-500 hover:text-white hover:bg-white/10"
                                 }`}
-                                title={
+                                aria-label={
                                   isRewatchView
                                     ? watched
                                       ? "Quitar de vistos (este rewatch)"
@@ -1709,7 +1709,7 @@ export default function TraktEpisodesWatchedModal({
                                   : "bg-emerald-600 border-emerald-500 text-white"
                                 : "bg-black/30 border-white/10 text-white/55 hover:bg-white/10 hover:text-white"
                             } ${busy ? "opacity-50" : ""}`}
-                            title={
+                            aria-label={
                               isRewatchView
                                 ? w
                                   ? "Quitar (rewatch)"
@@ -1791,7 +1791,7 @@ export default function TraktEpisodesWatchedModal({
                     disabled={addPlayBusy}
                     onClick={() => setAddPlayOpen(false)}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-                    title="Cerrar"
+                    aria-label="Cerrar"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1879,7 +1879,7 @@ export default function TraktEpisodesWatchedModal({
                               : "bg-black/30 border-white/10 text-white/70 hover:bg-white/10"
                           }
                           ${opt.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
-                        title={
+                        aria-label={
                           opt.id === "release_date" && !showReleaseDate
                             ? "Falta showReleaseDate"
                             : undefined
@@ -1988,7 +1988,7 @@ export default function TraktEpisodesWatchedModal({
                     type="button"
                     onClick={() => setHistoryOpen(false)}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-                    title="Cerrar"
+                    aria-label="Cerrar"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -2036,7 +2036,7 @@ export default function TraktEpisodesWatchedModal({
                                 setHistoryOpen(false);
                               }}
                               className="px-3 py-2 rounded-xl border text-xs font-black bg-purple-500/10 border-purple-500/20 text-purple-200 hover:bg-purple-500/15 transition"
-                              title="Abrir esta vista rewatch"
+                              aria-label="Abrir esta vista rewatch"
                             >
                               Abrir rewatch
                             </button>
@@ -2049,7 +2049,7 @@ export default function TraktEpisodesWatchedModal({
                                 }
                                 disabled={deleteRunBusyId === item.id}
                                 className="px-2.5 py-2 rounded-xl border text-xs font-black bg-red-500/10 border-red-500/20 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
-                                title="Borrar rewatch"
+                                aria-label="Borrar rewatch"
                               >
                                 {deleteRunBusyId === item.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
