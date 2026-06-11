@@ -1436,6 +1436,28 @@ const HistoryItemCard = memo(function HistoryItemCard({
             />
           )}
         </div>
+        <div
+          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+            isGroup
+              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                  type === "movie"
+                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                }`
+          }`}
+        >
+          {isGroup ? (
+            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              <span>{groupCount}</span>
+            </div>
+          ) : type === "movie" ? (
+            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          ) : (
+            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          )}
+        </div>
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2">
