@@ -660,14 +660,12 @@ function CalendarWithPosters({
             <button
               onClick={onPrev}
               className="p-1.5 lg:p-2 hover:bg-zinc-800 rounded-md lg:rounded-lg transition text-zinc-300 hover:text-white"
-              title="Mes anterior"
             >
               <ChevronLeft className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
             </button>
             <button
               onClick={onNext}
               className="p-1.5 lg:p-2 hover:bg-zinc-800 rounded-md lg:rounded-lg transition text-zinc-300 hover:text-white"
-              title="Mes siguiente"
             >
               <ChevronRight className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
             </button>
@@ -675,7 +673,6 @@ function CalendarWithPosters({
           <button
             onClick={onClose}
             className="p-1.5 lg:p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 rounded-lg lg:rounded-xl transition-all text-red-400 hover:text-red-300"
-            title="Cerrar vista calendario"
           >
             <X className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
           </button>
@@ -879,7 +876,6 @@ function CalendarWithPosters({
                   <button
                     onClick={() => setSelectedDayKey(null)}
                     className="p-1.5 hover:bg-white/10 rounded-lg transition"
-                    title="Cerrar"
                   >
                     <X className="w-4 h-4 text-zinc-400" />
                   </button>
@@ -2996,7 +2992,6 @@ export default function HistoryClient() {
                                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 }`}
-                                title="Lista"
                               >
                                 <LayoutList className="w-4 h-4" />
                               </button>
@@ -3007,7 +3002,6 @@ export default function HistoryClient() {
                                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 }`}
-                                title="Compacta"
                               >
                                 <Grid3x3 className="w-4 h-4" />
                               </button>
@@ -3018,7 +3012,6 @@ export default function HistoryClient() {
                                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                                 }`}
-                                title="Grid"
                               >
                                 <LayoutGrid className="w-4 h-4" />
                               </button>
@@ -3031,7 +3024,6 @@ export default function HistoryClient() {
                                   ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                                   : "text-zinc-200 hover:bg-black/30"
                               }`}
-                              title={editMode ? "Cancelar" : "Editar"}
                             >
                               {editMode ? (
                                 <X className="w-4 h-4" />
@@ -3217,7 +3209,6 @@ export default function HistoryClient() {
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
                       }`}
-                      title="Vista Lista"
                     >
                       <LayoutList className="w-4 h-4" />
                     </button>
@@ -3228,7 +3219,6 @@ export default function HistoryClient() {
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
                       }`}
-                      title="Vista Compacta"
                     >
                       <Grid3x3 className="w-4 h-4" />
                     </button>
@@ -3239,7 +3229,6 @@ export default function HistoryClient() {
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
                       }`}
-                      title="Vista Cuadrícula"
                     >
                       <LayoutGrid className="w-4 h-4" />
                     </button>

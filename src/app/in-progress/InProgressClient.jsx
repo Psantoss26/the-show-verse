@@ -1856,7 +1856,6 @@ export default function InProgressClient() {
                     <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setActiveTab("inprogress")}
-                        title={`Viendo${dataLoaded ? ` (${items.length})` : ""}`}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           activeTab === "inprogress"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
@@ -1872,7 +1871,6 @@ export default function InProgressClient() {
                       </button>
                       <button
                         onClick={() => setActiveTab("completed")}
-                        title={`Completadas${completedLoaded ? ` (${completedItems.length})` : ""}`}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           activeTab === "completed"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
@@ -1913,7 +1911,6 @@ export default function InProgressClient() {
                     <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setViewMode("cards")}
-                        title="Tarjetas"
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
@@ -1924,7 +1921,6 @@ export default function InProgressClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("poster")}
-                        title="Poster"
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
@@ -1935,7 +1931,6 @@ export default function InProgressClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
-                        title="Lista"
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
@@ -2063,7 +2058,6 @@ export default function InProgressClient() {
                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Tarjetas"
               >
                 <Film className="w-4 h-4" />
               </button>
@@ -2074,7 +2068,6 @@ export default function InProgressClient() {
                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Poster"
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -2085,7 +2078,6 @@ export default function InProgressClient() {
                     ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Lista"
               >
                 <LayoutList className="w-4 h-4" />
               </button>
