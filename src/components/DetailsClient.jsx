@@ -1054,9 +1054,9 @@ function AwardsPanel({ awards }) {
 
   return (
     <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
       <div
-        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
       />
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
@@ -9536,17 +9536,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {/* ===== TAB 1: SINOPSIS ===== */}
                       {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
                       {activeTab === "synopsis" && (
-                        <motion.div
-                          key="synopsis"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                        <div key="synopsis">
                           <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                            {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                            {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                             <div
-                              className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                              className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
                               style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
                             />
                             <div className="relative z-10">
@@ -9561,7 +9555,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </p>
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       )}
 
                       {/* ===== TAB 2: DETALLES ===== */}
@@ -9642,13 +9636,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
                       {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
                       {activeTab === "production" && (
-                        <motion.div
-                          key="production"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                        <div key="production">
                           <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                             {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
                             <VisualMetaCard
@@ -9684,20 +9672,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                             />
                           </div>
-                        </motion.div>
+                        </div>
                       )}
 
                       {/* 4. PREMIOS */}
                       {activeTab === "awards" && extras.awards && (
-                        <motion.div
-                          key="awards"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                        <div key="awards">
                           <AwardsPanel awards={extras.awards} />
-                        </motion.div>
+                        </div>
                       )}
                     </AnimatePresence>
                   </div>
@@ -9740,17 +9722,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <AnimatePresence mode="wait">
                 {/* 1. SINOPSIS */}
                 {activeTab === "synopsis" && (
-                  <motion.div
-                    key="synopsis-backdrop"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <div key="synopsis-backdrop">
                     <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                       <div
-                        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
                         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
                       />
                       <div className="relative z-10">
@@ -9764,7 +9740,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </p>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {/* 2. DETALLES */}
@@ -9842,13 +9818,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                 {/* 3. PRODUCCIÓN */}
                 {activeTab === "production" && (
-                  <motion.div
-                    key="production-backdrop"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <div key="production-backdrop">
                     <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                       <VisualMetaCard
                         icon={Users}
@@ -9879,21 +9849,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {/* ===== TAB 4: PREMIOS ===== */}
                 {/* Muestra el resumen de premios devuelto por OMDb */}
                 {activeTab === "awards" && extras.awards && (
-                  <motion.div
-                    key="awards-backdrop"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <div key="awards-backdrop">
                     <AwardsPanel awards={extras.awards} />
-                  </motion.div>
+                  </div>
                 )}
               </AnimatePresence>
             </div>
