@@ -9035,7 +9035,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-                <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu mb-6">
+              <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu mb-6">
                 <div
                   className="
       py-3
@@ -9871,13 +9871,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : "w-full h-full object-cover";
                           const recOverlayClass = enableHover
                             ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                            : "absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80";
+                            : "hidden";
                           const recHeaderInfoClass = enableHover
                             ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-500 ease-out -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
                             : "hidden";
                           const recFooterInfoClass = enableHover
                             ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "absolute bottom-0 left-0 right-0 p-3 pb-4";
+                            : "hidden";
 
                           return (
                             <SwiperSlide key={rec.id}>
@@ -10073,10 +10073,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             : "w-full h-full object-cover";
                           const colOverlayClass = enableHover
                             ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                            : "absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80";
+                            : "hidden";
                           const colFooterInfoClass = enableHover
                             ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "absolute bottom-0 left-0 right-0 p-3 pb-4";
+                            : "hidden";
 
                           return (
                             <SwiperSlide key={m.id}>
@@ -10859,7 +10859,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <DetailsArrowCarousel
                               spaceBetween={12}
                               slidesPerView={2}
-                        breakpoints={{ 640: { slidesPerView: 2, spaceBetween: 16 }, 768: { slidesPerView: 3, spaceBetween: 16 }, 1024: { slidesPerView: 4, spaceBetween: 16 }, 1280: { slidesPerView: 4, spaceBetween: 16 } }}
+                              breakpoints={{
+                                640: { slidesPerView: 2, spaceBetween: 16 },
+                                768: { slidesPerView: 3, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 16 },
+                                1280: { slidesPerView: 4, spaceBetween: 16 },
+                              }}
                               className="pb-2"
                             >
                               {videos.slice(0, 20).map((v) => {
@@ -10878,7 +10883,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     <button
                                       type="button"
                                       onClick={() => openVideo(v)}
-                                  aria-label={v.name || 'Ver vídeo'}
+                                      aria-label={v.name || "Ver vídeo"}
                                       className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
@@ -11020,7 +11025,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <DetailsArrowCarousel
                             spaceBetween={12}
                             slidesPerView={2}
-                          breakpoints={{ 640: { slidesPerView: 2, spaceBetween: 16 }, 768: { slidesPerView: 3, spaceBetween: 16 }, 1024: { slidesPerView: 4, spaceBetween: 16 }, 1280: { slidesPerView: 5, spaceBetween: 16 } }}
+                            breakpoints={{
+                              640: { slidesPerView: 2, spaceBetween: 16 },
+                              768: { slidesPerView: 3, spaceBetween: 16 },
+                              1024: { slidesPerView: 4, spaceBetween: 16 },
+                              1280: { slidesPerView: 5, spaceBetween: 16 },
+                            }}
                             className="pb-2"
                           >
                             {soundtrackTracks.slice(0, 12).map((track) => (
@@ -11028,7 +11038,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <button
                                   type="button"
                                   onClick={() => openSoundtrack(track.id)}
-                                aria-label={track.trackName || 'Reproducir música'}
+                                  aria-label={
+                                    track.trackName || "Reproducir música"
+                                  }
                                   className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
                                 >
                                   <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
@@ -11709,7 +11721,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
                                   className={[
-                                  "group relative isolate flex flex-col overflow-hidden rounded-3xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
+                                    "group relative isolate flex flex-col overflow-hidden rounded-3xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
                                     "hover:border-indigo-500/30 hover:bg-white/5",
                                     disabled
                                       ? "pointer-events-none opacity-60"
