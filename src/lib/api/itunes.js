@@ -115,6 +115,70 @@ function nameMatches(name, titleNorms, titleSigTokens) {
   });
 }
 
+function titleComparisonVariants(value) {
+  const normalized = norm(value);
+  const variants = new Set([normalized]);
+  variants.add(normalized.replace(/([a-z])7([a-z])/g, "$1v$2"));
+  return [...variants].filter(Boolean);
+}
+
+function hasLiteralTitlePhrase(name, title) {
+  const nameTokens = name.split(" ").filter(Boolean);
+  const titleTokens = title.split(" ").filter(Boolean);
+  if (!nameTokens.length || !titleTokens.length) return false;
+
+  return nameTokens.some((_, index) =>
+    titleTokens.every((token, offset) => nameTokens[index + offset] === token),
+  );
+}
+
+function hasStrictTitleMatch(name, ctx) {
+  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
+
+  return titles.some((title) =>
+    titleComparisonVariants(title).some((titleVariant) =>
+      titleComparisonVariants(name).some((nameVariant) =>
+        hasLiteralTitlePhrase(nameVariant, titleVariant),
+      ),
+    ),
+  );
+}
+
+function hasDisallowedTitleSuffix(name, releaseDate, ctx) {
+  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
+  const releaseYear = Number(String(releaseDate ?? "").slice(0, 4));
+  const nameVariants = titleComparisonVariants(name);
+
+  return titles.some((title) => {
+    if (/\d/.test(norm(title))) return false;
+    if (
+      ctx.year &&
+      Number.isFinite(releaseYear) &&
+      Math.abs(releaseYear - ctx.year) <= 1
+    ) {
+      return false;
+    }
+
+    return titleComparisonVariants(title).some((titleVariant) => {
+      const titleTokens = titleVariant.split(" ").filter(Boolean);
+      if (!titleTokens.length) return false;
+
+      return nameVariants.some((nameVariant) => {
+        const nameTokens = nameVariant.split(" ").filter(Boolean);
+        return nameTokens.some((_, index) => {
+          const matches = titleTokens.every(
+            (token, offset) => nameTokens[index + offset] === token,
+          );
+          if (!matches) return false;
+
+          const nextToken = nameTokens[index + titleTokens.length] ?? "";
+          return /^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken);
+        });
+      });
+    });
+  });
+}
+
 function isStrictSoundtrackAlbumName(name) {
   return (
     /official/.test(name) ||
@@ -136,8 +200,10 @@ function scoreAlbums(albums, ctx, options = {}) {
   for (const album of albums) {
     const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
     if (!nameMatches(name, titleNorms, titleSigTokens)) continue;
-    if (options.strictSoundtrackAlbums && !isStrictSoundtrackAlbumName(name)) {
-      continue;
+    if (options.strictSoundtrackAlbums) {
+      if (!isStrictSoundtrackAlbumName(name)) continue;
+      if (!hasStrictTitleMatch(name, ctx)) continue;
+      if (hasDisallowedTitleSuffix(name, album.releaseDate, ctx)) continue;
     }
 
     const genre = norm(album.primaryGenreName ?? "");
