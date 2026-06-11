@@ -1882,9 +1882,11 @@ function FavoriteCard({
     <div>
       <Link href={href} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-red-900/20 transition-all`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-all`}
           onMouseEnter={handleHover}
         >
+          {/* Overlay de borde para que los indicadores queden por debajo */}
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-red-500/40 transition-colors duration-300" />
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
           <div
             className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
