@@ -1486,28 +1486,42 @@ function CardSkeleton({ mode = "poster" }) {
   );
 }
 
-function GroupDivider({ title, stats, count, total, groupBy }) {
+function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
+  const [transitioningThreshold, setTransitioningThreshold] = useState(132);
+
+  useEffect(() => {
+    if (mobileFiltersOpen) {
+      setTransitioningThreshold(244);
+    } else {
+      const timer = setTimeout(() => {
+        setTransitioningThreshold(132);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileFiltersOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
       if (!ref.current) return;
       const top = ref.current.getBoundingClientRect().top;
       const isLg = window.innerWidth >= 1024;
-      const threshold = isLg ? 136 : 130;
+      const threshold = isLg ? 136 : transitioningThreshold;
       setIsSticky(top <= threshold + 1);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [transitioningThreshold]);
 
   return (
     <motion.div
       ref={ref}
-      className="sticky top-[130px] lg:top-[136px] z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
+      className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
+        mobileFiltersOpen ? "top-[244px]" : "top-[132px]"
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -2065,6 +2079,20 @@ export default function FavoritesClient() {
 
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersSticky, setFiltersSticky] = useState(false);
+  const filtersRef = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!filtersRef.current) return;
+      const rect = filtersRef.current.getBoundingClientRect();
+      setFiltersSticky(rect.top <= 82);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const needsImdbScores =
     groupBy === "imdb_rating" ||
     subGroupBy === "imdb_rating" ||
@@ -3034,7 +3062,8 @@ export default function FavoritesClient() {
 
         {/* Filters */}
         <motion.div
-          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
+          ref={filtersRef}
+          className="sticky top-20 z-[70] space-y-2 mb-2 lg:mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -3072,251 +3101,254 @@ export default function FavoritesClient() {
           </div>
 
           {/* Mobile: collapsible filters */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="relative z-10 lg:hidden overflow-visible"
-              >
-                <div className="space-y-3 pt-1">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Tipo"
-                        valueLabel={
-                          typeFilter === "all"
-                            ? "Todo"
-                            : typeFilter === "movies"
-                              ? "Películas"
-                              : "Series"
-                        }
-                        icon={Filter}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={typeFilter === "all"}
-                              onClick={() => {
-                                setTypeFilter("all");
-                                close();
-                              }}
-                            >
-                              Todo
-                            </DropdownItem>
-                            <DropdownItem
-                              active={typeFilter === "movies"}
-                              onClick={() => {
-                                setTypeFilter("movies");
-                                close();
-                              }}
-                            >
-                              Películas
-                            </DropdownItem>
-                            <DropdownItem
-                              active={typeFilter === "shows"}
-                              onClick={() => {
-                                setTypeFilter("shows");
-                                close();
-                              }}
-                            >
-                              Series
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Agrupar"
-                        valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
-                        mobileValueLabel={getCompactGroupingValueLabel(
-                          groupBy,
-                          subGroupBy,
-                        )}
-                        compactMobile
-                        icon={Layers3}
-                      >
-                        {({ close }) => (
-                          <GroupingDropdownContent
-                            groupBy={groupBy}
-                            subGroupBy={subGroupBy}
-                            onGroupChange={handleGroupChange}
-                            onSubGroupChange={handleSubGroupChange}
-                            close={close}
-                          />
-                        )}
-                      </InlineDropdown>
-                    </div>
+          <div
+            className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              mobileFiltersOpen
+                ? "opacity-100"
+                : "opacity-0 pointer-events-none"
+            } lg:hidden overflow-hidden ${
+              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 top-full z-10" : "relative z-10"
+            }`}
+            style={{
+              gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
+            }}
+          >
+            <div className="min-h-0">
+              <div className="space-y-2 pt-1 pb-1">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Tipo"
+                      valueLabel={
+                        typeFilter === "all"
+                          ? "Todo"
+                          : typeFilter === "movies"
+                            ? "Películas"
+                            : "Series"
+                      }
+                      icon={Filter}
+                    >
+                      {({ close }) => (
+                        <>
+                          <DropdownItem
+                            active={typeFilter === "all"}
+                            onClick={() => {
+                              setTypeFilter("all");
+                              close();
+                            }}
+                          >
+                            Todo
+                          </DropdownItem>
+                          <DropdownItem
+                            active={typeFilter === "movies"}
+                            onClick={() => {
+                              setTypeFilter("movies");
+                              close();
+                            }}
+                          >
+                            Películas
+                          </DropdownItem>
+                          <DropdownItem
+                            active={typeFilter === "shows"}
+                            onClick={() => {
+                              setTypeFilter("shows");
+                              close();
+                            }}
+                          >
+                            Series
+                          </DropdownItem>
+                        </>
+                      )}
+                    </InlineDropdown>
                   </div>
-
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Orden"
-                        valueLabel={
-                          sortBy === "title-asc"
-                            ? "A-Z"
-                            : sortBy === "title-desc"
-                              ? "Z-A"
-                              : sortBy === "rating-desc"
-                                ? "Mejor"
-                                : sortBy === "rating-asc"
-                                  ? "Peor"
-                                  : sortBy === "added-desc"
-                                    ? "Reciente"
-                                    : sortBy === "added-asc"
-                                      ? "Antiguo"
-                                      : sortBy === "watched-desc"
-                                        ? "Vista +"
-                                        : sortBy === "watched-asc"
-                                          ? "Vista -"
-                                          : "A-Z"
-                        }
-                        icon={ArrowUpDown}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={sortBy === "title-asc"}
-                              onClick={() => {
-                                setSortBy("title-asc");
-                                close();
-                              }}
-                            >
-                              Título A-Z
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "title-desc"}
-                              onClick={() => {
-                                setSortBy("title-desc");
-                                close();
-                              }}
-                            >
-                              Título Z-A
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "rating-desc"}
-                              onClick={() => {
-                                setSortBy("rating-desc");
-                                close();
-                              }}
-                            >
-                              Valoración ↓
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "rating-asc"}
-                              onClick={() => {
-                                setSortBy("rating-asc");
-                                close();
-                              }}
-                            >
-                              Valoración ↑
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "added-desc"}
-                              onClick={() => {
-                                setSortBy("added-desc");
-                                close();
-                              }}
-                            >
-                              Añadido reciente
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "added-asc"}
-                              onClick={() => {
-                                setSortBy("added-asc");
-                                close();
-                              }}
-                            >
-                              Añadido antiguo
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "watched-desc"}
-                              onClick={() => {
-                                setSortBy("watched-desc");
-                                close();
-                              }}
-                            >
-                              Vista reciente
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortBy === "watched-asc"}
-                              onClick={() => {
-                                setSortBy("watched-asc");
-                                close();
-                              }}
-                            >
-                              Vista antigua
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <div className="flex-1 flex gap-2">
-                      <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                        <button
-                          onClick={() => setViewMode("list")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "list"
-                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <Layers className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setViewMode("compact")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "compact"
-                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <AllGlyph className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setViewMode("grid")}
-                          className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                            viewMode === "grid"
-                              ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
-                              : "text-zinc-400 hover:text-white hover:bg-white/10"
-                          }`}
-                        >
-                          <PosterGlyph className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <button
-                        onClick={() =>
-                          setImageMode(
-                            imageMode === "poster" ? "backdrop" : "poster",
-                          )
-                        }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                          imageMode === "backdrop"
-                            ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                            : "text-zinc-200 hover:bg-black/30"
-                        }`}
-                        title={
-                          imageMode === "poster"
-                            ? "Cambiar a Backdrop"
-                            : "Cambiar a Poster"
-                        }
-                      >
-                        {imageMode === "poster" ? (
-                          <PosterGlyph className="w-4 h-4" />
-                        ) : (
-                          <BackdropGlyph className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Agrupar"
+                      valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
+                      mobileValueLabel={getCompactGroupingValueLabel(
+                        groupBy,
+                        subGroupBy,
+                      )}
+                      compactMobile
+                      icon={Layers3}
+                    >
+                      {({ close }) => (
+                        <GroupingDropdownContent
+                          groupBy={groupBy}
+                          subGroupBy={subGroupBy}
+                          onGroupChange={handleGroupChange}
+                          onSubGroupChange={handleSubGroupChange}
+                          close={close}
+                        />
+                      )}
+                    </InlineDropdown>
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDropdown
+                      label="Orden"
+                      valueLabel={
+                        sortBy === "title-asc"
+                          ? "A-Z"
+                          : sortBy === "title-desc"
+                            ? "Z-A"
+                            : sortBy === "rating-desc"
+                              ? "Mejor"
+                              : sortBy === "rating-asc"
+                                ? "Peor"
+                                : sortBy === "added-desc"
+                                  ? "Reciente"
+                                  : sortBy === "added-asc"
+                                    ? "Antiguo"
+                                    : sortBy === "watched-desc"
+                                      ? "Vista +"
+                                      : sortBy === "watched-asc"
+                                        ? "Vista -"
+                                        : "A-Z"
+                      }
+                      icon={ArrowUpDown}
+                    >
+                      {({ close }) => (
+                        <>
+                          <DropdownItem
+                            active={sortBy === "title-asc"}
+                            onClick={() => {
+                              setSortBy("title-asc");
+                              close();
+                            }}
+                          >
+                            Título A-Z
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "title-desc"}
+                            onClick={() => {
+                              setSortBy("title-desc");
+                              close();
+                            }}
+                          >
+                            Título Z-A
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "rating-desc"}
+                            onClick={() => {
+                              setSortBy("rating-desc");
+                              close();
+                            }}
+                          >
+                            Valoración ↓
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "rating-asc"}
+                            onClick={() => {
+                              setSortBy("rating-asc");
+                              close();
+                            }}
+                          >
+                            Valoración ↑
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "added-desc"}
+                            onClick={() => {
+                              setSortBy("added-desc");
+                              close();
+                            }}
+                          >
+                            Añadido reciente
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "added-asc"}
+                            onClick={() => {
+                              setSortBy("added-asc");
+                              close();
+                            }}
+                          >
+                            Añadido antiguo
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "watched-desc"}
+                            onClick={() => {
+                              setSortBy("watched-desc");
+                              close();
+                            }}
+                          >
+                            Vista reciente
+                          </DropdownItem>
+                          <DropdownItem
+                            active={sortBy === "watched-asc"}
+                            onClick={() => {
+                              setSortBy("watched-asc");
+                              close();
+                            }}
+                          >
+                            Vista antigua
+                          </DropdownItem>
+                        </>
+                      )}
+                    </InlineDropdown>
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <button
+                        onClick={() => setViewMode("list")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "list"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <Layers className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("compact")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "compact"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <AllGlyph className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "grid"
+                            ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <PosterGlyph className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setImageMode(
+                          imageMode === "poster" ? "backdrop" : "poster",
+                        )
+                      }
+                      className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                        imageMode === "backdrop"
+                          ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                          : "text-zinc-200 hover:bg-black/30"
+                      }`}
+                      title={
+                        imageMode === "poster"
+                          ? "Cambiar a Backdrop"
+                          : "Cambiar a Poster"
+                      }
+                    >
+                      {imageMode === "poster" ? (
+                        <PosterGlyph className="w-4 h-4" />
+                      ) : (
+                        <BackdropGlyph className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Desktop: Single row */}
           <div className="relative z-10 hidden lg:flex gap-3">
@@ -3598,6 +3630,7 @@ export default function FavoritesClient() {
                   total={sorted.length}
                   stats={group.stats}
                   groupBy={groupBy}
+                  mobileFiltersOpen={mobileFiltersOpen}
                 />
                 {group.subgroups?.length ? (
                   <div className="space-y-6">
