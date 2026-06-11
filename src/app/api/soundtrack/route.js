@@ -81,7 +81,7 @@ const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v30";
+const CACHE_VERSION = "soundtrack-ranking-v32";
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -319,6 +319,44 @@ function titleComparisonVariants(value) {
   return [...variants].filter(Boolean);
 }
 
+function hasLiteralTitlePhrase(text, title) {
+  const textTokens = tokens(text);
+  const titleTokens = tokens(title);
+  if (!textTokens.length || !titleTokens.length) return false;
+
+  return textTokens.some((_, index) =>
+    titleTokens.every((token, offset) => textTokens[index + offset] === token),
+  );
+}
+
+function hasDisallowedTitleSuffix(album, ctx) {
+  const title = primarySearchTitle(ctx);
+  if (!title || /\d/.test(norm(title))) return false;
+
+  const releaseYear = albumReleaseYear(album);
+  if (ctx.year && releaseYear && Math.abs(releaseYear - ctx.year) <= 1) {
+    return false;
+  }
+
+  const titleVariants = titleComparisonVariants(title);
+  const albumTokens = tokens(albumName(album));
+
+  return titleVariants.some((titleVariant) => {
+    const titleTokens = tokens(titleVariant);
+    if (!titleTokens.length) return false;
+
+    return albumTokens.some((_, index) => {
+      const matches = titleTokens.every(
+        (token, offset) => albumTokens[index + offset] === token,
+      );
+      if (!matches) return false;
+
+      const nextToken = albumTokens[index + titleTokens.length] ?? "";
+      return /^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken);
+    });
+  });
+}
+
 function albumMatchesTitle(album, ctx) {
   const name = albumName(album);
   const title = primarySearchTitle(ctx);
@@ -326,16 +364,11 @@ function albumMatchesTitle(album, ctx) {
 
   for (const titleVariant of titleComparisonVariants(title)) {
     for (const nameVariant of titleComparisonVariants(name)) {
-      const score = titleScore(nameVariant, titleVariant);
-      if (score >= 50) return true;
+      if (hasLiteralTitlePhrase(nameVariant, titleVariant)) return true;
     }
   }
 
-  const nameTokens = new Set(titleComparisonVariants(name).flatMap(sigTokens));
-  const titleTokens = titleComparisonVariants(title).flatMap(sigTokens);
-  if (!titleTokens.length) return false;
-  const hits = titleTokens.filter((token) => nameTokens.has(token)).length;
-  return hits / titleTokens.length >= 0.75;
+  return false;
 }
 
 function isSameReleaseYear(album, ctx) {
@@ -367,6 +400,7 @@ function isAcceptableFirstAlbum(album, ctx) {
   const name = norm(albumName(album));
   const totalTracks = Number(album?.total_tracks ?? 0);
   if (!albumMatchesTitle(album, ctx)) return false;
+  if (hasDisallowedTitleSuffix(album, ctx)) return false;
   if (album?.album_type === "single" || totalTracks < 3) return false;
   if (containsAny(name, BAD_MATCH_WORDS)) return false;
   if (/unofficial|tribute|karaoke|cover|covers|performed by/.test(name)) {
