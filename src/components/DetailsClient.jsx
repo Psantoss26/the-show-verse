@@ -213,12 +213,36 @@ import SoundtrackModal from "@/components/details/SoundtrackModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 
+function getSoundtrackSourceBadge(source) {
+  const key = String(source || "Spotify").toLowerCase();
+  if (key === "itunes") {
+    return {
+      label: "iTunes",
+      textClass: "text-fuchsia-300",
+      dotClass: "bg-fuchsia-400 shadow-[0_0_6px_rgba(232,121,249,0.8)]",
+    };
+  }
+  if (key === "deezer") {
+    return {
+      label: "Deezer",
+      textClass: "text-orange-300",
+      dotClass: "bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.8)]",
+    };
+  }
+  return {
+    label: "Spotify",
+    textClass: "text-emerald-400",
+    dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // CONSTANTES GLOBALES
 // ---------------------------------------------------------------------------
 
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v10";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
@@ -1751,6 +1775,9 @@ export default function DetailsClient({
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
   const [soundtrackResolved, setSoundtrackResolved] = useState(false);
   const [soundtrackError, setSoundtrackError] = useState("");
+  const soundtrackAbortRef = useRef(null);
+  const soundtrackInFlightRef = useRef(null);
+  const soundtrackLoadedKeyRef = useRef("");
 
   // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
@@ -1768,36 +1795,23 @@ export default function DetailsClient({
     if (!soundtrackSearchQuery) return "";
     return `https://open.spotify.com/search/${encodeURIComponent(soundtrackSearchQuery)}`;
   }, [soundtrackSearchQuery]);
-  const openSoundtrack = (trackId = null) => {
-    setActiveSoundtrackId(trackId);
-    setSoundtrackModalOpen(true);
-  };
+  const soundtrackRequestKey = useMemo(
+    () =>
+      [
+        SOUNDTRACK_ALGORITHM_VERSION,
+        endpointType,
+        id,
+        title,
+        originalTitle,
+        yearIso,
+      ]
+        .filter(Boolean)
+        .join("|"),
+    [endpointType, id, originalTitle, title, yearIso],
+  );
 
-  // Abre el modal de video con el video seleccionado
-  const openVideo = (v) => {
-    if (!v) return;
-    setActiveVideo(v);
-    setVideoModalOpen(true);
-  };
-
-  // Cierra el modal de video
-  const closeVideo = () => {
-    setVideoModalOpen(false);
-    setActiveVideo(null);
-  };
-
-  // Resetea el modal de video al cambiar de contenido
-  useEffect(() => {
-    setVideoModalOpen(false);
-    setActiveVideo(null);
-    setSoundtrackModalOpen(false);
-    setActiveSoundtrackId(null);
-  }, [id, endpointType]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadSoundtrack = async () => {
+  const loadSoundtrack = useCallback(
+    async ({ background = false, force = false } = {}) => {
       if (!soundtrackSearchQuery) {
         setSoundtrackTracks([]);
         setSoundtrackError("");
@@ -1806,15 +1820,48 @@ export default function DetailsClient({
         return;
       }
 
-      setSoundtrackLoading(true);
+      if (
+        !force &&
+        soundtrackLoadedKeyRef.current === soundtrackRequestKey &&
+        soundtrackResolved
+      ) {
+        return;
+      }
+
+      const inFlight = soundtrackInFlightRef.current;
+      if (!force && inFlight?.key === soundtrackRequestKey) {
+        if (!background) {
+          setSoundtrackLoading(true);
+          try {
+            await inFlight.promise;
+          } catch {
+            // The original request path owns the visible error state.
+          } finally {
+            setSoundtrackLoading(false);
+          }
+        }
+        return inFlight.promise.catch(() => undefined);
+      }
+
+      if (force) {
+        soundtrackAbortRef.current?.abort();
+      }
+
+      const controller = new AbortController();
+      soundtrackAbortRef.current = controller;
+
+      if (!background) {
+        setSoundtrackLoading(true);
+      }
       setSoundtrackResolved(false);
       setSoundtrackError("");
 
-      try {
+      const promise = (async () => {
         const params = new URLSearchParams({
           title,
           type: endpointType,
           country: "ES",
+          algorithm: SOUNDTRACK_ALGORITHM_VERSION,
         });
         if (originalTitle && originalTitle !== title) {
           params.set("originalTitle", originalTitle);
@@ -1824,19 +1871,32 @@ export default function DetailsClient({
 
         const response = await fetch(`/api/soundtrack?${params.toString()}`, {
           signal: controller.signal,
-          priority: "low",
+          priority: background ? "low" : "high",
         });
         const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.error || "No se pudo cargar el soundtrack");
         }
-        const normalized = Array.isArray(payload?.tracks) ? payload.tracks : [];
+        return payload;
+      })();
+
+      soundtrackInFlightRef.current = {
+        key: soundtrackRequestKey,
+        promise,
+      };
+
+      try {
+        const payload = await promise;
+        const normalized = Array.isArray(payload?.tracks)
+          ? payload.tracks
+          : [];
         const spotifyConfigured = Boolean(payload?.spotifyConfigured);
         const spotifyActive = payload?.spotifyActive !== false;
         const spotifyRateLimited = Boolean(payload?.spotifyRateLimited);
         const retryAfterSecs = Number(payload?.spotifyRetryAfter || 0);
 
         if (!controller.signal.aborted) {
+          soundtrackLoadedKeyRef.current = soundtrackRequestKey;
           setSoundtrackTracks(normalized);
           setSoundtrackError(
             normalized.length
@@ -1862,19 +1922,96 @@ export default function DetailsClient({
           );
         }
       } finally {
+        if (soundtrackInFlightRef.current?.promise === promise) {
+          soundtrackInFlightRef.current = null;
+        }
         if (!controller.signal.aborted) {
-          setSoundtrackLoading(false);
+          if (!background) {
+            setSoundtrackLoading(false);
+          }
           setSoundtrackResolved(true);
         }
       }
-    };
+    },
+    [
+      endpointType,
+      id,
+      originalTitle,
+      soundtrackRequestKey,
+      soundtrackResolved,
+      soundtrackSearchQuery,
+      title,
+      yearIso,
+    ],
+  );
 
-    loadSoundtrack();
+  const openSoundtrack = useCallback(
+    (trackId = null) => {
+      setActiveSoundtrackId(trackId);
+      setSoundtrackModalOpen(true);
+      void loadSoundtrack({ background: false });
+    },
+    [loadSoundtrack],
+  );
+
+  // Abre el modal de video con el video seleccionado
+  const openVideo = (v) => {
+    if (!v) return;
+    setActiveVideo(v);
+    setVideoModalOpen(true);
+  };
+
+  // Cierra el modal de video
+  const closeVideo = () => {
+    setVideoModalOpen(false);
+    setActiveVideo(null);
+  };
+
+  // Resetea el modal de video al cambiar de contenido
+  useEffect(() => {
+    setVideoModalOpen(false);
+    setActiveVideo(null);
+    setSoundtrackModalOpen(false);
+    setActiveSoundtrackId(null);
+    setSoundtrackTracks([]);
+    setSoundtrackLoading(false);
+    setSoundtrackResolved(false);
+    setSoundtrackError("");
+    soundtrackLoadedKeyRef.current = "";
+    soundtrackInFlightRef.current = null;
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+  }, [id, endpointType]);
+
+  useEffect(() => {
+    if (!soundtrackSearchQuery || soundtrackResolved || soundtrackTracks.length) {
+      return undefined;
+    }
+
+    let idleId = null;
+    const timer = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(
+          () => void loadSoundtrack({ background: true }),
+          { timeout: 3500 },
+        );
+      } else {
+        void loadSoundtrack({ background: true });
+      }
+    }, 1400);
 
     return () => {
-      controller.abort();
+      window.clearTimeout(timer);
+      if (idleId !== null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
     };
-  }, [endpointType, id, originalTitle, soundtrackSearchQuery, title, yearIso]);
+  }, [
+    loadSoundtrack,
+    soundtrackResolved,
+    soundtrackSearchQuery,
+    soundtrackTracks.length,
+  ]);
 
   useLayoutEffect(() => {
     if (!TMDB_API_KEY || !id) {
@@ -10971,7 +11108,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     key={`${id}-soundtrack-${soundtrackResolved ? "ready" : "loading"}-${soundtrackTracks.length}`}
                     delay={0.06}
                   >
-                    {soundtrackSearchQuery && (
+                    {soundtrackSearchQuery &&
+                      (soundtrackLoading ||
+                        soundtrackResolved ||
+                        soundtrackTracks.length > 0) && (
                       <section className="mt-2 mb-10">
                         <SectionTitle
                           title="Soundtrack y música"
@@ -11033,16 +11173,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             }}
                             className="pb-2"
                           >
-                            {soundtrackTracks.slice(0, 12).map((track) => (
-                              <SwiperSlide key={track.id} className="h-full">
-                                <button
-                                  type="button"
-                                  onClick={() => openSoundtrack(track.id)}
-                                  aria-label={
-                                    track.trackName || "Reproducir música"
-                                  }
-                                  className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
-                                >
+                            {soundtrackTracks.map((track) => {
+                              const sourceBadge = getSoundtrackSourceBadge(
+                                track.source,
+                              );
+
+                              return (
+                                <SwiperSlide key={track.id} className="h-full">
+                                  <button
+                                    type="button"
+                                    onClick={() => openSoundtrack(track.id)}
+                                    aria-label={
+                                      track.trackName || "Reproducir música"
+                                    }
+                                    className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
+                                  >
                                   <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
                                     {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
                                     <img
@@ -11050,6 +11195,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         track.artworkUrl || "/placeholder.png"
                                       }
                                       alt=""
+                                      loading="lazy"
+                                      decoding="async"
+                                      fetchPriority="low"
                                       className="absolute inset-0 w-full h-full object-cover opacity-30 blur-xl transform-gpu scale-110"
                                       aria-hidden="true"
                                     />
@@ -11059,6 +11207,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         track.artworkUrl || "/placeholder.png"
                                       }
                                       alt=""
+                                      loading="lazy"
+                                      decoding="async"
+                                      fetchPriority="low"
                                       className="absolute inset-0 w-full h-full object-contain transform-gpu transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
@@ -11081,15 +11232,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
 
                                     <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
-                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
-                                        {track.previewUrl
-                                          ? "Preview"
-                                          : "Spotify"}
-                                      </span>
-                                      <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-zinc-300">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-                                        {track.source || "Spotify"}
+                                      <span
+                                        className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${sourceBadge.textClass}`}
+                                      >
+                                        <span
+                                          className={`w-1.5 h-1.5 rounded-full ${sourceBadge.dotClass}`}
+                                        />
+                                        {sourceBadge.label}
                                       </span>
                                     </div>
 
@@ -11099,9 +11248,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       </span>
                                     </div>
                                   </div>
-                                </button>
-                              </SwiperSlide>
-                            ))}
+                                  </button>
+                                </SwiperSlide>
+                              );
+                            })}
                           </DetailsArrowCarousel>
                         )}
                       </section>

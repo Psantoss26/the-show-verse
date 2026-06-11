@@ -1,12 +1,22 @@
-import { norm, containsAny, sigTokens, SOUNDTRACK_WORDS, BAD_MATCH_WORDS } from "@/lib/api/soundtrack-utils";
+import {
+  norm,
+  containsAny,
+  sigTokens,
+  unique,
+  bestTitleScore,
+  yearScore,
+  SOUNDTRACK_WORDS,
+  BAD_MATCH_WORDS,
+} from "@/lib/api/soundtrack-utils";
 
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
 const MAX_TRACKS = 40;
-const MAX_ALBUMS = 4;
+const MAX_ALBUMS = 6;
 const MIN_ALBUM_SCORE = 0;
 const MIN_ALBUM_TRACKS = 3;
 const QUERY_TIMEOUT_MS = 7000;
+const SEARCH_QUERY_LIMIT = 8;
 
 function fetchJson(url) {
   const ctrl = new AbortController();
@@ -20,11 +30,38 @@ function fetchJson(url) {
 }
 
 function buildQueries(ctx) {
-  const queryTitle = ctx.originalTitle || ctx.titles[0] || "";
-  return queryTitle ? [queryTitle] : [];
+  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
+  const qs = [];
+
+  for (const title of titles) {
+    const short = norm(title).replace(/\s+/g, "").length <= 3;
+    qs.push(title);
+    qs.push(`${title} soundtrack`);
+    qs.push(`${title} OST`);
+
+    if (ctx.mediaType === "tv") {
+      qs.push(`${title} series soundtrack`);
+      qs.push(`${title} television soundtrack`);
+    } else {
+      qs.push(`${title} movie soundtrack`);
+      qs.push(`${title} motion picture soundtrack`);
+    }
+
+    if (short && ctx.mediaType === "movie") {
+      qs.push(`${title} the movie`);
+      qs.push(`${title} the album`);
+    }
+
+    if (ctx.year) {
+      qs.push(`${title} ${ctx.year}`);
+      qs.push(`${title} ${ctx.year} soundtrack`);
+    }
+  }
+
+  return unique(qs).slice(0, SEARCH_QUERY_LIMIT);
 }
 
-function normalizeTrack(track, album) {
+function normalizeTrack(track, album, albumScore = 0, index = 0) {
   const artwork = (track.artworkUrl100 ?? album.artworkUrl100 ?? "")
     .replace("100x100bb", "500x500bb");
 
@@ -38,6 +75,9 @@ function normalizeTrack(track, album) {
     source: "iTunes",
     externalUrl: track.trackViewUrl ?? album.collectionViewUrl ?? "",
     collectionUrl: album.collectionViewUrl ?? "",
+    albumScore,
+    trackIndex: index,
+    score: albumScore + Math.max(0, 14 - index * 0.25),
   };
 }
 
@@ -65,34 +105,50 @@ async function lookupAlbumTracks(collectionId, country) {
     .filter((r) => r.wrapperType === "track" && r.kind === "song");
 }
 
-function nameMatches(name, queryTitleNorm, querySigTokens) {
-  if (name.includes(queryTitleNorm)) return true;
-  if (querySigTokens.length < 2) return false;
-  const hits = querySigTokens.filter((t) => name.includes(t)).length;
-  return hits / querySigTokens.length >= 0.66;
+function nameMatches(name, titleNorms, titleSigTokens) {
+  if (titleNorms.some((title) => title && name.includes(title))) return true;
+
+  return titleSigTokens.some((querySigTokens) => {
+    if (querySigTokens.length < 2) return false;
+    const hits = querySigTokens.filter((t) => name.includes(t)).length;
+    return hits / querySigTokens.length >= 0.66;
+  });
 }
 
-function scoreAlbums(albums, queryTitleNorm) {
-  const querySigToks = sigTokens(queryTitleNorm);
+function scoreAlbums(albums, ctx) {
+  const titleNorms = unique([ctx.originalTitle, ...(ctx.titles || [])]).map(norm);
+  const titleSigTokens = titleNorms.map(sigTokens).filter((ts) => ts.length);
+  const hasShortTitle = titleNorms.some(
+    (title) => title.replace(/\s+/g, "").length <= 3,
+  );
   const scored = [];
 
   for (const album of albums) {
     const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
-    if (!nameMatches(name, queryTitleNorm, querySigToks)) continue;
+    if (!nameMatches(name, titleNorms, titleSigTokens)) continue;
 
-    let score = 0;
+    const genre = norm(album.primaryGenreName ?? "");
+    const text = `${name} ${genre}`;
+    const hasSoundtrackContext =
+      containsAny(text, SOUNDTRACK_WORDS) ||
+      /album|motion picture|television|series|movie|film|score|ost/.test(text);
+    let score = bestTitleScore(name, titleNorms);
 
-    if (containsAny(name, SOUNDTRACK_WORDS)) score += 12;
-    if (album.primaryGenreName?.toLowerCase().includes("soundtrack")) score += 8;
+    if (containsAny(text, SOUNDTRACK_WORDS)) score += 16;
     if (/original|official/.test(name)) score += 2;
+    if (/movie|film|motion picture/.test(name)) score += 8;
+    if (/album/.test(name)) score += 4;
+    if (hasShortTitle && !hasSoundtrackContext) score -= 100;
+    if (ctx.mediaType === "movie" && /game|video game|manager|simulator/.test(text) && !/movie|film|motion picture/.test(text)) score -= 120;
 
     if (name.includes("broadway")) score -= 30;
     if (name.includes("cast recording")) score -= 25;
-    if (containsAny(name, BAD_MATCH_WORDS)) score -= 20;
+    if (containsAny(name, BAD_MATCH_WORDS)) score -= 80;
 
     const trackCount = Number(album.trackCount ?? 0);
     if (trackCount < MIN_ALBUM_TRACKS) continue;
     if (trackCount >= 10) score += 4;
+    score += yearScore(album.releaseDate, ctx.year, ctx.mediaType);
 
     const nameTokens = name.split(" ");
     if (nameTokens.includes("ep")) score -= 15;
@@ -112,30 +168,43 @@ export async function searchITunes(ctx, country = "US") {
     return { tracks: [], query: "" };
   }
 
-  const query = queries[0];
+  let usedQuery = "";
+  let allAlbums = [];
+  for (const query of queries) {
+    let albums;
+    try {
+      albums = await searchAlbums(query, country);
+    } catch {
+      continue;
+    }
 
-  let albums;
-  try {
-    albums = await searchAlbums(query, country);
-  } catch {
-    return { tracks: [], query };
+    if (albums.length && !usedQuery) usedQuery = query;
+    allAlbums.push(...albums);
   }
 
-  const queryTitleNorm = norm(ctx.originalTitle || ctx.titles[0] || "");
+  if (!allAlbums.length) {
+    return { tracks: [], query: queries[0] };
+  }
 
-  const ranked = scoreAlbums(albums, queryTitleNorm);
-  const topAlbums = ranked.slice(0, MAX_ALBUMS).map((r) => r.album);
+  const uniqueAlbums = allAlbums.filter(
+    (album, index, arr) =>
+      arr.findIndex((item) => item.collectionId === album.collectionId) ===
+      index,
+  );
+  const ranked = scoreAlbums(uniqueAlbums, ctx);
+  const topAlbums = ranked.slice(0, MAX_ALBUMS);
 
   if (topAlbums.length === 0) {
-    return { tracks: [], query };
+    return { tracks: [], query: usedQuery || queries[0] };
   }
 
   let allTracks = [];
-  for (const album of topAlbums) {
+  for (const rankedAlbum of topAlbums) {
+    const album = rankedAlbum.album;
     try {
       const tracks = await lookupAlbumTracks(album.collectionId, country);
-      for (const t of tracks) {
-        allTracks.push(normalizeTrack(t, album));
+      for (let i = 0; i < tracks.length; i++) {
+        allTracks.push(normalizeTrack(tracks[i], album, rankedAlbum.score, i));
       }
     } catch {
       continue;
@@ -145,7 +214,7 @@ export async function searchITunes(ctx, country = "US") {
   const deduped = dedupeTracks(allTracks);
   return {
     tracks: deduped.slice(0, MAX_TRACKS),
-    query,
+    query: usedQuery || queries[0],
   };
 }
 

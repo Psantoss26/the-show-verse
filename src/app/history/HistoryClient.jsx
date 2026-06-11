@@ -1414,52 +1414,59 @@ const HistoryItemCard = memo(function HistoryItemCard({
     <div
       className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? "opacity-50 pointer-events-none grayscale" : ""}`}
     >
-      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
+      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md bg-zinc-900 shrink-0">
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 transition-colors duration-300" />
-        <div className="absolute inset-0 w-full h-full">
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/30 transition-colors duration-300" />
+        <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+          <div className="absolute inset-0 w-full h-full">
+            <div
+              className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
+                backdropReady && posterSrc ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              <Film className="w-8 h-8 text-zinc-700" />
+            </div>
+
+            {posterSrc && (
+              <img
+                src={posterSrc}
+                alt={title}
+                loading="lazy"
+                decoding="async"
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                  backdropReady ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
+          </div>
+          {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
           <div
-            className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
-              backdropReady && posterSrc ? "opacity-0" : "opacity-100"
+            className={`absolute inset-x-0 top-0 h-16 sm:h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
+          />
+          <div
+            className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+              isGroup
+                ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                    type === "movie"
+                      ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                      : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                  }`
             }`}
           >
-            <Film className="w-8 h-8 text-zinc-700" />
+            {isGroup ? (
+              <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+                <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                <span>{groupCount}</span>
+              </div>
+            ) : type === "movie" ? (
+              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            ) : (
+              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            )}
           </div>
-
-          {posterSrc && (
-            <img
-              src={posterSrc}
-              alt={title}
-              loading="lazy"
-              decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-                backdropReady ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          )}
         </div>
-        <div
-          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-            isGroup
-              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                  type === "movie"
-                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                }`
-          }`}
-        >
-          {isGroup ? (
-            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              <span>{groupCount}</span>
-            </div>
-          ) : type === "movie" ? (
-            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          ) : (
-            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          )}
-        </div>
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/30 transition-colors duration-300" />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2">
@@ -1488,7 +1495,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
-          className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
+          className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl rounded-tr-xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
           title="Borrar"
           aria-label="Borrar"
         >
@@ -1543,7 +1550,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return (
       <motion.div
         ref={ref}
-        className="relative bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+        className="relative bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1575,7 +1582,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     >
       <Link
         href={href}
-        className="block relative bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+        className="block relative bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
@@ -1629,7 +1636,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <motion.div
-      className={`relative aspect-[2/3] compact-card group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${disabledCls}`}
+      className={`relative aspect-[2/3] compact-card group rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
       whileHover={{
         scale: 1.15,
         zIndex: 50,
@@ -1642,110 +1649,122 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       }}
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/40 transition-colors duration-300" />
-      {/* Poster Image */}
-      <Poster entry={entry} className="w-full h-full" />
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/50 transition-all duration-300" />
+      <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+        {/* Poster Image */}
+        <Poster entry={entry} className="w-full h-full" />
 
-      <div
-        className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-          isGroup
-            ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-            : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                type === "movie"
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`
-        }`}
-      >
-        {isGroup ? (
-          <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-            <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            <span>{groupCount}</span>
-          </div>
-        ) : type === "movie" ? (
-          <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        ) : (
-          <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        )}
-      </div>
-
-      {/* Desktop: Hover overlay with information */}
-      <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-        <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-          <div className="flex items-center gap-2 mb-1 -ml-0.5">
-            <span className="text-[8px] text-zinc-300/90 font-medium">
-              {dayMonth}
-            </span>
-          </div>
-
-          <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
-            {title}
-          </h5>
-
+        {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
+        <div
+          className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
+        />
+        <div
+          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+            isGroup
+              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                  type === "movie"
+                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                }`
+          }`}
+        >
           {isGroup ? (
-            <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
-              {groupCount} episodios agrupados
+            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              <span>{groupCount}</span>
             </div>
+          ) : type === "movie" ? (
+            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           ) : (
-            type === "show" &&
-            epBadge && (
-              <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
-                {epBadge}
-              </div>
-            )
+            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           )}
         </div>
-      </div>
 
-      {/* Delete button - appears on hover o en editMode mobile */}
-      {!confirmDel && (!isMobile || editMode) && (
-        <button
-          onClick={handleDeleteClick}
-          className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
-          title="Borrar"
-          aria-label="Borrar"
-        >
-          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        </button>
-      )}
+        {/* Overlay con gradientes (Desktop) */}
+        <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          {/* Top gradient para asegurar contraste visual del indicador */}
+          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            <div />
+          </div>
 
-      {/* Delete confirmation overlay */}
-      <AnimatePresence>
-        {confirmDel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-red-200 text-[11px] sm:text-xs lg:text-sm font-bold mb-2.5 tracking-wide">
-              ¿Eliminar del historial?
-            </p>
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={handleCancel}
-                className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
-                aria-label="Cancelar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
-                aria-label="Borrar"
-              >
-                {busy ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </button>
+          {/* Bottom gradient con título e info */}
+          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+            <div className="flex items-center gap-2 mb-1 -ml-0.5">
+              <span className="text-[8px] text-zinc-300/90 font-medium">
+                {dayMonth}
+              </span>
             </div>
-          </motion.div>
+
+            <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
+              {title}
+            </h5>
+
+            {isGroup ? (
+              <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
+                {groupCount} episodios agrupados
+              </div>
+            ) : (
+              type === "show" &&
+              epBadge && (
+                <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
+                  {epBadge}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Delete button - appears on hover o en editMode mobile */}
+        {!confirmDel && (!isMobile || editMode) && (
+          <button
+            onClick={handleDeleteClick}
+            className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
+            title="Borrar"
+            aria-label="Borrar"
+          >
+            <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          </button>
         )}
-      </AnimatePresence>
+
+        {/* Delete confirmation overlay */}
+        <AnimatePresence>
+          {confirmDel && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-red-200 text-[11px] sm:text-xs lg:text-sm font-bold mb-2.5 tracking-wide">
+                ¿Eliminar del historial?
+              </p>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+                  aria-label="Cancelar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+                  aria-label="Borrar"
+                >
+                  {busy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 
@@ -1876,153 +1895,161 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <div
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
-        "relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md",
+        "relative aspect-[2/3] group rounded-xl bg-zinc-900 shadow-md",
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 lg:group-hover:border-emerald-500/40 transition-colors duration-300" />
-      <Poster entry={entry} className="w-full h-full" />
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 lg:group-hover:border-emerald-500/50 transition-all duration-300" />
+      <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+        <Poster entry={entry} className="w-full h-full" />
 
-      <div
-        className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-          isGroup
-            ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-            : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                type === "movie"
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`
-        }`}
-      >
-        {isGroup ? (
-          <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-            <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            <span>{groupCount}</span>
+        {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
+        <div
+          className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
+        />
+        <div
+          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+            isGroup
+              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                  type === "movie"
+                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                }`
+          }`}
+        >
+          {isGroup ? (
+            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              <span>{groupCount}</span>
+            </div>
+          ) : type === "movie" ? (
+            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          ) : (
+            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          )}
+        </div>
+
+        {/* MÓVIL: banda inferior - solo en editMode */}
+        {(!isMobile || editMode) && (
+          <div
+            className={[
+              "absolute inset-x-0 bottom-0 z-10 lg:hidden",
+              "p-3 pt-10",
+              "bg-gradient-to-t from-black/85 via-black/40 to-transparent",
+              "pointer-events-none",
+              confirmDel ? "opacity-0" : "",
+            ].join(" ")}
+          >
+            {InfoContent}
           </div>
-        ) : type === "movie" ? (
-          <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        ) : (
-          <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         )}
-      </div>
 
-      {/* MÓVIL: banda inferior - solo en editMode */}
-      {(!isMobile || editMode) && (
+        {/* DESKTOP: overlay más sutil con menos blur */}
         <div
           className={[
-            "absolute inset-x-0 bottom-0 z-10 lg:hidden",
-            "p-3 pt-10",
-            "bg-gradient-to-t from-black/85 via-black/40 to-transparent",
-            "pointer-events-none",
-            confirmDel ? "opacity-0" : "",
+            "absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3",
+            "bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300",
+            confirmDel ? "opacity-0 pointer-events-none" : "",
           ].join(" ")}
         >
-          {InfoContent}
-        </div>
-      )}
-
-      {/* DESKTOP: overlay más sutil con menos blur */}
-      <div
-        className={[
-          "absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3",
-          "bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300",
-          confirmDel ? "opacity-0 pointer-events-none" : "",
-        ].join(" ")}
-      >
-        <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-          <div className="flex items-center gap-2 mb-1 -ml-0.5">
-            <span className="text-[10px] text-zinc-300 font-medium">
-              {dayMonth}
-            </span>
-          </div>
-
-          <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
-            {title}
-          </h5>
-
-          {isGroup ? (
-            <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">
-              <span className="font-medium text-emerald-300/90">
-                {groupCount} episodios agrupados
+          <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            <div className="flex items-center gap-2 mb-1 -ml-0.5">
+              <span className="text-[10px] text-zinc-300 font-medium">
+                {dayMonth}
               </span>
-              {groupRange && (
-                <span className="text-zinc-400 text-[10px]">{groupRange}</span>
-              )}
             </div>
-          ) : (
-            type === "show" &&
-            (epBadge || episodeTitle) && (
-              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
-                {epBadge && (
-                  <span className="shrink-0 font-medium text-emerald-300/90">
-                    {epBadge}
-                  </span>
-                )}
-                {epBadge && episodeTitle && (
-                  <span className="text-zinc-500">•</span>
-                )}
-                {episodeTitle && (
-                  <span className="min-w-0 truncate text-zinc-400">
-                    {episodeTitle}
+
+            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
+              {title}
+            </h5>
+
+            {isGroup ? (
+              <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">
+                <span className="font-medium text-emerald-300/90">
+                  {groupCount} episodios agrupados
+                </span>
+                {groupRange && (
+                  <span className="text-zinc-400 text-[10px]">
+                    {groupRange}
                   </span>
                 )}
               </div>
-            )
-          )}
+            ) : (
+              type === "show" &&
+              (epBadge || episodeTitle) && (
+                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
+                  {epBadge && (
+                    <span className="shrink-0 font-medium text-emerald-300/90">
+                      {epBadge}
+                    </span>
+                  )}
+                  {epBadge && episodeTitle && (
+                    <span className="text-zinc-500">•</span>
+                  )}
+                  {episodeTitle && (
+                    <span className="min-w-0 truncate text-zinc-400">
+                      {episodeTitle}
+                    </span>
+                  )}
+                </div>
+              )
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
-      {!confirmDel && (!isMobile || editMode) && (
-        <button
-          onClick={handleDeleteClick}
-          className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
-          title="Borrar"
-          aria-label="Borrar"
-        >
-          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        </button>
-      )}
-
-      {/* Confirmación de borrado */}
-      <AnimatePresence>
-        {confirmDel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
-            onClick={(e) => e.stopPropagation()}
+        {/* Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
+        {!confirmDel && (!isMobile || editMode) && (
+          <button
+            onClick={handleDeleteClick}
+            className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
+            title="Borrar"
+            aria-label="Borrar"
           >
-            <p className="text-red-200 text-xs sm:text-sm lg:text-base font-bold mb-3 tracking-wide">
-              ¿Eliminar del historial?
-            </p>
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={handleCancel}
-                className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
-                aria-label="Cancelar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
-                aria-label="Borrar"
-              >
-                {busy ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </motion.div>
+            <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          </button>
         )}
-      </AnimatePresence>
+
+        {/* Confirmación de borrado */}
+        <AnimatePresence>
+          {confirmDel && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-red-200 text-xs sm:text-sm lg:text-base font-bold mb-3 tracking-wide">
+                ¿Eliminar del historial?
+              </p>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+                  aria-label="Cancelar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+                  aria-label="Borrar"
+                >
+                  {busy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 
