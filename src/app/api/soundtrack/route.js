@@ -115,7 +115,8 @@ async function getToken() {
         cached.mode = "refresh_token";
         return { token: cached.token, mode: cached.mode };
       }
-    } catch {
+    } catch (e) {
+      console.warn("[Spotify] refresh_token failed:", e?.message);
       cached.token = "";
       cached.expiresAt = 0;
     }
@@ -519,7 +520,7 @@ function matchTrack(a, b) {
 // Main loader (cache → search → fetch tracks)
 // ---------------------------------------------------------------------------
 async function loadSoundtrack(ctx, token, markets) {
-  const market = markets[0] ?? "US";
+  let market = markets[0] ?? "US";
   const cacheKey = getCacheKey(ctx, market);
 
   const cached = await getCached(cacheKey);
@@ -534,7 +535,8 @@ async function loadSoundtrack(ctx, token, markets) {
     !sources.rateLimited
   ) {
     await sleep(400);
-    sources = await searchSoundtrackSources(ctx, token, markets[1]);
+    market = markets[1];
+    sources = await searchSoundtrackSources(ctx, token, market);
   }
 
   if (sources.rateLimited && !sources.playlists.length && !sources.albums.length) {
@@ -547,6 +549,12 @@ async function loadSoundtrack(ctx, token, markets) {
     ...sources.playlists.map((pl) => playlistTracks(pl, token, market)),
     ...sources.albums.map((al) => albumTracks(al, token, market)),
   ]);
+
+  for (const r of trackResults) {
+    if (r.status === "rejected") {
+      console.warn("[Spotify] track fetch rejected:", r.reason?.message);
+    }
+  }
 
   const tracks = trackResults.flatMap((r) =>
     r.status === "fulfilled" ? r.value : [],
@@ -584,7 +592,8 @@ export async function GET(req) {
   if (configured) {
     try {
       auth = await getToken();
-    } catch {
+    } catch (e) {
+      console.error("[Spotify] getToken error:", e?.message);
       auth = { token: "", mode: "auth_failed" };
     }
   }

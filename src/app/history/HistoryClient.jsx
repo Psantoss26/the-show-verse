@@ -978,10 +978,10 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
         className="w-full flex items-center gap-3.5 p-2.5 hover:bg-white/5 transition-colors"
       >
         <div className="w-[56px] h-[84px] shrink-0 relative">
-          <div className="absolute inset-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
+          <div className="absolute inset-0 rounded-lg overflow-hidden bg-zinc-900 shadow-md">
             <Poster entry={entry} className="w-full h-full" />
           </div>
-          <div className="absolute -top-1.5 -right-1.5 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white shadow-lg">
+          <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white shadow-lg">
             <Layers className="w-3 h-3" />
             {count}
           </div>
@@ -1414,7 +1414,9 @@ const HistoryItemCard = memo(function HistoryItemCard({
     <div
       className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? "opacity-50 pointer-events-none grayscale" : ""}`}
     >
-      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
+        {/* Overlay de borde para que los indicadores queden por debajo */}
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 transition-colors duration-300" />
         <div className="absolute inset-0 w-full h-full">
           <div
             className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
@@ -1541,7 +1543,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return (
       <motion.div
         ref={ref}
-        className="bg-zinc-900/30 border border-white/5 rounded-xl cursor-pointer hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+        className="relative bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1552,6 +1554,8 @@ const HistoryItemCard = memo(function HistoryItemCard({
         }}
         layout
       >
+        {/* Overlay de borde para que los indicadores queden por debajo */}
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
         <div className="block">{Content}</div>
       </motion.div>
     );
@@ -1571,8 +1575,10 @@ const HistoryItemCard = memo(function HistoryItemCard({
     >
       <Link
         href={href}
-        className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+        className="block relative bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden"
       >
+        {/* Overlay de borde para que los indicadores queden por debajo */}
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
         {Content}
       </Link>
     </motion.div>
@@ -1623,20 +1629,20 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <motion.div
-      className={`relative aspect-[2/3] compact-card group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md ${disabledCls}`}
+      className={`relative aspect-[2/3] compact-card group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${disabledCls}`}
       whileHover={{
         scale: 1.15,
         zIndex: 50,
         boxShadow:
           "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-        borderColor: "rgba(16, 185, 129, 0.4)",
       }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       style={{
         transformOrigin: "center center",
-        borderColor: "rgba(255, 255, 255, 0.05)",
       }}
     >
+      {/* Overlay de borde para que los indicadores queden por debajo */}
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/40 transition-colors duration-300" />
       {/* Poster Image */}
       <Poster entry={entry} className="w-full h-full" />
 
@@ -1870,11 +1876,13 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <div
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
-        "relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md",
+        "relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md",
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
     >
+      {/* Overlay de borde para que los indicadores queden por debajo */}
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 lg:group-hover:border-emerald-500/40 transition-colors duration-300" />
       <Poster entry={entry} className="w-full h-full" />
 
       <div
@@ -3286,7 +3294,7 @@ export default function HistoryClient() {
                       return (
                         <div
                           key={`group:${collapseKey}`}
-                          className="relative cursor-pointer group/stack"
+                          className="relative cursor-pointer"
                         >
                           <div
                             onClick={(e) => {
@@ -3294,21 +3302,17 @@ export default function HistoryClient() {
                               e.stopPropagation();
                               toggleExpandGroup(collapseKey);
                             }}
+                            className="block"
                           >
-                            <div className="absolute inset-0 rounded-xl bg-zinc-900/30 border border-white/10 -z-10 transform translate-x-1 translate-y-1 transition-transform duration-300 group-hover/stack:translate-x-2 group-hover/stack:translate-y-2" />
-                            <div className="absolute inset-0 rounded-xl bg-zinc-900/20 border border-white/5 -z-20 transform translate-x-2 translate-y-2 transition-transform duration-300 group-hover/stack:translate-x-4 group-hover/stack:translate-y-4" />
-
-                            <div className="relative z-10">
-                              <CardComponent
-                                entry={entry}
-                                busy={false}
-                                index={idx}
-                                totalItems={g.collapsedItems.length}
-                                editMode={editMode}
-                                isMobile={isMobile}
-                                {...extraProps}
-                              />
-                            </div>
+                            <CardComponent
+                              entry={entry}
+                              busy={false}
+                              index={idx}
+                              totalItems={g.collapsedItems.length}
+                              editMode={editMode}
+                              isMobile={isMobile}
+                              {...extraProps}
+                            />
                           </div>
                           <AnimatePresence>
                             {isExpanded && (
