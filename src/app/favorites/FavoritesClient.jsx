@@ -1507,7 +1507,7 @@ function GroupDivider({ title, stats, count, total, groupBy }) {
   return (
     <motion.div
       ref={ref}
-      className="sticky top-[130px] lg:top-[136px] z-[50] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
+      className="sticky top-[130px] lg:top-[136px] z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
