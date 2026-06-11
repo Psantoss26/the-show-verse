@@ -228,7 +228,6 @@ export default function SoundtrackModal({
                       ? "border-[#1DB954]/30 bg-[#1DB954]/15 text-[#1DB954] hover:bg-[#1DB954]/25 hover:text-[#1ED760]"
                       : "border-white/20 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
                   }`}
-                  title={`Escuchar en ${selectedTrack?.source || "la web"}`}
                   aria-label={`Escuchar ${selectedTrack?.trackName || title || "soundtrack"} en ${selectedTrack?.source || "la web"}`}
                 >
                   <SourceLinkIcon
@@ -259,7 +258,7 @@ export default function SoundtrackModal({
                 type="button"
                 onClick={onClose}
                 className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
-                title="Cerrar (Esc)"
+                aria-label="Cerrar (Esc)"
               >
                 <X className="h-5 w-5" />
               </button>

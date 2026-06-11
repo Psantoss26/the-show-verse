@@ -73,6 +73,7 @@ const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 const REQUEST_TIMEOUT_MS = 9000;
 const MAX_TRACKS = 40;
+const SOUNDTRACK_ALBUM_RESERVE_TRACKS = 30;
 const SCORE_ALBUM_RESERVE_TRACKS = 10;
 const PRIMARY_COLLECTION_SOFT_LIMIT = 30;
 const MAX_SPOTIFY_ALBUMS = 5;
@@ -82,7 +83,7 @@ const SEARCH_LIMIT = 10;
 const ALBUM_MIN_SCORE = 32;
 const PLAYLIST_MIN_SCORE = 48;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v10";
+const CACHE_VERSION = "soundtrack-ranking-v11";
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -497,6 +498,7 @@ function collectionNoisePenalty(text, strongSoundtrackContext) {
   let score = 0;
   if (COMPILATION_WORD_RE.test(text) && !strongSoundtrackContext) score -= 95;
   if (/karaoke|tribute|cover|covers|made famous by|as made famous/.test(text)) score -= 120;
+  if (/unofficial|performed by|popcorn buckets|the hit co|tribute co/.test(text)) score -= 220;
   if (/from\s+["']?[^"']+["']?/.test(text) && !strongSoundtrackContext) score -= 25;
   return score;
 }
@@ -526,8 +528,11 @@ function scoreAlbum(album, ctx) {
   s += collectionNoisePenalty(text, strongSoundtrackContext);
   s += soundtrackBonus(text);
   if (containsAny(text, BAD_MATCH_WORDS)) s -= 80;
+  if (/unofficial|performed by/.test(text)) s -= 220;
+  if (/popcorn buckets|the hit co|tribute co|soundtrack orchestra|soundtrack hit lab/.test(text)) s -= 140;
   if (/official/.test(text)) s += 22;
   if (/original soundtrack|original motion picture/.test(text)) s += 24;
+  if (/the soundtrack/.test(text) && !/unofficial|performed by/.test(text)) s += 65;
   if (/motion picture|television|series|movie|film/.test(text)) s += 10;
   if (hasShortTitle && !hasSoundtrackContext) s -= 100;
   if (ctx.mediaType === "movie" && /game|video game|manager|simulator/.test(text) && !/movie|film|motion picture/.test(text)) s -= 120;
@@ -975,6 +980,20 @@ function isOfficialScoreAlbumTrack(track) {
   );
 }
 
+function isCanonicalSoundtrackAlbumTrack(track) {
+  const collection = norm(track.collectionName);
+  return (
+    isAlbumCollection(track) &&
+    !isOfficialScoreAlbumTrack(track) &&
+    !containsAny(collection, BAD_MATCH_WORDS) &&
+    (
+      /the soundtrack/.test(collection) ||
+      /original motion picture soundtrack/.test(collection) ||
+      /music from .*motion picture/.test(collection)
+    )
+  );
+}
+
 function topRelevantTracks(tracks) {
   const deduped = dedupeTracks(tracks);
   const playable = deduped.filter((track) => track.previewUrl);
@@ -1000,6 +1019,14 @@ function topRelevantTracks(tracks) {
   };
 
   const scoreAlbumTracks = sorted.filter(isOfficialScoreAlbumTrack);
+  const soundtrackAlbumTracks = sorted.filter(isCanonicalSoundtrackAlbumTrack);
+  const soundtrackReserve = scoreAlbumTracks.length
+    ? SOUNDTRACK_ALBUM_RESERVE_TRACKS
+    : MAX_TRACKS;
+
+  for (const track of soundtrackAlbumTracks.slice(0, soundtrackReserve)) {
+    addTrack(track);
+  }
   for (const track of scoreAlbumTracks.slice(0, SCORE_ALBUM_RESERVE_TRACKS)) {
     addTrack(track);
   }
@@ -1007,7 +1034,7 @@ function topRelevantTracks(tracks) {
   for (const track of sorted) {
     const cKey = collectionKey(track);
     if (
-      scoreAlbumTracks.length > 0 &&
+      (scoreAlbumTracks.length > 0 || soundtrackAlbumTracks.length > 0) &&
       (collectionCounts.get(cKey) || 0) >= PRIMARY_COLLECTION_SOFT_LIMIT
     ) {
       continue;
