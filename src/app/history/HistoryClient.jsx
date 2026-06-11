@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -1325,8 +1326,15 @@ const HistoryItemCard = memo(function HistoryItemCard({
 
   const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
   const baseTitle = getMainTitle(entry);
-  const inlineEp =
-    type === "show" && epMeta ? formatEpisodeInline(epMeta) : null;
+  const isGroup = entry?._group && entry._group.length > 1;
+  const groupCount = isGroup ? entry._group.length : 0;
+  const groupRange = isGroup ? getEpisodeRange(entry._group) : null;
+
+  const inlineEp = isGroup
+    ? groupRange
+    : type === "show" && epMeta
+      ? formatEpisodeInline(epMeta)
+      : null;
 
   // AQUÍ está la clave: el título incluye T1 E1
   const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle;
@@ -1439,7 +1447,11 @@ const HistoryItemCard = memo(function HistoryItemCard({
         <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
           {/* Para series: si hay título de episodio, lo mostramos; si no, el año */}
           <span className="truncate max-w-[260px]">
-            {type === "show" && epMeta?.title ? epMeta.title : year}
+            {isGroup
+              ? `${groupCount} episodios agrupados`
+              : type === "show" && epMeta?.title
+                ? epMeta.title
+                : year}
           </span>
         </div>
 
@@ -1503,11 +1515,11 @@ const HistoryItemCard = memo(function HistoryItemCard({
     totalItems > 20 ? Math.min(index * 0.02, 0.3) : index * 0.05;
   const shouldAnimate = index < 50; // Only animate first 50 items
 
-  if (!href)
+  if (!href || isGroup)
     return (
       <motion.div
         ref={ref}
-        className="bg-zinc-900/30 border border-white/5 rounded-xl"
+        className="bg-zinc-900/30 border border-white/5 rounded-xl cursor-pointer hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1518,7 +1530,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         }}
         layout
       >
-        {Content}
+        <div className="block">{Content}</div>
       </motion.div>
     );
 
@@ -1561,6 +1573,8 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const title = baseTitle;
   const episodeTitle = type === "show" && epMeta?.title ? epMeta.title : null;
   const epBadge = type === "show" && epMeta ? formatEpisodeBadge(epMeta) : null;
+  const isGroup = entry?._group && entry._group.length > 1;
+  const groupCount = isGroup ? entry._group.length : 0;
   const { dayMonth } = formatWatchedLine(entry?.watched_at);
   const year = getYear(entry);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
@@ -1605,13 +1619,22 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       <Poster entry={entry} className="w-full h-full" />
 
       <div
-        className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-          type === "movie"
-            ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-            : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+        className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+          isGroup
+            ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+            : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                type === "movie"
+                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+              }`
         }`}
       >
-        {type === "movie" ? (
+        {isGroup ? (
+          <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+            <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <span>{groupCount}</span>
+          </div>
+        ) : type === "movie" ? (
           <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         ) : (
           <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
@@ -1631,10 +1654,17 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
             {title}
           </h5>
 
-          {type === "show" && epBadge && (
-            <div className="text-[9px] text-emerald-300 font-semibold">
-              {epBadge}
+          {isGroup ? (
+            <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
+              {groupCount} episodios agrupados
             </div>
+          ) : (
+            type === "show" &&
+            epBadge && (
+              <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
+                {epBadge}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -1695,7 +1725,23 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = index < 60;
 
-  if (!href) return <div>{CardInner}</div>;
+  if (!href || isGroup)
+    return (
+      <motion.div
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.25,
+          delay: shouldAnimate ? animDelay : 0,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        layout
+      >
+        <div className="block cursor-pointer">{CardInner}</div>
+      </motion.div>
+    );
+
   return (
     <motion.div
       initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
@@ -1733,6 +1779,9 @@ const HistoryGridCard = memo(function HistoryGridCard({
 
   const episodeTitle = type === "show" && epMeta?.title ? epMeta.title : null;
   const epBadge = type === "show" && epMeta ? formatEpisodeBadge(epMeta) : null;
+  const isGroup = entry?._group && entry._group.length > 1;
+  const groupCount = isGroup ? entry._group.length : 0;
+  const groupRange = isGroup ? getEpisodeRange(entry._group) : null;
 
   const { dayMonth } = formatWatchedLine(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
@@ -1769,17 +1818,29 @@ const HistoryGridCard = memo(function HistoryGridCard({
         {title}
       </h5>
 
-      {/* Episodio (móvil: en 1-2 líneas suaves) */}
-      {type === "show" && (epBadge || episodeTitle) && (
-        <div className="mt-0.5 text-[10px] text-zinc-200/80">
-          {epBadge && <div className="leading-tight">{epBadge}</div>}
-          {episodeTitle && (
-            <div className="leading-tight line-clamp-1 text-zinc-200/70">
-              {episodeTitle}
+      <div className="mt-0.5 text-[10px] text-zinc-200/80">
+        {isGroup ? (
+          <>
+            <div className="leading-tight font-medium text-emerald-300/90">
+              {groupCount} episodios agrupados
             </div>
-          )}
-        </div>
-      )}
+            {groupRange && (
+              <div className="leading-tight line-clamp-1 text-zinc-200/70">
+                {groupRange}
+              </div>
+            )}
+          </>
+        ) : type === "show" && (epBadge || episodeTitle) ? (
+          <>
+            {epBadge && <div className="leading-tight">{epBadge}</div>}
+            {episodeTitle && (
+              <div className="leading-tight line-clamp-1 text-zinc-200/70">
+                {episodeTitle}
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
     </>
   );
 
@@ -1795,13 +1856,22 @@ const HistoryGridCard = memo(function HistoryGridCard({
       <Poster entry={entry} className="w-full h-full" />
 
       <div
-        className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-          type === "movie"
-            ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-            : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+        className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+          isGroup
+            ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+            : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
+                type === "movie"
+                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+              }`
         }`}
       >
-        {type === "movie" ? (
+        {isGroup ? (
+          <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
+            <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <span>{groupCount}</span>
+          </div>
+        ) : type === "movie" ? (
           <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         ) : (
           <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
@@ -1842,22 +1912,34 @@ const HistoryGridCard = memo(function HistoryGridCard({
             {title}
           </h5>
 
-          {type === "show" && (epBadge || episodeTitle) && (
-            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
-              {epBadge && (
-                <span className="shrink-0 font-medium text-emerald-300/90">
-                  {epBadge}
-                </span>
-              )}
-              {epBadge && episodeTitle && (
-                <span className="text-zinc-500">•</span>
-              )}
-              {episodeTitle && (
-                <span className="min-w-0 truncate text-zinc-400">
-                  {episodeTitle}
-                </span>
+          {isGroup ? (
+            <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">
+              <span className="font-medium text-emerald-300/90">
+                {groupCount} episodios agrupados
+              </span>
+              {groupRange && (
+                <span className="text-zinc-400 text-[10px]">{groupRange}</span>
               )}
             </div>
+          ) : (
+            type === "show" &&
+            (epBadge || episodeTitle) && (
+              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
+                {epBadge && (
+                  <span className="shrink-0 font-medium text-emerald-300/90">
+                    {epBadge}
+                  </span>
+                )}
+                {epBadge && episodeTitle && (
+                  <span className="text-zinc-500">•</span>
+                )}
+                {episodeTitle && (
+                  <span className="min-w-0 truncate text-zinc-400">
+                    {episodeTitle}
+                  </span>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -1918,7 +2000,17 @@ const HistoryGridCard = memo(function HistoryGridCard({
     totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = index < 60;
 
-  if (!href) return <div>{CardInner}</div>;
+  if (!href || isGroup)
+    return (
+      <motion.div
+        initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+      >
+        <div className="block cursor-pointer">{CardInner}</div>
+      </motion.div>
+    );
   return (
     <motion.div
       initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
@@ -1932,6 +2024,176 @@ const HistoryGridCard = memo(function HistoryGridCard({
     </motion.div>
   );
 });
+
+function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
+  const meta = getEpisodeMeta(entry);
+  const href = getDetailsHref(entry);
+  const historyId = getHistoryId(entry);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const handleDeleteClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDel(true);
+  };
+  const handleConfirm = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await onRemoveFromHistory?.(entry, { historyId });
+  };
+  const handleCancel = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDel(false);
+  };
+
+  return (
+    <div className="relative group/subitem rounded-xl overflow-hidden transition-all hover:bg-white/5 border border-transparent hover:border-white/10">
+      <Link
+        href={href || "#"}
+        className={`flex items-center gap-3 p-2.5 sm:p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
+      >
+        <div className="w-12 sm:w-14 aspect-[2/3] rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
+          <Poster entry={entry} className="w-full h-full" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm sm:text-[15px] font-bold text-emerald-400 drop-shadow-sm">
+            {formatEpisodeBadge(meta)}
+          </p>
+          <p className="text-xs sm:text-sm text-zinc-200 line-clamp-1 mt-0.5">
+            {meta.title || "Episodio sin título"}
+          </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-zinc-500 group-hover/subitem:text-emerald-400 transition-colors shrink-0" />
+      </Link>
+
+      {!confirmDel && (
+        <button
+          onClick={handleDeleteClick}
+          className="absolute top-1/2 right-12 sm:right-14 -translate-y-1/2 p-2 rounded-full bg-black/40 text-zinc-400 hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover/subitem:opacity-100 border border-transparent hover:border-red-500/50"
+          title="Borrar del historial"
+        >
+          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        </button>
+      )}
+
+      <AnimatePresence>
+        {confirmDel && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/90 backdrop-blur-sm z-10 flex items-center justify-center gap-3 px-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-red-200 text-xs sm:text-sm font-bold tracking-wide">
+              ¿Eliminar?
+            </span>
+            <button
+              onClick={handleCancel}
+              className="p-1.5 sm:p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors border border-white/10"
+              aria-label="Cancelar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="p-1.5 sm:p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors border border-red-500/50"
+              aria-label="Borrar"
+            >
+              {isBusy ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
+  const title = getMainTitle(entry);
+  const href = getDetailsHref(entry);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-lg"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onCollapse();
+      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.div
+        className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl flex flex-col max-h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-12 sm:w-14 aspect-[2/3] shrink-0 rounded-lg overflow-hidden bg-zinc-800 border border-white/10 shadow-inner">
+              <Poster entry={entry} className="w-full h-full" />
+            </div>
+            <div className="min-w-0">
+              <Link
+                href={href || "#"}
+                className="text-base sm:text-lg font-bold text-white hover:text-emerald-300 transition-colors line-clamp-1 drop-shadow-sm"
+              >
+                {title}
+              </Link>
+              <p className="text-xs sm:text-sm font-medium text-emerald-400/90 mt-0.5">
+                {entry._group.length} episodios agrupados
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onCollapse}
+            className="-mr-2 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            title="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto sv-scroll">
+          <div className="p-3 sm:p-4 space-y-1 sm:space-y-1.5">
+            {entry._group.map((ep, idx) => (
+              <EpisodeSubItem
+                key={getHistoryId(ep) || idx}
+                entry={ep}
+                onRemoveFromHistory={onRemoveFromHistory}
+                isBusy={busyId === `del:${getHistoryId(ep)}`}
+              />
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
 
 // ----------------------------
 // MAIN PAGE
@@ -2994,93 +3256,46 @@ export default function HistoryClient() {
                     const collapseKey = `${g.key}:${getTmdbId(entry)}:${idx}`;
                     const isExpanded = expandedGroups.has(collapseKey);
 
-                    if (isCollapsed && !isExpanded) {
-                      // Tarjeta colapsada con badge de cantidad
-                      const count = entry._group.length;
+                    if (isCollapsed) {
                       return (
                         <div
-                          key={`collapsed:${collapseKey}`}
-                          className="relative cursor-pointer"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleExpandGroup(collapseKey);
-                          }}
+                          key={`group:${collapseKey}`}
+                          className="relative cursor-pointer group/stack"
                         >
-                          {/* Tarjeta renderizada debajo */}
-                          <div className="relative z-10">
-                            <CardComponent
-                              entry={entry}
-                              busy={false}
-                              onRemoveFromHistory={removeFromHistory}
-                              index={idx}
-                              totalItems={g.collapsedItems.length}
-                              editMode={editMode}
-                              isMobile={isMobile}
-                              {...extraProps}
-                            />
-                          </div>
-                          {/* Overlay encima: bloquea TODO hover/click en la tarjeta, los clics suben al padre */}
-                          <div className="absolute inset-0 z-40 cursor-pointer">
-                            {/* Badge de cantidad dentro del overlay */}
-                            <div className="absolute top-2 right-2">
-                              <span className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-600/90 text-white backdrop-blur-md shadow-lg border border-emerald-400/30">
-                                <Layers className="w-3 h-3" />
-                                {count}
-                              </span>
+                          <div
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleExpandGroup(collapseKey);
+                            }}
+                          >
+                            <div className="absolute inset-0 rounded-xl bg-zinc-900/30 border border-white/10 -z-10 transform translate-x-1 translate-y-1 transition-transform duration-300 group-hover/stack:translate-x-2 group-hover/stack:translate-y-2" />
+                            <div className="absolute inset-0 rounded-xl bg-zinc-900/20 border border-white/5 -z-20 transform translate-x-2 translate-y-2 transition-transform duration-300 group-hover/stack:translate-x-4 group-hover/stack:translate-y-4" />
+
+                            <div className="relative z-10">
+                              <CardComponent
+                                entry={entry}
+                                busy={false}
+                                index={idx}
+                                totalItems={g.collapsedItems.length}
+                                editMode={editMode}
+                                isMobile={isMobile}
+                                {...extraProps}
+                              />
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-
-                    if (isCollapsed && isExpanded) {
-                      // Grupo expandido: mostrar todos los items individuales
-                      return (
-                        <div
-                          key={`expanded:${collapseKey}`}
-                          className={
-                            viewMode === "list" ? "col-span-full" : "contents"
-                          }
-                        >
-                          {/* Botón para colapsar de nuevo */}
-                          <div
-                            className={
-                              viewMode === "list"
-                                ? "mb-2"
-                                : "col-span-full flex justify-start mb-1"
-                            }
-                          >
-                            <button
-                              onClick={() => toggleExpandGroup(collapseKey)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors"
-                            >
-                              <Layers className="w-3.5 h-3.5" />
-                              {getMainTitle(entry)} · {entry._group.length}{" "}
-                              episodios
-                              <span className="text-emerald-500/60 ml-1">
-                                – Colapsar
-                              </span>
-                            </button>
-                          </div>
-                          {entry._group.map((subEntry, subIdx) => (
-                            <CardComponent
-                              key={
-                                getHistoryId(subEntry) ||
-                                `${getTmdbId(subEntry)}:${subEntry?.watched_at}:${subIdx}`
-                              }
-                              entry={subEntry}
-                              busy={
-                                mutatingId === `del:${getHistoryId(subEntry)}`
-                              }
-                              onRemoveFromHistory={removeFromHistory}
-                              index={subIdx}
-                              totalItems={entry._group.length}
-                              editMode={editMode}
-                              isMobile={isMobile}
-                              {...extraProps}
-                            />
-                          ))}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <ExpandedGroupView
+                                entry={entry}
+                                onCollapse={() =>
+                                  toggleExpandGroup(collapseKey)
+                                }
+                                onRemoveFromHistory={removeFromHistory}
+                                busyId={mutatingId}
+                              />
+                            )}
+                          </AnimatePresence>
                         </div>
                       );
                     }
