@@ -283,7 +283,7 @@ export default function SoundtrackModal({
 
             {/* --- INFO PISTA --- */}
             <div className="w-full text-center mb-8 space-y-1">
-              <h4 className="text-2xl sm:text-3xl font-black text-white line-clamp-1 drop-shadow-md">
+              <h4 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md text-balance">
                 {selectedTrack.trackName}
               </h4>
               <p className="text-base sm:text-lg font-medium text-white/70 line-clamp-1 drop-shadow-sm">
