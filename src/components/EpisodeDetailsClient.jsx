@@ -1479,13 +1479,13 @@ export default function EpisodeDetailsClient({
                 1024: { slidesPerView: 5, spaceBetween: 18 },
                 1280: { slidesPerView: 6, spaceBetween: 20 },
               }}
-              className={`pb-8 ${!isMounted ? "ssr-swiper-fix" : ""}`}
+              className={`mt-3 pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
             >
               {cast.slice(0, 20).map((actor) => (
                 <SwiperSlide key={actor.id}>
                   <Link
                     href={`/details/person/${actor.id}`}
-                    className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                    className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                   >
                     <div className="aspect-[2/3] overflow-hidden relative">
                       {actor.profile_path ? (
@@ -1531,13 +1531,13 @@ export default function EpisodeDetailsClient({
                 1024: { slidesPerView: 5, spaceBetween: 18 },
                 1280: { slidesPerView: 6, spaceBetween: 20 },
               }}
-              className={`pb-8 ${!isMounted ? "ssr-swiper-fix" : ""}`}
+              className={`mt-3 pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
             >
               {guestStars.slice(0, 20).map((actor) => (
                 <SwiperSlide key={actor.id}>
                   <Link
                     href={`/details/person/${actor.id}`}
-                    className="mt-3 block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
+                    className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
                   >
                     <div className="aspect-[2/3] overflow-hidden relative">
                       {actor.profile_path ? (

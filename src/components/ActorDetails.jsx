@@ -1014,7 +1014,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
   const showNext = isHoveredRow && canNext;
 
   return (
-    <div className="-mx-4 sm:mx-0">
+    <div className="mt-3 -mx-4 sm:mx-0">
       <div
         className="relative px-4 sm:px-0"
         onMouseEnter={() => setIsHoveredRow(true)}
@@ -1040,7 +1040,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
             allowTouchMove
             freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
             modules={[FreeMode]}
-            className="!overflow-visible pb-9 pt-5"
+            className="!overflow-visible pb-8"
           >
             {slides.map((child, idx) => (
               <SwiperSlide
@@ -2621,7 +2621,7 @@ export default function ActorDetails({
                   />
 
                   {/* Filters */}
-                  <div className="mb-6 space-y-3">
+                  <div className="mt-3 mb-6 space-y-3">
                     <div className="flex gap-3 lg:hidden">
                       <div className="relative flex-1">
                         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -2882,7 +2882,7 @@ export default function ActorDetails({
                     subtitle="Datos del actor/actriz"
                     icon={User}
                   />
-                  <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="mt-3 grid sm:grid-cols-2 gap-4">
                     <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 space-y-4">
                       <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
                         Información
