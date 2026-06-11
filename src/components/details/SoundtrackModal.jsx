@@ -223,16 +223,12 @@ export default function SoundtrackModal({
                   href={selectedExternalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-sm transition ${
-                    selectedTrack?.source === "Spotify"
-                      ? "border-[#1DB954]/30 bg-[#1DB954]/15 text-[#1DB954] hover:bg-[#1DB954]/25 hover:text-[#1ED760]"
-                      : "border-white/20 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
-                  }`}
+                  className="flex h-11 w-11 items-center justify-center transition-transform hover:scale-110 text-white/70 hover:text-white"
                   aria-label={`Escuchar ${selectedTrack?.trackName || title || "soundtrack"} en ${selectedTrack?.source || "la web"}`}
                 >
                   <SourceLinkIcon
                     source={selectedTrack?.source}
-                    className="h-5 w-5"
+                    className="h-7 w-7 sm:h-8 sm:w-8 drop-shadow-md"
                   />
                 </a>
               ) : (

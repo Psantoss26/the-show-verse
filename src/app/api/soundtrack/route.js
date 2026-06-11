@@ -81,7 +81,7 @@ const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v37";
+const CACHE_VERSION = "soundtrack-ranking-v38";
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -356,6 +356,9 @@ function hasDisallowedTitleSuffix(album, ctx) {
       if (/^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken)) return true;
 
       const allowedSoundtrackToken = /^(complete|music|official|original|score|soundtrack|ost)$/.test(nextToken);
+      const allowedSeriesToken =
+        ctx.mediaType === "tv" && /^(season|seasons|series|tv|television)$/.test(nextToken);
+      if (allowedSeriesToken) return false;
       return !allowedSoundtrackToken;
     });
   });
@@ -393,6 +396,38 @@ function isPriorityMotionPictureAlbum(album) {
     /complete original score|original score/.test(name) ||
     /official .*soundtrack/.test(name) ||
     /soundtrack oficial|banda sonora oficial/.test(name)
+  );
+}
+
+function isPrioritySeriesAlbum(album, ctx) {
+  if (ctx.mediaType !== "tv") return false;
+  const name = norm(albumName(album));
+  if (!albumMatchesTitle(album, ctx)) return false;
+  if (containsAny(name, BAD_MATCH_WORDS)) return false;
+  return (
+    /soundtrack/.test(name) ||
+    /original (music|score)/.test(name) ||
+    /music from .*series/.test(name) ||
+    /music from .*tv/.test(name) ||
+    /music from .*television/.test(name) ||
+    /music from .*hbo/.test(name) ||
+    /soundtrack from .*series/.test(name) ||
+    /all (seasons|songs)/.test(name)
+  );
+}
+
+function isPrioritySeriesSoundtrackPlaylist(playlist, ctx) {
+  if (ctx.mediaType !== "tv") return false;
+  const name = norm(playlist?.name);
+  if (!name || containsAny(name, BAD_MATCH_WORDS)) return false;
+  if (!albumMatchesTitle({ name }, ctx)) return false;
+  return (
+    (/soundtrack/.test(name) && /all (seasons|songs)/.test(name)) ||
+    /official .*playlist/.test(name) ||
+    /original (music|score)/.test(name) ||
+    /music from .*series/.test(name) ||
+    /music from .*tv/.test(name) ||
+    /music from .*television/.test(name)
   );
 }
 
@@ -438,7 +473,9 @@ function isCredibleFirstExactTitleAlbum(album, ctx) {
 
 function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   const titleMatches = albums.filter((album) => isAcceptableFirstAlbum(album, ctx));
-  const canonical = titleMatches.filter(isPriorityMotionPictureAlbum);
+  const canonical = titleMatches.filter((album) =>
+    isPriorityMotionPictureAlbum(album) || isPrioritySeriesAlbum(album, ctx),
+  );
   const canonicalSameYear = canonical.filter((album) => isSameReleaseYear(album, ctx));
   const firstAlbum = albums[0];
 
@@ -470,6 +507,21 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
 }
 
 function selectPlaylistsFromOriginalTitleSearch(playlists, ctx) {
+  if (ctx.mediaType === "tv") {
+    const seriesPlaylists = playlists
+      .filter((playlist) => isPrioritySeriesSoundtrackPlaylist(playlist, ctx))
+      .sort((a, b) => {
+        const aName = norm(a?.name);
+        const bName = norm(b?.name);
+        const aAll = /all (seasons|songs)/.test(aName) ? 1 : 0;
+        const bAll = /all (seasons|songs)/.test(bName) ? 1 : 0;
+        if (aAll !== bAll) return bAll - aAll;
+        return Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999);
+      })
+      .slice(0, MAX_SPOTIFY_PLAYLISTS);
+    if (seriesPlaylists.length) return seriesPlaylists;
+  }
+
   return playlists
     .filter((playlist) => isPriorityOfficialSoundtrackPlaylist(playlist, ctx))
     .sort((a, b) => Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999))
@@ -543,6 +595,26 @@ async function searchSoundtrackSources(ctx, token, market) {
     );
 
     if (i === 0) {
+      const originalTitlePlaylistSelection = selectPlaylistsFromOriginalTitleSearch(
+        annotatedPlaylists,
+        ctx,
+      );
+
+      if (ctx.mediaType === "tv" && originalTitlePlaylistSelection.length) {
+        return {
+          albums: [],
+          playlists: originalTitlePlaylistSelection.map((playlist) => ({
+            ...playlist,
+            score: canonicalSoundtrackBonus(norm(playlist.name)) + 190,
+            selectionReason: "original_title_series_soundtrack_playlist",
+          })),
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "original_title_series_soundtrack_playlist",
+        };
+      }
+
       const originalTitleSelection = selectAlbumsFromOriginalTitleSearch(
         annotatedAlbums,
         ctx,
@@ -555,6 +627,8 @@ async function searchSoundtrackSources(ctx, token, market) {
             score: scoreAlbum(album, ctx),
             selectionReason: isPriorityMotionPictureAlbum(album)
               ? "original_title_priority_motion_picture_album"
+              : isPrioritySeriesAlbum(album, ctx)
+                ? "original_title_priority_series_album"
               : (isSameReleaseYear(album, ctx)
                 ? "original_title_same_year_album"
                 : "original_title_first_title_match"),
@@ -566,11 +640,6 @@ async function searchSoundtrackSources(ctx, token, market) {
           spotifySelectionMode: "original_title_album",
         };
       }
-
-      const originalTitlePlaylistSelection = selectPlaylistsFromOriginalTitleSearch(
-        annotatedPlaylists,
-        ctx,
-      );
 
       if (originalTitlePlaylistSelection.length) {
         return {
@@ -686,6 +755,9 @@ function canonicalSoundtrackBonus(text) {
   if (/the soundtrack/.test(text)) score += 62;
   if (/original soundtrack/.test(text)) score += 55;
   if (/music from .*motion picture|music from .*film|music from .*movie/.test(text)) score += 48;
+  if (/music from .*series|music from .*tv|music from .*television/.test(text)) score += 48;
+  if (/original music from .*tv series|soundtrack from .*series/.test(text)) score += 48;
+  if (/all seasons|all songs/.test(text) && /soundtrack/.test(text)) score += 44;
   if (/original motion picture score|original score/.test(text)) score += 42;
   return score;
 }
