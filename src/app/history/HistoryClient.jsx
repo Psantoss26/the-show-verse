@@ -2177,7 +2177,8 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
 
 function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
   const title = getMainTitle(entry);
-  const href = getDetailsHref(entry);
+  const tmdbId = getTmdbId(entry);
+  const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
