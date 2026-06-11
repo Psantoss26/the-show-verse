@@ -1452,11 +1452,11 @@ const HistoryItemCard = memo(function HistoryItemCard({
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-sm bg-black/40 hover:bg-red-600 text-white transition-colors z-10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+          className="absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
           title="Borrar"
           aria-label="Borrar"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </button>
       )}
 
@@ -1643,11 +1643,11 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
-          className="absolute top-2 right-2 z-20 p-1.5 rounded-full backdrop-blur-md bg-black/40 hover:bg-red-600 text-white transition-all duration-200 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 pointer-events-auto border border-white/10 hover:border-transparent"
+          className="absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
           title="Borrar"
           aria-label="Borrar"
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </button>
       )}
 
@@ -1866,15 +1866,11 @@ const HistoryGridCard = memo(function HistoryGridCard({
       {!confirmDel && (!isMobile || editMode) && (
         <button
           onClick={handleDeleteClick}
-          className={[
-            "absolute top-2 right-2 z-20 p-2 rounded-full backdrop-blur-sm",
-            "bg-black/40 hover:bg-red-600 text-white transition-colors",
-            "opacity-100 lg:opacity-0 lg:group-hover:opacity-100",
-          ].join(" ")}
+          className="absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
           title="Borrar"
           aria-label="Borrar"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </button>
       )}
 
