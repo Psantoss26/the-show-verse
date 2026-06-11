@@ -1283,18 +1283,14 @@ export default function SeasonDetailsClient({
 
               <div className="relative min-h-[100px]">
                 <AnimatePresence mode="wait" initial={false}>
+
+
                   {activeTab === "synopsis" && (
-                    <motion.div
-                      key="synopsis"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
+                    <div key="synopsis">
                       <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                        {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                        {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                         <div
-                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
                           style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
                         />
                         <p className="relative z-10 text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
@@ -1302,7 +1298,7 @@ export default function SeasonDetailsClient({
                             "No hay descripción disponible."}
                         </p>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
 
                   {activeTab === "details" && (

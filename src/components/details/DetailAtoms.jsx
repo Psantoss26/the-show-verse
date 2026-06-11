@@ -9,9 +9,9 @@ export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
     <div
       className={`relative flex items-center gap-3.5 p-3.5 pl-4 rounded-xl h-full ${className}`}
     >
-      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 20px) */}
+      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
       <div
-        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[20px] pointer-events-none overflow-hidden"
+        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
       />
 
