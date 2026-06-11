@@ -1053,8 +1053,13 @@ function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative isolate overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-yellow-500/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu p-5 sm:p-6">
-      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+    <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+      <div
+        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+      />
+      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
 
       <div className="relative z-10">
         <div className="flex items-start gap-4">
@@ -9538,16 +9543,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <div className="relative isolate overflow-hidden p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu">
-                            {data.tagline && (
-                              <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                                “{data.tagline}”
-                              </div>
-                            )}
-                            <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                              {data.overview ||
-                                "No hay descripción disponible."}
-                            </p>
+                          <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                            {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                            <div
+                              className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                              style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                            />
+                            <div className="relative z-10">
+                              {data.tagline && (
+                                <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                                  “{data.tagline}”
+                                </div>
+                              )}
+                              <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                                {data.overview ||
+                                  "No hay descripción disponible."}
+                              </p>
+                            </div>
                           </div>
                         </motion.div>
                       )}
@@ -9555,13 +9567,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {/* ===== TAB 2: DETALLES ===== */}
                       {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
                       {activeTab === "details" && (
-                        <motion.div
-                          key="details"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                        <div key="details">
                           <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                             {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
                             <VisualMetaCard
@@ -9630,7 +9636,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </>
                             )}
                           </div>
-                        </motion.div>
+                        </div>
                       )}
 
                       {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
@@ -9741,28 +9747,29 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="relative isolate overflow-hidden p-5 sm:p-6 rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transform-gpu">
-                      {data.tagline && (
-                        <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                          "{data.tagline}"
-                        </div>
-                      )}
-                      <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                        {data.overview || "No hay descripción disponible."}
-                      </p>
+                    <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                      <div
+                        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                      />
+                      <div className="relative z-10">
+                        {data.tagline && (
+                          <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
+                            "{data.tagline}"
+                          </div>
+                        )}
+                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                          {data.overview || "No hay descripción disponible."}
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
                 )}
 
                 {/* 2. DETALLES */}
                 {activeTab === "details" && (
-                  <motion.div
-                    key="details-backdrop"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <div key="details-backdrop">
                     <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                       <VisualMetaCard
                         icon={type === "movie" ? FilmIcon : MonitorPlay}
@@ -9830,7 +9837,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {/* 3. PRODUCCIÓN */}

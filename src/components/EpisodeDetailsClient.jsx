@@ -1400,8 +1400,13 @@ export default function EpisodeDetailsClient({
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="relative p-5 sm:p-6 rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl">
-                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
+                      <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                        {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 50px) */}
+                        <div
+                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[50px] pointer-events-none overflow-hidden"
+                          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                        />
+                        <p className="relative z-10 text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
                           {episode?.overview?.trim() ||
                             "No hay descripción disponible."}
                         </p>
@@ -1410,13 +1415,7 @@ export default function EpisodeDetailsClient({
                   )}
 
                   {activeTab === "details" && (
-                    <motion.div
-                      key="details"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
+                    <div key="details">
                       <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                         <VisualMetaCard
                           icon={MonitorPlay}
@@ -1443,7 +1442,7 @@ export default function EpisodeDetailsClient({
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </AnimatePresence>
               </div>
