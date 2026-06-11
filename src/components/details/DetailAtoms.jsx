@@ -1,15 +1,16 @@
-// src/components/details/DetailAtoms.jsx
 "use client";
+
+import { motion } from "framer-motion";
 
 export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
   if (!value) return null;
 
   return (
     <div
-      className={`relative overflow-hidden flex items-start gap-3 p-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg h-full ${className}`}
+      className={`relative flex items-center gap-3.5 p-3.5 pl-4 rounded-xl bg-gradient-to-br from-white/14 via-white/6 to-white/2 h-full ${className}`}
     >
-      <div className="relative z-10 p-2 rounded-lg shrink-0 bg-black/20 text-zinc-400 mt-0.5">
-        <Icon className="w-4 h-4" />
+      <div className="relative z-10 shrink-0 text-zinc-300">
+        <Icon className="w-5 h-5" />
       </div>
 
       <div className="relative z-10 flex flex-col min-w-0 flex-1">
@@ -160,6 +161,36 @@ export function StatChip({ icon: Icon, label, value }) {
           {label}
         </div>
       </div>
+    </div>
+  );
+}
+
+export function DetailsTabsMenu({ tabs, activeTab, onChangeTab, layoutId = "activeTabIndicator" }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-black/35 border border-white/5 backdrop-blur-md w-fit mb-5">
+      {tabs.map((tab) => (
+        <motion.button
+          key={tab.id}
+          type="button"
+          onClick={() => onChangeTab(tab.id)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`relative px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-colors duration-300 ${
+            activeTab === tab.id
+              ? "text-neutral-950 font-black"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          {activeTab === tab.id && (
+            <motion.div
+              layoutId={layoutId}
+              className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-lg z-0 shadow-md shadow-yellow-500/10"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10">{tab.label}</span>
+        </motion.button>
+      ))}
     </div>
   );
 }
