@@ -198,7 +198,7 @@ export default function StarRating({
                   type="button"
                   onClick={() => setOpen(false)}
                   className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-                  title="Cerrar (Esc)"
+                  aria-label="Cerrar (Esc)"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -252,7 +252,7 @@ export default function StarRating({
                       onClick={() => adjust(-step)}
                       className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 backdrop-blur-xl transition hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                       disabled={effectiveDisabled}
-                      title="Bajar puntuación"
+                      aria-label="Bajar puntuación"
                     >
                       <Minus className="w-5 h-5" />
                     </button>
@@ -266,7 +266,7 @@ export default function StarRating({
                       onClick={() => adjust(step)}
                       className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 backdrop-blur-xl transition hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                       disabled={effectiveDisabled}
-                      title="Subir puntuación"
+                      aria-label="Subir puntuación"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
@@ -279,7 +279,7 @@ export default function StarRating({
                       type="button"
                       onClick={handleClear}
                       className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 backdrop-blur-xl transition hover:border-red-300/30 hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
-                      title="Eliminar nota"
+                      aria-label="Eliminar nota"
                       disabled={effectiveDisabled}
                     >
                       <Trash2 className="w-5 h-5" />

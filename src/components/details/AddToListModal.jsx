@@ -118,7 +118,6 @@ export default function AddToListModal(props) {
             onClick={onClose}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
             aria-label="Cerrar"
-            title="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>
@@ -141,7 +140,6 @@ export default function AddToListModal(props) {
                     <span
                       key={id || l?.name}
                       className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-black/20 px-2.5 py-1 text-[11px] font-bold text-emerald-100"
-                      title={l?.name}
                     >
                       <Check className="w-3.5 h-3.5" />
                       <span className="max-w-[220px] truncate">
