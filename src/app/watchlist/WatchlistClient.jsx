@@ -1046,28 +1046,42 @@ function StatBox({
   );
 }
 
-function GroupDivider({ title, stats, count, total, groupBy }) {
+function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
+  const [transitioningThreshold, setTransitioningThreshold] = useState(132);
+
+  useEffect(() => {
+    if (mobileFiltersOpen) {
+      setTransitioningThreshold(244);
+    } else {
+      const timer = setTimeout(() => {
+        setTransitioningThreshold(132);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileFiltersOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
       if (!ref.current) return;
       const top = ref.current.getBoundingClientRect().top;
       const isLg = window.innerWidth >= 1024;
-      const threshold = isLg ? 136 : 130;
+      const threshold = isLg ? 136 : transitioningThreshold;
       setIsSticky(top <= threshold + 1);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [transitioningThreshold]);
 
   return (
     <motion.div
       ref={ref}
-      className="sticky top-[130px] lg:top-[136px] z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
+      className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
+        mobileFiltersOpen ? "top-[244px]" : "top-[132px]"
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -1851,6 +1865,20 @@ export default function WatchlistClient() {
 
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersSticky, setFiltersSticky] = useState(false);
+  const filtersRef = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!filtersRef.current) return;
+      const rect = filtersRef.current.getBoundingClientRect();
+      setFiltersSticky(rect.top <= 82);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const needsImdbScores =
     groupBy === "imdb_rating" ||
     subGroupBy === "imdb_rating" ||
@@ -2660,7 +2688,8 @@ export default function WatchlistClient() {
 
         {/* Filters */}
         <motion.div
-          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
+          ref={filtersRef}
+          className="sticky top-20 z-[70] space-y-2 mb-2 lg:mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -2698,16 +2727,20 @@ export default function WatchlistClient() {
           </div>
 
           {/* Mobile: collapsible filters */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="relative z-10 lg:hidden overflow-visible"
-              >
-                <div className="space-y-3 pt-1">
+          <div
+            className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              mobileFiltersOpen
+                ? "opacity-100"
+                : "opacity-0 pointer-events-none"
+            } lg:hidden overflow-hidden ${
+              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 top-full z-10" : "relative z-10"
+            }`}
+            style={{
+              gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
+            }}
+          >
+            <div className="min-h-0">
+              <div className="space-y-2 pt-1 pb-1">
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <InlineDropdown
@@ -2917,10 +2950,9 @@ export default function WatchlistClient() {
                       </button>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </div>
+          </div>
 
           {/* Desktop: Single row */}
           <div className="relative z-10 hidden lg:flex gap-3">
@@ -3180,6 +3212,7 @@ export default function WatchlistClient() {
                   total={sorted.length}
                   stats={group.stats}
                   groupBy={groupBy}
+                  mobileFiltersOpen={mobileFiltersOpen}
                 />
                 {group.subgroups?.length ? (
                   <div className="space-y-6">
