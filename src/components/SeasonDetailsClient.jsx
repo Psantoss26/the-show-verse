@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
-import { SectionTitle, VisualMetaCard } from "@/components/details/DetailAtoms";
+import { SectionTitle, VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
@@ -1261,25 +1261,15 @@ export default function SeasonDetailsClient({
 
             {/* Tabs */}
             <div>
-              <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
-                {[
+              <DetailsTabsMenu
+                tabs={[
                   { id: "details", label: "Detalles" },
                   { id: "synopsis", label: "Sinopsis" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-                      ${
-                        activeTab === tab.id
-                          ? "text-white border-yellow-500"
-                          : "text-zinc-500 border-transparent hover:text-zinc-300"
-                      }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+                ]}
+                activeTab={activeTab}
+                onChangeTab={setActiveTab}
+                layoutId="seasonTabInline"
+              />
 
               <div className="relative min-h-[100px]">
                 <AnimatePresence mode="wait" initial={false}>

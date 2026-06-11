@@ -143,16 +143,18 @@ export default function AnimatedPosterFrame({
     >
       <div
         ref={tiltRef}
-        className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 will-change-transform"
+        className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 will-change-transform"
         style={{
           transformStyle: "preserve-3d",
           backfaceVisibility: "hidden",
           WebkitBackfaceVisibility: "hidden",
           outline: "1px solid transparent",
           isolation: "isolate",
+          WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         }}
       >
-        <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 z-10" />
+        {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
+        <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
         <div className={`relative bg-neutral-950 overflow-hidden ${aspectClass}`}>
           {src ? (
             <img
