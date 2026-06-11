@@ -724,7 +724,6 @@ export default function CalendarPage() {
               <button
                 onClick={goPrev}
                 className="p-3 rounded-xl sm:rounded-2xl transition shadow-lg flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
-                title={`${viewMode === "month" ? "Mes" : viewMode === "week" ? "Semana" : "Día"} anterior`}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -742,7 +741,6 @@ export default function CalendarPage() {
               <button
                 onClick={goNext}
                 className="p-3 rounded-xl sm:rounded-2xl transition shadow-lg flex-shrink-0 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
-                title={`${viewMode === "month" ? "Mes" : viewMode === "week" ? "Semana" : "Día"} siguiente`}
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
