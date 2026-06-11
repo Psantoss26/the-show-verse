@@ -14,28 +14,27 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-function SpotifyIcon({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle cx="12" cy="12" r="10" fill="currentColor" />
-      <path
-        d="M7.4 9.3c3.3-1 6.9-.7 9.7.9M8.1 12.2c2.5-.7 5.2-.5 7.4.8M8.8 14.9c1.9-.5 3.8-.3 5.5.5"
-        fill="none"
-        stroke="#000"
-        strokeLinecap="round"
-        strokeWidth="1.45"
-      />
-    </svg>
-  );
+function sourceIconPath(source) {
+  const key = String(source || "").toLowerCase();
+  if (key === "spotify") return "/spotify.png";
+  if (key === "itunes") return "/itunes.png";
+  if (key === "deezer") return "/deezer.png";
+  return "";
 }
 
 function SourceLinkIcon({ source, className = "" }) {
-  if (source === "Spotify") return <SpotifyIcon className={className} />;
+  const iconPath = sourceIconPath(source);
+  if (iconPath) {
+    return (
+      <img
+        src={iconPath}
+        alt=""
+        aria-hidden="true"
+        decoding="async"
+        className={`${className} object-contain`}
+      />
+    );
+  }
   return <ExternalLink className={className} />;
 }
 
@@ -272,6 +271,8 @@ export default function SoundtrackModal({
                 <img
                   src={selectedTrack.artworkUrl}
                   alt={selectedTrack.trackName}
+                  decoding="async"
+                  fetchPriority="high"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -293,11 +294,11 @@ export default function SoundtrackModal({
 
             {selectedHasPreview ? (
               <>
-                {/* Reproductor de Audio Oculto */}
                 <audio
                   ref={audioRef}
                   src={selectedTrack.previewUrl}
                   autoPlay
+                  preload="metadata"
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={handleEnded}
@@ -305,7 +306,6 @@ export default function SoundtrackModal({
                   onPause={() => setIsPlaying(false)}
                 />
 
-                {/* --- BARRA DE PROGRESO --- */}
                 <div className="w-full flex items-center gap-4 mb-8">
                   <span className="text-xs font-semibold text-white/50 w-10 text-right tabular-nums">
                     {formatTime(progress)}
@@ -371,23 +371,20 @@ export default function SoundtrackModal({
                 <SkipBack className="w-8 h-8 sm:w-9 sm:h-9 fill-current" />
               </button>
 
-              <button
-                type="button"
-                onClick={togglePlay}
-                disabled={!selectedHasPreview}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
-                aria-label={
-                  selectedHasPreview
-                    ? "Reproducir o pausar preview"
-                    : "Preview no disponible"
-                }
-              >
-                {isPlaying && selectedHasPreview ? (
-                  <Pause className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
-                ) : (
-                  <Play className="w-10 h-10 sm:w-12 sm:h-12 fill-current ml-1 sm:ml-1.5" />
-                )}
-              </button>
+              {selectedHasPreview && (
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
+                  aria-label="Reproducir o pausar preview"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
+                  ) : (
+                    <Play className="w-10 h-10 sm:w-12 sm:h-12 fill-current ml-1 sm:ml-1.5" />
+                  )}
+                </button>
+              )}
 
               <button
                 type="button"

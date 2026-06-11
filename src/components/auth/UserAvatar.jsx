@@ -1,49 +1,53 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function UserAvatar() {
-  const [traktAvatarUrl, setTraktAvatarUrl] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [available, setAvailable] = useState(false)
+  const [traktAvatarUrl, setTraktAvatarUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [available, setAvailable] = useState(false);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     async function loadTraktAvatar() {
       try {
-        const res = await fetch('/api/trakt/profile?userOnly=1', { cache: 'no-store' })
+        const res = await fetch("/api/trakt/profile?userOnly=1", {
+          cache: "no-store",
+        });
         if (!res.ok) {
-          if (!cancelled) setLoading(false)
-          return
+          if (!cancelled) setLoading(false);
+          return;
         }
-        const data = await res.json()
-        const url = data?.user?.avatarUrl
+        const data = await res.json();
+        const url = data?.user?.avatarUrl;
         if (!cancelled) {
-          setAvailable(!!url)
-          if (url) setTraktAvatarUrl(url)
-          setLoading(false)
+          setAvailable(!!url);
+          if (url) setTraktAvatarUrl(url);
+          setLoading(false);
         }
       } catch {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
     }
-    loadTraktAvatar()
-    return () => { cancelled = true }
-  }, [])
+    loadTraktAvatar();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
       <Link
         href="/profile"
-        title="Mi perfil"
+        aria-label="Mi perfil"
         className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
       >
         <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-800">
           <div className="w-full h-full animate-pulse" />
         </div>
       </Link>
-    )
+    );
   }
 
   if (!available) {
@@ -55,13 +59,13 @@ export default function UserAvatar() {
         <span className="hidden lg:inline">Iniciar sesión</span>
         <span className="lg:hidden">Acceder</span>
       </a>
-    )
+    );
   }
 
   return (
     <Link
       href="/profile"
-      title="Mi perfil"
+      aria-label="Mi perfil"
       className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
     >
       <div className="w-9 h-9 rounded-full overflow-hidden">
@@ -72,5 +76,5 @@ export default function UserAvatar() {
         />
       </div>
     </Link>
-  )
+  );
 }

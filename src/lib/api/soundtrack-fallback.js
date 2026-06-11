@@ -4,20 +4,27 @@ import { searchDeezer } from "@/lib/api/deezer";
 
 const MIN_TRACKS_TO_STOP = 4;
 
+function isSameTrack(a, b) {
+  const aName = norm(a.trackName);
+  const bName = norm(b.trackName);
+  if (!aName || aName !== bName) return false;
+
+  const aArtist = norm(a.artistName);
+  const bArtist = norm(b.artistName);
+  if (!aArtist || !bArtist) return true;
+  if (aArtist === bArtist) return true;
+
+  const aTokens = new Set(aArtist.split(" ").filter((t) => t.length > 2));
+  const bTokens = bArtist.split(" ").filter((t) => t.length > 2);
+  return bTokens.some((token) => aTokens.has(token));
+}
+
 export async function searchFallback(ctx, country = "US") {
   let tracks = [];
   let source = null;
   let query = "";
 
   const itunesResult = await searchITunes(ctx, country);
-  if (itunesResult.tracks.length >= MIN_TRACKS_TO_STOP) {
-    return {
-      tracks: itunesResult.tracks,
-      source: "iTunes",
-      query: itunesResult.query || query,
-    };
-  }
-
   if (itunesResult.tracks.length > 0) {
     tracks = itunesResult.tracks;
     source = "iTunes";
@@ -28,12 +35,21 @@ export async function searchFallback(ctx, country = "US") {
   if (deezerResult.tracks.length > 0) {
     const merged = [...tracks];
     for (const dt of deezerResult.tracks) {
-      const isDuplicate = merged.some(
-        (t) =>
-          norm(t.trackName) === norm(dt.trackName) &&
-          norm(t.artistName) === norm(dt.artistName),
-      );
-      if (!isDuplicate) merged.push(dt);
+      const matchIdx = merged.findIndex((t) => isSameTrack(t, dt));
+      if (matchIdx === -1) {
+        merged.push(dt);
+      } else {
+        const current = merged[matchIdx];
+        const deezerHasPreview = Boolean(dt.previewUrl);
+        const currentHasPreview = Boolean(current.previewUrl);
+        if (
+          (deezerHasPreview && !currentHasPreview) ||
+          ((dt.score ?? 0) > (current.score ?? 0) &&
+            deezerHasPreview === currentHasPreview)
+        ) {
+          merged[matchIdx] = { ...current, ...dt };
+        }
+      }
     }
 
     const totalTracks = merged.length;

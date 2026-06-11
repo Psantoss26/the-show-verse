@@ -87,16 +87,28 @@ function SearchBar({ onResultClick, isMobile = false }) {
     if (onResultClick) onResultClick();
   };
 
-  const getBadgeStyles = (mediaType) => {
+  const getBadgeConfig = (mediaType) => {
     switch (mediaType) {
       case "movie":
-        return "bg-blue-500/15 text-blue-300 border border-blue-500/30";
+        return {
+          textClass: "text-sky-300",
+          dotClass: "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]",
+        };
       case "tv":
-        return "bg-purple-500/15 text-purple-300 border border-purple-500/30";
+        return {
+          textClass: "text-purple-300",
+          dotClass: "bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.8)]",
+        };
       case "person":
-        return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+        return {
+          textClass: "text-emerald-300",
+          dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+        };
       default:
-        return "bg-neutral-500/15 text-neutral-300 border border-neutral-500/30";
+        return {
+          textClass: "text-zinc-300",
+          dotClass: "bg-zinc-400 shadow-[0_0_6px_rgba(161,161,170,0.8)]",
+        };
     }
   };
 
@@ -205,19 +217,28 @@ function SearchBar({ onResultClick, isMobile = false }) {
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBadgeStyles(item.media_type)}`}
+                          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${getBadgeConfig(item.media_type).textClass}`}
                         >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${getBadgeConfig(item.media_type).dotClass}`}
+                          />
                           {getMediaTypeLabel(item.media_type)}
                         </span>
                         {item.release_date && (
-                          <span className="text-xs text-neutral-500">
-                            {new Date(item.release_date).getFullYear()}
-                          </span>
+                          <>
+                            <span className="text-zinc-600 text-[10px]">●</span>
+                            <span className="text-xs font-semibold text-zinc-400">
+                              {new Date(item.release_date).getFullYear()}
+                            </span>
+                          </>
                         )}
                         {item.first_air_date && (
-                          <span className="text-xs text-neutral-500">
-                            {new Date(item.first_air_date).getFullYear()}
-                          </span>
+                          <>
+                            <span className="text-zinc-600 text-[10px]">●</span>
+                            <span className="text-xs font-semibold text-zinc-400">
+                              {new Date(item.first_air_date).getFullYear()}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -263,74 +284,64 @@ export default function Navbar() {
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${
+    `px-3 py-2 rounded-xl text-sm font-bold transition-all duration-300 ease-out ${
       isActive(href)
-        ? "bg-white/10 text-white"
+        ? "bg-white/10 text-white backdrop-blur-md shadow-sm"
         : isScrolled
-          ? "text-zinc-100 hover:text-white hover:bg-white/10"
-          : "text-neutral-300 hover:text-white hover:bg-white/5"
+          ? "text-zinc-100 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
+          : "text-neutral-300 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
     } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
 
   const iconLinkClass = (href, tone = "neutral") => {
     const active = isActive(href);
 
     const base =
-      "group p-2 rounded-full transition-all duration-200 " +
+      "group p-2 rounded-full transition-all duration-300 ease-out " +
       "text-neutral-400 " +
-      "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 " +
+      "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 " +
       "focus:outline-none";
-
-    const ringBase = "ring-1 ring-transparent";
 
     const tones = {
       red: {
         hover:
-          "hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]",
+          "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
         active:
-          "text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-red-500/30",
+          "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
       },
       blue: {
         hover:
-          "hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]",
+          "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
         active:
-          "text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-sky-500/30",
+          "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
       },
       purple: {
         hover:
-          "hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]",
+          "hover:text-fuchsia-300 hover:bg-fuchsia-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(217,70,239,0.15)]",
         active:
-          "text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-fuchsia-500/30",
+          "text-fuchsia-200 bg-fuchsia-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(217,70,239,0.2)]",
       },
       green: {
         hover:
-          "hover:text-emerald-300 hover:bg-emerald-500/10 hover:ring-emerald-500/30 hover:shadow-[0_0_18px_rgba(16,185,129,0.16)]",
+          "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
         active:
-          "text-emerald-200 bg-emerald-500/15 ring-emerald-500/35 shadow-[0_0_18px_rgba(16,185,129,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-emerald-500/30",
+          "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
       },
       amber: {
         hover:
-          "hover:text-amber-300 hover:bg-amber-500/10 hover:ring-amber-500/30 hover:shadow-[0_0_18px_rgba(245,158,11,0.16)]",
+          "hover:text-amber-300 hover:bg-amber-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(245,158,11,0.15)]",
         active:
-          "text-amber-200 bg-amber-500/15 ring-amber-500/35 shadow-[0_0_18px_rgba(245,158,11,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-amber-500/30",
+          "text-amber-200 bg-amber-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(245,158,11,0.2)]",
       },
       indigo: {
         hover:
-          "hover:text-indigo-300 hover:bg-indigo-500/10 hover:ring-indigo-500/30 hover:shadow-[0_0_18px_rgba(99,102,241,0.16)]",
+          "hover:text-indigo-300 hover:bg-indigo-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(99,102,241,0.15)]",
         active:
-          "text-indigo-200 bg-indigo-500/15 ring-indigo-500/35 shadow-[0_0_18px_rgba(99,102,241,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-indigo-500/30",
+          "text-indigo-200 bg-indigo-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(99,102,241,0.2)]",
       },
     };
 
     const t = tones[tone] || tones.amber;
-    const toneClass = active ? t.active : t.hover;
-
-    return `${base} ${ringBase} ${toneClass} ${t.focus}`;
+    return `${base} ${active ? t.active : t.hover}`;
   };
 
   const navLinkClassMobileBottom = (href, tone = "blue") => {
@@ -339,24 +350,21 @@ export default function Navbar() {
     const tones = {
       red: {
         hover:
-          "hover:text-red-300 hover:bg-red-500/10 hover:ring-red-500/30 hover:shadow-[0_0_18px_rgba(239,68,68,0.16)]",
+          "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
         active:
-          "text-red-200 bg-red-500/15 ring-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-red-500/30",
+          "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
       },
       blue: {
         hover:
-          "hover:text-sky-300 hover:bg-sky-500/10 hover:ring-sky-500/30 hover:shadow-[0_0_18px_rgba(14,165,233,0.16)]",
+          "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
         active:
-          "text-sky-200 bg-sky-500/15 ring-sky-500/35 shadow-[0_0_18px_rgba(14,165,233,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-sky-500/30",
+          "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
       },
       purple: {
         hover:
-          "hover:text-fuchsia-300 hover:bg-fuchsia-500/10 hover:ring-fuchsia-500/30 hover:shadow-[0_0_18px_rgba(217,70,239,0.16)]",
+          "hover:text-fuchsia-300 hover:bg-fuchsia-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(217,70,239,0.15)]",
         active:
-          "text-fuchsia-200 bg-fuchsia-500/15 ring-fuchsia-500/35 shadow-[0_0_18px_rgba(217,70,239,0.20)]",
-        focus: "focus-visible:ring-2 focus-visible:ring-fuchsia-500/30",
+          "text-fuchsia-200 bg-fuchsia-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(217,70,239,0.2)]",
       },
     };
 
@@ -365,9 +373,9 @@ export default function Navbar() {
 
     return (
       "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-2xl " +
-      "text-neutral-400 ring-1 ring-transparent transition-all duration-200 " +
-      "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus:outline-none " +
-      `${toneClass} ${t.focus}`
+      "text-neutral-400 transition-all duration-300 ease-out " +
+      "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
+      `${toneClass}`
     );
   };
 

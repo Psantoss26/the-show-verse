@@ -17,9 +17,9 @@ function iconToneClass({ active, tone = "green" }) {
   const tones = {
     green: {
       hover:
-        "hover:text-emerald-300 hover:bg-emerald-500/10 hover:ring-emerald-500/30 hover:shadow-[0_0_18px_rgba(16,185,129,0.16)]",
+        "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
       active:
-        "text-emerald-200 bg-emerald-500/15 ring-emerald-500/35 shadow-[0_0_18px_rgba(16,185,129,0.20)]",
+        "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
     },
   };
 
@@ -79,8 +79,7 @@ export default function TraktHistoryNavButton({
       <Link
         href={href}
         onClick={onClick}
-        title={connected ? "Historial de vistos" : "Conectar Trakt / Historial"}
-        className={`${base} ${ringBase} ${tone} ${className}`}
+        className={`${base} ${tone} ${className}`}
         aria-label="Historial"
         prefetch={false}
       >
@@ -103,7 +102,6 @@ export default function TraktHistoryNavButton({
       href={href}
       onClick={onClick}
       className={`${rowClass} ${className}`}
-      title={connected ? "Historial de vistos" : "Conectar Trakt / Historial"}
       aria-label="Historial"
       prefetch={false}
     >

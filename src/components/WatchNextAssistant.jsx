@@ -38,7 +38,9 @@ function mediaLabel(mediaType) {
 }
 
 function recommendationKey(item) {
-  return item?.mediaType && item?.id ? `${item.mediaType}:${Number(item.id)}` : null;
+  return item?.mediaType && item?.id
+    ? `${item.mediaType}:${Number(item.id)}`
+    : null;
 }
 
 function readRecentRecommendationEntries() {
@@ -644,19 +646,17 @@ export default function WatchNextAssistant({ isMobile = false }) {
           window.setTimeout(() => inputRef.current?.focus(), 120);
         }}
         className={[
-          "group relative grid shrink-0 place-items-center rounded-full transition-all duration-200",
-          "text-neutral-400",
-          "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95",
-          "hover:text-cyan-300 hover:bg-cyan-500/10 hover:ring-cyan-500/30 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)]",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30",
+          "group relative grid shrink-0 place-items-center rounded-full transition-all duration-300 ease-out",
+          open
+            ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
+            : "text-neutral-400 hover:text-cyan-300 hover:bg-cyan-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(34,211,238,0.15)]",
+          "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 focus:outline-none",
           isMobile ? "h-10 w-10 p-2" : "h-11 w-11 p-2",
-          "ring-1 ring-transparent",
         ].join(" ")}
         aria-label="Abrir recomendador de qué ver"
-        title="Qué ver ahora"
       >
         <Sparkles
-          className={`transition-transform duration-200 group-hover:scale-110 ${isMobile ? "h-5 w-5" : "h-[22px] w-[22px]"}`}
+          className={`transition-transform duration-300 ease-out group-hover:scale-110 ${isMobile ? "h-5 w-5" : "h-[22px] w-[22px]"}`}
         />
       </button>
 
