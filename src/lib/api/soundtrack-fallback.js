@@ -19,16 +19,24 @@ function isSameTrack(a, b) {
   return bTokens.some((token) => aTokens.has(token));
 }
 
-export async function searchFallback(ctx, country = "US") {
+export async function searchFallback(ctx, country = "US", options = {}) {
   let tracks = [];
   let source = null;
   let query = "";
 
-  const itunesResult = await searchITunes(ctx, country);
+  const itunesResult = await searchITunes(ctx, country, {
+    strictSoundtrackAlbums: Boolean(options.appleOnly),
+  });
   if (itunesResult.tracks.length > 0) {
     tracks = itunesResult.tracks;
     source = "iTunes";
     query = itunesResult.query;
+  }
+
+  if (options.appleOnly) {
+    return tracks.length > 0
+      ? { tracks, source: source ?? "iTunes", query }
+      : { tracks: [], source: null, query };
   }
 
   const deezerResult = await searchDeezer(ctx);

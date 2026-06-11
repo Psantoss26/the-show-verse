@@ -243,7 +243,7 @@ function getSoundtrackSourceBadge(source) {
 
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v11";
+const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v30";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
@@ -258,9 +258,9 @@ const getMovieDirectorsFromCrew = (crew) =>
 const formatCreditNames = (list) =>
   Array.isArray(list) && list.length
     ? list
-      .map((person) => person?.name)
-      .filter(Boolean)
-      .join(", ")
+        .map((person) => person?.name)
+        .filter(Boolean)
+        .join(", ")
     : null;
 
 /**
@@ -303,8 +303,8 @@ function formatRuntimeMinutes(minutes) {
 function formatEpisodeRuntime(data) {
   const runtimes = Array.isArray(data?.episode_run_time)
     ? data.episode_run_time
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value > 0)
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
     : [];
 
   const uniqueRuntimes = [...new Set(runtimes)].sort((a, b) => a - b);
@@ -1698,9 +1698,9 @@ export default function DetailsClient({
           const id = getListId(l);
           return id === lid
             ? {
-              ...l,
-              item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-            }
+                ...l,
+                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
+              }
             : l;
         }),
       );
@@ -2444,7 +2444,7 @@ export default function DetailsClient({
       img.decoding = "async";
       try {
         img.fetchPriority = "high";
-      } catch { }
+      } catch {}
       img.onload = finishOne;
       img.onerror = finishOne; // Si una falla, no bloqueamos toda la fila
       img.src = url;
@@ -2631,8 +2631,8 @@ export default function DetailsClient({
               const savedGlobalMode =
                 typeof window !== "undefined"
                   ? window.localStorage.getItem(
-                    "showverse:global:posterViewMode",
-                  )
+                      "showverse:global:posterViewMode",
+                    )
                   : null;
 
               if (savedGlobalMode === "preview" && bestPreviewPath) {
@@ -3075,7 +3075,7 @@ export default function DetailsClient({
         : false;
     const fromShowWatched =
       endpointType === "tv" &&
-        typeof initialShowWatched?.connected === "boolean"
+      typeof initialShowWatched?.connected === "boolean"
         ? initialShowWatched.connected
         : false;
     return fromStatus || fromShowWatched;
@@ -3200,12 +3200,12 @@ export default function DetailsClient({
 
       const normalizedEpisodes = Array.isArray(episodes)
         ? Array.from(
-          new Set(
-            episodes
-              .map((episode) => Number(episode))
-              .filter((episode) => Number.isFinite(episode) && episode > 0),
-          ),
-        ).sort((a, b) => a - b)
+            new Set(
+              episodes
+                .map((episode) => Number(episode))
+                .filter((episode) => Number.isFinite(episode) && episode > 0),
+            ),
+          ).sort((a, b) => a - b)
         : [];
 
       acc[seasonNumber] = normalizedEpisodes;
@@ -3296,8 +3296,8 @@ export default function DetailsClient({
     const fallbackTs = new Date(fallbackStartAt).getTime();
     const newerRun = Number.isFinite(fallbackTs)
       ? sortedRuns
-        .filter((run) => run.ts > fallbackTs)
-        .sort((a, b) => a.ts - b.ts)[0] || null
+          .filter((run) => run.ts > fallbackTs)
+          .sort((a, b) => a.ts - b.ts)[0] || null
       : null;
 
     return {
@@ -4144,7 +4144,7 @@ export default function DetailsClient({
     try {
       const v = window.localStorage.getItem("showverse:trakt:sync") === "1";
       setSyncTrakt(v);
-    } catch { }
+    } catch {}
   }, []);
 
   // Guardar preferencia de sincronizacion en localStorage
@@ -4155,7 +4155,7 @@ export default function DetailsClient({
         "showverse:trakt:sync",
         syncTrakt ? "1" : "0",
       );
-    } catch { }
+    } catch {}
   }, [syncTrakt]);
 
   // Recarga el estado de Trakt (visto, rating, historial, watchlist) para el contenido actual
@@ -4520,7 +4520,7 @@ export default function DetailsClient({
             error: "",
           }),
         );
-      } catch { }
+      } catch {}
     };
 
     const load = async () => {
@@ -4597,7 +4597,7 @@ export default function DetailsClient({
           );
           setTScoreboard((prev) => mergeScoreboardState(prev, hydratedQuick));
           persistScoreboardCache(workingScoreboard);
-        } catch { }
+        } catch {}
       }
 
       // 2) Si ya tenemos stats numéricas, no hace falta pedirlas otra vez.
@@ -4647,7 +4647,7 @@ export default function DetailsClient({
               return;
             }
           }
-        } catch { }
+        } catch {}
       }
 
       // Si las stats no llegan, al menos dejamos rating/votos sin bloquear el resto.
@@ -4719,7 +4719,7 @@ export default function DetailsClient({
             nextTrakt.error = "";
             hydratedStatus = true;
           }
-        } catch { }
+        } catch {}
       }
 
       if (endpointType === "tv" && !hasInitialShowWatched) {
@@ -4762,7 +4762,7 @@ export default function DetailsClient({
 
             nextTrakt.watched = hasAnyWatchedEpisode;
           }
-        } catch { }
+        } catch {}
       }
     }
 
@@ -4813,7 +4813,7 @@ export default function DetailsClient({
       } else if (trakt?.loading === false) {
         window.localStorage.removeItem(traktStatusStorageKey);
       }
-    } catch { }
+    } catch {}
   }, [trakt, traktStatusStorageKey]);
 
   useEffect(() => {
@@ -4837,7 +4837,7 @@ export default function DetailsClient({
       } else if (watchedBySeasonLoaded && !trakt?.connected) {
         window.localStorage.removeItem(traktShowWatchedStorageKey);
       }
-    } catch { }
+    } catch {}
   }, [
     endpointType,
     watchedBySeason,
@@ -4927,8 +4927,8 @@ export default function DetailsClient({
     const syncNotBefore =
       Date.now() +
       (hasInitialTraktStatus ||
-        hasCachedTraktStatus ||
-        (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched))
+      hasCachedTraktStatus ||
+      (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched))
         ? 2500
         : 0);
 
@@ -5124,7 +5124,7 @@ export default function DetailsClient({
                 rewatchRunsStorageKey,
                 JSON.stringify(mergedRuns),
               );
-            } catch { }
+            } catch {}
             return mergedRuns;
           });
         }
@@ -5140,12 +5140,12 @@ export default function DetailsClient({
         if (startAtIso) {
           const nextWatchedBySeason =
             r?.watchedBySeasonSince &&
-              typeof r.watchedBySeasonSince === "object"
+            typeof r.watchedBySeasonSince === "object"
               ? r.watchedBySeasonSince
               : {};
           const nextHistoryIds =
             r?.historyIdsByEpisodeSince &&
-              typeof r.historyIdsByEpisodeSince === "object"
+            typeof r.historyIdsByEpisodeSince === "object"
               ? r.historyIdsByEpisodeSince
               : {};
 
@@ -5247,12 +5247,12 @@ export default function DetailsClient({
       setTrakt((prev) => {
         const optimisticHistory = next
           ? normalizeTraktHistoryEntries([
-            {
-              id: `temp-${Date.now()}`,
-              watched_at: new Date().toISOString(),
-            },
-            ...(Array.isArray(prev.history) ? prev.history : []),
-          ])
+              {
+                id: `temp-${Date.now()}`,
+                watched_at: new Date().toISOString(),
+              },
+              ...(Array.isArray(prev.history) ? prev.history : []),
+            ])
           : [];
 
         return buildTraktStateFromHistory({
@@ -5356,11 +5356,11 @@ export default function DetailsClient({
           history: normalizeTraktHistoryEntries(prev.history).map((entry) =>
             String(entry.id) === String(historyId)
               ? {
-                ...entry,
-                id: nextHistoryId,
-                watched_at: optimisticIso,
-                watchedAt: optimisticIso,
-              }
+                  ...entry,
+                  id: nextHistoryId,
+                  watched_at: optimisticIso,
+                  watchedAt: optimisticIso,
+                }
               : entry,
           ),
         }),
@@ -5792,7 +5792,7 @@ export default function DetailsClient({
     // Persistir fecha de inicio del rewatch en localStorage
     try {
       window.localStorage.setItem(rewatchStorageKey, startIso);
-    } catch { }
+    } catch {}
 
     const windowState = resolveRewatchWindow(startIso, rewatchRunsRef.current);
     await loadTraktShowPlays(
@@ -5924,7 +5924,7 @@ export default function DetailsClient({
               rewatchRunsStorageKey,
               JSON.stringify(runs),
             );
-          } catch { }
+          } catch {}
         }
       }
 
@@ -6197,7 +6197,7 @@ export default function DetailsClient({
           rewatchRunsStorageKey,
           JSON.stringify(nextRuns || []),
         );
-      } catch { }
+      } catch {}
     },
     [rewatchRunsStorageKey],
   );
@@ -6209,7 +6209,7 @@ export default function DetailsClient({
       setActiveEpisodesView(v);
       try {
         window.localStorage.setItem(episodesViewStorageKey, v);
-      } catch { }
+      } catch {}
 
       if (v === "global") {
         setRewatchStartAt(null);
@@ -6256,7 +6256,7 @@ export default function DetailsClient({
       setActiveEpisodesView(run.id);
       try {
         window.localStorage.setItem(episodesViewStorageKey, run.id);
-      } catch { }
+      } catch {}
       setRewatchStartAt(run.startedAt);
 
       const windowState = resolveRewatchWindow(run.id, nextRuns);
@@ -6327,7 +6327,7 @@ export default function DetailsClient({
         const nextView = prev === runId ? "global" : prev;
         try {
           window.localStorage.setItem(episodesViewStorageKey, nextView);
-        } catch { }
+        } catch {}
         return nextView;
       });
 
@@ -6343,7 +6343,7 @@ export default function DetailsClient({
           applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
             loaded: true,
           });
-        } catch { }
+        } catch {}
 
         try {
           if (wasActive) {
@@ -6358,7 +6358,7 @@ export default function DetailsClient({
               windowState.endBefore || null,
             );
           }
-        } catch { }
+        } catch {}
       }
     },
     [
@@ -6411,7 +6411,7 @@ export default function DetailsClient({
           cacheKey,
           JSON.stringify({ ts: Date.now(), data }),
         );
-      } catch { }
+      } catch {}
     };
 
     let ignore = false;
@@ -6498,10 +6498,10 @@ export default function DetailsClient({
         .map((episode) =>
           toRatingNumber(
             episode?.seriesGraphRating ??
-            episode?.seriesgraphRating ??
-            episode?.series_graph_rating ??
-            episode?.rating ??
-            episode?.vote_average,
+              episode?.seriesgraphRating ??
+              episode?.series_graph_rating ??
+              episode?.rating ??
+              episode?.vote_average,
           ),
         )
         .filter((rating) => rating != null);
@@ -6543,7 +6543,7 @@ export default function DetailsClient({
       if (typeof window === "undefined") return;
       try {
         window.sessionStorage.setItem(cacheKey, JSON.stringify(value || {}));
-      } catch { }
+      } catch {}
     };
 
     const run = async () => {
@@ -6777,7 +6777,7 @@ export default function DetailsClient({
       if (!posterToggleBusy) {
         setPosterLayoutMode(posterViewMode);
       }
-    } catch { }
+    } catch {}
   }, [
     posterViewMode,
     globalViewModeStorageKey,
@@ -6841,8 +6841,8 @@ export default function DetailsClient({
   const seriesGraphUrl =
     type === "tv" && data?.id && (data.name || data.original_name)
       ? `https://seriesgraph.com/show/${data.id}-${slugifyForSeriesGraph(
-        data.original_name || data.name,
-      )}`
+          data.original_name || data.name,
+        )}`
       : null;
 
   const [traktHomepage, setTraktHomepage] = useState(null);
@@ -6929,7 +6929,7 @@ export default function DetailsClient({
       if (cached) {
         setExtLinks((p) => ({ ...p, justwatch: cached || null }));
       }
-    } catch { }
+    } catch {}
   }, [jwCacheKey]);
 
   useEffect(() => {
@@ -6944,7 +6944,7 @@ export default function DetailsClient({
       try {
         if (typeof window !== "undefined")
           window.localStorage.removeItem(jwCacheKey);
-      } catch { }
+      } catch {}
       return;
     }
 
@@ -6959,8 +6959,8 @@ export default function DetailsClient({
 
         const watchnow =
           watchLink &&
-            typeof watchLink === "string" &&
-            !watchLink.includes("themoviedb.org")
+          typeof watchLink === "string" &&
+          !watchLink.includes("themoviedb.org")
             ? watchLink
             : null;
 
@@ -6993,7 +6993,7 @@ export default function DetailsClient({
             if (resolved) window.localStorage.setItem(jwCacheKey, resolved);
             else window.localStorage.removeItem(jwCacheKey);
           }
-        } catch { }
+        } catch {}
       } catch (e) {
         if (ac.signal.aborted) return;
         setExtLinks((p) => ({
@@ -8620,10 +8620,11 @@ export default function DetailsClient({
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${isBackdropPoster
-              ? "max-w-full lg:max-w-[600px]"
-              : "max-w-[280px] lg:max-w-[320px]"
-              }`}
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${
+              isBackdropPoster
+                ? "max-w-full lg:max-w-[600px]"
+                : "max-w-[280px] lg:max-w-[320px]"
+            }`}
           >
             {/* Poster Card */}
             <div className="relative">
@@ -8673,8 +8674,9 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                      }`}
+                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${
+                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
+                    }`}
                     style={{
                       transition:
                         "aspect-ratio 500ms cubic-bezier(0.25, 1, 0.5, 1)",
@@ -8769,7 +8771,7 @@ ${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || curr
                                 setPosterHighLoaded(true);
                               }
                             }}
-                            onError={() => { }}
+                            onError={() => {}}
                             className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
@@ -8826,7 +8828,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {(limitedProviders && limitedProviders.length > 0) ||
-              (isBackdropPoster && externalLinks.length > 0) ? (
+            (isBackdropPoster && externalLinks.length > 0) ? (
               <StaggerContainer
                 className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-2"
                 staggerDelay={0.05}
@@ -8999,8 +9001,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
           <div
-            className={`flex-1 flex flex-col min-w-0 w-full ${isBackdropPoster ? "" : ""
-              }`}
+            className={`flex-1 flex flex-col min-w-0 w-full ${
+              isBackdropPoster ? "" : ""
+            }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <FadeIn delay={0.06} className="mb-5 px-1">
@@ -9027,10 +9030,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                 {data.status && (
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${data.status === "Ended" || data.status === "Canceled"
-                      ? "bg-red-500/10 border-red-500/20 text-red-300"
-                      : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                      }`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${
+                      data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 border-red-500/20 text-red-300"
+                        : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                    }`}
                   >
                     {data.status}
                   </span>
@@ -9256,9 +9260,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         onClick={
                           !trakt?.connected
                             ? () =>
-                              window.location.assign(
-                                `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                              )
+                                window.location.assign(
+                                  `/api/trakt/auth/start?next=/details/${type}/${id}`,
+                                )
                             : undefined
                         }
                         tooltip={trakt?.traktUrl ? "Ver en Trakt" : "Trakt"}
@@ -9292,7 +9296,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {extras.imdbRating && (
                       <CompactBadge
                         logo="/logo-IMDb.svg"
-                        logoClassName="h-5 sm:h-5"
+                        logoWrapClassName="min-w-[28px]"
+                        logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
                         value={Number(extras.imdbRating).toFixed(1)}
                         sub={formatCountShort(extras.imdbVotes)}
                         href={
@@ -9308,21 +9313,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
                     {(tScoreboard?.external?.rtAudience != null ||
                       extras.rtScore != null) && (
-                        <div className="hidden sm:block">
-                          <CompactBadge
-                            logo="/logo-RottenTomatoes.png"
-                            value={
-                              tScoreboard?.external?.rtAudience != null
-                                ? Math.round(tScoreboard.external.rtAudience)
-                                : extras.rtScore != null
-                                  ? Math.round(extras.rtScore)
-                                  : null
-                            }
-                            suffix="%"
-                            tooltip="Rotten Tomatoes"
-                          />
-                        </div>
-                      )}
+                      <div className="hidden sm:block">
+                        <CompactBadge
+                          logo="/logo-RottenTomatoes.png"
+                          value={
+                            tScoreboard?.external?.rtAudience != null
+                              ? Math.round(tScoreboard.external.rtAudience)
+                              : extras.rtScore != null
+                                ? Math.round(extras.rtScore)
+                                : null
+                          }
+                          suffix="%"
+                          tooltip="Rotten Tomatoes"
+                        />
+                      </div>
+                    )}
 
                     {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
                     {/* Muestra la puntuación de Metacritic sobre 100 */}
@@ -9430,66 +9435,66 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {Object.values(tScoreboard?.stats || {}).some(
                   (v) => typeof v === "number",
                 ) && (
-                    <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
-                      {/* Scroller con padding + safe-area para que no se recorte en bordes */}
-                      <div
-                        className="
+                  <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
+                    {/* Scroller con padding + safe-area para que no se recorte en bordes */}
+                    <div
+                      className="
         overflow-x-auto sm:overflow-visible
         [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
         py-2
         pl-[calc(1rem+env(safe-area-inset-left))]
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
-                      >
-                        {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
-                        <div className="flex items-center gap-3 min-w-max">
-                          {/* Watchers - Usuarios que siguen este contenido */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Eye}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.watchers ?? 0,
-                              )}
-                              tooltip="Watchers"
-                            />
-                          </div>
+                    >
+                      {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
+                      <div className="flex items-center gap-3 min-w-max">
+                        {/* Watchers - Usuarios que siguen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Eye}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.watchers ?? 0,
+                            )}
+                            tooltip="Watchers"
+                          />
+                        </div>
 
-                          {/* Plays - Número de reproducciones totales */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Play}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.plays ?? 0,
-                              )}
-                              tooltip="Plays"
-                            />
-                          </div>
+                        {/* Plays - Número de reproducciones totales */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Play}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.plays ?? 0,
+                            )}
+                            tooltip="Plays"
+                          />
+                        </div>
 
-                          {/* Lists - Cantidad de listas que incluyen este contenido */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={List}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.lists ?? 0,
-                              )}
-                              tooltip="Lists"
-                            />
-                          </div>
+                        {/* Lists - Cantidad de listas que incluyen este contenido */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={List}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.lists ?? 0,
+                            )}
+                            tooltip="Lists"
+                          />
+                        </div>
 
-                          {/* Favorited - Usuarios que lo han marcado como favorito */}
-                          <div className="shrink-0">
-                            <MiniStat
-                              icon={Heart}
-                              value={formatVoteCount(
-                                tScoreboard?.stats?.favorited ?? 0,
-                              )}
-                              tooltip="Favorited"
-                            />
-                          </div>
+                        {/* Favorited - Usuarios que lo han marcado como favorito */}
+                        <div className="shrink-0">
+                          <MiniStat
+                            icon={Heart}
+                            value={formatVoteCount(
+                              tScoreboard?.stats?.favorited ?? 0,
+                            )}
+                            tooltip="Favorited"
+                          />
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
             </ScaleIn>
 
@@ -9531,7 +9536,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                             <div
                               className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                              style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                              style={{
+                                WebkitMaskImage:
+                                  "-webkit-radial-gradient(white, black)",
+                              }}
                             />
                             <div className="relative z-10">
                               {data.tagline && (
@@ -9705,7 +9713,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                       <div
                         className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                        style={{
+                          WebkitMaskImage:
+                            "-webkit-radial-gradient(white, black)",
+                        }}
                       />
                       <div className="relative z-10">
                         {data.tagline && (
@@ -9966,7 +9977,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
-                              rec.vote_average > 0
+                            rec.vote_average > 0
                               ? rec.vote_average
                               : null;
 
@@ -10064,13 +10075,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className={recOverlayClass} />
 
                                   <div
-                                    className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${enableHover
-                                      ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                                      : ""
-                                      } ${isMovie
+                                    className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+                                      enableHover
+                                        ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
+                                        : ""
+                                    } ${
+                                      isMovie
                                         ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
                                         : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                                      }`}
+                                    }`}
                                   >
                                     {isMovie ? (
                                       <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
@@ -10277,10 +10290,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => setActiveImagesTab(tab)}
                                       className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
-              ${activeImagesTab === tab
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+              ${
+                activeImagesTab === tab
+                  ? "bg-white/10 text-white shadow-md"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+              }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10465,10 +10479,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("posters")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "posters"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "posters"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10481,10 +10496,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("backdrops")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "backdrops"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "backdrops"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10497,10 +10513,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("background")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${activeImagesTab === "background"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
+                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                        activeImagesTab === "background"
+                                          ? "bg-white/10 text-white shadow-md"
+                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                      }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
@@ -10614,10 +10631,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangES((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${langES
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                          }`}
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langES
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                        }`}
                                         style={{
                                           WebkitTapHighlightColor:
                                             "transparent",
@@ -10628,10 +10646,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangEN((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${langEN
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                          }`}
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langEN
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                        }`}
                                         style={{
                                           WebkitTapHighlightColor:
                                             "transparent",
@@ -10668,19 +10687,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const breakpoints = isPoster
                             ? {
-                              500: { slidesPerView: 3, spaceBetween: 14 },
-                              640: { slidesPerView: 4, spaceBetween: 14 },
-                              768: { slidesPerView: 5, spaceBetween: 16 },
-                              1024: { slidesPerView: 6, spaceBetween: 18 },
-                              1280: { slidesPerView: 7, spaceBetween: 18 },
-                            }
+                                500: { slidesPerView: 3, spaceBetween: 14 },
+                                640: { slidesPerView: 4, spaceBetween: 14 },
+                                768: { slidesPerView: 5, spaceBetween: 16 },
+                                1024: { slidesPerView: 6, spaceBetween: 18 },
+                                1280: { slidesPerView: 7, spaceBetween: 18 },
+                              }
                             : {
-                              0: { slidesPerView: 2, spaceBetween: 12 },
-                              640: { slidesPerView: 3, spaceBetween: 14 },
-                              768: { slidesPerView: 4, spaceBetween: 16 },
-                              1024: { slidesPerView: 4, spaceBetween: 18 },
-                              1280: { slidesPerView: 4, spaceBetween: 20 },
-                            };
+                                0: { slidesPerView: 2, spaceBetween: 12 },
+                                640: { slidesPerView: 3, spaceBetween: 14 },
+                                768: { slidesPerView: 4, spaceBetween: 16 },
+                                1024: { slidesPerView: 4, spaceBetween: 18 },
+                                1280: { slidesPerView: 4, spaceBetween: 20 },
+                              };
 
                           const loadingCardsCount = Math.max(
                             1,
@@ -10812,10 +10831,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                           className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        ${isActive
-                                              ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                                              : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
-                                            }`}
+                        ${
+                          isActive
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
+                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                        }`}
                                           aria-label="Seleccionar"
                                           style={{
                                             WebkitTapHighlightColor:
@@ -11588,8 +11608,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {reviews.slice(0, reviewLimit).map((r) => {
                             const avatar = r.author_details?.avatar_path
                               ? r.author_details.avatar_path.startsWith(
-                                "/https",
-                              )
+                                  "/https",
+                                )
                                 ? r.author_details.avatar_path.slice(1)
                                 : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
                               : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
@@ -11666,10 +11686,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={t.id}
                                 type="button"
                                 onClick={() => setTCommentsTab(t.id)}
-                                className={`relative isolate transform-gpu rounded-xl px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center border ${tCommentsTab === t.id
-                                  ? "border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm text-white"
-                                  : "border-transparent bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
-                                  }`}
+                                className={`relative isolate transform-gpu rounded-xl px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center border ${
+                                  tCommentsTab === t.id
+                                    ? "border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm text-white"
+                                    : "border-transparent bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
+                                }`}
                               >
                                 {t.label}
                               </button>

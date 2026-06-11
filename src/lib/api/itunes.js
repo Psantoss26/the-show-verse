@@ -115,7 +115,17 @@ function nameMatches(name, titleNorms, titleSigTokens) {
   });
 }
 
-function scoreAlbums(albums, ctx) {
+function isStrictSoundtrackAlbumName(name) {
+  return (
+    /official/.test(name) ||
+    /soundtrack/.test(name) ||
+    /original motion picture/.test(name) ||
+    /banda sonora/.test(name) ||
+    /score/.test(name)
+  );
+}
+
+function scoreAlbums(albums, ctx, options = {}) {
   const titleNorms = unique([ctx.originalTitle, ...(ctx.titles || [])]).map(norm);
   const titleSigTokens = titleNorms.map(sigTokens).filter((ts) => ts.length);
   const hasShortTitle = titleNorms.some(
@@ -126,6 +136,9 @@ function scoreAlbums(albums, ctx) {
   for (const album of albums) {
     const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
     if (!nameMatches(name, titleNorms, titleSigTokens)) continue;
+    if (options.strictSoundtrackAlbums && !isStrictSoundtrackAlbumName(name)) {
+      continue;
+    }
 
     const genre = norm(album.primaryGenreName ?? "");
     const text = `${name} ${genre}`;
@@ -162,7 +175,7 @@ function scoreAlbums(albums, ctx) {
   return scored.sort((a, b) => b.score - a.score);
 }
 
-export async function searchITunes(ctx, country = "US") {
+export async function searchITunes(ctx, country = "US", options = {}) {
   const queries = buildQueries(ctx);
   if (queries.length === 0) {
     return { tracks: [], query: "" };
@@ -191,7 +204,7 @@ export async function searchITunes(ctx, country = "US") {
       arr.findIndex((item) => item.collectionId === album.collectionId) ===
       index,
   );
-  const ranked = scoreAlbums(uniqueAlbums, ctx);
+  const ranked = scoreAlbums(uniqueAlbums, ctx, options);
   const topAlbums = ranked.slice(0, MAX_ALBUMS);
 
   if (topAlbums.length === 0) {
