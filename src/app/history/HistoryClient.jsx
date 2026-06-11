@@ -2074,10 +2074,10 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
       {!confirmDel && (
         <button
           onClick={handleDeleteClick}
-          className="absolute top-1/2 right-12 sm:right-14 -translate-y-1/2 p-2 rounded-full bg-black/40 text-zinc-400 hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover/subitem:opacity-100 border border-transparent hover:border-red-500/50"
+          className="absolute top-1/2 right-12 sm:right-14 -translate-y-1/2 z-20 flex items-center justify-center p-2 rounded-xl border backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu opacity-0 scale-95 group-hover/subitem:scale-100 group-hover/subitem:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
           title="Borrar del historial"
         >
-          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </button>
       )}
 
