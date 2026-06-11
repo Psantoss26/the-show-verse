@@ -2689,8 +2689,8 @@ export default function WatchlistClient() {
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-blue-400 shadow-sm border border-white/10">
-                    <Bookmark className="w-4 h-4 md:w-5 md:h-5 fill-blue-400" />
+                  <div className="relative z-10 mb-1 text-blue-400">
+                    <Bookmark className="w-6 h-6 md:w-7 md:h-7 fill-blue-400" />
                   </div>
                   <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.total}
@@ -2700,8 +2700,8 @@ export default function WatchlistClient() {
                   </div>
                 </div>
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-sky-400 shadow-sm border border-white/10">
-                    <Film className="w-4 h-4 md:w-5 md:h-5" />
+                  <div className="relative z-10 mb-1 text-sky-400">
+                    <Film className="w-6 h-6 md:w-7 md:h-7" />
                   </div>
                   <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.movies}
@@ -2711,8 +2711,8 @@ export default function WatchlistClient() {
                   </div>
                 </div>
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 p-1.5 md:p-2 rounded-full bg-white/5 mb-1 text-purple-400 shadow-sm border border-white/10">
-                    <TvGlyph className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+                  <div className="relative z-10 mb-1 text-purple-400">
+                    <TvGlyph className="w-6 h-6 md:w-7 md:h-7 text-purple-400" />
                   </div>
                   <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
                     {stats.shows}

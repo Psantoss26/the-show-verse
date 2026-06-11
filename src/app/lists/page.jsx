@@ -2144,7 +2144,6 @@ export default function ListsPage() {
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
-                        title="Cuadrícula"
                       >
                         <LayoutGrid className="w-4 h-4" />
                       </button>
@@ -2157,7 +2156,6 @@ export default function ListsPage() {
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
-                        title="Filas"
                       >
                         <Rows className="w-4 h-4" />
                       </button>
@@ -2170,7 +2168,6 @@ export default function ListsPage() {
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
-                        title="Lista"
                       >
                         <StretchHorizontal className="w-4 h-4" />
                       </button>
@@ -2385,7 +2382,6 @@ export default function ListsPage() {
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Cuadrícula"
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -2396,7 +2392,6 @@ export default function ListsPage() {
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Filas"
               >
                 <Rows className="w-4 h-4" />
               </button>
@@ -2407,7 +2402,6 @@ export default function ListsPage() {
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Lista"
               >
                 <StretchHorizontal className="w-4 h-4" />
               </button>

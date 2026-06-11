@@ -525,10 +525,8 @@ function StatCard({
 }) {
   return (
     <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-      <div
-        className={`relative z-10 p-1 sm:p-1.5 md:p-2 rounded-full bg-white/5 mb-1 shadow-sm border border-white/10 ${colorClass}`}
-      >
-        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+      <div className={`relative z-10 mb-1 ${colorClass}`}>
+        <Icon className="w-6 h-6 md:w-7 md:h-7" />
       </div>
       <div className="relative z-10 text-sm sm:text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
         {loading ? (
@@ -1728,7 +1726,7 @@ export default function InProgressClient() {
                   value={currentStats?.total ?? 0}
                   loading={!currentDataLoaded}
                   icon={Tv}
-                  colorClass="text-emerald-400 bg-emerald-500/10"
+                  colorClass="text-emerald-400"
                 />
               </motion.div>
               <motion.div
@@ -1742,7 +1740,7 @@ export default function InProgressClient() {
                   value={`${currentStats?.avgProgress ?? 0}%`}
                   loading={!currentDataLoaded}
                   icon={TrendingUp}
-                  colorClass="text-purple-400 bg-purple-500/10"
+                  colorClass="text-purple-400"
                 />
               </motion.div>
               <motion.div
@@ -1756,7 +1754,7 @@ export default function InProgressClient() {
                   value={currentStats?.totalEpisodesWatched ?? 0}
                   loading={!currentDataLoaded}
                   icon={Eye}
-                  colorClass="text-sky-400 bg-sky-500/10"
+                  colorClass="text-sky-400"
                 />
               </motion.div>
               <motion.div
@@ -1770,7 +1768,7 @@ export default function InProgressClient() {
                   value={currentStats?.totalEpisodesRemaining ?? 0}
                   loading={!currentDataLoaded}
                   icon={Layers}
-                  colorClass="text-amber-400 bg-amber-500/10"
+                  colorClass="text-amber-400"
                 />
               </motion.div>
             </motion.div>
