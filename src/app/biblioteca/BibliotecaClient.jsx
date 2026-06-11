@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
@@ -352,54 +353,123 @@ function StatBox({
 
 // ================== UI COMPONENTS ==================
 
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+function InlineDropdown({
+  label,
+  valueLabel,
+  mobileValueLabel,
+  compactMobile = false,
+  icon: Icon,
+  children,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+    };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex items-center gap-2 min-w-0">
           {Icon && <Icon className="w-4 h-4 text-amber-500 shrink-0" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider shrink-0">
+          <span
+            className={`text-zinc-500 font-bold text-xs uppercase tracking-wider shrink-0 ${compactMobile ? "hidden sm:inline" : ""}`}
+          >
             {label}:
           </span>
-          <span className="font-semibold text-white truncate">
+          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
             {valueLabel}
+          </span>
+          <span className="min-w-0 truncate font-semibold text-white sm:hidden">
+            {mobileValueLabel || valueLabel}
           </span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2 sv-scroll"
-          >
-            <div className="space-y-1">
-              {children({ close: () => setOpen(false) })}
-            </div>
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                <div className="space-y-1">
+                  {children({ close: () => setOpen(false) })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -418,28 +488,42 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
-function GroupDivider({ title, count, total, stats }) {
+function GroupDivider({ title, count, total, stats, mobileFiltersOpen }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
+  const [transitioningThreshold, setTransitioningThreshold] = useState(130);
+
+  useEffect(() => {
+    if (mobileFiltersOpen) {
+      setTransitioningThreshold(232);
+    } else {
+      const timer = setTimeout(() => {
+        setTransitioningThreshold(130);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileFiltersOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
       if (!ref.current) return;
       const top = ref.current.getBoundingClientRect().top;
       const isLg = window.innerWidth >= 1024;
-      const threshold = isLg ? 136 : 130;
+      const threshold = isLg ? 136 : transitioningThreshold;
       setIsSticky(top <= threshold + 1);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [transitioningThreshold]);
 
   return (
     <motion.div
       ref={ref}
-      className="sticky top-[130px] lg:top-[136px] z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0"
+      className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
+        mobileFiltersOpen ? "top-[232px]" : "top-[130px]"
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -964,6 +1048,19 @@ export default function BibliotecaClient() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
+  const [filtersSticky, setFiltersSticky] = useState(false);
+  const filtersRef = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!filtersRef.current) return;
+      const rect = filtersRef.current.getBoundingClientRect();
+      setFiltersSticky(rect.top <= 82);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Persist view preferences
   useEffect(() => {
@@ -1501,10 +1598,14 @@ export default function BibliotecaClient() {
 
   // Filter dropdowns (shared between mobile & desktop)
   function renderTypeDropdown() {
+    const mobileTypeLabels = { all: "Todo", movie: "Pelis", show: "Series" };
     return (
       <InlineDropdown
         label="Tipo"
         valueLabel={typeLabels[typeFilter]}
+        mobileValueLabel={
+          mobileTypeLabels[typeFilter] || typeLabels[typeFilter]
+        }
         icon={Filter}
       >
         {({ close }) => (
@@ -1528,10 +1629,12 @@ export default function BibliotecaClient() {
   }
 
   function renderResDropdown() {
+    const mobileResLabel = resFilter === "all" ? "Todas" : resFilter;
     return (
       <InlineDropdown
         label="Resolución"
         valueLabel={resLabel}
+        mobileValueLabel={mobileResLabel}
         icon={MonitorPlay}
       >
         {({ close }) => (
@@ -1564,10 +1667,18 @@ export default function BibliotecaClient() {
   }
 
   function renderSortDropdown() {
+    const mobileSortLabels = {
+      "added-desc": "Reciente",
+      "added-asc": "Antiguo",
+      "title-asc": "A-Z",
+      "year-desc": "Año ↓",
+      "year-asc": "Año ↑",
+    };
     return (
       <InlineDropdown
         label="Orden"
         valueLabel={sortLabels[sortBy]}
+        mobileValueLabel={mobileSortLabels[sortBy]}
         icon={ArrowUpDown}
       >
         {({ close }) => (
@@ -1591,10 +1702,20 @@ export default function BibliotecaClient() {
   }
 
   function renderGroupDropdown() {
+    const mobileGroupLabels = {
+      none: "Sin agr.",
+      resolution: "Res",
+      type: "Tipo",
+      year: "Año",
+      decade: "Déc",
+      section: "Sec",
+    };
     return (
       <InlineDropdown
         label="Agrupar"
         valueLabel={groupLabels[groupBy]}
+        mobileValueLabel={mobileGroupLabels[groupBy]}
+        compactMobile
         icon={Layers3}
       >
         {({ close }) => (
@@ -1741,6 +1862,7 @@ export default function BibliotecaClient() {
                 count={group.items.length}
                 total={filteredItems.length}
                 stats={group.stats}
+                mobileFiltersOpen={mobileFiltersOpen}
               />
               <motion.div
                 key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
@@ -1972,7 +2094,8 @@ export default function BibliotecaClient() {
 
         {/* ====== FILTERS ====== */}
         <motion.div
-          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
+          ref={filtersRef}
+          className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -2007,34 +2130,89 @@ export default function BibliotecaClient() {
           </div>
 
           {/* Mobile: collapsible filters */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="lg:hidden overflow-visible"
-              >
-                <div className="space-y-3 pt-1">
-                  <div className="flex gap-2">
-                    <div className="flex-1">{renderTypeDropdown()}</div>
-                    <div className="flex-1">{renderResDropdown()}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="flex-1">{renderSortDropdown()}</div>
-                    <div className="flex-1">{renderGroupDropdown()}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="flex-1">{renderViewToggle()}</div>
+          <div
+            className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              mobileFiltersOpen
+                ? "opacity-100"
+                : "opacity-0 pointer-events-none"
+            } lg:hidden overflow-hidden ${
+              filtersSticky && mobileFiltersOpen
+                ? "absolute left-0 right-0 z-10"
+                : "relative z-10"
+            }`}
+            style={{
+              gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
+              top:
+                filtersSticky && mobileFiltersOpen
+                  ? "calc(100% + 4px)"
+                  : undefined,
+            }}
+          >
+            <div className="min-h-0">
+              <div className="space-y-1 pt-1 pb-1">
+                <div className="flex gap-2">
+                  <div className="flex-1">{renderTypeDropdown()}</div>
+                  <div className="flex-1">{renderResDropdown()}</div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">{renderSortDropdown()}</div>
+                  <div className="flex-1">{renderGroupDropdown()}</div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1 flex gap-2">
+                    <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "list" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                        title="Lista"
+                      >
+                        <LayoutList className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("compact")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "compact" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                        title="Compacta"
+                      >
+                        <Grid3x3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("grid")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "grid" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                        title="Grid"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                    </div>
                     {viewMode !== "list" && (
-                      <div className="shrink-0">{renderImageToggle()}</div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImageMode(
+                            imageMode === "poster" ? "backdrop" : "poster",
+                          )
+                        }
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
+                        title={
+                          imageMode === "poster"
+                            ? "Cambiar a Backdrop"
+                            : "Cambiar a Poster"
+                        }
+                      >
+                        {imageMode === "poster" ? (
+                          <PosterGlyph className="w-4 h-4" />
+                        ) : (
+                          <BackdropGlyph className="w-4 h-4" />
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </div>
+          </div>
 
           {/* Desktop filters */}
           <div className="hidden lg:flex gap-3 relative z-10">
