@@ -9,6 +9,7 @@ import {
   useCallback,
   startTransition,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -1181,37 +1182,65 @@ function InlineDropdown({
   children,
 }) {
   const [open, setOpen] = useState(false);
-  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
-    const updateMenuSize = () => {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const availableBelow = window.innerHeight - rect.bottom - 12;
-      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
-    };
-
-    updateMenuSize();
-    const frame = window.requestAnimationFrame(updateMenuSize);
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    window.addEventListener("resize", updateMenuSize);
-    window.addEventListener("scroll", updateMenuSize, true);
     return () => {
-      window.cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("resize", updateMenuSize);
-      window.removeEventListener("scroll", updateMenuSize, true);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
@@ -1237,24 +1266,30 @@ function InlineDropdown({
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
-            style={{
-              maxHeight: `${menuMaxHeight}px`,
-              scrollbarWidth: "thin",
-              scrollbarGutter: "stable",
-              overscrollBehavior: "contain",
-            }}
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -1486,7 +1521,14 @@ function CardSkeleton({ mode = "poster" }) {
   );
 }
 
-function GroupDivider({ title, stats, count, total, groupBy, mobileFiltersOpen }) {
+function GroupDivider({
+  title,
+  stats,
+  count,
+  total,
+  groupBy,
+  mobileFiltersOpen,
+}) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
@@ -3107,11 +3149,16 @@ export default function FavoritesClient() {
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
             } lg:hidden overflow-hidden ${
-              filtersSticky && mobileFiltersOpen ? "absolute left-0 right-0 z-10" : "relative z-10"
+              filtersSticky && mobileFiltersOpen
+                ? "absolute left-0 right-0 z-10"
+                : "relative z-10"
             }`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top: (filtersSticky && mobileFiltersOpen) ? "calc(100% + 4px)" : undefined,
+              top:
+                filtersSticky && mobileFiltersOpen
+                  ? "calc(100% + 4px)"
+                  : undefined,
             }}
           >
             <div className="min-h-0">
