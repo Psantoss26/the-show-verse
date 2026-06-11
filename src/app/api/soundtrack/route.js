@@ -22,7 +22,32 @@ export const dynamic = "force-dynamic";
 // Spotify preview URL resolver (embed workaround)
 // ---------------------------------------------------------------------------
 const PREVIEW_CACHE_MAX = 2000;
+const TRACK_DETAILS_CACHE_MAX = 2000;
 const previewCache = new Map();
+const trackDetailsCache = new Map();
+
+function cacheSpotifyTrackDetails(spotifyId, details) {
+  if (!spotifyId) return;
+  if (trackDetailsCache.size >= TRACK_DETAILS_CACHE_MAX) {
+    const firstKey = trackDetailsCache.keys().next().value;
+    if (firstKey) trackDetailsCache.delete(firstKey);
+  }
+  trackDetailsCache.set(spotifyId, details);
+}
+
+async function resolveSpotifyTrackDetails(spotifyId, token) {
+  if (!spotifyId || !token) return null;
+  const cached = trackDetailsCache.get(spotifyId);
+  if (cached) return cached;
+
+  const data = await spotifyGet(`/tracks/${spotifyId}`, token, {});
+  const details = {
+    popularity: Math.max(0, Number(data?.popularity ?? 0)),
+    previewUrl: data?.preview_url ?? "",
+  };
+  cacheSpotifyTrackDetails(spotifyId, details);
+  return details;
+}
 
 async function resolvePreviewUrl(spotifyId, token) {
   if (!spotifyId) return "";
@@ -34,8 +59,8 @@ async function resolvePreviewUrl(spotifyId, token) {
   // Try 1: Single-track API endpoint (sometimes has preview_url when album endpoint doesn't)
   if (token && !url) {
     try {
-      const data = await spotifyGet(`/tracks/${spotifyId}`, token, {});
-      if (data?.preview_url) url = data.preview_url;
+      const details = await resolveSpotifyTrackDetails(spotifyId, token);
+      if (details?.previewUrl) url = details.previewUrl;
     } catch { /* skip */ }
   }
 
@@ -78,10 +103,12 @@ const SCORE_ALBUM_RESERVE_TRACKS = 10;
 const PRIMARY_COLLECTION_SOFT_LIMIT = 30;
 const MAX_SPOTIFY_ALBUMS = 5;
 const MAX_SPOTIFY_PLAYLISTS = 1;
+const SPOTIFY_POPULARITY_RESOLVE_LIMIT = 80;
+const SPOTIFY_TRACK_DETAIL_FALLBACK_LIMIT = 24;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v32";
+const CACHE_VERSION = "soundtrack-ranking-v36";
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -300,6 +327,78 @@ async function spotifyGet(path, token, params = {}) {
   });
 }
 
+function applySpotifyTrackMetadata(track, info) {
+  const popularity = Math.max(0, Number(info?.popularity ?? 0));
+  const currentPopularity = Math.max(0, Number(track.popularity ?? 0));
+  if (popularity > currentPopularity) {
+    track.popularity = popularity;
+    track.score = Number(track.score ?? 0) + (popularity - currentPopularity) * 0.35;
+  }
+  if (!track.previewUrl && info?.previewUrl) track.previewUrl = info.previewUrl;
+}
+
+async function enrichSpotifyTrackPopularityFromDetails(tracks, token) {
+  const candidates = tracks
+    .filter((track) => track.source === "Spotify" && track.spotifyId)
+    .sort((a, b) => trackPriority(b) - trackPriority(a))
+    .slice(0, SPOTIFY_TRACK_DETAIL_FALLBACK_LIMIT);
+
+  for (const track of candidates) {
+    try {
+      const details = await resolveSpotifyTrackDetails(track.spotifyId, token);
+      applySpotifyTrackMetadata(track, details);
+    } catch (err) {
+      console.warn("[Spotify] track detail popularity fallback stopped:", err?.message);
+      if (err?.status === 429) return;
+    }
+  }
+}
+
+async function enrichSpotifyTrackPopularity(tracks, token, market) {
+  if (!token || !Array.isArray(tracks) || tracks.length === 0) return;
+
+  const ids = unique(
+    tracks
+      .filter((track) => track.source === "Spotify" && track.spotifyId)
+      .map((track) => track.spotifyId),
+  ).slice(0, SPOTIFY_POPULARITY_RESOLVE_LIMIT);
+
+  if (!ids.length) return;
+
+  const metadata = new Map();
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    try {
+      const data = await spotifyGet("/tracks", token, {
+        ids: chunk.join(","),
+        market,
+      });
+      const items = Array.isArray(data?.tracks) ? data.tracks : [];
+      for (const item of items) {
+        if (!item?.id) continue;
+        const info = {
+          popularity: Number(item.popularity ?? 0),
+          previewUrl: item.preview_url ?? "",
+        };
+        metadata.set(item.id, info);
+        cacheSpotifyTrackDetails(item.id, info);
+      }
+    } catch (err) {
+      console.warn("[Spotify] popularity enrichment skipped:", err?.message);
+      if (err?.status === 403) {
+        await enrichSpotifyTrackPopularityFromDetails(tracks, token);
+      }
+      return;
+    }
+  }
+
+  for (const track of tracks) {
+    const info = metadata.get(track.spotifyId);
+    if (!info) continue;
+    applySpotifyTrackMetadata(track, info);
+  }
+}
+
 function primarySearchTitle(ctx) {
   return unique([ctx.originalTitle, ...(ctx.titles || [])])[0] ?? "";
 }
@@ -352,7 +451,11 @@ function hasDisallowedTitleSuffix(album, ctx) {
       if (!matches) return false;
 
       const nextToken = albumTokens[index + titleTokens.length] ?? "";
-      return /^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken);
+      if (!nextToken) return false;
+      if (/^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken)) return true;
+
+      const allowedSoundtrackToken = /^(complete|music|official|original|score|soundtrack|ost)$/.test(nextToken);
+      return !allowedSoundtrackToken;
     });
   });
 }
@@ -379,6 +482,7 @@ function isPriorityMotionPictureAlbum(album) {
   const name = norm(albumName(album));
   return (
     /original motion picture (score|soundtrack)/.test(name) ||
+    /music from (the )?(motion picture|film|movie)/.test(name) ||
     /complete original score|original score/.test(name) ||
     /official .*soundtrack/.test(name) ||
     /soundtrack oficial|banda sonora oficial/.test(name)
@@ -391,6 +495,7 @@ function isPriorityOfficialSoundtrackPlaylist(playlist, ctx) {
   if (!albumMatchesTitle({ name }, ctx)) return false;
   return (
     /original motion picture (score|soundtrack)/.test(name) ||
+    /music from (the )?(motion picture|film|movie)/.test(name) ||
     /official .*soundtrack/.test(name) ||
     /soundtrack oficial|banda sonora oficial/.test(name)
   );
@@ -1027,6 +1132,7 @@ function toPublic(t) {
     embedUrl: t.embedUrl ?? "",
     artworkUrl: t.artworkUrl,
     source: t.source,
+    popularity: trackPopularity(t),
     externalUrl: t.externalUrl,
     collectionUrl: t.collectionUrl,
   };
@@ -1088,6 +1194,10 @@ function trackPriority(track) {
   score -= Number(track.albumIndex ?? 0) * 3;
   score -= Number(track.trackIndex ?? 0) * 0.05;
   return score;
+}
+
+function trackPopularity(track) {
+  return Math.max(0, Number(track.popularity ?? 0));
 }
 
 function trackStableKey(track) {
@@ -1180,6 +1290,8 @@ function topRelevantTracks(tracks) {
   }
 
   return selected.sort((a, b) => {
+    const popularityDelta = trackPopularity(b) - trackPopularity(a);
+    if (popularityDelta) return popularityDelta;
     const priorityDelta = trackPriority(b) - trackPriority(a);
     if (priorityDelta) return priorityDelta;
     return norm(a.trackName).localeCompare(norm(b.trackName));
@@ -1272,6 +1384,8 @@ async function loadSoundtrack(ctx, token, markets) {
   console.log(
     `[Spotify] got ${tracks.length} tracks from sources, ${tracks.filter((t) => t.previewUrl).length} with preview`,
   );
+
+  await enrichSpotifyTrackPopularity(tracks, token, market);
 
   const needPreview = tracks
     .filter((t) => !t.previewUrl && t.spotifyId)
