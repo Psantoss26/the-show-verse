@@ -3380,11 +3380,6 @@ export default function FavoritesClient() {
                           ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                           : "text-zinc-200 hover:bg-black/30"
                       }`}
-                      title={
-                        imageMode === "poster"
-                          ? "Cambiar a Backdrop"
-                          : "Cambiar a Poster"
-                      }
                     >
                       {imageMode === "poster" ? (
                         <PosterGlyph className="w-4 h-4" />
@@ -3625,7 +3620,6 @@ export default function FavoritesClient() {
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Vista Poster"
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
@@ -3636,7 +3630,6 @@ export default function FavoritesClient() {
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Vista Backdrop"
               >
                 <BackdropGlyph className="w-4 h-4" />
               </button>

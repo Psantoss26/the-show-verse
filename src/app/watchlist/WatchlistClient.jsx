@@ -2982,11 +2982,6 @@ export default function WatchlistClient() {
                           ? "text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                           : "text-zinc-200 hover:bg-black/30"
                       }`}
-                      title={
-                        imageMode === "poster"
-                          ? "Cambiar a Backdrop"
-                          : "Cambiar a Poster"
-                      }
                     >
                       {imageMode === "poster" ? (
                         <PosterGlyph className="w-4 h-4" />
@@ -3205,7 +3200,6 @@ export default function WatchlistClient() {
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Vista Poster"
               >
                 <PosterGlyph className="w-4 h-4" />
               </button>
@@ -3216,7 +3210,6 @@ export default function WatchlistClient() {
                     ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
-                title="Vista Backdrop"
               >
                 <BackdropGlyph className="w-4 h-4" />
               </button>
