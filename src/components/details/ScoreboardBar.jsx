@@ -16,6 +16,7 @@ import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 function CompactBadge({
   logo,
   logoClassName = "h-4",
+  logoWrapClassName = "w-6",
   value,
   suffix,
   sub,
@@ -24,11 +25,13 @@ function CompactBadge({
 }) {
   const inner = (
     <div className="flex items-center gap-2">
-      <span className="grid h-6 w-6 shrink-0 place-items-center">
+      <span
+        className={`grid h-6 shrink-0 place-items-center ${logoWrapClassName}`}
+      >
         <img
           src={logo}
           alt=""
-          className={`${logoClassName} max-h-5 max-w-6 w-auto object-contain opacity-95`}
+          className={`${logoClassName} max-h-6 max-w-6 w-auto object-contain opacity-95`}
         />
       </span>
       <div className="leading-tight">
@@ -379,7 +382,8 @@ export default function ScoreboardBar({
           {imdb?.rating != null || imdb?.id ? (
             <CompactBadge
               logo="/logo-IMDb.svg"
-              logoClassName="h-5"
+              logoWrapClassName="min-w-[28px]"
+              logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
               value={
                 imdb?.rating != null ? Number(imdb.rating).toFixed(1) : null
               }

@@ -77,13 +77,11 @@ const SOUNDTRACK_ALBUM_RESERVE_TRACKS = 30;
 const SCORE_ALBUM_RESERVE_TRACKS = 10;
 const PRIMARY_COLLECTION_SOFT_LIMIT = 30;
 const MAX_SPOTIFY_ALBUMS = 5;
-const MAX_SPOTIFY_PLAYLISTS = 3;
+const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
-const ALBUM_MIN_SCORE = 32;
-const PLAYLIST_MIN_SCORE = 48;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v11";
+const CACHE_VERSION = "soundtrack-ranking-v30";
 
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
@@ -194,44 +192,9 @@ async function getToken() {
 // Query construction
 // ---------------------------------------------------------------------------
 function buildQueries(ctx) {
-  const qs = [];
   const titleList = unique([ctx.originalTitle, ...(ctx.titles || [])]);
-
-  for (const title of titleList) {
-    const short = norm(title).replace(/\s+/g, "").length <= 3;
-
-    if (!short) {
-      qs.push(`"${title}" soundtrack`);
-      qs.push(`"${title}" OST`);
-    }
-
-    qs.push(`${title} soundtrack`);
-    qs.push(`${title} OST`);
-
-    if (ctx.mediaType === "tv") {
-      qs.push(`${title} series soundtrack`);
-      qs.push(`${title} television soundtrack`);
-    } else {
-      qs.push(`${title} movie soundtrack`);
-      qs.push(`${title} motion picture soundtrack`);
-    }
-
-    if (short && ctx.mediaType === "movie") {
-      qs.push(`${title} the movie`);
-      qs.push(`${title} the album`);
-    }
-
-    if (ctx.year) {
-      if (!short) qs.push(`"${title}" ${ctx.year} soundtrack`);
-      qs.push(`${title} ${ctx.year} soundtrack`);
-      qs.push(`${title} ${ctx.year}`);
-    }
-
-    if (!short) qs.push(`"${title}"`);
-    qs.push(title);
-  }
-
-  return unique(qs).slice(0, 10);
+  const primaryTitle = titleList[0];
+  return primaryTitle ? [primaryTitle] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +300,133 @@ async function spotifyGet(path, token, params = {}) {
   });
 }
 
+function primarySearchTitle(ctx) {
+  return unique([ctx.originalTitle, ...(ctx.titles || [])])[0] ?? "";
+}
+
+function albumName(album) {
+  return album?.name ?? album?.collectionName ?? "";
+}
+
+function albumReleaseYear(album) {
+  return getYear(album?.release_date ?? album?.releaseDate);
+}
+
+function titleComparisonVariants(value) {
+  const normalized = norm(value);
+  const variants = new Set([normalized]);
+  variants.add(normalized.replace(/([a-z])7([a-z])/g, "$1v$2"));
+  return [...variants].filter(Boolean);
+}
+
+function albumMatchesTitle(album, ctx) {
+  const name = albumName(album);
+  const title = primarySearchTitle(ctx);
+  if (!name || !title) return false;
+
+  for (const titleVariant of titleComparisonVariants(title)) {
+    for (const nameVariant of titleComparisonVariants(name)) {
+      const score = titleScore(nameVariant, titleVariant);
+      if (score >= 50) return true;
+    }
+  }
+
+  const nameTokens = new Set(titleComparisonVariants(name).flatMap(sigTokens));
+  const titleTokens = titleComparisonVariants(title).flatMap(sigTokens);
+  if (!titleTokens.length) return false;
+  const hits = titleTokens.filter((token) => nameTokens.has(token)).length;
+  return hits / titleTokens.length >= 0.75;
+}
+
+function isSameReleaseYear(album, ctx) {
+  return Boolean(ctx.year) && albumReleaseYear(album) === ctx.year;
+}
+
+function isPriorityMotionPictureAlbum(album) {
+  const name = norm(albumName(album));
+  return (
+    /original motion picture (score|soundtrack)/.test(name) ||
+    /complete original score|original score/.test(name) ||
+    /official .*soundtrack/.test(name) ||
+    /soundtrack oficial|banda sonora oficial/.test(name)
+  );
+}
+
+function isPriorityOfficialSoundtrackPlaylist(playlist, ctx) {
+  const name = norm(playlist?.name);
+  if (!name || containsAny(name, BAD_MATCH_WORDS)) return false;
+  if (!albumMatchesTitle({ name }, ctx)) return false;
+  return (
+    /original motion picture (score|soundtrack)/.test(name) ||
+    /official .*soundtrack/.test(name) ||
+    /soundtrack oficial|banda sonora oficial/.test(name)
+  );
+}
+
+function isAcceptableFirstAlbum(album, ctx) {
+  const name = norm(albumName(album));
+  const totalTracks = Number(album?.total_tracks ?? 0);
+  if (!albumMatchesTitle(album, ctx)) return false;
+  if (album?.album_type === "single" || totalTracks < 3) return false;
+  if (containsAny(name, BAD_MATCH_WORDS)) return false;
+  if (/unofficial|tribute|karaoke|cover|covers|performed by/.test(name)) {
+    return false;
+  }
+  return true;
+}
+
+function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
+  const titleMatches = albums.filter((album) => isAcceptableFirstAlbum(album, ctx));
+  const canonical = titleMatches.filter(isPriorityMotionPictureAlbum);
+  const canonicalSameYear = canonical.filter((album) => isSameReleaseYear(album, ctx));
+  const firstAlbum = albums[0];
+
+  if (canonicalSameYear.length) {
+    return canonicalSameYear;
+  }
+
+  if (canonical.length) {
+    return canonical.sort((a, b) => {
+      const aSameYear = isSameReleaseYear(a, ctx) ? 1 : 0;
+      const bSameYear = isSameReleaseYear(b, ctx) ? 1 : 0;
+      if (aSameYear !== bSameYear) return bSameYear - aSameYear;
+      return Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999);
+    });
+  }
+
+  if (
+    firstAlbum &&
+    isAcceptableFirstAlbum(firstAlbum, ctx) &&
+    (!ctx.year ||
+      !albumReleaseYear(firstAlbum) ||
+      Math.abs(albumReleaseYear(firstAlbum) - ctx.year) <= 1)
+  ) {
+    return [firstAlbum];
+  }
+
+  return [];
+}
+
+function selectPlaylistsFromOriginalTitleSearch(playlists, ctx) {
+  return playlists
+    .filter((playlist) => isPriorityOfficialSoundtrackPlaylist(playlist, ctx))
+    .sort((a, b) => Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999))
+    .slice(0, MAX_SPOTIFY_PLAYLISTS);
+}
+
+function annotateSearchItem(item, ctx, query, queryIndex, searchRank) {
+  const primaryTitle = primarySearchTitle(ctx);
+  const primaryTitleSearch = Boolean(primaryTitle) && norm(query) === norm(primaryTitle);
+  return {
+    ...item,
+    searchQuery: query,
+    queryIndex,
+    searchRank,
+    primaryTitleSearch,
+    primaryTitleSearchRank: primaryTitleSearch ? searchRank : null,
+  };
+}
+
 async function searchSoundtrackSources(ctx, token, market) {
   if (isRateLimited()) {
     const secondsLeft = Math.ceil((g.__svSpRateBlock.until - Date.now()) / 1000);
@@ -350,8 +440,6 @@ async function searchSoundtrackSources(ctx, token, market) {
   }
 
   const queries = buildQueries(ctx);
-  let allAlbums = [];
-  let allPlaylists = [];
   let usedQuery = queries[0] ?? "";
   let rateLimited = false;
   let retryAfter = "";
@@ -385,53 +473,78 @@ async function searchSoundtrackSources(ctx, token, market) {
     const newPl = Array.isArray(result?.playlists?.items)
       ? result.playlists.items.filter(Boolean)
       : [];
-    allAlbums.push(...newAl);
-    allPlaylists.push(...newPl);
+    const annotatedAlbums = newAl.map((album, index) =>
+      annotateSearchItem(album, ctx, q, i, index + 1),
+    );
+    const annotatedPlaylists = newPl.map((playlist, index) =>
+      annotateSearchItem(playlist, ctx, q, i, index + 1),
+    );
 
-    const goodAlbumIds = new Set(
-      allAlbums
-        .map((a) => ({ id: a.id, score: scoreAlbum(a, ctx) }))
-        .filter((a) => a.id && a.score >= ALBUM_MIN_SCORE)
-        .map((a) => a.id),
-    );
-    const goodPlaylistIds = new Set(
-      allPlaylists
-        .map((p) => ({ id: p.id, score: scorePlaylist(p, ctx) }))
-        .filter((p) => p.id && p.score >= PLAYLIST_MIN_SCORE)
-        .map((p) => p.id),
-    );
-    if (
-      goodPlaylistIds.size >= MAX_SPOTIFY_PLAYLISTS ||
-      goodAlbumIds.size >= MAX_SPOTIFY_ALBUMS ||
-      (i >= 1 && goodPlaylistIds.size >= 1 && goodAlbumIds.size >= 1) ||
-      (i >= 1 && goodAlbumIds.size >= 3)
-    ) {
-      break;
+    if (i === 0) {
+      const originalTitleSelection = selectAlbumsFromOriginalTitleSearch(
+        annotatedAlbums,
+        ctx,
+      ).slice(0, MAX_SPOTIFY_ALBUMS);
+
+      if (originalTitleSelection.length) {
+        return {
+          albums: originalTitleSelection.map((album) => ({
+            ...album,
+            score: scoreAlbum(album, ctx),
+            selectionReason: isPriorityMotionPictureAlbum(album)
+              ? "original_title_priority_motion_picture_album"
+              : (isSameReleaseYear(album, ctx)
+                ? "original_title_same_year_album"
+                : "original_title_first_title_match"),
+          })),
+          playlists: [],
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "original_title_album",
+        };
+      }
+
+      const originalTitlePlaylistSelection = selectPlaylistsFromOriginalTitleSearch(
+        annotatedPlaylists,
+        ctx,
+      );
+
+      if (originalTitlePlaylistSelection.length) {
+        return {
+          albums: [],
+          playlists: originalTitlePlaylistSelection.map((playlist) => ({
+            ...playlist,
+            score: canonicalSoundtrackBonus(norm(playlist.name)) + 180,
+            selectionReason: "original_title_official_soundtrack_playlist",
+          })),
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "original_title_official_soundtrack_playlist",
+        };
+      }
+
+      return {
+        albums: [],
+        playlists: [],
+        query: usedQuery,
+        rateLimited,
+        retryAfter,
+        spotifySelectionMode: "no_original_title_album_match",
+        spotifySkippedReason: "no_original_title_album_match",
+      };
     }
-
-    if (i < queries.length - 1) await sleep(80);
   }
 
-  const uniqueAlbums = allAlbums
-    .map((a) => ({ ...a, score: scoreAlbum(a, ctx) }))
-    .filter((a) => a.score >= ALBUM_MIN_SCORE)
-    .sort((a, b) => b.score - a.score)
-    .filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i)
-    .slice(0, MAX_SPOTIFY_ALBUMS);
-
-  const uniquePlaylists = allPlaylists
-    .map((p) => ({ ...p, score: scorePlaylist(p, ctx) }))
-    .filter((p) => p.score >= PLAYLIST_MIN_SCORE)
-    .sort((a, b) => b.score - a.score)
-    .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i)
-    .slice(0, MAX_SPOTIFY_PLAYLISTS);
-
   return {
-    albums: uniqueAlbums,
-    playlists: uniquePlaylists,
+    albums: [],
+    playlists: [],
     query: usedQuery,
     rateLimited,
     retryAfter,
+    spotifySelectionMode: "no_original_title_album_match",
+    spotifySkippedReason: "no_original_title_album_match",
   };
 }
 
@@ -503,6 +616,42 @@ function collectionNoisePenalty(text, strongSoundtrackContext) {
   return score;
 }
 
+function canonicalSoundtrackBonus(text) {
+  let score = 0;
+  if (/original motion picture soundtrack/.test(text)) score += 95;
+  if (/official movie soundtrack/.test(text)) score += 95;
+  if (/official .*soundtrack|soundtrack oficial|banda sonora oficial/.test(text)) score += 68;
+  if (/the soundtrack/.test(text)) score += 62;
+  if (/original soundtrack/.test(text)) score += 55;
+  if (/music from .*motion picture|music from .*film|music from .*movie/.test(text)) score += 48;
+  if (/original motion picture score|original score/.test(text)) score += 42;
+  return score;
+}
+
+function canonicalYearBonus(releaseDate, ctx, canonicalScore) {
+  if (!ctx.year || !canonicalScore) return 0;
+  const releaseYear = getYear(releaseDate);
+  if (!releaseYear) return 0;
+  const diff = releaseYear - ctx.year;
+
+  if (diff === 0) return 32;
+  if (diff === 1 || diff === -1) return 18;
+  if (ctx.mediaType === "tv" && diff >= 0 && diff <= 5) return 12;
+  if (Math.abs(diff) <= 5) return 4;
+  return -8;
+}
+
+function primaryTitleSearchBonus(item, canonicalScore, strongSoundtrackContext) {
+  const rank = Number(item?.primaryTitleSearchRank ?? 0);
+  if (!rank) return 0;
+
+  const rankBonus = Math.max(0, 72 - (rank - 1) * 7);
+  if (canonicalScore >= 80) return rankBonus + 44;
+  if (canonicalScore > 0) return rankBonus + 22;
+  if (strongSoundtrackContext) return Math.max(0, rankBonus - 18);
+  return 0;
+}
+
 function scoreAlbum(album, ctx) {
   const name = album?.name ?? "";
   const artist = names(album?.artists).join(", ");
@@ -524,9 +673,13 @@ function scoreAlbum(album, ctx) {
     else if (os >= 50) s += 8;
   }
 
+  const canonicalScore = canonicalSoundtrackBonus(text);
   s += titleFitBonus(name, ctx, strongSoundtrackContext);
   s += collectionNoisePenalty(text, strongSoundtrackContext);
   s += soundtrackBonus(text);
+  s += canonicalScore;
+  s += primaryTitleSearchBonus(album, canonicalScore, strongSoundtrackContext);
+  s += canonicalYearBonus(album?.release_date, ctx, canonicalScore);
   if (containsAny(text, BAD_MATCH_WORDS)) s -= 80;
   if (/unofficial|performed by/.test(text)) s -= 220;
   if (/popcorn buckets|the hit co|tribute co|soundtrack orchestra|soundtrack hit lab/.test(text)) s -= 140;
@@ -553,54 +706,6 @@ function scoreAlbum(album, ctx) {
 
   const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
   if (bestTitleScore(album?.name ?? "", ctx.titles) === 0 && hasSigTokens) s -= 200;
-
-  return Math.round(s);
-}
-
-function scorePlaylist(playlist, ctx) {
-  const name = playlist?.name ?? "";
-  const desc = playlist?.description ?? "";
-  const owner = playlist?.owner?.display_name ?? "";
-  const text = norm(`${name} ${desc} ${owner}`);
-  const strongSoundtrackContext =
-    containsAny(text, SOUNDTRACK_WORDS) ||
-    /official|original motion picture|original soundtrack|music from|ost/.test(text);
-  let s = bestTitleScore(name, ctx.titles);
-
-  if (ctx.originalTitle) {
-    const os = titleScore(name, ctx.originalTitle);
-    if (os >= 70) s += 16;
-    else if (os >= 50) s += 8;
-  }
-
-  s += titleFitBonus(name, ctx, strongSoundtrackContext);
-  s += collectionNoisePenalty(text, strongSoundtrackContext);
-  s += soundtrackBonus(text);
-
-  if (/official/.test(text)) s += 55;
-  if (/original soundtrack|original motion picture/.test(text)) s += 26;
-  if (ctx.mediaType === "tv" && /series|show|season|episode|tv|television/.test(text)) s += 10;
-  if (ctx.mediaType === "movie" && /movie|film|motion picture/.test(text)) s += 10;
-  if (ctx.mediaType === "tv" && /movie|film/.test(text) && !/series|show|season|episode|tv|television/.test(text)) s -= 14;
-  if (ctx.mediaType === "movie" && /series|season|episode|tv|television/.test(text) && !/movie|film|motion picture/.test(text)) s -= 14;
-
-  const total = Number(playlist?.tracks?.total ?? 0);
-  if (total > 0) {
-    if (total >= 6 && total <= 45) s += 18;
-    else if (total >= 3 && total <= 80) s += 10;
-    if (total > 120) s -= 45;
-    if (total < 3) s -= 80;
-  }
-
-  const nameTokens = new Set(tokens(name));
-  const anyTitleToken = ctx.titles
-    .map(sigTokens)
-    .filter((ts) => ts.length)
-    .some((ts) => ts.some((t) => nameTokens.has(t)));
-  if (!anyTitleToken) s -= 70;
-
-  const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
-  if (bestTitleScore(name, ctx.titles) === 0 && hasSigTokens) s -= 220;
 
   return Math.round(s);
 }
@@ -642,69 +747,6 @@ function decodeHtml(value) {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
-}
-
-async function playlistEmbedTracks(playlist) {
-  const res = await fetch(`https://open.spotify.com/embed/playlist/${playlist.id}`, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (!res.ok) return [];
-
-  const html = await res.text();
-  const match = html.match(
-    /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/,
-  );
-  if (!match?.[1]) return [];
-
-  let data;
-  try {
-    data = JSON.parse(match[1]);
-  } catch {
-    return [];
-  }
-
-  const entity = data?.props?.pageProps?.state?.data?.entity;
-  const trackList = Array.isArray(entity?.trackList) ? entity.trackList : [];
-  const cover = entity?.coverArt?.sources?.[0]?.url || primaryImage(playlist.images);
-  const src = {
-    name: entity?.title || playlist.name,
-    url: playlist.external_urls?.spotify ?? "",
-    artworkUrl: cover,
-    score: playlist.score,
-    albumIndex: playlist.albumIndex ?? 0,
-    orderBonus: 38,
-    indexPenalty: 0.55,
-  };
-
-  return trackList
-    .filter((track) => track?.entityType === "track" && track?.title)
-    .slice(0, MAX_TRACKS)
-    .map((track, index) => {
-      const spotifyId = String(track.uri || "").replace("spotify:track:", "");
-      return normalizeTrack(
-        {
-          id: spotifyId,
-          name: decodeHtml(track.title),
-          preview_url: track.audioPreview?.url ?? "",
-          external_urls: spotifyId
-            ? { spotify: `https://open.spotify.com/track/${spotifyId}` }
-            : {},
-          album: {
-            name: src.name,
-            images: cover ? [{ url: cover }] : [],
-          },
-          artists: [{ name: decodeHtml(track.subtitle) }],
-          type: "track",
-          popularity: 0,
-        },
-        src,
-        index,
-      );
-    });
 }
 
 async function albumEmbedTracks(album) {
@@ -770,36 +812,67 @@ async function albumEmbedTracks(album) {
     });
 }
 
-async function playlistTracks(playlist, token, market) {
-  const src = {
-    name: playlist.name,
-    url: playlist.external_urls?.spotify ?? "",
-    artworkUrl: primaryImage(playlist.images),
-    score: playlist.score,
-    albumIndex: playlist.albumIndex ?? 0,
-    orderBonus: 34,
-    indexPenalty: 0.7,
-  };
+async function playlistEmbedTracks(playlist) {
+  const res = await fetch(`https://open.spotify.com/embed/playlist/${playlist.id}`, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) return [];
+
+  const html = await res.text();
+  const match = html.match(
+    /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/,
+  );
+  if (!match?.[1]) return [];
 
   let data;
   try {
-    data = await spotifyGet(`/playlists/${playlist.id}/tracks`, token, {
-      market,
-      limit: MAX_TRACKS,
-      fields:
-        "items(track(id,name,popularity,preview_url,external_urls,album(name,images),artists(name),type)),total",
-    });
-  } catch (err) {
-    if (err?.status === 429) throw err;
-    const embedTracks = await playlistEmbedTracks(playlist);
-    if (embedTracks.length) return embedTracks;
-    throw err;
+    data = JSON.parse(match[1]);
+  } catch {
+    return [];
   }
 
-  return (Array.isArray(data?.items) ? data.items : [])
-    .map((item) => item?.track)
-    .filter((t) => t?.type === "track" && t?.name)
-    .map((t, i) => normalizeTrack(t, src, i));
+  const entity = data?.props?.pageProps?.state?.data?.entity;
+  const trackList = Array.isArray(entity?.trackList) ? entity.trackList : [];
+  const cover = entity?.coverArt?.sources?.[0]?.url || primaryImage(playlist.images);
+  const src = {
+    name: entity?.title || playlist.name,
+    url: playlist.external_urls?.spotify ?? "",
+    artworkUrl: cover,
+    score: playlist.score,
+    albumIndex: playlist.albumIndex ?? 0,
+    orderBonus: 34,
+    indexPenalty: 0.55,
+  };
+
+  return trackList
+    .filter((track) => track?.entityType === "track" && track?.title)
+    .slice(0, MAX_TRACKS)
+    .map((track, index) => {
+      const spotifyId = String(track.uri || "").replace("spotify:track:", "");
+      return normalizeTrack(
+        {
+          id: spotifyId,
+          name: decodeHtml(track.title),
+          preview_url: track.audioPreview?.url ?? "",
+          external_urls: spotifyId
+            ? { spotify: `https://open.spotify.com/track/${spotifyId}` }
+            : {},
+          album: {
+            name: src.name,
+            images: cover ? [{ url: cover }] : [],
+          },
+          artists: [{ name: decodeHtml(track.subtitle) }],
+          type: "track",
+          popularity: 0,
+        },
+        src,
+        index,
+      );
+    });
 }
 
 async function albumTracks(album, token, market) {
@@ -816,25 +889,41 @@ async function albumTracks(album, token, market) {
   const items = [];
   let offset = 0;
 
-  while (items.length < MAX_TRACKS) {
-    const data = await spotifyGet(`/albums/${album.id}/tracks`, token, {
-      market,
-      limit: Math.min(50, MAX_TRACKS - items.length),
-      offset,
-    });
-    const pageItems = Array.isArray(data?.items) ? data.items : [];
-    items.push(...pageItems);
+  try {
+    while (items.length < MAX_TRACKS) {
+      const data = await spotifyGet(`/albums/${album.id}/tracks`, token, {
+        market,
+        limit: Math.min(50, MAX_TRACKS - items.length),
+        offset,
+      });
+      const pageItems = Array.isArray(data?.items) ? data.items : [];
+      items.push(...pageItems);
 
-    if (!data?.next || pageItems.length === 0) break;
-    offset += pageItems.length;
+      if (!data?.next || pageItems.length === 0) break;
+      offset += pageItems.length;
+    }
+  } catch (err) {
+    const embedTracks = await albumEmbedTracks(album);
+    if (embedTracks.length > 0) return embedTracks;
+    if (err?.status === 429) throw err;
+    throw err;
   }
 
   const normalized = items
     .filter((t) => t?.type === "track" && t?.name)
     .map((t, i) => normalizeTrack(t, src, i));
 
+  if (normalized.length === 0) {
+    const embedTracks = await albumEmbedTracks(album);
+    if (embedTracks.length > 0) return embedTracks;
+  }
+
   const previewCount = normalized.filter((track) => track.previewUrl).length;
-  if (normalized.length > 0 && previewCount < Math.min(3, normalized.length)) {
+  const minimumUsefulPreviewCount = Math.min(
+    MIN_PREVIEW_TRACKS_BEFORE_FALLBACK,
+    normalized.length,
+  );
+  if (normalized.length > 0 && previewCount < minimumUsefulPreviewCount) {
     const embedTracks = await albumEmbedTracks(album);
     if (embedTracks.length > 0) {
       return dedupeTracks([...normalized, ...embedTracks]);
@@ -871,14 +960,18 @@ function dedupeTracks(tracks) {
     const existing = merged[existingIndex];
     const candidateIsScoreAlbum = isOfficialScoreAlbumTrack(track);
     const existingIsScoreAlbum = isOfficialScoreAlbumTrack(existing);
+    const candidateIsCanonicalAlbum = isCanonicalSoundtrackAlbumTrack(track);
+    const existingIsCanonicalAlbum = isCanonicalSoundtrackAlbumTrack(existing);
     const candidateHasPreview = Boolean(track.previewUrl);
     const existingHasPreview = Boolean(existing.previewUrl);
     if (
       (candidateIsScoreAlbum && !existingIsScoreAlbum) ||
+      (candidateIsCanonicalAlbum && !existingIsCanonicalAlbum) ||
       (candidateHasPreview && !existingHasPreview) ||
       (trackPriority(track) > trackPriority(existing) &&
         candidateHasPreview === existingHasPreview &&
-        candidateIsScoreAlbum === existingIsScoreAlbum)
+        candidateIsScoreAlbum === existingIsScoreAlbum &&
+        candidateIsCanonicalAlbum === existingIsCanonicalAlbum)
     ) {
       merged[existingIndex] = { ...existing, ...track };
     } else if (!existing.previewUrl && track.previewUrl) {
@@ -922,6 +1015,9 @@ function sourcePriority(source) {
 function collectionTier(collection) {
   if (containsAny(collection, BAD_MATCH_WORDS)) return -2;
   if (/single|ep/.test(collection)) return -1;
+  if (/original motion picture soundtrack|official movie soundtrack/.test(collection)) return 8;
+  if (/official .*soundtrack|soundtrack oficial|banda sonora oficial/.test(collection)) return 7;
+  if (/the soundtrack|original soundtrack/.test(collection)) return 6;
   if (/official/.test(collection) && /soundtrack|ost/.test(collection)) return 6;
   if (/the album/.test(collection)) return 5;
   if (/soundtrack|music from|inspired by/.test(collection)) return 4;
@@ -939,6 +1035,7 @@ function trackPriority(track) {
   score += sourcePriority(track.source);
   score += Number(track.popularity ?? 0) * 0.45;
 
+  score += canonicalSoundtrackBonus(collection) * 2;
   if (/official/.test(collection)) score += 55;
   if (/the album/.test(collection)) score += 70;
   if (/soundtrack/.test(collection)) score += 45;
@@ -988,6 +1085,7 @@ function isCanonicalSoundtrackAlbumTrack(track) {
     !containsAny(collection, BAD_MATCH_WORDS) &&
     (
       /the soundtrack/.test(collection) ||
+      /official movie soundtrack/.test(collection) ||
       /original motion picture soundtrack/.test(collection) ||
       /music from .*motion picture/.test(collection)
     )
@@ -1091,13 +1189,18 @@ async function loadSoundtrack(ctx, token, markets) {
   const albums = Array.isArray(sources.albums) ? sources.albums : [];
   const playlists = Array.isArray(sources.playlists) ? sources.playlists : [];
   if (!albums.length && !playlists.length) {
-    const result = { ...sources, tracks: [], market };
+    const result = {
+      ...sources,
+      tracks: [],
+      market,
+      spotifySkippedReason: "no_original_title_album_match",
+    };
     await setCache(cacheKey, result);
     return result;
   }
 
   console.log(
-    `[Spotify] selected playlists: ${playlists
+    `[Spotify] skipped playlists because album selection is deterministic: ${playlists
       .map((playlist) => `"${playlist.name}"`)
       .join(", ") || "none"}`,
   );
@@ -1109,11 +1212,14 @@ async function loadSoundtrack(ctx, token, markets) {
 
   const trackResults = await Promise.allSettled(
     [
-      ...playlists.map((playlist, albumIndex) =>
-        playlistTracks({ ...playlist, albumIndex }, token, market),
-      ),
       ...albums.map((album, albumIndex) =>
-        albumTracks({ ...album, albumIndex: albumIndex + playlists.length }, token, market),
+        albumTracks({ ...album, albumIndex }, token, market),
+      ),
+      ...playlists.map((playlist, playlistIndex) =>
+        playlistEmbedTracks({
+          ...playlist,
+          albumIndex: albums.length + playlistIndex,
+        }),
       ),
     ],
   );
@@ -1135,6 +1241,7 @@ async function loadSoundtrack(ctx, token, markets) {
 
   const needPreview = tracks
     .filter((t) => !t.previewUrl && t.spotifyId)
+    .sort((a, b) => trackPriority(b) - trackPriority(a))
     .slice(0, SPOTIFY_PREVIEW_RESOLVE_LIMIT);
   if (needPreview.length > 0) {
     console.log(`[Spotify] resolving ${needPreview.length} preview URLs...`);
@@ -1154,7 +1261,13 @@ async function loadSoundtrack(ctx, token, markets) {
     }
   }
 
-  const result = { ...sources, tracks, market };
+  const result = {
+    ...sources,
+    albums,
+    playlists,
+    tracks,
+    market,
+  };
   await setCache(cacheKey, result);
   return result;
 }
@@ -1202,6 +1315,7 @@ export async function GET(req) {
   let spotifyPlaylists = [];
   let spotifyAlbums = [];
   let spotifyQuery = "";
+  let spotifySkippedReason = "";
   let market = country;
 
   // ---- Try Spotify ----
@@ -1220,6 +1334,7 @@ export async function GET(req) {
       spotifyQuery = result.query ?? "";
       spotifyPlaylists = Array.isArray(result.playlists) ? result.playlists : [];
       spotifyAlbums = Array.isArray(result.albums) ? result.albums : [];
+      spotifySkippedReason = result.spotifySkippedReason ?? "";
 
       const spotifyTracks = Array.isArray(result.tracks) ? result.tracks : [];
       tracks = spotifyTracks;
@@ -1240,7 +1355,11 @@ export async function GET(req) {
 
   if (needsFallback) {
     try {
-      const fallback = await searchFallback(ctx, country);
+      const fallback = await searchFallback(ctx, country, {
+        appleOnly:
+          spotifySkippedReason === "no_original_title_album_match" ||
+          (spotifyActive && spotifyAlbums.length > 0),
+      });
 
       if (Array.isArray(fallback.tracks) && fallback.tracks.length > 0) {
         if (tracks.length === 0) {
@@ -1277,7 +1396,12 @@ export async function GET(req) {
 
   // ---- Build response payload ----
   const payload = {
-    source: tracks.some((t) => t.source === "Spotify") ? "spotify" : (fallbackSource?.toLowerCase() ?? "spotify"),
+    source: tracks.some((t) => t.source === "Spotify")
+      ? "spotify"
+      : (fallbackSource?.toLowerCase() ??
+        (spotifySkippedReason === "no_original_title_album_match"
+          ? "itunes"
+          : "spotify")),
     query: spotifyQuery || "",
     market,
     spotifyConfigured: configured,
@@ -1285,6 +1409,7 @@ export async function GET(req) {
     spotifyRateLimited,
     spotifyRetryAfter,
     spotifyAuthMode: auth.mode,
+    spotifySkippedReason,
     fromCache,
     fallbackSource,
     fallbackActive,

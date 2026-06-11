@@ -22,7 +22,11 @@ import {
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
-import { SectionTitle, VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
+import {
+  SectionTitle,
+  VisualMetaCard,
+  DetailsTabsMenu,
+} from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
@@ -1280,7 +1284,8 @@ export default function EpisodeDetailsClient({
                   {imdbData?.rating != null && (
                     <CompactBadge
                       logo="/logo-IMDb.svg"
-                      logoClassName="h-5 sm:h-5"
+                      logoWrapClassName="min-w-[28px]"
+                      logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
                       value={Number(imdbData.rating).toFixed(1)}
                       sub={
                         imdbData?.votes
@@ -1388,7 +1393,10 @@ export default function EpisodeDetailsClient({
                         {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
                         <div
                           className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                          style={{
+                            WebkitMaskImage:
+                              "-webkit-radial-gradient(white, black)",
+                          }}
                         />
                         <p className="relative z-10 text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
                           {episode?.overview?.trim() ||

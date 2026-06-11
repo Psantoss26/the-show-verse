@@ -16,6 +16,7 @@ export function CompactBadge({
   className = "",
   hideSubOnMobile = false,
   logoClassName = "",
+  logoWrapClassName = "w-6",
   animateOnMount = true,
   tooltip,
 }) {
@@ -50,7 +51,9 @@ export function CompactBadge({
       `}
       aria-label={titleText}
     >
-      <span className="grid h-6 w-6 shrink-0 place-items-center">
+      <span
+        className={`grid h-6 shrink-0 place-items-center ${logoWrapClassName}`}
+      >
         <img
           src={logo}
           alt={label || "Provider"}
