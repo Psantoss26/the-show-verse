@@ -2053,8 +2053,12 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
         href={href || "#"}
         className={`flex items-center gap-3 p-2.5 sm:p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
-        <div className="w-12 sm:w-14 aspect-[2/3] rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
-          <Poster entry={entry} className="w-full h-full" />
+        <div className="relative w-24 sm:w-28 aspect-video rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
+          <SmartPoster
+            entry={entry}
+            title={meta?.title || "Episodio"}
+            mode="backdrop"
+          />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm sm:text-[15px] font-bold text-emerald-400 drop-shadow-sm">
