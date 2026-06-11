@@ -164,7 +164,7 @@ function CalendarPickerModal({
             type="button"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-            title="Cerrar"
+            aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>
@@ -180,7 +180,7 @@ function CalendarPickerModal({
               )
             }
             className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
-            title="Mes anterior"
+            aria-label="Mes anterior"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -195,7 +195,7 @@ function CalendarPickerModal({
               )
             }
             className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
-            title="Mes siguiente"
+            aria-label="Mes siguiente"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -402,7 +402,7 @@ export default function TraktWatchedModal({
             type="button"
             onClick={onClose}
             className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-            title="Cerrar (Esc)"
+            aria-label="Cerrar (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -422,7 +422,7 @@ export default function TraktWatchedModal({
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={openCalendarForNew}
@@ -444,8 +444,8 @@ export default function TraktWatchedModal({
                   type="button"
                   onClick={doAdd}
                   disabled={isBusy}
-                  className="flex items-center justify-center rounded-full border border-emerald-200/30 bg-emerald-400/90 px-5 py-3 font-extrabold text-black shadow-[0_10px_30px_-10px_rgba(52,211,153,0.65)] transition-all hover:bg-emerald-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Añadir visionado"
+                  className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border border-emerald-200/30 bg-emerald-400/90 font-extrabold text-black shadow-[0_10px_30px_-10px_rgba(52,211,153,0.65)] transition-all hover:bg-emerald-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Añadir visionado"
                 >
                   <Plus className="w-6 h-6" />
                 </button>
@@ -518,7 +518,7 @@ export default function TraktWatchedModal({
                               onClick={() => startEdit(it.id, it.watchedAt)}
                               disabled={isBusy}
                               className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
-                              title="Editar"
+                              aria-label="Editar"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -527,7 +527,7 @@ export default function TraktWatchedModal({
                               onClick={() => doRemove(it.id)}
                               disabled={isBusy}
                               className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
-                              title="Eliminar"
+                              aria-label="Eliminar"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -563,7 +563,7 @@ export default function TraktWatchedModal({
                               onClick={stopEdit}
                               disabled={isBusy}
                               className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
-                              title="Cancelar"
+                              aria-label="Cancelar"
                             >
                               <X className="w-4 h-4" />
                             </button>
