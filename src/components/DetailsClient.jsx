@@ -9004,54 +9004,52 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
+              <div className="flex flex-wrap items-center gap-3 text-base md:text-lg font-medium text-zinc-300">
                 {yearIso && (
                   <span className="text-white font-bold tracking-wide">
                     {yearIso}
                   </span>
                 )}
 
-                {displayRuntimeValue && (
-                  <>
-                    <span className="text-white text-[10px]">●</span>
-                    <span>{displayRuntimeValue}</span>
-                  </>
+                {yearIso && displayRuntimeValue && (
+                  <span className="w-1 h-1 rounded-full bg-white/30" />
+                )}
+
+                {displayRuntimeValue && <span>{displayRuntimeValue}</span>}
+
+                {(yearIso || displayRuntimeValue) && data.status && (
+                  <span className="w-1 h-1 rounded-full bg-white/30" />
                 )}
 
                 {data.status && (
-                  <>
-                    <span className="text-white text-[10px]">●</span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.6)]"
-                          : "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${data.status === "Ended" || data.status === "Canceled" ? "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.8)]" : "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"}`}
-                      />
-                      {data.status}
-                    </span>
-                  </>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${
+                      data.status === "Ended" || data.status === "Canceled"
+                        ? "bg-red-500/10 border-red-500/20 text-red-300"
+                        : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                    }`}
+                  >
+                    {data.status}
+                  </span>
                 )}
+
+                {(yearIso || displayRuntimeValue || data.status) &&
+                  data.genres?.length > 0 && (
+                    <span className="w-1 h-1 rounded-full bg-white/30" />
+                  )}
 
                 {/* Géneros */}
                 {data.genres?.length > 0 && (
-                  <>
-                    <span className="text-white text-[10px]">●</span>
-                    <div className="flex flex-wrap items-center gap-3">
-                      {data.genres.slice(0, 3).map((g) => (
-                        <span
-                          key={g.id}
-                          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-                          {g.name}
-                        </span>
-                      ))}
-                    </div>
-                  </>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {data.genres.slice(0, 3).map((g) => (
+                      <span
+                        key={g.id}
+                        className="inline-flex items-center px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 backdrop-blur-md shadow-sm"
+                      >
+                        {g.name}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
             </FadeIn>

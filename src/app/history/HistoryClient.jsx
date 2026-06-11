@@ -1659,7 +1659,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
         />
         <div
-          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+          className={`items-center justify-center absolute top-0 left-0 z-20 p-1.5 sm:p-2 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
             isGroup
               ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
               : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -1670,14 +1670,14 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           }`}
         >
           {isGroup ? (
-            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <div className="flex items-center gap-1 font-bold text-[10px] sm:text-xs">
+              <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{groupCount}</span>
             </div>
           ) : type === "movie" ? (
-            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           ) : (
-            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <MonitorPlay className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           )}
         </div>
 
@@ -1719,11 +1719,11 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         {!confirmDel && (!isMobile || editMode) && (
           <button
             onClick={handleDeleteClick}
-            className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
+            className="absolute top-0 right-0 z-20 flex items-center justify-center p-1.5 sm:p-2 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
             title="Borrar"
             aria-label="Borrar"
           >
-            <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         )}
 
