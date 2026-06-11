@@ -173,29 +173,28 @@ export function StatChip({ icon: Icon, label, value }) {
 
 export function DetailsTabsMenu({ tabs, activeTab, onChangeTab, layoutId = "activeTabIndicator" }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-black/35 border border-white/5 backdrop-blur-md w-fit mb-5">
+    <div className="flex flex-wrap items-center gap-6 md:gap-8 border-b border-white/10 w-full mb-4 pb-0 relative">
       {tabs.map((tab) => (
-        <motion.button
+        <button
           key={tab.id}
           type="button"
           onClick={() => onChangeTab(tab.id)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={`relative px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-colors duration-300 ${
+          className={`relative pb-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors duration-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
             activeTab === tab.id
-              ? "text-neutral-950 font-black"
-              : "text-zinc-400 hover:text-zinc-200"
+              ? "text-white font-extrabold"
+              : "text-zinc-500 hover:text-zinc-300"
           }`}
         >
+          <span className="relative z-10">{tab.label}</span>
+          
           {activeTab === tab.id && (
             <motion.div
               layoutId={layoutId}
-              className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-lg z-0 shadow-md shadow-yellow-500/10"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20"
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}
-          <span className="relative z-10">{tab.label}</span>
-        </motion.button>
+        </button>
       ))}
     </div>
   );

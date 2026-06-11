@@ -197,6 +197,7 @@ import {
   MetaItem,
   ScoreBadge,
   StatChip,
+  DetailsTabsMenu,
 } from "@/components/details/DetailAtoms";
 import {
   CompactBadge,
@@ -8657,18 +8658,19 @@ export default function DetailsClient({
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
-                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 will-change-transform"
+                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 will-change-transform"
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
+                    WebkitMaskImage: "-webkit-radial-gradient(white, black)",
                     // NO transition en transform - manejado por requestAnimationFrame
                   }}
                 >
-                  {/* (Opcional) borde suave sin sombreado encima */}
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10" />
+                  {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
 
                   <div
                     className={`relative bg-neutral-950 will-change-auto overflow-hidden ${isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
@@ -9502,31 +9504,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
                   {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
                   {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
-                  <div className="flex flex-wrap items-center gap-6 my-1.5 border-b border-white/10 pb-1">
-                    {[
+                  <DetailsTabsMenu
+                    tabs={[
                       { id: "details", label: "Detalles" },
                       { id: "production", label: "Producción" },
                       { id: "synopsis", label: "Sinopsis" },
                       ...(extras.awards
                         ? [{ id: "awards", label: "Premios" }]
                         : []),
-                    ].map((tab) => (
-                      <motion.button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-          ${activeTab === tab.id
-                            ? "text-white border-yellow-500"
-                            : "text-zinc-500 border-transparent hover:text-zinc-300"
-                          }`}
-                      >
-                        {tab.label}
-                      </motion.button>
-                    ))}
-                  </div>
+                    ]}
+                    activeTab={activeTab}
+                    onChangeTab={setActiveTab}
+                    layoutId="detailsTabInline"
+                  />
 
                   {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
                   {/* Muestra el contenido de la tab activa con animaciones de transición */}
@@ -9693,29 +9683,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         {isBackdropPoster && (
           <FadeIn delay={0.24} className="mt-6 w-full">
             {/* --- MENÚ DE NAVEGACIÓN --- */}
-            <div className="flex flex-wrap items-center gap-6 mb-4 border-b border-white/10 pb-1">
-              {[
+            <DetailsTabsMenu
+              tabs={[
                 { id: "details", label: "Detalles" },
                 { id: "production", label: "Producción" },
                 { id: "synopsis", label: "Sinopsis" },
                 ...(extras.awards ? [{ id: "awards", label: "Premios" }] : []),
-              ].map((tab) => (
-                <motion.button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 
-        ${activeTab === tab.id
-                      ? "text-white border-yellow-500"
-                      : "text-zinc-500 border-transparent hover:text-zinc-300"
-                    }`}
-                >
-                  {tab.label}
-                </motion.button>
-              ))}
-            </div>
+              ]}
+              activeTab={activeTab}
+              onChangeTab={setActiveTab}
+              layoutId="detailsTabBackdrop"
+            />
 
             {/* --- ÁREA DE CONTENIDO --- */}
             <div className="relative min-h-[100px]">
