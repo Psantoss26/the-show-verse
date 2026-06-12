@@ -8,15 +8,13 @@ import {
   useRef,
   useCallback,
   startTransition,
+  memo,
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import {
-  fetchRatedForUser,
-  getWatchProviders,
-} from "@/lib/api/tmdb";
+import { fetchRatedForUser, getWatchProviders } from "@/lib/api/tmdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Heart,
@@ -940,10 +938,7 @@ function formatRatingBucketLabel(bucket) {
 
 function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5, offset = 0) {
   const numericRating = Number(rating);
-  if (
-    (!Number.isFinite(numericRating) || numericRating <= 0) &&
-    emptyKey
-  ) {
+  if ((!Number.isFinite(numericRating) || numericRating <= 0) && emptyKey) {
     return { key: emptyKey, label: emptyLabel };
   }
   const normalized = Math.max(0, Math.min(10, numericRating || 0));
@@ -1595,79 +1590,79 @@ function GroupDivider({
           <div
             className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
           >
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-            <div
-              className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
-            />
-
-            <div
-              className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
-            >
-              <h2
-                className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
-              >
-                {title}
-              </h2>
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <div
+                className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
+              />
 
               <div
-                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+                className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
               >
-                <span className="text-zinc-300 font-bold">{count}</span>
-                <span>items</span>
-                <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
-                <span className="opacity-90">{pct}%</span>
+                <h2
+                  className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
+                >
+                  {title}
+                </h2>
+
+                <div
+                  className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+                >
+                  <span className="text-zinc-300 font-bold">{count}</span>
+                  <span>items</span>
+                  <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
+                  <span className="opacity-90">{pct}%</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-            {stats?.imdb?.avg != null &&
-              typeof stats.imdb.avg === "number" &&
-              !Number.isNaN(stats.imdb.avg) && (
-                <StatBox
-                  label="IMDb"
-                  value={formatAvg(stats.imdb.avg)}
-                  imgSrc="/logo-IMDb.svg"
-                  horizontal={renderSticky}
-                />
-              )}
-            {stats?.trakt?.avg != null &&
-              typeof stats.trakt.avg === "number" &&
-              !Number.isNaN(stats.trakt.avg) && (
-                <StatBox
-                  label="Trakt"
-                  value={formatAvg(stats.trakt.avg)}
-                  imgSrc="/logo-Trakt.png"
-                  horizontal={renderSticky}
-                />
-              )}
-            {stats?.tmdb?.avg != null &&
-              typeof stats.tmdb.avg === "number" &&
-              !Number.isNaN(stats.tmdb.avg) && (
-                <StatBox
-                  label="TMDb"
-                  value={formatAvg(stats.tmdb.avg)}
-                  imgSrc="/logo-TMDb.png"
-                  horizontal={renderSticky}
-                />
-              )}
-
-            {stats?.my?.avg != null &&
-              typeof stats.my.avg === "number" &&
-              !Number.isNaN(stats.my.avg) && (
-                <div
-                  className={`${stickyTransitionClass} border-white/10 ${renderSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
-                >
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              {stats?.imdb?.avg != null &&
+                typeof stats.imdb.avg === "number" &&
+                !Number.isNaN(stats.imdb.avg) && (
                   <StatBox
-                    label="Tu media"
-                    value={formatAvg(stats.my.avg)}
-                    icon={Star}
-                    colorClass="text-amber-400 fill-amber-400"
+                    label="IMDb"
+                    value={formatAvg(stats.imdb.avg)}
+                    imgSrc="/logo-IMDb.svg"
                     horizontal={renderSticky}
                   />
-                </div>
-              )}
-          </div>
+                )}
+              {stats?.trakt?.avg != null &&
+                typeof stats.trakt.avg === "number" &&
+                !Number.isNaN(stats.trakt.avg) && (
+                  <StatBox
+                    label="Trakt"
+                    value={formatAvg(stats.trakt.avg)}
+                    imgSrc="/logo-Trakt.png"
+                    horizontal={renderSticky}
+                  />
+                )}
+              {stats?.tmdb?.avg != null &&
+                typeof stats.tmdb.avg === "number" &&
+                !Number.isNaN(stats.tmdb.avg) && (
+                  <StatBox
+                    label="TMDb"
+                    value={formatAvg(stats.tmdb.avg)}
+                    imgSrc="/logo-TMDb.png"
+                    horizontal={renderSticky}
+                  />
+                )}
+
+              {stats?.my?.avg != null &&
+                typeof stats.my.avg === "number" &&
+                !Number.isNaN(stats.my.avg) && (
+                  <div
+                    className={`${stickyTransitionClass} border-white/10 ${renderSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
+                  >
+                    <StatBox
+                      label="Tu media"
+                      value={formatAvg(stats.my.avg)}
+                      icon={Star}
+                      colorClass="text-amber-400 fill-amber-400"
+                      horizontal={renderSticky}
+                    />
+                  </div>
+                )}
+            </div>
           </div>
         </div>
         <div
@@ -1700,7 +1695,7 @@ function GroupDivider({
 }
 
 // ================== CARD COMPONENTS ==================
-function FavoriteCard({
+const FavoriteCard = memo(function FavoriteCard({
   item,
   index = 0,
   totalItems = 0,
@@ -1810,9 +1805,23 @@ function FavoriteCard({
     }
   }, [imdbScore, traktScore, loadingScores, item, type]);
 
+  const animDelay =
+    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  const shouldAnimate = index < 60;
+
   if (viewMode === "list") {
     return (
-      <div>
+      <motion.div
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.25,
+          delay: shouldAnimate ? animDelay : 0,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        layout
+      >
         <Link
           href={href}
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-red-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
@@ -1846,13 +1855,23 @@ function FavoriteCard({
             </div>
           </div>
         </Link>
-      </div>
+      </motion.div>
     );
   }
 
   if (viewMode === "compact") {
     return (
-      <div>
+      <motion.div
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.25,
+          delay: shouldAnimate ? animDelay : 0,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        layout
+      >
         <Link href={href} className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
@@ -1956,13 +1975,18 @@ function FavoriteCard({
             </div>
           </motion.div>
         </Link>
-      </div>
+      </motion.div>
     );
   }
 
   // Grid mode
   return (
-    <div>
+    <motion.div
+      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+    >
       <Link href={href} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-all`}
@@ -2075,9 +2099,9 @@ function FavoriteCard({
           </div>
         </div>
       </Link>
-    </div>
+    </motion.div>
   );
-}
+});
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
@@ -2458,10 +2482,7 @@ export default function FavoritesClient() {
             fetchedCount++;
             return true;
           } catch (err) {
-            console.warn(
-              `[Trakt] Failed to fetch score for ${item.id}:`,
-              err,
-            );
+            console.warn(`[Trakt] Failed to fetch score for ${item.id}:`, err);
             return false;
           }
         };
@@ -2895,7 +2916,10 @@ export default function FavoritesClient() {
     }, 900);
 
     window.scrollTo({
-      top: Math.max(0, targetTop + dividerMarginTop - stickyTop + activationBias),
+      top: Math.max(
+        0,
+        targetTop + dividerMarginTop - stickyTop + activationBias,
+      ),
       behavior: "smooth",
     });
   }, []);
@@ -3722,10 +3746,13 @@ export default function FavoritesClient() {
           // Grouped view
           <div className="space-y-8">
             {grouped.map((group, groupIndex) => (
-              <div
+              <motion.div
                 key={group.key}
                 ref={(node) => setGroupSectionRef(group.key, node)}
                 className="overflow-visible scroll-mt-[148px]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
               >
                 <GroupDivider
                   title={group.label}
@@ -3765,7 +3792,9 @@ export default function FavoritesClient() {
                               viewMode={viewMode}
                               imageMode={imageMode}
                               imdbScore={imdbScores.get(getScoreItemKey(item))}
-                              traktScore={traktScores.get(getScoreItemKey(item))}
+                              traktScore={traktScores.get(
+                                getScoreItemKey(item),
+                              )}
                             />
                           ))}
                         </div>
@@ -3791,7 +3820,7 @@ export default function FavoritesClient() {
                     ))}
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : (
