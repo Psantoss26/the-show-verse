@@ -673,6 +673,34 @@ function CustomTooltip({ active, payload, label, formatter }) {
   return null;
 }
 
+function ChartFrame({ className = "h-[300px]", children }) {
+  const ref = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    const update = () => {
+      const rect = node.getBoundingClientRect();
+      setReady(rect.width > 0 && rect.height > 0);
+    };
+
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`${className} min-w-0 w-full`}>
+      {ready ? children : null}
+    </div>
+  );
+}
+
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
     return null;
@@ -1993,13 +2021,13 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {/* Main Charts Row */}
                 {stats && (
-                  <div className="order-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="order-1 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Activity Chart - Spans 2 cols */}
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className={`${PROFILE_GLASS_PANEL} lg:col-span-2 rounded-3xl p-6`}
+                      className={`${PROFILE_GLASS_PANEL} min-w-0 lg:col-span-2 rounded-3xl p-6`}
                     >
                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
                       <SectionTitle
@@ -2009,8 +2037,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         color="indigo"
                       />
 
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <ChartFrame>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <AreaChart
                             data={stats.monthlyData}
                             margin={{
@@ -2078,7 +2106,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             />
                           </AreaChart>
                         </ResponsiveContainer>
-                      </div>
+                      </ChartFrame>
                     </motion.div>
 
                     {/* Time Distribution */}
@@ -2086,7 +2114,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.3 }}
-                      className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6 flex flex-col items-center justify-center`}
+                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6 flex flex-col items-center justify-center`}
                     >
                       <SectionTitle
                         icon={Clock}
@@ -2094,8 +2122,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         subtitle="Películas vs Series"
                         color="indigo"
                       />
-                      <div className="h-[250px] w-full relative">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <ChartFrame className="relative h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <PieChart>
                             <Pie
                               data={stats.timeDistribution}
@@ -2134,7 +2162,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             {stats.formattedTotalTime.split(" ")[1]}
                           </span>
                         </div>
-                      </div>
+                      </ChartFrame>
                     </motion.div>
                   </div>
                 )}
@@ -2285,17 +2313,17 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 transition={{ duration: 0.5 }}
                 className="space-y-8"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
                   {/* Hour of Day */}
-                  <div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
+                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}>
                     <SectionTitle
                       icon={Clock}
                       title="Hora del Día"
                       subtitle="¿Cuándo ves más contenido?"
                       color="pink"
                     />
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ChartFrame>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={stats.hourOfDayData}>
                           <CartesianGrid
                             strokeDasharray="3 3"
@@ -2320,19 +2348,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
                           />
                         </BarChart>
                       </ResponsiveContainer>
-                    </div>
+                      </ChartFrame>
                   </div>
 
                   {/* Day of Week */}
-                  <div className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}>
+                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}>
                     <SectionTitle
                       icon={CalendarIcon}
                       title="Día de la Semana"
                       subtitle="Tus días más activos"
                       color="cyan"
                     />
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ChartFrame>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={stats.dayOfWeekData}>
                           <CartesianGrid
                             strokeDasharray="3 3"
@@ -2357,15 +2385,15 @@ export default function StatsClient({ connectNext = "/profile" }) {
                           />
                         </BarChart>
                       </ResponsiveContainer>
-                    </div>
+                      </ChartFrame>
                   </div>
                 </div>
 
                 {/* Genres & Ratings row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
                   {/* Genres - Radar */}
                   <motion.div
-                    className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}
+                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}
                   >
                     <SectionTitle
                       icon={Target}
@@ -2373,8 +2401,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus categorías más frecuentes"
                       color="lime"
                     />
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ChartFrame>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <RadarChart
                           cx="50%"
                           cy="50%"
@@ -2406,12 +2434,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
                           <Tooltip content={<CustomTooltip />} />
                         </RadarChart>
                       </ResponsiveContainer>
-                    </div>
+                      </ChartFrame>
                   </motion.div>
 
                   {/* Ratings - Bar */}
                   <motion.div
-                    className={`${PROFILE_GLASS_PANEL} rounded-3xl p-6`}
+                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}
                   >
                     <SectionTitle
                       icon={Award}
@@ -2419,8 +2447,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Distribución de ratings (1-10)"
                       color="teal"
                     />
-                    <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <ChartFrame>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={stats.ratingData} barSize={20}>
                           <CartesianGrid
                             strokeDasharray="3 3"
@@ -2458,7 +2486,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
-                    </div>
+                      </ChartFrame>
                   </motion.div>
                 </div>
               </motion.div>
