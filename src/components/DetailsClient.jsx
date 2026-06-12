@@ -11988,6 +11988,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         open={videoModalOpen}
         onClose={closeVideo}
         video={activeVideo}
+        videos={videos}
+        onVideoChange={setActiveVideo}
       />
 
       <SoundtrackModal

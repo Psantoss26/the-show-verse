@@ -1,13 +1,137 @@
 // src/components/details/modals/VideoModal.jsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { ExternalLink, X, PlayCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
+import { X, PlayCircle } from "lucide-react";
 import { videoEmbedUrl, videoExternalUrl } from "@/lib/details/videos";
 
-export default function VideoModal({ open, onClose, video }) {
+let youtubeIframeApiPromise = null;
+
+function loadYouTubeIframeApi() {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+
+  youtubeIframeApiPromise = new Promise((resolve) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolve(window.YT);
+    };
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]',
+    );
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    document.head.appendChild(script);
+  });
+
+  return youtubeIframeApiPromise;
+}
+
+function getVideoIdentity(video) {
+  return video?.site && video?.key ? `${video.site}:${video.key}` : "";
+}
+
+function getPlayerEmbedUrl(video) {
+  const url = videoEmbedUrl(video, true);
+  if (!url || video?.site !== "YouTube") return url;
+
+  const separator = url.includes("?") ? "&" : "?";
+  const origin =
+    typeof window !== "undefined"
+      ? `&origin=${encodeURIComponent(window.location.origin)}`
+      : "";
+
+  return `${url}${separator}enablejsapi=1${origin}`;
+}
+
+export default function VideoModal({
+  open,
+  onClose,
+  video,
+  videos = [],
+  onVideoChange,
+}) {
+  const iframeRef = useRef(null);
+  const skippedVideoKeysRef = useRef(new Set());
+  const videoKey = getVideoIdentity(video);
+
+  const orderedVideos = useMemo(() => {
+    const seen = new Set();
+    const ordered = [];
+
+    for (const candidate of [video, ...(Array.isArray(videos) ? videos : [])]) {
+      const key = getVideoIdentity(candidate);
+      if (!key || seen.has(key) || !videoEmbedUrl(candidate, false)) continue;
+      seen.add(key);
+      ordered.push(candidate);
+    }
+
+    return ordered;
+  }, [video, videos]);
+
+  const showNextVideo = useCallback(() => {
+    if (!videoKey || orderedVideos.length <= 1) return false;
+
+    skippedVideoKeysRef.current.add(videoKey);
+
+    const currentIndex = Math.max(
+      0,
+      orderedVideos.findIndex(
+        (candidate) => getVideoIdentity(candidate) === videoKey,
+      ),
+    );
+
+    for (let offset = 1; offset < orderedVideos.length; offset += 1) {
+      const candidate =
+        orderedVideos[(currentIndex + offset) % orderedVideos.length];
+      const candidateKey = getVideoIdentity(candidate);
+      if (!candidateKey || skippedVideoKeysRef.current.has(candidateKey))
+        continue;
+
+      onVideoChange?.(candidate);
+      return true;
+    }
+
+    return false;
+  }, [onVideoChange, orderedVideos, videoKey]);
+
   // Estado local para controlar la animación de montaje si es necesario,
   // pero aquí usaremos clases de Tailwind 'animate-in' para simplicidad.
+
+  useEffect(() => {
+    if (!open) skippedVideoKeysRef.current.clear();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !video || video.site !== "YouTube" || !iframeRef.current)
+      return;
+
+    let cancelled = false;
+
+    loadYouTubeIframeApi().then((YT) => {
+      if (cancelled || !YT?.Player || !iframeRef.current) return;
+
+      new YT.Player(iframeRef.current, {
+        events: {
+          onError: () => {
+            if (!cancelled) showNextVideo();
+          },
+        },
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, showNextVideo, video, videoKey]);
 
   // Bloqueo de scroll
   useEffect(() => {
@@ -39,7 +163,7 @@ export default function VideoModal({ open, onClose, video }) {
 
   if (!open || !video) return null;
 
-  const embed = videoEmbedUrl(video, true);
+  const embed = getPlayerEmbedUrl(video);
   const ext = videoExternalUrl(video);
 
   return (
@@ -64,8 +188,8 @@ export default function VideoModal({ open, onClose, video }) {
               {video.name || "Tráiler Oficial"}
             </h3>
             <div className="flex items-center gap-2 text-xs font-medium text-white/50 uppercase tracking-wider mt-1">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.65)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.85)]" />
                 {video.type || "Video"}
               </span>
               <span>•</span>
@@ -87,7 +211,8 @@ export default function VideoModal({ open, onClose, video }) {
         <div className="relative w-full aspect-video bg-black/40 group">
           {embed ? (
             <iframe
-              key={video.key}
+              ref={iframeRef}
+              key={videoKey}
               src={embed}
               title={video.name || "Video"}
               allow="autoplay; encrypted-media; picture-in-picture"
@@ -126,12 +251,18 @@ export default function VideoModal({ open, onClose, video }) {
               href={ext}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 
-                                       px-5 py-2.5 text-xs font-bold uppercase tracking-wide text-white/90 
-                                       transition-all hover:bg-white/20 hover:scale-105 active:scale-95 shadow-[0_10px_20px_-10px_rgba(255,255,255,0.1)]"
+              aria-label={`Ver en ${video.site || "YouTube"}`}
+              title={`Ver en ${video.site || "YouTube"}`}
+              className="inline-flex h-11 min-w-11 items-center justify-center p-0 transition-transform hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70"
             >
-              <span>Ver en {video.site}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <Image
+                src="/youtube.webp"
+                alt=""
+                width={40}
+                height={30}
+                aria-hidden="true"
+                className="h-8 w-auto"
+              />
             </a>
           )}
         </div>
