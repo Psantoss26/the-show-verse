@@ -9221,7 +9221,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       pr-[calc(1.25rem+env(safe-area-inset-right))]
       sm:px-4
       flex items-center gap-3 sm:gap-4
-      overflow-x-auto sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+      overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
     "
                 >
                   {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
@@ -9241,6 +9241,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       value={data.vote_average?.toFixed(1)}
                       sub={formatCountShort(data.vote_count)}
                       href={tmdbDetailUrl}
+                      disableHoverLift
                       tooltip={tmdbDetailUrl ? "Ver en TMDb" : "TMDb"}
                     />
 
@@ -9257,6 +9258,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }
                         href={trakt?.traktUrl}
                         animateOnMount={false}
+                        disableHoverLift
                         onClick={
                           !trakt?.connected
                             ? () =>
@@ -9283,6 +9285,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               : undefined
                           }
                           animateOnMount={false}
+                          disableHoverLift
                           onClick={() =>
                             window.location.assign(
                               `/api/trakt/auth/start?next=/details/${type}/${id}`,
@@ -9305,6 +9308,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? `https://www.imdb.com/title/${resolvedImdbId}`
                             : undefined
                         }
+                        disableHoverLift
                         tooltip={resolvedImdbId ? "Ver en IMDb" : "IMDb"}
                       />
                     )}
@@ -9439,15 +9443,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Scroller con padding + safe-area para que no se recorte en bordes */}
                     <div
                       className="
-        overflow-x-auto sm:overflow-visible
-        [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
+        overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
         py-2
         pl-[calc(1rem+env(safe-area-inset-left))]
         pr-[calc(1rem+env(safe-area-inset-right))]
       "
                     >
                       {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
-                      <div className="flex items-center gap-3 min-w-max">
+                      <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
                         {/* Watchers - Usuarios que siguen este contenido */}
                         <div className="shrink-0">
                           <MiniStat

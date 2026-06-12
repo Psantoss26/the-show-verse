@@ -18,6 +18,7 @@ export function CompactBadge({
   logoClassName = "",
   logoWrapClassName = "w-6",
   animateOnMount = true,
+  disableHoverLift = false,
   tooltip,
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
@@ -36,9 +37,11 @@ export function CompactBadge({
       target={href ? "_blank" : undefined}
       rel={href ? "noopener noreferrer" : undefined}
       type={onClick && !href ? "button" : undefined}
+      draggable={false}
+      onDragStart={(event) => event.preventDefault()}
       initial={animateOnMount ? { opacity: 0, y: 6, scale: 0.99 } : false}
       animate={animateOnMount ? { opacity: 1, y: 0, scale: 1 } : undefined}
-      whileHover={isInteractive ? { y: -1 } : undefined}
+      whileHover={isInteractive && !disableHoverLift ? { y: -1 } : undefined}
       transition={
         animateOnMount
           ? { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
@@ -57,6 +60,7 @@ export function CompactBadge({
         <img
           src={logo}
           alt={label || "Provider"}
+          draggable="false"
           className={`
             max-h-5 max-w-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
             ${logoClassName}
