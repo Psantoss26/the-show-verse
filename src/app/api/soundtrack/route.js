@@ -193,8 +193,52 @@ async function getToken() {
 // ---------------------------------------------------------------------------
 function buildQueries(ctx) {
   const titleList = unique([ctx.originalTitle, ...(ctx.titles || [])]);
-  const primaryTitle = titleList[0];
-  return primaryTitle ? [primaryTitle] : [];
+  if (!titleList.length) return [];
+
+  const queries = [];
+  const used = new Set();
+
+  const push = (q) => {
+    const nq = norm(q);
+    if (nq && !used.has(nq)) {
+      queries.push(q);
+      used.add(nq);
+    }
+  };
+
+  // --- Consultas para cada título disponible ---
+  // Primero el título principal con todas las variantes contextuales,
+  // luego los títulos alternativos (p.ej. inglés para anime) como respaldo
+  for (let ti = 0; ti < titleList.length; ti++) {
+    const title = titleList[ti];
+    if (!title) continue;
+
+    if (ti === 0) {
+      // Título principal: consulta simple + variantes con contexto
+      push(title);
+
+      if (ctx.mediaType === "movie") {
+        if (ctx.year) push(`${title} ${ctx.year} motion picture soundtrack`);
+        push(`${title} original motion picture soundtrack`);
+        push(`${title} soundtrack`);
+        push(`${title} playlist oficial`);
+      } else {
+        // Para series: incluir variantes con temporada/volumen
+        // ya que los álbumes suelen titularse "Serie Season 1 Soundtrack"
+        if (ctx.year) push(`${title} ${ctx.year} series soundtrack`);
+        push(`${title} series soundtrack`);
+        push(`${title} soundtrack`);
+        push(`${title} season soundtrack`);
+        push(`${title} soundtrack season`);
+      }
+    } else {
+      // Títulos alternativos (p.ej. título en inglés para anime con título
+      // original en japonés/coreano): solo consulta simple como respaldo
+      push(title);
+    }
+  }
+
+  return queries;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,6 +422,20 @@ function albumMatchesTitle(album, ctx) {
   return false;
 }
 
+function albumNameMatchesAnyTitle(name, titles) {
+  if (!name) return false;
+  const nameNorm = norm(name);
+  return titles.some((t) => {
+    if (!t) return false;
+    for (const tv of titleComparisonVariants(t)) {
+      for (const nv of titleComparisonVariants(nameNorm)) {
+        if (hasLiteralTitlePhrase(nv, tv)) return true;
+      }
+    }
+    return false;
+  });
+}
+
 function isExactTitleAlbum(album, ctx) {
   const name = norm(albumName(album));
   if (!name) return false;
@@ -424,6 +482,7 @@ function isPrioritySeriesSoundtrackPlaylist(playlist, ctx) {
   return (
     (/soundtrack/.test(name) && /all (seasons|songs)/.test(name)) ||
     /official .*playlist/.test(name) ||
+    /playlist oficial|oficial playlist/.test(name) ||
     /original (music|score)/.test(name) ||
     /music from .*series/.test(name) ||
     /music from .*tv/.test(name) ||
@@ -439,7 +498,8 @@ function isPriorityOfficialSoundtrackPlaylist(playlist, ctx) {
     /original motion picture (score|soundtrack)/.test(name) ||
     /music from (the )?(motion picture|film|movie)/.test(name) ||
     /official .*soundtrack/.test(name) ||
-    /soundtrack oficial|banda sonora oficial/.test(name)
+    /soundtrack oficial|banda sonora oficial/.test(name) ||
+    /playlist oficial|oficial playlist/.test(name)
   );
 }
 
@@ -656,15 +716,82 @@ async function searchSoundtrackSources(ctx, token, market) {
         };
       }
 
-      return {
-        albums: [],
-        playlists: [],
-        query: usedQuery,
-        rateLimited,
-        retryAfter,
-        spotifySelectionMode: "no_original_title_album_match",
-        spotifySkippedReason: "no_original_title_album_match",
-      };
+      // Si el título simple no encontró nada, continuamos con las
+      // siguientes consultas más específicas (año + soundtrack, playlist oficial, etc.)
+    }
+
+    // --- Consultas adicionales (i > 0): busqueda especifica ---
+    if (i > 0) {
+      // Puntuar y ordenar álbumes por relevancia
+      // Exigimos que el nombre del álbum contenga el título como frase literal
+      // para evitar falsos positivos como "One Fine Day" para la película "One Day"
+      // Comprobamos contra TODOS los títulos disponibles (original + alternativos),
+      // no solo el principal, para cubrir títulos en inglés de anime con título
+      // original en japonés/coreano (p.ej. "Your Name" para "君の名は。")
+      const scoredAlbums = annotatedAlbums
+        .filter((album) => albumNameMatchesAnyTitle(album.name, ctx.titles))
+        .map((album) => ({ ...album, _score: scoreAlbum(album, ctx) }))
+        .filter(
+          (album) =>
+            album._score > 20 &&
+            !containsAny(norm(album.name || ""), BAD_MATCH_WORDS) &&
+            Number(album?.total_tracks ?? 0) >= 3,
+        )
+        .sort((a, b) => b._score - a._score)
+        .slice(0, 1); // Solo el mejor álbum para consultas específicas
+
+      if (scoredAlbums.length) {
+        usedQuery = q;
+        return {
+          albums: scoredAlbums.map((album) => ({
+            ...album,
+            score: album._score,
+            selectionReason: "fallback_scored_album",
+          })),
+          playlists: [],
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "fallback_scored_album",
+        };
+      }
+
+      // Playlists: buscar coincidencias por título + contexto oficial/oficial
+      const scoredPlaylists = annotatedPlaylists
+        .filter((pl) => {
+          const name = norm(pl.name || "");
+          return (
+            albumNameMatchesAnyTitle(name, ctx.titles) &&
+            !containsAny(name, BAD_MATCH_WORDS) &&
+            (
+              /playlist oficial|oficial playlist|official playlist/.test(name) ||
+              /soundtrack/.test(name) ||
+              /music from/.test(name)
+            )
+          );
+        })
+        .map((pl) => ({
+          ...pl,
+          _score: canonicalSoundtrackBonus(norm(pl.name || "")) + 140,
+        }))
+        .sort((a, b) => b._score - a._score)
+        .slice(0, MAX_SPOTIFY_PLAYLISTS);
+
+      if (scoredPlaylists.length) {
+        usedQuery = q;
+        return {
+          albums: [],
+          playlists: scoredPlaylists.map((pl) => ({
+            ...pl,
+            score: pl._score,
+            selectionReason: "fallback_playlist_match",
+          })),
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "fallback_playlist_match",
+        };
+      }
     }
   }
 
@@ -759,6 +886,7 @@ function canonicalSoundtrackBonus(text) {
   if (/original music from .*tv series|soundtrack from .*series/.test(text)) score += 48;
   if (/all seasons|all songs/.test(text) && /soundtrack/.test(text)) score += 44;
   if (/original motion picture score|original score/.test(text)) score += 42;
+  if (/playlist oficial|oficial playlist/.test(text)) score += 44;
   return score;
 }
 
