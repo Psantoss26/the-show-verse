@@ -1259,7 +1259,7 @@ export default function EpisodeDetailsClient({
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
                   <CompactBadge
                     logo="/logo-TMDb.png"
-                    logoClassName="h-2 sm:h-4"
+                    logoClassName="h-5 sm:h-5"
                     value={vote?.toFixed(1)}
                     sub={voteCount ? formatCountShort(voteCount) : undefined}
                     href={tmdbEpisodeUrl}

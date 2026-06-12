@@ -1141,7 +1141,7 @@ export default function SeasonDetailsClient({
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
                   <CompactBadge
                     logo="/logo-TMDb.png"
-                    logoClassName="h-2 sm:h-4"
+                    logoClassName="h-5 sm:h-5"
                     value={seasonVote?.toFixed(1)}
                     sub={
                       tmdbVotesSeason
