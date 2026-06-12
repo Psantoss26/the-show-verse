@@ -153,7 +153,6 @@ import {
   pickBestImage,
   pickBestNeutralPosterByResVotes,
   pickBestBackdropByLangResVotes,
-  pickBestPosterTV,
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
@@ -235,6 +234,30 @@ function getSoundtrackSourceBadge(source) {
     textClass: "text-emerald-400",
     dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
   };
+}
+
+function pickBestEnglishPoster(list) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const isEnglishPoster = (img) => {
+    const language = String(img?.iso_639_1 || "").toLowerCase();
+    return img?.file_path && (language === "en" || language === "en-us");
+  };
+  const isSpanishPoster = (img) => {
+    const language = String(img?.iso_639_1 || "").toLowerCase();
+    return language === "es" || language === "es-es";
+  };
+
+  const englishPosters = list.filter(isEnglishPoster);
+  if (englishPosters.length) return pickBestImage(englishPosters);
+
+  const neutralPosters = list.filter((img) => img?.file_path && !img?.iso_639_1);
+  if (neutralPosters.length) return pickBestImage(neutralPosters);
+
+  const nonSpanishPosters = list.filter(
+    (img) => img?.file_path && !isSpanishPoster(img),
+  );
+  return pickBestImage(nonSpanishPosters);
 }
 
 // ---------------------------------------------------------------------------
@@ -2260,7 +2283,6 @@ export default function DetailsClient({
     const currentPosterActive =
       (selectedPosterPath ||
         basePosterPath ||
-        data?.poster_path ||
         data?.profile_path) ??
       null;
 
@@ -2375,7 +2397,6 @@ export default function DetailsClient({
     langEN,
     selectedPosterPath,
     basePosterPath,
-    data?.poster_path,
     data?.profile_path,
     previewBackdropFallback,
     selectedPreviewBackdropPath,
@@ -2501,7 +2522,6 @@ export default function DetailsClient({
       (typeof window !== "undefined"
         ? window.localStorage.getItem(posterStorageKey)
         : null) ||
-      data?.poster_path ||
       data?.profile_path ||
       null;
 
@@ -2577,11 +2597,11 @@ export default function DetailsClient({
     const initArtwork = async () => {
       setArtworkInitialized(false);
 
-      let poster = data.poster_path || data.profile_path || null;
+      let poster = data.profile_path || null;
       let backdrop = data.backdrop_path || null;
 
       if (data?.images) {
-        const bestPoster = pickBestImage(data.images.posters || []);
+        const bestPoster = pickBestEnglishPoster(data.images.posters || []);
         if (bestPoster?.file_path) poster = bestPoster.file_path;
 
         setImagesState((prev) => ({
@@ -2616,7 +2636,7 @@ export default function DetailsClient({
             });
 
             if (!cancelled) {
-              const bestPoster = pickBestPosterTV(fetched.posters);
+              const bestPoster = pickBestEnglishPoster(fetched.posters);
               const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(
                 fetched.backdrops,
               );
@@ -2660,7 +2680,7 @@ export default function DetailsClient({
           }
         } else {
           // Imágenes del servidor: aplicar selectores TV-optimizados sin fetch adicional
-          const bestPoster = pickBestPosterTV(tvPosters);
+          const bestPoster = pickBestEnglishPoster(tvPosters);
           const bestBackdropForBackground =
             pickBestBackdropTVNeutralFirst(tvBackdrops);
           const bestBackdropForPreviewCalc =
@@ -2702,7 +2722,7 @@ export default function DetailsClient({
           const posters = json.posters || [];
           const backdrops = json.backdrops || [];
 
-          const bestPoster = pickBestImage(posters);
+          const bestPoster = pickBestEnglishPoster(posters);
           const bestBackdropForPreviewCalc =
             pickBestBackdropForPreview(backdrops);
 
@@ -2735,9 +2755,16 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        // No sobrescribir si ya habia un poster base (evita el "swap" visual)
+        const hasSavedPoster =
+          typeof window !== "undefined" &&
+          Boolean(window.localStorage.getItem(posterStorageKey));
+
+        // Respetar selecciones manuales, pero permitir sustituir el poster base
+        // localizado por el poster ingles calculado.
         if (poster) {
-          setBasePosterPath((prev) => prev || asTmdbPath(poster));
+          setBasePosterPath((prev) =>
+            hasSavedPoster ? prev || asTmdbPath(poster) : asTmdbPath(poster),
+          );
         }
         if (backdrop) {
           setBaseBackdropPath((prev) => prev || asTmdbPath(backdrop));
@@ -2766,11 +2793,12 @@ export default function DetailsClient({
   // Cadena de prioridad: seleccion del usuario > calculada > datos de TMDb
   // ---------------------------------------------------------------------------
 
-  // Poster a mostrar: seleccion manual > calculado > datos originales
+  // Poster a mostrar: seleccion manual > calculado. No usar data.poster_path
+  // como fallback inicial porque puede venir localizado en espanol.
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
-    asTmdbPath(data?.poster_path || data?.profile_path) ||
+    asTmdbPath(data?.profile_path) ||
     null;
 
   // Backdrop para modo preview: seleccion manual > fallback inteligente
@@ -2848,7 +2876,6 @@ export default function DetailsClient({
       selectedBackgroundPath || // Si el usuario eligio un fondo manual, respetarlo
       mobileNeutralPosterPath ||
       basePosterPath ||
-      data.poster_path ||
       data.profile_path ||
       desktop ||
       null;
@@ -6711,7 +6738,7 @@ export default function DetailsClient({
     const posterPath =
       asTmdbPath(selectedPosterPath) ||
       asTmdbPath(basePosterPath) ||
-      asTmdbPath(data?.poster_path || data?.profile_path) ||
+      asTmdbPath(data?.profile_path) ||
       null;
 
     const previewPath =
@@ -6760,7 +6787,6 @@ export default function DetailsClient({
   }, [
     selectedPosterPath,
     basePosterPath,
-    data?.poster_path,
     data?.profile_path,
     selectedPreviewBackdropPath,
     previewBackdropFallback,
