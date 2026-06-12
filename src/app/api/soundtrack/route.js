@@ -402,7 +402,7 @@ function hasDisallowedTitleSuffix(album, ctx) {
   if (!title || /\d/.test(norm(title))) return false;
 
   const releaseYear = albumReleaseYear(album);
-  if (ctx.year && releaseYear && Math.abs(releaseYear - ctx.year) <= 1) {
+  if (ctx.year && releaseYear && Math.abs(releaseYear - Number(ctx.year)) <= 1) {
     return false;
   }
 
@@ -423,11 +423,7 @@ function hasDisallowedTitleSuffix(album, ctx) {
       if (!nextToken) return false;
       if (/^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken)) return true;
 
-      const allowedSoundtrackToken = /^(complete|music|official|original|score|soundtrack|ost)$/.test(nextToken);
-      const allowedSeriesToken =
-        ctx.mediaType === "tv" && /^(season|seasons|series|tv|television)$/.test(nextToken);
-      if (allowedSeriesToken) return false;
-      return !allowedSoundtrackToken;
+      return false;
     });
   });
 }
@@ -478,7 +474,8 @@ function isExactTitleAlbum(album, ctx) {
 }
 
 function isSameReleaseYear(album, ctx) {
-  return Boolean(ctx.year) && albumReleaseYear(album) === ctx.year;
+  const year = Number(ctx.year);
+  return Boolean(year) && albumReleaseYear(album) === year;
 }
 
 function isPriorityMotionPictureAlbum(album) {
@@ -574,6 +571,16 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   const canonicalSameYear = canonical.filter((album) => isSameReleaseYear(album, ctx));
   const firstAlbum = albums[0];
 
+  // Si el primer resultado de búsqueda es un álbum canónico, es la mejor
+  // opción: Spotify lo devuelve primero por su relevancia para la serie/película
+  if (
+    firstAlbum &&
+    isAcceptableFirstAlbum(firstAlbum, ctx) &&
+    (isPrioritySeriesAlbum(firstAlbum, ctx) || isPriorityMotionPictureAlbum(firstAlbum))
+  ) {
+    return [firstAlbum];
+  }
+
   if (canonicalSameYear.length) {
     return canonicalSameYear;
   }
@@ -593,7 +600,7 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
     (isCredibleFirstExactTitleAlbum(firstAlbum, ctx) ||
       !ctx.year ||
       !albumReleaseYear(firstAlbum) ||
-      Math.abs(albumReleaseYear(firstAlbum) - ctx.year) <= 1)
+      Math.abs(albumReleaseYear(firstAlbum) - Number(ctx.year)) <= 1)
   ) {
     return [firstAlbum];
   }
