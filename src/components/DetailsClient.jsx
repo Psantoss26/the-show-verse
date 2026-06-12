@@ -10425,16 +10425,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       >
                         {/* ========== Header de la Sección de Media ========== */}
                         {/* Incluye título y controles (tabs y filtros) */}
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-3 w-full">
                           {/* Título de la sección - Alineado a la izquierda */}
                           <SectionTitle
                             title="Portadas y fondos"
                             icon={ImageIcon}
+                            className="!w-auto flex-1 min-w-0 pr-4 sm:pr-6"
                           />
 
                           {/* ========== Controles de Filtrado ========== */}
                           {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
-                          <div className="self-start flex items-center gap-2 sm:gap-3 h-10 md:h-11">
+                          <div className="self-start shrink-0 flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                               {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
