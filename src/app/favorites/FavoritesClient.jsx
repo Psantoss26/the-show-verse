@@ -23,6 +23,7 @@ import {
   Film,
   FilterX,
   ChevronDown,
+  ChevronUp,
   CheckCircle2,
   ArrowUpDown,
   Layers,
@@ -1532,6 +1533,10 @@ function GroupDivider({
   total,
   groupBy,
   mobileFiltersOpen,
+  hasPreviousGroup = false,
+  hasNextGroup = false,
+  onPreviousGroup,
+  onNextGroup,
 }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
@@ -1555,7 +1560,10 @@ function GroupDivider({
       const top = ref.current.getBoundingClientRect().top;
       const isLg = window.innerWidth >= 1024;
       const threshold = isLg ? 136 : transitioningThreshold;
-      setIsSticky(top <= threshold + 1);
+      setIsSticky((prev) => {
+        const next = prev ? top <= threshold + 12 : top <= threshold + 1;
+        return prev === next ? prev : next;
+      });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
@@ -1572,12 +1580,13 @@ function GroupDivider({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <div
-        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
-      >
+      <div className="flex min-w-0 items-center gap-3 lg:gap-4">
         <div
-          className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+          className={`relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
         >
+          <div
+            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+          >
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div
               className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
@@ -1651,6 +1660,33 @@ function GroupDivider({
                 </div>
               )}
           </div>
+          </div>
+        </div>
+        <div
+          className={`hidden shrink-0 lg:flex overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"} ${
+            isSticky ? "flex-row gap-1" : "flex-col gap-1"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={onPreviousGroup}
+            disabled={!hasPreviousGroup}
+            aria-label="Ir a la agrupación anterior"
+            title="Agrupación anterior"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={onNextGroup}
+            disabled={!hasNextGroup}
+            aria-label="Ir a la siguiente agrupación"
+            title="Siguiente agrupación"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
         </div>
       </div>
     </motion.div>
@@ -2808,6 +2844,66 @@ export default function FavoritesClient() {
     loadingProviders,
   ]);
 
+  const groupSectionRefs = useRef(new Map());
+
+  const setGroupSectionRef = useCallback((key, node) => {
+    if (!key) return;
+    if (node) groupSectionRefs.current.set(key, node);
+    else groupSectionRefs.current.delete(key);
+  }, []);
+
+  const scrollToNextGroup = useCallback(
+    (currentKey) => {
+      if (typeof window === "undefined" || window.innerWidth < 1024) return;
+      if (!grouped?.length) return;
+
+      const currentIndex = grouped.findIndex(
+        (group) => group.key === currentKey,
+      );
+      const nextGroup = grouped[currentIndex + 1];
+      if (!nextGroup) return;
+
+      const target = groupSectionRefs.current.get(nextGroup.key);
+      if (!target) return;
+
+      const stickyOffset = 148;
+      const top =
+        window.scrollY + target.getBoundingClientRect().top - stickyOffset;
+
+      window.scrollTo({
+        top: Math.max(0, top),
+        behavior: "smooth",
+      });
+    },
+    [grouped],
+  );
+
+  const scrollToPreviousGroup = useCallback(
+    (currentKey) => {
+      if (typeof window === "undefined" || window.innerWidth < 1024) return;
+      if (!grouped?.length) return;
+
+      const currentIndex = grouped.findIndex(
+        (group) => group.key === currentKey,
+      );
+      const previousGroup = grouped[currentIndex - 1];
+      if (!previousGroup) return;
+
+      const target = groupSectionRefs.current.get(previousGroup.key);
+      if (!target) return;
+
+      const stickyOffset = 148;
+      const top =
+        window.scrollY + target.getBoundingClientRect().top - stickyOffset;
+
+      window.scrollTo({
+        top: Math.max(0, top),
+        behavior: "smooth",
+      });
+    },
+    [grouped],
+  );
+
   const scoreLoadingLabel =
     loadingImdb && loadingTrakt
       ? "Actualizando puntuaciones de IMDb y Trakt..."
@@ -3597,8 +3693,12 @@ export default function FavoritesClient() {
         ) : grouped ? (
           // Grouped view
           <div className="space-y-8">
-            {grouped.map((group) => (
-              <div key={group.key} className="overflow-visible">
+            {grouped.map((group, groupIndex) => (
+              <div
+                key={group.key}
+                ref={(node) => setGroupSectionRef(group.key, node)}
+                className="overflow-visible scroll-mt-[148px]"
+              >
                 <GroupDivider
                   title={group.label}
                   count={group.items.length}
@@ -3606,6 +3706,10 @@ export default function FavoritesClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                   mobileFiltersOpen={mobileFiltersOpen}
+                  hasPreviousGroup={groupIndex > 0}
+                  hasNextGroup={groupIndex < grouped.length - 1}
+                  onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                  onNextGroup={() => scrollToNextGroup(group.key)}
                 />
                 {group.subgroups?.length ? (
                   <div className="">
