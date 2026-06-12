@@ -9978,13 +9978,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? rec.media_type === "movie"
                             : type === "movie";
 
-                          // Porcentaje de similitud: si la API no lo provee, calculamos uno descendente
-                          const matchPercentage =
-                            rec.match_percentage ||
-                            (rec.score
-                              ? Math.round(rec.score * 100)
-                              : Math.max(60, 98 - index * 2));
-
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
                             rec.vote_average > 0
@@ -10083,21 +10076,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
 
                                   <div className={recOverlayClass} />
-
-                                  <div
-                                    className={`hidden lg:block absolute top-0 left-0 z-20 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-                                      enableHover
-                                        ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                                        : ""
-                                    } bg-yellow-500/15 border-yellow-500/30 text-yellow-400 font-black font-mono tracking-tight flex items-baseline`}
-                                  >
-                                    <span className="text-sm sm:text-base">
-                                      {matchPercentage}
-                                    </span>
-                                    <span className="text-[9px] sm:text-[10px] ml-[1px] opacity-80">
-                                      %
-                                    </span>
-                                  </div>
 
                                   <div className={recFooterInfoClass}>
                                     <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
