@@ -530,19 +530,27 @@ async function fetchWikidataAwards(wikidataId) {
 
 function SectionTitle({ title, subtitle, icon: Icon, right }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-5">
-      <div className="flex items-center gap-3">
+    <div className="flex items-start justify-between gap-4 mb-5 w-full">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
         {Icon && (
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/5 border border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_-3px_rgba(52,211,153,0.2)]">
-            <Icon className="w-5 h-5" />
+          <div className="relative flex items-center justify-center p-2.5 rounded-[14px] bg-emerald-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(16,185,129,0.12)] shrink-0 overflow-hidden group-hover/section:bg-emerald-500/10 group-hover/section:shadow-[0_8px_32px_rgba(16,185,129,0.2)] transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 via-transparent to-transparent opacity-60" />
+            <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
+            <Icon className="relative z-10 w-5 h-5 text-emerald-500 group-hover/section:text-emerald-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(16,185,129,0.4)]" />
           </div>
         )}
-        <div className="flex flex-col">
-          <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-            {title}
-          </h2>
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex items-center w-full">
+            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight shrink-0">
+              {title}
+            </h2>
+            <div className="ml-3 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center min-w-[20px]">
+              <div className="absolute left-0 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
+              <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-emerald-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
+            </div>
+          </div>
           {subtitle && (
-            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5 truncate">
               {subtitle}
             </p>
           )}
@@ -2564,7 +2572,7 @@ export default function ActorDetails({
             {popularItems.length > 0 && (
               <section id="section-popular" ref={registerSection("popular")}>
                 <AnimatedSection delay={0.04}>
-                  <section className="mb-16">
+                  <section className="mb-16 group/section">
                     <SectionTitle title="Conocido por" icon={Star} />
                     <ActorRowCarousel>
                       {popularItems.map((item, index) => (
@@ -2582,7 +2590,7 @@ export default function ActorDetails({
             {watchedCredits.length > 0 && (
               <section id="section-watched" ref={registerSection("watched")}>
                 <AnimatedSection delay={0.04}>
-                  <section className="mb-16">
+                  <section className="mb-16 group/section">
                     <SectionTitle
                       title="Ya vistos"
                       subtitle={`${watchedCredits.length} títulos vistos de ${safeText(actorDetails?.name)}`}
@@ -2603,7 +2611,7 @@ export default function ActorDetails({
 
             <section id="section-credits" ref={registerSection("credits")}>
               <AnimatedSection delay={0.04}>
-                <section className="mb-16">
+                <section className="mb-16 group/section">
                   <SectionTitle
                     title="Créditos en pantalla"
                     subtitle={`${displayCreditGroups.reduce((total, group) => total + group.items.length, 0)} de ${stats.total} títulos`}
@@ -2792,7 +2800,7 @@ export default function ActorDetails({
 
             <section id="section-awards" ref={registerSection("awards")}>
               <AnimatedSection delay={0.04}>
-                <section className="mb-16">
+                <section className="mb-16 group/section">
                   <SectionTitle
                     title="Premios"
                     subtitle={
@@ -2839,7 +2847,7 @@ export default function ActorDetails({
             {photos.length > 0 && (
               <section id="section-photos" ref={registerSection("photos")}>
                 <AnimatedSection delay={0.04}>
-                  <section className="mb-16">
+                  <section className="mb-16 group/section">
                     <SectionTitle
                       title="Fotos"
                       subtitle={`${photos.length} imágenes`}
@@ -2858,7 +2866,7 @@ export default function ActorDetails({
             {taggedImages?.results?.length > 0 && (
               <section id="section-tagged" ref={registerSection("tagged")}>
                 <AnimatedSection delay={0.04}>
-                  <section className="mb-16">
+                  <section className="mb-16 group/section">
                     <SectionTitle
                       title="Apariciones en medios"
                       subtitle="Imágenes donde aparece etiquetado/a"
@@ -2876,7 +2884,7 @@ export default function ActorDetails({
 
             <section id="section-about" ref={registerSection("about")}>
               <AnimatedSection delay={0.04}>
-                <section className="mb-16">
+                <section className="mb-16 group/section">
                   <SectionTitle
                     title="Perfil"
                     subtitle="Datos del actor/actriz"

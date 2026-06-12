@@ -1240,20 +1240,21 @@ function AwardCard({ item }) {
 function SectionTitle({ title, icon: Icon, className = "" }) {
   return (
     <div
-      className={`flex items-center gap-3 sm:gap-4 mb-8 w-full group ${className}`}
+      className={`flex items-center gap-3 sm:gap-4 mb-8 w-full ${className}`}
     >
       {Icon && (
-        <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-zinc-900/80 border border-white/10 backdrop-blur-md shadow-lg shrink-0 overflow-hidden group-hover:border-yellow-500/40 transition-colors duration-500">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-300 group-hover:text-yellow-400 group-hover:scale-110 transition-all duration-500 drop-shadow-md" />
+        <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden group-hover/section:bg-yellow-500/10 group-hover/section:shadow-[0_8px_32px_rgba(234,179,8,0.2)] transition-all duration-500">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-transparent to-transparent opacity-60" />
+          <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
+          <Icon className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 group-hover/section:text-yellow-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
         </div>
       )}
       <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0">
         {title}
       </h2>
       <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
-        <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover:opacity-100 group-hover:scale-150 transition-all duration-500" />
-        <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
+        <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
       </div>
     </div>
   );
@@ -10003,7 +10004,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {!castSectionLoading &&
                   castDataForUI &&
                   castDataForUI.length > 0 && (
-                    <section className="mb-16">
+                    <section className="mb-16 group/section">
                       <SectionTitle title="Reparto Principal" icon={Users} />
                       <DetailsArrowCarousel
                         spaceBetween={12}
@@ -10061,7 +10062,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {canRenderRecommendations &&
                   recommendations &&
                   recommendations.length > 0 && (
-                    <section className="mb-16">
+                    <section className="mb-16 group/section">
                       <SectionTitle
                         title="Recomendaciones"
                         icon={MonitorPlay}
@@ -10268,7 +10269,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {canRenderAwards && hasAwardItems && (
               <section id="section-awards" ref={registerSection("awards")}>
                 <AnimatedSection delay={0.04}>
-                  <section className="mb-16">
+                  <section className="mb-16 group/section">
                     <SectionTitle title="Premios" icon={Trophy} />
 
                     <DetailsArrowCarousel
@@ -10318,7 +10319,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   delay={0.04}
                 >
                   {/* --- COLECCIÓN --- */}
-                  <section className="mb-10">
+                  <section className="mb-10 group/section">
                     <SectionTitle title="Colección" icon={Layers} />
 
                     {collectionLoading ? (
@@ -10418,7 +10419,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   >
                     {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
                     {(type === "movie" || type === "tv") && (
-                      <section className="mb-16" ref={artworkControlsWrapRef}>
+                      <section
+                        className="mb-16 group/section"
+                        ref={artworkControlsWrapRef}
+                      >
                         {/* ========== Header de la Sección de Media ========== */}
                         {/* Incluye título y controles (tabs y filtros) */}
                         <div className="flex items-start justify-between gap-3">
@@ -11076,7 +11080,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Carrusel de vídeos (tráilers, teasers, clips, etc.) del contenido */}
                     {/* Solo se muestra si hay una API key de TMDb configurada */}
                     {TMDB_API_KEY && (
-                      <section className="mt-6">
+                      <section className="mt-6 group/section">
                         <SectionTitle
                           title="Tráiler y vídeos"
                           icon={MonitorPlay}
@@ -11256,7 +11260,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       (soundtrackLoading ||
                         soundtrackResolved ||
                         soundtrackTracks.length > 0) && (
-                        <section className="mt-2 mb-10">
+                        <section className="mt-2 mb-10 group/section">
                           <SectionTitle
                             title="Soundtrack y música"
                             icon={Music2}
@@ -11432,7 +11436,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* ===================================================== */}
                     {/* Trakt: sentimientos - Solo mostrar si no hay error */}
                     {!tSentiment.error && (
-                      <section className="mb-12">
+                      <section className="mb-12 group/section">
                         <SectionTitle
                           title="Análisis de sentimientos"
                           icon={Sparkles}
@@ -11544,7 +11548,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ref={registerSection("seasons")}
                   >
                     <AnimatedSection delay={0.04}>
-                      <section className="mb-12">
+                      <section className="mb-12 group/section">
                         <SectionTitle title="Temporadas" icon={Layers} />
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -11702,7 +11706,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     <AnimatedSection delay={0.04}>
                       {/* Subsección: Episodios y sus valoraciones */}
                       {type === "tv" ? (
-                        <section className="mb-10">
+                        <section className="mb-10 group/section">
                           <SectionTitle
                             title="Valoración de Episodios"
                             icon={TrendingUp}
@@ -11744,7 +11748,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <AnimatedSection delay={0.04}>
                     {/* CRÍTICAS */}
                     {reviews && reviews.length > 0 && (
-                      <section className="mb-10">
+                      <section className="mb-10 group/section">
                         <div className="flex items-start justify-between gap-3">
                           <SectionTitle
                             title="Críticas de Usuarios"
@@ -11823,7 +11827,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <AnimatedSection delay={0.04}>
                     {/* ===================================================== */}
                     {/* Trakt: comentarios */}
-                    <section className="mb-10">
+                    <section className="mb-10 group/section">
                       <SectionTitle
                         title="Comentarios"
                         icon={MessageSquareIcon}
@@ -11964,7 +11968,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* ===================================================== */}
                     {/* Trakt: listas - Solo mostrar si no hay error */}
                     {!tLists.error && (
-                      <section className="mb-12">
+                      <section className="mb-12 group/section">
                         <SectionTitle title="Listas" icon={ListVideo} />
 
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
