@@ -1,7 +1,14 @@
 // /src/components/EpisodeDetailsClient.jsx
 "use client";
 
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  Children,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -23,7 +30,6 @@ import {
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import {
-  SectionTitle,
   VisualMetaCard,
   DetailsTabsMenu,
 } from "@/components/details/DetailAtoms";
@@ -235,6 +241,193 @@ async function fetchEpisodeImdbCached({
 
   episodeImdbInflight.set(key, promise);
   return promise;
+}
+
+function SectionTitle({ title, icon: Icon, className = "" }) {
+  return (
+    <div
+      className={`flex items-center gap-3 sm:gap-4 mb-8 w-full ${className}`}
+    >
+      {Icon && (
+        <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden group-hover/section:bg-yellow-500/10 group-hover/section:shadow-[0_8px_32px_rgba(234,179,8,0.2)] transition-all duration-500">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-transparent to-transparent opacity-60" />
+          <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
+          <Icon className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 group-hover/section:text-yellow-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
+        </div>
+      )}
+      <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0">
+        {title}
+      </h2>
+      <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
+        <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
+        <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
+      </div>
+    </div>
+  );
+}
+
+function DetailsArrowCarousel({
+  children,
+  className = "",
+  arrowClassName = "inset-y-0",
+  ...swiperProps
+}) {
+  const swiperRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const childrenCount = Children.count(children);
+
+  const updateNav = useCallback((swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  }, []);
+
+  const handleSwiper = useCallback(
+    (swiper) => {
+      swiperRef.current = swiper;
+      updateNav(swiper);
+      requestAnimationFrame(() => {
+        swiper.update?.();
+        updateNav(swiper);
+      });
+    },
+    [updateNav],
+  );
+
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper) return undefined;
+
+    const refresh = () => {
+      swiper.update?.();
+      updateNav(swiper);
+    };
+
+    const raf = requestAnimationFrame(refresh);
+    const t1 = window.setTimeout(refresh, 120);
+    const t2 = window.setTimeout(refresh, 450);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [childrenCount, updateNav]);
+
+  const getStep = useCallback((swiper) => {
+    const current = swiper?.params?.slidesPerView;
+    return typeof current === "number" ? Math.max(1, Math.floor(current)) : 1;
+  }, []);
+
+  const handlePrevClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      swiper.slideTo(Math.max((swiper.activeIndex || 0) - getStep(swiper), 0));
+    },
+    [getStep],
+  );
+
+  const handleNextClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      const maxIndex = Math.max((swiper.slides?.length || 1) - 1, 0);
+      swiper.slideTo(
+        Math.min((swiper.activeIndex || 0) + getStep(swiper), maxIndex),
+      );
+    },
+    [getStep],
+  );
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div style={{ overflowX: "clip", overflowY: "visible" }}>
+        <Swiper
+          {...swiperProps}
+          observer={swiperProps.observer ?? true}
+          observeParents={swiperProps.observeParents ?? true}
+          resizeObserver={swiperProps.resizeObserver ?? true}
+          onSwiper={(swiper) => {
+            handleSwiper(swiper);
+            swiperProps.onSwiper?.(swiper);
+          }}
+          onSlideChange={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onSlideChange?.(swiper);
+          }}
+          onResize={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onResize?.(swiper);
+          }}
+          onReachBeginning={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onReachBeginning?.(swiper);
+          }}
+          onReachEnd={(swiper) => {
+            updateNav(swiper);
+            swiperProps.onReachEnd?.(swiper);
+          }}
+          className={className}
+        >
+          {children}
+        </Swiper>
+      </div>
+
+      <AnimatePresence>
+        {isHovered && canPrev && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handlePrevClick}
+            className={`absolute -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10 ${arrowClassName}`}
+            aria-label="Anterior"
+          >
+            <motion.span
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: -4 }}
+            >
+              ‹
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isHovered && canNext && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            type="button"
+            onClick={handleNextClick}
+            className={`absolute -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10 ${arrowClassName}`}
+            aria-label="Siguiente"
+          >
+            <motion.span
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: 4 }}
+            >
+              ›
+            </motion.span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export default function EpisodeDetailsClient({
@@ -1305,7 +1498,7 @@ export default function EpisodeDetailsClient({
                 <div className="flex-1 min-w-0" />
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3 shrink-0 [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_.text-xl]:!text-[22px]">
                   {/* Botón de visionado — abre modal con historial de plays */}
                   <TraktWatchedControl
                     connected={trakt.connected}
@@ -1464,53 +1657,51 @@ export default function EpisodeDetailsClient({
           <AnimatedSection delay={0.04}>
             <section className="mb-16 group/section">
               <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
-              <div style={{ overflowX: "clip", overflowY: "visible" }}>
-                <Swiper
-                  spaceBetween={12}
-                  slidesPerView={3}
-                  breakpoints={{
-                    500: { slidesPerView: 3, spaceBetween: 14 },
-                    768: { slidesPerView: 4, spaceBetween: 16 },
-                    1024: { slidesPerView: 5, spaceBetween: 18 },
-                    1280: { slidesPerView: 6, spaceBetween: 20 },
-                  }}
-                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
-                >
-                  {cast.slice(0, 20).map((actor) => (
-                    <SwiperSlide key={actor.id}>
-                      <Link
-                        href={`/details/person/${actor.id}`}
-                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
-                      >
-                        <div className="aspect-[2/3] overflow-hidden relative">
-                          {actor.profile_path ? (
-                            <img
-                              src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                              alt={actor.name}
-                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
-                              <UsersIconComponent size={40} />
-                            </div>
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
-
-                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
-                            <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
-                              {actor.name}
-                            </p>
-                            <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-                              {actor.character}
-                            </p>
+              <DetailsArrowCarousel
+                spaceBetween={12}
+                slidesPerView={3}
+                breakpoints={{
+                  500: { slidesPerView: 3, spaceBetween: 14 },
+                  768: { slidesPerView: 4, spaceBetween: 16 },
+                  1024: { slidesPerView: 5, spaceBetween: 18 },
+                  1280: { slidesPerView: 6, spaceBetween: 20 },
+                }}
+                className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
+              >
+                {cast.slice(0, 20).map((actor) => (
+                  <SwiperSlide key={actor.id}>
+                    <Link
+                      href={`/details/person/${actor.id}`}
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                    >
+                      <div className="aspect-[2/3] overflow-hidden relative">
+                        {actor.profile_path ? (
+                          <img
+                            src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                            alt={actor.name}
+                            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
+                            <UsersIconComponent size={40} />
                           </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+
+                        <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                          <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                            {actor.name}
+                          </p>
+                          <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                            {actor.character}
+                          </p>
                         </div>
-                      </Link>
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </div>
+                      </div>
+                    </Link>
+                  </SwiperSlide>
+                ))}
+              </DetailsArrowCarousel>
             </section>
           </AnimatedSection>
         )}
@@ -1520,53 +1711,51 @@ export default function EpisodeDetailsClient({
           <AnimatedSection delay={0.04}>
             <section className="mb-16 group/section">
               <SectionTitle title="Invitados" icon={UsersIcon} />
-              <div style={{ overflowX: "clip", overflowY: "visible" }}>
-                <Swiper
-                  spaceBetween={12}
-                  slidesPerView={3}
-                  breakpoints={{
-                    500: { slidesPerView: 3, spaceBetween: 14 },
-                    768: { slidesPerView: 4, spaceBetween: 16 },
-                    1024: { slidesPerView: 5, spaceBetween: 18 },
-                    1280: { slidesPerView: 6, spaceBetween: 20 },
-                  }}
-                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
-                >
-                  {guestStars.slice(0, 20).map((actor) => (
-                    <SwiperSlide key={actor.id}>
-                      <Link
-                        href={`/details/person/${actor.id}`}
-                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
-                      >
-                        <div className="aspect-[2/3] overflow-hidden relative">
-                          {actor.profile_path ? (
-                            <img
-                              src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                              alt={actor.name}
-                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
-                              <UsersIconComponent size={40} />
-                            </div>
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
-
-                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
-                            <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
-                              {actor.name}
-                            </p>
-                            <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-                              {actor.character}
-                            </p>
+              <DetailsArrowCarousel
+                spaceBetween={12}
+                slidesPerView={3}
+                breakpoints={{
+                  500: { slidesPerView: 3, spaceBetween: 14 },
+                  768: { slidesPerView: 4, spaceBetween: 16 },
+                  1024: { slidesPerView: 5, spaceBetween: 18 },
+                  1280: { slidesPerView: 6, spaceBetween: 20 },
+                }}
+                className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
+              >
+                {guestStars.slice(0, 20).map((actor) => (
+                  <SwiperSlide key={actor.id}>
+                    <Link
+                      href={`/details/person/${actor.id}`}
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                    >
+                      <div className="aspect-[2/3] overflow-hidden relative">
+                        {actor.profile_path ? (
+                          <img
+                            src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                            alt={actor.name}
+                            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
+                            <UsersIconComponent size={40} />
                           </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+
+                        <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                          <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                            {actor.name}
+                          </p>
+                          <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                            {actor.character}
+                          </p>
                         </div>
-                      </Link>
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-              </div>
+                      </div>
+                    </Link>
+                  </SwiperSlide>
+                ))}
+              </DetailsArrowCarousel>
             </section>
           </AnimatedSection>
         )}

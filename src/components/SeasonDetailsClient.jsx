@@ -22,7 +22,6 @@ import {
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import {
-  SectionTitle,
   VisualMetaCard,
   DetailsTabsMenu,
 } from "@/components/details/DetailAtoms";
@@ -1197,7 +1196,7 @@ export default function SeasonDetailsClient({
                 <div className="w-px h-6 bg-white/10 shrink-0" />
 
                 {/* C. Puntuación usuario */}
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3 shrink-0 [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_.text-xl]:!text-[22px]">
                   {Number(seasonNumber) > 0 && (
                     <TraktWatchedControl
                       connected={trakt.connected}
@@ -1340,17 +1339,25 @@ export default function SeasonDetailsClient({
         </motion.div>
 
         {/* Episodes */}
-        <AnimatedSection className="mb-12" delay={0.04}>
+        <AnimatedSection className="mb-12 group/section" delay={0.04}>
           {/* Header con toggle (mismo estilo SectionTitle) */}
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3 border-l-4 border-yellow-500 pl-4 py-1">
-              <Layers className="text-yellow-500 w-6 h-6" />
-              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-wide">
+          <div className="flex items-center justify-between gap-4 mb-8 w-full">
+            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pr-4 sm:pr-6">
+              <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden group-hover/section:bg-yellow-500/10 group-hover/section:shadow-[0_8px_32px_rgba(234,179,8,0.2)] transition-all duration-500">
+                <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-transparent to-transparent opacity-60" />
+                <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
+                <Layers className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 group-hover/section:text-yellow-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
+              </div>
+              <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0">
                 Episodios
               </h2>
+              <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
+                <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
+                <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
+              </div>
             </div>
 
-            <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+            <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setEpisodesView("list")}
@@ -1408,11 +1415,14 @@ export default function SeasonDetailsClient({
                       <Link
                         key={`${seasonNumber}-${epNum}`}
                         href={href}
-                        className="group block rounded-2xl border border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/30 transition overflow-hidden"
+                        className="group relative block rounded-2xl bg-zinc-900/20 backdrop-blur-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)] hover:bg-zinc-800/30 hover:shadow-[0_8px_32px_rgba(234,179,8,0.15)] transition-all duration-500 overflow-hidden"
                       >
-                        <div className="flex flex-col sm:flex-row gap-4 p-4">
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-40 group-hover:from-yellow-400/10 transition-colors duration-500" />
+                        <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.3)] rounded-2xl pointer-events-none" />
+
+                        <div className="relative z-10 flex flex-col sm:flex-row gap-4 p-4">
                           {/* Still */}
-                          <div className="relative w-full sm:w-[280px] aspect-video sm:aspect-[16/9] rounded-xl overflow-hidden bg-white/5 border border-white/10 shrink-0">
+                          <div className="relative w-full sm:w-[280px] aspect-video sm:aspect-[16/9] rounded-xl overflow-hidden bg-black/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] shrink-0">
                             {still ? (
                               <img
                                 src={`https://image.tmdb.org/t/p/w780${still}`}
