@@ -13,8 +13,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { getExternalIds, getWatchProviders } from "@/lib/api/tmdb";
-import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { getWatchProviders } from "@/lib/api/tmdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Bookmark,
@@ -306,6 +305,34 @@ function updateScoreCache(source, id, score) {
   } catch (e) {
     console.warn("Failed to update score cache:", e);
   }
+}
+
+async function fetchImdbScoresForItems(items) {
+  const payloadItems = (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const key = getScoreItemKey(item);
+      if (!key) return null;
+      return {
+        key,
+        id: item.id,
+        mediaType: getWatchlistItemType(item),
+        imdbId: item.imdb_id || item.imdbId || null,
+      };
+    })
+    .filter(Boolean);
+
+  if (!payloadItems.length) return {};
+
+  const res = await fetch("/api/imdb/ratings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items: payloadItems }),
+    cache: "no-store",
+  });
+  if (!res.ok) return {};
+
+  const json = await res.json().catch(() => null);
+  return json?.items && typeof json.items === "object" ? json.items : {};
 }
 
 function buildImg(path, size = "w500") {
@@ -1487,21 +1514,15 @@ function WatchlistCard({
         if (cachedImdb.has(itemId)) {
           setImdbScore(cachedImdb.get(itemId));
         } else {
-          // Fetch from API
           try {
-            const externalIds = await getExternalIds(type, item.id);
-            const imdbId = externalIds?.imdb_id;
+            const batchScores = await fetchImdbScoresForItems([item]);
+            const imdbRating = batchScores[itemId]?.rating;
 
-            if (imdbId) {
-              const omdbData = await fetchOmdbByImdb(imdbId);
-              const imdbRating = omdbData?.imdbRating;
-
-              if (imdbRating && imdbRating !== "N/A") {
-                const numRating = parseFloat(imdbRating);
-                if (!isNaN(numRating)) {
-                  setImdbScore(numRating);
-                  updateScoreCache("imdb", itemId, numRating);
-                }
+            if (imdbRating) {
+              const numRating = Number(imdbRating);
+              if (Number.isFinite(numRating) && numRating > 0) {
+                setImdbScore(numRating);
+                updateScoreCache("imdb", itemId, numRating);
               }
             }
           } catch (err) {
@@ -2026,42 +2047,24 @@ export default function WatchlistClient() {
       setLoadingImdb(true);
 
       try {
-        let fetchedCount = 0;
         const refreshedIds = new Set();
-        const batchSize = 4;
-
-        const processItem = async (item) => {
-          const type = item.media_type || (item.title ? "movie" : "tv");
-
-          try {
-            const externalIds = await getExternalIds(type, item.id);
-            const imdbId = externalIds?.imdb_id;
-            if (!imdbId) return false;
-
-            const omdbData = await fetchOmdbByImdb(imdbId);
-            const rating = omdbData?.imdbRating;
-            if (!rating || rating === "N/A") return false;
-
-            const numRating = parseFloat(rating);
-            if (isNaN(numRating)) return false;
-
-            const scoreKey = getScoreItemKey(item);
-            scores.set(scoreKey, numRating);
-            refreshedIds.add(scoreKey);
-            fetchedCount++;
-            return true;
-          } catch (err) {
-            console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
-            return false;
-          }
-        };
+        const batchSize = 80;
 
         for (let i = 0; i < itemsToFetch.length; i += batchSize) {
           if (cancelled) break;
 
           const batch = itemsToFetch.slice(i, i + batchSize);
-          const results = await Promise.all(batch.map(processItem));
-          const hasBatchUpdates = results.some(Boolean);
+          const batchScores = await fetchImdbScoresForItems(batch);
+          let hasBatchUpdates = false;
+
+          batch.forEach((item) => {
+            const scoreKey = getScoreItemKey(item);
+            const rating = Number(batchScores[scoreKey]?.rating);
+            if (!Number.isFinite(rating) || rating <= 0) return;
+            scores.set(scoreKey, rating);
+            refreshedIds.add(scoreKey);
+            hasBatchUpdates = true;
+          });
 
           if (hasBatchUpdates && !cancelled) {
             startTransition(() => setImdbScores(new Map(scores)));
@@ -2069,7 +2072,7 @@ export default function WatchlistClient() {
           }
         }
 
-        if (!cancelled && fetchedCount > 0) {
+        if (!cancelled && refreshedIds.size > 0) {
           writeScoreCache("imdb", scores, refreshedIds);
         }
       } catch (error) {

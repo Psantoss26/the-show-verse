@@ -7901,6 +7901,7 @@ export default function DetailsClient({
   const recImdbInFlightRef = useRef(new Set());
   const recImdbTimersRef = useRef({});
   const recImdbIdCacheRef = useRef({});
+  const [recAccountStates, setRecAccountStates] = useState({});
 
   useEffect(() => {
     recImdbRatingsRef.current = recImdbRatings;
@@ -7913,6 +7914,67 @@ export default function DetailsClient({
     recImdbTimersRef.current = {};
     recImdbIdCacheRef.current = {};
   }, [id, type]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRecommendationStates = async () => {
+      if (!session || !account?.id || !Array.isArray(recommendations)) {
+        setRecAccountStates({});
+        return;
+      }
+
+      const visibleRecs = recommendations.slice(0, 15).filter((rec) => rec?.id);
+      if (visibleRecs.length === 0) {
+        setRecAccountStates({});
+        return;
+      }
+
+      try {
+        const entries = await Promise.all(
+          visibleRecs.map(async (rec) => {
+            const mediaType =
+              rec.media_type === "movie" || rec.media_type === "tv"
+                ? rec.media_type
+                : type === "tv"
+                  ? "tv"
+                  : "movie";
+            const key = `${mediaType}:${rec.id}`;
+            try {
+              const st = await getMediaAccountStates(mediaType, rec.id, session);
+              return [
+                key,
+                {
+                  favorite: !!st?.favorite,
+                  watchlist: !!st?.watchlist,
+                  rating:
+                    st?.rated && typeof st.rated.value === "number"
+                      ? st.rated.value
+                      : null,
+                },
+              ];
+            } catch {
+              return [
+                key,
+                { favorite: false, watchlist: false, rating: null },
+              ];
+            }
+          }),
+        );
+
+        if (!cancelled) {
+          setRecAccountStates(Object.fromEntries(entries));
+        }
+      } catch {
+        if (!cancelled) setRecAccountStates({});
+      }
+    };
+
+    loadRecommendationStates();
+    return () => {
+      cancelled = true;
+    };
+  }, [recommendations, session, account?.id, type]);
 
   const prefetchRecImdb = useCallback(
     (rec) => {
@@ -9977,6 +10039,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const isMovie = rec.media_type
                             ? rec.media_type === "movie"
                             : type === "movie";
+                          const recType =
+                            rec.media_type === "movie" || rec.media_type === "tv"
+                              ? rec.media_type
+                              : isMovie
+                                ? "movie"
+                                : "tv";
+                          const recAccountState =
+                            recAccountStates[`${recType}:${rec.id}`] || null;
+                          const recIsFavorite = !!recAccountState?.favorite;
+                          const recIsWatchlist = !!recAccountState?.watchlist;
+                          const recUserRating =
+                            typeof recAccountState?.rating === "number" &&
+                            Number.isFinite(recAccountState.rating) &&
+                            recAccountState.rating > 0
+                              ? recAccountState.rating
+                              : null;
+                          const recUserRatingLabel =
+                            recUserRating == null
+                              ? null
+                              : Number.isInteger(recUserRating)
+                                ? String(recUserRating)
+                                : recUserRating.toFixed(1);
+                          const recAccountBadgeColor =
+                            recIsFavorite && recIsWatchlist
+                              ? "bg-fuchsia-500/15 border-fuchsia-500/30 text-fuchsia-300"
+                              : recIsFavorite
+                                ? "bg-red-500/15 border-red-500/30 text-red-300"
+                                : "bg-blue-500/15 border-blue-500/30 text-blue-300";
 
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
@@ -9992,6 +10082,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // En móvil, deshabilitar hover para mostrar solo las imágenes
                           const enableHover =
                             supportsHover && !isMobileViewport;
+                          const showAccountBadge =
+                            enableHover && (recIsFavorite || recIsWatchlist);
                           const recCardClass = enableHover
                             ? "block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
@@ -10038,6 +10130,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     className={recImageClass}
                                   />
 
+                                  {enableHover && (
+                                    <div className="pointer-events-none absolute inset-x-0 top-0 z-[9] h-20 bg-gradient-to-b from-black/75 via-black/35 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100" />
+                                  )}
+
+                                  {showAccountBadge && (
+                                    <div
+                                      className={`hidden lg:flex items-center justify-center gap-1.5 absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${recAccountBadgeColor}`}
+                                      aria-hidden="true"
+                                    >
+                                      {recIsFavorite && (
+                                        <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />
+                                      )}
+                                      {recIsWatchlist && (
+                                        <BookmarkPlus className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />
+                                      )}
+                                    </div>
+                                  )}
+
                                   <div className={recHeaderInfoClass}>
                                     <div />
 
@@ -10078,14 +10188,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className={recOverlayClass} />
 
                                   <div className={recFooterInfoClass}>
-                                    <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
-                                      {recTitle}
-                                    </p>
-                                    {recYear && (
-                                      <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-                                        {recYear}
-                                      </p>
-                                    )}
+                                    <div className="flex items-end justify-between gap-3">
+                                      <div className="min-w-0 text-left flex-1">
+                                        <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
+                                          {recTitle}
+                                        </p>
+                                        {recYear && (
+                                          <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                                            {recYear}
+                                          </p>
+                                        )}
+                                      </div>
+                                      {recUserRatingLabel && (
+                                        <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                                          {recUserRatingLabel}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </Link>
