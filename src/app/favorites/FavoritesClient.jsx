@@ -218,17 +218,6 @@ function writeProvidersCache(providersMap) {
   }
 }
 
-function buildLayoutScoreSnapshot(items, source) {
-  const scores = new Map(readScoreCache(source));
-  for (const item of Array.isArray(items) ? items : []) {
-    const key = String(item?.id);
-    if (!scores.has(key) && typeof item?.vote_average === "number") {
-      scores.set(key, item.vote_average);
-    }
-  }
-  return scores;
-}
-
 async function syncOverflowFavoritesToTraktList(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return { connected: false, synced: 0, skipped: 0, list: null };
@@ -278,10 +267,18 @@ function getScoreCacheTtlForItem(item, now = Date.now()) {
   return SCORE_CACHE_TTL_MS;
 }
 
+function getFavoriteItemType(item) {
+  return item?.media_type || (item?.title ? "movie" : "tv");
+}
+
+function getScoreItemKey(item) {
+  return item?.id == null ? "" : `${getFavoriteItemType(item)}:${item.id}`;
+}
+
 function readScoreCacheEntries(source) {
   if (typeof window === "undefined") return new Map();
   try {
-    const key = `showverse:scores:${source}`;
+    const key = `showverse:scores:${source}:v2`;
     const raw = window.localStorage.getItem(key);
     if (!raw) return new Map();
 
@@ -321,7 +318,7 @@ function shouldRefreshScore(item, entry, now = Date.now()) {
 function writeScoreCache(source, scoresMap, refreshedIds = null) {
   if (typeof window === "undefined") return;
   try {
-    const key = `showverse:scores:${source}`;
+    const key = `showverse:scores:${source}:v2`;
     const now = Date.now();
     const raw = window.localStorage.getItem(key);
     const previous = raw ? JSON.parse(raw) : {};
@@ -352,7 +349,7 @@ function writeScoreCache(source, scoresMap, refreshedIds = null) {
 function updateScoreCache(source, id, score) {
   if (typeof window === "undefined") return;
   try {
-    const key = `showverse:scores:${source}`;
+    const key = `showverse:scores:${source}:v2`;
     const raw = window.localStorage.getItem(key);
     const data = raw ? JSON.parse(raw) : {};
 
@@ -915,11 +912,19 @@ function formatRatingBucketLabel(bucket) {
 }
 
 function ratingRangeMeta(rating, emptyKey, emptyLabel, step = 0.5, offset = 0) {
-  if (!rating && emptyKey) return { key: emptyKey, label: emptyLabel };
-  const normalized = Math.max(0, Math.min(10, Number(rating) || 0));
+  const numericRating = Number(rating);
+  if (
+    (!Number.isFinite(numericRating) || numericRating <= 0) &&
+    emptyKey
+  ) {
+    return { key: emptyKey, label: emptyLabel };
+  }
+  const normalized = Math.max(0, Math.min(10, numericRating || 0));
   const maxBucket = Math.max(0, 10 - step + offset);
-  const rawBucket = Math.floor((normalized - offset) / step) * step + offset;
-  const bucket = Math.max(0, Math.min(maxBucket, rawBucket));
+  const rawBucket =
+    Math.floor((normalized - offset + Number.EPSILON) / step) * step + offset;
+  const bucket =
+    Math.round(Math.max(0, Math.min(maxBucket, rawBucket)) * 10) / 10;
   const next = Math.min(10, bucket + step);
   return {
     key: bucket.toString(),
@@ -986,9 +991,9 @@ function buildFavoriteGroupMetas(
   if (groupBy === "tmdb_rating") {
     return [
       ratingRangeMeta(
-        item.vote_average || 0,
-        null,
-        null,
+        item.vote_average,
+        "no_tmdb",
+        "Sin puntuación TMDb",
         ratingStep,
         ratingOffset,
       ),
@@ -998,7 +1003,7 @@ function buildFavoriteGroupMetas(
   if (groupBy === "imdb_rating") {
     return [
       ratingRangeMeta(
-        imdbScores.get(String(item.id)) || 0,
+        imdbScores.get(getScoreItemKey(item)),
         "no_imdb",
         "Sin puntuación IMDb",
         ratingStep,
@@ -1010,7 +1015,7 @@ function buildFavoriteGroupMetas(
   if (groupBy === "trakt_rating") {
     return [
       ratingRangeMeta(
-        traktScores.get(String(item.id)) || 0,
+        traktScores.get(getScoreItemKey(item)),
         "no_trakt",
         "Sin puntuación Trakt",
         ratingStep,
@@ -1064,12 +1069,12 @@ function addFavoriteGroupStats(stats, item, imdbScores, traktScores) {
     stats.my.sum += item.user_rating;
     stats.my.count++;
   }
-  const imdbRating = imdbScores.get(String(item.id));
+  const imdbRating = imdbScores.get(getScoreItemKey(item));
   if (imdbRating) {
     stats.imdb.sum += imdbRating;
     stats.imdb.count++;
   }
-  const traktRating = traktScores.get(String(item.id));
+  const traktRating = traktScores.get(getScoreItemKey(item));
   if (traktRating) {
     stats.trakt.sum += traktRating;
     stats.trakt.count++;
@@ -1121,55 +1126,28 @@ function sortFavoriteGroups(groupsArray, groupBy) {
 }
 
 function buildSmartFavoriteRatingSubgroups(items, subGroupBy, groupContext) {
-  const candidates = [0, 0.5].map((ratingOffset) => {
-    const subgroups = new Map();
-    const context = {
-      ...groupContext,
-      ratingStep: 1,
-      ratingOffset,
-      forceUserRatingRange: true,
-    };
+  const subgroups = new Map();
+  const context = {
+    ...groupContext,
+    ratingStep: 1,
+    ratingOffset: 0,
+    forceUserRatingRange: true,
+  };
 
-    for (const item of items) {
-      const [meta] = buildFavoriteGroupMetas(item, subGroupBy, context);
-      if (!meta) continue;
-      if (!subgroups.has(meta.key)) {
-        subgroups.set(meta.key, {
-          key: meta.key,
-          label: meta.label,
-          items: [],
-        });
-      }
-      subgroups.get(meta.key).items.push(item);
+  for (const item of items) {
+    const [meta] = buildFavoriteGroupMetas(item, subGroupBy, context);
+    if (!meta) continue;
+    if (!subgroups.has(meta.key)) {
+      subgroups.set(meta.key, {
+        key: meta.key,
+        label: meta.label,
+        items: [],
+      });
     }
+    subgroups.get(meta.key).items.push(item);
+  }
 
-    const groups = Array.from(subgroups.values());
-    const numericGroups = groups.filter(
-      (group) =>
-        !["unrated", "no_tmdb", "no_imdb", "no_trakt"].includes(group.key),
-    );
-    const counts = numericGroups.map((group) => group.items.length);
-    const largestGroup = counts.length ? Math.max(...counts) : 0;
-    const singletons = counts.filter((count) => count === 1).length;
-
-    return {
-      ratingOffset,
-      groups,
-      largestGroup,
-      singletons,
-      groupCount: numericGroups.length,
-    };
-  });
-
-  const best = candidates.sort((a, b) => {
-    if (b.largestGroup !== a.largestGroup)
-      return b.largestGroup - a.largestGroup;
-    if (a.singletons !== b.singletons) return a.singletons - b.singletons;
-    if (a.groupCount !== b.groupCount) return a.groupCount - b.groupCount;
-    return b.ratingOffset - a.ratingOffset;
-  })[0];
-
-  return sortFavoriteGroups(best?.groups || [], subGroupBy);
+  return sortFavoriteGroups(Array.from(subgroups.values()), subGroupBy);
 }
 
 // ================== UI COMPONENTS ==================
@@ -1707,7 +1685,7 @@ function FavoriteCard({
     setLoadingScores(true);
 
     try {
-      const itemId = String(item.id);
+      const itemId = getScoreItemKey(item);
 
       // Load IMDb score if not available
       if (!imdbScore) {
@@ -1759,29 +1737,16 @@ function FavoriteCard({
             ) {
               setTraktScore(traktRating);
               updateScoreCache("trakt", itemId, traktRating);
-            } else if (rating) {
-              // Fallback to TMDb rating
-              const tmdbRating = parseFloat(rating);
-              if (!isNaN(tmdbRating)) {
-                setTraktScore(tmdbRating);
-              }
             }
           } catch (err) {
             console.warn(`Failed to fetch Trakt score for ${item.id}:`, err);
-            // Fallback to TMDb rating
-            if (rating) {
-              const tmdbRating = parseFloat(rating);
-              if (!isNaN(tmdbRating)) {
-                setTraktScore(tmdbRating);
-              }
-            }
           }
         }
       }
     } finally {
       setLoadingScores(false);
     }
-  }, [imdbScore, traktScore, loadingScores, item.id, type, rating]);
+  }, [imdbScore, traktScore, loadingScores, item, type]);
 
   if (viewMode === "list") {
     return (
@@ -2062,12 +2027,8 @@ export default function FavoritesClient() {
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
-  const [layoutImdbScores, setLayoutImdbScores] = useState(() =>
-    buildLayoutScoreSnapshot(readFavoritesCache()?.items || [], "imdb"),
-  );
-  const [layoutTraktScores, setLayoutTraktScores] = useState(() =>
-    buildLayoutScoreSnapshot(readFavoritesCache()?.items || [], "trakt"),
-  );
+  const layoutImdbScores = imdbScores;
+  const layoutTraktScores = traktScores;
   const [providersByItem, setProvidersByItem] = useState(() =>
     readProvidersCache(),
   );
@@ -2256,20 +2217,15 @@ export default function FavoritesClient() {
         }));
 
         if (!cancelled) {
-          // Load cached scores BEFORE setting items so grouped views
-          // never flash a "Sin puntuación" frame.
+          // Load namespaced cached scores before rendering grouped views.
+          // Missing IMDb/Trakt scores stay in their explicit "Sin puntuación"
+          // bucket until the real provider score arrives.
           const cachedImdb = readScoreCache("imdb");
           if (cachedImdb.size > 0) setImdbScores(cachedImdb);
           const cachedTrakt = readScoreCache("trakt");
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
           setRatedItems(rated);
-          setLayoutImdbScores(
-            buildLayoutScoreSnapshot(favoritesWithMeta, "imdb"),
-          );
-          setLayoutTraktScores(
-            buildLayoutScoreSnapshot(favoritesWithMeta, "trakt"),
-          );
           setItems(favoritesWithMeta);
           writeFavoritesCache(favoritesWithMeta, rated);
 
@@ -2332,22 +2288,8 @@ export default function FavoritesClient() {
 
       const now = Date.now();
       const itemsToFetch = items.filter((item) =>
-        shouldRefreshScore(item, cachedEntries.get(String(item.id)), now),
+        shouldRefreshScore(item, cachedEntries.get(getScoreItemKey(item)), now),
       );
-
-      // Fallback temprano a TMDb para que los grupos por IMDb no esperen
-      for (const item of itemsToFetch) {
-        if (
-          item.vote_average &&
-          typeof item.vote_average === "number" &&
-          !isNaN(item.vote_average)
-        ) {
-          scores.set(String(item.id), item.vote_average);
-        }
-      }
-      if (itemsToFetch.length > 0) {
-        startTransition(() => setImdbScores(new Map(scores)));
-      }
 
       if (itemsToFetch.length === 0) {
         setLoadingImdb(false);
@@ -2376,8 +2318,9 @@ export default function FavoritesClient() {
             const numRating = parseFloat(rating);
             if (isNaN(numRating)) return false;
 
-            scores.set(String(item.id), numRating);
-            refreshedIds.add(String(item.id));
+            const scoreKey = getScoreItemKey(item);
+            scores.set(scoreKey, numRating);
+            refreshedIds.add(scoreKey);
             fetchedCount++;
             return true;
           } catch (err) {
@@ -2437,20 +2380,8 @@ export default function FavoritesClient() {
 
       const now = Date.now();
       const itemsToFetch = items.filter((item) =>
-        shouldRefreshScore(item, cachedEntries.get(String(item.id)), now),
+        shouldRefreshScore(item, cachedEntries.get(getScoreItemKey(item)), now),
       );
-
-      // Fallback temprano a TMDb para que los grupos por Trakt no esperen
-      for (const item of itemsToFetch) {
-        if (
-          item.vote_average &&
-          typeof item.vote_average === "number" &&
-          !isNaN(item.vote_average)
-        ) {
-          scores.set(String(item.id), item.vote_average);
-        }
-      }
-      startTransition(() => setTraktScores(new Map(scores)));
 
       if (itemsToFetch.length === 0) {
         setLoadingTrakt(false);
@@ -2477,13 +2408,14 @@ export default function FavoritesClient() {
               return false;
             }
 
-            scores.set(String(item.id), rating);
-            refreshedIds.add(String(item.id));
+            const scoreKey = getScoreItemKey(item);
+            scores.set(scoreKey, rating);
+            refreshedIds.add(scoreKey);
             fetchedCount++;
             return true;
           } catch (err) {
             console.warn(
-              `[Trakt] Failed to fetch score for ${item.id}, using TMDb fallback:`,
+              `[Trakt] Failed to fetch score for ${item.id}:`,
               err,
             );
             return false;
@@ -2608,14 +2540,14 @@ export default function FavoritesClient() {
     if (sortBy === "rating-desc" || sortBy === "rating-asc") {
       const getRating = (item) => {
         if (groupBy === "imdb_rating")
-          return layoutImdbScores.get(String(item.id)) || 0;
+          return layoutImdbScores.get(getScoreItemKey(item)) || 0;
         if (groupBy === "tmdb_rating") return item.vote_average || 0;
         if (groupBy === "trakt_rating")
-          return layoutTraktScores.get(String(item.id)) || 0;
+          return layoutTraktScores.get(getScoreItemKey(item)) || 0;
         // Default (including user_rating): average of available ratings (IMDb, TMDb, Trakt)
         const tmdb = item.vote_average || 0;
-        const imdb = layoutImdbScores.get(String(item.id)) || 0;
-        const trakt = layoutTraktScores.get(String(item.id)) || 0;
+        const imdb = layoutImdbScores.get(getScoreItemKey(item)) || 0;
+        const trakt = layoutTraktScores.get(getScoreItemKey(item)) || 0;
         let sum = 0,
           count = 0;
         if (tmdb > 0) {
@@ -3696,8 +3628,8 @@ export default function FavoritesClient() {
                               totalItems={subgroup.items.length}
                               viewMode={viewMode}
                               imageMode={imageMode}
-                              imdbScore={imdbScores.get(String(item.id))}
-                              traktScore={traktScores.get(String(item.id))}
+                              imdbScore={imdbScores.get(getScoreItemKey(item))}
+                              traktScore={traktScores.get(getScoreItemKey(item))}
                             />
                           ))}
                         </div>
@@ -3717,8 +3649,8 @@ export default function FavoritesClient() {
                         totalItems={group.items.length}
                         viewMode={viewMode}
                         imageMode={imageMode}
-                        imdbScore={imdbScores.get(String(item.id))}
-                        traktScore={traktScores.get(String(item.id))}
+                        imdbScore={imdbScores.get(getScoreItemKey(item))}
+                        traktScore={traktScores.get(getScoreItemKey(item))}
                       />
                     ))}
                   </div>
@@ -3739,8 +3671,8 @@ export default function FavoritesClient() {
                 totalItems={sorted.length}
                 viewMode={viewMode}
                 imageMode={imageMode}
-                imdbScore={imdbScores.get(String(item.id))}
-                traktScore={traktScores.get(String(item.id))}
+                imdbScore={imdbScores.get(getScoreItemKey(item))}
+                traktScore={traktScores.get(getScoreItemKey(item))}
               />
             ))}
           </div>
