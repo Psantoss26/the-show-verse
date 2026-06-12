@@ -80,11 +80,13 @@ function CompactBadge({
 function MiniStat({ icon: Icon, value, tooltip }) {
   return (
     <div
-      className="relative group/ministat flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-zinc-300"
+      className="relative group/ministat flex shrink-0 items-center gap-1.5 text-xs text-zinc-400 transition-colors"
       aria-label={tooltip}
     >
-      <Icon className="h-4 w-4 text-zinc-400" />
-      <span className="font-bold text-white">{value}</span>
+      <Icon className="h-3.5 w-3.5 text-zinc-500 transition-colors group-hover/ministat:text-zinc-300" />
+      <span className="font-mono font-semibold leading-none tracking-tight text-zinc-300 transition-colors group-hover/ministat:text-zinc-100 [text-box:trim-both_cap_alphabetic]">
+        {value}
+      </span>
       {tooltip && (
         <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/ministat:scale-100 group-hover/ministat:opacity-100 group-hover/ministat:delay-[2000ms]">
           {tooltip}
