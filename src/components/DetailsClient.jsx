@@ -192,7 +192,6 @@ import {
 // -- Componentes atomicos para la UI de detalle --
 import {
   VisualMetaCard,
-  SectionTitle,
   MetaItem,
   ScoreBadge,
   StatChip,
@@ -251,7 +250,9 @@ function pickBestEnglishPoster(list) {
   const englishPosters = list.filter(isEnglishPoster);
   if (englishPosters.length) return pickBestImage(englishPosters);
 
-  const neutralPosters = list.filter((img) => img?.file_path && !img?.iso_639_1);
+  const neutralPosters = list.filter(
+    (img) => img?.file_path && !img?.iso_639_1,
+  );
   if (neutralPosters.length) return pickBestImage(neutralPosters);
 
   const nonSpanishPosters = list.filter(
@@ -1233,6 +1234,28 @@ function AwardCard({ item }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function SectionTitle({ title, icon: Icon, className = "" }) {
+  return (
+    <div
+      className={`flex items-center gap-3 sm:gap-4 mb-8 w-full group ${className}`}
+    >
+      {Icon && (
+        <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-zinc-900/80 border border-white/10 backdrop-blur-md shadow-lg shrink-0 overflow-hidden group-hover:border-yellow-500/40 transition-colors duration-500">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-300 group-hover:text-yellow-400 group-hover:scale-110 transition-all duration-500 drop-shadow-md" />
+        </div>
+      )}
+      <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0">
+        {title}
+      </h2>
+      <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
+        <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover:opacity-100 group-hover:scale-150 transition-all duration-500" />
+        <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      </div>
+    </div>
   );
 }
 
@@ -2281,10 +2304,7 @@ export default function DetailsClient({
     const size = isPoster ? "w342" : "w780";
 
     const currentPosterActive =
-      (selectedPosterPath ||
-        basePosterPath ||
-        data?.profile_path) ??
-      null;
+      (selectedPosterPath || basePosterPath || data?.profile_path) ?? null;
 
     // Backdrop de preview: misma logica de seleccion que MainDashboard
     const previewFallback = previewBackdropFallback;
