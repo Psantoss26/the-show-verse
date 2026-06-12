@@ -183,13 +183,11 @@ export function MiniStat({ icon: Icon, value, tooltip }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="relative flex items-center gap-2 group group/ministat shrink-0"
+      className="relative flex items-center gap-1.5 group group/ministat shrink-0 text-zinc-400 transition-colors"
       aria-label={tooltip}
     >
-      <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
-        <Icon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
-      </div>
-      <span className="text-xs font-semibold text-zinc-400 font-mono tracking-tight group-hover:text-zinc-300">
+      <Icon className="w-3.5 h-3.5 text-zinc-500 transition-colors group-hover/ministat:text-zinc-300" />
+      <span className="text-xs font-semibold text-zinc-300 font-mono leading-none tracking-tight transition-colors group-hover/ministat:text-zinc-100 [text-box:trim-both_cap_alphabetic]">
         {value}
       </span>
       {tooltip && (
