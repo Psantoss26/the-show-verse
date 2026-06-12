@@ -83,6 +83,9 @@ const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
 const CACHE_VERSION = "soundtrack-ranking-v38";
 
+const TMDB_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
 const CACHE_DIR = path.join(process.cwd(), ".next", "cache", "spotify");
 const CACHE_FILE = path.join(CACHE_DIR, "soundtrack.json");
 
@@ -235,10 +238,31 @@ function buildQueries(ctx) {
       // Títulos alternativos (p.ej. título en inglés para anime con título
       // original en japonés/coreano): solo consulta simple como respaldo
       push(title);
+      // También añadir versión truncada antes de ":" para títulos como
+      // "Kimetsu no Yaiba: Guardianes de la Noche" donde la parte
+      // relevante para Spotify es "Kimetsu no Yaiba"
+      const shortTitle = title.split(/[:：]/)[0]?.trim();
+      if (shortTitle && shortTitle !== title) push(shortTitle);
     }
   }
 
   return queries;
+}
+
+async function fetchEnglishTitle(tmdbId, mediaType) {
+  if (!TMDB_KEY || !tmdbId) return null;
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${TMDB_KEY}&language=en-US`,
+      { next: { revalidate: 86400 } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data) return null;
+    return mediaType === "tv" ? data.name || null : data.title || null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -427,9 +451,20 @@ function albumNameMatchesAnyTitle(name, titles) {
   const nameNorm = norm(name);
   return titles.some((t) => {
     if (!t) return false;
+    // Intentar coincidencia con el título completo
     for (const tv of titleComparisonVariants(t)) {
       for (const nv of titleComparisonVariants(nameNorm)) {
         if (hasLiteralTitlePhrase(nv, tv)) return true;
+      }
+    }
+    // Intentar con versión truncada antes de ":" para títulos como
+    // "Kimetsu no Yaiba: Guardianes de la Noche" → "Kimetsu no Yaiba"
+    const short = t.split(/[:：]/)[0]?.trim();
+    if (short && short !== t) {
+      for (const tv of titleComparisonVariants(short)) {
+        for (const nv of titleComparisonVariants(nameNorm)) {
+          if (hasLiteralTitlePhrase(nv, tv)) return true;
+        }
       }
     }
     return false;
@@ -1544,6 +1579,7 @@ export async function GET(req) {
   const originalTitle = String(sp.get("originalTitle") ?? "").trim();
   const mediaType = sp.get("type") === "tv" ? "tv" : "movie";
   const year = getYear(sp.get("year"));
+  const tmdbId = sp.get("tmdbId");
   const country = String(sp.get("country") ?? "US").toUpperCase();
   const debug =
     process.env.NODE_ENV !== "production" && sp.get("debug") === "1";
@@ -1553,6 +1589,20 @@ export async function GET(req) {
   }
 
   const titles = unique([originalTitle, title]);
+
+  // Obtener título en inglés desde TMDb para usarlo como fallback en búsquedas
+  // de Spotify, necesario para anime/series extranjeras donde el título
+  // localizado (español) no coincide con los álbumes en Spotify (inglés).
+  // Ej: "Ataque a los Titanes" → "Attack on Titan"
+  let englishTitle = null;
+  if (tmdbId && titles.some((t) => /[^\x00-\x7F]/.test(t))) {
+    englishTitle = await fetchEnglishTitle(tmdbId, mediaType);
+    if (englishTitle) {
+      const alreadyIncluded = titles.some((t) => norm(t) === norm(englishTitle));
+      if (!alreadyIncluded) titles.push(englishTitle);
+    }
+  }
+
   const ctx = { titles, originalTitle, year, mediaType };
   const configured = Boolean(credentials());
 
