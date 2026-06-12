@@ -7,6 +7,7 @@ import {
   getOfflineQueueCount,
   subscribeOfflineQueue,
 } from "@/lib/offline/syncQueue";
+import LiquidButton from "@/components/LiquidButton";
 
 const ENABLE_SERVICE_WORKER = process.env.NODE_ENV === "production";
 
@@ -139,15 +140,15 @@ export default function PwaManager() {
       )}
 
       {showInstall && (
-        <button
-          type="button"
+        <LiquidButton
           onClick={installApp}
-          className="fixed bottom-20 right-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-sky-300/25 bg-sky-500/15 text-sky-100 shadow-[0_0_22px_rgba(14,165,233,0.24)] ring-1 ring-sky-500/35 backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.04] hover:bg-sky-500/20 hover:text-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 active:scale-95 lg:bottom-4"
+          activeColor="blue"
+          groupId="pwa-install-action"
           title="Instalar app"
-          aria-label="Instalar app"
+          className="!fixed !bottom-20 !right-4 !z-50 lg:!bottom-4 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
         >
           <Download className="h-5 w-5" />
-        </button>
+        </LiquidButton>
       )}
     </>
   );
