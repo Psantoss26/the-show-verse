@@ -675,18 +675,7 @@ function CustomTooltip({ active, payload, label, formatter }) {
 
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   if (!user) {
-    return (
-      <div
-        className={`${PROFILE_GLASS_SURFACE} min-h-[172px] rounded-[2rem] p-5 sm:p-6`}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/15 via-zinc-900/30 to-transparent" />
-        <div className="relative z-10 space-y-3 pt-8">
-          <div className="h-4 w-36 rounded-lg bg-zinc-800/70 animate-pulse" />
-          <div className="h-10 w-64 max-w-full rounded-xl bg-zinc-900/60 animate-pulse" />
-          <div className="h-4 w-44 rounded-lg bg-zinc-900/50 animate-pulse" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const avatarUrl = user?.avatarUrl || null;
@@ -907,11 +896,11 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
   return (
     <div className={className}>
       <div
-        className={`${PROFILE_GLASS_SURFACE} w-full rounded-3xl p-1.5 lg:w-fit`}
+        className="relative isolate w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-[50px] sm:rounded-3xl lg:w-fit"
         role="tablist"
         aria-label="Secciones del perfil"
       >
-        <div className="grid w-full grid-cols-3 items-center gap-1.5 lg:flex lg:w-fit">
+        <div className="grid w-full grid-cols-3 items-center gap-1.5 lg:flex lg:w-fit lg:gap-2">
           {tabs.map((tab) => {
             const active = viewMode === tab.id;
             return (
@@ -923,7 +912,7 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
                 aria-selected={active}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className={`group relative inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-[1.45rem] px-2 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 sm:px-4 lg:min-w-[155px] ${
+                className={`group relative inline-flex h-11 min-w-0 items-center justify-center overflow-hidden rounded-xl px-2 text-sm font-semibold uppercase tracking-wider transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 sm:px-4 lg:min-w-[155px] ${
                   active
                     ? "text-white"
                     : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
@@ -933,7 +922,7 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
                   {active && (
                     <motion.span
                       layoutId="profileSectionActiveBg"
-                      className="absolute inset-0 rounded-[1.45rem] bg-white/10 shadow-md border border-white/5"
+                      className="absolute inset-0 rounded-xl bg-black/20 bg-gradient-to-br from-indigo-500/40 via-white/10 to-indigo-500/10 shadow-[0_10px_30px_-10px_rgba(129,140,248,0.55)] backdrop-blur-lg"
                       initial={{ opacity: 0, scale: 0.96 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.96 }}
@@ -948,18 +937,20 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
                 {active && (
                   <motion.span
                     layoutId="profileSectionActiveLine"
-                    className="absolute inset-x-7 bottom-1.5 h-0.5 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent shadow-[0_0_10px_rgba(99,102,241,0.85)]"
+                    className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r from-indigo-500 via-violet-400 to-cyan-400 shadow-[0_0_8px_rgba(129,140,248,0.65)]"
                   />
                 )}
                 <span className="relative z-10 flex min-w-0 items-center gap-2">
                   <tab.icon
-                    className={`h-4 w-4 shrink-0 transition-all duration-300 ${
+                    className={`h-5 w-5 shrink-0 transition-all duration-300 ${
                       active
                         ? "text-indigo-300 drop-shadow-[0_0_6px_rgba(129,140,248,0.75)]"
-                        : "text-indigo-500 group-hover:text-indigo-400"
+                        : "text-zinc-400 group-hover:text-zinc-200"
                     }`}
                   />
-                  <span className="min-w-0 truncate">{tab.label}</span>
+                  <span className="min-w-0 truncate text-xs sm:text-sm">
+                    {tab.label}
+                  </span>
                 </span>
               </motion.button>
             );
@@ -1673,6 +1664,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const watchlist = profileData?.watchlist || [];
   const headerReady = !!profileUser;
   const profileRowsReady = !!stats;
+  const pageReady = headerReady && profileRowsReady;
 
   if (notConnected) {
     return (
@@ -1739,31 +1731,38 @@ export default function StatsClient({ connectNext = "/profile" }) {
     );
   }
 
+  if (!pageReady && !error) {
+    return (
+      <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
+        <ProfilePageBackground />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* Header - Always Visible */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 lg:mb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8"
-        >
-          <ProfileHero
-            user={profileUser}
-            onSync={handleSyncProfile}
-            onDisconnect={() => setShowDisconnectModal(true)}
-            syncing={loading}
-          />
-          {headerReady ? (
+        {headerReady ? (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 lg:mb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8"
+          >
+            <ProfileHero
+              user={profileUser}
+              onSync={handleSyncProfile}
+              onDisconnect={() => setShowDisconnectModal(true)}
+              syncing={loading}
+            />
             <ProfileSectionTabs
               viewMode={viewMode}
               setViewMode={setViewMode}
               className="hidden justify-self-end lg:block"
             />
-          ) : null}
-        </motion.div>
+          </motion.div>
+        ) : null}
 
         {headerReady ? (
           <motion.div
