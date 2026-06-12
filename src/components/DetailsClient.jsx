@@ -673,9 +673,9 @@ function awardResultClass(result) {
     return "text-yellow-400";
   }
   if (result === "nominee") {
-    return "text-sky-300";
+    return "text-zinc-300";
   }
-  return "text-zinc-300";
+  return "text-zinc-400";
 }
 
 function flattenAwardItems(details) {
@@ -1151,10 +1151,10 @@ function AwardCard({ item }) {
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
             )}
             {item?.result === "nominee" && (
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(212,212,216,0.8)]" />
             )}
             {item?.result !== "winner" && item?.result !== "nominee" && (
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
             )}
             {awardResultLabel(item?.result)}
           </span>
