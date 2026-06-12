@@ -1461,105 +1461,113 @@ export default function EpisodeDetailsClient({
 
         {/* === Reparto del episodio === */}
         {cast.length > 0 && (
-          <AnimatedSection className="mb-10" delay={0.04}>
-            <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
-            <Swiper
-              spaceBetween={12}
-              slidesPerView={3}
-              breakpoints={{
-                500: { slidesPerView: 3, spaceBetween: 14 },
-                768: { slidesPerView: 4, spaceBetween: 16 },
-                1024: { slidesPerView: 5, spaceBetween: 18 },
-                1280: { slidesPerView: 6, spaceBetween: 20 },
-              }}
-              className={`mt-3 pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
-            >
-              {cast.slice(0, 20).map((actor) => (
-                <SwiperSlide key={actor.id}>
-                  <Link
-                    href={`/details/person/${actor.id}`}
-                    className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                  >
-                    <div className="aspect-[2/3] overflow-hidden relative">
-                      {actor.profile_path ? (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                          alt={actor.name}
-                          className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                          <UsersIconComponent size={40} />
+          <AnimatedSection delay={0.04}>
+            <section className="mb-16 group/section">
+              <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
+              <div style={{ overflowX: "clip", overflowY: "visible" }}>
+                <Swiper
+                  spaceBetween={12}
+                  slidesPerView={3}
+                  breakpoints={{
+                    500: { slidesPerView: 3, spaceBetween: 14 },
+                    768: { slidesPerView: 4, spaceBetween: 16 },
+                    1024: { slidesPerView: 5, spaceBetween: 18 },
+                    1280: { slidesPerView: 6, spaceBetween: 20 },
+                  }}
+                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
+                >
+                  {cast.slice(0, 20).map((actor) => (
+                    <SwiperSlide key={actor.id}>
+                      <Link
+                        href={`/details/person/${actor.id}`}
+                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                      >
+                        <div className="aspect-[2/3] overflow-hidden relative">
+                          {actor.profile_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                              alt={actor.name}
+                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
+                              <UsersIconComponent size={40} />
+                            </div>
+                          )}
+
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+
+                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                            <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                              {actor.name}
+                            </p>
+                            <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                              {actor.character}
+                            </p>
+                          </div>
                         </div>
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                        <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                          {actor.name}
-                        </p>
-                        <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                          {actor.character}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                </SwiperSlide>
-              ))}
-            </Swiper>
+                      </Link>
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              </div>
+            </section>
           </AnimatedSection>
         )}
 
         {/* === Invitados === */}
         {guestStars.length > 0 && (
-          <AnimatedSection className="mb-10" delay={0.04}>
-            <SectionTitle title="Invitados" icon={UsersIcon} />
-            <Swiper
-              spaceBetween={12}
-              slidesPerView={3}
-              breakpoints={{
-                500: { slidesPerView: 3, spaceBetween: 14 },
-                768: { slidesPerView: 4, spaceBetween: 16 },
-                1024: { slidesPerView: 5, spaceBetween: 18 },
-                1280: { slidesPerView: 6, spaceBetween: 20 },
-              }}
-              className={`mt-3 pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
-            >
-              {guestStars.slice(0, 20).map((actor) => (
-                <SwiperSlide key={actor.id}>
-                  <Link
-                    href={`/details/person/${actor.id}`}
-                    className="block group relative bg-neutral-800/80 rounded-xl overflow-hidden shadow-lg border border-transparent hover:border-yellow-500/60 hover:shadow-2xl hover:shadow-yellow-500/25 transition-all duration-300 transform-gpu hover:-translate-y-1"
-                  >
-                    <div className="aspect-[2/3] overflow-hidden relative">
-                      {actor.profile_path ? (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
-                          alt={actor.name}
-                          className="w-full h-full object-cover transition-transform duration-500 transform-gpu group-hover:scale-[1.10] group-hover:-translate-y-1 group-hover:rotate-[0.4deg] group-hover:grayscale-0 grayscale-[18%]"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
-                          <UsersIconComponent size={40} />
+          <AnimatedSection delay={0.04}>
+            <section className="mb-16 group/section">
+              <SectionTitle title="Invitados" icon={UsersIcon} />
+              <div style={{ overflowX: "clip", overflowY: "visible" }}>
+                <Swiper
+                  spaceBetween={12}
+                  slidesPerView={3}
+                  breakpoints={{
+                    500: { slidesPerView: 3, spaceBetween: 14 },
+                    768: { slidesPerView: 4, spaceBetween: 16 },
+                    1024: { slidesPerView: 5, spaceBetween: 18 },
+                    1280: { slidesPerView: 6, spaceBetween: 20 },
+                  }}
+                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix" : ""}`}
+                >
+                  {guestStars.slice(0, 20).map((actor) => (
+                    <SwiperSlide key={actor.id}>
+                      <Link
+                        href={`/details/person/${actor.id}`}
+                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                      >
+                        <div className="aspect-[2/3] overflow-hidden relative">
+                          {actor.profile_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
+                              alt={actor.name}
+                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
+                              <UsersIconComponent size={40} />
+                            </div>
+                          )}
+
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+
+                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                            <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                              {actor.name}
+                            </p>
+                            <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                              {actor.character}
+                            </p>
+                          </div>
                         </div>
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-300" />
-
-                      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3">
-                        <p className="text-white font-extrabold text-[11px] sm:text-sm leading-tight line-clamp-1">
-                          {actor.name}
-                        </p>
-                        <p className="text-gray-300 text-[10px] sm:text-xs leading-tight line-clamp-1">
-                          {actor.character}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                </SwiperSlide>
-              ))}
-            </Swiper>
+                      </Link>
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              </div>
+            </section>
           </AnimatedSection>
         )}
 
