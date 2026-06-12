@@ -9627,7 +9627,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       { id: "details", label: "Detalles" },
                       { id: "production", label: "Producción" },
                       { id: "synopsis", label: "Sinopsis" },
-                      ...(extras.awards
+                      ...(extras.awards || hasAwardItems
                         ? [{ id: "awards", label: "Premios" }]
                         : []),
                     ]}
@@ -9787,9 +9787,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
 
                       {/* 4. PREMIOS */}
-                      {activeTab === "awards" && extras.awards && (
+                      {activeTab === "awards" && (extras.awards || hasAwardItems) && (
                         <div key="awards">
-                          <AwardsPanel awards={extras.awards} />
+                          {extras.awards ? (
+                            <AwardsPanel awards={extras.awards} />
+                          ) : (
+                            <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                              <div
+                                className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
+                                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                              />
+                              <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
+                              <div className="relative z-10">
+                                <div className="flex items-start gap-4">
+                                  <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                                    <Trophy className="w-8 h-8" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <h3 className="text-lg font-bold text-white mb-2">
+                                      Premios y nominaciones
+                                    </h3>
+                                    <p className="text-base leading-relaxed text-zinc-200">
+                                      {awardItems.filter((a) => a.result === "winner").length} premios y {awardItems.filter((a) => a.result === "nominee").length} nominaciones
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </AnimatePresence>
@@ -9809,7 +9834,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 { id: "details", label: "Detalles" },
                 { id: "production", label: "Producción" },
                 { id: "synopsis", label: "Sinopsis" },
-                ...(extras.awards ? [{ id: "awards", label: "Premios" }] : []),
+                ...(extras.awards || hasAwardItems
+                  ? [{ id: "awards", label: "Premios" }]
+                  : []),
               ]}
               activeTab={activeTab}
               onChangeTab={setActiveTab}
@@ -9955,10 +9982,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 )}
 
                 {/* ===== TAB 4: PREMIOS ===== */}
-                {/* Muestra el resumen de premios devuelto por OMDb */}
-                {activeTab === "awards" && extras.awards && (
+                {activeTab === "awards" && (extras.awards || hasAwardItems) && (
                   <div key="awards-backdrop">
-                    <AwardsPanel awards={extras.awards} />
+                    {extras.awards ? (
+                      <AwardsPanel awards={extras.awards} />
+                    ) : (
+                      <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                        <div
+                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
+                          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                        />
+                        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
+                        <div className="relative z-10">
+                          <div className="flex items-start gap-4">
+                            <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                              <Trophy className="w-8 h-8" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-lg font-bold text-white mb-2">
+                                Premios y nominaciones
+                              </h3>
+                              <p className="text-base leading-relaxed text-zinc-200">
+                                {awardItems.filter((a) => a.result === "winner").length} premios y {awardItems.filter((a) => a.result === "nominee").length} nominaciones
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </AnimatePresence>
