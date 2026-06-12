@@ -1,6 +1,5 @@
 // /src/app/page.jsx
 import MainDashboardClient from "@/components/MainDashboardClient";
-import { cookies } from "next/headers";
 
 import {
   fetchTopRatedMovies,
@@ -10,13 +9,8 @@ import {
   discoverMovies,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
-import {
-  getTraktMoviesAnticipated,
-  getTraktRecommended,
-  getTraktShowsAnticipated,
-} from "@/lib/api/traktHelpers";
-import { getValidTraktToken } from "@/lib/trakt/server";
 
+export const dynamic = "force-static";
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
@@ -69,7 +63,7 @@ function curateList(
 }
 
 /* ======== Carga de datos en el SERVIDOR ======== */
-async function getDashboardData(traktToken = null) {
+async function getDashboardData() {
   try {
     const [
       topRatedMovies,
@@ -78,9 +72,6 @@ async function getDashboardData(traktToken = null) {
       dramaTV,
       trending,
       popular,
-      traktMoviesAnticipated,
-      traktShowsAnticipated,
-      traktRecommended,
     ] = await Promise.all([
       fetchTopRatedMovies(5000),
       fetchTopRatedTV(5000),
@@ -98,11 +89,6 @@ async function getDashboardData(traktToken = null) {
       }),
       fetchTrendingMovies(),
       fetchPopularMovies(),
-      getTraktMoviesAnticipated(30).catch(() => null),
-      getTraktShowsAnticipated(30).catch(() => null),
-      getTraktRecommended(30, "weekly", { token: traktToken }).catch(
-        () => null,
-      ),
     ]);
 
     // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
@@ -135,18 +121,11 @@ async function getDashboardData(traktToken = null) {
       trending,
       popular,
 
-      // SSR para fijar la posición de "Más esperadas" desde el primer render.
-      traktMoviesAnticipated: Array.isArray(traktMoviesAnticipated)
-        ? traktMoviesAnticipated
-        : null,
-      traktShowsAnticipated: Array.isArray(traktShowsAnticipated)
-        ? traktShowsAnticipated
-        : null,
-      traktRecommended: Array.isArray(traktRecommended)
-        ? traktRecommended
-        : null,
-
-      // El resto de secciones Trakt se cargan en el cliente (lazy)
+      // Trakt se carga en el cliente para que Inicio no bloquee la navegación
+      // validando cookies/tokens ni esperando endpoints externos.
+      traktMoviesAnticipated: null,
+      traktShowsAnticipated: null,
+      traktRecommended: null,
       traktTrending: [],
       traktPopular: [],
       traktAnticipated: [],
@@ -168,11 +147,6 @@ async function getDashboardData(traktToken = null) {
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  const cookieStore = await cookies();
-  const { token: traktToken } = await getValidTraktToken(cookieStore).catch(
-    () => ({ token: null }),
-  );
-
-  const dashboardData = await getDashboardData(traktToken);
+  const dashboardData = await getDashboardData();
   return <MainDashboardClient initialData={dashboardData} />;
 }

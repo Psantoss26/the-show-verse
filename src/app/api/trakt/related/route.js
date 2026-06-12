@@ -177,7 +177,15 @@ export async function GET(request) {
       5, // Reducido de 8 a 5 para evitar saturar el límite serverless
     );
 
-    return NextResponse.json({ results: hydrated });
+    // Asignar porcentaje de similitud basado en el orden de relevancia de Trakt
+    // Los items aparecen ordenados por relevancia (más similar primero)
+    const total = hydrated.length;
+    const results = hydrated.map((item, index) => ({
+      ...item,
+      match_percentage: Math.round(95 - (index / Math.max(total - 1, 1)) * 40),
+    }));
+
+    return NextResponse.json({ results });
   } catch (e) {
     console.error("trakt related error", e);
     return NextResponse.json({ results: [] }, { status: 200 });

@@ -9969,7 +9969,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {recommendations.slice(0, 15).map((rec) => {
+                        {recommendations.slice(0, 15).map((rec, index) => {
                           const recTitle = rec.title || rec.name;
                           const recDate =
                             rec.release_date || rec.first_air_date || "";
@@ -9977,6 +9977,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const isMovie = rec.media_type
                             ? rec.media_type === "movie"
                             : type === "movie";
+
+                          // Porcentaje de similitud: si la API no lo provee, calculamos uno descendente
+                          const matchPercentage =
+                            rec.match_percentage ||
+                            (rec.score
+                              ? Math.round(rec.score * 100)
+                              : Math.max(60, 98 - index * 2));
 
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
@@ -10078,21 +10085,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className={recOverlayClass} />
 
                                   <div
-                                    className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
+                                    className={`hidden lg:block absolute top-0 left-0 z-20 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
                                       enableHover
                                         ? "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
                                         : ""
-                                    } ${
-                                      isMovie
-                                        ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                                        : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                                    }`}
+                                    } bg-yellow-500/15 border-yellow-500/30 text-yellow-400 font-black font-mono tracking-tight flex items-baseline`}
                                   >
-                                    {isMovie ? (
-                                      <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                    ) : (
-                                      <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                    )}
+                                    <span className="text-sm sm:text-base">
+                                      {matchPercentage}
+                                    </span>
+                                    <span className="text-[9px] sm:text-[10px] ml-[1px] opacity-80">
+                                      %
+                                    </span>
                                   </div>
 
                                   <div className={recFooterInfoClass}>

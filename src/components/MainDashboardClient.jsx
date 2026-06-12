@@ -489,13 +489,20 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
 
     const load = async () => {
       if (!movie) return;
+      const mediaType =
+        movie.media_type === "tv" ||
+        (movie.name && !movie.title) ||
+        movie.first_air_date
+          ? "tv"
+          : "movie";
+      const posterCacheKey = `${mediaType}:${movie.id}`;
 
       const { poster: userPoster } = getArtworkPreference(movie.id);
       if (userPoster) {
         const url = buildImg(userPoster, "w342");
         await preloadImage(url);
         if (!abort) {
-          cache.current.set(movie.id, userPoster);
+          cache.current.set(posterCacheKey, userPoster);
           setPosterPath(userPoster);
           setReady(true);
         }
@@ -511,14 +518,14 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
           movie.profile_path ||
           null;
         if (!abort) {
-          if (existingPoster) cache.current.set(movie.id, existingPoster);
+          if (existingPoster) cache.current.set(posterCacheKey, existingPoster);
           setPosterPath(existingPoster);
           setReady(!!existingPoster);
         }
         return;
       }
 
-      const cached = cache.current.get(movie.id);
+      const cached = cache.current.get(posterCacheKey);
       if (cached) {
         const url = buildImg(cached, "w342");
         await preloadImage(url);
@@ -535,7 +542,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         const url = buildImg(existingPoster, "w342");
         await preloadImage(url);
         if (!abort) {
-          cache.current.set(movie.id, existingPoster);
+          cache.current.set(posterCacheKey, existingPoster);
           setPosterPath(existingPoster);
           setReady(true);
         }
@@ -543,12 +550,6 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       }
 
       setReady(false);
-      const mediaType =
-        movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
-          ? "tv"
-          : "movie";
       const preferred = await fetchBestPoster(movie.id, mediaType);
       const chosen =
         preferred ||
@@ -560,7 +561,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       const url = chosen ? buildImg(chosen, "w342") : null;
       await preloadImage(url);
       if (!abort) {
-        cache.current.set(movie.id, chosen);
+        cache.current.set(posterCacheKey, chosen);
         setPosterPath(chosen);
         setReady(!!chosen);
       }
@@ -1820,6 +1821,7 @@ function Row({
   hideTitle = false, // Ocultar título cuando se usa con RowWithTimeFilter
   labelText, // Label superior para la sección
   sectionHref,
+  reserveWhileEmpty = false,
 }) {
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
@@ -1919,7 +1921,16 @@ function Row({
   const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
-  if (!hasItems) return null;
+  if (!hasItems) {
+    if (!reserveWhileEmpty) return null;
+
+    return (
+      <div
+        aria-hidden="true"
+        className="relative pointer-events-none select-none min-h-[285px] sm:min-h-[315px] md:min-h-[360px] xl:min-h-[405px]"
+      />
+    );
+  }
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -2031,11 +2042,16 @@ function Row({
             className="group relative"
             breakpoints={breakpointsRow}
           >
-            {items.map((m, i) => {
-              const isActive = hydrated && !isMobile && hoveredId === m.id;
-              const isLast = i === items.length - 1;
-              const isSecondToLast = i === items.length - 2;
-              const isThirdToLast = i === items.length - 3;
+            {normalizedItems.map((m, i) => {
+              const itemType =
+                m.media_type === "tv" || (m.name && !m.title) || m.first_air_date
+                  ? "tv"
+                  : "movie";
+              const itemKey = `${itemType}:${m.id}`;
+              const isActive = hydrated && !isMobile && hoveredId === itemKey;
+              const isLast = i === normalizedItems.length - 1;
+              const isSecondToLast = i === normalizedItems.length - 2;
+              const isThirdToLast = i === normalizedItems.length - 3;
               const isNearEnd = isLast || isSecondToLast || isThirdToLast;
 
               const base =
@@ -2051,7 +2067,7 @@ function Row({
               let transformClass = "";
               if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
                 const activeIndex = hoveredIndex;
-                const totalItems = items.length;
+                const totalItems = normalizedItems.length;
 
                 // Si el item activo está en los últimos 3 items, desplazar todo hacia la izquierda
                 if (activeIndex >= totalItems - 3) {
@@ -2098,19 +2114,19 @@ function Row({
 
               return (
                 <SwiperSlide
-                  key={m.id}
+                  key={itemKey}
                   className={isMobile ? "select-none" : "!w-auto select-none"}
                 >
                   <div
                     className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                     onMouseEnter={() => {
                       if (!isMobile) {
-                        setHoveredId(m.id);
+                        setHoveredId(itemKey);
                         setHoveredIndex(i);
                       }
                     }}
                     onMouseLeave={() => {
-                      setHoveredId((prev) => (prev === m.id ? null : prev));
+                      setHoveredId((prev) => (prev === itemKey ? null : prev));
                       setHoveredIndex(null);
                     }}
                   >
@@ -3007,10 +3023,10 @@ export default function MainDashboardClient({ initialData }) {
     const loadAnticipated = async () => {
       try {
         const [moviesAnticipated, showsAnticipated] = await Promise.all([
-          fetch("/api/trakt/dashboard/movies-anticipated")
+          fetch("/api/trakt/dashboard/movies-anticipated", { priority: "low" })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/shows-anticipated")
+          fetch("/api/trakt/dashboard/shows-anticipated", { priority: "low" })
             .then((r) => r.json())
             .catch(() => []),
         ]);
@@ -3034,6 +3050,43 @@ export default function MainDashboardClient({ initialData }) {
     };
   }, [hasRenderableInitialAnticipatedData]);
 
+  // ⚡ Carga independiente: Recomendados no espera al resto de secciones Trakt.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRecommended = async () => {
+      try {
+        const recommended = await fetch("/api/trakt/dashboard/recommended", {
+          cache: "no-store",
+          priority: "high",
+        })
+          .then((r) => r.json())
+          .catch(() => []);
+        const recommendedItems = toItemsArray(recommended);
+
+        if (cancelled) return;
+        setLazySections((prev) => ({
+          ...prev,
+          traktRecommended: recommendedItems,
+        }));
+      } catch (err) {
+        console.error("❌ Error cargando recomendados:", err);
+        if (!cancelled) {
+          setLazySections((prev) => ({
+            ...prev,
+            traktRecommended: [],
+          }));
+        }
+      }
+    };
+
+    loadRecommended();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
   useEffect(() => {
     let cancelled = false;
@@ -3043,7 +3096,6 @@ export default function MainDashboardClient({ initialData }) {
         const [
           trending,
           popular,
-          recommended,
           playedWeekly,
           playedMonthly,
           watchedWeekly,
@@ -3051,31 +3103,40 @@ export default function MainDashboardClient({ initialData }) {
           collectedWeekly,
           collectedMonthly,
         ] = await Promise.all([
-          fetch("/api/trakt/dashboard/trending")
+          fetch("/api/trakt/dashboard/trending", { priority: "low" })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/popular")
+          fetch("/api/trakt/dashboard/popular", { priority: "low" })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/recommended")
+          fetch("/api/trakt/dashboard/played?period=weekly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/played?period=weekly")
+          fetch("/api/trakt/dashboard/played?period=monthly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/played?period=monthly")
+          fetch("/api/trakt/dashboard/watched?period=weekly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/watched?period=weekly")
+          fetch("/api/trakt/dashboard/watched?period=monthly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/watched?period=monthly")
+          fetch("/api/trakt/dashboard/collected?period=weekly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
-          fetch("/api/trakt/dashboard/collected?period=weekly")
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/collected?period=monthly")
+          fetch("/api/trakt/dashboard/collected?period=monthly", {
+            priority: "low",
+          })
             .then((r) => r.json())
             .catch(() => []),
         ]);
@@ -3084,7 +3145,6 @@ export default function MainDashboardClient({ initialData }) {
           ...prev,
           traktTrending: Array.isArray(trending) ? trending : [],
           traktPopular: Array.isArray(popular) ? popular : [],
-          traktRecommended: Array.isArray(recommended) ? recommended : [],
           traktPlayedWeekly: Array.isArray(playedWeekly) ? playedWeekly : [],
           traktPlayedMonthly: Array.isArray(playedMonthly) ? playedMonthly : [],
           traktWatchedWeekly: Array.isArray(watchedWeekly) ? watchedWeekly : [],
@@ -3162,13 +3222,15 @@ export default function MainDashboardClient({ initialData }) {
         <Row
           title="Recomendados"
           labelText="TRAKT"
-          items={dashboardData.traktRecommended || EMPTY_ARRAY}
+          items={toItemsArray(dashboardData.traktRecommended)}
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
           posterOverrides={posterOverrides}
           backdropOverrides={backdropOverrides}
           overridesReady={overridesReady}
+          eager={true}
+          reserveWhileEmpty={dashboardData.traktRecommended === null}
         />
 
         {/* Tendencias unificadas (Trakt/TMDb) */}
