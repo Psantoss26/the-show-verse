@@ -1253,7 +1253,7 @@ export default function EpisodeDetailsClient({
       pr-[calc(1.25rem+env(safe-area-inset-right))]
       sm:px-4
       flex items-center gap-3 sm:gap-4
-      overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+      overflow-x-clip overscroll-none [touch-action:pan-y]
     "
               >
                 <div className="flex items-center gap-4 sm:gap-5 shrink-0">
@@ -1263,6 +1263,7 @@ export default function EpisodeDetailsClient({
                     value={vote?.toFixed(1)}
                     sub={voteCount ? formatCountShort(voteCount) : undefined}
                     href={tmdbEpisodeUrl}
+                    disableHoverLift
                     tooltip={tmdbEpisodeUrl ? "Ver en TMDb" : "TMDb"}
                   />
 
@@ -1277,6 +1278,7 @@ export default function EpisodeDetailsClient({
                           : undefined
                       }
                       href={tScoreboard.traktUrl}
+                      disableHoverLift
                       tooltip={tScoreboard.traktUrl ? "Ver en Trakt" : "Trakt"}
                     />
                   )}
@@ -1293,6 +1295,7 @@ export default function EpisodeDetailsClient({
                           : undefined
                       }
                       href={imdbUrl || undefined}
+                      disableHoverLift
                       tooltip={imdbUrl ? "Ver en IMDb" : "IMDb"}
                     />
                   )}
@@ -1338,14 +1341,13 @@ export default function EpisodeDetailsClient({
                   <div className="border-t border-white/5 bg-black/10">
                     <div
                       className="
-          overflow-x-auto
-          [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
+          overflow-x-clip overscroll-none [touch-action:pan-y]
           py-2
           pl-[calc(1rem+env(safe-area-inset-left))]
           pr-[calc(1rem+env(safe-area-inset-right))]
         "
                     >
-                      <div className="flex items-center gap-3 min-w-max">
+                      <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
                         <div className="shrink-0">
                           <MiniStat
                             icon={Eye}

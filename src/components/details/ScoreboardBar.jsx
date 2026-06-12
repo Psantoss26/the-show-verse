@@ -31,6 +31,7 @@ function CompactBadge({
         <img
           src={logo}
           alt=""
+          draggable="false"
           className={`${logoClassName} max-h-6 max-w-6 w-auto object-contain opacity-95`}
         />
       </span>
@@ -60,6 +61,8 @@ function CompactBadge({
       href={href}
       target="_blank"
       rel="noreferrer"
+      draggable={false}
+      onDragStart={(event) => event.preventDefault()}
       className={baseClass}
       aria-label={tooltip || "Abrir enlace"}
     >
@@ -323,7 +326,7 @@ export default function ScoreboardBar({
           pr-[calc(1.25rem+env(safe-area-inset-right))]
           sm:px-4
           flex items-center gap-3 sm:gap-4
-          overflow-x-auto sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+          overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
         "
       >
         {/* A) Ratings */}
@@ -414,14 +417,13 @@ export default function ScoreboardBar({
         <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
           <div
             className="
-              overflow-x-auto sm:overflow-visible
-              [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden
+              overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
               py-2
               pl-[calc(1rem+env(safe-area-inset-left))]
               pr-[calc(1rem+env(safe-area-inset-right))]
             "
           >
-            <div className="flex items-center gap-3 min-w-max">
+            <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
               <div className="shrink-0">
                 <MiniStat
                   icon={Eye}
