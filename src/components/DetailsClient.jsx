@@ -7941,7 +7941,11 @@ export default function DetailsClient({
                   : "movie";
             const key = `${mediaType}:${rec.id}`;
             try {
-              const st = await getMediaAccountStates(mediaType, rec.id, session);
+              const st = await getMediaAccountStates(
+                mediaType,
+                rec.id,
+                session,
+              );
               return [
                 key,
                 {
@@ -7954,10 +7958,7 @@ export default function DetailsClient({
                 },
               ];
             } catch {
-              return [
-                key,
-                { favorite: false, watchlist: false, rating: null },
-              ];
+              return [key, { favorite: false, watchlist: false, rating: null }];
             }
           }),
         );
@@ -10040,7 +10041,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? rec.media_type === "movie"
                             : type === "movie";
                           const recType =
-                            rec.media_type === "movie" || rec.media_type === "tv"
+                            rec.media_type === "movie" ||
+                            rec.media_type === "tv"
                               ? rec.media_type
                               : isMovie
                                 ? "movie"
@@ -11150,8 +11152,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                             {/* Label de Tipo (Trailer, Teaser, etc) */}
                                             {v.type && (
-                                              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-sky-300">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+                                              <span
+                                                className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${v.type.toLowerCase() === "trailer" ? "text-red-300" : "text-sky-300"}`}
+                                              >
+                                                <span
+                                                  className={`w-1.5 h-1.5 rounded-full ${v.type.toLowerCase() === "trailer" ? "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.8)]" : "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]"}`}
+                                                />
                                                 {v.type}
                                               </span>
                                             )}

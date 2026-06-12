@@ -1533,6 +1533,8 @@ function GroupDivider({
   total,
   groupBy,
   mobileFiltersOpen,
+  forceSticky = false,
+  disableStickyAnimation = false,
   hasPreviousGroup = false,
   hasNextGroup = false,
   onPreviousGroup,
@@ -1570,9 +1572,15 @@ function GroupDivider({
     return () => window.removeEventListener("scroll", handleScroll);
   }, [transitioningThreshold]);
 
+  const renderSticky = isSticky || forceSticky;
+  const stickyTransitionClass = disableStickyAnimation
+    ? "transition-none"
+    : "transition-all duration-300";
+
   return (
     <motion.div
       ref={ref}
+      data-group-divider
       className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
         mobileFiltersOpen ? "top-[232px]" : "top-[128px]"
       }`}
@@ -1582,27 +1590,27 @@ function GroupDivider({
     >
       <div className="flex min-w-0 items-center gap-3 lg:gap-4">
         <div
-          className={`relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
+          className={`relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
         >
           <div
-            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
           >
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
             <div
-              className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
+              className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
             />
 
             <div
-              className={`min-w-0 flex-1 transition-all duration-300 ${isSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
+              className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
             >
               <h2
-                className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md transition-all duration-300 ${isSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
+                className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
               >
                 {title}
               </h2>
 
               <div
-                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 transition-all duration-300 ${isSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+                className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
               >
                 <span className="text-zinc-300 font-bold">{count}</span>
                 <span>items</span>
@@ -1620,7 +1628,7 @@ function GroupDivider({
                   label="IMDb"
                   value={formatAvg(stats.imdb.avg)}
                   imgSrc="/logo-IMDb.svg"
-                  horizontal={isSticky}
+                  horizontal={renderSticky}
                 />
               )}
             {stats?.trakt?.avg != null &&
@@ -1630,7 +1638,7 @@ function GroupDivider({
                   label="Trakt"
                   value={formatAvg(stats.trakt.avg)}
                   imgSrc="/logo-Trakt.png"
-                  horizontal={isSticky}
+                  horizontal={renderSticky}
                 />
               )}
             {stats?.tmdb?.avg != null &&
@@ -1640,7 +1648,7 @@ function GroupDivider({
                   label="TMDb"
                   value={formatAvg(stats.tmdb.avg)}
                   imgSrc="/logo-TMDb.png"
-                  horizontal={isSticky}
+                  horizontal={renderSticky}
                 />
               )}
 
@@ -1648,14 +1656,14 @@ function GroupDivider({
               typeof stats.my.avg === "number" &&
               !Number.isNaN(stats.my.avg) && (
                 <div
-                  className={`transition-all duration-300 border-white/10 ${isSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
+                  className={`${stickyTransitionClass} border-white/10 ${renderSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
                 >
                   <StatBox
                     label="Tu media"
                     value={formatAvg(stats.my.avg)}
                     icon={Star}
                     colorClass="text-amber-400 fill-amber-400"
-                    horizontal={isSticky}
+                    horizontal={renderSticky}
                   />
                 </div>
               )}
@@ -1663,8 +1671,8 @@ function GroupDivider({
           </div>
         </div>
         <div
-          className={`hidden shrink-0 lg:flex overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"} ${
-            isSticky ? "flex-row gap-1" : "flex-col gap-1"
+          className={`hidden shrink-0 lg:flex overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"} ${
+            renderSticky ? "flex-row gap-1" : "flex-col gap-1"
           }`}
         >
           <button
@@ -1672,7 +1680,6 @@ function GroupDivider({
             onClick={onPreviousGroup}
             disabled={!hasPreviousGroup}
             aria-label="Ir a la agrupación anterior"
-            title="Agrupación anterior"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronUp className="h-5 w-5" />
@@ -1682,7 +1689,6 @@ function GroupDivider({
             onClick={onNextGroup}
             disabled={!hasNextGroup}
             aria-label="Ir a la siguiente agrupación"
-            title="Siguiente agrupación"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronDown className="h-5 w-5" />
@@ -2845,11 +2851,53 @@ export default function FavoritesClient() {
   ]);
 
   const groupSectionRefs = useRef(new Map());
+  const forcedStickyTimerRef = useRef(null);
+  const [forcedStickyGroupKey, setForcedStickyGroupKey] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (forcedStickyTimerRef.current) {
+        window.clearTimeout(forcedStickyTimerRef.current);
+      }
+    };
+  }, []);
 
   const setGroupSectionRef = useCallback((key, node) => {
     if (!key) return;
     if (node) groupSectionRefs.current.set(key, node);
     else groupSectionRefs.current.delete(key);
+  }, []);
+
+  const scrollGroupIntoStickyPosition = useCallback((groupKey) => {
+    if (typeof window === "undefined" || window.innerWidth < 1024) return;
+
+    const target = groupSectionRefs.current.get(groupKey);
+    if (!target) return;
+
+    const divider = target.querySelector("[data-group-divider]");
+    const targetRect = target.getBoundingClientRect();
+    const targetTop = window.scrollY + targetRect.top;
+    const dividerMarginTop = divider
+      ? Number.parseFloat(window.getComputedStyle(divider).marginTop) || 0
+      : 0;
+    const stickyTop = 136;
+    const activationBias = 4;
+
+    setForcedStickyGroupKey(groupKey);
+    if (forcedStickyTimerRef.current) {
+      window.clearTimeout(forcedStickyTimerRef.current);
+    }
+    forcedStickyTimerRef.current = window.setTimeout(() => {
+      setForcedStickyGroupKey((currentKey) =>
+        currentKey === groupKey ? null : currentKey,
+      );
+      forcedStickyTimerRef.current = null;
+    }, 900);
+
+    window.scrollTo({
+      top: Math.max(0, targetTop + dividerMarginTop - stickyTop + activationBias),
+      behavior: "smooth",
+    });
   }, []);
 
   const scrollToNextGroup = useCallback(
@@ -2863,19 +2911,9 @@ export default function FavoritesClient() {
       const nextGroup = grouped[currentIndex + 1];
       if (!nextGroup) return;
 
-      const target = groupSectionRefs.current.get(nextGroup.key);
-      if (!target) return;
-
-      const stickyOffset = 148;
-      const top =
-        window.scrollY + target.getBoundingClientRect().top - stickyOffset;
-
-      window.scrollTo({
-        top: Math.max(0, top),
-        behavior: "smooth",
-      });
+      scrollGroupIntoStickyPosition(nextGroup.key);
     },
-    [grouped],
+    [grouped, scrollGroupIntoStickyPosition],
   );
 
   const scrollToPreviousGroup = useCallback(
@@ -2889,19 +2927,9 @@ export default function FavoritesClient() {
       const previousGroup = grouped[currentIndex - 1];
       if (!previousGroup) return;
 
-      const target = groupSectionRefs.current.get(previousGroup.key);
-      if (!target) return;
-
-      const stickyOffset = 148;
-      const top =
-        window.scrollY + target.getBoundingClientRect().top - stickyOffset;
-
-      window.scrollTo({
-        top: Math.max(0, top),
-        behavior: "smooth",
-      });
+      scrollGroupIntoStickyPosition(previousGroup.key);
     },
-    [grouped],
+    [grouped, scrollGroupIntoStickyPosition],
   );
 
   const scoreLoadingLabel =
@@ -3706,6 +3734,8 @@ export default function FavoritesClient() {
                   stats={group.stats}
                   groupBy={groupBy}
                   mobileFiltersOpen={mobileFiltersOpen}
+                  forceSticky={forcedStickyGroupKey === group.key}
+                  disableStickyAnimation={forcedStickyGroupKey === group.key}
                   hasPreviousGroup={groupIndex > 0}
                   hasNextGroup={groupIndex < grouped.length - 1}
                   onPreviousGroup={() => scrollToPreviousGroup(group.key)}
