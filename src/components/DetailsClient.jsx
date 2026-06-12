@@ -10195,8 +10195,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const colCardClass = enableHover
-                            ? "mt-3 block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
-                            : "mt-3 block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
+                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                            : "block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
                           const colImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
