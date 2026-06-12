@@ -70,9 +70,9 @@ function awardResultClass(result) {
     return "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]";
   }
   if (result === "nominee") {
-    return "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]";
+    return "text-zinc-300 drop-shadow-[0_0_8px_rgba(212,212,216,0.6)]";
   }
-  return "text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]";
+  return "text-zinc-400 drop-shadow-[0_0_8px_rgba(161,161,170,0.3)]";
 }
 
 const genderLabel = (g) => {
@@ -1203,10 +1203,10 @@ function AwardCard({ item }) {
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
             )}
             {result === "nominee" && (
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 shadow-[0_0_6px_rgba(212,212,216,0.8)]" />
             )}
             {result !== "winner" && result !== "nominee" && (
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
             )}
             {awardResultLabel(result)}
           </span>
@@ -1248,7 +1248,7 @@ function AwardCard({ item }) {
               {result === "winner" ? (
                 <Trophy className="h-16 w-16 sm:h-20 sm:w-20 text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               ) : (
-                <Award className="h-16 w-16 sm:h-20 sm:w-20 text-sky-200 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+                <Award className="h-16 w-16 sm:h-20 sm:w-20 text-zinc-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               )}
             </div>
           )}
