@@ -1079,7 +1079,7 @@ function AwardsPanel({ awards }) {
 
   return (
     <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
+      {/* Capa de fondo suave */}
       <div
         className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
@@ -9645,7 +9645,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {activeTab === "synopsis" && (
                         <div key="synopsis">
                           <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                            {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
+                            {/* Capa de fondo suave */}
                             <div
                               className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
                               style={{
@@ -9864,7 +9864,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {activeTab === "synopsis" && (
                   <div key="synopsis-backdrop">
                     <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
+                      {/* Capa de fondo suave */}
                       <div
                         className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
                         style={{

@@ -7,11 +7,11 @@ export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
 
   return (
     <div
-      className={`relative flex items-center gap-3.5 p-3.5 pl-4 rounded-xl h-full ${className}`}
+      className={`relative isolate flex h-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] ${className}`}
     >
-      {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
+      {/* Capa de luz estilo ScoreboardBar */}
       <div
-        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
+        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
       />
 
