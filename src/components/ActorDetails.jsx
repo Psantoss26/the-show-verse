@@ -38,7 +38,6 @@ import {
   ArrowUpDown,
   ChevronDown,
   Calendar,
-  Youtube,
   Music2,
 } from "lucide-react";
 import {
@@ -2041,8 +2040,11 @@ export default function ActorDetails({
         ? {
             id: "youtube",
             label: "YouTube",
-            iconComponent: Youtube,
+            icon: "/youtube.webp",
             href: socials.youtube,
+            iconSize: { width: 24, height: 24 },
+            iconClassName: "!h-6 !w-6 rounded-md object-contain",
+            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
           }
         : null,
       socials.tiktok
