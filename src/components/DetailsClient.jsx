@@ -9514,8 +9514,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <button
                         type="button"
                         onClick={() => setExternalLinksOpen(true)}
-                        className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center
-                 border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
+                        className="sm:hidden flex isolate transform-gpu items-center justify-center w-10 h-10 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 transition-all duration-300 hover:text-white hover:bg-white/10"
                         title="Enlaces"
                         aria-label="Abrir enlaces externos"
                       >
@@ -9533,7 +9532,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ========== Botón de Compartir ========== */}
                   {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
                   {/* Se mantiene pegado al extremo derecho con ml-auto */}
-                  <div className="ml-auto shrink-0">
+                  <div className="ml-auto shrink-0 max-sm:[&>button]:!flex max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!items-center max-sm:[&>button]:!justify-center max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-transparent max-sm:[&>button]:!bg-black/20 max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-white/5 max-sm:[&>button]:!to-black/40 max-sm:[&>button]:!backdrop-blur-[50px] max-sm:[&>button]:!shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/10 max-sm:[&>button>span]:!hidden max-sm:[&>button_svg]:!w-5 max-sm:[&>button_svg]:!h-5">
                     <ActionShareButton
                       title={title}
                       text={`Echa un vistazo a ${title} en The Show Verse`}
@@ -9787,36 +9786,51 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       )}
 
                       {/* 4. PREMIOS */}
-                      {activeTab === "awards" && (extras.awards || hasAwardItems) && (
-                        <div key="awards">
-                          {extras.awards ? (
-                            <AwardsPanel awards={extras.awards} />
-                          ) : (
-                            <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                              <div
-                                className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-                              />
-                              <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
-                              <div className="relative z-10">
-                                <div className="flex items-start gap-4">
-                                  <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                                    <Trophy className="w-8 h-8" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h3 className="text-lg font-bold text-white mb-2">
-                                      Premios y nominaciones
-                                    </h3>
-                                    <p className="text-base leading-relaxed text-zinc-200">
-                                      {awardItems.filter((a) => a.result === "winner").length} premios y {awardItems.filter((a) => a.result === "nominee").length} nominaciones
-                                    </p>
+                      {activeTab === "awards" &&
+                        (extras.awards || hasAwardItems) && (
+                          <div key="awards">
+                            {extras.awards ? (
+                              <AwardsPanel awards={extras.awards} />
+                            ) : (
+                              <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
+                                <div
+                                  className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
+                                  style={{
+                                    WebkitMaskImage:
+                                      "-webkit-radial-gradient(white, black)",
+                                  }}
+                                />
+                                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
+                                <div className="relative z-10">
+                                  <div className="flex items-start gap-4">
+                                    <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
+                                      <Trophy className="w-8 h-8" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="text-lg font-bold text-white mb-2">
+                                        Premios y nominaciones
+                                      </h3>
+                                      <p className="text-base leading-relaxed text-zinc-200">
+                                        {
+                                          awardItems.filter(
+                                            (a) => a.result === "winner",
+                                          ).length
+                                        }{" "}
+                                        premios y{" "}
+                                        {
+                                          awardItems.filter(
+                                            (a) => a.result === "nominee",
+                                          ).length
+                                        }{" "}
+                                        nominaciones
+                                      </p>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            )}
+                          </div>
+                        )}
                     </AnimatePresence>
                   </div>
                 </div>
@@ -9990,7 +10004,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
                         <div
                           className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+                          style={{
+                            WebkitMaskImage:
+                              "-webkit-radial-gradient(white, black)",
+                          }}
                         />
                         <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
                         <div className="relative z-10">
@@ -10003,7 +10020,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 Premios y nominaciones
                               </h3>
                               <p className="text-base leading-relaxed text-zinc-200">
-                                {awardItems.filter((a) => a.result === "winner").length} premios y {awardItems.filter((a) => a.result === "nominee").length} nominaciones
+                                {
+                                  awardItems.filter(
+                                    (a) => a.result === "winner",
+                                  ).length
+                                }{" "}
+                                premios y{" "}
+                                {
+                                  awardItems.filter(
+                                    (a) => a.result === "nominee",
+                                  ).length
+                                }{" "}
+                                nominaciones
                               </p>
                             </div>
                           </div>
