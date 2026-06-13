@@ -81,7 +81,7 @@ const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v38";
+const CACHE_VERSION = "soundtrack-ranking-v39";
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
