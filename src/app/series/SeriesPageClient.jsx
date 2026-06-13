@@ -13,7 +13,6 @@ import {
   HeartOff,
   BookmarkPlus,
   BookmarkMinus,
-  Loader2,
   Play,
   X,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import {
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
+import LiquidButton from "@/components/LiquidButton";
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -102,6 +102,28 @@ const PREVIEW_BACKDROP_SIZE = "w780";
 const getPreviewBackdropFallback = (show) =>
   show?.backdrop_path || show?.poster_path || null;
 
+const dashboardPreviewCardClass = (heightClass) =>
+  [
+    "relative isolate grid grid-rows-[76%_24%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
+    "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px]",
+    "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
+    "transition-all duration-300",
+    heightClass,
+  ].join(" ");
+
+const dashboardPreviewMediaClass =
+  "relative h-full w-full overflow-hidden bg-transparent";
+
+const dashboardPreviewInfoClass =
+  "relative h-full w-full overflow-hidden bg-black/10 bg-gradient-to-br from-white/5 via-transparent to-black/20 backdrop-blur-[50px]";
+
+const dashboardPreviewBackdropFadeStyle = {
+  WebkitMaskImage:
+    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+  maskImage:
+    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+};
+
 const TV_GENRES = {
   10759: "Acción y aventura",
   16: "Animación",
@@ -131,7 +153,12 @@ function preloadImage(src) {
   const promise = new Promise((resolve) => {
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => resolve(true);
+    img.onload = async () => {
+      try {
+        if (typeof img.decode === "function") await img.decode();
+      } catch {}
+      resolve(true);
+    };
     img.onerror = () => resolve(false);
     img.src = src;
   });
@@ -366,6 +393,30 @@ async function fetchBestTVBackdrop(showId) {
   });
 
   return best?.file_path || null;
+}
+
+async function preparePreviewBackdrop(show) {
+  if (!show?.id) return null;
+
+  let backdropPath = tvBackdropCache.get(show.id);
+
+  if (backdropPath === undefined) {
+    try {
+      backdropPath =
+        (await fetchBestTVBackdrop(show.id)) ||
+        getPreviewBackdropFallback(show);
+    } catch {
+      backdropPath = getPreviewBackdropFallback(show);
+    }
+
+    tvBackdropCache.set(show.id, backdropPath);
+  }
+
+  if (backdropPath) {
+    await preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
+  }
+
+  return backdropPath || null;
 }
 
 /* ====================================================================
@@ -657,7 +708,7 @@ function InlinePreviewCard({ show, heightClass }) {
       const revealBackdrop = (path) => {
         if (abort) return;
         setBackdropPath(path);
-        setBackdropReady(false);
+        setBackdropReady(!!path);
       };
 
       const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
@@ -863,14 +914,13 @@ function InlinePreviewCard({ show, heightClass }) {
 
   return (
     <div
-      // CAMBIO: rounded-3xl -> rounded-lg
-      className={`rounded-lg overflow-hidden bg-neutral-900 text-white shadow-xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer`}
+      className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
-      <div className="relative w-full h-full bg-black">
+      <div className={dashboardPreviewMediaClass}>
         {!showTrailer && !backdropReady && (
           <div className="absolute inset-0 bg-neutral-900" />
         )}
@@ -880,9 +930,10 @@ function InlinePreviewCard({ show, heightClass }) {
             key={bgSrc}
             src={bgSrc}
             alt={show.name || show.title}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+            className={`absolute inset-0 h-full w-full scale-[1.015] object-cover transition-opacity duration-200 ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
+            style={dashboardPreviewBackdropFadeStyle}
             loading="eager"
             decoding="async"
             fetchPriority="high"
@@ -892,7 +943,7 @@ function InlinePreviewCard({ show, heightClass }) {
               if (fallback && fallback !== backdropPath) {
                 tvBackdropCache.set(show.id, fallback);
                 setBackdropPath(fallback);
-                setBackdropReady(false);
+                setBackdropReady(true);
                 return;
               }
               setBackdropReady(false);
@@ -940,10 +991,10 @@ function InlinePreviewCard({ show, heightClass }) {
           </>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 bg-gradient-to-b from-transparent via-black/55 to-neutral-950/95" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70" />
       </div>
 
-      <div className="w-full h-full bg-neutral-950/95 border-t border-neutral-800">
+      <div className={dashboardPreviewInfoClass}>
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
@@ -999,58 +1050,45 @@ function InlinePreviewCard({ show, heightClass }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <button
+            <LiquidButton
               onClick={handleToggleTrailer}
-              disabled={trailerLoading}
+              loading={trailerLoading}
+              active
+              activeColor="yellow"
+              groupId="series-preview-actions"
               title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-yellow-500/90 to-yellow-600/90 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-400/40 flex items-center justify-center text-black transition-all duration-200 disabled:opacity-60 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50"
+              className="!h-9 !w-9 !bg-white !text-black sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {trailerLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-              ) : showTrailer ? (
-                <X className="w-5 h-5 text-black" />
+              {showTrailer ? (
+                <X className="text-black" />
               ) : (
-                <Play className="w-5 h-5 text-black" />
+                <Play className="ml-0.5 fill-current text-black" />
               )}
-            </button>
+            </LiquidButton>
 
-            <button
+            <LiquidButton
               onClick={handleToggleFavorite}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={favorite}
+              activeColor="red"
+              groupId="series-preview-actions"
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                favorite
-                  ? "bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Heart
-                  className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
-                />
-              )}
-            </button>
+              <Heart className={favorite ? "fill-current" : ""} />
+            </LiquidButton>
 
-            <button
+            <LiquidButton
               onClick={handleToggleWatchlist}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={watchlist}
+              activeColor="blue"
+              groupId="series-preview-actions"
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                watchlist
-                  ? "bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <BookmarkPlus
-                  className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
-                />
-              )}
-            </button>
+              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+            </LiquidButton>
           </div>
         </div>
       </div>
@@ -1093,6 +1131,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
+  const hoverIntentRef = useRef(0);
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -1109,22 +1148,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
         .filter((show) => !preloadedBackdrops.has(show.id));
 
       for (const show of toPreload) {
-        let backdropPath = tvBackdropCache.get(show.id);
-
-        if (backdropPath === undefined) {
-          try {
-            backdropPath =
-              (await fetchBestTVBackdrop(show.id)) ||
-              getPreviewBackdropFallback(show);
-          } catch {
-            backdropPath = getPreviewBackdropFallback(show);
-          }
-          tvBackdropCache.set(show.id, backdropPath);
-        }
-
-        if (backdropPath) {
-          preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
-        }
+        await preparePreviewBackdrop(show);
         setPreloadedBackdrops((prev) => new Set([...prev, show.id]));
       }
     };
@@ -1254,6 +1278,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
         className="relative"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
+          hoverIntentRef.current += 1;
           setIsHoveredRow(false);
           setHoveredId(null);
         }}
@@ -1304,9 +1329,18 @@ function Row({ title, items, isMobile, posterCacheRef }) {
               <div
                 className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
                 onMouseEnter={() => {
-                  if (!isMobile) setHoveredId(s.id);
+                  if (!isMobile) {
+                    const hoverToken = hoverIntentRef.current + 1;
+                    hoverIntentRef.current = hoverToken;
+                    preparePreviewBackdrop(s).finally(() => {
+                      if (hoverIntentRef.current === hoverToken) {
+                        setHoveredId(s.id);
+                      }
+                    });
+                  }
                 }}
                 onMouseLeave={() => {
+                  hoverIntentRef.current += 1;
                   if (!isMobile)
                     setHoveredId((prev) => (prev === s.id ? null : prev));
                 }}
@@ -1453,8 +1487,14 @@ export default function SeriesPageClient({ initialData }) {
   }
 
   return (
-    <div className="px-6 py-6 text-white bg-black">
-      <div className="space-y-12 pt-2">
+    <div className="relative min-h-screen overflow-hidden bg-black px-4 py-6 text-white selection:bg-amber-500/30 sm:px-6">
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-amber-500/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-yellow-600/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-amber-700/25 blur-[120px] sm:blur-[150px]" />
+      </div>
+
+      <div className="relative z-10 space-y-12 pt-2">
         {dashboardData["Top 10 hoy en España"]?.length ? (
           <Row
             title="Top 10 hoy en España"
