@@ -52,6 +52,10 @@ import DetailsSectionMenu from "./DetailsSectionMenu";
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const ACTOR_LIQUID_CARD_CLASS =
+  "relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] transform-gpu";
+const ACTOR_LIQUID_CARD_LAYER_CLASS =
+  "pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70";
 
 const tmdbImg = (path, size = "original") =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
@@ -2467,12 +2471,13 @@ export default function ActorDetails({
                   return (
                     <div
                       key={item.label}
-                      className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 p-4 sm:p-5"
+                      className={`${ACTOR_LIQUID_CARD_CLASS} p-4 sm:p-5`}
                     >
+                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
                       <div
                         className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tones[item.tone]} to-transparent blur-2xl opacity-80`}
                       />
-                      <div className="relative flex items-start justify-between gap-3">
+                      <div className="relative z-10 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-500">
                             {item.label}
@@ -2498,11 +2503,13 @@ export default function ActorDetails({
 
             {mostPopularCredit && (
               <FadeIn delay={0.2} className="mb-5">
-                <div className="flex items-center gap-3 rounded-[2rem] bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 backdrop-blur-lg shadow-lg border border-emerald-500/20 p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
+                <div className={`${ACTOR_LIQUID_CARD_CLASS} flex items-center gap-3 p-4`}>
+                  <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
+                  <div className="pointer-events-none absolute -left-10 -top-10 h-28 w-28 rounded-full bg-emerald-500/15 blur-2xl" />
+                  <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
                     <Star className="h-5 w-5 fill-emerald-300" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="relative z-10 min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300/80">
                       Crédito más popular
                     </p>
@@ -2518,9 +2525,10 @@ export default function ActorDetails({
             )}
 
             <FadeIn delay={0.24}>
-              <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 relative">
+              <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
+                <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
                 <p
-                  className={`text-zinc-200 text-base leading-relaxed text-justify whitespace-pre-line ${
+                  className={`relative z-10 text-zinc-200 text-base leading-relaxed text-justify whitespace-pre-line ${
                     !showFullBio && bio.length > 420
                       ? "line-clamp-4 mask-fade-bottom"
                       : ""
@@ -2535,7 +2543,7 @@ export default function ActorDetails({
                 {bio.length > 420 && (
                   <button
                     onClick={() => setShowFullBio(!showFullBio)}
-                    className="mt-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 uppercase tracking-wide flex items-center gap-1"
+                    className="relative z-10 mt-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 uppercase tracking-wide flex items-center gap-1"
                   >
                     {showFullBio ? "Ver menos" : "Leer más"}{" "}
                     <ChevronDown
@@ -2893,100 +2901,109 @@ export default function ActorDetails({
                     icon={User}
                   />
                   <div className="mt-3 grid sm:grid-cols-2 gap-4">
-                    <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 space-y-4">
-                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                        Información
-                      </h3>
-                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                        <span className="text-zinc-400">Género</span>
-                        <span className="text-white text-right">
-                          {genderLabel(actorDetails?.gender)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                        <span className="text-zinc-400">Lugar</span>
-                        <span className="text-white text-right max-w-[60%] truncate">
-                          {safeText(actorDetails?.place_of_birth)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                        <span className="text-zinc-400">Conocido/a por</span>
-                        <span className="text-white text-right">
-                          {safeText(actorDetails?.known_for_department)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-zinc-400">TMDb ID</span>
-                        <span className="text-white font-mono">
-                          {safeText(actorDetails?.id)}
-                        </span>
+                    <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
+                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
+                      <div className="relative z-10 space-y-4">
+                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                          Información
+                        </h3>
+                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                          <span className="text-zinc-400">Género</span>
+                          <span className="text-white text-right">
+                            {genderLabel(actorDetails?.gender)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                          <span className="text-zinc-400">Lugar</span>
+                          <span className="text-white text-right max-w-[60%] truncate">
+                            {safeText(actorDetails?.place_of_birth)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
+                          <span className="text-zinc-400">Conocido/a por</span>
+                          <span className="text-white text-right">
+                            {safeText(actorDetails?.known_for_department)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-zinc-400">TMDb ID</span>
+                          <span className="text-white font-mono">
+                            {safeText(actorDetails?.id)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="p-5 sm:p-6 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 space-y-4">
-                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                        Enlaces & Alias
-                      </h3>
+                    <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
+                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
+                      <div className="relative z-10 space-y-4">
+                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                          Enlaces & Alias
+                        </h3>
 
-                      <div className="flex flex-wrap gap-2">
-                        {actorExternalLinks.map((link) => {
-                          const Icon = link.iconComponent;
-                          return (
-                            <a
-                              key={link.id}
-                              href={link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-white/5 bg-zinc-800/70 px-3 py-1.5 text-sm text-zinc-200 transition-colors hover:border-emerald-400/25 hover:bg-emerald-500/15 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-                              aria-label={`Abrir ${link.label}`}
-                            >
-                              {Icon ? (
-                                <Icon
-                                  className="h-3.5 w-3.5"
-                                  aria-hidden="true"
-                                />
-                              ) : link.icon ? (
-                                <img
-                                  src={link.icon}
-                                  alt=""
-                                  className={
-                                    link.menuIconClassName ||
-                                    "h-3.5 w-3.5 rounded-sm object-contain"
-                                  }
-                                  draggable="false"
-                                />
-                              ) : (
-                                <ExternalLink
-                                  className="h-3.5 w-3.5"
-                                  aria-hidden="true"
-                                />
-                              )}
-                              <span>{link.label}</span>
-                            </a>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-1">
-                        <h4 className="text-xs text-zinc-500 mb-2">
-                          También conocido/a como
-                        </h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(actorDetails?.also_known_as || [])
-                            .slice(0, 14)
-                            .map((a) => (
-                              <span
-                                key={a}
-                                className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400 border border-white/5"
+                        <div className="flex flex-wrap gap-2">
+                          {actorExternalLinks.map((link) => {
+                            const Icon = link.iconComponent;
+                            return (
+                              <a
+                                key={link.id}
+                                href={link.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white/5 px-3 py-1.5 text-sm text-zinc-200 shadow-sm backdrop-blur-md transition-colors hover:bg-emerald-500/15 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                                aria-label={`Abrir ${link.label}`}
                               >
-                                {a}
+                                {Icon ? (
+                                  <Icon
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                ) : link.icon ? (
+                                  <img
+                                    src={link.icon}
+                                    alt=""
+                                    className={
+                                      link.menuIconClassName ||
+                                      "h-3.5 w-3.5 rounded-sm object-contain"
+                                    }
+                                    draggable="false"
+                                  />
+                                ) : (
+                                  <ExternalLink
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <span>{link.label}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-1">
+                          <h4 className="text-xs text-zinc-500 mb-2">
+                            También conocido/a como
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(actorDetails?.also_known_as || [])
+                              .slice(0, 14)
+                              .map((a) => (
+                                <span
+                                  key={a}
+                                  className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400"
+                                >
+                                  {a}
+                                </span>
+                              ))}
+                            {(actorDetails?.also_known_as || []).length >
+                              14 && (
+                              <span className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-500">
+                                +
+                                {(actorDetails?.also_known_as || []).length -
+                                  14}
                               </span>
-                            ))}
-                          {(actorDetails?.also_known_as || []).length > 14 && (
-                            <span className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-500 border border-white/5">
-                              +{(actorDetails?.also_known_as || []).length - 14}
-                            </span>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
