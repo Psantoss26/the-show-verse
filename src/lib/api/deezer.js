@@ -2,6 +2,12 @@ import {
   norm, tokens, sigTokens, unique, containsAny, bestTitleScore,
   yearScore, soundtrackBonus, sleep, SOUNDTRACK_WORDS,
   BAD_MATCH_WORDS,
+  buildSpotifyLikeSoundtrackQueries,
+  albumNameMatchesAnyTitle,
+  hasDisallowedTitleSuffixForName,
+  isPrioritySoundtrackName,
+  primarySearchTitle,
+  scoreSoundtrackAlbumCandidate,
 } from "@/lib/api/soundtrack-utils";
 
 const DEEZER_API = "https://api.deezer.com";
@@ -43,84 +49,38 @@ async function fetchJson(url) {
 }
 
 function buildQueries(ctx) {
-  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
-  const qs = [];
-
-  for (const title of titles) {
-    const short = norm(title).replace(/\s+/g, "").length <= 3;
-    qs.push(`${title} soundtrack`);
-    qs.push(`${title} OST`);
-    qs.push(`${title} music from`);
-
-    if (ctx.mediaType === "tv") {
-      qs.push(`${title} series soundtrack`);
-      qs.push(`${title} television soundtrack`);
-    } else {
-      qs.push(`${title} movie soundtrack`);
-      qs.push(`${title} motion picture soundtrack`);
-    }
-
-    if (short && ctx.mediaType === "movie") {
-      qs.push(`${title} the movie`);
-      qs.push(`${title} the album`);
-    }
-
-    if (ctx.year) {
-      qs.push(`${title} ${ctx.year} soundtrack`);
-      qs.push(`${title} ${ctx.year}`);
-    }
-  }
-
-  return unique(qs).slice(0, SEARCH_QUERY_LIMIT);
+  return buildSpotifyLikeSoundtrackQueries(ctx, SEARCH_QUERY_LIMIT);
 }
 
 function scoreAlbum(album, ctx) {
   const name = album.title ?? "";
   const artist = album.artist?.name ?? "";
+  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
+  if (!albumNameMatchesAnyTitle(name, titles)) return -999;
+  if (hasDisallowedTitleSuffixForName(name, album.release_date, ctx)) return -999;
+
   const text = norm(`${name} ${artist}`);
-
-  let s = bestTitleScore(name, ctx.titles);
-  const hasShortTitle = ctx.titles.some(
-    (title) => norm(title).replace(/\s+/g, "").length <= 3,
+  let s = scoreSoundtrackAlbumCandidate(
+    {
+      name,
+      artist,
+      releaseDate: album.release_date,
+      totalTracks: album.nb_tracks,
+      albumType: album.record_type ?? "",
+      primaryTitleSearchRank: album.primaryTitleSearchRank,
+    },
+    { ...ctx, titles },
   );
-  const hasSoundtrackContext =
-    containsAny(text, SOUNDTRACK_WORDS) ||
-    /album|motion picture|television|series|movie|film|score|ost/.test(text);
-
-  if (ctx.originalTitle) {
-    const os = bestTitleScore(name, [ctx.originalTitle]);
-    if (os >= 70) s += 16;
-    else if (os >= 50) s += 8;
-  }
-
-  s += soundtrackBonus(text);
-  if (containsAny(text, BAD_MATCH_WORDS)) s -= 80;
-
-  if (/motion picture|television|series|movie|film/.test(text)) s += 10;
-  if (ctx.mediaType === "tv" && /series|show|season|episode|tv|television/.test(text)) s += 8;
-  if (ctx.mediaType === "movie" && /movie|film|motion picture/.test(text)) s += 8;
-  if (hasShortTitle && !hasSoundtrackContext) s -= 100;
-  if (ctx.mediaType === "movie" && /game|video game|manager|simulator/.test(text) && !/movie|film|motion picture/.test(text)) s -= 120;
-  if (ctx.mediaType === "tv" && /movie|film/.test(text) && !/series|show|season|episode|tv|television/.test(text)) s -= 12;
-  if (ctx.mediaType === "movie" && /series|season|episode|tv|television/.test(text) && !/movie|film|motion picture/.test(text)) s -= 12;
-  if (/original|official/.test(text)) s += 6;
-  if (/album/.test(text)) s += 4;
-
-  s += yearScore(album.release_date, ctx.year, ctx.mediaType);
-
-  const total = Number(album.nb_tracks ?? 0);
-  if (total >= 4 && total <= 80) s += 8;
-  if (total < 3) s -= 100;
+  if (isPrioritySoundtrackName(name, { ...ctx, titles })) s += 30;
 
   const nameTokens = new Set(tokens(name));
-  const anyTitleToken = ctx.titles
+  const anyTitleToken = titles
     .map(sigTokens)
     .filter((ts) => ts.length)
     .some((ts) => ts.some((t) => nameTokens.has(t)));
   if (!anyTitleToken) s -= 40;
 
-  const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
-  if (bestTitleScore(name, ctx.titles) === 0 && hasSigTokens) s -= 200;
+  if (containsAny(text, BAD_MATCH_WORDS)) s -= 80;
 
   const knownComposers = [
     "hans zimmer", "john williams", "danny elfman", "howard shore",
@@ -179,6 +139,7 @@ export async function searchDeezer(ctx) {
   const queries = buildQueries(ctx);
   let allScoredAlbums = [];
   let usedQuery = "";
+  const primaryTitle = primarySearchTitle(ctx);
 
   for (let qi = 0; qi < queries.length; qi++) {
     if (isRateLimited()) break;
@@ -199,7 +160,16 @@ export async function searchDeezer(ctx) {
 
     if (!usedQuery) usedQuery = q;
 
+    const primaryTitleSearch = Boolean(primaryTitle) && norm(q) === norm(primaryTitle);
     const scored = albums
+      .map((a, index) => ({
+        ...a,
+        searchQuery: q,
+        queryIndex: qi,
+        searchRank: index + 1,
+        primaryTitleSearch,
+        primaryTitleSearchRank: primaryTitleSearch ? index + 1 : null,
+      }))
       .map((a) => ({ ...a, _score: scoreAlbum(a, ctx) }))
       .filter((a) => a._score >= ALBUM_MIN_SCORE)
       .sort((a, b) => b._score - a._score)

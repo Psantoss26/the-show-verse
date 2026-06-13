@@ -7,6 +7,12 @@ import {
   yearScore,
   SOUNDTRACK_WORDS,
   BAD_MATCH_WORDS,
+  buildSpotifyLikeSoundtrackQueries,
+  albumNameMatchesAnyTitle,
+  hasDisallowedTitleSuffixForName,
+  isPrioritySoundtrackName,
+  primarySearchTitle,
+  scoreSoundtrackAlbumCandidate,
 } from "@/lib/api/soundtrack-utils";
 
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
@@ -30,35 +36,7 @@ function fetchJson(url) {
 }
 
 function buildQueries(ctx) {
-  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
-  const qs = [];
-
-  for (const title of titles) {
-    const short = norm(title).replace(/\s+/g, "").length <= 3;
-    qs.push(title);
-    qs.push(`${title} soundtrack`);
-    qs.push(`${title} OST`);
-
-    if (ctx.mediaType === "tv") {
-      qs.push(`${title} series soundtrack`);
-      qs.push(`${title} television soundtrack`);
-    } else {
-      qs.push(`${title} movie soundtrack`);
-      qs.push(`${title} motion picture soundtrack`);
-    }
-
-    if (short && ctx.mediaType === "movie") {
-      qs.push(`${title} the movie`);
-      qs.push(`${title} the album`);
-    }
-
-    if (ctx.year) {
-      qs.push(`${title} ${ctx.year}`);
-      qs.push(`${title} ${ctx.year} soundtrack`);
-    }
-  }
-
-  return unique(qs).slice(0, SEARCH_QUERY_LIMIT);
+  return buildSpotifyLikeSoundtrackQueries(ctx, SEARCH_QUERY_LIMIT);
 }
 
 function normalizeTrack(track, album, albumScore = 0, index = 0) {
@@ -195,46 +173,45 @@ function isStrictSoundtrackAlbumName(name) {
 }
 
 function scoreAlbums(albums, ctx, options = {}) {
-  const titleNorms = unique([ctx.originalTitle, ...(ctx.titles || [])]).map(norm);
-  const titleSigTokens = titleNorms.map(sigTokens).filter((ts) => ts.length);
-  const hasShortTitle = titleNorms.some(
-    (title) => title.replace(/\s+/g, "").length <= 3,
-  );
+  const titles = unique([ctx.originalTitle, ...(ctx.titles || [])]);
   const scored = [];
 
   for (const album of albums) {
-    const name = norm(album.collectionName ?? album.collectionCensoredName ?? "");
-    if (!nameMatches(name, titleNorms, titleSigTokens)) continue;
-    if (options.strictSoundtrackAlbums) {
-      if (!isStrictSoundtrackAlbumName(name)) continue;
-      if (!hasStrictTitleMatch(name, ctx)) continue;
-      if (hasDisallowedTitleSuffix(name, album.releaseDate, ctx)) continue;
-    }
-
-    const genre = norm(album.primaryGenreName ?? "");
-    const text = `${name} ${genre}`;
-    const hasSoundtrackContext =
-      containsAny(text, SOUNDTRACK_WORDS) ||
-      /album|motion picture|television|series|movie|film|score|ost/.test(text);
-    let score = bestTitleScore(name, titleNorms);
-
-    if (containsAny(text, SOUNDTRACK_WORDS)) score += 16;
-    if (/original|official/.test(name)) score += 2;
-    if (/movie|film|motion picture/.test(name)) score += 8;
-    if (/album/.test(name)) score += 4;
-    if (hasShortTitle && !hasSoundtrackContext) score -= 100;
-    if (ctx.mediaType === "movie" && /game|video game|manager|simulator/.test(text) && !/movie|film|motion picture/.test(text)) score -= 120;
-
-    if (name.includes("broadway")) score -= 30;
-    if (name.includes("cast recording")) score -= 25;
-    if (containsAny(name, BAD_MATCH_WORDS)) score -= 80;
+    const name = album.collectionName ?? album.collectionCensoredName ?? "";
+    const nameNorm = norm(name);
+    if (!albumNameMatchesAnyTitle(name, titles)) continue;
 
     const trackCount = Number(album.trackCount ?? 0);
     if (trackCount < MIN_ALBUM_TRACKS) continue;
-    if (trackCount >= 10) score += 4;
-    score += yearScore(album.releaseDate, ctx.year, ctx.mediaType);
 
-    const nameTokens = name.split(" ");
+    if (options.strictSoundtrackAlbums) {
+      if (!isStrictSoundtrackAlbumName(nameNorm) && !isPrioritySoundtrackName(name, { ...ctx, titles })) {
+        continue;
+      }
+      if (!hasStrictTitleMatch(nameNorm, ctx)) continue;
+      if (hasDisallowedTitleSuffixForName(name, album.releaseDate, ctx)) continue;
+    }
+
+    const genre = norm(album.primaryGenreName ?? "");
+    let score = scoreSoundtrackAlbumCandidate(
+      {
+        name,
+        artist: album.artistName ?? "",
+        genre,
+        releaseDate: album.releaseDate,
+        totalTracks: trackCount,
+        albumType: album.collectionType ?? "",
+        primaryTitleSearchRank: album.primaryTitleSearchRank,
+      },
+      { ...ctx, titles },
+    );
+
+    if (trackCount >= 10) score += 4;
+    if (nameNorm.includes("broadway")) score -= 30;
+    if (nameNorm.includes("cast recording")) score -= 25;
+    if (containsAny(nameNorm, BAD_MATCH_WORDS)) score -= 80;
+
+    const nameTokens = nameNorm.split(" ");
     if (nameTokens.includes("ep")) score -= 15;
     if (nameTokens.includes("single")) score -= 15;
 
@@ -254,7 +231,9 @@ export async function searchITunes(ctx, country = "US", options = {}) {
 
   let usedQuery = "";
   let allAlbums = [];
-  for (const query of queries) {
+  const primaryTitle = primarySearchTitle(ctx);
+  for (let qi = 0; qi < queries.length; qi++) {
+    const query = queries[qi];
     let albums;
     try {
       albums = await searchAlbums(query, country);
@@ -263,7 +242,17 @@ export async function searchITunes(ctx, country = "US", options = {}) {
     }
 
     if (albums.length && !usedQuery) usedQuery = query;
-    allAlbums.push(...albums);
+    const primaryTitleSearch = Boolean(primaryTitle) && norm(query) === norm(primaryTitle);
+    allAlbums.push(
+      ...albums.map((album, index) => ({
+        ...album,
+        searchQuery: query,
+        queryIndex: qi,
+        searchRank: index + 1,
+        primaryTitleSearch,
+        primaryTitleSearchRank: primaryTitleSearch ? index + 1 : null,
+      })),
+    );
   }
 
   if (!allAlbums.length) {
