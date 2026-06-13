@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Calendar, ImageOff } from "lucide-react";
+import { ImageOff } from "lucide-react";
 
 function TmdbPoster({ posterPath, alt, enableHover = true }) {
   const [failed, setFailed] = useState(false);
@@ -22,8 +22,10 @@ function TmdbPoster({ posterPath, alt, enableHover = true }) {
       <img
         src={`https://image.tmdb.org/t/p/w500${posterPath}`}
         alt={alt}
-        className={`h-full w-full object-cover transition-all duration-700 ease-out ${
-          enableHover ? "md:group-hover/card:scale-110" : ""
+        className={`h-full w-full object-cover transition-all duration-500 ease-out transform-gpu ${
+          enableHover
+            ? "md:group-hover/card:scale-[1.08] md:group-hover/card:-translate-y-1 md:group-hover/card:grayscale-0 md:group-focus/card:scale-[1.08] md:group-focus/card:-translate-y-1 md:group-focus/card:grayscale-0 grayscale-[18%]"
+            : ""
         } ${
           loaded ? "opacity-100" : "opacity-0"
         }`}
@@ -52,13 +54,12 @@ export default function ListPosterCard({
   className = "",
   disableHover = false,
 }) {
-  const typeLabel = mediaType === "tv" ? "SERIE" : mediaType === "person" ? "PERSONA" : "PELÍCULA";
   const typeClass =
     mediaType === "tv"
-      ? "border-purple-500/30 bg-purple-500/20 text-purple-200"
+      ? "border-purple-500/30 bg-purple-500/15 text-purple-300"
       : mediaType === "person"
-        ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-200"
-        : "border-sky-500/30 bg-sky-500/20 text-sky-200";
+        ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+        : "border-sky-500/30 bg-sky-500/15 text-sky-300";
 
   const rating =
     typeof voteAverage === "number" && voteAverage > 0
@@ -71,19 +72,13 @@ export default function ListPosterCard({
 
   const content = (
     <div
-      className={`relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-lg ring-1 ring-white/5 transition-all duration-500 ${
+      className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-all duration-500 transform-gpu ${
         disableHover
           ? ""
-          : "md:group-hover/card:-translate-y-1 md:group-hover/card:scale-[1.03] md:group-hover/card:ring-purple-500/30 md:group-hover/card:shadow-[0_0_30px_rgba(168,85,247,0.22)]"
+          : "md:group-hover/card:-translate-y-1.5 md:group-hover/card:border-purple-500/30 md:group-hover/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)] md:group-focus/card:-translate-y-1.5 md:group-focus/card:border-purple-500/30 md:group-focus/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)]"
       } ${className}`}
     >
       <TmdbPoster posterPath={posterPath} alt={title} enableHover={!disableHover} />
-
-      {!disableHover ? (
-        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-700 md:group-hover/card:opacity-100">
-          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-[1200ms] ease-out md:group-hover/card:translate-x-full" />
-        </div>
-      ) : null}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 pt-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent md:hidden">
         <div className="mb-1 flex items-center gap-1.5">
@@ -98,46 +93,42 @@ export default function ListPosterCard({
       </div>
 
       {!disableHover ? (
-        <div className="pointer-events-none absolute inset-0 z-10 hidden flex-col justify-between opacity-0 transition-opacity duration-300 md:flex md:group-hover/card:opacity-100">
-          <div className="flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-3 transition-transform duration-300 md:-translate-y-2 md:group-hover/card:translate-y-0">
-            <span className={`rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider shadow-sm backdrop-blur-md ${typeClass}`}>
-              {typeLabel}
-            </span>
-
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-3 p-3 opacity-0 transition-all duration-500 ease-out transform-gpu md:flex md:-translate-y-2 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100 md:group-focus/card:translate-y-0 md:group-focus/card:opacity-100">
+            <div />
             <div className="flex flex-col items-end gap-1">
               {rating ? (
                 <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  <span className="font-mono text-xs font-black tracking-tight text-emerald-400">
+                  <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
                     {rating}
                   </span>
-                  <img src="/logo-TMDb.png" alt="TMDb" className="h-2.5 w-auto" draggable={false} />
+                  <img src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" draggable={false} />
                 </div>
               ) : null}
               {imdb ? (
                 <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  <span className="font-mono text-xs font-black tracking-tight text-yellow-400">
+                  <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
                     {imdb}
                   </span>
-                  <img src="/logo-IMDb.svg" alt="IMDb" className="h-3 w-auto" draggable={false} />
+                  <img src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" draggable={false} />
                 </div>
               ) : null}
             </div>
           </div>
 
-          <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 transition-transform duration-300 md:translate-y-4 md:group-hover/card:translate-y-0">
-            <div className="flex items-end justify-between gap-3">
-              <h3 className="line-clamp-2 min-w-0 flex-1 text-xs font-bold leading-tight text-white drop-shadow-md sm:text-sm">
-                {title}
-              </h3>
-              {year ? (
-                <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-yellow-400 sm:text-xs">
-                  <Calendar className="h-3 w-3" />
-                  {year}
-                </span>
-              ) : null}
-            </div>
+          <div className="pointer-events-none absolute inset-0 z-0 hidden bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 md:block md:group-hover/card:opacity-100 md:group-focus/card:opacity-100" />
+
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 hidden p-3 pb-4 opacity-0 transition-all duration-500 ease-out transform-gpu md:block md:translate-y-2 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100 md:group-focus/card:translate-y-0 md:group-focus/card:opacity-100">
+            <h3 className="line-clamp-2 text-xs font-extrabold leading-tight text-white drop-shadow-sm sm:text-sm">
+              {title}
+            </h3>
+            {year ? (
+              <p className="mt-0.5 text-[10px] font-semibold leading-tight text-zinc-300 transition-colors duration-300 line-clamp-1 drop-shadow-sm group-hover/card:text-purple-400 sm:text-xs">
+                {year}
+              </p>
+            ) : null}
           </div>
-        </div>
+        </>
       ) : null}
 
       {children}
@@ -151,7 +142,7 @@ export default function ListPosterCard({
   return (
     <Link
       href={href}
-      className="group/card relative block w-full select-none"
+      className="group/card relative block w-full select-none focus:outline-none"
       draggable={false}
       onClick={onClick}
     >
