@@ -225,11 +225,7 @@ export default function CollectionDetailsClient({ collectionId }) {
             posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w500${collectionPoster}` : null}
             backdropImage={collectionBackdrop ? `https://image.tmdb.org/t/p/original${collectionBackdrop}` : null}
             badges={[`${parts.length} películas`, totalRuntime > 0 ? `${Math.round(totalRuntime / 60)}h total` : 'TMDb']}
-            stats={[
-                { label: 'Películas', value: parts.length },
-                { label: 'Duración', value: totalRuntime > 0 ? `${Math.round(totalRuntime / 60)}h` : '—' },
-                { label: 'Fuente', value: 'TMDb' },
-            ]}
+            stats={[]}
             backHref="/lists"
             rightActions={
                 tmdbUrl ? (

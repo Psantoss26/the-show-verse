@@ -182,11 +182,9 @@ export default function UnifiedListDetailsLayout({
                             ) : null}
                         </div>
 
+                        {stats.length > 0 && (
                         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-                            {(stats.length ? stats : [
-                                { label: 'Títulos', value: badges?.[0] || '—', icon: ListVideo, tone: 'yellow' },
-                                { label: 'Fuente', value: sourceLabel, icon: Star, tone: 'emerald' },
-                            ]).map((stat, index) => {
+                            {stats.map((stat, index) => {
                                 const Icon = stat.icon || (index % 2 ? Heart : ListVideo)
                                 const tones = {
                                     emerald: 'from-emerald-500/18 text-emerald-300',
@@ -222,6 +220,7 @@ export default function UnifiedListDetailsLayout({
                                 )
                             })}
                         </div>
+                        )}
 
                         <div className="mb-5">
                             <DescriptionBlock description={description} />
