@@ -178,23 +178,23 @@ const dashboardSegmentButtonClass = (active) =>
 const dashboardPreviewCardClass = (heightClass) =>
   [
     "relative isolate grid grid-rows-[76%_24%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
-    "bg-black/10 bg-gradient-to-br from-white/5 via-neutral-950/45 to-black/55 backdrop-blur-[42px]",
-    "shadow-[0_18px_55px_-36px_rgba(0,0,0,0.85)]",
+    "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px]",
+    "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
     "transition-all duration-300",
     heightClass,
   ].join(" ");
 
 const dashboardPreviewMediaClass =
-  "relative h-full w-full overflow-hidden bg-black/45";
+  "relative h-full w-full overflow-hidden bg-transparent";
 
 const dashboardPreviewInfoClass =
-  "relative h-full w-full overflow-hidden bg-black/15 bg-gradient-to-br from-white/5 via-neutral-950/45 to-black/55 backdrop-blur-[36px]";
+  "relative h-full w-full overflow-hidden bg-black/10 bg-gradient-to-br from-white/5 via-transparent to-black/20 backdrop-blur-[50px]";
 
 const dashboardPreviewBackdropFadeStyle = {
   WebkitMaskImage:
-    "radial-gradient(ellipse at center, black 72%, rgba(0,0,0,0.98) 86%, rgba(0,0,0,0.82) 100%)",
+    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
   maskImage:
-    "radial-gradient(ellipse at center, black 72%, rgba(0,0,0,0.98) 86%, rgba(0,0,0,0.82) 100%)",
+    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
 };
 
 const EXPANDABLE_SECTION_HREFS = {
@@ -276,7 +276,14 @@ function preloadImage(src) {
   const promise = new Promise((resolve) => {
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => resolve(true);
+    img.onload = async () => {
+      try {
+        if (typeof img.decode === "function") {
+          await img.decode();
+        }
+      } catch {}
+      resolve(true);
+    };
     img.onerror = () => resolve(false);
     img.src = src;
   });
@@ -439,6 +446,32 @@ async function fetchBestBackdrop(itemId, mediaType = "movie") {
   });
 
   return best?.file_path || null;
+}
+
+async function preparePreviewBackdrop(item, backdropOverride) {
+  if (!item?.id) return null;
+
+  const mediaType = getMediaTypeForItem(item);
+  const backdropCacheKey = getBackdropCacheKey(item, mediaType);
+  let backdropPath = backdropOverride || movieBackdropCache.get(backdropCacheKey);
+
+  if (backdropPath === undefined) {
+    try {
+      backdropPath =
+        (await fetchBestBackdrop(item.id, mediaType)) ||
+        getPreviewBackdropFallback(item);
+    } catch {
+      backdropPath = getPreviewBackdropFallback(item);
+    }
+
+    movieBackdropCache.set(backdropCacheKey, backdropPath);
+  }
+
+  if (backdropPath) {
+    await preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
+  }
+
+  return backdropPath || null;
 }
 
 async function fetchBestPoster(itemId, mediaType = "movie") {
@@ -759,7 +792,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       const revealBackdrop = (path) => {
         if (abort) return;
         setBackdropPath(path);
-        setBackdropReady(false);
+        setBackdropReady(!!path);
       };
 
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
@@ -1030,7 +1063,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               if (fallback && fallback !== backdropPath) {
                 movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
                 setBackdropPath(fallback);
-                setBackdropReady(false);
+                setBackdropReady(true);
                 return;
               }
               setBackdropReady(false);
@@ -1086,7 +1119,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24
-                      bg-gradient-to-b from-transparent via-black/60 to-black/95"
+                      bg-gradient-to-b from-transparent via-black/35 to-black/70"
         />
       </div>
 
@@ -1271,7 +1304,7 @@ function InlinePreviewCardAnticipated({
       const revealBackdrop = (path) => {
         if (abort) return;
         setBackdropPath(path);
-        setBackdropReady(false);
+        setBackdropReady(!!path);
       };
 
       // Backdrop (igual que tu preview normal)
@@ -1511,7 +1544,7 @@ function InlinePreviewCardAnticipated({
               if (fallback && fallback !== backdropPath) {
                 movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
                 setBackdropPath(fallback);
-                setBackdropReady(false);
+                setBackdropReady(true);
                 return;
               }
               setBackdropReady(false);
@@ -1544,7 +1577,7 @@ function InlinePreviewCardAnticipated({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/60 to-black/95"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70"
         />
       </div>
 
@@ -1870,6 +1903,7 @@ function Row({
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
+  const hoverIntentRef = useRef(0);
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -1891,25 +1925,7 @@ function Row({
 
       for (const movie of toPreload) {
         const backdropOverride = backdropOverrides?.[movie.id];
-        const mediaType = getMediaTypeForItem(movie);
-        const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
-        let backdropPath =
-          backdropOverride || movieBackdropCache.get(backdropCacheKey);
-
-        if (backdropPath === undefined) {
-          try {
-            backdropPath =
-              (await fetchBestBackdrop(movie.id, mediaType)) ||
-              getPreviewBackdropFallback(movie);
-          } catch {
-            backdropPath = getPreviewBackdropFallback(movie);
-          }
-          movieBackdropCache.set(backdropCacheKey, backdropPath);
-        }
-
-        if (backdropPath) {
-          preloadImage(buildImg(backdropPath, PREVIEW_BACKDROP_SIZE));
-        }
+        await preparePreviewBackdrop(movie, backdropOverride);
         setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
       }
     };
@@ -2018,8 +2034,10 @@ function Row({
         className="relative"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
+          hoverIntentRef.current += 1;
           setIsHoveredRow(false);
           setHoveredId(null);
+          setHoveredIndex(null);
         }}
       >
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
@@ -2129,11 +2147,20 @@ function Row({
                     className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                     onMouseEnter={() => {
                       if (!isMobile) {
-                        setHoveredId(itemKey);
+                        const hoverToken = hoverIntentRef.current + 1;
+                        hoverIntentRef.current = hoverToken;
                         setHoveredIndex(i);
+                        preparePreviewBackdrop(m, backdropOverride).finally(
+                          () => {
+                            if (hoverIntentRef.current === hoverToken) {
+                              setHoveredId(itemKey);
+                            }
+                          },
+                        );
                       }
                     }}
                     onMouseLeave={() => {
+                      hoverIntentRef.current += 1;
                       setHoveredId((prev) => (prev === itemKey ? null : prev));
                       setHoveredIndex(null);
                     }}
@@ -3316,158 +3343,165 @@ export default function MainDashboardClient({ initialData }) {
 
   return (
     <motion.div
-      className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 text-white bg-gradient-to-b from-black via-neutral-950 to-black"
+      className="relative min-h-screen overflow-hidden bg-black px-4 py-6 text-white selection:bg-amber-500/30 sm:px-6 sm:py-8"
       initial="hidden"
       animate="visible"
       variants={fadeInUp}
     >
-      <TopRatedHero
-        movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
-        tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
-        isMobile={isMobile}
-        hydrated={hydrated}
-        backdropOverrides={backdropOverrides}
-      />
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-amber-500/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-yellow-600/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-amber-700/25 blur-[120px] sm:blur-[150px]" />
+      </div>
 
-      <motion.div
-        className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Trakt: Más esperadas con selector Películas/Series */}
-        <AnticipatedSection
-          movieItems={
-            dashboardData.traktMoviesAnticipated === null
-              ? null
-              : (dashboardData.traktMoviesAnticipated ?? EMPTY_ARRAY)
-          }
-          tvItems={
-            dashboardData.traktShowsAnticipated === null
-              ? null
-              : (dashboardData.traktShowsAnticipated ?? EMPTY_ARRAY)
-          }
+      <div className="relative z-10">
+        <TopRatedHero
+          movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
+          tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
           isMobile={isMobile}
           hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
           backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
         />
 
-        {/* Trakt: Recomendados con selector Películas/Series */}
-        <RecommendedSection
-          movieItems={
-            dashboardData.traktRecommendedMovies === null
-              ? null
-              : (dashboardData.traktRecommendedMovies ?? EMPTY_ARRAY)
-          }
-          tvItems={
-            dashboardData.traktRecommendedShows === null
-              ? null
-              : (dashboardData.traktRecommendedShows ?? EMPTY_ARRAY)
-          }
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+        <motion.div
+          className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Trakt: Más esperadas con selector Películas/Series */}
+          <AnticipatedSection
+            movieItems={
+              dashboardData.traktMoviesAnticipated === null
+                ? null
+                : (dashboardData.traktMoviesAnticipated ?? EMPTY_ARRAY)
+            }
+            tvItems={
+              dashboardData.traktShowsAnticipated === null
+                ? null
+                : (dashboardData.traktShowsAnticipated ?? EMPTY_ARRAY)
+            }
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        {/* Tendencias unificadas (Trakt/TMDb) */}
-        <RowWithSourceFilter
-          title="Tendencias"
-          traktData={dashboardData.traktTrending || EMPTY_ARRAY}
-          tmdbData={dashboardData.trending || EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          {/* Trakt: Recomendados con selector Películas/Series */}
+          <RecommendedSection
+            movieItems={
+              dashboardData.traktRecommendedMovies === null
+                ? null
+                : (dashboardData.traktRecommendedMovies ?? EMPTY_ARRAY)
+            }
+            tvItems={
+              dashboardData.traktRecommendedShows === null
+                ? null
+                : (dashboardData.traktRecommendedShows ?? EMPTY_ARRAY)
+            }
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        {/* Populares unificados (Trakt/TMDb) */}
-        <RowWithSourceFilter
-          title="Populares"
-          traktData={dashboardData.traktPopular || EMPTY_ARRAY}
-          tmdbData={dashboardData.popular || EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-          eager={true}
-        />
+          {/* Tendencias unificadas (Trakt/TMDb) */}
+          <RowWithSourceFilter
+            title="Tendencias"
+            traktData={dashboardData.traktTrending || EMPTY_ARRAY}
+            tmdbData={dashboardData.trending || EMPTY_ARRAY}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        <Row
-          title="Premiadas y nominadas"
-          labelText="GALARDONADAS"
-          items={dashboardData.awarded}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          {/* Populares unificados (Trakt/TMDb) */}
+          <RowWithSourceFilter
+            title="Populares"
+            traktData={dashboardData.traktPopular || EMPTY_ARRAY}
+            tmdbData={dashboardData.popular || EMPTY_ARRAY}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+            eager={true}
+          />
 
-        <Row
-          title="Dramas que enganchan"
-          items={dashboardData.dramaTV}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          <Row
+            title="Premiadas y nominadas"
+            labelText="GALARDONADAS"
+            items={dashboardData.awarded}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        {/* Trakt: Más reproducidas (con selector de período) */}
-        <RowWithTimeFilter
-          title="Más reproducidas"
-          weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
-          monthlyData={dashboardData.traktPlayedMonthly || EMPTY_ARRAY}
-          yearlyData={EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          <Row
+            title="Dramas que enganchan"
+            items={dashboardData.dramaTV}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        {/* Trakt: Más vistas (con selector de período) */}
-        <RowWithTimeFilter
-          title="Más vistas"
-          weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
-          monthlyData={dashboardData.traktWatchedMonthly || EMPTY_ARRAY}
-          yearlyData={EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          {/* Trakt: Más reproducidas (con selector de período) */}
+          <RowWithTimeFilter
+            title="Más reproducidas"
+            weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
+            monthlyData={dashboardData.traktPlayedMonthly || EMPTY_ARRAY}
+            yearlyData={EMPTY_ARRAY}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-        {/* Trakt: Más coleccionadas (con selector de período) */}
-        <RowWithTimeFilter
-          title="Más coleccionadas"
-          weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}
-          monthlyData={dashboardData.traktCollectedMonthly || EMPTY_ARRAY}
-          yearlyData={EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-          posterCacheRef={posterCacheRef}
-          posterOverrides={posterOverrides}
-          backdropOverrides={backdropOverrides}
-          overridesReady={overridesReady}
-        />
+          {/* Trakt: Más vistas (con selector de período) */}
+          <RowWithTimeFilter
+            title="Más vistas"
+            weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
+            monthlyData={dashboardData.traktWatchedMonthly || EMPTY_ARRAY}
+            yearlyData={EMPTY_ARRAY}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
 
-      </motion.div>
+          {/* Trakt: Más coleccionadas (con selector de período) */}
+          <RowWithTimeFilter
+            title="Más coleccionadas"
+            weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}
+            monthlyData={dashboardData.traktCollectedMonthly || EMPTY_ARRAY}
+            yearlyData={EMPTY_ARRAY}
+            isMobile={isMobile}
+            hydrated={hydrated}
+            posterCacheRef={posterCacheRef}
+            posterOverrides={posterOverrides}
+            backdropOverrides={backdropOverrides}
+            overridesReady={overridesReady}
+          />
+        </motion.div>
+      </div>
     </motion.div>
   );
 }
