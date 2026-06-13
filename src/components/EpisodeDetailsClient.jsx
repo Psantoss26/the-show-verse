@@ -1438,9 +1438,16 @@ export default function EpisodeDetailsClient({
             </div>
 
             {/* SCOREBOARD */}
-            <div className="relative w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
+            <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] mb-6">
+              <div
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                style={{
+                  WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+                }}
+              />
               <div
                 className="
+      relative z-10
       py-3
       pl-[calc(1rem+env(safe-area-inset-left))]
       pr-[calc(1.25rem+env(safe-area-inset-right))]
@@ -1531,7 +1538,7 @@ export default function EpisodeDetailsClient({
 
               {!tScoreboard.loading &&
                 hasNumericScoreboardStats(tScoreboard?.stats) && (
-                  <div className="border-t border-white/5 bg-black/10">
+                  <div className="relative z-10 border-t border-white/5 bg-black/[0.06] rounded-b-2xl">
                     <div
                       className="
           overflow-x-clip overscroll-none [touch-action:pan-y]
