@@ -47,6 +47,25 @@ function toItemsArray(value) {
   return EMPTY_ARRAY;
 }
 
+function splitItemsByMediaType(items) {
+  const movies = [];
+  const shows = [];
+
+  for (const item of Array.isArray(items) ? items : EMPTY_ARRAY) {
+    if (!item?.id) continue;
+    const type =
+      item.media_type === "tv" ||
+      (item.name && !item.title) ||
+      item.first_air_date
+        ? "tv"
+        : "movie";
+    if (type === "tv") shows.push({ ...item, media_type: "tv" });
+    else movies.push({ ...item, media_type: "movie" });
+  }
+
+  return { movies, shows };
+}
+
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
@@ -2526,6 +2545,129 @@ const AnticipatedSection = memo(function AnticipatedSection({
   );
 });
 
+/* ---------- Sección "Recomendados" con selector Películas/Series ---------- */
+const RecommendedSection = memo(function RecommendedSection({
+  movieItems,
+  tvItems,
+  isMobile,
+  hydrated,
+  posterCacheRef,
+  posterOverrides,
+  backdropOverrides,
+  overridesReady,
+}) {
+  const [activeTab, setActiveTab] = useState("movies");
+  const hasMovieItems = Array.isArray(movieItems) && movieItems.length > 0;
+  const hasTvItems = Array.isArray(tvItems) && tvItems.length > 0;
+
+  const loading = movieItems === null && tvItems === null;
+  const empty = !loading && !hasMovieItems && !hasTvItems;
+
+  useEffect(() => {
+    if (activeTab === "movies" && !hasMovieItems && hasTvItems) {
+      setActiveTab("series");
+      return;
+    }
+    if (activeTab === "series" && !hasTvItems && hasMovieItems) {
+      setActiveTab("movies");
+    }
+  }, [activeTab, hasMovieItems, hasTvItems]);
+
+  const items =
+    activeTab === "movies"
+      ? hasMovieItems
+        ? movieItems
+        : (tvItems ?? [])
+      : hasTvItems
+        ? tvItems
+        : (movieItems ?? []);
+
+  if (empty) return null;
+
+  const SKELETON_COUNT = isMobile ? 2 : 6;
+
+  return (
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      variants={fadeInUp}
+      viewport={{ once: true, margin: "-50px" }}
+    >
+      <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="h-px w-8 bg-emerald-500" />
+            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+              TRAKT
+            </span>
+          </div>
+          <ExpandableSectionTitle
+            title="Recomendados"
+            href={EXPANDABLE_SECTION_HREFS["Recomendados"]}
+          />
+        </div>
+
+        {!loading && (
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {hasMovieItems && (
+              <button
+                onClick={() => setActiveTab("movies")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "movies"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Películas
+              </button>
+            )}
+            {hasTvItems && (
+              <button
+                onClick={() => setActiveTab("series")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  activeTab === "series"
+                    ? "bg-white text-black"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Series
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse"
+              style={{
+                width: isMobile ? "calc(50% - 6px)" : "calc(16.666% - 10px)",
+                aspectRatio: "2/3",
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <Row
+          title=""
+          hideTitle={true}
+          items={items}
+          isMobile={isMobile}
+          hydrated={hydrated}
+          posterCacheRef={posterCacheRef}
+          posterOverrides={posterOverrides}
+          backdropOverrides={backdropOverrides}
+          overridesReady={overridesReady}
+          eager={true}
+        />
+      )}
+    </motion.div>
+  );
+});
+
 /* ---------- Carrusel hero (backdrops) ---------- */
 function TopRatedHero({
   movieItems,
@@ -2895,6 +3037,21 @@ export default function MainDashboardClient({ initialData }) {
   const seededRecommended = Array.isArray(initialData?.traktRecommended)
     ? initialData.traktRecommended
     : null;
+  const splitSeededRecommended = splitItemsByMediaType(seededRecommended);
+  const seededRecommendedMovies = Array.isArray(
+    initialData?.traktRecommendedMovies,
+  )
+    ? initialData.traktRecommendedMovies
+    : seededRecommended
+      ? splitSeededRecommended.movies
+      : null;
+  const seededRecommendedShows = Array.isArray(
+    initialData?.traktRecommendedShows,
+  )
+    ? initialData.traktRecommendedShows
+    : seededRecommended
+      ? splitSeededRecommended.shows
+      : null;
 
   // ⚡ Estado para secciones lazy (se cargan progresivamente en el cliente)
   const [lazySections, setLazySections] = useState({
@@ -2909,6 +3066,8 @@ export default function MainDashboardClient({ initialData }) {
       ? (seededShowsAnticipated ?? [])
       : null,
     traktRecommended: seededRecommended,
+    traktRecommendedMovies: seededRecommendedMovies,
+    traktRecommendedShows: seededRecommendedShows,
     traktPlayedWeekly: [],
     traktPlayedMonthly: [],
     traktWatchedWeekly: [],
@@ -2938,6 +3097,8 @@ export default function MainDashboardClient({ initialData }) {
       "traktTrending",
       "traktPopular",
       "traktRecommended",
+      "traktRecommendedMovies",
+      "traktRecommendedShows",
       "traktAnticipated",
       "traktMoviesAnticipated",
       "traktShowsAnticipated",
@@ -3063,11 +3224,20 @@ export default function MainDashboardClient({ initialData }) {
           .then((r) => r.json())
           .catch(() => []);
         const recommendedItems = toItemsArray(recommended);
+        const fallbackSplit = splitItemsByMediaType(recommendedItems);
+        const recommendedMovies = Array.isArray(recommended?.movies)
+          ? recommended.movies
+          : fallbackSplit.movies;
+        const recommendedShows = Array.isArray(recommended?.shows)
+          ? recommended.shows
+          : fallbackSplit.shows;
 
         if (cancelled) return;
         setLazySections((prev) => ({
           ...prev,
           traktRecommended: recommendedItems,
+          traktRecommendedMovies: recommendedMovies,
+          traktRecommendedShows: recommendedShows,
         }));
       } catch (err) {
         console.error("❌ Error cargando recomendados:", err);
@@ -3075,6 +3245,8 @@ export default function MainDashboardClient({ initialData }) {
           setLazySections((prev) => ({
             ...prev,
             traktRecommended: [],
+            traktRecommendedMovies: [],
+            traktRecommendedShows: [],
           }));
         }
       }
@@ -3218,19 +3390,24 @@ export default function MainDashboardClient({ initialData }) {
           overridesReady={overridesReady}
         />
 
-        {/* Trakt: Recomendados (preview normal) */}
-        <Row
-          title="Recomendados"
-          labelText="TRAKT"
-          items={toItemsArray(dashboardData.traktRecommended)}
+        {/* Trakt: Recomendados con selector Películas/Series */}
+        <RecommendedSection
+          movieItems={
+            dashboardData.traktRecommendedMovies === null
+              ? null
+              : (dashboardData.traktRecommendedMovies ?? EMPTY_ARRAY)
+          }
+          tvItems={
+            dashboardData.traktRecommendedShows === null
+              ? null
+              : (dashboardData.traktRecommendedShows ?? EMPTY_ARRAY)
+          }
           isMobile={isMobile}
           hydrated={hydrated}
           posterCacheRef={posterCacheRef}
           posterOverrides={posterOverrides}
           backdropOverrides={backdropOverrides}
           overridesReady={overridesReady}
-          eager={true}
-          reserveWhileEmpty={dashboardData.traktRecommended === null}
         />
 
         {/* Tendencias unificadas (Trakt/TMDb) */}

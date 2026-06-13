@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getTraktRecommended, removeDuplicates } from "@/lib/api/traktHelpers";
+import {
+  getTraktRecommendedByType,
+  removeDuplicates,
+} from "@/lib/api/traktHelpers";
 import {
   clearTraktCookies,
   getValidTraktToken,
@@ -62,18 +65,27 @@ async function getFallbackRecommended(limit = 30) {
     }),
   ]);
 
-  const mixed = [];
-  const max = Math.max(movies.length, shows.length);
-  for (let index = 0; index < max && mixed.length < limit; index += 1) {
-    const movie = withMediaType(movies[index], "movie");
-    if (movie) mixed.push(movie);
-    if (mixed.length >= limit) break;
+  const movieItems = removeDuplicates(
+    movies.map((item) => withMediaType(item, "movie")).filter(Boolean),
+  ).slice(0, limit);
+  const showItems = removeDuplicates(
+    shows.map((item) => withMediaType(item, "tv")).filter(Boolean),
+  ).slice(0, limit);
 
-    const show = withMediaType(shows[index], "tv");
-    if (show) mixed.push(show);
+  const items = [];
+  const max = Math.max(movieItems.length, showItems.length);
+  for (let index = 0; index < max && items.length < limit; index += 1) {
+    if (movieItems[index]) items.push(movieItems[index]);
+    if (items.length >= limit) break;
+    if (showItems[index]) items.push(showItems[index]);
   }
 
-  return removeDuplicates(mixed).slice(0, limit);
+  return {
+    items: removeDuplicates(items).slice(0, limit),
+    movies: movieItems,
+    shows: showItems,
+    source: "fallback",
+  };
 }
 
 export async function GET(request) {
@@ -88,15 +100,20 @@ export async function GET(request) {
     ).catch(() => ({ token: null, refreshedTokens: null, shouldClear: false }));
     responseCookies = { refreshedTokens, shouldClear };
 
-    const traktItems = token
-      ? await getTraktRecommended(30, "weekly", { token }).catch(() => [])
-      : [];
-    const items =
-      Array.isArray(traktItems) && traktItems.length > 0
-        ? traktItems
-        : await getFallbackRecommended(30);
+    const recommended = token
+      ? await getTraktRecommendedByType(30, "weekly", { token }).catch(
+          () => null,
+        )
+      : null;
+    const hasRecommended =
+      recommended?.items?.length ||
+      recommended?.movies?.length ||
+      recommended?.shows?.length;
+    const payload = hasRecommended
+      ? recommended
+      : await getFallbackRecommended(30);
 
-    const res = NextResponse.json(items || []);
+    const res = NextResponse.json(payload);
     if (shouldClear) clearTraktCookies(res);
     if (refreshedTokens) setTraktCookies(res, refreshedTokens);
     return res;

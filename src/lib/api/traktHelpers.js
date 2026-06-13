@@ -272,6 +272,15 @@ export async function getTraktRecommended(
   period = "weekly",
   { token } = {},
 ) {
+  const buckets = await getTraktRecommendedByType(limit, period, { token });
+  return buckets.items;
+}
+
+export async function getTraktRecommendedByType(
+  limit = 24,
+  period = "weekly",
+  { token } = {},
+) {
   const [moviesResult, showsResult] = await Promise.all([
     fetchRecommendedTraktItems("movies", { period, token }),
     fetchRecommendedTraktItems("shows", { period, token }),
@@ -287,11 +296,23 @@ export async function getTraktRecommended(
 
   const isPersonal =
     moviesResult.source === "personal" || showsResult.source === "personal";
-  const mixed = interleave(movieSeeds, showSeeds, limit).map((item) => ({
+  const source = isPersonal ? "personal" : "public";
+  const tagSource = (item) => ({
     ...item,
-    trakt_recommendation_source: isPersonal ? "personal" : "public",
-  }));
-  return await hydrateTraktResults(mixed, limit);
+    trakt_recommendation_source: source,
+  });
+
+  const [movies, shows] = await Promise.all([
+    hydrateTraktResults(movieSeeds.slice(0, limit).map(tagSource), limit),
+    hydrateTraktResults(showSeeds.slice(0, limit).map(tagSource), limit),
+  ]);
+
+  return {
+    movies,
+    shows,
+    items: interleave(movies, shows, limit),
+    source,
+  };
 }
 
 /**
