@@ -297,42 +297,41 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
   const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
-  // Mantener el orden, aplicando minWidth si procede
-  const pool0 =
-    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
-  const pool = pool0.length ? pool0 : list;
-
-  // 3 primeras imágenes con idioma preferido. Si no existen, 3 sin idioma.
-  const top3en = [];
-  const top3NoLanguage = [];
-  for (const b of pool) {
-    if (isPreferredLang(b)) top3en.push(b);
-    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
-    if (top3en.length === 3) break;
-  }
-
-  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
-  if (!candidates.length) return null;
-
-  // 1) 1920x1080
-  const b1080 = candidates.find(
-    (b) => (b?.width || 0) === 1920 && (b?.height || 0) === 1080,
+  const preferred = list.filter(isPreferredLang);
+  const withLanguage = list.filter(
+    (img) => norm(img?.iso_639_1) && !isPreferredLang(img),
   );
-  if (b1080) return b1080;
+  const noLanguage = list.filter(hasNoLanguage);
 
-  // 2) 1712x964
-  const b1712 = candidates.find(
-    (b) => (b?.width || 0) === 1712 && (b?.height || 0) === 964,
-  );
-  if (b1712) return b1712;
+  const pickFrom = (pool) => {
+    if (!pool.length) return null;
+    const sizeFiltered =
+      minWidth > 0 ? pool.filter((b) => (b?.width || 0) >= minWidth) : pool;
+    const candidates = (sizeFiltered.length ? sizeFiltered : pool).slice(0, 3);
+    if (!candidates.length) return null;
 
-  // 3) 4K 3840x2160
-  const b4k = candidates.find(
-    (b) => (b?.width || 0) === 3840 && (b?.height || 0) === 2160,
-  );
-  if (b4k) return b4k;
+    // 1) 1920x1080
+    const b1080 = candidates.find(
+      (b) => (b?.width || 0) === 1920 && (b?.height || 0) === 1080,
+    );
+    if (b1080) return b1080;
 
-  return candidates[0];
+    // 2) 1712x964
+    const b1712 = candidates.find(
+      (b) => (b?.width || 0) === 1712 && (b?.height || 0) === 964,
+    );
+    if (b1712) return b1712;
+
+    // 3) 4K 3840x2160
+    const b4k = candidates.find(
+      (b) => (b?.width || 0) === 3840 && (b?.height || 0) === 2160,
+    );
+    if (b4k) return b4k;
+
+    return candidates[0];
+  };
+
+  return pickFrom(preferred) || pickFrom(withLanguage) || pickFrom(noLanguage);
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {

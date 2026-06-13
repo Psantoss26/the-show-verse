@@ -10,26 +10,37 @@ function pickBestByLangThenResolution(list, opts = {}) {
 
   const area = (img) => (img?.width || 0) * (img?.height || 0)
   const lang = (img) => img?.iso_639_1 || null
+  const normLang = (value) => (value ? String(value).toLowerCase().split('-')[0] : null)
+  const preferSet = new Set(preferLangs.map(normLang).filter(Boolean))
+  const isPreferred = (img) => preferSet.has(normLang(lang(img)))
+  const hasNoLanguage = (img) => !normLang(lang(img))
 
-  const sizeFiltered = minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list
-  const pool0 = sizeFiltered.length ? sizeFiltered : list
+  const preferred = list.filter(isPreferred)
+  const withLanguage = list.filter((img) => normLang(lang(img)) && !isPreferred(img))
+  const noLanguage = list.filter(hasNoLanguage)
 
-  const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)))
-  const pool1 = hasPreferred ? pool0.filter((p) => preferLangs.includes(lang(p))) : pool0
+  const pickFrom = (pool) => {
+    if (!pool.length) return null
+    const sizeFiltered =
+      minWidth > 0 ? pool.filter((p) => (p?.width || 0) >= minWidth) : pool
+    const candidates = sizeFiltered.length ? sizeFiltered : pool
 
-  let best = null
-  let bestArea = -1
-  for (const p of pool1) {
-    const a = area(p)
-    if (a > bestArea) {
-      bestArea = a
-      best = p
+    let best = null
+    let bestArea = -1
+    for (const p of candidates) {
+      const a = area(p)
+      if (a > bestArea) {
+        bestArea = a
+        best = p
+      }
     }
+    return best
   }
-  return best
+
+  return pickFrom(preferred) || pickFrom(withLanguage) || pickFrom(noLanguage)
 }
 
-// Backdrop: EN -> cualquier idioma, priorizando tamaño útil (mismo criterio que Favoritos)
+// Backdrop: EN -> otros idiomas -> sin idioma. "null" solo como última alternativa.
 function pickLocalizedBackdrop(backdrops = []) {
   const best = pickBestByLangThenResolution(backdrops, {
     preferLangs: ['en', 'en-US'],
@@ -89,8 +100,8 @@ export async function POST(req) {
     const unique = [...new Set(ids)].slice(0, 400)
 
     const pairs = await poolMap(8, unique, async (id) => {
-      // Mismo criterio que Favoritos/Pendientes: inglés + imágenes sin idioma (backdrops)
-      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=en,en-US,null`
+      // Pedimos null para fallback, pero el selector solo lo usa si no hay backdrop EN.
+      const url = `${TMDB}/${type}/${id}/images?api_key=${API_KEY}&include_image_language=en,en-US,es,es-ES,null`
       const r = await fetch(url, { cache: 'force-cache', next: { revalidate: REVALIDATE_SECS } })
       if (!r.ok) return [id, null]
       const j = await r.json()
