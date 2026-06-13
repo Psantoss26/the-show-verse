@@ -7,7 +7,7 @@ import { ArrowLeft, Film, Heart, ListVideo, Star } from 'lucide-react'
 
 function Badge({ children }) {
     return (
-        <span className="text-xs font-bold text-zinc-400 bg-black/30 px-3 py-1 rounded-full border border-white/5">
+        <span className="text-xs font-bold text-zinc-400 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-3 py-1 rounded-full shadow-lg backdrop-blur-2xl">
             {children}
         </span>
     )
@@ -23,11 +23,12 @@ function DescriptionBlock({ description }) {
     }
 
     return (
-        <div className="relative rounded-2xl border border-white/5 bg-white/[0.055] p-5 backdrop-blur-sm">
+        <div className="relative isolate overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-5 shadow-none backdrop-blur-[28px]">
+            <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
             <div className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
                 Descripción
             </div>
-            <div className="sv-scroll max-h-36 overflow-y-auto pr-3 text-sm leading-6 text-zinc-200 sm:max-h-44 sm:text-base">
+            <div className="sv-scroll relative max-h-36 overflow-y-auto pr-3 text-sm leading-6 text-zinc-200 sm:max-h-44 sm:text-base">
                 <p className="whitespace-pre-wrap break-words text-left">
                     {description}
                 </p>
@@ -46,8 +47,8 @@ function TabButton({ active, disabled, onClick, icon: Icon, children }) {
                 'flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all',
                 disabled ? 'opacity-40 cursor-not-allowed' : '',
                 active
-                    ? 'bg-zinc-800 text-white shadow-lg'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                    ? 'bg-white/15 text-white shadow-lg'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/10'
             ].join(' ')}
         >
             {Icon ? <Icon className="w-4 h-4" /> : null}
@@ -96,6 +97,7 @@ export default function UnifiedListDetailsLayout({
                     <img
                         src={backdropImage}
                         alt=""
+                        fetchPriority="low"
                         className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
                     />
                 ) : null}
@@ -103,13 +105,13 @@ export default function UnifiedListDetailsLayout({
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
             </div>
 
-            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+            <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 lg:py-12">
                 {/* --- TOP BAR --- */}
                 <div className="mb-8 flex items-center gap-4">
                     {backHref ? (
                         <Link
                             href={backHref}
-                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
+                            className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2.5 text-zinc-300 shadow-lg backdrop-blur-[28px] transition hover:bg-white/10 hover:text-white"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
@@ -117,16 +119,16 @@ export default function UnifiedListDetailsLayout({
                         <button
                             type="button"
                             onClick={() => router.back()}
-                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
+                            className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2.5 text-zinc-300 shadow-lg backdrop-blur-[28px] transition hover:bg-white/10 hover:text-white"
                             aria-label="Volver"
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                     )}
 
-                    <div className="h-8 w-[1px] bg-zinc-800" />
+                    <div className="h-8 w-[1px] bg-white/10" />
 
-                    <div className="flex gap-2 ml-auto">{rightActions}</div>
+                    <div className="ml-auto flex gap-2 [&>a]:!rounded-full [&>a]:!border-0 [&>a]:!bg-black/20 [&>a]:!bg-gradient-to-br [&>a]:!from-white/10 [&>a]:!via-transparent [&>a]:!to-black/40 [&>a]:!text-zinc-300 [&>a]:!shadow-lg [&>a]:!backdrop-blur-[28px] hover:[&>a]:!bg-white/10 hover:[&>a]:!text-white [&>button]:!rounded-full [&>button]:!border-0 [&>button]:!bg-black/20 [&>button]:!bg-gradient-to-br [&>button]:!from-white/10 [&>button]:!via-transparent [&>button]:!to-black/40 [&>button]:!text-zinc-300 [&>button]:!shadow-lg [&>button]:!backdrop-blur-[28px] hover:[&>button]:!bg-white/10 hover:[&>button]:!text-white">{rightActions}</div>
                 </div>
 
                 {/* --- HERO, misma base visual que ActorDetails --- */}
@@ -137,11 +139,17 @@ export default function UnifiedListDetailsLayout({
                     className="mb-12 flex flex-col items-start gap-8 lg:flex-row lg:gap-12"
                 >
                     <div className="relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[320px]">
-                        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl shadow-black/80 aspect-[2/3]">
-                            <div className="pointer-events-none absolute inset-0 z-20 rounded-2xl ring-1 ring-white/10" />
+                        <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]">
+                            <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
                             <div className="relative z-10 h-full w-full bg-neutral-950">
                                 {posterImage ? (
-                                    <img src={posterImage} alt="" className="h-full w-full object-cover" />
+                                    <img
+                                        src={posterImage}
+                                        alt=""
+                                        fetchPriority="high"
+                                        decoding="async"
+                                        className="h-full w-full object-cover"
+                                    />
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center text-zinc-700">
                                         <ListVideo className="h-16 w-16" />
@@ -190,9 +198,10 @@ export default function UnifiedListDetailsLayout({
                                 return (
                                     <div
                                         key={`${stat.label}-${index}`}
-                                        className="relative min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur-sm"
+                                        className="relative isolate min-w-0 overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-4 shadow-none backdrop-blur-[28px]"
                                     >
-                                        <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tone} to-transparent blur-2xl opacity-80`} />
+                                        <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
+                                        <div className={`absolute -right-10 -top-10 h-24 w-24 rounded-full bg-gradient-to-br ${tone} to-transparent blur-2xl opacity-40`} />
                                         <div className="relative flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <span className="block truncate text-[10px] font-black uppercase tracking-wider text-zinc-500">
@@ -221,7 +230,7 @@ export default function UnifiedListDetailsLayout({
                         {(hasTabs || topControls) && (
                             <div className="flex w-full flex-col gap-4">
                                 {hasTabs && (
-                                    <div className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 p-1.5">
+                                    <div className="w-full rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 p-1.5 shadow-lg backdrop-blur-[28px]">
                                         <div className="flex w-full gap-1">
                                             {tabs.map((t) => (
                                                 <TabButton

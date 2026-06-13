@@ -67,7 +67,7 @@ function TmdbPoster({ path, alt, className = '' }) {
 
 function Segmented({ options, value, onChange }) {
     return (
-        <div className="flex items-center rounded-xl bg-zinc-900 border border-zinc-800 p-1 w-full">
+        <div className="flex w-full items-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
             {options.map((opt) => {
                 const active = opt.id === value
                 const Icon = opt.icon
@@ -77,7 +77,7 @@ function Segmented({ options, value, onChange }) {
                         type="button"
                         onClick={() => onChange(opt.id)}
                         className={`flex-1 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg inline-flex items-center justify-center gap-2 transition-all
-              ${active ? 'bg-zinc-700 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+              ${active ? 'bg-white/15 text-white shadow-md' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
                     >
                         {Icon && <Icon className="w-4 h-4" />}
                         <span>{opt.label}</span>
@@ -145,7 +145,7 @@ function CatalogDropdown({ value, onChange }) {
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="w-full h-10 inline-flex items-center justify-between px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition text-sm text-zinc-200 shadow-sm"
+                className="inline-flex h-10 w-full items-center justify-between rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-3 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white"
             >
                 <div className="flex items-center gap-2 overflow-hidden">
                     <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider whitespace-nowrap">Ver:</span>
@@ -165,7 +165,7 @@ function CatalogDropdown({ value, onChange }) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 5, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
-                        className="absolute right-0 left-0 top-full mt-2 p-1 rounded-xl border border-zinc-800 bg-[#121212] shadow-2xl shadow-black z-[100] overflow-hidden origin-top"
+                        className="absolute left-0 right-0 top-full z-[100] mt-2 origin-top overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl shadow-black backdrop-blur-2xl"
                     >
                         <div className="flex flex-col gap-0.5">
                             {CATS.map((opt) => {
@@ -180,7 +180,7 @@ function CatalogDropdown({ value, onChange }) {
                                             setOpen(false)
                                         }}
                                         className={`w-full px-3 py-2.5 rounded-lg text-left text-xs sm:text-sm transition flex items-center gap-2
-                      ${active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+                      ${active ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
                                     >
                                         <I className={`w-4 h-4 ${active ? 'text-purple-400' : 'text-zinc-500'}`} />
                                         <span>{opt.label}</span>
@@ -225,6 +225,10 @@ export default function ListDetailsPage() {
     const [tab, setTab] = useState('items')
     const items = Array.isArray(data?.items) ? data.items : []
     const idsInList = useMemo(() => new Set(items.map((x) => x?.id)), [items])
+    const filterableItems = useMemo(
+        () => items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' })),
+        [items]
+    )
 
     // Add: search + catalog
     const [addMode, setAddMode] = useState('search')
@@ -450,6 +454,7 @@ export default function ListDetailsPage() {
 
     // Si no hay sesión, no renderizamos (como ya hacías)
     if (!canUse) return null
+    if (loading && !data) return null
 
     const tmdbListUrl = `https://www.themoviedb.org/list/${listId}`
     const gridItems = tab === 'items' ? items : addMode === 'search' ? searchRes : catRes
@@ -540,7 +545,7 @@ export default function ListDetailsPage() {
                                     value={q}
                                     onChange={(e) => setQ(e.target.value)}
                                     placeholder="Buscar película..."
-                                    className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 text-sm text-white focus:outline-none focus:border-purple-500 transition placeholder:text-zinc-600"
+                                    className="h-10 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 pl-9 pr-4 text-sm text-white shadow-lg backdrop-blur-lg transition placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                     autoFocus
                                 />
                                 {searchLoading && (
@@ -568,7 +573,7 @@ export default function ListDetailsPage() {
                                 <input
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-lg font-bold text-white focus:border-purple-500 outline-none transition"
+                                    className="h-12 w-full rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-4 text-lg font-bold text-white shadow-lg backdrop-blur-[28px] outline-none transition focus:bg-white/10"
                                     placeholder="Nombre"
                                     maxLength={60}
                                     autoFocus
@@ -576,7 +581,7 @@ export default function ListDetailsPage() {
                                 <textarea
                                     value={editDesc}
                                     onChange={(e) => setEditDesc(e.target.value)}
-                                    className="w-full h-24 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-300 focus:border-purple-500 outline-none transition resize-none"
+                                    className="h-24 w-full resize-none rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-4 py-3 text-sm text-zinc-300 shadow-lg backdrop-blur-[28px] outline-none transition focus:bg-white/10"
                                     placeholder="Descripción"
                                     maxLength={200}
                                 />
@@ -586,7 +591,7 @@ export default function ListDetailsPage() {
                                 <button
                                     onClick={handleSaveEdit}
                                     disabled={savingEdit || !editName.trim()}
-                                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition flex items-center gap-2 disabled:opacity-50"
+                                    className="flex items-center gap-2 rounded-full bg-purple-500/25 px-6 py-2.5 font-bold text-purple-100 shadow-lg backdrop-blur-[28px] transition hover:bg-purple-500/35 disabled:opacity-50"
                                 >
                                     {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     Guardar
@@ -598,7 +603,7 @@ export default function ListDetailsPage() {
                                         setEditName(data?.name || '')
                                         setEditDesc(data?.description || '')
                                     }}
-                                    className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition"
+                                    className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-6 py-2.5 font-bold text-white shadow-lg backdrop-blur-[28px] transition hover:bg-white/10"
                                 >
                                     Cancelar
                                 </button>
@@ -610,7 +615,7 @@ export default function ListDetailsPage() {
         >
             {/* Error */}
             {err ? (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm font-medium flex items-center gap-2">
+                <div className="mb-6 flex items-center gap-2 rounded-xl bg-red-500/10 p-4 text-sm font-medium text-red-200 shadow-lg backdrop-blur-[28px]">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                     {err}
                 </div>
@@ -618,7 +623,7 @@ export default function ListDetailsPage() {
 
             {/* Empty / Filtros / Grid */}
             {tab === 'items' && items.length === 0 && !loading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
+                <div className="flex flex-col items-center justify-center rounded-3xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 py-20 text-center shadow-none backdrop-blur-[28px]">
                     <ListVideo className="w-12 h-12 text-zinc-700 mb-4" />
                     <h3 className="text-lg font-bold text-zinc-300">Lista vacía</h3>
                     <p className="text-zinc-500 mt-1 text-sm">
@@ -627,7 +632,7 @@ export default function ListDetailsPage() {
                 </div>
             ) : tab === 'items' && items.length > 0 ? (
                 <FilterableListItems
-                    items={items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' }))}
+                    items={filterableItems}
                     renderCard={(it, meta, viewMode) => {
                         const id = it?.id
                         const posterPath = it?.poster_path || it?.backdrop_path || null
@@ -654,7 +659,7 @@ export default function ListDetailsPage() {
                                         e.stopPropagation()
                                         handleRemove(id)
                                     }}
-                                    className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all shadow-lg bg-black/60 border-white/10 text-zinc-400 hover:bg-red-500 hover:border-red-400 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
+                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
                                 >
                                     {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                 </button>
@@ -700,12 +705,12 @@ export default function ListDetailsPage() {
                                         if (tab === 'items') handleRemove(id)
                                         else handleAdd(it)
                                     }}
-                                    className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all shadow-lg
+                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full shadow-lg backdrop-blur-[28px] transition-all
                     ${tab === 'items'
-                                            ? 'bg-black/60 border-white/10 text-zinc-400 hover:bg-red-500 hover:border-red-400 hover:text-white opacity-0 group-hover:opacity-100'
+                                            ? 'bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 hover:bg-red-500/70 hover:text-white opacity-0 group-hover:opacity-100'
                                             : inList
-                                                ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-500 cursor-default opacity-0'
-                                                : 'bg-black/60 border-white/10 text-white hover:bg-purple-600 hover:border-purple-500 hover:scale-110 opacity-100'
+                                                ? 'bg-emerald-500/20 text-emerald-300 cursor-default opacity-0'
+                                                : 'bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white hover:bg-purple-600/70 hover:scale-110 opacity-100'
                                         }
                     ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
                                 >

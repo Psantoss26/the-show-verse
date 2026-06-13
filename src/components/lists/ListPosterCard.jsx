@@ -39,7 +39,7 @@ function TmdbPoster({ posterPath, alt, enableHover = true }) {
 }
 
 export const listPosterGridClass =
-  "relative z-0 grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-5 lg:grid-cols-6 lg:gap-6";
+  "relative z-0 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6 lg:gap-4";
 
 export default function ListPosterCard({
   href,
@@ -54,13 +54,6 @@ export default function ListPosterCard({
   className = "",
   disableHover = false,
 }) {
-  const typeClass =
-    mediaType === "tv"
-      ? "border-purple-500/30 bg-purple-500/15 text-purple-300"
-      : mediaType === "person"
-        ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-        : "border-sky-500/30 bg-sky-500/15 text-sky-300";
-
   const rating =
     typeof voteAverage === "number" && voteAverage > 0
       ? voteAverage.toFixed(1)
@@ -72,21 +65,16 @@ export default function ListPosterCard({
 
   const content = (
     <div
-      className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-all duration-500 transform-gpu ${
+      className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] transition-all duration-500 transform-gpu ${
         disableHover
           ? ""
-          : "md:group-hover/card:-translate-y-1.5 md:group-hover/card:border-purple-500/30 md:group-hover/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)] md:group-focus/card:-translate-y-1.5 md:group-focus/card:border-purple-500/30 md:group-focus/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)]"
+          : "md:group-hover/card:-translate-y-1.5 md:group-hover/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)] md:group-focus/card:-translate-y-1.5 md:group-focus/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)]"
       } ${className}`}
     >
       <TmdbPoster posterPath={posterPath} alt={title} enableHover={!disableHover} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 pt-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent md:hidden">
-        <div className="mb-1 flex items-center gap-1.5">
-          <span className={`rounded border px-1 py-0.5 text-[8px] font-black uppercase tracking-wider ${typeClass}`}>
-            {mediaType === "tv" ? "TV" : mediaType === "person" ? "PER" : "CINE"}
-          </span>
-          {year ? <span className="text-[10px] font-bold text-yellow-300">{year}</span> : null}
-        </div>
+        {year ? <div className="mb-1 text-[10px] font-bold text-yellow-300">{year}</div> : null}
         <h3 className="line-clamp-2 text-[11px] font-bold leading-tight text-white drop-shadow-md sm:text-xs">
           {title}
         </h3>

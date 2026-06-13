@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import ListPosterCard, { listPosterGridClass } from "@/components/lists/ListPosterCard";
 
+const INITIAL_RENDER_COUNT = 60;
+const RENDER_BATCH_SIZE = 60;
+
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
 
@@ -30,7 +33,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             setOpen(false);
           }
         }}
-        className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-4 text-sm text-zinc-300 transition hover:border-zinc-600 lg:min-w-[145px]"
+        className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white lg:min-w-[145px]"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-purple-400" /> : null}
@@ -51,7 +54,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#121212] p-1 shadow-2xl"
+            className="absolute left-0 top-full z-[100] mt-2 w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
           >
             {children({ close: () => setOpen(false) })}
           </motion.div>
@@ -68,8 +71,8 @@ function DropdownItem({ active, onClick, children }) {
       onClick={onClick}
       className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
         active
-          ? "bg-zinc-800 text-white"
-          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+          ? "bg-white/15 text-white"
+          : "text-zinc-400 hover:bg-white/10 hover:text-white"
       }`}
     >
       <span className="font-medium">{children}</span>
@@ -180,7 +183,7 @@ function groupItems(entries, groupBy) {
 
 function ViewSwitcher({ viewMode, setViewMode }) {
   return (
-    <div className="flex h-11 items-center rounded-xl border border-zinc-800 bg-zinc-900 p-1">
+    <div className="flex h-11 items-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
       {[
         { id: "grid", icon: Grid3X3, label: "Grid" },
         { id: "compact", icon: Rows3, label: "Compacto" },
@@ -193,8 +196,8 @@ function ViewSwitcher({ viewMode, setViewMode }) {
           title={label}
           className={`flex h-full min-w-10 items-center justify-center rounded-lg px-3 transition ${
             viewMode === id
-              ? "bg-white text-black shadow-lg"
-              : "text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-200"
+              ? "bg-white/90 text-black shadow-lg"
+              : "text-zinc-400 hover:bg-white/10 hover:text-white"
           }`}
         >
           <Icon className="h-4 w-4" />
@@ -217,12 +220,54 @@ export default function FilterableListItems({
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
+  const loadMoreRef = useRef(null);
 
   const entries = useMemo(
     () => filterAndSortItems(items, getMeta, q, typeFilter, sortBy),
     [items, getMeta, q, typeFilter, sortBy],
   );
   const groups = useMemo(() => groupItems(entries, groupBy), [entries, groupBy]);
+  const visibleGroups = useMemo(() => {
+    let remaining = visibleCount;
+    const nextGroups = [];
+
+    for (const group of groups) {
+      if (remaining <= 0) break;
+      const visibleEntries = group.entries.slice(0, remaining);
+      if (visibleEntries.length) {
+        nextGroups.push({ ...group, entries: visibleEntries });
+        remaining -= visibleEntries.length;
+      }
+    }
+
+    return nextGroups;
+  }, [groups, visibleCount]);
+  const hasMoreEntries = visibleCount < entries.length;
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_RENDER_COUNT);
+  }, [q, typeFilter, sortBy, groupBy, viewMode]);
+
+  useEffect(() => {
+    if (!hasMoreEntries) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (observerEntries) => {
+        if (observerEntries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((current) =>
+            Math.min(current + RENDER_BATCH_SIZE, entries.length),
+          );
+        }
+      },
+      { rootMargin: "900px 0px", threshold: 0.01 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [entries.length, hasMoreEntries]);
 
   const renderEntry = (entry) => {
     if (renderCard) return renderCard(entry.item, entry.meta, viewMode);
@@ -242,9 +287,9 @@ export default function FilterableListItems({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <motion.div
-        className="sticky top-16 z-[60] mb-3 rounded-2xl p-2 transition-all duration-300"
+        className="sticky top-20 z-[70] mb-4 space-y-1 transition-all duration-300"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
@@ -256,13 +301,13 @@ export default function FilterableListItems({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar..."
-              className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-purple-500/50 focus:outline-none"
+              className="h-11 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
             {q ? (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
               >
                 <X className="h-3.5 w-3.5 text-zinc-500" />
               </button>
@@ -271,10 +316,10 @@ export default function FilterableListItems({
           <button
             type="button"
             onClick={() => setMobileFiltersOpen((v) => !v)}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all ${
               mobileFiltersOpen
-                ? "border-purple-500/40 bg-purple-500/20 text-purple-300"
-                : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                ? "bg-gradient-to-br from-white/15 to-white/10 text-white shadow-lg backdrop-blur-lg"
+                : "bg-gradient-to-br from-white/10 to-white/5 text-zinc-200 shadow-lg backdrop-blur-lg hover:from-white/15 hover:to-white/10 hover:text-white"
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -311,13 +356,13 @@ export default function FilterableListItems({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por título..."
-              className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 transition-all focus:border-purple-500/50 focus:outline-none"
+              className="h-11 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
             {q ? (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
               >
                 <X className="h-3.5 w-3.5 text-zinc-500" />
               </button>
@@ -336,15 +381,15 @@ export default function FilterableListItems({
       </motion.div>
 
       {entries.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-neutral-800 bg-neutral-900/20 py-20 text-center">
+        <div className="rounded-3xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 py-20 text-center shadow-none backdrop-blur-[28px]">
           <h3 className="text-lg font-bold text-zinc-300">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-zinc-500">{emptyText}</p>
         </div>
       ) : (
-        groups.map((group) => (
+        visibleGroups.map((group) => (
           <section key={group.key} className="space-y-4">
             {groupBy !== "none" ? (
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center justify-between rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 px-4 py-3 shadow-none backdrop-blur-[28px]">
                 <h2 className="text-xl font-black text-white">{group.title}</h2>
                 <span className="text-xs font-bold text-zinc-500">
                   {group.entries.length} títulos
@@ -358,9 +403,9 @@ export default function FilterableListItems({
                   <Link
                     key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}-list`}
                     href={entry.meta.href || "#"}
-                    className="group flex items-center gap-4 rounded-xl border border-white/5 bg-zinc-900/30 p-3 transition hover:border-purple-500/30 hover:bg-zinc-900/60"
+                    className="group flex items-center gap-4 rounded-xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-3 shadow-none backdrop-blur-[28px] transition hover:bg-white/10"
                   >
-                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/5">
+                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
                       <ListPosterCard
                         title={entry.meta.title}
                         mediaType={entry.meta.mediaType}
@@ -388,7 +433,7 @@ export default function FilterableListItems({
               <div
                 className={
                   viewMode === "compact"
-                    ? "relative z-0 grid grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-4 lg:grid-cols-8 xl:grid-cols-10"
+                    ? "relative z-0 grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
                     : listPosterGridClass
                 }
               >
@@ -398,6 +443,14 @@ export default function FilterableListItems({
           </section>
         ))
       )}
+
+      {hasMoreEntries ? (
+        <div
+          ref={loadMoreRef}
+          className="h-8 w-full"
+          aria-hidden="true"
+        />
+      ) : null}
     </div>
   );
 }

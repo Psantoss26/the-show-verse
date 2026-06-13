@@ -300,10 +300,14 @@ export default function TraktListDetailsClient({ username, listId }) {
                 : `https://trakt.tv/users/${username}/lists/${slugOrId}`)
             : null
 
+    if (state.loading && !list && items.length === 0) {
+        return null
+    }
+
     if (state.error && !list && items.length === 0) {
         return (
             <UnifiedListDetailsLayout title="Lista" sourceLabel="Trakt" backHref="/lists">
-                <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-zinc-300">
+                <div className="rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-6 text-zinc-300 shadow-none backdrop-blur-[28px]">
                     <p className="font-bold text-red-300">Error</p>
                     <p className="mt-2 text-sm text-zinc-400">{state.error}</p>
                 </div>
@@ -314,7 +318,7 @@ export default function TraktListDetailsClient({ username, listId }) {
     const firstPoster = items.find((item) => item?._tmdb?.poster_path)?._tmdb?.poster_path
     const firstBackdrop = items.find((item) => item?._tmdb?.backdrop_path)?._tmdb?.backdrop_path || firstPoster
 
-    const getTraktMeta = (it, index) => {
+    const getTraktMeta = useCallback((it, index) => {
         const tmdb = it?._tmdb || null
         const mediaType = tmdb?.media_type || (it?.movie ? 'movie' : it?.show ? 'tv' : null)
         const tmdbId = tmdb?.id || it?.movie?.ids?.tmdb || it?.show?.ids?.tmdb || null
@@ -328,7 +332,7 @@ export default function TraktListDetailsClient({ username, listId }) {
             voteAverage: tmdb?.vote_average || null,
             addedAt: it?.listed_at || '',
         }
-    }
+    }, [])
 
     return (
         <UnifiedListDetailsLayout
