@@ -32,12 +32,15 @@ PLEX_CLIENT_IDENTIFIER=b3d4e68f-42c3-4e7c-8a85-55218fa7aa9e
 PLEX_JWT_SCOPE=username,email,friendly_name
 PLEX_JWT_KID=the-show-verse-ed25519-01
 PLEX_JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIB7hMtnaSw5jY5VBxoejV512EFQbcyIheWPzLgudMDLX\n-----END PRIVATE KEY-----
+
+# Acceso privado a theshowverse.com en el servidor NAS local
+SHOWVERSE_PRIVATE_ACCESS_KEY=4601482a5296c43a426416e3c8016a2b9283dd24235becc2cbeb3945fa208dc5
 ENVEOF
 
 echo "✓ Creado/actualizado: $ENV_FILE"
 echo "Variables incluidas:"
 grep -c '=' "$ENV_FILE" | xargs echo "  Total líneas con valor:"
-grep -E '^(SPOTIFY_|NEXT_PUBLIC_TMDB|TMDB_V4|OMDB|TRAKT_|OLLAMA_|PLEX_)' "$ENV_FILE" | cut -d= -f1 | sed 's/^/  ✅ /'
+grep -E '^(SPOTIFY_|NEXT_PUBLIC_TMDB|TMDB_V4|OMDB|TRAKT_|OLLAMA_|PLEX_|SHOWVERSE_PRIVATE_ACCESS_KEY)' "$ENV_FILE" | cut -d= -f1 | sed 's/^/  ✅ /'
 echo ""
 echo "El próximo deploy encontrará este .env y lo copiará a /nas-deploy/app/.env"
 echo "Para aplicar los cambios ahora, ejecuta:"

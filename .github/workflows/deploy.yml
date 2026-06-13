@@ -44,6 +44,7 @@ jobs:
           GH_SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           GH_SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
           GH_SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          GH_SHOWVERSE_PRIVATE_ACCESS_KEY: ${{ secrets.SHOWVERSE_PRIVATE_ACCESS_KEY }}
         run: |
           set -euo pipefail
 
@@ -167,6 +168,11 @@ jobs:
             SPOTIFY_REFRESH_TOKEN_VALUE="$(read_env_value SPOTIFY_REFRESH_TOKEN /nas-deploy/app/.env)"
           fi
 
+          SHOWVERSE_PRIVATE_ACCESS_KEY_VALUE="${GH_SHOWVERSE_PRIVATE_ACCESS_KEY:-}"
+          if [ -z "$SHOWVERSE_PRIVATE_ACCESS_KEY_VALUE" ]; then
+            SHOWVERSE_PRIVATE_ACCESS_KEY_VALUE="$(read_env_value SHOWVERSE_PRIVATE_ACCESS_KEY /nas-deploy/app/.env)"
+          fi
+
           set_key NEXT_PUBLIC_APP_URL "https://theshowverse.com"
           set_key NEXT_PUBLIC_TMDB_API_KEY "$TMDB_VALUE"
           set_key TMDB_API_KEY "$TMDB_VALUE"
@@ -177,8 +183,9 @@ jobs:
           set_key SPOTIFY_CLIENT_SECRET "$SPOTIFY_CLIENT_SECRET_VALUE"
           set_key SPOTIFY_REDIRECT_URI "$SPOTIFY_REDIRECT_URI_VALUE"
           set_key SPOTIFY_REFRESH_TOKEN "$SPOTIFY_REFRESH_TOKEN_VALUE"
+          set_key SHOWVERSE_PRIVATE_ACCESS_KEY "$SHOWVERSE_PRIVATE_ACCESS_KEY_VALUE"
 
-          for value in "$TMDB_VALUE" "$TRAKT_CLIENT_VALUE" "$TRAKT_SECRET_VALUE" "$SPOTIFY_CLIENT_ID_VALUE" "$SPOTIFY_CLIENT_SECRET_VALUE" "$SPOTIFY_REFRESH_TOKEN_VALUE"; do
+          for value in "$TMDB_VALUE" "$TRAKT_CLIENT_VALUE" "$TRAKT_SECRET_VALUE" "$SPOTIFY_CLIENT_ID_VALUE" "$SPOTIFY_CLIENT_SECRET_VALUE" "$SPOTIFY_REFRESH_TOKEN_VALUE" "$SHOWVERSE_PRIVATE_ACCESS_KEY_VALUE"; do
             if [ -n "$value" ]; then
               echo "::add-mask::$value"
             fi
@@ -193,7 +200,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
           echo "Variables detectadas:"
-          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN; do
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN SHOWVERSE_PRIVATE_ACCESS_KEY; do
             if grep -q "^${key}=." /nas-deploy/app/.env; then
               echo "✅ $key"
             else
@@ -223,7 +230,7 @@ jobs:
       - name: Reiniciar contenedor con la nueva imagen
         run: |
           echo "Variables runtime detectadas:"
-          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN; do
+          for key in NEXT_PUBLIC_TMDB_API_KEY TMDB_API_KEY NEXT_PUBLIC_TRAKT_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET SPOTIFY_REDIRECT_URI SPOTIFY_REFRESH_TOKEN SHOWVERSE_PRIVATE_ACCESS_KEY; do
             if grep -q "^${key}=." /nas-deploy/app/.env; then
               echo "✅ $key"
             else
