@@ -420,5 +420,12 @@ export function scoreSoundtrackAlbumCandidate(candidate, ctx) {
   if (hasDisallowedTitleSuffixForName(name, releaseDate, ctx)) score -= 180;
   if (isPrioritySoundtrackName(name, ctx)) score += 90;
 
+  if (
+    ctx.titles &&
+    ctx.titles.some((t) => norm(t) === norm(candidate?.name ?? candidate?.collectionName ?? ""))
+  ) {
+    score += 40;
+  }
+
   return Math.round(score);
 }

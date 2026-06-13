@@ -565,6 +565,16 @@ function isCredibleFirstExactTitleAlbum(album, ctx) {
 
 function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   const titleMatches = albums.filter((album) => isAcceptableFirstAlbum(album, ctx));
+
+  // Preferir álbumes con título exacto (nombre === título de la película) y mismo año
+  // sobre álbumes canónicos con subtítulo (ej: "The Illusionist" > "The Illusionist (Original Motion Picture Soundtrack)")
+  const exactTitleSameYear = titleMatches.filter(
+    (album) => isExactTitleAlbum(album, ctx) && isSameReleaseYear(album, ctx),
+  );
+  if (exactTitleSameYear.length) {
+    return exactTitleSameYear;
+  }
+
   const canonical = titleMatches.filter((album) =>
     isPriorityMotionPictureAlbum(album) || isPrioritySeriesAlbum(album, ctx),
   );
@@ -1010,6 +1020,8 @@ function scoreAlbum(album, ctx) {
 
   const hasSigTokens = ctx.titles.some((t) => sigTokens(t).length > 0);
   if (bestTitleScore(album?.name ?? "", ctx.titles) === 0 && hasSigTokens) s -= 200;
+
+  if (isExactTitleAlbum(album, ctx)) s += 40;
 
   return Math.round(s);
 }
