@@ -14,7 +14,6 @@ import {
   HeartOff,
   BookmarkPlus,
   BookmarkMinus,
-  Loader2,
   Play,
   X,
   FilmIcon,
@@ -35,6 +34,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchArtworkOverrides } from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
+import LiquidButton from "@/components/LiquidButton";
 
 // Constantes para evitar recreación de referencias
 const EMPTY_ARRAY = [];
@@ -178,17 +178,24 @@ const dashboardSegmentButtonClass = (active) =>
 const dashboardPreviewCardClass = (heightClass) =>
   [
     "relative isolate grid grid-rows-[76%_24%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
-    "bg-black/25 bg-gradient-to-br from-white/10 via-neutral-950/70 to-black/80 backdrop-blur-[42px]",
-    "shadow-[0_22px_70px_-30px_rgba(0,0,0,0.9)]",
+    "bg-black/10 bg-gradient-to-br from-white/5 via-neutral-950/45 to-black/55 backdrop-blur-[42px]",
+    "shadow-[0_18px_55px_-36px_rgba(0,0,0,0.85)]",
     "transition-all duration-300",
     heightClass,
   ].join(" ");
 
 const dashboardPreviewMediaClass =
-  "relative h-full w-full overflow-hidden bg-black/70";
+  "relative h-full w-full overflow-hidden bg-black/45";
 
 const dashboardPreviewInfoClass =
-  "relative h-full w-full overflow-hidden bg-black/25 bg-gradient-to-br from-white/12 via-neutral-950/60 to-black/75 backdrop-blur-[36px]";
+  "relative h-full w-full overflow-hidden bg-black/15 bg-gradient-to-br from-white/5 via-neutral-950/45 to-black/55 backdrop-blur-[36px]";
+
+const dashboardPreviewBackdropFadeStyle = {
+  WebkitMaskImage:
+    "radial-gradient(ellipse at center, black 72%, rgba(0,0,0,0.98) 86%, rgba(0,0,0,0.82) 100%)",
+  maskImage:
+    "radial-gradient(ellipse at center, black 72%, rgba(0,0,0,0.98) 86%, rgba(0,0,0,0.82) 100%)",
+};
 
 const EXPANDABLE_SECTION_HREFS = {
   Tendencias: "/dashboard/tendencias",
@@ -661,7 +668,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900 shadow-lg`}
+      className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900`}
     >
       <NextImage
         src={buildImg(posterPath, "w342")}
@@ -1011,9 +1018,10 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             alt={movie.title || movie.name}
             fill
             sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-            className={`object-cover transition-opacity duration-200 ${
+            className={`scale-[1.015] object-cover transition-opacity duration-200 ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
+            style={dashboardPreviewBackdropFadeStyle}
             loading="eager"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
@@ -1080,11 +1088,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24
                       bg-gradient-to-b from-transparent via-black/60 to-black/95"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-black/20 opacity-60 mix-blend-screen" />
       </div>
 
       <div className={dashboardPreviewInfoClass}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(120deg,transparent,rgba(255,255,255,0.05),transparent)]" />
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
@@ -1147,64 +1153,45 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleTrailer}
-              disabled={trailerLoading}
+              loading={trailerLoading}
+              active
+              activeColor="yellow"
+              groupId="dashboard-preview-actions"
               title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-yellow-500/90 to-yellow-600/90 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-400/40 flex items-center justify-center text-black transition-all duration-200 disabled:opacity-60 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50"
+              className="!h-9 !w-9 !bg-white !text-black sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {trailerLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-              ) : showTrailer ? (
-                <X className="w-5 h-5 text-black" />
+              {showTrailer ? (
+                <X className="text-black" />
               ) : (
-                <Play className="w-5 h-5 ml-0.5 text-black" />
+                <Play className="ml-0.5 fill-current text-black" />
               )}
-            </motion.button>
+            </LiquidButton>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleFavorite}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={favorite}
+              activeColor="red"
+              groupId="dashboard-preview-actions"
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                favorite
-                  ? "bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Heart
-                  className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
-                />
-              )}
-            </motion.button>
+              <Heart className={favorite ? "fill-current" : ""} />
+            </LiquidButton>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleWatchlist}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={watchlist}
+              activeColor="blue"
+              groupId="dashboard-preview-actions"
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                watchlist
-                  ? "bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <BookmarkPlus
-                  className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
-                />
-              )}
-            </motion.button>
+              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+            </LiquidButton>
           </motion.div>
         </div>
       </div>
@@ -1512,9 +1499,10 @@ function InlinePreviewCardAnticipated({
             alt={movie.title || movie.name}
             fill
             sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-            className={`object-cover transition-opacity duration-200 ${
+            className={`scale-[1.015] object-cover transition-opacity duration-200 ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
+            style={dashboardPreviewBackdropFadeStyle}
             loading="eager"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
@@ -1558,11 +1546,9 @@ function InlinePreviewCardAnticipated({
           transition={{ delay: 0.2 }}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/60 to-black/95"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-black/20 opacity-60 mix-blend-screen" />
       </div>
 
       <div className={dashboardPreviewInfoClass}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(120deg,transparent,rgba(255,255,255,0.05),transparent)]" />
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             {/* META NUEVA SOLO PARA MÁS ESPERADAS */}
@@ -1593,64 +1579,45 @@ function InlinePreviewCardAnticipated({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleTrailer}
-              disabled={trailerLoading}
+              loading={trailerLoading}
+              active
+              activeColor="yellow"
+              groupId="dashboard-preview-actions"
               title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-yellow-500/90 to-yellow-600/90 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-400/40 flex items-center justify-center text-black transition-all duration-200 disabled:opacity-60 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50"
+              className="!h-9 !w-9 !bg-white !text-black sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {trailerLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-              ) : showTrailer ? (
-                <X className="w-5 h-5 text-black" />
+              {showTrailer ? (
+                <X className="text-black" />
               ) : (
-                <Play className="w-5 h-5 ml-0.5 text-black" />
+                <Play className="ml-0.5 fill-current text-black" />
               )}
-            </motion.button>
+            </LiquidButton>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleFavorite}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={favorite}
+              activeColor="red"
+              groupId="dashboard-preview-actions"
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                favorite
-                  ? "bg-gradient-to-br from-red-600/90 to-red-700/90 hover:from-red-500 hover:to-red-600 border-red-400/40 shadow-red-500/30 hover:shadow-red-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Heart
-                  className={`w-5 h-5 ${favorite ? "fill-current" : ""}`}
-                />
-              )}
-            </motion.button>
+              <Heart className={favorite ? "fill-current" : ""} />
+            </LiquidButton>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            <LiquidButton
               onClick={handleToggleWatchlist}
-              disabled={loadingStates || updating}
+              loading={loadingStates || updating}
+              active={watchlist}
+              activeColor="blue"
+              groupId="dashboard-preview-actions"
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-200 disabled:opacity-60 shadow-lg ${
-                watchlist
-                  ? "bg-gradient-to-br from-blue-600/90 to-blue-700/90 hover:from-blue-500 hover:to-blue-600 border-blue-400/40 shadow-blue-500/30 hover:shadow-blue-500/50 text-white"
-                  : "bg-gradient-to-br from-neutral-700/70 to-neutral-800/70 hover:from-neutral-600 hover:to-neutral-700 border-neutral-500/30 shadow-black/20 text-white"
-              }`}
+              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
             >
-              {loadingStates || updating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <BookmarkPlus
-                  className={`w-5 h-5 ${watchlist ? "fill-current" : ""}`}
-                />
-              )}
-            </motion.button>
+              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+            </LiquidButton>
           </motion.div>
         </div>
       </div>
