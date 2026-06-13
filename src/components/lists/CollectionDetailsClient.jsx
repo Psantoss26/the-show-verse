@@ -68,14 +68,11 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
 }
 
 export default function CollectionDetailsClient({ collectionId }) {
-    const [state, setState] = useState(() => {
-        const cached = readCollectionDetailsCache(collectionId)
-        return {
-            loading: !cached,
-            error: null,
-            collection: cached?.collection || null,
-            parts: Array.isArray(cached?.parts) ? cached.parts : [],
-        }
+    const [state, setState] = useState({
+        loading: true,
+        error: null,
+        collection: null,
+        parts: [],
     })
 
     const [imdbRatings, setImdbRatings] = useState({})
