@@ -24,6 +24,19 @@ function safeNextPath(value) {
   return value
 }
 
+function publicOrigin(request) {
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const host = forwardedHost || request.headers.get('host') || ''
+  const proto = forwardedProto || 'https'
+
+  if (host && !host.startsWith('0.0.0.0')) {
+    return `${proto}://${host}`
+  }
+
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://theshowverse.com'
+}
+
 export async function GET(request) {
   const secret = process.env.SHOWVERSE_PRIVATE_ACCESS_KEY || ''
   if (!secret) return notFound()
@@ -32,7 +45,7 @@ export async function GET(request) {
   const key = url.searchParams.get('key') || ''
   if (key !== secret) return notFound()
 
-  const redirectUrl = new URL(safeNextPath(url.searchParams.get('next')), url.origin)
+  const redirectUrl = new URL(safeNextPath(url.searchParams.get('next')), publicOrigin(request))
   const response = NextResponse.redirect(redirectUrl)
   response.cookies.set(ACCESS_COOKIE, await sha256(secret), {
     httpOnly: true,
