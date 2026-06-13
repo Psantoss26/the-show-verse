@@ -175,6 +175,21 @@ const dashboardSegmentButtonClass = (active) =>
       : "text-zinc-400 hover:bg-white/5 hover:text-white",
   ].join(" ");
 
+const dashboardPreviewCardClass = (heightClass) =>
+  [
+    "relative isolate grid grid-rows-[76%_24%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
+    "bg-black/25 bg-gradient-to-br from-white/10 via-neutral-950/70 to-black/80 backdrop-blur-[42px]",
+    "shadow-[0_22px_70px_-30px_rgba(0,0,0,0.9)]",
+    "transition-all duration-300",
+    heightClass,
+  ].join(" ");
+
+const dashboardPreviewMediaClass =
+  "relative h-full w-full overflow-hidden bg-black/70";
+
+const dashboardPreviewInfoClass =
+  "relative h-full w-full overflow-hidden bg-black/25 bg-gradient-to-br from-white/12 via-neutral-950/60 to-black/75 backdrop-blur-[36px]";
+
 const EXPANDABLE_SECTION_HREFS = {
   Tendencias: "/dashboard/tendencias",
   Populares: "/dashboard/populares",
@@ -633,7 +648,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
           alt={movie.title || movie.name}
           fill
           sizes="(min-width:1280px) 210px, (min-width:768px) 190px, 140px"
-          className="object-cover rounded-lg transition-all duration-300 group-hover/poster:shadow-2xl group-hover/poster:shadow-white/10"
+          className="object-cover rounded-lg transition-all duration-300 group-hover/poster:brightness-110"
           loading="lazy"
         />
         <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/poster:opacity-100 transition-opacity duration-300" />
@@ -971,13 +986,13 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
+      className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
-      <div className="relative w-full h-full bg-black">
+      <div className={dashboardPreviewMediaClass}>
         {!showTrailer && !backdropReady && (
           <div className="relative w-full h-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 overflow-hidden">
             <motion.div
@@ -1065,9 +1080,11 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24
                       bg-gradient-to-b from-transparent via-black/60 to-black/95"
         />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-black/20 opacity-60 mix-blend-screen" />
       </div>
 
-      <div className="w-full h-full bg-gradient-to-br from-neutral-950/98 to-black/98 border-t border-white/5 backdrop-blur-sm">
+      <div className={dashboardPreviewInfoClass}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(120deg,transparent,rgba(255,255,255,0.05),transparent)]" />
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
@@ -1477,13 +1494,13 @@ function InlinePreviewCardAnticipated({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className={`rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white shadow-2xl ${heightClass} grid grid-rows-[76%_24%] cursor-pointer ring-1 ring-white/5 hover:ring-white/10 transition-all duration-300`}
+      className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
-      <div className="relative w-full h-full bg-black">
+      <div className={dashboardPreviewMediaClass}>
         {!showTrailer && !backdropReady && (
           <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
         )}
@@ -1541,9 +1558,11 @@ function InlinePreviewCardAnticipated({
           transition={{ delay: 0.2 }}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/60 to-black/95"
         />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-black/20 opacity-60 mix-blend-screen" />
       </div>
 
-      <div className="w-full h-full bg-gradient-to-br from-neutral-950/98 to-black/98 border-t border-white/5 backdrop-blur-sm">
+      <div className={dashboardPreviewInfoClass}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(120deg,transparent,rgba(255,255,255,0.05),transparent)]" />
         <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             {/* META NUEVA SOLO PARA MÁS ESPERADAS */}
