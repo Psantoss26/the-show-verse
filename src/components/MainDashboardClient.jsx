@@ -163,6 +163,18 @@ const getBackdropCacheKey = (item, mediaType = getMediaTypeForItem(item)) =>
 const getPreviewBackdropFallback = (item) =>
   item?.backdrop_path || item?.poster_path || null;
 
+const dashboardSegmentGroupClass =
+  "flex isolate transform-gpu items-center gap-1 rounded-full p-1 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.65)]";
+
+const dashboardSegmentButtonClass = (active) =>
+  [
+    "relative isolate inline-flex min-h-8 items-center justify-center rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 sm:min-h-9 sm:px-4 sm:text-sm",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70",
+    active
+      ? "bg-white/10 bg-gradient-to-br from-white/20 via-white/10 to-white/5 text-white shadow-[0_8px_24px_-12px_rgba(255,255,255,0.45)]"
+      : "text-zinc-400 hover:bg-white/5 hover:text-white",
+  ].join(" ");
+
 const EXPANDABLE_SECTION_HREFS = {
   Tendencias: "/dashboard/tendencias",
   Populares: "/dashboard/populares",
@@ -1692,16 +1704,12 @@ const RowWithTimeFilter = memo(function RowWithTimeFilter({
           </h3>
 
           {/* Selector de período */}
-          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          <div className={dashboardSegmentGroupClass}>
             {availablePeriods.map(([key, { label, data }]) => (
               <button
                 key={key}
                 onClick={() => setSelectedPeriod(key)}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  selectedPeriod === key
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(selectedPeriod === key)}
               >
                 {label}
               </button>
@@ -1788,16 +1796,12 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
           />
 
           {/* Selector de fuente */}
-          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          <div className={dashboardSegmentGroupClass}>
             {availableSources.map(([key, { label, data }]) => (
               <button
                 key={key}
                 onClick={() => setSelectedSource(key)}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  effectiveSource === key
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(effectiveSource === key)}
               >
                 {label}
               </button>
@@ -2482,15 +2486,11 @@ const AnticipatedSection = memo(function AnticipatedSection({
         </div>
 
         {!loading && (
-          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          <div className={dashboardSegmentGroupClass}>
             {movieItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("movies")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "movies"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "movies")}
               >
                 Películas
               </button>
@@ -2498,11 +2498,7 @@ const AnticipatedSection = memo(function AnticipatedSection({
             {tvItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("series")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "series"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "series")}
               >
                 Series
               </button>
@@ -2607,15 +2603,11 @@ const RecommendedSection = memo(function RecommendedSection({
         </div>
 
         {!loading && (
-          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          <div className={dashboardSegmentGroupClass}>
             {hasMovieItems && (
               <button
                 onClick={() => setActiveTab("movies")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "movies"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "movies")}
               >
                 Películas
               </button>
@@ -2623,11 +2615,7 @@ const RecommendedSection = memo(function RecommendedSection({
             {hasTvItems && (
               <button
                 onClick={() => setActiveTab("series")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "series"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "series")}
               >
                 Series
               </button>
@@ -2830,15 +2818,11 @@ function TopRatedHero({
             Mejor valoradas<span className="text-amber-500">.</span>
           </h3>
 
-          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          <div className={dashboardSegmentGroupClass}>
             {movieItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("movies")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "movies"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "movies")}
               >
                 Películas
               </button>
@@ -2846,11 +2830,7 @@ function TopRatedHero({
             {tvItems?.length > 0 && (
               <button
                 onClick={() => setActiveTab("series")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
-                  activeTab === "series"
-                    ? "bg-white text-black"
-                    : "text-neutral-400 hover:text-white"
-                }`}
+                className={dashboardSegmentButtonClass(activeTab === "series")}
               >
                 Series
               </button>
