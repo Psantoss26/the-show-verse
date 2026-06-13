@@ -320,9 +320,14 @@ export default function ScoreboardBar({
   const imdbHref = imdb?.id ? `https://www.imdb.com/title/${imdb.id}` : null;
 
   return (
-    <div className="relative w-full overflow-visible rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] mb-6">
+    <div className="relative isolate w-full overflow-visible rounded-2xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[28px] mb-6">
+      <div
+        className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+      />
       <div
         className="
+          relative z-10
           py-3
           pl-[calc(1rem+env(safe-area-inset-left))]
           pr-[calc(1.25rem+env(safe-area-inset-right))]
@@ -416,7 +421,7 @@ export default function ScoreboardBar({
 
       {/* Footer stats (si hay) */}
       {!tScoreboard.loading && tScoreboard?.stats ? (
-        <div className="border-t border-white/5 bg-black/10 rounded-b-2xl">
+        <div className="relative z-10 rounded-b-2xl border-t border-white/5 bg-black/[0.04]">
           <div
             className="
               overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
