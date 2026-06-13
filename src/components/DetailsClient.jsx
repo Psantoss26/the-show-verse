@@ -9323,7 +9323,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
             <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[28px] transform-gpu mb-6">
+              <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] transform-gpu mb-6">
                 <div
                   className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
                   style={{
@@ -9555,7 +9555,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {Object.values(tScoreboard?.stats || {}).some(
                   (v) => typeof v === "number",
                 ) && (
-                  <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+                  <div className="relative z-10 border-t border-white/5 bg-black/[0.06] rounded-b-2xl">
                     {/* Scroller con padding + safe-area para que no se recorte en bordes */}
                     <div
                       className="
