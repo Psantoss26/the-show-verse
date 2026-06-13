@@ -1317,7 +1317,6 @@ export default function DetailsClient({
 
   // -- Estado general de la UI --
   const [showAdminImages, setShowAdminImages] = useState(false); // Panel admin de imagenes (solo admin)
-  const [reviewLimit, setReviewLimit] = useState(2); // Numero de reseñas visibles (expandible)
   const [useBackdrop, setUseBackdrop] = useState(true); // Alternar entre backdrop y poster como fondo
 
   // -- Autenticacion y permisos --
@@ -10406,7 +10405,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 >
                   {/* --- COLECCIÓN --- */}
                   <section className="mb-10 group/section">
-                    <SectionTitle title="Colección" icon={Layers} />
+                    <Link
+                      href={`/lists/collection/${collectionId}`}
+                      className="group/collection-title mb-3 inline-flex w-fit items-center gap-3 rounded-xl border-l-4 border-yellow-500 py-1 pl-4 transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 sm:mb-5 md:mb-6"
+                      aria-label="Ver detalles de la colección"
+                    >
+                      <Layers className="h-6 w-6 text-yellow-500" />
+                      <h2 className="text-2xl font-bold tracking-wide text-white md:text-3xl">
+                        Colección
+                      </h2>
+                      <ChevronRight className="h-5 w-5 text-yellow-500/70 transition-transform duration-300 group-hover/collection-title:translate-x-1 group-hover/collection-title:text-yellow-400 group-focus-visible/collection-title:translate-x-1 group-focus-visible/collection-title:text-yellow-400" />
+                    </Link>
 
                     {collectionLoading ? (
                       <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
@@ -11836,23 +11845,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* CRÍTICAS */}
                     {reviews && reviews.length > 0 && (
                       <section className="mb-10 group/section">
-                        <div className="flex items-start justify-between gap-3">
-                          <SectionTitle
-                            title="Críticas de Usuarios"
-                            icon={MessageSquareIcon}
-                          />
-                          {reviewLimit < reviews.length && (
-                            <button
-                              onClick={() => setReviewLimit((prev) => prev + 2)}
-                              className="mt-2 text-sm text-yellow-500 hover:text-yellow-400 font-semibold uppercase tracking-wide"
-                            >
-                              Ver más
-                            </button>
-                          )}
-                        </div>
+                        <SectionTitle
+                          title="Críticas de Usuarios"
+                          icon={MessageSquareIcon}
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {reviews.slice(0, reviewLimit).map((r) => {
+                          {reviews.slice(0, 2).map((r) => {
                             const avatar = r.author_details?.avatar_path
                               ? r.author_details.avatar_path.startsWith(
                                   "/https",
@@ -11894,15 +11893,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <div className="relative z-10 text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
                                   "{r.content.replace(/<[^>]*>?/gm, "")}"
                                 </div>
-
-                                <a
-                                  href={r.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="relative z-10 text-blue-400 text-xs font-semibold hover:underline mt-auto self-start"
-                                >
-                                  Leer review completa en TMDb &rarr;
-                                </a>
                               </div>
                             );
                           })}
@@ -12125,26 +12115,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <div className="flex h-full items-center justify-center opacity-10">
                                         <ListVideo className="h-20 w-20" />
                                       </div>
-                                    )}
-
-                                    {/* Botón externo (opcional) sin romper el Link */}
-                                    {traktUrl && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          window.open(
-                                            traktUrl,
-                                            "_blank",
-                                            "noopener,noreferrer",
-                                          );
-                                        }}
-                                        className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-zinc-200 border border-white/10 hover:border-indigo-400/30 hover:text-white"
-                                        title="Ver en Trakt"
-                                      >
-                                        Trakt
-                                      </button>
                                     )}
                                   </div>
 
