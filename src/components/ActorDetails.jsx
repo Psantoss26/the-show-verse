@@ -1989,7 +1989,7 @@ export default function ActorDetails({
             href: socials.imdb,
             iconSize: { width: 42, height: 22 },
             iconClassName:
-              "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-md shadow-lg object-contain",
+              "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-none object-contain overflow-visible",
           }
         : null,
       socials.wikipedia
@@ -1999,8 +1999,8 @@ export default function ActorDetails({
             icon: "/wikipedia.png",
             href: socials.wikipedia,
             iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-md object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+            iconClassName: "!h-6 !w-6 rounded-none object-contain overflow-visible",
+            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.instagram
@@ -2010,8 +2010,8 @@ export default function ActorDetails({
             icon: "/instagram.png",
             href: socials.instagram,
             iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-md object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+            iconClassName: "!h-6 !w-6 rounded-none object-contain overflow-visible",
+            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.twitter
@@ -2021,8 +2021,8 @@ export default function ActorDetails({
             icon: "/x.png",
             href: socials.twitter,
             iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-md object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+            iconClassName: "!h-6 !w-6 rounded-none object-contain overflow-visible",
+            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.facebook
@@ -2032,8 +2032,8 @@ export default function ActorDetails({
             icon: "/facebook.png",
             href: socials.facebook,
             iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-md object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+            iconClassName: "!h-6 !w-6 rounded-none object-contain overflow-visible",
+            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.youtube
@@ -2042,9 +2042,9 @@ export default function ActorDetails({
             label: "YouTube",
             icon: "/youtube.webp",
             href: socials.youtube,
-            iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-md object-contain",
-            menuIconClassName: "h-4 w-4 rounded-sm object-contain",
+            iconSize: { width: 26, height: 26 },
+            iconClassName: "!h-[26px] !w-[26px] rounded-none object-contain overflow-visible",
+            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.tiktok

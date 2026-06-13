@@ -309,13 +309,13 @@ export function ActionShareButton({ title, text, url }) {
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="group/share inline-flex items-center justify-center gap-2 rounded-xl border transition-all duration-300 p-2 sm:px-3 sm:py-2 bg-transparent border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200 relative"
+      className="group/share relative inline-grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-transparent p-0 text-zinc-400 leading-none transition-all duration-300 hover:bg-white/5 hover:text-zinc-200 sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2"
       aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
     >
       {copied ? (
-        <Check className="w-4 h-4 transition-transform group-hover/share:scale-110" />
+        <Check className="block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
       ) : (
-        <Share2 className="w-4 h-4 transition-transform group-hover/share:scale-110" />
+        <Share2 className="block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
       )}
       <span className="hidden sm:block text-sm font-medium">
         {copied ? "Copiado" : "Compartir"}
