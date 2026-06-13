@@ -136,17 +136,14 @@ export default function TraktListDetailsClient({ username, listId }) {
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
-    const [state, setState] = useState(() => {
-        const cached = readDetailsCache(username, listId)
-        return {
-            loading: !cached,
-            loadingMore: false,
-            error: null,
-            list: cached?.list || null,
-            items: Array.isArray(cached?.items) ? cached.items : [],
-            page: cached?.page || 1,
-            hasMore: !!cached?.hasMore,
-        }
+    const [state, setState] = useState({
+        loading: true,
+        loadingMore: false,
+        error: null,
+        list: null,
+        items: [],
+        page: 1,
+        hasMore: false,
     })
 
     useEffect(() => {
@@ -300,21 +297,6 @@ export default function TraktListDetailsClient({ username, listId }) {
                 : `https://trakt.tv/users/${username}/lists/${slugOrId}`)
             : null
 
-    if (state.loading && !list && items.length === 0) {
-        return null
-    }
-
-    if (state.error && !list && items.length === 0) {
-        return (
-            <UnifiedListDetailsLayout title="Lista" sourceLabel="Trakt" backHref="/lists">
-                <div className="rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-6 text-zinc-300 shadow-none backdrop-blur-[28px]">
-                    <p className="font-bold text-red-300">Error</p>
-                    <p className="mt-2 text-sm text-zinc-400">{state.error}</p>
-                </div>
-            </UnifiedListDetailsLayout>
-        )
-    }
-
     const firstPoster = items.find((item) => item?._tmdb?.poster_path)?._tmdb?.poster_path
     const firstBackdrop = items.find((item) => item?._tmdb?.backdrop_path)?._tmdb?.backdrop_path || firstPoster
 
@@ -333,6 +315,21 @@ export default function TraktListDetailsClient({ username, listId }) {
             addedAt: it?.listed_at || '',
         }
     }, [])
+
+    if (state.loading && !list && items.length === 0) {
+        return null
+    }
+
+    if (state.error && !list && items.length === 0) {
+        return (
+            <UnifiedListDetailsLayout title="Lista" sourceLabel="Trakt" backHref="/lists">
+                <div className="rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-6 text-zinc-300 shadow-none backdrop-blur-[28px]">
+                    <p className="font-bold text-red-300">Error</p>
+                    <p className="mt-2 text-sm text-zinc-400">{state.error}</p>
+                </div>
+            </UnifiedListDetailsLayout>
+        )
+    }
 
     return (
         <UnifiedListDetailsLayout
