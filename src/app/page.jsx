@@ -126,6 +126,8 @@ async function getDashboardData() {
       traktMoviesAnticipated: null,
       traktShowsAnticipated: null,
       traktRecommended: null,
+      traktRecommendedMovies: null,
+      traktRecommendedShows: null,
       traktTrending: [],
       traktPopular: [],
       traktAnticipated: [],
@@ -141,6 +143,9 @@ async function getDashboardData() {
     return {
       traktMoviesAnticipated: null,
       traktShowsAnticipated: null,
+      traktRecommended: null,
+      traktRecommendedMovies: null,
+      traktRecommendedShows: null,
     };
   }
 }
