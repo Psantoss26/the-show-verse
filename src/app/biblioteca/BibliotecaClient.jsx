@@ -972,21 +972,7 @@ function LibraryMediaCard({
             </div>
           )}
 
-          {/* Mobile overlay - bottom only */}
-          <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
-            {year && (
-              <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                <span className="text-[10px] text-zinc-300/80 font-medium">
-                  {year}
-                </span>
-              </div>
-            )}
-            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
-              {title}
-            </h5>
-          </div>
-
-          {/* Overlay con gradientes */}
+          {/* Desktop overlay con gradientes */}
           <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
             {/* Bottom gradient con título y año */}
             <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
