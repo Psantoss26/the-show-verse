@@ -190,12 +190,23 @@ export async function GET(request) {
       new Map(filteredRows.map((row) => [calendarRowKey(row), row])).values(),
     );
 
-    const mapped = await mapLimit(uniqueRows, 8, async (row) => {
+    // Agrupar por tmdbId para evitar llamadas duplicadas a TMDb
+    const uniqueTmdbIds = [
+      ...new Set(
+        uniqueRows.map((r) => r?.show?.ids?.tmdb).filter(Boolean),
+      ),
+    ];
+    const tmdbResults = await mapLimit(uniqueTmdbIds, 8, fetchTmdbShow);
+    const tmdbMap = new Map(
+      uniqueTmdbIds.map((id, i) => [id, tmdbResults[i]]),
+    );
+
+    const mapped = uniqueRows.map((row) => {
       const show = row?.show || {};
       const episode = row?.episode || {};
       const tmdbId = show?.ids?.tmdb || null;
       const traktId = show?.ids?.trakt || null;
-      const tmdb = await fetchTmdbShow(tmdbId);
+      const tmdb = tmdbId ? tmdbMap.get(tmdbId) : null;
       const sources = buildSources(show, watchlistIds, favoriteIds);
 
       return {
