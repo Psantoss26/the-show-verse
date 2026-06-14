@@ -1618,7 +1618,8 @@ function GroupDivider({
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               {stats?.imdb?.avg != null &&
                 typeof stats.imdb.avg === "number" &&
-                !Number.isNaN(stats.imdb.avg) && (
+                !Number.isNaN(stats.imdb.avg) &&
+                stats.imdb.avg > 0 && (
                   <StatBox
                     label="IMDb"
                     value={formatAvg(stats.imdb.avg)}
@@ -1628,7 +1629,8 @@ function GroupDivider({
                 )}
               {stats?.trakt?.avg != null &&
                 typeof stats.trakt.avg === "number" &&
-                !Number.isNaN(stats.trakt.avg) && (
+                !Number.isNaN(stats.trakt.avg) &&
+                stats.trakt.avg > 0 && (
                   <StatBox
                     label="Trakt"
                     value={formatAvg(stats.trakt.avg)}
@@ -1638,7 +1640,8 @@ function GroupDivider({
                 )}
               {stats?.tmdb?.avg != null &&
                 typeof stats.tmdb.avg === "number" &&
-                !Number.isNaN(stats.tmdb.avg) && (
+                !Number.isNaN(stats.tmdb.avg) &&
+                stats.tmdb.avg > 0 && (
                   <StatBox
                     label="TMDb"
                     value={formatAvg(stats.tmdb.avg)}
@@ -1649,7 +1652,8 @@ function GroupDivider({
 
               {stats?.my?.avg != null &&
                 typeof stats.my.avg === "number" &&
-                !Number.isNaN(stats.my.avg) && (
+                !Number.isNaN(stats.my.avg) &&
+                stats.my.avg > 0 && (
                   <div
                     className={`${stickyTransitionClass} border-white/10 ${renderSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
                   >
