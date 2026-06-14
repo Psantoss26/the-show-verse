@@ -20,22 +20,28 @@
     "lang": "es",
     "icons": [
         {
-            "src": "/icon.png",
-            "sizes": "256x256",
+            "src": "/pwa-icon-192.png",
+            "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon.png",
+            "src": "/pwa-icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/icon.png",
+            "src": "/pwa-icon-1024.png",
             "sizes": "1024x1024",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "/pwa-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
     "shortcuts": [
@@ -43,19 +49,19 @@
             "name": "Calendario",
             "short_name": "Calendario",
             "url": "/calendar",
-            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
+            "icons": [{ "src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png" }]
         },
         {
             "name": "Pendientes",
             "short_name": "Pendientes",
             "url": "/watchlist",
-            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
+            "icons": [{ "src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png" }]
         },
         {
             "name": "Favoritas",
             "short_name": "Favoritas",
             "url": "/favorites",
-            "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png" }]
+            "icons": [{ "src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png" }]
         }
     ]
 }

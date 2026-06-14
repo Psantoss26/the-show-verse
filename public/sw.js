@@ -1,4 +1,4 @@
-const VERSION = "showverse-v3";
+const VERSION = "showverse-v4";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -9,8 +9,11 @@ const APP_SHELL = [
   "/",
   OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
-  "/icon.png",
-  "/apple-icon.png",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/pwa-icon-1024.png",
+  "/pwa-maskable-512.png",
+  "/pwa-apple-icon.png",
   "/logo-TSV-sinFondo.png",
   "/logo-final.png",
 ];
