@@ -2008,25 +2008,6 @@ const FavoriteCard = memo(function FavoriteCard({
               <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
             )}
           </div>
-          {/* Mobile overlay - bottom only */}
-          <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
-            {year && (
-              <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                <span className="text-[10px] text-zinc-300/80 font-medium">
-                  {year}
-                </span>
-              </div>
-            )}
-            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
-              {title}
-            </h5>
-            {rating && (
-              <div className="mt-0.5 text-[10px] text-amber-300/90 flex items-center gap-1">
-                <Star className="w-2.5 h-2.5 fill-amber-300" />
-                {rating}
-              </div>
-            )}
-          </div>
           {/* Overlay con gradientes */}
           <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
             {/* Top gradient con tipo y ratings */}
