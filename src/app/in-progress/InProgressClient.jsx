@@ -803,43 +803,6 @@ const InProgressCard = memo(function InProgressCard({
               <CheckCircle2 className="absolute top-2.5 left-2.5 z-10 lg:hidden w-5 h-5 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
             )}
 
-            {/* Mobile overlay - bottom only */}
-            <div className="absolute inset-x-0 bottom-0 z-10 lg:hidden p-3 pt-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none">
-              <div className="flex items-center gap-2 mb-1 -ml-0.5">
-                {activeTab === "completed" ? null : (
-                  <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}
-                  >
-                    {item.pct}%
-                  </span>
-                )}
-                {nextEpCode && (
-                  <span className="text-[10px] text-emerald-300/90 font-medium flex items-center gap-1">
-                    <Play className="w-2.5 h-2.5" fill="currentColor" />
-                    {nextEpCode}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-end justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
-                    {title}
-                  </h5>
-                  {item.completed && item.aired && (
-                    <div className="mt-0.5 text-[10px] text-zinc-400 flex items-center gap-1">
-                      <Eye className="w-2.5 h-2.5" />
-                      {item.completed}/{item.aired} eps
-                    </div>
-                  )}
-                </div>
-                {activeTab === "completed" && item.user_rating && (
-                  <span className="text-yellow-400 text-lg font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                    {item.user_rating}
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* Overlay con gradientes - desktop hover */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               {/* Top gradient con porcentaje */}
@@ -2092,7 +2055,7 @@ export default function InProgressClient() {
               viewMode === "cards"
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6"
                 : viewMode === "poster"
-                  ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
+                  ? "grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
                   : "grid grid-cols-1 xl:grid-cols-2 gap-4"
             }
           >
@@ -2161,7 +2124,7 @@ export default function InProgressClient() {
                         ))}
                       </div>
                     ) : viewMode === "poster" ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
                         {group.items.map((item, idx) => (
                           <InProgressCard
                             key={item.tmdbId}
@@ -2210,7 +2173,7 @@ export default function InProgressClient() {
                 ) : viewMode === "poster" ? (
                   <motion.div
                     key="poster-grid"
-                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
+                    className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
                     layout
                   >
                     {filtered.map((item, idx) => (
