@@ -571,6 +571,10 @@ function DiscoverCard({ item }) {
     router.prefetch(href);
   };
 
+  const typeColorClass = isMovie
+    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
+    : "bg-purple-500/15 border-purple-500/30 text-purple-300";
+
   return (
     <Link
       href={href}
@@ -585,24 +589,24 @@ function DiscoverCard({ item }) {
         <img
           src={posterSrc(item)}
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-500"
+          className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
           loading="lazy"
           decoding="async"
         />
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-          <div className="absolute top-2 right-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
-            <div className="rounded-md bg-black/60 backdrop-blur-md px-1.5 py-1 border border-white/10 text-white">
-              {isMovie ? (
-                <FilmIcon className="w-3.5 h-3.5" />
-              ) : (
-                <TvIcon className="w-3.5 h-3.5" />
-              )}
-            </div>
-          </div>
+        <div
+          className={`absolute top-0 left-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${typeColorClass}`}
+        >
+          {isMovie ? (
+            <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          ) : (
+            <TvIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          )}
+        </div>
 
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
           {percent > 0 && (
-            <div className="absolute top-2 left-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
+            <div className="absolute top-2 right-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
               <RatingBadge percent={percent} />
             </div>
           )}
