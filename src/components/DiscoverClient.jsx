@@ -594,7 +594,7 @@ function DiscoverCard({ item }) {
       onFocus={handlePrefetch}
       onTouchStart={handlePrefetch}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[1.5rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent border border-transparent shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group-hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)] group-hover:bg-white/5 group-hover:-translate-y-1 z-0 group-hover:z-10">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent border border-transparent shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group-hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)] group-hover:bg-white/5 group-hover:-translate-y-1 z-0 group-hover:z-10">
         <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/5 z-20 group-hover:border-white/20 transition-colors" />
         <img
           src={posterSrc(item)}
@@ -605,7 +605,7 @@ function DiscoverCard({ item }) {
         />
 
         <div
-          className={`absolute top-0 left-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${typeColorClass}`}
+          className={`absolute top-0 left-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-br-xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${typeColorClass}`}
         >
           {isMovie ? (
             <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
