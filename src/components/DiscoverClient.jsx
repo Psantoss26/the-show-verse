@@ -590,7 +590,6 @@ function DiscoverCard({ item }) {
     <Link
       href={href}
       className="group relative flex flex-col w-full h-full"
-      title={title}
       onMouseEnter={handlePrefetch}
       onFocus={handlePrefetch}
       onTouchStart={handlePrefetch}
