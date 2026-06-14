@@ -2317,7 +2317,7 @@ export default function ActorDetails({
                 style={{
                   perspective: poster3dEnabled ? 1100 : undefined,
                   transformStyle: "preserve-3d",
-                  touchAction: "none",
+                  touchAction: "pan-y",
                 }}
               >
                 <div
