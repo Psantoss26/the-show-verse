@@ -477,7 +477,7 @@ function DateSelector({
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState("day");
+  const [viewMode, setViewMode] = useState("week");
 
   const [selectedMovies, setSelectedMovies] = useState([]);
   const [trackedEpisodes, setTrackedEpisodes] = useState([]);
@@ -836,10 +836,6 @@ export default function CalendarPage() {
                         Episodios de tus series
                       </h2>
                     </div>
-                    <p className="text-sm text-zinc-500">
-                      Próximas emisiones de series en Trakt marcadas como
-                      pendientes o favoritas.
-                    </p>
                   </div>
                   {hasEpisodes && (
                     <span className="w-fit rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-300 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
