@@ -153,7 +153,9 @@ const buildImg = (path, size = "original") =>
 const PREVIEW_BACKDROP_SIZE = "w780";
 
 const getMediaTypeForItem = (item) =>
-  item?.media_type === "tv" || (item?.name && !item?.title) || item?.first_air_date
+  item?.media_type === "tv" ||
+  (item?.name && !item?.title) ||
+  item?.first_air_date
     ? "tv"
     : "movie";
 
@@ -453,7 +455,8 @@ async function preparePreviewBackdrop(item, backdropOverride) {
 
   const mediaType = getMediaTypeForItem(item);
   const backdropCacheKey = getBackdropCacheKey(item, mediaType);
-  let backdropPath = backdropOverride || movieBackdropCache.get(backdropCacheKey);
+  let backdropPath =
+    backdropOverride || movieBackdropCache.get(backdropCacheKey);
 
   if (backdropPath === undefined) {
     try {
@@ -2070,7 +2073,9 @@ function Row({
           >
             {normalizedItems.map((m, i) => {
               const itemType =
-                m.media_type === "tv" || (m.name && !m.title) || m.first_air_date
+                m.media_type === "tv" ||
+                (m.name && !m.title) ||
+                m.first_air_date
                   ? "tv"
                   : "movie";
               const itemKey = `${itemType}:${m.id}`;
@@ -2604,8 +2609,8 @@ const RecommendedSection = memo(function RecommendedSection({
       <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            <div className="h-px w-8 bg-amber-500" />
+            <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
               TRAKT
             </span>
           </div>
@@ -2816,10 +2821,7 @@ function TopRatedHero({
       className="relative group mb-10 sm:mb-14"
     >
       {/* Título de la sección con selector Películas / Series */}
-      <motion.div
-        variants={scaleIn}
-        className="mb-5 px-1 sm:px-0"
-      >
+      <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
         <div className="flex items-center gap-2 mb-1.5">
           <div className="h-px w-8 bg-amber-500" />
           <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
@@ -2941,9 +2943,7 @@ function TopRatedHero({
                             ? { priority: true, fetchPriority: "high" }
                             : {
                                 loading:
-                                  index < (isMobile ? 1 : 3)
-                                    ? "eager"
-                                    : "lazy",
+                                  index < (isMobile ? 1 : 3) ? "eager" : "lazy",
                               })}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
@@ -3020,7 +3020,9 @@ export default function MainDashboardClient({ initialData }) {
   )
     ? initialData.traktMoviesAnticipated
     : null;
-  const seededShowsAnticipated = Array.isArray(initialData?.traktShowsAnticipated)
+  const seededShowsAnticipated = Array.isArray(
+    initialData?.traktShowsAnticipated,
+  )
     ? initialData.traktShowsAnticipated
     : null;
   const hasRenderableInitialAnticipatedData =
