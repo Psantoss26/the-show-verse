@@ -522,16 +522,27 @@ function SortMenu({ value, onChange }) {
 function RatingBadge({ percent }) {
   const p = Math.max(0, Math.min(100, Math.round(percent || 0)));
   let stroke = "rgba(249, 115, 22, 1)"; // Orange
-  if (p >= 70) stroke = "rgba(16, 185, 129, 1)"; // Green
-  if (p < 40) stroke = "rgba(239, 68, 68, 1)"; // Red
+  let shadowColor = "rgba(249, 115, 22, 0.4)";
+
+  if (p >= 70) {
+    stroke = "rgba(16, 185, 129, 1)"; // Green
+    shadowColor = "rgba(16, 185, 129, 0.4)";
+  } else if (p < 40) {
+    stroke = "rgba(239, 68, 68, 1)"; // Red
+    shadowColor = "rgba(239, 68, 68, 0.4)";
+  }
 
   const r = 14;
   const c = 2 * Math.PI * r;
   const dash = (p / 100) * c;
 
   return (
-    <div className="relative w-9 h-9 flex items-center justify-center bg-black/80 rounded-full backdrop-blur-sm border border-white/5 shadow-xl">
-      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90 p-0.5">
+    <div className="relative isolate w-9 h-9 flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/20 via-white/5 to-transparent backdrop-blur-md border border-white/10 shadow-lg">
+      <svg
+        viewBox="0 0 36 36"
+        className="relative z-10 w-full h-full -rotate-90 p-0.5"
+        style={{ filter: `drop-shadow(0 0 3px ${shadowColor})` }}
+      >
         <circle
           cx="18"
           cy="18"
@@ -551,9 +562,9 @@ function RatingBadge({ percent }) {
           strokeDasharray={`${dash} ${c}`}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+      <div className="absolute inset-0 z-20 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-md">
         {p}
-        <span className="text-[7px] align-top mt-[2px]">%</span>
+        <span className="text-[7px] align-top mt-[1.5px] opacity-70">%</span>
       </div>
     </div>
   );
