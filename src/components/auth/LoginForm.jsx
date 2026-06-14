@@ -21,34 +21,26 @@ export default function LoginForm() {
     setErr("");
 
     try {
-      // Llamamos directamente a la API pública de TMDb desde el cliente,
-      // sin pasar por el servidor Next.js, para que el login funcione
-      // aunque el servidor de producción esté apagado.
-      const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-      if (!API_KEY) throw new Error("Falta NEXT_PUBLIC_TMDB_API_KEY");
-
-      const tmdbRes = await fetch(
-        `https://api.themoviedb.org/3/authentication/token/new?api_key=${encodeURIComponent(API_KEY)}`,
-        { headers: { Accept: "application/json" } },
-      );
-      const json = await tmdbRes.json().catch(() => ({}));
-      if (!tmdbRes.ok || !json?.success)
-        throw new Error(json?.status_message || "No se pudo obtener el token de TMDb");
+      const res = await fetch("/api/tmdb/auth/request-token", {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok)
+        throw new Error(json?.error || "No se pudo iniciar el login");
 
       const token = json?.request_token;
-      if (!token) throw new Error("Token inválido");
+      const authenticateUrl = json?.authenticate_url;
+      if (!token || !authenticateUrl) throw new Error("Token inválido");
 
-      // Construimos la URL de callback con el parámetro next.
-      // TMDb añade automáticamente ?request_token=...&approved=true al redirect_to.
-      const origin = window.location.origin;
-      const redirectUrl = new URL(`${origin}/auth/callback`);
-      if (next && next !== "/") redirectUrl.searchParams.set("next", next);
+      const finalUrl = new URL(authenticateUrl);
+      const redirectTo = finalUrl.searchParams.get("redirect_to");
+      if (redirectTo) {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("next", next);
+        finalUrl.searchParams.set("redirect_to", redirectUrl.toString());
+      }
 
-      const authenticateUrl =
-        `https://www.themoviedb.org/authenticate/${token}` +
-        `?redirect_to=${encodeURIComponent(redirectUrl.toString())}`;
-
-      window.location.href = authenticateUrl;
+      window.location.href = finalUrl.toString();
     } catch (e) {
       setErr(e?.message || "Error iniciando login TMDb");
       setLoading(false);
