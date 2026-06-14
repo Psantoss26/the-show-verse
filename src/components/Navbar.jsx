@@ -84,11 +84,18 @@ function SearchBar({ onResultClick, isMobile = false }) {
         const multiData = await multiRes.json();
         const collData = await collRes.json();
 
-        const multiResults = (multiData.results || []).filter(
-          (item) =>
-            item.media_type !== "person" ||
-            item.known_for_department === "Acting",
-        );
+        const multiResults = (multiData.results || [])
+          .filter(
+            (item) =>
+              item.media_type !== "person" ||
+              item.known_for_department === "Acting",
+          )
+          .sort((a, b) => {
+            const aVotes = a.vote_count || 0;
+            const bVotes = b.vote_count || 0;
+            if (aVotes !== bVotes) return bVotes - aVotes;
+            return (b.popularity || 0) - (a.popularity || 0);
+          });
 
         // Precargar colección en ref para mostrarla instantáneamente tras la pausa
         const topColl = (collData.results || []).slice(0, 1).map((c) => ({
