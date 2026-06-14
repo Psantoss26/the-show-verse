@@ -7625,17 +7625,6 @@ export default function DetailsClient({
         : undefined,
     });
 
-    // Premios
-    if (awardsLoading || hasAwardItems) {
-      items.push({
-        id: "awards",
-        label: "Premios",
-        icon: Trophy,
-        count: awardItems.length || undefined,
-        loading: awardsLoading,
-      });
-    }
-
     // Coleccion
     if (collectionId) {
       items.push({
@@ -7644,6 +7633,17 @@ export default function DetailsClient({
         icon: Layers,
         count: collectionData?.items?.length || undefined,
         loading: collectionLoading && !collectionData,
+      });
+    }
+
+    // Premios
+    if (awardsLoading || hasAwardItems) {
+      items.push({
+        id: "awards",
+        label: "Premios",
+        icon: Trophy,
+        count: awardItems.length || undefined,
+        loading: awardsLoading,
       });
     }
 
@@ -10351,49 +10351,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </AnimatedSection>
             </section>
 
-            {canRenderAwards && hasAwardItems && (
-              <section id="section-awards" ref={registerSection("awards")}>
-                <AnimatedSection delay={0.04}>
-                  <section className="mb-16 group/section">
-                    <SectionTitle title="Premios" icon={Trophy} />
-
-                    <DetailsArrowCarousel
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {awardItems.map((award, index) => {
-                        const previous = awardItems[index - 1] || null;
-                        const startsNominations =
-                          award?.result === "nominee" &&
-                          previous?.result === "winner";
-
-                        return (
-                          <SwiperSlide key={award.id}>
-                            <div
-                              className={
-                                startsNominations
-                                  ? "relative before:absolute before:-left-2.5 before:top-3 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-yellow-300/80 before:via-yellow-500/45 before:to-transparent"
-                                  : ""
-                              }
-                            >
-                              <AwardCard item={award} />
-                            </div>
-                          </SwiperSlide>
-                        );
-                      })}
-                    </DetailsArrowCarousel>
-                  </section>
-                </AnimatedSection>
-              </section>
-            )}
-
             {canRenderCollection && (
               <section
                 id="section-collection"
@@ -10505,6 +10462,49 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         No hay datos de colección.
                       </div>
                     )}
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
+            {canRenderAwards && hasAwardItems && (
+              <section id="section-awards" ref={registerSection("awards")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16 group/section">
+                    <SectionTitle title="Premios" icon={Trophy} />
+
+                    <DetailsArrowCarousel
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                      className="pb-8"
+                    >
+                      {awardItems.map((award, index) => {
+                        const previous = awardItems[index - 1] || null;
+                        const startsNominations =
+                          award?.result === "nominee" &&
+                          previous?.result === "winner";
+
+                        return (
+                          <SwiperSlide key={award.id}>
+                            <div
+                              className={
+                                startsNominations
+                                  ? "relative before:absolute before:-left-2.5 before:top-3 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-yellow-300/80 before:via-yellow-500/45 before:to-transparent"
+                                  : ""
+                              }
+                            >
+                              <AwardCard item={award} />
+                            </div>
+                          </SwiperSlide>
+                        );
+                      })}
+                    </DetailsArrowCarousel>
                   </section>
                 </AnimatedSection>
               </section>
