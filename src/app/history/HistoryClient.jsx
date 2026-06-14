@@ -2111,7 +2111,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
             mode="backdrop"
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-12 sm:pr-14">
           <p className="text-sm sm:text-[15px] font-bold text-emerald-400 drop-shadow-sm">
             {formatEpisodeBadge(meta)}
           </p>

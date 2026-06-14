@@ -38,7 +38,6 @@ import {
   ArrowUpDown,
   ChevronDown,
   Calendar,
-  Music2,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -2049,14 +2048,6 @@ export default function ActorDetails({
             iconSize: { width: 26, height: 26 },
             iconClassName: "!h-[26px] !w-[26px] rounded-none object-contain overflow-visible",
             menuIconClassName: "h-4 w-4 rounded-none object-contain",
-          }
-        : null,
-      socials.tiktok
-        ? {
-            id: "tiktok",
-            label: "TikTok",
-            iconComponent: Music2,
-            href: socials.tiktok,
           }
         : null,
       socials.tmdb
