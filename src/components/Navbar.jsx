@@ -35,6 +35,16 @@ function SearchBar({ onResultClick, isMobile = false }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef(null);
+  const [showCollection, setShowCollection] = useState(false);
+  const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
+
+  // Activar colección tras 600ms de pausa
+  useEffect(() => {
+    setShowCollection(false);
+    if (!query.trim()) return;
+    const t = setTimeout(() => setShowCollection(true), 600);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -46,29 +56,49 @@ function SearchBar({ onResultClick, isMobile = false }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Búsqueda multi y colección en paralelo
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       setShowDropdown(false);
       setIsSearching(false);
+      pendingCollectionRef.current = null;
       return;
     }
 
+    pendingCollectionRef.current = null;
+
     setIsSearching(true);
+    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
     const searchTimer = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(
-            query,
-          )}`,
-        );
-        const data = await res.json();
-        const filteredResults = (data.results || []).filter(
+        const [multiRes, collRes] = await Promise.all([
+          fetch(
+            `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&language=es-ES&query=${encodeURIComponent(query)}`,
+          ),
+          fetch(
+            `https://api.themoviedb.org/3/search/collection?api_key=${apiKey}&language=es-ES&query=${encodeURIComponent(query)}`,
+          ),
+        ]);
+
+        const multiData = await multiRes.json();
+        const collData = await collRes.json();
+
+        const multiResults = (multiData.results || []).filter(
           (item) =>
             item.media_type !== "person" ||
             item.known_for_department === "Acting",
         );
-        setResults(filteredResults);
+
+        // Precargar colección en ref para mostrarla instantáneamente tras la pausa
+        const topColl = (collData.results || []).slice(0, 1).map((c) => ({
+          ...c,
+          media_type: "collection",
+          title: c.name,
+        }));
+        pendingCollectionRef.current = topColl.length > 0 ? topColl[0] : null;
+
+        setResults(multiResults);
         setShowDropdown(true);
         setIsSearching(false);
       } catch (err) {
@@ -77,8 +107,25 @@ function SearchBar({ onResultClick, isMobile = false }) {
       }
     }, 300);
 
-    return () => clearTimeout(searchTimer);
+    return () => {
+      clearTimeout(searchTimer);
+    };
   }, [query]);
+
+  // Insertar colección precargada instantáneamente cuando se activa
+  useEffect(() => {
+    if (!showCollection || !pendingCollectionRef.current) return;
+
+    setResults((prev) => {
+      if (prev.some((r) => r.media_type === "collection" && r.id === pendingCollectionRef.current.id)) return prev;
+      const TOP_MULTI = 3;
+      return [
+        ...prev.slice(0, TOP_MULTI),
+        pendingCollectionRef.current,
+        ...prev.slice(TOP_MULTI),
+      ];
+    });
+  }, [showCollection]);
 
   const handleResultClick = () => {
     setShowDropdown(false);
@@ -104,6 +151,11 @@ function SearchBar({ onResultClick, isMobile = false }) {
           textClass: "text-emerald-300",
           dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
         };
+      case "collection":
+        return {
+          textClass: "text-amber-300",
+          dotClass: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]",
+        };
       default:
         return {
           textClass: "text-zinc-300",
@@ -120,6 +172,8 @@ function SearchBar({ onResultClick, isMobile = false }) {
         return "Serie";
       case "person":
         return "Persona";
+      case "collection":
+        return "Colección";
       default:
         return mediaType;
     }
@@ -151,9 +205,9 @@ function SearchBar({ onResultClick, isMobile = false }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.trim() && setShowDropdown(true)}
-            placeholder={
-              isMobile ? "Buscar..." : "Buscar películas, series o actores..."
-            }
+              placeholder={
+                  isMobile ? "Buscar..." : "Buscar películas, series, actores o colecciones..."
+                }
             className={`
               flex-1 w-full bg-transparent border-none focus:ring-0 shadow-none outline-none
               text-white placeholder-neutral-400 text-sm font-medium ml-3 h-full
@@ -193,10 +247,15 @@ function SearchBar({ onResultClick, isMobile = false }) {
               rounded-2xl bg-black/95 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-[100px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
           >
             <div className="p-2">
-              {results.slice(0, 8).map((item, index) => (
+              {results.slice(0, 8).map((item, index) => {
+                const isCollection = item.media_type === "collection";
+                const href = isCollection
+                  ? `/lists/collection/${item.id}`
+                  : `/details/${item.media_type}/${item.id}`;
+                return (
                 <Link
                   key={`${item.media_type}-${item.id}`}
-                  href={`/details/${item.media_type}/${item.id}`}
+                  href={href}
                   onClick={handleResultClick}
                 >
                   <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
@@ -244,7 +303,8 @@ function SearchBar({ onResultClick, isMobile = false }) {
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
             {results.length > 8 && (
               <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
