@@ -87,8 +87,10 @@ function loadFiltersFromStorage() {
         localStorage.getItem(STORAGE_KEYS.PROVIDERS) ||
           JSON.stringify(defaults.selectedProviders),
       ),
-      seenMode: localStorage.getItem(STORAGE_KEYS.SEEN_MODE) || defaults.seenMode,
-      dateFrom: localStorage.getItem(STORAGE_KEYS.DATE_FROM) || defaults.dateFrom,
+      seenMode:
+        localStorage.getItem(STORAGE_KEYS.SEEN_MODE) || defaults.seenMode,
+      dateFrom:
+        localStorage.getItem(STORAGE_KEYS.DATE_FROM) || defaults.dateFrom,
       dateTo: localStorage.getItem(STORAGE_KEYS.DATE_TO) || defaults.dateTo,
       selectedGenres: JSON.parse(
         localStorage.getItem(STORAGE_KEYS.GENRES) ||
@@ -104,7 +106,8 @@ function loadFiltersFromStorage() {
           JSON.stringify(defaults.scoreRange),
       ),
       minVotes: Number(
-        localStorage.getItem(STORAGE_KEYS.MIN_VOTES) || String(defaults.minVotes),
+        localStorage.getItem(STORAGE_KEYS.MIN_VOTES) ||
+          String(defaults.minVotes),
       ),
       runtimeRange: JSON.parse(
         localStorage.getItem(STORAGE_KEYS.RUNTIME_RANGE) ||
@@ -284,11 +287,11 @@ function Chip({ active, children, onClick, className = "" }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 border
         ${
           active
-            ? "bg-orange-500 text-black border-orange-500 font-bold shadow-[0_0_10px_rgba(249,115,22,0.3)]"
-            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+            ? "bg-orange-500 text-black border-transparent font-bold shadow-[0_0_10px_rgba(249,115,22,0.3)]"
+            : "bg-black/20 backdrop-blur-md border-transparent text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
         } ${className}`}
     >
       {children}
@@ -483,7 +486,7 @@ function SortMenu({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-200 hover:border-zinc-600 transition flex items-center justify-between group"
+        className="w-full h-10 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-zinc-200 hover:bg-black/30 transition flex items-center justify-between group shadow-inner"
       >
         <span className="text-sm font-medium truncate">{current.label}</span>
         <ChevronDown
@@ -491,7 +494,7 @@ function SortMenu({ value, onChange }) {
         />
       </button>
       {open && (
-        <div className="absolute z-[250] mt-1 w-full rounded-lg border-2 border-zinc-700 bg-[#0a0a0a] shadow-[0_10px_40px_rgba(0,0,0,0.95)] overflow-hidden py-1">
+        <div className="absolute isolate z-[250] mt-1 w-full rounded-2xl border border-white/10 bg-black/85 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-2xl shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden py-1">
           {SORT_OPTIONS.map((opt) => {
             const active = opt.id === value;
             return (
@@ -503,7 +506,7 @@ function SortMenu({ value, onChange }) {
                   setOpen(false);
                 }}
                 className={`w-full text-left px-3 py-2 transition flex items-center justify-between gap-3
-                                    ${active ? "bg-zinc-800/90 text-orange-500" : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200"}`}
+                                    ${active ? "bg-white/10 text-orange-500 font-bold" : "text-zinc-300 hover:bg-white/5"}`}
               >
                 <span className="text-sm">{opt.label}</span>
                 {active && <Check className="w-3.5 h-3.5" />}
@@ -577,7 +580,8 @@ function DiscoverCard({ item }) {
       onFocus={handlePrefetch}
       onTouchStart={handlePrefetch}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] group-hover:ring-white/20 group-hover:scale-[1.03] z-0 group-hover:z-10">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[1.5rem] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent border border-transparent shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group-hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)] group-hover:bg-white/5 group-hover:-translate-y-1 z-0 group-hover:z-10">
+        <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/5 z-20 group-hover:border-white/20 transition-colors" />
         <img
           src={posterSrc(item)}
           alt={title}
@@ -640,7 +644,7 @@ function ProviderIcon({ provider, active, onToggle }) {
           loading="lazy"
         />
       ) : (
-        <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-500">
+        <div className="w-full h-full bg-black/20 backdrop-blur-md flex items-center justify-center text-[10px] text-zinc-500 border border-white/5">
           {provider.provider_name?.slice(0, 2)}
         </div>
       )}
@@ -1147,11 +1151,12 @@ export default function DiscoverClient() {
           {/* --- Sidebar --- */}
           <aside className="space-y-6 relative">
             {/* Contenido / Reset */}
-            <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm">
+            <div className="relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] p-4 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)]">
+              <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
                 Contenido
               </h3>
-              <div className="flex bg-zinc-900 rounded-lg p-1 mb-4 border border-zinc-800">
+              <div className="flex isolate transform-gpu items-center rounded-xl p-1 mb-4 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                 {["movie", "tv", "all"].map((type) => {
                   const labels = {
                     movie: "Películas",
@@ -1163,8 +1168,8 @@ export default function DiscoverClient() {
                     <button
                       key={type}
                       onClick={() => setContent(type)}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200
-                                                ${active ? "bg-zinc-700 text-white shadow" : "text-zinc-400 hover:text-zinc-200"}`}
+                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200
+                                                ${active ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
                     >
                       {labels[type]}
                     </button>
@@ -1173,14 +1178,15 @@ export default function DiscoverClient() {
               </div>
               <button
                 onClick={resetFilters}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-zinc-800 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-md shadow-sm text-xs font-medium text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <RotateCcw className="w-3 h-3" /> Reset filtros
               </button>
             </div>
 
             {/* Filtros Accordions */}
-            <div className="bg-[#121212] border border-zinc-800 rounded-xl p-4 shadow-sm space-y-1 overflow-visible">
+            <div className="relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] p-4 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] space-y-1 !overflow-visible">
+              <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
               <Section
                 title="Ordenar"
                 defaultOpen
@@ -1220,7 +1226,7 @@ export default function DiscoverClient() {
                       value={providerQuery}
                       onChange={(e) => setProviderQuery(e.target.value)}
                       placeholder="Buscar plataforma..."
-                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 placeholder:text-zinc-600"
+                      className="w-full h-9 pl-9 pr-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 placeholder:text-zinc-500 shadow-inner"
                     />
                   </div>
                   {selectedProviders.length > 0 && (
@@ -1327,7 +1333,7 @@ export default function DiscoverClient() {
                         type="date"
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
-                        className="w-full h-9 pl-9 pr-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none"
+                        className="w-full h-9 pl-9 pr-2 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner"
                       />
                     </div>
                   </div>
@@ -1339,7 +1345,7 @@ export default function DiscoverClient() {
                         type="date"
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
-                        className="w-full h-9 pl-9 pr-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none"
+                        className="w-full h-9 pl-9 pr-2 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner"
                       />
                     </div>
                   </div>
@@ -1447,10 +1453,10 @@ export default function DiscoverClient() {
                   value={keywordQuery}
                   onChange={(e) => setKeywordQuery(e.target.value)}
                   placeholder="Buscar keyword..."
-                  className="w-full h-9 px-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:border-zinc-600 outline-none mb-2"
+                  className="w-full h-9 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner mb-2"
                 />
                 {keywordOptions.length > 0 && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden mb-2">
+                  <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden mb-2 shadow-lg">
                     {keywordOptions.map((k) => (
                       <button
                         key={k.id}
@@ -1461,7 +1467,7 @@ export default function DiscoverClient() {
                           setKeywordQuery("");
                           setKeywordOptions([]);
                         }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-zinc-800 text-zinc-300"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 text-zinc-300"
                       >
                         {k.name}
                       </button>
@@ -1472,7 +1478,7 @@ export default function DiscoverClient() {
                   {selectedKeywords.map((id) => (
                     <div
                       key={id}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 border border-zinc-700"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/20 backdrop-blur-md text-[10px] text-zinc-300 border border-transparent"
                     >
                       #{id}{" "}
                       <button
@@ -1502,7 +1508,7 @@ export default function DiscoverClient() {
             {/* 2. Error (solo si NO hay items) */}
             {error && items.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="p-4 rounded-xl bg-red-900/20 border border-red-900/50 text-red-200 text-sm">
+                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-md text-red-200 text-sm shadow-[0_8px_24px_-12px_rgba(239,68,68,0.5)]">
                   {error}
                 </div>
               </div>
@@ -1510,8 +1516,8 @@ export default function DiscoverClient() {
 
             {/* 3. Empty State (sin resultados) */}
             {!loading && !error && items.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 h-fit my-auto">
-                <FilmIcon className="w-12 h-12 text-zinc-700 mb-4" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 rounded-[2rem] border border-dashed border-white/10 bg-black/20 backdrop-blur-md shadow-lg h-fit my-auto">
+                <FilmIcon className="w-12 h-12 text-zinc-500 mb-4" />
                 <h3 className="text-lg font-bold text-zinc-300">
                   No se encontraron resultados
                 </h3>
@@ -1520,7 +1526,7 @@ export default function DiscoverClient() {
                 </p>
                 <button
                   onClick={resetFilters}
-                  className="mt-6 text-yellow-500 hover:underline text-sm"
+                  className="mt-6 text-yellow-500 hover:text-yellow-400 transition-colors text-sm font-semibold"
                 >
                   Limpiar todos los filtros
                 </button>
@@ -1545,7 +1551,7 @@ export default function DiscoverClient() {
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={loadingMore}
-                    className="px-8 py-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-8 py-3 rounded-full border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] hover:bg-white/5 hover:shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] text-zinc-200 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {loadingMore ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
