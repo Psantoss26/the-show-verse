@@ -8762,7 +8762,7 @@ export default function DetailsClient({
                 style={{
                   perspective: poster3dEnabled ? 1100 : undefined,
                   transformStyle: "preserve-3d",
-                  touchAction: "none",
+                  touchAction: "pan-y",
                 }}
               >
                 {/* Este es el recuadro completo que se inclina */}
