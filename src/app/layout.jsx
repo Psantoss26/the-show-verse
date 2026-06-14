@@ -24,10 +24,10 @@ export const metadata = {
     telephone: false,
   },
   icons: {
+    shortcut: [{ url: "/favicon.ico?v=2", type: "image/x-icon" }],
     icon: [
-      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
-      { url: "/pwa-icon-1024.png", sizes: "1024x1024", type: "image/png" },
+      { url: "/favicon.ico?v=2", sizes: "any", type: "image/x-icon" },
+      { url: "/browser-icon.png?v=2", sizes: "1280x1280", type: "image/png" },
     ],
     apple: [{ url: "/pwa-apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
