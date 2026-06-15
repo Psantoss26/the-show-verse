@@ -5,10 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import {
-    createTmdbSessionClient,
-    fetchTmdbAccountClient,
-} from '@/lib/api/tmdb'
 
 export default function CallbackPage() {
     const router = useRouter()
@@ -51,37 +47,25 @@ export default function CallbackPage() {
                 if (!cancelled) setErr('')
                 if (!cancelled) setStep('Creando sesión…')
 
-                let session_id
-                try {
-                    session_id = await createTmdbSessionClient(requestToken)
-                } catch (directError) {
-                    console.warn('[TMDb] Callback directo no disponible; usando API local', directError)
-                    const sres = await fetch('/api/tmdb/auth/session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        cache: 'no-store',
-                        body: JSON.stringify({ request_token: requestToken })
-                    })
+                const sres = await fetch('/api/tmdb/auth/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    cache: 'no-store',
+                    body: JSON.stringify({ request_token: requestToken })
+                })
 
-                    const sj = await sres.json().catch(() => ({}))
-                    if (!sres.ok) throw new Error(sj?.error || 'No se pudo crear la sesión')
+                const sj = await sres.json().catch(() => ({}))
+                if (!sres.ok) throw new Error(sj?.error || 'No se pudo crear la sesión')
 
-                    session_id = sj?.session_id
-                    if (!session_id) throw new Error('session_id inválido')
-                }
+                const session_id = sj?.session_id
+                if (!session_id) throw new Error('session_id inválido')
 
                 if (!cancelled) setStep('Cargando perfil…')
-                let aj
-                try {
-                    aj = await fetchTmdbAccountClient(session_id)
-                } catch (directError) {
-                    console.warn('[TMDb] Perfil directo no disponible; usando API local', directError)
-                    const ares = await fetch(`/api/tmdb/auth/account?session_id=${encodeURIComponent(session_id)}`, {
-                        cache: 'no-store'
-                    })
-                    aj = await ares.json().catch(() => ({}))
-                    if (!ares.ok) throw new Error(aj?.error || 'No se pudo cargar la cuenta')
-                }
+                const ares = await fetch(`/api/tmdb/auth/account?session_id=${encodeURIComponent(session_id)}`, {
+                    cache: 'no-store'
+                })
+                const aj = await ares.json().catch(() => ({}))
+                if (!ares.ok) throw new Error(aj?.error || 'No se pudo cargar la cuenta')
 
                 login({ session_id, account: aj })
                 if (typeof window !== 'undefined') {

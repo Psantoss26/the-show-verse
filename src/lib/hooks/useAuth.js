@@ -1,7 +1,6 @@
 // /lib/hooks/useAuth.js
 'use client'
 import { useEffect, useState } from 'react'
-import { fetchTmdbAccountClient } from '@/lib/api/tmdb'
 
 const SESSION_KEY = 'tmdb_session_id'
 const ACCOUNT_KEY = 'tmdb_account'
@@ -37,33 +36,20 @@ export default function useAuth() {
     const check = async () => {
       if (!sessionId) { setChecking(false); return }
       try {
-        let valid = false
-        try {
-          const accountData = await fetchTmdbAccountClient(sessionId)
-          valid = !!accountData?.id
-          if (valid) {
-            localStorage.setItem(ACCOUNT_KEY, JSON.stringify(accountData))
-            if (!ignore) setAccount(accountData)
-          }
-        } catch {
-          const r = await fetch(`/api/tmdb/account?session_id=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
-          const json = await r.json().catch(() => ({}))
-          if (r.ok && json?.id) {
-            valid = true
-            localStorage.setItem(ACCOUNT_KEY, JSON.stringify(json))
-            if (!ignore) setAccount(json)
-          } else if (json?.offline || json?.error === 'LOCAL_API_FALLBACK_UNAVAILABLE') {
-            valid = true
-          }
-        }
-
-        if (!valid) {
+        const r = await fetch(`/api/tmdb/account?session_id=${encodeURIComponent(sessionId)}`, { cache: 'no-store' })
+        if (!r.ok) {
           // sesión inválida → limpia
           localStorage.removeItem(SESSION_KEY)
           localStorage.removeItem(ACCOUNT_KEY)
           if (!ignore) {
             setSessionId(null)
             setAccount(null)
+          }
+        } else {
+          const accountData = await r.json().catch(() => null)
+          if (accountData?.id) {
+            localStorage.setItem(ACCOUNT_KEY, JSON.stringify(accountData))
+            if (!ignore) setAccount(accountData)
           }
         }
       } catch {}
