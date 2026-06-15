@@ -2,7 +2,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { fetchTmdbAccountClient } from "@/lib/api/tmdb";
 
 const AuthContext = createContext(null);
 const SESSION_STORAGE_KEY = "tmdb_session";
@@ -53,21 +52,13 @@ export const AuthProvider = ({ children }) => {
         } else if (storedSession) {
           try {
             let accountFromCookie;
-            try {
-              accountFromCookie = await fetchTmdbAccountClient(storedSession);
-            } catch (directError) {
-              console.warn(
-                "No se pudo refrescar la cuenta TMDb directo; usando API local",
-                directError,
-              );
-              const res = await fetch(
-                `/api/tmdb/auth/account?session_id=${encodeURIComponent(
-                  storedSession,
-                )}`,
-                { cache: "no-store" },
-              );
-              if (res.ok) accountFromCookie = await res.json();
-            }
+            const res = await fetch(
+              `/api/tmdb/auth/account?session_id=${encodeURIComponent(
+                storedSession,
+              )}`,
+              { cache: "no-store" },
+            );
+            if (res.ok) accountFromCookie = await res.json();
 
             if (accountFromCookie?.id) {
               window.localStorage.setItem(

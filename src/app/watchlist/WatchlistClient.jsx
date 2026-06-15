@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { fetchWatchlistForUser, getWatchProviders } from "@/lib/api/tmdb";
+import { getWatchProviders } from "@/lib/api/tmdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Bookmark,
@@ -2024,35 +2024,23 @@ export default function WatchlistClient() {
 
       try {
         setLoading(items.length === 0);
-        const watchlistResult = await fetchWatchlistForUser(account.id, session)
-          .then((watchlist) => ({ ok: true, watchlist }))
-          .catch(async () => {
-            const response = await fetch("/api/tmdb/account/watchlist");
-            if (!response.ok) {
-              return {
-                ok: false,
-                status: response.status,
-                statusText: response.statusText,
-                watchlist: [],
-              };
-            }
-            const text = await response.text();
-            return {
-              ok: true,
-              watchlist: text ? JSON.parse(text)?.watchlist || [] : [],
-            };
-          });
+        const response = await fetch("/api/tmdb/account/watchlist");
 
-        if (!watchlistResult.ok) {
-          console.error(
-            "API error:",
-            watchlistResult.status,
-            watchlistResult.statusText,
-          );
+        if (!response.ok) {
+          console.error("API error:", response.status, response.statusText);
           setItems([]);
           return;
         }
-        const watchlist = watchlistResult.watchlist || [];
+
+        const text = await response.text();
+        if (!text) {
+          console.error("Empty response from API");
+          setItems([]);
+          return;
+        }
+
+        const data = JSON.parse(text);
+        const watchlist = data?.watchlist || [];
 
         // Add index for sorting by added date (most recent first from API)
         const watchlistWithIndex = watchlist.map((item, index) => ({

@@ -15,7 +15,6 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
-  fetchFavoritesForUser,
   fetchRatedForUser,
   getWatchProviders,
 } from "@/lib/api/tmdb";
@@ -2250,42 +2249,33 @@ export default function FavoritesClient() {
         // Fetch favorites and rated items in parallel so user_rating
         // is available from the very first render — avoids the flash
         // of "Sin puntuar" when grouped by user_rating.
-        const [favoritesResult, rated] = await Promise.all([
-          fetchFavoritesForUser(account.id, session).then((favorites) => ({
-            ok: true,
-            favorites,
-          })).catch(async () => {
-            const favResponse = await fetch("/api/tmdb/account/favorite");
-            if (!favResponse.ok) {
-              return {
-                ok: false,
-                status: favResponse.status,
-                statusText: favResponse.statusText,
-                favorites: [],
-              };
-            }
-            const text = await favResponse.text();
-            return {
-              ok: true,
-              favorites: text ? JSON.parse(text)?.favorites || [] : [],
-            };
-          }),
+        const [favResponse, rated] = await Promise.all([
+          fetch("/api/tmdb/account/favorite"),
           fetchRatedForUser(account.id, session).catch((err) => {
             console.error("Error loading rated items:", err);
             return [];
           }),
         ]);
 
-        if (!favoritesResult.ok) {
+        if (!favResponse.ok) {
           console.error(
             "API error:",
-            favoritesResult.status,
-            favoritesResult.statusText,
+            favResponse.status,
+            favResponse.statusText,
           );
           setItems([]);
           return;
         }
-        const favorites = favoritesResult.favorites || [];
+
+        const text = await favResponse.text();
+        if (!text) {
+          console.error("Empty response from API");
+          setItems([]);
+          return;
+        }
+
+        const data = JSON.parse(text);
+        const favorites = data?.favorites || [];
 
         // Build rating map from rated items
         const ratingMap = new Map();
