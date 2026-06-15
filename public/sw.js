@@ -1,4 +1,4 @@
-const VERSION = "showverse-v5";
+const VERSION = "showverse-v6";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -18,6 +18,7 @@ const APP_SHELL = [
   "/in-progress",
   "/profile",
   "/lists",
+  "/login",
   OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
   "/favicon.ico",
@@ -114,12 +115,18 @@ async function getUsableCachedNavigation(request) {
   const cache = await caches.open(PAGE_CACHE);
   const staticCache = await caches.open(STATIC_CACHE);
   const routeCache = await caches.open(ROUTE_CACHE);
+  const url = new URL(request.url, self.location.origin);
+  const pathnameRequest = new Request(url.pathname, {
+    method: "GET",
+    credentials: "include",
+  });
   const candidates = [
     await cache.match(request),
     await routeCache.match(request),
-    await cache.match("/"),
-    await routeCache.match("/"),
-    await staticCache.match("/"),
+    await cache.match(pathnameRequest),
+    await routeCache.match(pathnameRequest),
+    await cache.match(url.pathname),
+    await routeCache.match(url.pathname),
     await staticCache.match(OFFLINE_FALLBACK_URL),
   ];
 
@@ -140,7 +147,13 @@ async function networkFirst(request, preloadResponsePromise = null) {
     if (await isUnusableResponse(response)) {
       throw new Error("unusable-response");
     }
-    if (response.ok) cache.put(request, response.clone());
+    if (response.ok) {
+      cache.put(request, response.clone());
+      const url = new URL(request.url, self.location.origin);
+      if (!url.search) {
+        cache.put(url.pathname, response.clone());
+      }
+    }
     await trimCache(PAGE_CACHE, 30);
     return response;
   } catch {
@@ -183,7 +196,6 @@ async function routeStaleWhileRevalidate(request) {
   return (
     cached ||
     (await fresh) ||
-    (await getUsableCachedNavigation(request)) ||
     new Response("The Show Verse esta disponible offline cuando ya has visitado esta pantalla.", {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -234,6 +246,10 @@ async function warmAppShell(urls = APP_SHELL) {
           ? staticCache
           : pageCache;
       await targetCache.put(request, response.clone());
+      const normalizedUrl = new URL(url, self.location.origin);
+      if (!normalizedUrl.search && targetCache === pageCache) {
+        await targetCache.put(normalizedUrl.pathname, response.clone());
+      }
     }),
   );
 
@@ -244,6 +260,9 @@ self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "SHOWVERSE_WARM_APP_SHELL") {
     event.waitUntil(warmAppShell(Array.isArray(data.urls) ? data.urls : APP_SHELL));
+  }
+  if (data.type === "SHOWVERSE_CACHE_ROUTES") {
+    event.waitUntil(warmAppShell(Array.isArray(data.urls) ? data.urls : []));
   }
 });
 

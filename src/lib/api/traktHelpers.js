@@ -213,13 +213,17 @@ function traktRecommendationSeed(type, item, index = 0) {
   };
 }
 
-async function fetchPersonalRecommendedTraktItems(type, token) {
+async function fetchPersonalRecommendedTraktItems(
+  type,
+  token,
+  { timeoutMs = 10000, retries = 1 } = {},
+) {
   if (!token) return [];
 
   const res = await traktFetch(`/recommendations/${type}?limit=50`, {
     token,
-    timeoutMs: 10000,
-    retries: 1,
+    timeoutMs,
+    retries,
   });
 
   if (!res.ok) {
@@ -241,13 +245,21 @@ async function fetchPublicRecommendedTraktItems(type, period = "weekly") {
 
 async function fetchRecommendedTraktItems(
   type,
-  { period = "weekly", token } = {},
+  { period = "weekly", token, personalTimeoutMs, personalRetries } = {},
 ) {
   if (token) {
     try {
+      const personalOptions = {};
+      if (personalTimeoutMs != null) {
+        personalOptions.timeoutMs = personalTimeoutMs;
+      }
+      if (personalRetries != null) {
+        personalOptions.retries = personalRetries;
+      }
       const personalItems = await fetchPersonalRecommendedTraktItems(
         type,
         token,
+        personalOptions,
       );
       return { items: personalItems, source: "personal" };
     } catch (err) {
@@ -279,11 +291,21 @@ export async function getTraktRecommended(
 export async function getTraktRecommendedByType(
   limit = 24,
   period = "weekly",
-  { token } = {},
+  { token, personalTimeoutMs, personalRetries } = {},
 ) {
   const [moviesResult, showsResult] = await Promise.all([
-    fetchRecommendedTraktItems("movies", { period, token }),
-    fetchRecommendedTraktItems("shows", { period, token }),
+    fetchRecommendedTraktItems("movies", {
+      period,
+      token,
+      personalTimeoutMs,
+      personalRetries,
+    }),
+    fetchRecommendedTraktItems("shows", {
+      period,
+      token,
+      personalTimeoutMs,
+      personalRetries,
+    }),
   ]);
 
   const movieSeeds = moviesResult.items

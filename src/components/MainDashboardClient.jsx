@@ -39,6 +39,8 @@ import LiquidButton from "@/components/LiquidButton";
 // Constantes para evitar recreación de referencias
 const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
+const DASHBOARD_RECOMMENDED_CACHE_KEY = "showverse:dashboard:recommended:v2";
+const DASHBOARD_RECOMMENDED_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function toItemsArray(value) {
   if (Array.isArray(value)) return value;
@@ -64,6 +66,64 @@ function splitItemsByMediaType(items) {
   }
 
   return { movies, shows };
+}
+
+function normalizeRecommendedPayload(payload) {
+  const items = toItemsArray(payload);
+  const fallbackSplit = splitItemsByMediaType(items);
+  const movies = Array.isArray(payload?.movies)
+    ? payload.movies
+    : fallbackSplit.movies;
+  const shows = Array.isArray(payload?.shows)
+    ? payload.shows
+    : fallbackSplit.shows;
+
+  return {
+    items,
+    movies,
+    shows,
+  };
+}
+
+function readRecommendedDashboardCache() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_RECOMMENDED_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const savedAt = Number(parsed?.savedAt || 0);
+    if (!savedAt || Date.now() - savedAt > DASHBOARD_RECOMMENDED_CACHE_TTL_MS) {
+      window.localStorage.removeItem(DASHBOARD_RECOMMENDED_CACHE_KEY);
+      return null;
+    }
+
+    const normalized = normalizeRecommendedPayload(parsed?.payload);
+    if (!normalized.movies.length && !normalized.shows.length) return null;
+    return normalized;
+  } catch {
+    return null;
+  }
+}
+
+function writeRecommendedDashboardCache(payload) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const normalized = normalizeRecommendedPayload(payload);
+    if (!normalized.movies.length && !normalized.shows.length) return;
+    window.localStorage.setItem(
+      DASHBOARD_RECOMMENDED_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        payload: {
+          items: normalized.items,
+          movies: normalized.movies,
+          shows: normalized.shows,
+        },
+      }),
+    );
+  } catch {}
 }
 
 /* =================== ANIMATION VARIANTS =================== */
@@ -3208,34 +3268,47 @@ export default function MainDashboardClient({ initialData }) {
   // ⚡ Carga independiente: Recomendados no espera al resto de secciones Trakt.
   useEffect(() => {
     let cancelled = false;
+    let usedCachedRecommended = false;
 
     const loadRecommended = async () => {
       try {
-        const recommended = await fetch("/api/trakt/dashboard/recommended", {
-          cache: "no-store",
-          priority: "high",
-        })
-          .then((r) => r.json())
-          .catch(() => []);
-        const recommendedItems = toItemsArray(recommended);
-        const fallbackSplit = splitItemsByMediaType(recommendedItems);
-        const recommendedMovies = Array.isArray(recommended?.movies)
-          ? recommended.movies
-          : fallbackSplit.movies;
-        const recommendedShows = Array.isArray(recommended?.shows)
-          ? recommended.shows
-          : fallbackSplit.shows;
+        const cached = readRecommendedDashboardCache();
+        if (cached && !cancelled) {
+          usedCachedRecommended = true;
+          setLazySections((prev) => ({
+            ...prev,
+            traktRecommended: cached.items,
+            traktRecommendedMovies: cached.movies,
+            traktRecommendedShows: cached.shows,
+          }));
+        }
+
+        const recommended = await fetch(
+          "/api/trakt/dashboard/recommended?limit=18",
+          {
+            cache: "default",
+            priority: "high",
+          },
+        ).then((r) => {
+          if (!r.ok) throw new Error(`Recommended HTTP ${r.status}`);
+          return r.json();
+        });
+        const normalized = normalizeRecommendedPayload(recommended);
 
         if (cancelled) return;
+        if (!normalized.movies.length && !normalized.shows.length && cached) {
+          return;
+        }
+        writeRecommendedDashboardCache(recommended);
         setLazySections((prev) => ({
           ...prev,
-          traktRecommended: recommendedItems,
-          traktRecommendedMovies: recommendedMovies,
-          traktRecommendedShows: recommendedShows,
+          traktRecommended: normalized.items,
+          traktRecommendedMovies: normalized.movies,
+          traktRecommendedShows: normalized.shows,
         }));
       } catch (err) {
         console.error("❌ Error cargando recomendados:", err);
-        if (!cancelled) {
+        if (!cancelled && !usedCachedRecommended) {
           setLazySections((prev) => ({
             ...prev,
             traktRecommended: [],
