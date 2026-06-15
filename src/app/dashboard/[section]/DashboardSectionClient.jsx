@@ -121,15 +121,21 @@ function getYear(item) {
 function getGenreLabel(item) {
   const type = resolveType(item);
   const map = type === "movie" ? MOVIE_GENRES : TV_GENRES;
-  const id = Array.isArray(item?.genre_ids) ? item.genre_ids[0] : null;
+  const id = Array.isArray(item?.genre_ids)
+    ? item.genre_ids.find(Boolean)
+    : null;
   if (id) return map[id] || `Género ${id}`;
 
-  const genre = Array.isArray(item?.genres) ? item.genres[0] : null;
+  const genre = Array.isArray(item?.genres)
+    ? item.genres.find((entry) =>
+        typeof entry === "string" ? entry.trim() : entry?.name,
+      )
+    : null;
   if (typeof genre === "string" && genre.trim()) return genre.trim();
   if (genre?.name) return genre.name;
 
   const genreName = Array.isArray(item?.genre_names)
-    ? item.genre_names[0]
+    ? item.genre_names.find(Boolean)
     : null;
   if (genreName) return genreName;
 

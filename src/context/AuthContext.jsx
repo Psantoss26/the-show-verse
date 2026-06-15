@@ -4,6 +4,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext(null);
+const SESSION_STORAGE_KEY = "tmdb_session";
+const LEGACY_SESSION_STORAGE_KEY = "tmdb_session_id";
+const ACCOUNT_STORAGE_KEY = "tmdb_account";
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
@@ -20,10 +23,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const storedSession = window.localStorage.getItem("tmdb_session");
-        const storedAccount = window.localStorage.getItem("tmdb_account");
+        const storedSession =
+          window.localStorage.getItem(SESSION_STORAGE_KEY) ||
+          window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+        const storedAccount = window.localStorage.getItem(ACCOUNT_STORAGE_KEY);
 
         if (storedSession) {
+          window.localStorage.setItem(SESSION_STORAGE_KEY, storedSession);
+          window.localStorage.setItem(LEGACY_SESSION_STORAGE_KEY, storedSession);
           if (!cancelled) setSession(storedSession);
           // Asegurar que la cookie tiene el nombre correcto (tmdb_session_id)
           document.cookie = `tmdb_session_id=${encodeURIComponent(
@@ -44,11 +51,16 @@ export const AuthProvider = ({ children }) => {
           }
         } else if (storedSession) {
           try {
-            const res = await fetch("/api/tmdb/account", { cache: "no-store" });
+            const res = await fetch(
+              `/api/tmdb/auth/account?session_id=${encodeURIComponent(
+                storedSession,
+              )}`,
+              { cache: "no-store" },
+            );
             if (res.ok) {
               const accountFromCookie = await res.json();
               window.localStorage.setItem(
-                "tmdb_account",
+                ACCOUNT_STORAGE_KEY,
                 JSON.stringify(accountFromCookie),
               );
               if (!cancelled) setAccount(accountFromCookie);
@@ -65,7 +77,8 @@ export const AuthProvider = ({ children }) => {
         if (!cancelled) {
           const fallbackSession =
             typeof window !== "undefined"
-              ? window.localStorage.getItem("tmdb_session")
+              ? window.localStorage.getItem(SESSION_STORAGE_KEY) ||
+                window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)
               : null;
           if (fallbackSession) {
             setSession(fallbackSession);
@@ -87,8 +100,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = ({ session_id, account }) => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("tmdb_session", session_id);
-      window.localStorage.setItem("tmdb_account", JSON.stringify(account));
+      window.localStorage.setItem(SESSION_STORAGE_KEY, session_id);
+      window.localStorage.setItem(LEGACY_SESSION_STORAGE_KEY, session_id);
+      window.localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
       document.cookie = `tmdb_session_id=${encodeURIComponent(
         session_id,
       )}; path=/; max-age=31536000`;
@@ -101,8 +115,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem("tmdb_session");
-      window.localStorage.removeItem("tmdb_account");
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(ACCOUNT_STORAGE_KEY);
       document.cookie = "tmdb_session_id=; path=/; max-age=0";
     }
 

@@ -1,4 +1,4 @@
-const VERSION = "showverse-v6";
+const VERSION = "showverse-v7";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -18,7 +18,6 @@ const APP_SHELL = [
   "/in-progress",
   "/profile",
   "/lists",
-  "/login",
   OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
   "/favicon.ico",
@@ -33,6 +32,38 @@ const APP_SHELL = [
 ];
 
 const NAVIGATION_PRELOAD_SUPPORTED = "navigationPreload" in self.registration;
+
+function isAuthNavigationPath(pathname) {
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/auth/callback" ||
+    pathname.startsWith("/auth/callback/") ||
+    pathname === "/auth/tmdb/callback" ||
+    pathname.startsWith("/auth/tmdb/callback/")
+  );
+}
+
+function isNetworkOnlyApiPath(pathname) {
+  return (
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/tmdb/auth/") ||
+    pathname === "/api/tmdb/account" ||
+    pathname === "/api/tmdb/account/me" ||
+    pathname.startsWith("/api/tmdb/account/me/") ||
+    pathname.startsWith("/api/tmdb/session/") ||
+    pathname.startsWith("/api/trakt/auth/") ||
+    pathname.startsWith("/api/trakt/oauth/")
+  );
+}
+
+function isOfflineCacheableUrl(url) {
+  if (url.origin !== self.location.origin) return true;
+  if (isAuthNavigationPath(url.pathname)) return false;
+  if (isNetworkOnlyApiPath(url.pathname)) return false;
+  return true;
+}
 
 function sameOriginUrl(request) {
   try {
@@ -167,6 +198,37 @@ async function networkFirst(request, preloadResponsePromise = null) {
   }
 }
 
+async function networkOnlyNavigation(request, preloadResponsePromise = null) {
+  try {
+    const preloadResponse = preloadResponsePromise ? await preloadResponsePromise : null;
+    const response = preloadResponse || (await fetch(request));
+    if (await isUnusableResponse(response)) {
+      throw new Error("unusable-response");
+    }
+    return response;
+  } catch {
+    const staticCache = await caches.open(STATIC_CACHE);
+    return (
+      (await staticCache.match(OFFLINE_FALLBACK_URL)) ||
+      new Response("Necesitas conexion con el servidor para iniciar sesion.", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
+    );
+  }
+}
+
+async function networkOnly(request) {
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response(JSON.stringify({ offline: true }), {
+      status: 503,
+      headers: OFFLINE_JSON_HEADERS,
+    });
+  }
+}
+
 async function cacheFirst(request, cacheName, maxEntries) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
@@ -238,15 +300,16 @@ async function warmAppShell(urls = APP_SHELL) {
         credentials: "include",
         cache: "reload",
       });
+      const normalizedUrl = new URL(url, self.location.origin);
+      if (!isOfflineCacheableUrl(normalizedUrl)) return;
       const response = await fetch(request);
       if (!response.ok || (await isUnusableResponse(response))) return;
 
       const targetCache =
-        new URL(url, self.location.origin).pathname.match(/\.[a-z0-9]+$/i)
+        normalizedUrl.pathname.match(/\.[a-z0-9]+$/i)
           ? staticCache
           : pageCache;
       await targetCache.put(request, response.clone());
-      const normalizedUrl = new URL(url, self.location.origin);
       if (!normalizedUrl.search && targetCache === pageCache) {
         await targetCache.put(normalizedUrl.pathname, response.clone());
       }
@@ -273,6 +336,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate") {
+    if (url.origin === self.location.origin && isAuthNavigationPath(url.pathname)) {
+      event.respondWith(networkOnlyNavigation(request, event.preloadResponse));
+      return;
+    }
     event.respondWith(networkFirst(request, event.preloadResponse));
     return;
   }
@@ -283,6 +350,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
+    if (isNetworkOnlyApiPath(url.pathname)) {
+      event.respondWith(networkOnly(request));
+      return;
+    }
     event.respondWith(staleWhileRevalidate(request, API_CACHE, 120));
     return;
   }
@@ -292,6 +363,10 @@ self.addEventListener("fetch", (event) => {
     !url.pathname.startsWith("/api/") &&
     (request.headers.get("accept") || "").includes("text/x-component")
   ) {
+    if (isAuthNavigationPath(url.pathname)) {
+      event.respondWith(networkOnly(request));
+      return;
+    }
     event.respondWith(routeStaleWhileRevalidate(request));
     return;
   }

@@ -106,6 +106,8 @@ async function hydrateTraktResults(seeds, limit = 24) {
         it.tmdb,
       );
       if (!details?.id || !details?.poster_path) return null;
+      const genres = Array.isArray(details.genres) ? details.genres : [];
+      const genreIds = genres.map((genre) => genre?.id).filter(Boolean);
 
       return {
         id: details.id,
@@ -130,6 +132,8 @@ async function hydrateTraktResults(seeds, limit = 24) {
         backdrop_path: details.backdrop_path || null,
         release_date: details.release_date || null,
         first_air_date: details.first_air_date || null,
+        genre_ids: genreIds,
+        genres,
         vote_average: details.vote_average ?? null,
         runtime: details.runtime ?? null,
         number_of_episodes: details.number_of_episodes ?? null,

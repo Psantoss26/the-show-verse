@@ -3101,6 +3101,7 @@ export default function FavoritesClient() {
                       onClick={() => {
                         if (typeof window !== "undefined") {
                           window.localStorage.removeItem("tmdb_session");
+                          window.localStorage.removeItem("tmdb_session_id");
                           window.localStorage.removeItem("tmdb_account");
                           document.cookie =
                             "tmdb_session_id=; path=/; max-age=0";
