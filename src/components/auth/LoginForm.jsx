@@ -5,28 +5,35 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { createTmdbRequestTokenClient } from "@/lib/api/tmdb";
 
-export default function LoginForm() {
+export default function LoginForm({ next: nextProp }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const searchParams = useSearchParams();
 
   const next = useMemo(() => {
-    const n = searchParams?.get("next") || "/";
+    const n = nextProp || searchParams?.get("next") || "/";
     return n.startsWith("/") ? n : "/";
-  }, [searchParams]);
+  }, [nextProp, searchParams]);
 
   const startTmdbLogin = async () => {
     setLoading(true);
     setErr("");
 
     try {
-      const res = await fetch("/api/tmdb/auth/request-token", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok)
-        throw new Error(json?.error || "No se pudo iniciar el login");
+      let json;
+      try {
+        json = await createTmdbRequestTokenClient({ next });
+      } catch (directError) {
+        console.warn("[TMDb] Login directo no disponible; usando API local", directError);
+        const res = await fetch("/api/tmdb/auth/request-token", {
+          cache: "no-store",
+        });
+        json = await res.json().catch(() => ({}));
+        if (!res.ok)
+          throw new Error(json?.error || "No se pudo iniciar el login");
+      }
 
       const token = json?.request_token;
       const authenticateUrl = json?.authenticate_url;

@@ -1,4 +1,4 @@
-const VERSION = "showverse-v7";
+const VERSION = "showverse-v8";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -6,6 +6,10 @@ const IMAGE_CACHE = `${VERSION}-images`;
 const ROUTE_CACHE = `${VERSION}-routes`;
 const OFFLINE_FALLBACK_URL = "/offline.html";
 const OFFLINE_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
+const TMDB_BASE = "https://api.themoviedb.org/3";
+let runtimeConfig = {
+  tmdbApiKey: "",
+};
 
 const APP_SHELL = [
   "/",
@@ -18,6 +22,7 @@ const APP_SHELL = [
   "/in-progress",
   "/profile",
   "/lists",
+  "/login",
   OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
   "/favicon.ico",
@@ -35,8 +40,6 @@ const NAVIGATION_PRELOAD_SUPPORTED = "navigationPreload" in self.registration;
 
 function isAuthNavigationPath(pathname) {
   return (
-    pathname === "/login" ||
-    pathname.startsWith("/login/") ||
     pathname === "/auth/callback" ||
     pathname.startsWith("/auth/callback/") ||
     pathname === "/auth/tmdb/callback" ||
@@ -48,7 +51,11 @@ function isNetworkOnlyApiPath(pathname) {
   return (
     pathname === "/api/health" ||
     pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/dashboard/sections/") ||
     pathname.startsWith("/api/tmdb/auth/") ||
+    pathname === "/api/tmdb/collection" ||
+    pathname.startsWith("/api/tmdb/movies/") ||
+    pathname.startsWith("/api/tmdb/tv/") ||
     pathname === "/api/tmdb/account" ||
     pathname === "/api/tmdb/account/me" ||
     pathname.startsWith("/api/tmdb/account/me/") ||
@@ -63,6 +70,277 @@ function isOfflineCacheableUrl(url) {
   if (isAuthNavigationPath(url.pathname)) return false;
   if (isNetworkOnlyApiPath(url.pathname)) return false;
   return true;
+}
+
+function localJson(payload, { status = 200 } = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: OFFLINE_JSON_HEADERS,
+  });
+}
+
+function getTmdbApiKey() {
+  return runtimeConfig.tmdbApiKey || "";
+}
+
+function buildTmdbUrl(path, params = {}) {
+  const apiKey = getTmdbApiKey();
+  if (!apiKey) return null;
+
+  const url = new URL(`${TMDB_BASE}${path.startsWith("/") ? path : `/${path}`}`);
+  url.searchParams.set("api_key", apiKey);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+  return url;
+}
+
+async function fetchTmdbJson(path, params = {}, init = {}) {
+  const url = buildTmdbUrl(path, params);
+  if (!url) {
+    return localJson({ error: "TMDB_CLIENT_KEY_MISSING", offline: true }, { status: 503 });
+  }
+
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  const json = await response.json().catch(() => ({}));
+  return localJson(json, { status: response.ok ? 200 : response.status || 500 });
+}
+
+async function fetchTmdbData(path, params = {}, init = {}) {
+  const url = buildTmdbUrl(path, params);
+  if (!url) throw new Error("TMDB_CLIENT_KEY_MISSING");
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(json?.status_message || `TMDb ${response.status}`);
+  }
+  return json;
+}
+
+async function localDashboardSection(section) {
+  const config = {
+    tendencias: {
+      title: "Tendencias",
+      eyebrow: "TMDb",
+      description: "Los títulos que más se están moviendo ahora mismo.",
+    },
+    populares: {
+      title: "Populares",
+      eyebrow: "TMDb",
+      description: "Películas y series con mayor tracción.",
+    },
+    recomendados: {
+      title: "Recomendados",
+      eyebrow: "TMDb",
+      description: "Recomendaciones generadas desde TMDb en el dispositivo.",
+    },
+    "mas-esperadas": {
+      title: "Más esperadas",
+      eyebrow: "TMDb",
+      description: "Estrenos anticipados destacados.",
+    },
+  }[section];
+
+  if (!config) {
+    return localJson({ error: "Sección no encontrada", items: [] }, { status: 404 });
+  }
+
+  let items = [];
+  if (section === "tendencias") {
+    const data = await fetchTmdbData("/trending/all/week");
+    items = (data.results || []).filter((item) => item.media_type === "movie" || item.media_type === "tv");
+  } else if (section === "populares") {
+    const [movies, shows] = await Promise.all([
+      fetchTmdbData("/movie/popular", { page: 1 }),
+      fetchTmdbData("/tv/popular", { page: 1 }),
+    ]);
+    items = [
+      ...(movies.results || []).map((item) => ({ ...item, media_type: "movie" })),
+      ...(shows.results || []).map((item) => ({ ...item, media_type: "tv" })),
+    ];
+  } else if (section === "mas-esperadas") {
+    const today = new Date().toISOString().slice(0, 10);
+    const [movies, shows] = await Promise.all([
+      fetchTmdbData("/discover/movie", {
+        "primary_release_date.gte": today,
+        sort_by: "popularity.desc",
+        page: 1,
+      }),
+      fetchTmdbData("/discover/tv", {
+        "first_air_date.gte": today,
+        sort_by: "popularity.desc",
+        page: 1,
+      }),
+    ]);
+    items = [
+      ...(movies.results || []).map((item) => ({ ...item, media_type: "movie" })),
+      ...(shows.results || []).map((item) => ({ ...item, media_type: "tv" })),
+    ];
+  } else if (section === "recomendados") {
+    const [movies, shows] = await Promise.all([
+      fetchTmdbData("/movie/popular", { page: 2 }),
+      fetchTmdbData("/tv/popular", { page: 2 }),
+    ]);
+    items = [
+      ...(movies.results || []).map((item) => ({ ...item, media_type: "movie" })),
+      ...(shows.results || []).map((item) => ({ ...item, media_type: "tv" })),
+    ];
+  }
+
+  return localJson({
+    section,
+    ...config,
+    items: items.map((item) => ({
+      ...item,
+      source: "tmdb",
+      sources: ["tmdb"],
+      section,
+      _key: `local:${item.media_type}:${item.id}`,
+    })),
+    localRuntime: true,
+  });
+}
+
+async function localTmdbApiFallback(request) {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/api/health") {
+    return localJson({
+      ok: true,
+      service: "the-show-verse-pwa",
+      localRuntime: true,
+      serverReachable: false,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  if (url.pathname.startsWith("/api/dashboard/sections/")) {
+    const section = decodeURIComponent(url.pathname.split("/").pop() || "");
+    return localDashboardSection(section);
+  }
+
+  if (url.pathname === "/api/tmdb/auth/request-token") {
+    const tokenResponse = await fetchTmdbJson("/authentication/token/new");
+    const tokenJson = await tokenResponse.clone().json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenJson?.success || !tokenJson?.request_token) {
+      return tokenResponse;
+    }
+
+    const origin = url.origin;
+    const redirectTo = `${origin}/auth/callback`;
+    const authenticateUrl =
+      `https://www.themoviedb.org/authenticate/${tokenJson.request_token}` +
+      `?redirect_to=${encodeURIComponent(redirectTo)}`;
+
+    return localJson({
+      request_token: tokenJson.request_token,
+      expires_at: tokenJson.expires_at,
+      redirect_to: redirectTo,
+      authenticate_url: authenticateUrl,
+      localRuntime: true,
+    });
+  }
+
+  if (url.pathname === "/api/tmdb/auth/session") {
+    if (request.method !== "POST") {
+      return localJson({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
+    }
+    const body = await request.json().catch(() => ({}));
+    const requestToken = body?.request_token || body?.requestToken;
+    if (!requestToken) {
+      return localJson({ error: "Falta request_token" }, { status: 400 });
+    }
+    return fetchTmdbJson("/authentication/session/new", {}, {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=utf-8" },
+      body: JSON.stringify({ request_token: requestToken }),
+    });
+  }
+
+  if (url.pathname === "/api/tmdb/auth/account") {
+    const sessionId = url.searchParams.get("session_id");
+    if (!sessionId) {
+      return localJson({ error: "Missing session_id" }, { status: 400 });
+    }
+    return fetchTmdbJson("/account", { session_id: sessionId });
+  }
+
+  if (url.pathname === "/api/tmdb/collection") {
+    const id = url.searchParams.get("id");
+    if (!id) return localJson({ error: "Missing id" }, { status: 400 });
+    const collection = await fetchTmdbData(`/collection/${id}`, { language: "es-ES" });
+    const parts = Array.isArray(collection?.parts) ? [...collection.parts] : [];
+    parts.sort((a, b) =>
+      (a?.release_date || "9999-99-99").localeCompare(b?.release_date || "9999-99-99"),
+    );
+    return localJson({
+      ok: true,
+      collection: {
+        source: "collection",
+        id: String(collection?.id),
+        name: collection?.name || "Colección",
+        description: collection?.overview || "",
+        item_count: parts.length,
+        poster_path: collection?.poster_path || null,
+        backdrop_path: collection?.backdrop_path || null,
+        tmdbUrl: collection?.id ? `https://www.themoviedb.org/collection/${collection.id}` : null,
+      },
+      items: parts.map((item) => ({
+        ...item,
+        media_type: "movie",
+        title: item?.title,
+      })),
+      localRuntime: true,
+    });
+  }
+
+  {
+    const creditsMatch = url.pathname.match(/^\/api\/tmdb\/movies\/([^/]+)\/credits$/);
+    if (creditsMatch) {
+      return fetchTmdbJson(`/movie/${creditsMatch[1]}/credits`, { language: "es-ES" });
+    }
+  }
+
+  {
+    const tvMatch = url.pathname.match(/^\/api\/tmdb\/tv\/([^/]+)$/);
+    if (tvMatch) {
+      return fetchTmdbJson(`/tv/${tvMatch[1]}`, { language: "es-ES" });
+    }
+  }
+
+  {
+    const episodeMatch = url.pathname.match(
+      /^\/api\/tmdb\/tv\/([^/]+)\/season\/([^/]+)\/episode\/([^/]+)$/,
+    );
+    if (episodeMatch) {
+      const data = await fetchTmdbData(
+        `/tv/${episodeMatch[1]}/season/${episodeMatch[2]}/episode/${episodeMatch[3]}`,
+        { language: "es-ES" },
+      );
+      return localJson({
+        name: data?.name || null,
+        season_number: data?.season_number ?? Number(episodeMatch[2]),
+        episode_number: data?.episode_number ?? Number(episodeMatch[3]),
+        localRuntime: true,
+      });
+    }
+  }
+
+  return localJson({ error: "LOCAL_API_FALLBACK_UNAVAILABLE", offline: true }, { status: 503 });
 }
 
 function sameOriginUrl(request) {
@@ -158,6 +436,8 @@ async function getUsableCachedNavigation(request) {
     await routeCache.match(pathnameRequest),
     await cache.match(url.pathname),
     await routeCache.match(url.pathname),
+    await cache.match("/"),
+    await staticCache.match("/"),
     await staticCache.match(OFFLINE_FALLBACK_URL),
   ];
 
@@ -226,6 +506,33 @@ async function networkOnly(request) {
       status: 503,
       headers: OFFLINE_JSON_HEADERS,
     });
+  }
+}
+
+async function networkOnlyWithLocalFallback(request) {
+  const fallbackRequest = request.clone();
+  const runLocalFallback = async () => {
+    try {
+      return await localTmdbApiFallback(fallbackRequest.clone());
+    } catch (error) {
+      return localJson(
+        {
+          error: error?.message || "LOCAL_API_FALLBACK_FAILED",
+          offline: true,
+        },
+        { status: 503 },
+      );
+    }
+  };
+
+  try {
+    const response = await fetch(request);
+    if (response.status >= 500) {
+      return runLocalFallback();
+    }
+    return response;
+  } catch {
+    return runLocalFallback();
   }
 }
 
@@ -327,6 +634,12 @@ self.addEventListener("message", (event) => {
   if (data.type === "SHOWVERSE_CACHE_ROUTES") {
     event.waitUntil(warmAppShell(Array.isArray(data.urls) ? data.urls : []));
   }
+  if (data.type === "SHOWVERSE_CLIENT_CONFIG") {
+    runtimeConfig = {
+      ...runtimeConfig,
+      tmdbApiKey: typeof data.tmdbApiKey === "string" ? data.tmdbApiKey : runtimeConfig.tmdbApiKey,
+    };
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -351,7 +664,7 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
     if (isNetworkOnlyApiPath(url.pathname)) {
-      event.respondWith(networkOnly(request));
+      event.respondWith(networkOnlyWithLocalFallback(request));
       return;
     }
     event.respondWith(staleWhileRevalidate(request, API_CACHE, 120));

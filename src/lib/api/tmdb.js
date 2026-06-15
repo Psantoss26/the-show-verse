@@ -23,6 +23,102 @@ function buildUrl(path, params = {}) {
   return url.toString();
 }
 
+export function hasTmdbClientRuntime() {
+  return Boolean(API_KEY);
+}
+
+export async function createTmdbRequestTokenClient({ next = "/" } = {}) {
+  const data = await tmdb("/authentication/token/new", {}, { cache: "no-store" });
+  if (!data?.success || !data?.request_token) {
+    throw new Error(data?.status_message || "No se pudo iniciar el login");
+  }
+
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const safeNext = String(next || "/").startsWith("/") ? String(next || "/") : "/";
+  const redirectUrl = new URL("/auth/callback", origin || "http://localhost");
+  redirectUrl.searchParams.set("next", safeNext);
+
+  const authenticateUrl =
+    `https://www.themoviedb.org/authenticate/${data.request_token}` +
+    `?redirect_to=${encodeURIComponent(redirectUrl.toString())}`;
+
+  return {
+    request_token: data.request_token,
+    expires_at: data.expires_at,
+    redirect_to: redirectUrl.toString(),
+    authenticate_url: authenticateUrl,
+  };
+}
+
+export async function createTmdbSessionClient(requestToken) {
+  if (!requestToken) throw new Error("Falta request_token");
+
+  const res = await fetch(buildUrl("/authentication/session/new", {}), {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json;charset=utf-8",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ request_token: requestToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.success || !data?.session_id) {
+    throw new Error(data?.status_message || "No se pudo crear la sesión");
+  }
+  return data.session_id;
+}
+
+export async function fetchTmdbAccountClient(sessionId) {
+  if (!sessionId) throw new Error("Falta session_id");
+  const data = await tmdb(
+    "/account",
+    { session_id: sessionId },
+    { cache: "no-store" },
+  );
+  if (!data?.id) throw new Error(data?.status_message || "No se pudo cargar la cuenta");
+  return data;
+}
+
+async function mutateTmdbAccountList({
+  accountId,
+  sessionId,
+  type,
+  mediaId,
+  action,
+  value,
+}) {
+  if (!accountId || !sessionId) {
+    throw new Error("Falta sesión TMDb");
+  }
+  if (type !== "movie" && type !== "tv") {
+    throw new Error("Tipo de medio no soportado");
+  }
+
+  const res = await fetch(
+    buildUrl(`/account/${accountId}/${action}`, { session_id: sessionId }),
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json;charset=utf-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        media_type: type,
+        media_id: mediaId,
+        [action === "favorite" ? "favorite" : "watchlist"]: value,
+      }),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.success === false) {
+    throw new Error(data?.status_message || "No se pudo actualizar TMDb");
+  }
+  return data;
+}
+
 /**
  * Cliente TMDb con:
  * - Timeout
@@ -497,14 +593,32 @@ export async function getMediaAccountStates(type, id, sessionOrOpts) {
 }
 
 export async function markAsFavorite({
-  // accountId and sessionId kept for backwards-compat but not used here:
-  // the server route reads them from cookies.
-  accountId: _accountId,
-  sessionId: _sessionId,
+  accountId,
+  sessionId,
   type,
   mediaId,
   favorite,
 }) {
+  if (!IS_SERVER && API_KEY && accountId && sessionId) {
+    try {
+      const tmdbResult = await mutateTmdbAccountList({
+        accountId,
+        sessionId,
+        type,
+        mediaId,
+        action: "favorite",
+        value: favorite,
+      });
+      return {
+        ok: true,
+        tmdb: tmdbResult,
+        trakt: { synced: false, skipped: "client-runtime" },
+      };
+    } catch (directError) {
+      console.warn("[TMDb] Direct favorite update failed; trying local API", directError);
+    }
+  }
+
   // Route through our Next.js API so Trakt sync happens server-side
   const res = await offlineMutationFetch('/api/tmdb/account/favorite', {
     method: 'POST',
@@ -527,14 +641,32 @@ export async function markAsFavorite({
 }
 
 export async function markInWatchlist({
-  // accountId and sessionId kept for backwards-compat but not used here:
-  // the server route reads them from cookies.
-  accountId: _accountId,
-  sessionId: _sessionId,
+  accountId,
+  sessionId,
   type,
   mediaId,
   watchlist,
 }) {
+  if (!IS_SERVER && API_KEY && accountId && sessionId) {
+    try {
+      const tmdbResult = await mutateTmdbAccountList({
+        accountId,
+        sessionId,
+        type,
+        mediaId,
+        action: "watchlist",
+        value: watchlist,
+      });
+      return {
+        ok: true,
+        tmdb: tmdbResult,
+        trakt: { synced: false, skipped: "client-runtime" },
+      };
+    } catch (directError) {
+      console.warn("[TMDb] Direct watchlist update failed; trying local API", directError);
+    }
+  }
+
   // Route through our Next.js API so Trakt sync happens server-side
   const res = await offlineMutationFetch('/api/tmdb/account/watchlist', {
     method: 'POST',
