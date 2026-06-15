@@ -23,6 +23,7 @@ const APP_SHELL_ROUTES = [
   "/profile",
   "/lists",
   "/login",
+  "/auth/callback",
 ];
 
 function isAuthRoute(pathname) {

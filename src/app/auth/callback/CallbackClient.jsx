@@ -42,8 +42,10 @@ export default function CallbackPage() {
 
                 const ssKey = `tmdb_cb_done:${requestToken}`
                 if (typeof window !== 'undefined') {
-                    if (sessionStorage.getItem(ssKey) === '1') return
-                    sessionStorage.setItem(ssKey, '1')
+                    if (sessionStorage.getItem(ssKey) === '1') {
+                        router.replace(next)
+                        return
+                    }
                 }
 
                 if (!cancelled) setErr('')
@@ -82,6 +84,9 @@ export default function CallbackPage() {
                 }
 
                 login({ session_id, account: aj })
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem(ssKey, '1')
+                }
 
                 if (!cancelled) setStep('¡Listo! Redirigiendo…')
                 router.replace(next)
