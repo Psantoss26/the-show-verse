@@ -28,6 +28,7 @@ function isPublicAsset(pathname) {
         pathname.startsWith('/images/') ||
         pathname.startsWith('/assets/') ||
         PUBLIC_API_ROUTES.has(pathname) ||
+        pathname === '/offline.html' ||
         pathname === '/favicon.ico' ||
         pathname === '/robots.txt' ||
         pathname === '/sitemap.xml' ||
