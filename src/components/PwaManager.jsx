@@ -10,6 +10,7 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 
 const ENABLE_SERVICE_WORKER = process.env.NODE_ENV === "production";
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
 const APP_SHELL_ROUTES = [
   "/",
   "/movies",
@@ -21,12 +22,11 @@ const APP_SHELL_ROUTES = [
   "/in-progress",
   "/profile",
   "/lists",
+  "/login",
 ];
 
 function isAuthRoute(pathname) {
   return (
-    pathname === "/login" ||
-    pathname.startsWith("/login/") ||
     pathname === "/auth/callback" ||
     pathname.startsWith("/auth/callback/") ||
     pathname === "/auth/tmdb/callback" ||
@@ -239,6 +239,11 @@ export default function PwaManager() {
         readyRegistration.waiting ||
         readyRegistration.installing ||
         navigator.serviceWorker.controller;
+
+      worker?.postMessage({
+        type: "SHOWVERSE_CLIENT_CONFIG",
+        tmdbApiKey: TMDB_API_KEY,
+      });
 
       worker?.postMessage({
         type: "SHOWVERSE_WARM_APP_SHELL",
