@@ -18,8 +18,52 @@ function privateAccessKey() {
     return process.env.SHOWVERSE_PRIVATE_ACCESS_KEY || ''
 }
 
-function isPrivateAccessEnabled() {
-    return Boolean(privateAccessKey())
+function truthy(value) {
+    return /^(1|true|yes|on)$/i.test(String(value || '').trim())
+}
+
+function requestHost(req) {
+    return (
+        req.headers.get('x-forwarded-host') ||
+        req.headers.get('host') ||
+        ''
+    )
+        .split(',')[0]
+        .trim()
+        .toLowerCase()
+        .replace(/:\d+$/, '')
+}
+
+function privateAccessHosts() {
+    return (process.env.SHOWVERSE_PRIVATE_ACCESS_HOSTS || '')
+        .split(',')
+        .map((host) => host.trim().toLowerCase().replace(/:\d+$/, ''))
+        .filter(Boolean)
+}
+
+function hostMatches(host, pattern) {
+    if (!host || !pattern) return false
+    if (pattern.startsWith('*.')) {
+        const suffix = pattern.slice(1)
+        return host.endsWith(suffix)
+    }
+    return host === pattern
+}
+
+function isPrivateAccessEnabled(req) {
+    if (!privateAccessKey()) return false
+
+    const host = requestHost(req)
+    const hosts = privateAccessHosts()
+    if (hosts.length > 0) {
+        return hosts.some((allowedHost) => hostMatches(host, allowedHost))
+    }
+
+    if (process.env.VERCEL === '1' && !truthy(process.env.SHOWVERSE_PRIVATE_ACCESS_ON_VERCEL)) {
+        return false
+    }
+
+    return true
 }
 
 function isPublicAsset(pathname) {
@@ -46,7 +90,7 @@ export async function middleware(req) {
     const { pathname } = req.nextUrl
 
     if (
-        isPrivateAccessEnabled() &&
+        isPrivateAccessEnabled(req) &&
         pathname !== ACCESS_ROUTE &&
         !isPublicAsset(pathname) &&
         !(await hasPrivateAccess(req))
