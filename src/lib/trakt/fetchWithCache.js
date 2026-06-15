@@ -389,6 +389,11 @@ export async function fetchTrakt(path, options = {}) {
       if (useCache) {
         saveErrorToCache(cacheKey, err);
       }
+      const staleData = getFromCache(cacheKey, true);
+      if (staleData !== null) {
+        console.log(`⚠️ Error temporal, sirviendo cache stale para ${path}`);
+        return staleData;
+      }
       throw err;
     })
     .finally(() => {

@@ -11,7 +11,7 @@ import { traktFetch } from "@/lib/trakt/server";
 const tmdbDetailsCache = new Map();
 
 function getTmdbKey() {
-  return process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  return process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 }
 
 async function safeJson(res) {
@@ -31,6 +31,8 @@ async function fetchTrakt(path) {
     const data = await fetchTraktWithCache(path, {
       useCache: true,
       cacheTTL: 60 * 60 * 1000, // 1 hora
+      timeoutMs: 7000,
+      maxRetries: 1,
     });
     return Array.isArray(data) ? data : [];
   } catch (err) {

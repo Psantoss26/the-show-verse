@@ -1,14 +1,25 @@
 "use client";
 
+import { createTmdbRequestTokenClient } from "@/lib/api/tmdb";
+
 export default function LoginButton() {
   const handleLogin = async () => {
     try {
-      const res = await fetch("/api/tmdb/auth/request-token", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json?.authenticate_url) {
-        throw new Error(json?.error || "No se pudo iniciar el login");
+      let json;
+      try {
+        json = await createTmdbRequestTokenClient();
+      } catch (directError) {
+        console.warn(
+          "[TMDb] Login directo no disponible; usando API local",
+          directError,
+        );
+        const res = await fetch("/api/tmdb/auth/request-token", {
+          cache: "no-store",
+        });
+        json = await res.json().catch(() => ({}));
+        if (!res.ok || !json?.authenticate_url) {
+          throw new Error(json?.error || "No se pudo iniciar el login");
+        }
       }
 
       window.location.href = json.authenticate_url;

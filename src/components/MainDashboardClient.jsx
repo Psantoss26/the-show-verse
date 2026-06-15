@@ -41,6 +41,9 @@ const EMPTY_ARRAY = [];
 const EMPTY_OBJECT = {};
 const DASHBOARD_RECOMMENDED_CACHE_KEY = "showverse:dashboard:recommended:v2";
 const DASHBOARD_RECOMMENDED_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const DASHBOARD_SECTION_CACHE_PREFIX = "showverse:dashboard:section:v1:";
+const DASHBOARD_SECTION_CACHE_TTL_MS = 60 * 60 * 1000;
+const DASHBOARD_FETCH_TIMEOUT_MS = 8500;
 
 function toItemsArray(value) {
   if (Array.isArray(value)) return value;
@@ -124,6 +127,62 @@ function writeRecommendedDashboardCache(payload) {
       }),
     );
   } catch {}
+}
+
+function readDashboardSectionCache(key) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(
+      `${DASHBOARD_SECTION_CACHE_PREFIX}${key}`,
+    );
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const savedAt = Number(parsed?.savedAt || 0);
+    if (
+      !savedAt ||
+      Date.now() - savedAt > DASHBOARD_SECTION_CACHE_TTL_MS ||
+      !Array.isArray(parsed?.items)
+    ) {
+      window.localStorage.removeItem(`${DASHBOARD_SECTION_CACHE_PREFIX}${key}`);
+      return null;
+    }
+    return parsed.items;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardSectionCache(key, items) {
+  if (typeof window === "undefined" || !Array.isArray(items) || !items.length) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      `${DASHBOARD_SECTION_CACHE_PREFIX}${key}`,
+      JSON.stringify({
+        savedAt: Date.now(),
+        items,
+      }),
+    );
+  } catch {}
+}
+
+async function fetchDashboardJson(url, { timeoutMs = DASHBOARD_FETCH_TIMEOUT_MS, ...init } = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 /* =================== ANIMATION VARIANTS =================== */
@@ -1868,7 +1927,7 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
         <div className="flex items-center gap-2 mb-1.5">
           <div className="h-px w-8 bg-amber-500" />
           <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-            {selectedSource === "trakt" ? "TRAKT" : "TMDB"}
+            {effectiveSource === "trakt" ? "TRAKT" : "TMDB"}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
@@ -3235,31 +3294,50 @@ export default function MainDashboardClient({ initialData }) {
       };
     }
 
-    const loadAnticipated = async () => {
-      try {
-        const [moviesAnticipated, showsAnticipated] = await Promise.all([
-          fetch("/api/trakt/dashboard/movies-anticipated", { priority: "low" })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/shows-anticipated", { priority: "low" })
-            .then((r) => r.json())
-            .catch(() => []),
-        ]);
-        if (cancelled) return;
+    const loadAnticipatedBucket = async ({ key, url }) => {
+      const cached = readDashboardSectionCache(key);
+      if (cached && !cancelled) {
         setLazySections((prev) => ({
           ...prev,
-          traktMoviesAnticipated: Array.isArray(moviesAnticipated)
-            ? moviesAnticipated
-            : [],
-          traktShowsAnticipated: Array.isArray(showsAnticipated)
-            ? showsAnticipated
-            : [],
+          [key]: cached,
+        }));
+      }
+
+      try {
+        const items = await fetchDashboardJson(url, {
+          priority: "high",
+          cache: "default",
+          timeoutMs: 6500,
+        }).catch(() => cached || []);
+        if (cancelled) return;
+        const fetchedItems = Array.isArray(items) ? items : [];
+        const safeItems =
+          fetchedItems.length === 0 && cached?.length ? cached : fetchedItems;
+        writeDashboardSectionCache(key, safeItems);
+        setLazySections((prev) => ({
+          ...prev,
+          [key]: safeItems,
         }));
       } catch (err) {
-        console.error("❌ Error cargando anticipated:", err);
+        console.error(`❌ Error cargando ${key}:`, err);
+        if (!cancelled && !cached) {
+          setLazySections((prev) => ({
+            ...prev,
+            [key]: [],
+          }));
+        }
       }
     };
-    loadAnticipated();
+
+    loadAnticipatedBucket({
+      key: "traktMoviesAnticipated",
+      url: "/api/trakt/dashboard/movies-anticipated?limit=18",
+    });
+    loadAnticipatedBucket({
+      key: "traktShowsAnticipated",
+      url: "/api/trakt/dashboard/shows-anticipated?limit=18",
+    });
+
     return () => {
       cancelled = true;
     };
@@ -3329,76 +3407,74 @@ export default function MainDashboardClient({ initialData }) {
   // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
   useEffect(() => {
     let cancelled = false;
-    const loadLazySections = async () => {
+    const sectionRequests = [
+      {
+        key: "traktTrending",
+        url: "/api/trakt/dashboard/trending?limit=18",
+      },
+      {
+        key: "traktPopular",
+        url: "/api/trakt/dashboard/popular?limit=18",
+      },
+      {
+        key: "traktPlayedWeekly",
+        url: "/api/trakt/dashboard/played?period=weekly&limit=18",
+      },
+      {
+        key: "traktPlayedMonthly",
+        url: "/api/trakt/dashboard/played?period=monthly&limit=18",
+      },
+      {
+        key: "traktWatchedWeekly",
+        url: "/api/trakt/dashboard/watched?period=weekly&limit=18",
+      },
+      {
+        key: "traktWatchedMonthly",
+        url: "/api/trakt/dashboard/watched?period=monthly&limit=18",
+      },
+      {
+        key: "traktCollectedWeekly",
+        url: "/api/trakt/dashboard/collected?period=weekly&limit=18",
+      },
+      {
+        key: "traktCollectedMonthly",
+        url: "/api/trakt/dashboard/collected?period=monthly&limit=18",
+      },
+    ];
+
+    const loadSection = async ({ key, url }) => {
       if (cancelled) return;
-      try {
-        const [
-          trending,
-          popular,
-          playedWeekly,
-          playedMonthly,
-          watchedWeekly,
-          watchedMonthly,
-          collectedWeekly,
-          collectedMonthly,
-        ] = await Promise.all([
-          fetch("/api/trakt/dashboard/trending", { priority: "low" })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/popular", { priority: "low" })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/played?period=weekly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/played?period=monthly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/watched?period=weekly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/watched?period=monthly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/collected?period=weekly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-          fetch("/api/trakt/dashboard/collected?period=monthly", {
-            priority: "low",
-          })
-            .then((r) => r.json())
-            .catch(() => []),
-        ]);
-        if (cancelled) return;
+      const cached = readDashboardSectionCache(key);
+      if (cached && !cancelled) {
         setLazySections((prev) => ({
           ...prev,
-          traktTrending: Array.isArray(trending) ? trending : [],
-          traktPopular: Array.isArray(popular) ? popular : [],
-          traktPlayedWeekly: Array.isArray(playedWeekly) ? playedWeekly : [],
-          traktPlayedMonthly: Array.isArray(playedMonthly) ? playedMonthly : [],
-          traktWatchedWeekly: Array.isArray(watchedWeekly) ? watchedWeekly : [],
-          traktWatchedMonthly: Array.isArray(watchedMonthly)
-            ? watchedMonthly
-            : [],
-          traktCollectedWeekly: Array.isArray(collectedWeekly)
-            ? collectedWeekly
-            : [],
-          traktCollectedMonthly: Array.isArray(collectedMonthly)
-            ? collectedMonthly
-            : [],
+          [key]: cached,
+        }));
+      }
+
+      try {
+        const items = await fetchDashboardJson(url, {
+          priority: "low",
+          cache: "default",
+          timeoutMs: 9000,
+        }).catch(() => cached || []);
+        if (cancelled) return;
+        const fetchedItems = Array.isArray(items) ? items : [];
+        const safeItems =
+          fetchedItems.length === 0 && cached?.length ? cached : fetchedItems;
+        writeDashboardSectionCache(key, safeItems);
+        setLazySections((prev) => ({
+          ...prev,
+          [key]: safeItems,
         }));
       } catch (err) {
-        console.error("❌ Error cargando secciones lazy:", err);
+        console.error(`❌ Error cargando ${key}:`, err);
+        if (!cancelled && !cached) {
+          setLazySections((prev) => ({
+            ...prev,
+            [key]: [],
+          }));
+        }
       }
     };
 
@@ -3406,6 +3482,14 @@ export default function MainDashboardClient({ initialData }) {
       timeout: 3000,
       delay: 1000,
     });
+    function loadLazySections() {
+      sectionRequests.forEach((request, index) => {
+        window.setTimeout(() => {
+          loadSection(request);
+        }, index * 120);
+      });
+    }
+
     return () => {
       cancelled = true;
       cancelIdle();

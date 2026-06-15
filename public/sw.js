@@ -1,4 +1,4 @@
-const VERSION = "showverse-v8";
+const VERSION = "showverse-v9";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -23,6 +23,7 @@ const APP_SHELL = [
   "/profile",
   "/lists",
   "/login",
+  "/auth/callback",
   OFFLINE_FALLBACK_URL,
   "/site.webmanifest",
   "/favicon.ico",
@@ -37,15 +38,6 @@ const APP_SHELL = [
 ];
 
 const NAVIGATION_PRELOAD_SUPPORTED = "navigationPreload" in self.registration;
-
-function isAuthNavigationPath(pathname) {
-  return (
-    pathname === "/auth/callback" ||
-    pathname.startsWith("/auth/callback/") ||
-    pathname === "/auth/tmdb/callback" ||
-    pathname.startsWith("/auth/tmdb/callback/")
-  );
-}
 
 function isNetworkOnlyApiPath(pathname) {
   return (
@@ -67,7 +59,6 @@ function isNetworkOnlyApiPath(pathname) {
 
 function isOfflineCacheableUrl(url) {
   if (url.origin !== self.location.origin) return true;
-  if (isAuthNavigationPath(url.pathname)) return false;
   if (isNetworkOnlyApiPath(url.pathname)) return false;
   return true;
 }
@@ -478,37 +469,6 @@ async function networkFirst(request, preloadResponsePromise = null) {
   }
 }
 
-async function networkOnlyNavigation(request, preloadResponsePromise = null) {
-  try {
-    const preloadResponse = preloadResponsePromise ? await preloadResponsePromise : null;
-    const response = preloadResponse || (await fetch(request));
-    if (await isUnusableResponse(response)) {
-      throw new Error("unusable-response");
-    }
-    return response;
-  } catch {
-    const staticCache = await caches.open(STATIC_CACHE);
-    return (
-      (await staticCache.match(OFFLINE_FALLBACK_URL)) ||
-      new Response("Necesitas conexion con el servidor para iniciar sesion.", {
-        status: 503,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      })
-    );
-  }
-}
-
-async function networkOnly(request) {
-  try {
-    return await fetch(request);
-  } catch {
-    return new Response(JSON.stringify({ offline: true }), {
-      status: 503,
-      headers: OFFLINE_JSON_HEADERS,
-    });
-  }
-}
-
 async function networkOnlyWithLocalFallback(request) {
   const fallbackRequest = request.clone();
   const runLocalFallback = async () => {
@@ -644,15 +604,20 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
-
   const url = new URL(request.url);
 
-  if (request.mode === "navigate") {
-    if (url.origin === self.location.origin && isAuthNavigationPath(url.pathname)) {
-      event.respondWith(networkOnlyNavigation(request, event.preloadResponse));
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
+    if (isNetworkOnlyApiPath(url.pathname)) {
+      event.respondWith(networkOnlyWithLocalFallback(request));
       return;
     }
+
+    if (request.method !== "GET") return;
+  }
+
+  if (request.method !== "GET") return;
+
+  if (request.mode === "navigate") {
     event.respondWith(networkFirst(request, event.preloadResponse));
     return;
   }
@@ -663,10 +628,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) {
-    if (isNetworkOnlyApiPath(url.pathname)) {
-      event.respondWith(networkOnlyWithLocalFallback(request));
-      return;
-    }
     event.respondWith(staleWhileRevalidate(request, API_CACHE, 120));
     return;
   }
@@ -676,10 +637,6 @@ self.addEventListener("fetch", (event) => {
     !url.pathname.startsWith("/api/") &&
     (request.headers.get("accept") || "").includes("text/x-component")
   ) {
-    if (isAuthNavigationPath(url.pathname)) {
-      event.respondWith(networkOnly(request));
-      return;
-    }
     event.respondWith(routeStaleWhileRevalidate(request));
     return;
   }
