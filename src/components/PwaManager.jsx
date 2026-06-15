@@ -21,11 +21,22 @@ const APP_SHELL_ROUTES = [
   "/in-progress",
   "/profile",
   "/lists",
-  "/login",
 ];
+
+function isAuthRoute(pathname) {
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/auth/callback" ||
+    pathname.startsWith("/auth/callback/") ||
+    pathname === "/auth/tmdb/callback" ||
+    pathname.startsWith("/auth/tmdb/callback/")
+  );
+}
 
 function isCacheableInternalRoute(url) {
   if (url.origin !== window.location.origin) return false;
+  if (isAuthRoute(url.pathname)) return false;
   if (url.hash && url.pathname === window.location.pathname) return false;
   if (url.pathname.startsWith("/api/")) return false;
   if (url.pathname.startsWith("/_next/")) return false;
