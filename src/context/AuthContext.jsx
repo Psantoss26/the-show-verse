@@ -43,24 +43,35 @@ export const AuthProvider = ({ children }) => {
             if (!cancelled) setAccount(null);
           }
         } else if (storedSession) {
-          const res = await fetch("/api/tmdb/account", { cache: "no-store" });
-          if (res.ok) {
-            const accountFromCookie = await res.json();
-            window.localStorage.setItem(
-              "tmdb_account",
-              JSON.stringify(accountFromCookie),
+          try {
+            const res = await fetch("/api/tmdb/account", { cache: "no-store" });
+            if (res.ok) {
+              const accountFromCookie = await res.json();
+              window.localStorage.setItem(
+                "tmdb_account",
+                JSON.stringify(accountFromCookie),
+              );
+              if (!cancelled) setAccount(accountFromCookie);
+            }
+          } catch (e) {
+            console.warn(
+              "No se pudo refrescar la cuenta TMDb; se mantiene la sesión local",
+              e,
             );
-            if (!cancelled) setAccount(accountFromCookie);
           }
         }
       } catch (e) {
         console.warn("Error leyendo sesión TMDb desde localStorage", e);
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem("tmdb_session");
-          window.localStorage.removeItem("tmdb_account");
-        }
         if (!cancelled) {
-          setSession(null);
+          const fallbackSession =
+            typeof window !== "undefined"
+              ? window.localStorage.getItem("tmdb_session")
+              : null;
+          if (fallbackSession) {
+            setSession(fallbackSession);
+          } else {
+            setSession(null);
+          }
           setAccount(null);
         }
       } finally {

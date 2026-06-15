@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, WifiOff, RotateCw } from "lucide-react";
 import {
   flushOfflineMutations,
@@ -21,7 +21,33 @@ const APP_SHELL_ROUTES = [
   "/in-progress",
   "/profile",
   "/lists",
+  "/login",
 ];
+
+function isCacheableInternalRoute(url) {
+  if (url.origin !== window.location.origin) return false;
+  if (url.hash && url.pathname === window.location.pathname) return false;
+  if (url.pathname.startsWith("/api/")) return false;
+  if (url.pathname.startsWith("/_next/")) return false;
+  if (/\.[a-z0-9]+$/i.test(url.pathname)) return false;
+  return true;
+}
+
+function collectInternalRoutes(limit = 80) {
+  if (typeof document === "undefined") return APP_SHELL_ROUTES;
+
+  const routes = new Set(APP_SHELL_ROUTES);
+  document.querySelectorAll("a[href]").forEach((anchor) => {
+    if (routes.size >= limit) return;
+    try {
+      const url = new URL(anchor.getAttribute("href"), window.location.origin);
+      if (!isCacheableInternalRoute(url)) return;
+      routes.add(`${url.pathname}${url.search}`);
+    } catch {}
+  });
+
+  return Array.from(routes).slice(0, limit);
+}
 
 async function clearShowVerseCaches() {
   if (typeof window === "undefined" || !("caches" in window)) return;
@@ -37,8 +63,15 @@ export default function PwaManager() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [online, setOnline] = useState(true);
+  const [serverReachable, setServerReachable] = useState(true);
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const serverReachableRef = useRef(true);
+  const routeWarmupScheduledRef = useRef(false);
+
+  useEffect(() => {
+    serverReachableRef.current = serverReachable;
+  }, [serverReachable]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -79,12 +112,60 @@ export default function PwaManager() {
       setIsInstalled(true);
       setInstallPrompt(null);
     };
+    const pingServer = async () => {
+      if (!navigator.onLine) {
+        setServerReachable(false);
+        return false;
+      }
+
+      try {
+        const res = await fetch(`/api/health?__pwa_ping=${Date.now()}`, {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const ok = res.ok;
+        setServerReachable(ok);
+        return ok;
+      } catch {
+        setServerReachable(false);
+        return false;
+      }
+    };
+
     const onOnline = () => {
       setOnline(true);
       syncNow();
-      warmAppShell();
+      pingServer().then((ok) => {
+        if (ok) warmAppShell();
+      });
     };
-    const onOffline = () => setOnline(false);
+    const onOffline = () => {
+      setOnline(false);
+      setServerReachable(false);
+    };
+
+    const onDocumentClick = (event) => {
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const anchor = event.target?.closest?.("a[href]");
+      if (!anchor) return;
+      if (anchor.target && anchor.target !== "_self") return;
+
+      let url;
+      try {
+        url = new URL(anchor.href, window.location.href);
+      } catch {
+        return;
+      }
+
+      if (!isCacheableInternalRoute(url)) return;
+      if (navigator.onLine && serverReachableRef.current) return;
+
+      event.preventDefault();
+      window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+    };
 
     const unsubscribe = subscribeOfflineQueue(setPending);
 
@@ -92,15 +173,37 @@ export default function PwaManager() {
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    document.addEventListener("click", onDocumentClick, true);
 
-    if (navigator.onLine) syncNow();
+    if (navigator.onLine) {
+      syncNow();
+      pingServer().then((ok) => {
+        if (ok) warmAppShell();
+      });
+    }
+
+    const pingInterval = window.setInterval(pingServer, 30000);
+    const mutationObserver =
+      "MutationObserver" in window
+        ? new MutationObserver(() => {
+            if (!navigator.onLine || !serverReachableRef.current) return;
+            scheduleRouteWarmup();
+          })
+        : null;
+    mutationObserver?.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
 
     return () => {
       unsubscribe();
+      window.clearInterval(pingInterval);
+      mutationObserver?.disconnect();
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      document.removeEventListener("click", onDocumentClick, true);
     };
   }, []);
 
@@ -128,11 +231,27 @@ export default function PwaManager() {
 
       worker?.postMessage({
         type: "SHOWVERSE_WARM_APP_SHELL",
-        urls: APP_SHELL_ROUTES,
+        urls: collectInternalRoutes(),
       });
     } catch (error) {
       console.warn("[PWA] No se pudo preparar el modo offline", error);
     }
+  }
+
+  function scheduleRouteWarmup() {
+    if (typeof window === "undefined") return;
+    if (routeWarmupScheduledRef.current) return;
+    routeWarmupScheduledRef.current = true;
+
+    const run = () => {
+      routeWarmupScheduledRef.current = false;
+      warmAppShell();
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(run, { timeout: 4000 });
+      return;
+    }
+    window.setTimeout(run, 1000);
   }
 
   async function installApp() {
