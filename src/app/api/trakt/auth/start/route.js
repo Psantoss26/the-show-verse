@@ -20,7 +20,6 @@ async function originFromRequest(req) {
   // En Vercel pon: TRAKT_APP_ORIGIN=https://the-show-verse.vercel.app
   const forced =
     process.env.TRAKT_APP_ORIGIN ||
-    process.env.NEXT_PUBLIC_APP_URL ||
     process.env.APP_URL;
 
   if (forced) return cleanOrigin(forced);
@@ -38,6 +37,7 @@ async function originFromRequest(req) {
 
   if (host) return `${proto}://${host}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NEXT_PUBLIC_APP_URL) return cleanOrigin(process.env.NEXT_PUBLIC_APP_URL);
 
   return "http://localhost:3000";
 }
