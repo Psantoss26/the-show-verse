@@ -10,6 +10,18 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 
 const ENABLE_SERVICE_WORKER = process.env.NODE_ENV === "production";
+const APP_SHELL_ROUTES = [
+  "/",
+  "/movies",
+  "/series",
+  "/favorites",
+  "/watchlist",
+  "/calendar",
+  "/history",
+  "/in-progress",
+  "/profile",
+  "/lists",
+];
 
 async function clearShowVerseCaches() {
   if (typeof window === "undefined" || !("caches" in window)) return;
@@ -48,9 +60,15 @@ export default function PwaManager() {
           console.warn("[PWA] No se pudo limpiar el service worker local", error);
         });
     } else if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((error) => {
-        console.warn("[PWA] No se pudo registrar el service worker", error);
-      });
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          registration.update?.().catch(() => {});
+          warmAppShell(registration);
+        })
+        .catch((error) => {
+          console.warn("[PWA] No se pudo registrar el service worker", error);
+        });
     }
 
     const onBeforeInstallPrompt = (event) => {
@@ -64,6 +82,7 @@ export default function PwaManager() {
     const onOnline = () => {
       setOnline(true);
       syncNow();
+      warmAppShell();
     };
     const onOffline = () => setOnline(false);
 
@@ -92,6 +111,27 @@ export default function PwaManager() {
       setPending(result.pending);
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function warmAppShell(registration = null) {
+    if (typeof window === "undefined" || !navigator.onLine) return;
+    if (!("serviceWorker" in navigator)) return;
+
+    try {
+      const readyRegistration = registration || (await navigator.serviceWorker.ready);
+      const worker =
+        readyRegistration.active ||
+        readyRegistration.waiting ||
+        readyRegistration.installing ||
+        navigator.serviceWorker.controller;
+
+      worker?.postMessage({
+        type: "SHOWVERSE_WARM_APP_SHELL",
+        urls: APP_SHELL_ROUTES,
+      });
+    } catch (error) {
+      console.warn("[PWA] No se pudo preparar el modo offline", error);
     }
   }
 
