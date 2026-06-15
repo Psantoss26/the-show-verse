@@ -1,9 +1,10 @@
-const VERSION = "showverse-v10";
+const VERSION = "showverse-v11";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
 const IMAGE_CACHE = `${VERSION}-images`;
 const ROUTE_CACHE = `${VERSION}-routes`;
+const CACHE_PREFIX = "showverse-";
 const OFFLINE_FALLBACK_URL = "/offline.html";
 const OFFLINE_JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -492,45 +493,35 @@ function sameOriginUrl(request) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(STATIC_CACHE)
-      .then((cache) =>
-        Promise.allSettled(
-          APP_SHELL.map((url) =>
-            fetch(url, { credentials: "include", cache: "reload" }).then(
-              async (response) => {
-                if (response.ok && !(await isUnusableResponse(response))) {
-                  await cache.put(url, response.clone());
-                }
-              },
-            ),
-          ),
-        ),
-      )
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(warmAppShell(APP_SHELL).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key.startsWith("showverse-") && !key.startsWith(VERSION))
-            .map((key) => caches.delete(key)),
-        ),
-      )
-      .then(() =>
-        NAVIGATION_PRELOAD_SUPPORTED
-          ? self.registration.navigationPreload.enable()
-          : undefined,
-      )
+    Promise.resolve()
+      .then(() => (NAVIGATION_PRELOAD_SUPPORTED ? self.registration.navigationPreload.enable() : undefined))
       .then(() => self.clients.claim()),
   );
 });
+
+async function showverseCacheNames(preferredNames = []) {
+  const keys = await caches.keys();
+  const preferred = preferredNames.filter((name) => keys.includes(name));
+  const legacy = keys.filter(
+    (key) => key.startsWith(CACHE_PREFIX) && !preferred.includes(key),
+  );
+  return [...preferred, ...legacy];
+}
+
+async function matchInShowverseCaches(request, preferredNames = []) {
+  const names = await showverseCacheNames(preferredNames);
+  for (const name of names) {
+    const cache = await caches.open(name);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+  }
+  return null;
+}
 
 async function trimCache(cacheName, maxEntries) {
   const cache = await caches.open(cacheName);
@@ -587,6 +578,20 @@ async function getUsableCachedNavigation(request) {
     }
   }
 
+  const legacyCandidates = [
+    await matchInShowverseCaches(request, [PAGE_CACHE, ROUTE_CACHE, STATIC_CACHE]),
+    await matchInShowverseCaches(pathnameRequest, [PAGE_CACHE, ROUTE_CACHE, STATIC_CACHE]),
+    await matchInShowverseCaches(url.pathname, [PAGE_CACHE, ROUTE_CACHE, STATIC_CACHE]),
+    await matchInShowverseCaches("/", [PAGE_CACHE, STATIC_CACHE]),
+    await matchInShowverseCaches(OFFLINE_FALLBACK_URL, [STATIC_CACHE]),
+  ];
+
+  for (const candidate of legacyCandidates) {
+    if (candidate && !(await isUnusableResponse(candidate))) {
+      return candidate;
+    }
+  }
+
   return null;
 }
 
@@ -636,7 +641,7 @@ async function networkOnlyWithLocalFallback(request) {
 
   try {
     const response = await fetch(request);
-    if (response.status >= 500) {
+    if (response.status >= 500 || (await isUnusableResponse(response))) {
       return runLocalFallback();
     }
     return response;
@@ -650,17 +655,27 @@ async function cacheFirst(request, cacheName, maxEntries) {
   const cached = await cache.match(request);
   if (cached) return cached;
 
-  const response = await fetch(request);
-  if (response.ok || response.type === "opaque") {
-    cache.put(request, response.clone());
-    trimCache(cacheName, maxEntries);
+  const legacyCached = await matchInShowverseCaches(request, [cacheName]);
+  if (legacyCached) return legacyCached;
+
+  try {
+    const response = await fetch(request);
+    if (response.ok || response.type === "opaque") {
+      cache.put(request, response.clone());
+      trimCache(cacheName, maxEntries);
+    }
+    return response;
+  } catch (error) {
+    const fallback = await matchInShowverseCaches(request, [cacheName]);
+    if (fallback) return fallback;
+    throw error;
   }
-  return response;
 }
 
 async function routeStaleWhileRevalidate(request) {
   const cache = await caches.open(ROUTE_CACHE);
   const cached = await cache.match(request);
+  const legacyCached = cached || (await matchInShowverseCaches(request, [ROUTE_CACHE]));
   const fresh = fetch(request, { credentials: "include" })
     .then(async (response) => {
       if (response.ok && !(await isUnusableResponse(response))) {
@@ -672,7 +687,7 @@ async function routeStaleWhileRevalidate(request) {
     .catch(() => null);
 
   return (
-    cached ||
+    legacyCached ||
     (await fresh) ||
     new Response("The Show Verse esta disponible offline cuando ya has visitado esta pantalla.", {
       status: 503,
