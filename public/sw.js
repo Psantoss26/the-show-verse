@@ -1,4 +1,4 @@
-const VERSION = "showverse-v9";
+const VERSION = "showverse-v10";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const API_CACHE = `${VERSION}-api`;
@@ -120,6 +120,64 @@ async function fetchTmdbData(path, params = {}, init = {}) {
     throw new Error(json?.status_message || `TMDb ${response.status}`);
   }
   return json;
+}
+
+function getCookieValue(cookieHeader, name) {
+  if (!cookieHeader || !name) return "";
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || "";
+}
+
+function getSessionIdFromRequest(url, request, body = {}) {
+  return (
+    url.searchParams.get("session_id") ||
+    url.searchParams.get("sessionId") ||
+    body.session_id ||
+    body.sessionId ||
+    decodeURIComponent(getCookieValue(request.headers.get("cookie"), "tmdb_session_id")) ||
+    ""
+  );
+}
+
+async function getAccountIdForSession(sessionId, body = {}) {
+  const explicitAccountId = body.account_id || body.accountId;
+  if (explicitAccountId) return explicitAccountId;
+  const account = await fetchTmdbData("/account", { session_id: sessionId });
+  return account?.id || "";
+}
+
+async function fetchTmdbAccountList(accountId, sessionId, listType) {
+  const mediaPaths = [
+    { mediaType: "movie", path: `/account/${accountId}/${listType}/movies` },
+    { mediaType: "tv", path: `/account/${accountId}/${listType}/tv` },
+  ];
+
+  const fetchAllPages = async ({ mediaType, path }) => {
+    const firstPage = await fetchTmdbData(path, {
+      session_id: sessionId,
+      sort_by: "created_at.desc",
+      page: 1,
+    });
+    const totalPages = Math.min(Number(firstPage?.total_pages || 1), 25);
+    const items = Array.isArray(firstPage?.results) ? [...firstPage.results] : [];
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const data = await fetchTmdbData(path, {
+        session_id: sessionId,
+        sort_by: "created_at.desc",
+        page,
+      }).catch(() => ({ results: [] }));
+      items.push(...(Array.isArray(data?.results) ? data.results : []));
+    }
+
+    return items.map((item) => ({ ...item, media_type: mediaType }));
+  };
+
+  const results = await Promise.all(mediaPaths.map(fetchAllPages));
+  return results.flat();
 }
 
 async function localDashboardSection(section) {
@@ -262,12 +320,103 @@ async function localTmdbApiFallback(request) {
     });
   }
 
-  if (url.pathname === "/api/tmdb/auth/account") {
-    const sessionId = url.searchParams.get("session_id");
+  if (url.pathname === "/api/tmdb/auth/account" || url.pathname === "/api/tmdb/account") {
+    const sessionId = getSessionIdFromRequest(url, request);
     if (!sessionId) {
       return localJson({ error: "Missing session_id" }, { status: 400 });
     }
     return fetchTmdbJson("/account", { session_id: sessionId });
+  }
+
+  if (url.pathname === "/api/tmdb/account/me") {
+    const sessionId = getSessionIdFromRequest(url, request);
+    if (!sessionId) {
+      return localJson({ error: "NO_SESSION" }, { status: 401 });
+    }
+    const accountResponse = await fetchTmdbJson("/account", { session_id: sessionId });
+    const account = await accountResponse.clone().json().catch(() => ({}));
+    if (!accountResponse.ok) return accountResponse;
+    return localJson({ account, localRuntime: true });
+  }
+
+  {
+    const statusMatch = url.pathname.match(/^\/api\/tmdb\/account\/status\/(movie|tv)\/([^/]+)$/);
+    if (statusMatch) {
+      const sessionId = getSessionIdFromRequest(url, request);
+      if (!sessionId) {
+        return localJson({ error: "NO_SESSION" }, { status: 401 });
+      }
+      return fetchTmdbJson(`/${statusMatch[1]}/${statusMatch[2]}/account_states`, {
+        session_id: sessionId,
+      });
+    }
+  }
+
+  {
+    const movieStateMatch = url.pathname.match(/^\/api\/tmdb\/account\/states\/movies\/([^/]+)$/);
+    if (movieStateMatch) {
+      const sessionId = getSessionIdFromRequest(url, request);
+      if (!sessionId) {
+        return localJson({ error: "missing session_id" }, { status: 400 });
+      }
+      const statesResponse = await fetchTmdbJson(`/movie/${movieStateMatch[1]}/account_states`, {
+        session_id: sessionId,
+      });
+      const states = await statesResponse.clone().json().catch(() => ({}));
+      if (!statesResponse.ok) return statesResponse;
+      return localJson({
+        favorite: !!states.favorite,
+        watchlist: !!states.watchlist,
+        rated: typeof states.rated === "object" ? states.rated.value : null,
+        localRuntime: true,
+      });
+    }
+  }
+
+  if (
+    url.pathname === "/api/tmdb/account/favorite" ||
+    url.pathname === "/api/tmdb/account/watchlist"
+  ) {
+    const listType = url.pathname.endsWith("/favorite") ? "favorite" : "watchlist";
+    const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
+    const sessionId = getSessionIdFromRequest(url, request, body);
+    if (!sessionId) {
+      return localJson({ error: "NO_SESSION" }, { status: 401 });
+    }
+
+    const accountId = await getAccountIdForSession(sessionId, body);
+    if (!accountId) {
+      return localJson({ error: "TMDB_ACCOUNT_ERROR" }, { status: 400 });
+    }
+
+    if (request.method === "GET") {
+      const items = await fetchTmdbAccountList(accountId, sessionId, listType);
+      return localJson({
+        [listType === "favorite" ? "favorites" : "watchlist"]: items,
+        localRuntime: true,
+      });
+    }
+
+    if (request.method === "POST") {
+      const mediaType = body.mediaType || body.media_type;
+      const mediaId = body.mediaId || body.media_id;
+      const enabled = listType === "favorite" ? body.favorite : body.watchlist;
+      if (!mediaType || !mediaId) {
+        return localJson({ error: "Missing media" }, { status: 400 });
+      }
+
+      return fetchTmdbJson(`/account/${accountId}/${listType}`, { session_id: sessionId }, {
+        method: "POST",
+        headers: { "Content-Type": "application/json;charset=utf-8" },
+        body: JSON.stringify({
+          media_type: mediaType,
+          media_id: mediaId,
+          [listType]: !!enabled,
+        }),
+      });
+    }
+
+    return localJson({ error: "METHOD_NOT_ALLOWED" }, { status: 405 });
   }
 
   if (url.pathname === "/api/tmdb/collection") {
