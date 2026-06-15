@@ -624,6 +624,8 @@ export async function markAsFavorite({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      accountId,
+      sessionId,
       mediaType: type,
       mediaId,
       favorite,
@@ -672,6 +674,8 @@ export async function markInWatchlist({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      accountId,
+      sessionId,
       mediaType: type,
       mediaId,
       watchlist,
