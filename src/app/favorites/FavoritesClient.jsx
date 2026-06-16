@@ -1768,7 +1768,6 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "list") {
     return (
       <motion.div
-        key={`favorite-list-${effectiveImageMode}`}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1819,7 +1818,6 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        key={`favorite-compact-${effectiveImageMode}`}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1940,16 +1938,10 @@ const FavoriteCard = memo(function FavoriteCard({
   // Grid mode
   return (
     <motion.div
-      key={`favorite-grid-${effectiveImageMode}`}
-      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{
-        duration: 0.25,
-        delay: shouldAnimate ? animDelay : 0,
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
-      layout
+      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
       <Link href={href} className="block">
         <div
@@ -3739,7 +3731,10 @@ export default function FavoritesClient() {
                           title={subgroup.label}
                           count={subgroup.items.length}
                         />
-                        <div className={getItemsGridClass(true)}>
+                        <div
+                          key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                          className={getItemsGridClass(true)}
+                        >
                           {subgroup.items.map((item, idx) => (
                             <FavoriteCard
                               key={getMediaKey(item)}
@@ -3759,7 +3754,10 @@ export default function FavoritesClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className={getItemsGridClass(true)}>
+                  <div
+                    key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                    className={getItemsGridClass(true)}
+                  >
                     {group.items.map((item, idx) => (
                       <FavoriteCard
                         key={getMediaKey(item)}
@@ -3778,7 +3776,10 @@ export default function FavoritesClient() {
             ))}
           </div>
         ) : (
-          <div className={getItemsGridClass(false)}>
+          <div
+            key={`flat-grid-${viewMode}-${imageMode}`}
+            className={getItemsGridClass(false)}
+          >
             {sorted.map((item, idx) => (
               <FavoriteCard
                 key={getMediaKey(item)}

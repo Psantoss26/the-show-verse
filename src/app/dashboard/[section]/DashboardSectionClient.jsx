@@ -1335,10 +1335,19 @@ export default function DashboardSectionClient({ section }) {
           </div>
         ) : grouped ? (
           <div className="space-y-8">
-            {grouped.map((group) => (
-              <section key={group.key} className="overflow-visible">
+            {grouped.map((group, groupIndex) => (
+              <motion.div
+                key={group.key}
+                className="overflow-visible"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+              >
                 <GroupDivider title={group.label} count={group.items.length} />
-                <div className={favoritesGridClassFor(viewMode, imageMode, true)}>
+                <div
+                  key={`section-grid-${group.key}-${viewMode}-${imageMode}`}
+                  className={favoritesGridClassFor(viewMode, imageMode, true)}
+                >
                   {group.items.map((item, index) => (
                     <SectionCard
                       key={`${item.source}-${resolveType(item)}-${item.id}`}
@@ -1353,11 +1362,14 @@ export default function DashboardSectionClient({ section }) {
                     />
                   ))}
                 </div>
-              </section>
+              </motion.div>
             ))}
           </div>
         ) : (
-          <div className={favoritesGridClassFor(viewMode, imageMode)}>
+          <div
+            key={`section-flat-grid-${viewMode}-${imageMode}`}
+            className={favoritesGridClassFor(viewMode, imageMode)}
+          >
             {sorted.map((item, index) => (
               <SectionCard
                 key={`${item.source}-${resolveType(item)}-${item.id}`}
