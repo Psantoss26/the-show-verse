@@ -8799,8 +8799,7 @@ export default function DetailsClient({
                       isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
                     }`}
                     style={{
-                      transition:
-                        "aspect-ratio 500ms cubic-bezier(0.25, 1, 0.5, 1)",
+                      transition: "opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)",
                       contain: "layout paint",
                     }}
                   >
@@ -10094,7 +10093,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
              ================================================================= */}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
-          <div className="mt-6 space-y-14">
+          <div className="mt-6 space-y-14 sv-details-sections">
             <section id="section-cast" ref={registerSection("cast")}>
               <AnimatedSection delay={0.04}>
                 {/* === REPARTO PRINCIPAL (Cast) === */}

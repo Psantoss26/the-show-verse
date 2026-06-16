@@ -2976,7 +2976,7 @@ export default function FavoritesClient() {
   };
 
   if (!hydrated) {
-    return <div className="min-h-screen bg-black" />;
+    return <div className="min-h-screen bg-black sv-stable-auth-shell" />;
   }
 
   if (!session || !account) {
@@ -3128,9 +3128,21 @@ export default function FavoritesClient() {
               </p>
             </div>
 
-            {!loading && (
+            {loading ? (
+              <div
+                aria-hidden="true"
+                className="sv-favorites-stats-reserve flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+              >
+                {[0, 1, 2].map((idx) => (
+                  <div
+                    key={idx}
+                    className="sv-favorites-stat-skeleton flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-white/5 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
               <motion.div
-                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="sv-favorites-stats-reserve flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -3711,7 +3723,9 @@ export default function FavoritesClient() {
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
-        {loading ? null : sorted.length === 0 ? (
+        {loading ? (
+          <div aria-hidden="true" className="sv-favorites-content-reserve" />
+        ) : sorted.length === 0 ? (
           <motion.div
             className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -3738,7 +3752,7 @@ export default function FavoritesClient() {
               <motion.div
                 key={group.key}
                 ref={(node) => setGroupSectionRef(group.key, node)}
-                className="overflow-visible scroll-mt-[148px]"
+                className="overflow-visible scroll-mt-[148px] sv-deferred-section"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
@@ -3770,7 +3784,7 @@ export default function FavoritesClient() {
                         />
                         <div
                           key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                          className={getItemsGridClass(true)}
+                          className={`${getItemsGridClass(true)} sv-deferred-grid`}
                         >
                           {subgroup.items.map((item, idx) => (
                             <FavoriteCard
@@ -3793,7 +3807,7 @@ export default function FavoritesClient() {
                 ) : (
                   <div
                     key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                    className={getItemsGridClass(true)}
+                    className={`${getItemsGridClass(true)} sv-deferred-grid`}
                   >
                     {group.items.map((item, idx) => (
                       <FavoriteCard
@@ -3815,7 +3829,7 @@ export default function FavoritesClient() {
         ) : (
           <div
             key={`flat-grid-${viewMode}-${imageMode}`}
-            className={getItemsGridClass(false)}
+            className={`${getItemsGridClass(false)} sv-deferred-grid`}
           >
             {sorted.map((item, idx) => (
               <FavoriteCard

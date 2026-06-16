@@ -2133,7 +2133,7 @@ function Row({
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
-      className="relative group"
+      className="relative group sv-deferred-row"
     >
       {!hideTitle && (
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">

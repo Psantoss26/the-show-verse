@@ -1203,7 +1203,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   // ✅ TOP 10 SOLO MÓVIL (<768): backdrop completo + 1 por vista
   if (isTop10 && isMobile) {
     return (
-      <div className="relative group">
+      <div className="relative group sv-deferred-row">
         {/* Título para Top 10 móvil con diseño igual a escritorio */}
         <div className="mb-4 px-1 sm:px-0">
           <div className="flex items-center gap-2 mb-1.5">
@@ -1288,7 +1288,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
-      className="relative group"
+      className="relative group sv-deferred-row"
     >
       <motion.div
         initial="hidden"
