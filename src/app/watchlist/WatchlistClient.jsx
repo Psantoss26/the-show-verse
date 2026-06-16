@@ -23,12 +23,14 @@ import {
   ChevronUp,
   CheckCircle2,
   ArrowUpDown,
+  Grid2X2,
+  LayoutGrid,
+  List,
   Search,
   Star,
   X,
   Filter,
   SlidersHorizontal,
-  Layers,
   Layers3,
   MoreHorizontal,
   RotateCcw,
@@ -1425,25 +1427,6 @@ function SubGroupDivider({ title, count }) {
   );
 }
 
-function AllGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}
-
 function TvGlyph({ className = "" }) {
   return (
     <svg
@@ -1457,40 +1440,6 @@ function TvGlyph({ className = "" }) {
     >
       <rect x="2" y="7" width="20" height="15" rx="2" />
       <path d="m17 2-5 5-5-5" />
-    </svg>
-  );
-}
-
-function PosterGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <path d="M9 7h6M9 12h6" opacity="0.5" />
-    </svg>
-  );
-}
-
-function BackdropGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 15l5.5-5.5L12 13l3.5-3.5L21 15" opacity="0.5" />
     </svg>
   );
 }
@@ -3020,7 +2969,7 @@ export default function WatchlistClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <Layers className="w-4 h-4" />
+                        <List className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
@@ -3030,7 +2979,7 @@ export default function WatchlistClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <AllGlyph className="w-4 h-4" />
+                        <Grid2X2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("grid")}
@@ -3040,7 +2989,7 @@ export default function WatchlistClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <PosterGlyph className="w-4 h-4" />
+                        <LayoutGrid className="w-4 h-4" />
                       </button>
                     </div>
                     <button
@@ -3056,9 +3005,9 @@ export default function WatchlistClient() {
                       }`}
                     >
                       {imageMode === "poster" ? (
-                        <PosterGlyph className="w-4 h-4" />
+                        <Film className="w-4 h-4" />
                       ) : (
-                        <BackdropGlyph className="w-4 h-4" />
+                        <MonitorPlay className="w-4 h-4" />
                       )}
                     </button>
                   </div>
@@ -3240,7 +3189,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <Layers className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
@@ -3250,7 +3199,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <AllGlyph className="w-4 h-4" />
+                <Grid2X2 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
@@ -3260,7 +3209,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <PosterGlyph className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
             </div>
 
@@ -3273,7 +3222,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <PosterGlyph className="w-4 h-4" />
+                <Film className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setImageMode("backdrop")}
@@ -3283,7 +3232,7 @@ export default function WatchlistClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <BackdropGlyph className="w-4 h-4" />
+                <MonitorPlay className="w-4 h-4" />
               </button>
             </div>
           </div>

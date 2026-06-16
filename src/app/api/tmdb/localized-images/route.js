@@ -1,5 +1,6 @@
 // /api/tmdb/localized-images  (POST { type: "movie"|"tv", ids: number[], kind?: "backdrop"|"poster" })
 import { NextResponse } from 'next/server'
+import { pickBestBackdropForPreview } from '@/lib/details/tmdbImages'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -40,13 +41,12 @@ function pickBestByLangThenResolution(list, opts = {}) {
   return pickFrom(preferred) || pickFrom(withLanguage) || pickFrom(noLanguage)
 }
 
-// Backdrop: EN -> otros idiomas -> sin idioma. "null" solo como última alternativa.
+// Backdrop: mismo criterio que la vista previa de detalles.
 function pickLocalizedBackdrop(backdrops = []) {
-  const best = pickBestByLangThenResolution(backdrops, {
+  return pickBestBackdropForPreview(backdrops, {
     preferLangs: ['en', 'en-US'],
-    minWidth: 1280,
+    minWidth: 1200,
   })
-  return best?.file_path || null
 }
 
 // Poster: EN -> cualquier idioma, priorizando mayor área disponible (mismo criterio que Favoritos)

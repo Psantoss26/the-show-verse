@@ -27,8 +27,10 @@ import {
   ChevronUp,
   CheckCircle2,
   ArrowUpDown,
-  Layers,
+  Grid2X2,
+  LayoutGrid,
   Layers3,
+  List,
   Search,
   Star,
   X,
@@ -1390,25 +1392,6 @@ function SubGroupDivider({ title, count }) {
   );
 }
 
-function AllGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}
-
 function TvGlyph({ className = "" }) {
   return (
     <svg
@@ -1422,40 +1405,6 @@ function TvGlyph({ className = "" }) {
     >
       <rect x="2" y="7" width="20" height="15" rx="2" />
       <path d="m17 2-5 5-5-5" />
-    </svg>
-  );
-}
-
-function PosterGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <path d="M9 7h6M9 12h6" opacity="0.5" />
-    </svg>
-  );
-}
-
-function BackdropGlyph({ className = "" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 15l5.5-5.5L12 13l3.5-3.5L21 15" opacity="0.5" />
     </svg>
   );
 }
@@ -1819,6 +1768,7 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "list") {
     return (
       <motion.div
+        key={`favorite-list-${effectiveImageMode}`}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1869,6 +1819,7 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "compact") {
     return (
       <motion.div
+        key={`favorite-compact-${effectiveImageMode}`}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1989,10 +1940,16 @@ const FavoriteCard = memo(function FavoriteCard({
   // Grid mode
   return (
     <motion.div
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+      key={`favorite-grid-${effectiveImageMode}`}
+      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      transition={{
+        duration: 0.25,
+        delay: shouldAnimate ? animDelay : 0,
+        ease: [0.25, 0.1, 0.25, 1],
+      }}
+      layout
     >
       <Link href={href} className="block">
         <div
@@ -3429,7 +3386,7 @@ export default function FavoritesClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <Layers className="w-4 h-4" />
+                        <List className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
@@ -3439,7 +3396,7 @@ export default function FavoritesClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <AllGlyph className="w-4 h-4" />
+                        <Grid2X2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("grid")}
@@ -3449,7 +3406,7 @@ export default function FavoritesClient() {
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <PosterGlyph className="w-4 h-4" />
+                        <LayoutGrid className="w-4 h-4" />
                       </button>
                     </div>
                     <button
@@ -3465,9 +3422,9 @@ export default function FavoritesClient() {
                       }`}
                     >
                       {imageMode === "poster" ? (
-                        <PosterGlyph className="w-4 h-4" />
+                        <Film className="w-4 h-4" />
                       ) : (
-                        <BackdropGlyph className="w-4 h-4" />
+                        <MonitorPlay className="w-4 h-4" />
                       )}
                     </button>
                   </div>
@@ -3671,7 +3628,7 @@ export default function FavoritesClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <Layers className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
@@ -3681,7 +3638,7 @@ export default function FavoritesClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <AllGlyph className="w-4 h-4" />
+                <Grid2X2 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
@@ -3691,7 +3648,7 @@ export default function FavoritesClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <PosterGlyph className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
             </div>
 
@@ -3704,7 +3661,7 @@ export default function FavoritesClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <PosterGlyph className="w-4 h-4" />
+                <Film className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setImageMode("backdrop")}
@@ -3714,7 +3671,7 @@ export default function FavoritesClient() {
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <BackdropGlyph className="w-4 h-4" />
+                <MonitorPlay className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -3782,10 +3739,7 @@ export default function FavoritesClient() {
                           title={subgroup.label}
                           count={subgroup.items.length}
                         />
-                        <div
-                          key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                          className={getItemsGridClass(true)}
-                        >
+                        <div className={getItemsGridClass(true)}>
                           {subgroup.items.map((item, idx) => (
                             <FavoriteCard
                               key={getMediaKey(item)}
@@ -3805,10 +3759,7 @@ export default function FavoritesClient() {
                     ))}
                   </div>
                 ) : (
-                  <div
-                    key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                    className={getItemsGridClass(true)}
-                  >
+                  <div className={getItemsGridClass(true)}>
                     {group.items.map((item, idx) => (
                       <FavoriteCard
                         key={getMediaKey(item)}
@@ -3827,10 +3778,7 @@ export default function FavoritesClient() {
             ))}
           </div>
         ) : (
-          <div
-            key={`flat-grid-${viewMode}-${imageMode}`}
-            className={getItemsGridClass(false)}
-          >
+          <div className={getItemsGridClass(false)}>
             {sorted.map((item, idx) => (
               <FavoriteCard
                 key={getMediaKey(item)}
