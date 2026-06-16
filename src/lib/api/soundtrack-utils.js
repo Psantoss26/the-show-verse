@@ -184,6 +184,50 @@ export function hasLiteralTitlePhrase(text, title) {
   );
 }
 
+const TITLE_MATCH_DESCRIPTOR_TOKENS = new Set([
+  "album", "all", "banda", "complete", "film", "from", "inspired", "motion",
+  "movie", "music", "official", "original", "ost", "picture", "playlist",
+  "score", "season", "seasons", "series", "songs", "sonora", "soundtrack",
+  "soundtracks", "television", "temporada", "temporadas", "tv",
+]);
+
+const TITLE_MATCH_CONTEXTUAL_TOKENS = new Set([
+  "chapter", "episode", "part", "pt", "vol", "volume",
+]);
+
+export function hasStrictTitlePhrase(text, title, allTitles = []) {
+  const textTokens = tokens(text);
+  const titleTokens = tokens(title);
+  if (!textTokens.length || !titleTokens.length) return false;
+
+  const titleTokenSet = new Set((allTitles || []).flatMap(sigTokens));
+  const hasSoundtrackContext =
+    containsAny(text, SOUNDTRACK_WORDS) ||
+    textTokens.some((token) => TITLE_MATCH_DESCRIPTOR_TOKENS.has(token));
+
+  return textTokens.some((_, index) => {
+    const matches = titleTokens.every(
+      (token, offset) => textTokens[index + offset] === token,
+    );
+    if (!matches) return false;
+
+    const extraTokens = [
+      ...textTokens.slice(0, index),
+      ...textTokens.slice(index + titleTokens.length),
+    ];
+
+    return extraTokens.every((token) => {
+      if (!token) return true;
+      if (/^\d+$/.test(token)) return true;
+      if (GENERIC_WORDS.has(token)) return true;
+      if (titleTokenSet.has(token)) return true;
+      if (TITLE_MATCH_DESCRIPTOR_TOKENS.has(token)) return true;
+      if (TITLE_MATCH_CONTEXTUAL_TOKENS.has(token)) return hasSoundtrackContext;
+      return false;
+    });
+  });
+}
+
 export function albumNameMatchesAnyTitle(name, titles) {
   if (!name) return false;
   const nameNorm = norm(name);
@@ -192,7 +236,9 @@ export function albumNameMatchesAnyTitle(name, titles) {
 
     for (const titleVariant of titleComparisonVariants(title)) {
       for (const nameVariant of titleComparisonVariants(nameNorm)) {
-        if (hasLiteralTitlePhrase(nameVariant, titleVariant)) return true;
+        if (hasStrictTitlePhrase(nameVariant, titleVariant, titles)) {
+          return true;
+        }
       }
     }
 
@@ -200,7 +246,9 @@ export function albumNameMatchesAnyTitle(name, titles) {
     if (short && short !== title) {
       for (const titleVariant of titleComparisonVariants(short)) {
         for (const nameVariant of titleComparisonVariants(nameNorm)) {
-          if (hasLiteralTitlePhrase(nameVariant, titleVariant)) return true;
+          if (hasStrictTitlePhrase(nameVariant, titleVariant, titles)) {
+            return true;
+          }
         }
       }
     }
@@ -213,9 +261,36 @@ export function hasDisallowedTitleSuffixForName(name, releaseDate, ctx) {
   const title = primarySearchTitle(ctx);
   if (!title || /\d/.test(norm(title))) return false;
 
+  const text = norm(name);
+  const hasSoundtrackContext =
+    containsAny(text, SOUNDTRACK_WORDS) ||
+    /original|official|motion picture|movie|film|score|ost|banda sonora|music from/.test(
+      text,
+    );
+
   const releaseYear = getYear(releaseDate);
   if (ctx.year && releaseYear && Math.abs(releaseYear - Number(ctx.year)) <= 1) {
-    return false;
+    const titleVariants = titleComparisonVariants(title);
+    const albumTokens = tokens(name);
+
+    const hasBareVolumeSuffix = titleVariants.some((titleVariant) => {
+      const titleTokens = tokens(titleVariant);
+      if (!titleTokens.length) return false;
+
+      return albumTokens.some((_, index) => {
+        const matches = titleTokens.every(
+          (token, offset) => albumTokens[index + offset] === token,
+        );
+        if (!matches) return false;
+
+        const nextToken = albumTokens[index + titleTokens.length] ?? "";
+        return /^(vol|volume|part|pt|chapter|episode|season|temporada)$/.test(
+          nextToken,
+        );
+      });
+    });
+
+    return hasBareVolumeSuffix && !hasSoundtrackContext;
   }
 
   const titleVariants = titleComparisonVariants(title);
@@ -233,6 +308,11 @@ export function hasDisallowedTitleSuffixForName(name, releaseDate, ctx) {
 
       const nextToken = albumTokens[index + titleTokens.length] ?? "";
       if (!nextToken) return false;
+      if (
+        /^(vol|volume|part|pt|chapter|episode|season|temporada)$/.test(nextToken)
+      ) {
+        return !hasSoundtrackContext;
+      }
       return /^\d+$/.test(nextToken) || /^[ivx]+$/.test(nextToken);
     });
   });
@@ -400,8 +480,8 @@ export function scoreSoundtrackAlbumCandidate(candidate, ctx) {
   if (/motion picture|television|series|movie|film/.test(text)) score += 10;
   if (hasShortTitle && !hasSoundtrackContext) score -= 100;
   if (ctx.mediaType === "movie" && /game|video game|manager|simulator/.test(text) && !/movie|film|motion picture/.test(text)) score -= 120;
-  if (ctx.mediaType === "tv" && /movie|film|motion picture/.test(text) && !/series|television|tv/.test(text)) score -= 12;
-  if (ctx.mediaType === "movie" && /series|television|tv/.test(text) && !/movie|film|motion picture/.test(text)) score -= 12;
+  if (ctx.mediaType === "tv" && /movie|film|motion picture/.test(text) && !/series|television|tv|season|temporada/.test(text)) score -= 220;
+  if (ctx.mediaType === "movie" && /series|television|tv|season|temporada/.test(text) && !/movie|film|motion picture/.test(text)) score -= 120;
 
   if (totalTracks >= 4 && totalTracks <= 80) score += 8;
   if (totalTracks < 3) score -= 100;
