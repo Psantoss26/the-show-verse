@@ -210,18 +210,29 @@ function imgUrl(path, size = "w500") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : "";
 }
 
-function PosterImage({ item, mode = "poster", title }) {
+function dashboardImageKey(item) {
+  return `${resolveType(item)}:${item?.id}`;
+}
+
+function PosterImage({ item, mode = "poster", title, previewBackdropPath }) {
   const [failed, setFailed] = useState(false);
   const poster = item?.poster_path;
-  const backdrop = item?.backdrop_path;
+  const backdrop = previewBackdropPath || item?.backdrop_path;
+  const preferredPath =
+    mode === "backdrop" ? backdrop || poster : poster || backdrop;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [mode, preferredPath]);
+
   const path =
     mode === "backdrop"
       ? failed
         ? poster
-        : backdrop || poster
+        : preferredPath
       : failed
         ? backdrop
-        : poster || backdrop;
+        : preferredPath;
 
   if (!path) {
     return (
@@ -385,6 +396,7 @@ function SectionCard({
   totalItems = 0,
   viewMode,
   imageMode = "poster",
+  previewBackdropPath,
 }) {
   const type = resolveType(item);
   const title = getTitle(item);
@@ -421,7 +433,12 @@ function SectionCard({
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
-              <PosterImage item={item} mode="backdrop" title={title} />
+              <PosterImage
+                item={item}
+                mode="backdrop"
+                title={title}
+                previewBackdropPath={previewBackdropPath}
+              />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               <h3 className="text-white font-bold text-base leading-tight truncate">
@@ -485,7 +502,12 @@ function SectionCard({
               borderColor: "rgba(255, 255, 255, 0.05)",
             }}
           >
-            <PosterImage item={item} mode={effectiveImageMode} title={title} />
+            <PosterImage
+              item={item}
+              mode={effectiveImageMode}
+              title={title}
+              previewBackdropPath={previewBackdropPath}
+            />
             <div
               className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
                 type === "movie"
@@ -552,7 +574,12 @@ function SectionCard({
           className={`group relative ${aspect} overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-all lg:hover:shadow-amber-900/20`}
         >
           <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-amber-500/40 transition-colors duration-300" />
-          <PosterImage item={item} mode={effectiveImageMode} title={title} />
+          <PosterImage
+            item={item}
+            mode={effectiveImageMode}
+            title={title}
+            previewBackdropPath={previewBackdropPath}
+          />
 
           <div
             className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -659,6 +686,7 @@ export default function DashboardSectionClient({ section }) {
   const [viewMode, setViewMode] = useState("compact");
   const [imageMode, setImageMode] = useState("poster");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState({});
 
   useEffect(() => {
     document.title = formatPageTitle(data?.title || "Dashboard");
@@ -710,7 +738,70 @@ export default function DashboardSectionClient({ section }) {
     };
   }, [section]);
 
-  const rawItems = Array.isArray(data?.items) ? data.items : [];
+  const rawItems = useMemo(
+    () => (Array.isArray(data?.items) ? data.items : []),
+    [data?.items],
+  );
+
+  useEffect(() => {
+    const shouldLoadPreviewBackdrops =
+      viewMode === "list" || imageMode === "backdrop";
+
+    if (!shouldLoadPreviewBackdrops || rawItems.length === 0) {
+      setPreviewBackdropsByItem((current) =>
+        Object.keys(current).length ? {} : current,
+      );
+      return;
+    }
+
+    let cancelled = false;
+    const idsByType = rawItems.reduce(
+      (acc, item) => {
+        const id = Number(item?.id);
+        const type = resolveType(item);
+        if (!Number.isFinite(id) || (type !== "movie" && type !== "tv")) {
+          return acc;
+        }
+        acc[type].add(id);
+        return acc;
+      },
+      { movie: new Set(), tv: new Set() },
+    );
+
+    const loadPreviewBackdrops = async () => {
+      const entries = [];
+      await Promise.all(
+        Object.entries(idsByType).map(async ([type, idsSet]) => {
+          const ids = Array.from(idsSet);
+          if (!ids.length) return;
+
+          const response = await fetch("/api/tmdb/localized-images", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type, ids, kind: "backdrop" }),
+          });
+          if (!response.ok) return;
+
+          const json = await response.json().catch(() => null);
+          for (const [id, filePath] of Object.entries(json?.map || {})) {
+            if (filePath) entries.push([`${type}:${id}`, filePath]);
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setPreviewBackdropsByItem(Object.fromEntries(entries));
+      }
+    };
+
+    loadPreviewBackdrops().catch(() => {
+      if (!cancelled) setPreviewBackdropsByItem({});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageMode, rawItems, viewMode]);
 
   const filtered = useMemo(() => {
     const q = normText(deferredQuery);
@@ -1256,6 +1347,9 @@ export default function DashboardSectionClient({ section }) {
                       totalItems={group.items.length}
                       viewMode={viewMode}
                       imageMode={imageMode}
+                      previewBackdropPath={
+                        previewBackdropsByItem[dashboardImageKey(item)]
+                      }
                     />
                   ))}
                 </div>
@@ -1272,6 +1366,9 @@ export default function DashboardSectionClient({ section }) {
                 totalItems={sorted.length}
                 viewMode={viewMode}
                 imageMode={imageMode}
+                previewBackdropPath={
+                  previewBackdropsByItem[dashboardImageKey(item)]
+                }
               />
             ))}
           </div>
