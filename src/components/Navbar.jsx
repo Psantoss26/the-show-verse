@@ -274,6 +274,8 @@ function SearchBar({ onResultClick, isMobile = false }) {
                             : "/default-poster.png"
                         }
                         alt={item.title || item.name || "Resultado"}
+                        width={48}
+                        height={64}
                         className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
                       />
                     </div>
@@ -507,6 +509,8 @@ export default function Navbar() {
                 <img
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
+                  width={120}
+                  height={48}
                   className="h-full w-auto object-contain scale-[2.5] origin-left"
                 />
               </div>
@@ -633,6 +637,8 @@ export default function Navbar() {
                 <img
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
+                  width={140}
+                  height={40}
                   className="h-full w-auto object-contain scale-[2.8] origin-center"
                 />
               </div>
@@ -736,6 +742,8 @@ export default function Navbar() {
                   <img
                     src="/logo-final-titulo-sinFondo.png"
                     alt="The Show Verse"
+                    width={248}
+                    height={112}
                     className="h-full w-full object-contain object-left"
                   />
                 </Link>

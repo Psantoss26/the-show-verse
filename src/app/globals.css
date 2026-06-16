@@ -66,6 +66,73 @@ body {
   .soundtrack-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.26);
   }
+
+  .sv-stable-auth-shell {
+    min-height: calc(100dvh - 4rem);
+  }
+
+  .sv-favorites-content-reserve {
+    min-height: min(72vh, 760px);
+  }
+
+  .sv-favorites-stats-reserve {
+    min-height: 5.75rem;
+  }
+
+  .sv-favorites-stat-skeleton {
+    min-height: 5.75rem;
+  }
+}
+
+@supports (content-visibility: auto) {
+  .sv-deferred-row,
+  .sv-deferred-section,
+  .sv-deferred-grid,
+  .sv-details-sections > section {
+    content-visibility: auto;
+  }
+
+  .sv-deferred-row {
+    contain-intrinsic-size: auto none auto 410px;
+  }
+
+  .sv-deferred-section {
+    contain-intrinsic-size: auto none auto 760px;
+  }
+
+  .sv-deferred-grid {
+    contain-intrinsic-size: auto none auto 900px;
+  }
+
+  .sv-details-sections > section {
+    contain-intrinsic-size: auto none auto 620px;
+  }
+}
+
+@supports not (content-visibility: auto) {
+  .sv-deferred-row,
+  .sv-deferred-section,
+  .sv-deferred-grid,
+  .sv-details-sections > section {
+    contain: layout style paint;
+  }
+}
+
+@media (max-width: 767px) {
+  @supports (content-visibility: auto) {
+    .sv-deferred-row {
+      contain-intrinsic-size: auto none auto 300px;
+    }
+
+    .sv-deferred-section,
+    .sv-deferred-grid {
+      contain-intrinsic-size: auto none auto 680px;
+    }
+
+    .sv-details-sections > section {
+      contain-intrinsic-size: auto none auto 540px;
+    }
+  }
 }
 
 .react-day-picker {
