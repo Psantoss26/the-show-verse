@@ -2869,18 +2869,27 @@ export default function DetailsClient({
     asTmdbPath(data?.backdrop_path) ||
     null;
 
-  // Mejor poster neutro (sin texto/idioma) para uso en movil como fondo
+  // Mejor poster neutro (sin idioma) para uso en movil como fondo.
+  // En series excluimos data.poster_path ("main") porque llega sin metadatos
+  // de idioma y puede ser un poster localizado.
   const mobileNeutralPosterPath = useMemo(() => {
+    const sourcePosters = imagesState?.posters || [];
+    const neutralPosters =
+      endpointType === "tv"
+        ? sourcePosters.filter(
+            (p) => p?.file_path && p.from !== "main" && !p?.iso_639_1,
+          )
+        : sourcePosters;
+
     const best =
-      pickBestNeutralPosterByResVotes(imagesState?.posters || [])?.file_path ||
-      null;
+      pickBestNeutralPosterByResVotes(neutralPosters)?.file_path || null;
     if (best) return best;
     // Fallback: primera imagen sin idioma si no hay metadata de tamanos/votos
     return (
-      (imagesState?.posters || []).find((p) => p?.file_path && !p?.iso_639_1)
-        ?.file_path || null
+      neutralPosters.find((p) => p?.file_path && !p?.iso_639_1)?.file_path ||
+      null
     );
-  }, [imagesState?.posters]);
+  }, [endpointType, imagesState?.posters]);
 
   // Selecciona la imagen de fondo del hero segun el viewport:
   // - Desktop: usa el backdrop horizontal
@@ -2891,14 +2900,17 @@ export default function DetailsClient({
     // Desktop: usa el backdrop horizontal seleccionado
     const desktop = displayBackdropPath;
 
-    // Movil: prioriza poster sin idioma, pero respeta seleccion manual del usuario
+    // Movil series: usar solo poster con idioma null. Si no existe, no caer
+    // al poster base porque puede venir localizado.
     const mobile =
-      selectedBackgroundPath || // Si el usuario eligio un fondo manual, respetarlo
-      mobileNeutralPosterPath ||
-      basePosterPath ||
-      data.profile_path ||
-      desktop ||
-      null;
+      endpointType === "tv"
+        ? mobileNeutralPosterPath
+        : selectedBackgroundPath || // En peliculas respetamos la seleccion manual
+          mobileNeutralPosterPath ||
+          basePosterPath ||
+          data.profile_path ||
+          desktop ||
+          null;
 
     return isMobileViewport ? mobile : desktop;
   })();
