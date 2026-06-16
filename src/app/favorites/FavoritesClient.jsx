@@ -132,6 +132,8 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVORITES_CACHE_KEY = "showverse:favorites:items:v1";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
+const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v1";
+const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PLEX_LIBRARY_INDEX_CACHE_KEY = "showverse:plex-library-index:v1";
@@ -737,18 +739,88 @@ async function getBestPosterCached(type, id) {
   return p;
 }
 
-function SmartPoster({ item, title, mode = "poster" }) {
+function readImageChoiceCache() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(IMAGE_CHOICE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function getStoredImageChoice(kind, key) {
+  const cache = readImageChoiceCache();
+  const entry = cache[`${kind}:${key}`];
+  if (!entry?.path) return null;
+  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS) return null;
+  return entry.path;
+}
+
+function writeImageChoice(kind, key, path) {
+  if (typeof window === "undefined" || !path) return;
+  try {
+    const cache = readImageChoiceCache();
+    cache[`${kind}:${key}`] = { path, t: Date.now() };
+    window.localStorage.setItem(IMAGE_CHOICE_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function getCachedSmartPosterUrl(item, mode = "poster") {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
+  const key = `${type}:${id}`;
 
-  const [src, setSrc] = useState(null);
-  const [ready, setReady] = useState(false);
+  if (mode === "backdrop") {
+    const cachedBackdrop = backdropChoiceCache.has(key)
+      ? backdropChoiceCache.get(key)
+      : null;
+    const storedBackdrop = getStoredImageChoice("backdrop", key);
+    const path = cachedBackdrop || storedBackdrop || null;
+    return path ? buildImg(path, "w1280") : null;
+  }
+
+  const preferredPoster = getPosterPreference(type, id);
+  const cachedPoster = posterChoiceCache.has(key)
+    ? posterChoiceCache.get(key)
+    : null;
+  const storedPoster = getStoredImageChoice("poster", key);
+  const path = preferredPoster || cachedPoster || storedPoster || null;
+  return path ? buildImg(path, "w500") : null;
+}
+
+function SmartPoster({
+  item,
+  title,
+  mode = "poster",
+  eager = false,
+  priority = false,
+}) {
+  const type = item.media_type || (item.title ? "movie" : "tv");
+  const id = item.id;
+  const imageKey = `${type}:${id}`;
+  const initialSrc = getCachedSmartPosterUrl(item, mode);
+
+  const [src, setSrc] = useState(initialSrc);
+  const [ready, setReady] = useState(Boolean(initialSrc));
 
   useEffect(() => {
     let abort = false;
 
-    setSrc(null);
-    setReady(false);
+    const cachedUrl = getCachedSmartPosterUrl(item, mode);
+    if (cachedUrl) {
+      setSrc(cachedUrl);
+      setReady(true);
+      return () => {
+        abort = true;
+      };
+    } else {
+      setSrc(null);
+      setReady(false);
+    }
 
     const load = async () => {
       if (mode === "backdrop") {
@@ -758,6 +830,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
         if (url) await preloadImage(url);
         if (!abort) {
+          writeImageChoice("backdrop", imageKey, finalPath);
           setSrc(url);
           setReady(!!url);
         }
@@ -769,6 +842,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         const url = buildImg(pref, "w500");
         await preloadImage(url);
         if (!abort) {
+          writeImageChoice("poster", imageKey, pref);
           setSrc(url);
           setReady(true);
         }
@@ -780,6 +854,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
       if (!abort) {
+        writeImageChoice("poster", imageKey, finalPath);
         setSrc(url);
         setReady(!!url);
       }
@@ -789,7 +864,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, item.poster_path, item.backdrop_path]);
+  }, [mode, type, id, imageKey, item.poster_path, item.backdrop_path, item]);
 
   return (
     <div className="relative w-full h-full">
@@ -805,7 +880,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
         <img
           src={src}
           alt={title}
-          loading="lazy"
+          loading={eager || priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
             ready ? "opacity-100" : "opacity-0"
@@ -1659,6 +1735,9 @@ const FavoriteCard = memo(function FavoriteCard({
   imageMode = "poster",
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
+  animateEntry = true,
+  eagerImage = false,
+  prioritizeImage = false,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1768,12 +1847,16 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "list") {
     return (
       <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        initial={
+          animateEntry && shouldAnimate
+            ? { opacity: 0, y: 10, scale: 0.95 }
+            : false
+        }
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{
           duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
+          delay: animateEntry && shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout
@@ -1788,6 +1871,8 @@ const FavoriteCard = memo(function FavoriteCard({
                 item={item}
                 title={title}
                 mode={effectiveImageMode}
+                eager={eagerImage}
+                priority={prioritizeImage}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1818,12 +1903,16 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        initial={
+          animateEntry && shouldAnimate
+            ? { opacity: 0, y: 10, scale: 0.95 }
+            : false
+        }
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{
           duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
+          delay: animateEntry && shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout
@@ -1845,7 +1934,13 @@ const FavoriteCard = memo(function FavoriteCard({
             }}
             onMouseEnter={handleHover}
           >
-            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            <SmartPoster
+              item={item}
+              title={title}
+              mode={effectiveImageMode}
+              eager={eagerImage}
+              priority={prioritizeImage}
+            />
             <div
               className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
                 type === "movie"
@@ -1938,10 +2033,15 @@ const FavoriteCard = memo(function FavoriteCard({
   // Grid mode
   return (
     <motion.div
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
+      initial={
+        animateEntry && shouldAnimate ? { opacity: 0, scale: 0.95 } : false
+      }
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+      transition={{
+        duration: 0.2,
+        delay: animateEntry && shouldAnimate ? animDelay : 0,
+      }}
     >
       <Link href={href} className="block">
         <div
@@ -1950,7 +2050,13 @@ const FavoriteCard = memo(function FavoriteCard({
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
           <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-red-500/40 transition-colors duration-300" />
-          <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          <SmartPoster
+            item={item}
+            title={title}
+            mode={effectiveImageMode}
+            eager={eagerImage}
+            priority={prioritizeImage}
+          />
           <div
             className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
               type === "movie"
@@ -2048,6 +2154,8 @@ export default function FavoritesClient() {
   const [ratedItems, setRatedItems] = useState(
     () => readFavoritesCache()?.ratedItems || [],
   );
+  const [suppressCachedEntryAnimations, setSuppressCachedEntryAnimations] =
+    useState(() => Boolean(readFavoritesCache()?.items?.length));
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
@@ -2107,6 +2215,14 @@ export default function FavoritesClient() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
+
+  useEffect(() => {
+    if (!suppressCachedEntryAnimations) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      setSuppressCachedEntryAnimations(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [suppressCachedEntryAnimations]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -3702,9 +3818,17 @@ export default function FavoritesClient() {
                 key={group.key}
                 ref={(node) => setGroupSectionRef(group.key, node)}
                 className="overflow-visible scroll-mt-[148px]"
-                initial={{ opacity: 0, y: 20 }}
+                initial={
+                  suppressCachedEntryAnimations
+                    ? { opacity: 0.96, y: 6 }
+                    : { opacity: 0, y: 20 }
+                }
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                transition={{
+                  duration: suppressCachedEntryAnimations ? 0.18 : 0.4,
+                  delay: suppressCachedEntryAnimations ? 0 : groupIndex * 0.1,
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
               >
                 <GroupDivider
                   title={group.label}
@@ -3747,6 +3871,13 @@ export default function FavoritesClient() {
                               traktScore={traktScores.get(
                                 getScoreItemKey(item),
                               )}
+                              animateEntry={!suppressCachedEntryAnimations}
+                              eagerImage={
+                                suppressCachedEntryAnimations && idx < 40
+                              }
+                              prioritizeImage={
+                                suppressCachedEntryAnimations && idx < 2
+                              }
                             />
                           ))}
                         </div>
@@ -3768,6 +3899,11 @@ export default function FavoritesClient() {
                         imageMode={imageMode}
                         imdbScore={imdbScores.get(getScoreItemKey(item))}
                         traktScore={traktScores.get(getScoreItemKey(item))}
+                        animateEntry={!suppressCachedEntryAnimations}
+                        eagerImage={suppressCachedEntryAnimations && idx < 40}
+                        prioritizeImage={
+                          suppressCachedEntryAnimations && idx < 2
+                        }
                       />
                     ))}
                   </div>
@@ -3776,9 +3912,16 @@ export default function FavoritesClient() {
             ))}
           </div>
         ) : (
-          <div
+          <motion.div
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
+            initial={
+              suppressCachedEntryAnimations
+                ? { opacity: 0.96, y: 6 }
+                : false
+            }
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
           >
             {sorted.map((item, idx) => (
               <FavoriteCard
@@ -3790,9 +3933,12 @@ export default function FavoritesClient() {
                 imageMode={imageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
                 traktScore={traktScores.get(getScoreItemKey(item))}
+                animateEntry={!suppressCachedEntryAnimations}
+                eagerImage={suppressCachedEntryAnimations && idx < 40}
+                prioritizeImage={suppressCachedEntryAnimations && idx < 2}
               />
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
