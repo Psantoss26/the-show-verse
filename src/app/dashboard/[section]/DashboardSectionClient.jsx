@@ -214,19 +214,30 @@ function dashboardImageKey(item) {
   return `${resolveType(item)}:${item?.id}`;
 }
 
-function PosterImage({ item, mode = "poster", title, previewBackdropPath }) {
+function PosterImage({
+  item,
+  mode = "poster",
+  title,
+  previewBackdropPath,
+  backdropPending = false,
+}) {
   const [failed, setFailed] = useState(false);
   const poster = item?.poster_path;
-  const backdrop = previewBackdropPath || item?.backdrop_path;
+  const wantsBackdrop = mode === "backdrop";
+  const backdrop = wantsBackdrop
+    ? previewBackdropPath
+    : previewBackdropPath || item?.backdrop_path;
   const preferredPath =
-    mode === "backdrop" ? backdrop || poster : poster || backdrop;
+    wantsBackdrop
+      ? backdrop || (!backdropPending ? poster : null)
+      : poster || backdrop;
 
   useEffect(() => {
     setFailed(false);
-  }, [mode, preferredPath]);
+  }, [backdropPending, mode, preferredPath]);
 
   const path =
-    mode === "backdrop"
+    wantsBackdrop
       ? failed
         ? poster
         : preferredPath
@@ -397,6 +408,7 @@ function SectionCard({
   viewMode,
   imageMode = "poster",
   previewBackdropPath,
+  backdropPending = false,
 }) {
   const type = resolveType(item);
   const title = getTitle(item);
@@ -438,6 +450,7 @@ function SectionCard({
                 mode="backdrop"
                 title={title}
                 previewBackdropPath={previewBackdropPath}
+                backdropPending={backdropPending}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -507,6 +520,7 @@ function SectionCard({
               mode={effectiveImageMode}
               title={title}
               previewBackdropPath={previewBackdropPath}
+              backdropPending={backdropPending}
             />
             <div
               className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -579,6 +593,7 @@ function SectionCard({
             mode={effectiveImageMode}
             title={title}
             previewBackdropPath={previewBackdropPath}
+            backdropPending={backdropPending}
           />
 
           <div
@@ -687,6 +702,7 @@ export default function DashboardSectionClient({ section }) {
   const [imageMode, setImageMode] = useState("poster");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState({});
+  const [previewBackdropsReady, setPreviewBackdropsReady] = useState(false);
 
   useEffect(() => {
     document.title = formatPageTitle(data?.title || "Dashboard");
@@ -751,10 +767,12 @@ export default function DashboardSectionClient({ section }) {
       setPreviewBackdropsByItem((current) =>
         Object.keys(current).length ? {} : current,
       );
+      setPreviewBackdropsReady(true);
       return;
     }
 
     let cancelled = false;
+    setPreviewBackdropsReady(false);
     const idsByType = rawItems.reduce(
       (acc, item) => {
         const id = Number(item?.id);
@@ -775,27 +793,44 @@ export default function DashboardSectionClient({ section }) {
           const ids = Array.from(idsSet);
           if (!ids.length) return;
 
-          const response = await fetch("/api/tmdb/localized-images", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type, ids, kind: "backdrop" }),
-          });
-          if (!response.ok) return;
+          let response = null;
+          try {
+            response = await fetch("/api/tmdb/localized-images", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type, ids, kind: "backdrop" }),
+            });
+          } catch {
+            response = null;
+          }
+
+          if (!response?.ok) {
+            for (const id of ids) entries.push([`${type}:${id}`, null]);
+            return;
+          }
 
           const json = await response.json().catch(() => null);
-          for (const [id, filePath] of Object.entries(json?.map || {})) {
-            if (filePath) entries.push([`${type}:${id}`, filePath]);
+          const map = json?.map || {};
+          for (const id of ids) {
+            entries.push([`${type}:${id}`, map[id] || null]);
           }
         }),
       );
 
       if (!cancelled) {
-        setPreviewBackdropsByItem(Object.fromEntries(entries));
+        setPreviewBackdropsByItem((current) => ({
+          ...current,
+          ...Object.fromEntries(entries),
+        }));
+        setPreviewBackdropsReady(true);
       }
     };
 
     loadPreviewBackdrops().catch(() => {
-      if (!cancelled) setPreviewBackdropsByItem({});
+      if (!cancelled) {
+        setPreviewBackdropsByItem({});
+        setPreviewBackdropsReady(true);
+      }
     });
 
     return () => {
@@ -846,6 +881,19 @@ export default function DashboardSectionClient({ section }) {
     }
     return arr;
   }, [filtered, sortBy, rawItems]);
+
+  const getPreviewBackdropPath = useCallback(
+    (item) => previewBackdropsByItem[dashboardImageKey(item)],
+    [previewBackdropsByItem],
+  );
+
+  const isPreviewBackdropPending = useCallback(
+    (item) =>
+      (viewMode === "list" || imageMode === "backdrop") &&
+      !previewBackdropsReady &&
+      getPreviewBackdropPath(item) === undefined,
+    [getPreviewBackdropPath, imageMode, previewBackdropsReady, viewMode],
+  );
 
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
@@ -1356,9 +1404,8 @@ export default function DashboardSectionClient({ section }) {
                       totalItems={group.items.length}
                       viewMode={viewMode}
                       imageMode={imageMode}
-                      previewBackdropPath={
-                        previewBackdropsByItem[dashboardImageKey(item)]
-                      }
+                      previewBackdropPath={getPreviewBackdropPath(item)}
+                      backdropPending={isPreviewBackdropPending(item)}
                     />
                   ))}
                 </div>
@@ -1378,9 +1425,8 @@ export default function DashboardSectionClient({ section }) {
                 totalItems={sorted.length}
                 viewMode={viewMode}
                 imageMode={imageMode}
-                previewBackdropPath={
-                  previewBackdropsByItem[dashboardImageKey(item)]
-                }
+                previewBackdropPath={getPreviewBackdropPath(item)}
+                backdropPending={isPreviewBackdropPending(item)}
               />
             ))}
           </div>
