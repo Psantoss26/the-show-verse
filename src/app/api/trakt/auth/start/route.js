@@ -17,7 +17,7 @@ function cleanUrl(s) {
 
 async function originFromRequest(req) {
   // ✅ Forzar dominio estable (RECOMENDADO)
-  // En Vercel pon: TRAKT_APP_ORIGIN=https://the-show-verse.vercel.app
+  // En Vercel pon: TRAKT_APP_ORIGIN=https://theshowverse.com
   const forced =
     process.env.TRAKT_APP_ORIGIN ||
     process.env.APP_URL;

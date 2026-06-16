@@ -82,7 +82,7 @@ const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v45";
+const CACHE_VERSION = "soundtrack-ranking-v47";
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -399,6 +399,22 @@ const TITLE_MATCH_CONTEXTUAL_TOKENS = new Set([
   "chapter", "episode", "part", "pt", "vol", "volume",
 ]);
 
+function hasStrongCanonicalTitleContext(text) {
+  return (
+    /music from .*motion picture/.test(text) ||
+    /music from .*film/.test(text) ||
+    /music from .*movie/.test(text) ||
+    /music from .*series/.test(text) ||
+    /music from .*tv/.test(text) ||
+    /music from .*television/.test(text) ||
+    /original motion picture/.test(text) ||
+    /motion picture soundtrack/.test(text) ||
+    /original soundtrack/.test(text) ||
+    /official .*soundtrack/.test(text) ||
+    /soundtrack oficial|banda sonora oficial/.test(text)
+  );
+}
+
 function hasStrictTitlePhrase(text, title, allTitles = []) {
   const textTokens = tokens(text);
   const titleTokens = tokens(title);
@@ -408,6 +424,7 @@ function hasStrictTitlePhrase(text, title, allTitles = []) {
   const hasSoundtrackContext =
     containsAny(text, SOUNDTRACK_WORDS) ||
     textTokens.some((token) => TITLE_MATCH_DESCRIPTOR_TOKENS.has(token));
+  const strongCanonicalContext = hasStrongCanonicalTitleContext(text);
 
   return textTokens.some((_, index) => {
     const matches = titleTokens.every(
@@ -427,9 +444,23 @@ function hasStrictTitlePhrase(text, title, allTitles = []) {
       if (titleTokenSet.has(token)) return true;
       if (TITLE_MATCH_DESCRIPTOR_TOKENS.has(token)) return true;
       if (TITLE_MATCH_CONTEXTUAL_TOKENS.has(token)) return hasSoundtrackContext;
+      if (strongCanonicalContext && !/game|karaoke|tribute|cover/.test(token)) {
+        return true;
+      }
       return false;
     });
   });
+}
+
+function hasStrongCanonicalTitleOverlap(text, title) {
+  if (!hasStrongCanonicalTitleContext(text)) return false;
+
+  const titleTokens = sigTokens(title);
+  if (titleTokens.length < 3) return false;
+
+  const textTokenSet = new Set(tokens(text));
+  const hits = titleTokens.filter((token) => textTokenSet.has(token)).length;
+  return hits >= 3 && hits / titleTokens.length >= 0.75;
 }
 
 function hasDisallowedTitleSuffix(album, ctx) {
@@ -503,7 +534,10 @@ function albumMatchesTitle(album, ctx) {
 
   for (const titleVariant of titleComparisonVariants(title)) {
     for (const nameVariant of titleComparisonVariants(name)) {
-      if (hasStrictTitlePhrase(nameVariant, titleVariant, allTitles)) {
+      if (
+        hasStrictTitlePhrase(nameVariant, titleVariant, allTitles) ||
+        hasStrongCanonicalTitleOverlap(nameVariant, titleVariant)
+      ) {
         return true;
       }
     }
@@ -520,7 +554,12 @@ function albumNameMatchesAnyTitle(name, titles) {
     // Intentar coincidencia con el título completo
     for (const tv of titleComparisonVariants(t)) {
       for (const nv of titleComparisonVariants(nameNorm)) {
-        if (hasStrictTitlePhrase(nv, tv, titles)) return true;
+        if (
+          hasStrictTitlePhrase(nv, tv, titles) ||
+          hasStrongCanonicalTitleOverlap(nv, tv)
+        ) {
+          return true;
+        }
       }
     }
     // Intentar con versión truncada antes de ":" para títulos como
@@ -529,7 +568,12 @@ function albumNameMatchesAnyTitle(name, titles) {
     if (short && short !== t) {
       for (const tv of titleComparisonVariants(short)) {
         for (const nv of titleComparisonVariants(nameNorm)) {
-          if (hasStrictTitlePhrase(nv, tv, titles)) return true;
+          if (
+            hasStrictTitlePhrase(nv, tv, titles) ||
+            hasStrongCanonicalTitleOverlap(nv, tv)
+          ) {
+            return true;
+          }
         }
       }
     }
@@ -745,15 +789,6 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
     isViableTitleOnlySameYearAlbum(album, ctx),
   );
 
-  // Un álbum cuyo nombre es solo el título de la película/serie puede ser un
-  // falso positivo. Solo lo aceptamos temprano si tiene señales de soundtrack.
-  const credibleExactTitleSameYear = exactTitleSameYear.filter((album) =>
-    isCredibleFirstExactTitleAlbum(album, ctx),
-  );
-  if (credibleExactTitleSameYear.length) {
-    return credibleExactTitleSameYear;
-  }
-
   const canonical = titleMatches.filter((album) =>
     isPriorityMotionPictureAlbum(album) || isPrioritySeriesAlbum(album, ctx),
   );
@@ -773,6 +808,15 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
 
   if (canonicalSameYear.length) {
     return canonicalSameYear;
+  }
+
+  // Un álbum cuyo nombre es solo el título de la película/serie puede ser un
+  // falso positivo. Solo lo aceptamos si no hay álbum canónico del mismo año.
+  const credibleExactTitleSameYear = exactTitleSameYear.filter((album) =>
+    isCredibleFirstExactTitleAlbum(album, ctx),
+  );
+  if (credibleExactTitleSameYear.length) {
+    return credibleExactTitleSameYear;
   }
 
   if (

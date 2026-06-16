@@ -12,7 +12,7 @@ export async function GET() {
       traktClientId: Boolean(process.env.TRAKT_CLIENT_ID || process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID),
       traktClientSecret: Boolean(process.env.TRAKT_CLIENT_SECRET),
       plex: Boolean(process.env.PLEX_TOKEN),
-      ollama: Boolean(process.env.OLLAMA_BASE_URL),
+      ai: Boolean(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
     },
     timestamp: new Date().toISOString(),
   });

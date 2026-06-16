@@ -1,5 +1,0 @@
-language: node_js
-before_install:
-  - npm install dredd@14.1.0 --global
-before_script:
-  - dredd
