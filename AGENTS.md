@@ -17,3 +17,8 @@ npx -y modern-web-guidance@latest retrieve "<guide-id>"
 Project Baseline target: Baseline 2024.
 
 Use modern platform features when they meet this target. For newer or limited-availability features, prefer progressive enhancement and feature detection, and avoid adding polyfills or dependencies unless the benefit is clear for this app.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
