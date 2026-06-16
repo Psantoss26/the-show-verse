@@ -81,7 +81,7 @@ const MAX_SPOTIFY_PLAYLISTS = 1;
 const SPOTIFY_PREVIEW_RESOLVE_LIMIT = 12;
 const SEARCH_LIMIT = 10;
 const MIN_PREVIEW_TRACKS_BEFORE_FALLBACK = 8;
-const CACHE_VERSION = "soundtrack-ranking-v39";
+const CACHE_VERSION = "soundtrack-ranking-v41";
 
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -478,6 +478,14 @@ function isSameReleaseYear(album, ctx) {
   return Boolean(year) && albumReleaseYear(album) === year;
 }
 
+function hasReleaseYearConflict(album, ctx) {
+  const year = Number(ctx.year);
+  const releaseYear = albumReleaseYear(album);
+  if (!year || !releaseYear) return false;
+  const diff = Math.abs(releaseYear - year);
+  return ctx.mediaType === "tv" ? diff > 5 : diff > 1;
+}
+
 function isPriorityMotionPictureAlbum(album) {
   const name = norm(albumName(album));
   return (
@@ -563,16 +571,52 @@ function isCredibleFirstExactTitleAlbum(album, ctx) {
   );
 }
 
+function isViableTitleOnlySameYearAlbum(album, ctx) {
+  if (!isAcceptableFirstAlbum(album, ctx)) return false;
+  if (!isExactTitleAlbum(album, ctx)) return false;
+  if (!isSameReleaseYear(album, ctx)) return false;
+
+  const searchRank = Number(album?.searchRank ?? 999);
+  const totalTracks = Number(album?.total_tracks ?? 0);
+  return searchRank <= 5 && totalTracks >= 8;
+}
+
+function isTitleFallbackPlaylist(playlist, ctx) {
+  const name = norm(playlist?.name);
+  const totalTracks = Number(playlist?.tracks?.total ?? 0);
+  const primaryTitle = primarySearchTitle(ctx);
+  const shortOrGenericTitle =
+    norm(primaryTitle).replace(/\s+/g, "").length <= 3 ||
+    sigTokens(primaryTitle).length === 0;
+
+  if (!name || containsAny(name, BAD_MATCH_WORDS)) return false;
+  if (totalTracks > 0 && totalTracks < 3) return false;
+  if (!albumMatchesTitle({ name }, ctx)) return false;
+  if (
+    shortOrGenericTitle &&
+    !/soundtrack|music|songs|playlist|score|ost|banda sonora/.test(name)
+  ) {
+    return false;
+  }
+  if (/karaoke|tribute|cover|covers|unofficial|performed by/.test(name)) {
+    return false;
+  }
+  return true;
+}
+
 function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   const titleMatches = albums.filter((album) => isAcceptableFirstAlbum(album, ctx));
-
-  // Preferir álbumes con título exacto (nombre === título de la película) y mismo año
-  // sobre álbumes canónicos con subtítulo (ej: "The Illusionist" > "The Illusionist (Original Motion Picture Soundtrack)")
-  const exactTitleSameYear = titleMatches.filter(
-    (album) => isExactTitleAlbum(album, ctx) && isSameReleaseYear(album, ctx),
+  const exactTitleSameYear = titleMatches.filter((album) =>
+    isViableTitleOnlySameYearAlbum(album, ctx),
   );
-  if (exactTitleSameYear.length) {
-    return exactTitleSameYear;
+
+  // Un álbum cuyo nombre es solo el título de la película/serie puede ser un
+  // falso positivo. Solo lo aceptamos temprano si tiene señales de soundtrack.
+  const credibleExactTitleSameYear = exactTitleSameYear.filter((album) =>
+    isCredibleFirstExactTitleAlbum(album, ctx),
+  );
+  if (credibleExactTitleSameYear.length) {
+    return credibleExactTitleSameYear;
   }
 
   const canonical = titleMatches.filter((album) =>
@@ -586,13 +630,24 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   if (
     firstAlbum &&
     isAcceptableFirstAlbum(firstAlbum, ctx) &&
-    (isPrioritySeriesAlbum(firstAlbum, ctx) || isPriorityMotionPictureAlbum(firstAlbum))
+    (isPrioritySeriesAlbum(firstAlbum, ctx) || isPriorityMotionPictureAlbum(firstAlbum)) &&
+    !(exactTitleSameYear.length && hasReleaseYearConflict(firstAlbum, ctx))
   ) {
     return [firstAlbum];
   }
 
   if (canonicalSameYear.length) {
     return canonicalSameYear;
+  }
+
+  if (
+    exactTitleSameYear.length &&
+    canonical.length &&
+    canonical.every((album) => hasReleaseYearConflict(album, ctx))
+  ) {
+    return exactTitleSameYear.sort(
+      (a, b) => Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999),
+    );
   }
 
   if (canonical.length) {
@@ -607,10 +662,7 @@ function selectAlbumsFromOriginalTitleSearch(albums, ctx) {
   if (
     firstAlbum &&
     isAcceptableFirstAlbum(firstAlbum, ctx) &&
-    (isCredibleFirstExactTitleAlbum(firstAlbum, ctx) ||
-      !ctx.year ||
-      !albumReleaseYear(firstAlbum) ||
-      Math.abs(albumReleaseYear(firstAlbum) - Number(ctx.year)) <= 1)
+    isCredibleFirstExactTitleAlbum(firstAlbum, ctx)
   ) {
     return [firstAlbum];
   }
@@ -636,6 +688,13 @@ function selectPlaylistsFromOriginalTitleSearch(playlists, ctx) {
 
   return playlists
     .filter((playlist) => isPriorityOfficialSoundtrackPlaylist(playlist, ctx))
+    .sort((a, b) => Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999))
+    .slice(0, MAX_SPOTIFY_PLAYLISTS);
+}
+
+function selectTitleFallbackPlaylistsFromOriginalTitleSearch(playlists, ctx) {
+  return playlists
+    .filter((playlist) => isTitleFallbackPlaylist(playlist, ctx))
     .sort((a, b) => Number(a.searchRank ?? 999) - Number(b.searchRank ?? 999))
     .slice(0, MAX_SPOTIFY_PLAYLISTS);
 }
@@ -765,6 +824,30 @@ async function searchSoundtrackSources(ctx, token, market) {
           rateLimited,
           retryAfter,
           spotifySelectionMode: "original_title_official_soundtrack_playlist",
+        };
+      }
+
+      const titleFallbackPlaylistSelection =
+        selectTitleFallbackPlaylistsFromOriginalTitleSearch(
+          annotatedPlaylists,
+          ctx,
+        );
+
+      if (titleFallbackPlaylistSelection.length) {
+        return {
+          albums: [],
+          playlists: titleFallbackPlaylistSelection.map((playlist) => ({
+            ...playlist,
+            score:
+              canonicalSoundtrackBonus(norm(playlist.name)) +
+              titleScore(playlist.name, primarySearchTitle(ctx)) +
+              120,
+            selectionReason: "original_title_title_matched_playlist",
+          })),
+          query: usedQuery,
+          rateLimited,
+          retryAfter,
+          spotifySelectionMode: "original_title_title_matched_playlist",
         };
       }
 
