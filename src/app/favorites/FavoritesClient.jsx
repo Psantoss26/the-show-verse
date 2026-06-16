@@ -3752,7 +3752,7 @@ export default function FavoritesClient() {
               <motion.div
                 key={group.key}
                 ref={(node) => setGroupSectionRef(group.key, node)}
-                className="overflow-visible scroll-mt-[148px] sv-deferred-section"
+                className="overflow-visible scroll-mt-[148px]"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
@@ -3784,7 +3784,7 @@ export default function FavoritesClient() {
                         />
                         <div
                           key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                          className={`${getItemsGridClass(true)} sv-deferred-grid`}
+                          className={getItemsGridClass(true)}
                         >
                           {subgroup.items.map((item, idx) => (
                             <FavoriteCard
@@ -3807,7 +3807,7 @@ export default function FavoritesClient() {
                 ) : (
                   <div
                     key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                    className={`${getItemsGridClass(true)} sv-deferred-grid`}
+                    className={getItemsGridClass(true)}
                   >
                     {group.items.map((item, idx) => (
                       <FavoriteCard
@@ -3829,7 +3829,7 @@ export default function FavoritesClient() {
         ) : (
           <div
             key={`flat-grid-${viewMode}-${imageMode}`}
-            className={`${getItemsGridClass(false)} sv-deferred-grid`}
+            className={getItemsGridClass(false)}
           >
             {sorted.map((item, idx) => (
               <FavoriteCard
