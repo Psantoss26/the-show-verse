@@ -498,15 +498,15 @@ La app usa Client Credentials para buscar playlists y un refresh token de usuari
 
 ### Configuración de Producción
 
-Para desplegar en producción (ej. Vercel):
+Para desplegar en producción en Vercel:
 
 1. **Actualiza Redirect URI en Trakt:**
-   - Añade tu dominio de producción: `https://tu-dominio.com`
+   - Añade tu dominio de producción: `https://theshowverse.com/api/trakt/auth/callback`
 
 2. **Variables de entorno en Vercel:**
    - Ve a Project Settings → Environment Variables
    - Añade todas las variables del `.env`
-   - En Spotify, añade tambien `https://tu-dominio.com/api/spotify/callback` como Redirect URI si vas a usar el dominio de producción.
+   - En Spotify, añade tambien `https://theshowverse.com/api/spotify/callback` como Redirect URI si vas a usar el dominio de producción.
 
 ---
 

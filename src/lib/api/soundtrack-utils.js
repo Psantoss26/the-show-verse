@@ -195,6 +195,22 @@ const TITLE_MATCH_CONTEXTUAL_TOKENS = new Set([
   "chapter", "episode", "part", "pt", "vol", "volume",
 ]);
 
+function hasStrongCanonicalTitleContext(text) {
+  return (
+    /music from .*motion picture/.test(text) ||
+    /music from .*film/.test(text) ||
+    /music from .*movie/.test(text) ||
+    /music from .*series/.test(text) ||
+    /music from .*tv/.test(text) ||
+    /music from .*television/.test(text) ||
+    /original motion picture/.test(text) ||
+    /motion picture soundtrack/.test(text) ||
+    /original soundtrack/.test(text) ||
+    /official .*soundtrack/.test(text) ||
+    /soundtrack oficial|banda sonora oficial/.test(text)
+  );
+}
+
 export function hasStrictTitlePhrase(text, title, allTitles = []) {
   const textTokens = tokens(text);
   const titleTokens = tokens(title);
@@ -204,6 +220,7 @@ export function hasStrictTitlePhrase(text, title, allTitles = []) {
   const hasSoundtrackContext =
     containsAny(text, SOUNDTRACK_WORDS) ||
     textTokens.some((token) => TITLE_MATCH_DESCRIPTOR_TOKENS.has(token));
+  const strongCanonicalContext = hasStrongCanonicalTitleContext(text);
 
   return textTokens.some((_, index) => {
     const matches = titleTokens.every(
@@ -223,9 +240,23 @@ export function hasStrictTitlePhrase(text, title, allTitles = []) {
       if (titleTokenSet.has(token)) return true;
       if (TITLE_MATCH_DESCRIPTOR_TOKENS.has(token)) return true;
       if (TITLE_MATCH_CONTEXTUAL_TOKENS.has(token)) return hasSoundtrackContext;
+      if (strongCanonicalContext && !/game|karaoke|tribute|cover/.test(token)) {
+        return true;
+      }
       return false;
     });
   });
+}
+
+export function hasStrongCanonicalTitleOverlap(text, title) {
+  if (!hasStrongCanonicalTitleContext(text)) return false;
+
+  const titleTokens = sigTokens(title);
+  if (titleTokens.length < 3) return false;
+
+  const textTokenSet = new Set(tokens(text));
+  const hits = titleTokens.filter((token) => textTokenSet.has(token)).length;
+  return hits >= 3 && hits / titleTokens.length >= 0.75;
 }
 
 export function albumNameMatchesAnyTitle(name, titles) {
@@ -236,7 +267,10 @@ export function albumNameMatchesAnyTitle(name, titles) {
 
     for (const titleVariant of titleComparisonVariants(title)) {
       for (const nameVariant of titleComparisonVariants(nameNorm)) {
-        if (hasStrictTitlePhrase(nameVariant, titleVariant, titles)) {
+        if (
+          hasStrictTitlePhrase(nameVariant, titleVariant, titles) ||
+          hasStrongCanonicalTitleOverlap(nameVariant, titleVariant)
+        ) {
           return true;
         }
       }
@@ -246,7 +280,10 @@ export function albumNameMatchesAnyTitle(name, titles) {
     if (short && short !== title) {
       for (const titleVariant of titleComparisonVariants(short)) {
         for (const nameVariant of titleComparisonVariants(nameNorm)) {
-          if (hasStrictTitlePhrase(nameVariant, titleVariant, titles)) {
+          if (
+            hasStrictTitlePhrase(nameVariant, titleVariant, titles) ||
+            hasStrongCanonicalTitleOverlap(nameVariant, titleVariant)
+          ) {
             return true;
           }
         }

@@ -35,12 +35,9 @@ const GEMINI_MODEL =
   process.env.GEMINI_WATCH_NEXT_MODEL ||
   process.env.GEMINI_MODEL ||
   "gemini-2.5-flash";
-// Ollama — LLM local gratuito (por defecto: qwen2.5:3b)
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || "").replace(/\/$/, "");
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:3b";
 const WATCH_NEXT_AI_PROVIDER =
   process.env.WATCH_NEXT_AI_PROVIDER ||
-  (OLLAMA_BASE_URL ? "ollama" : GEMINI_API_KEY ? "gemini" : "openai");
+  (GEMINI_API_KEY ? "gemini" : "openai");
 
 const WATCH_NEXT_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -83,49 +80,6 @@ const WATCH_NEXT_RESPONSE_FORMAT = {
     },
     required: ["reply", "recommendations"],
   },
-};
-
-const GEMINI_RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    reply: { type: "STRING" },
-    recommendations: {
-      type: "ARRAY",
-      minItems: 3,
-      maxItems: 8,
-      items: {
-        type: "OBJECT",
-        properties: {
-          key: { type: "STRING" },
-          reason: { type: "STRING" },
-          matchTags: {
-            type: "ARRAY",
-            minItems: 1,
-            maxItems: 4,
-            items: { type: "STRING" },
-          },
-        },
-        required: ["key", "reason", "matchTags"],
-      },
-    },
-  },
-  required: ["reply", "recommendations"],
-};
-
-const OLLAMA_GENRE_MAP = {
-  action:       [28, 10759],
-  comedy:       [35],
-  drama:        [18],
-  thriller:     [53],
-  horror:       [27],
-  romance:      [10749],
-  "sci-fi":     [878, 10765],
-  animation:    [16],
-  crime:        [80],
-  documentary:  [99],
-  fantasy:      [14, 10765],
-  mystery:      [9648],
-  adventure:    [12],
 };
 
 const GENRE_HINTS = [
@@ -979,17 +933,6 @@ function buildAiSystemPrompt() {
   ].join(" ");
 }
 
-function buildOllamaIntentPrompt() {
-  return (
-    "Extract viewing intent from user message. Reply ONLY with compact JSON, nothing else.\n" +
-    'Schema: {"t":"movie"|"show"|"any","g":["comedy",...],"y":"1990s"|"2000s"|"2010s"|"2020s"|"recent"|"classic","year":1996}\n' +
-    "- 'year' is an exact 4-digit year if the user mentions a specific year (e.g. 1996, 2003). Overrides 'y'.\n" +
-    "- 'y' is a decade string only if no specific year is mentioned.\n" +
-    "Genres (use only these): action,comedy,drama,thriller,horror,romance,sci-fi,animation,crime,documentary,fantasy,mystery,adventure\n" +
-    "Omit fields that are not specified. Reply with {} if no intent is clear."
-  );
-}
-
 function buildAiUserPayload({ message, candidates, contextSummary }) {
   const compactCandidates = compactCandidatesForAi(candidates);
   const userContext = [
@@ -1258,167 +1201,23 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
   };
 }
 
-// ─── Ollama ───────────────────────────────────────────────────────────────────
-// Uses intent extraction to boost/filter the already query-aware scored candidates.
-// Keeps LLM output ≤ 80 tokens (~5-10 s at 3.5 tok/s on NAS hardware).
-async function getOllamaRecommendation({ message, candidates }) {
-  if (!OLLAMA_BASE_URL) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-  let res;
-  try {
-    res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [
-          { role: "system", content: buildOllamaIntentPrompt() },
-          { role: "user", content: message || "Recomiéndame algo interesante" },
-        ],
-        temperature: 0.1,
-        max_tokens: 80,
-        stream: false,
-        options: { num_thread: 4 },
-      }),
-      cache: "no-store",
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  const json = await safeJson(res);
-  if (!res.ok) {
-    console.warn("[watch-next] Ollama error:", { status: res.status, error: json?.error || "unknown" });
-    // Even on error, return top of already-scored candidates (better than null→same fallback)
-    return buildOllamaFallback({ candidates, message, reason: "error" });
-  }
-
-  const rawContent = json?.choices?.[0]?.message?.content;
-  const intent = parseJsonLoose(rawContent);
-
-  if (!intent) {
-    console.warn("[watch-next] Ollama intent parse failed:", { raw: String(rawContent || "").slice(0, 100) });
-    return buildOllamaFallback({ candidates, message, reason: "parse_failed" });
-  }
-
-  // Map intent fields to additional score boosts on top of already-scored candidates
-  const intentType = intent.t === "movie" ? "movie" : intent.t === "show" ? "tv" : null;
-  const intentGenreIds = new Set();
-  for (const g of safeArray(intent.g)) {
-    for (const id of (OLLAMA_GENRE_MAP[String(g).toLowerCase()] || [])) intentGenreIds.add(id);
-  }
-
-  // Support specific year (e.g. 1996) or decade range from Ollama intent
-  let yearMin = null, yearMax = null;
-  const specificYear = Number.isFinite(Number(intent.year)) && Number(intent.year) > 1900
-    ? Number(intent.year) : null;
-  if (specificYear) {
-    yearMin = specificYear;
-    yearMax = specificYear;
-  } else if (intent.y === "recent" || intent.y === "2020s") { yearMin = 2020; }
-  else if (intent.y === "2010s") { yearMin = 2010; yearMax = 2019; }
-  else if (intent.y === "2000s") { yearMin = 2000; yearMax = 2009; }
-  else if (intent.y === "1990s") { yearMin = 1990; yearMax = 1999; }
-  else if (intent.y === "1980s") { yearMin = 1980; yearMax = 1989; }
-  else if (intent.y === "classic") { yearMax = 2000; }
-
-  const hasIntent = intentType || intentGenreIds.size > 0 || yearMin || yearMax;
-
-  // No structured intent extracted — use already query-aware scoring from scoreCandidates.
-  // Do NOT return null here, as that would fall through to the always-same generic ranking.
-  if (!hasIntent) {
-    return buildOllamaFallback({ candidates, message, reason: "no_intent" });
-  }
-
-  // Apply additional refinement boosts on top of existing scores
-  const rescored = candidates.map((item) => {
-    let boost = 0;
-    if (intentType) {
-      boost += item.mediaType === intentType ? 20 : -30;
-    }
-    for (const id of intentGenreIds) {
-      if (safeArray(item.genreIds).includes(id)) boost += 25;
-    }
-    const itemYear = parseInt(item.year, 10);
-    if (!isNaN(itemYear)) {
-      if (specificYear) {
-        if (itemYear === specificYear) boost += 50;
-        else boost -= Math.min(60, Math.abs(itemYear - specificYear) * 6);
-      } else {
-        if (yearMin && itemYear < yearMin) boost -= 30;
-        if (yearMax && itemYear > yearMax) boost -= 30;
-        if (yearMin && yearMax && itemYear >= yearMin && itemYear <= yearMax) boost += 20;
-      }
-    }
-    return { ...item, score: (item.score || 0) + boost };
-  }).sort((a, b) => b.score - a.score);
-
-  const top = rescored.slice(0, 8);
-  if (!top.length) return buildOllamaFallback({ candidates, message, reason: "empty_top" });
-
-  const typeLabel = intentType === "movie" ? "películas" : intentType === "tv" ? "series" : "títulos";
-  const genreLabel = safeArray(intent.g).slice(0, 2).join(" y ");
-  const parts = [];
-  if (genreLabel) parts.push(`de ${genreLabel}`);
-  if (specificYear)                parts.push(`del año ${specificYear}`);
-  else if (intent.y === "recent")  parts.push("recientes");
-  else if (intent.y === "classic") parts.push("clásicos");
-  else if (intent.y)               parts.push(`de los ${intent.y}`);
-
-  const reply = parts.length
-    ? `He seleccionado ${typeLabel} ${parts.join(", ")} que encajan con tu petición.`
-    : `He seleccionado los ${typeLabel} que mejor encajan con lo que buscas.`;
-
-  return { reply, recommendations: top, provider: "ollama", model: OLLAMA_MODEL };
-}
-
-/**
- * Fallback when Ollama can't extract structured intent.
- * Returns the top of the already query-aware scored list rather than null,
- * so the response is always influenced by the user's message.
- */
-function buildOllamaFallback({ candidates, message, reason }) {
-  console.info("[watch-next] Ollama fallback (", reason, ") — using scored ranking");
-  const top = candidates.slice(0, 8);
-  if (!top.length) return null;
-
-  const wantedType = getWantedMediaType(message);
-  const wantedGenres = getWantedGenreIds(message);
-  const typeLabel = wantedType === "movie" ? "películas" : wantedType === "tv" ? "series" : "títulos";
-  const genreHint = wantedGenres.length === 0 ? "" : " según tu petición";
-
-  const reply = message?.trim()
-    ? `He seleccionado los ${typeLabel} que mejor encajan con lo que pides${genreHint}.`
-    : "He seleccionado los títulos que mejor encajan con tus gustos y las tendencias actuales.";
-
-  return { reply, recommendations: top, provider: "ollama", model: OLLAMA_MODEL };
-}
-
 async function getAiRecommendation({ message, candidates, contextSummary }) {
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
-    .filter((provider) => provider === "ollama");
+    .filter((provider) => provider === "openai" || provider === "gemini");
 
-  const orderedProviders = providers.length ? providers : ["ollama"];
+  const orderedProviders = providers.length
+    ? providers
+    : [GEMINI_API_KEY ? "gemini" : "openai"];
   for (const provider of orderedProviders) {
     let result = null;
     try {
       result =
-        provider === "ollama"
-          ? await getOllamaRecommendation({
+        provider === "openai"
+          ? await getOpenAiRecommendation({
               message,
               candidates,
-              contextSummary,
-            })
-          : provider === "openai"
-            ? await getOpenAiRecommendation({
-                message,
-                candidates,
                 contextSummary,
               })
             : provider === "gemini"
@@ -1544,12 +1343,10 @@ export async function POST(request) {
     favoritesCount: tmdbContext.favorites.length,
     watchlistCount: tmdbContext.watchlist.length,
     ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
-    aiEnabled: !!OLLAMA_BASE_URL,
+    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY),
     aiProviders: {
-      ollama: !!OLLAMA_BASE_URL,
-      ollamaModel: OLLAMA_BASE_URL ? OLLAMA_MODEL : null,
-      gemini: false,
-      openai: false,
+      gemini: !!GEMINI_API_KEY,
+      openai: !!OPENAI_API_KEY,
     },
     quickPick,
     recentKeysCount: recentKeys.length,
@@ -1593,7 +1390,7 @@ export async function POST(request) {
     mode: ai ? "ai" : "ranking",
     requestMode: mode,
     provider: ai?.provider || "ranking",
-    engine: ai ? "ollama-assisted" : "rules",
+    engine: ai?.provider || "rules",
     diversityApplied: true,
   };
 

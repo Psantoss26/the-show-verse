@@ -267,7 +267,7 @@ function pickBestEnglishPoster(list) {
 
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v45";
+const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v47";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }

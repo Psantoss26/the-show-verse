@@ -134,7 +134,7 @@ export async function GET(req) {
         hasStateParam: !!state,
         hasStateCookie: !!expected,
         origin,
-        isProduction: origin.includes("vercel.app"),
+        isProduction: origin.startsWith("https://"),
         availableCookies: req.cookies.getAll().map((c) => c.name),
       },
     );
