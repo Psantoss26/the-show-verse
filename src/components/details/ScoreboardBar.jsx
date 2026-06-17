@@ -1,6 +1,7 @@
 // src/components/details/ScoreboardBar.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Loader2,
@@ -28,7 +29,7 @@ function CompactBadge({
       <span
         className={`grid h-6 shrink-0 place-items-center ${logoWrapClassName}`}
       >
-        <img
+        <OptimizedImage
           src={logo}
           alt=""
           draggable="false"

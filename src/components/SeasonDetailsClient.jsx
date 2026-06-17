@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1431,7 +1433,7 @@ export default function SeasonDetailsClient({
                           {/* Still */}
                           <div className="relative w-full sm:w-[280px] aspect-video sm:aspect-[16/9] rounded-xl overflow-hidden bg-black/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] shrink-0">
                             {still ? (
-                              <img
+                              <OptimizedImage
                                 src={`https://image.tmdb.org/t/p/w780${still}`}
                                 alt={epTitle}
                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -1515,7 +1517,7 @@ export default function SeasonDetailsClient({
                       >
                         <div className="relative aspect-video bg-white/5">
                           {still ? (
-                            <img
+                            <OptimizedImage
                               src={`https://image.tmdb.org/t/p/w780${still}`}
                               alt={epTitle}
                               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"

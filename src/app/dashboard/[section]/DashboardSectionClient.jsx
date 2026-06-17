@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
   useDeferredValue,
@@ -254,7 +256,7 @@ function PosterImage({
   }
 
   return (
-    <img
+    <OptimizedImage
       src={imgUrl(path, mode === "backdrop" ? "w780" : "w500")}
       alt={title}
       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -544,7 +546,7 @@ function SectionCard({
                       <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                         {rating}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-TMDb.png"
                         alt=""
                         className="w-auto h-2.5 opacity-100"
@@ -619,7 +621,7 @@ function SectionCard({
                     <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                       {rating}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-TMDb.png"
                       alt=""
                       className="w-auto h-2.5 opacity-100"

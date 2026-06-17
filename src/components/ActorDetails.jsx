@@ -1,6 +1,7 @@
 // ActorDetails.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   Children,
   useCallback,
@@ -1137,7 +1138,7 @@ function PosterCard({ item }) {
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-800 border border-white/5 group-hover:border-emerald-500/50 transition-all duration-300">
         {poster && !err ? (
-          <img
+          <OptimizedImage
             src={poster}
             alt={title}
             className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500"
@@ -1236,7 +1237,7 @@ function AwardCard({ item }) {
 
           {imageSrc ? (
             <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
-              <img
+              <OptimizedImage
                 key={imageSrc}
                 src={imageSrc}
                 alt=""
@@ -1306,7 +1307,7 @@ function PhotoCard({ image }) {
       }}
       transition={{ type: "spring", stiffness: 360, damping: 26 }}
     >
-      <img
+      <OptimizedImage
         src={tmdbImg(image.file_path, "w500")}
         alt=""
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
@@ -1367,7 +1368,7 @@ function TaggedMediaCard({ image }) {
       }}
       transition={{ type: "spring", stiffness: 360, damping: 26 }}
     >
-      <img
+      <OptimizedImage
         src={tmdbImg(image.file_path, "w780")}
         alt=""
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
@@ -2334,7 +2335,7 @@ export default function ActorDetails({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 z-20" />
                   <div className="relative w-full h-full bg-neutral-950 z-10 overflow-hidden">
                     {profileSrc ? (
-                      <img
+                      <OptimizedImage
                         src={profileSrc}
                         alt={actorDetails?.name}
                         className="w-full h-full object-cover"
@@ -2950,7 +2951,7 @@ export default function ActorDetails({
                                     aria-hidden="true"
                                   />
                                 ) : link.icon ? (
-                                  <img
+                                  <OptimizedImage
                                     src={link.icon}
                                     alt=""
                                     className={

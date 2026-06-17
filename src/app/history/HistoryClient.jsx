@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -1209,7 +1211,7 @@ function Poster({ entry, className = "" }) {
       className={`overflow-hidden bg-zinc-800 border border-white/5 shrink-0 relative shadow-lg ${className}`}
     >
       {src ? (
-        <img
+        <OptimizedImage
           src={src}
           alt="poster"
           className="w-full h-full object-cover"
@@ -1292,7 +1294,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
       </div>
 
       {src && (
-        <img
+        <OptimizedImage
           src={src}
           alt={title}
           loading="lazy"
@@ -1422,7 +1424,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
             </div>
 
             {posterSrc && (
-              <img
+              <OptimizedImage
                 src={posterSrc}
                 alt={title}
                 loading="lazy"
@@ -3239,7 +3241,7 @@ export default function HistoryClient() {
             {!auth.loading && !auth.connected ? (
               <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
                 <div className="mb-6">
-                  <img
+                  <OptimizedImage
                     src="/logo-Trakt.png"
                     alt="Trakt Logo"
                     className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"

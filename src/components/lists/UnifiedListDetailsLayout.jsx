@@ -1,5 +1,7 @@
 'use client'
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -94,7 +96,7 @@ export default function UnifiedListDetailsLayout({
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 {backdropImage ? (
-                    <img
+                    <OptimizedImage
                         src={backdropImage}
                         alt=""
                         fetchPriority="low"
@@ -143,7 +145,7 @@ export default function UnifiedListDetailsLayout({
                             <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
                             <div className="relative z-10 h-full w-full bg-neutral-950">
                                 {posterImage ? (
-                                    <img
+                                    <OptimizedImage
                                         src={posterImage}
                                         alt=""
                                         fetchPriority="high"

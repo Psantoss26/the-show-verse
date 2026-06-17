@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -267,7 +269,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                 >
                   <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
                     <div className="relative flex-shrink-0">
-                      <img
+                      <OptimizedImage
                         src={
                           item.poster_path || item.profile_path
                             ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
@@ -506,7 +508,7 @@ export default function Navbar() {
           <div className="flex items-center gap-8 flex-shrink-0 pl-6 -ml-10">
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[120px] flex items-center justify-center overflow-hidden">
-                <img
+                <OptimizedImage
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
                   width={120}
@@ -634,7 +636,7 @@ export default function Navbar() {
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <Link href="/" className="block h-10 overflow-hidden">
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
-                <img
+                <OptimizedImage
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
                   width={140}
@@ -739,7 +741,7 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex-1 min-w-0 h-28"
                 >
-                  <img
+                  <OptimizedImage
                     src="/logo-final-titulo-sinFondo.png"
                     alt="The Show Verse"
                     width={248}

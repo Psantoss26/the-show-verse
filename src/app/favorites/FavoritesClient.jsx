@@ -1,6 +1,7 @@
 // src/app/favorites/FavoritesClient.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   useEffect,
   useState,
@@ -12,7 +13,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchRatedForUser,
@@ -63,6 +64,9 @@ const cardVariants = {
 };
 
 const FAVORITES_IMAGE_ROOT_MARGIN = "140px 0px";
+const FAVORITE_ROW_STAGGER_SECONDS = 0.12;
+const FAVORITE_COLUMN_STAGGER_SECONDS = 0.014;
+const FAVORITE_MAX_ENTRY_DELAY_SECONDS = 0.5;
 
 function useNearViewport({ disabled = false, rootMargin = "300px 0px" } = {}) {
   const ref = useRef(null);
@@ -117,6 +121,51 @@ function getInitialFavoriteCardBudget(viewMode, imageMode) {
   if (width >= 1280) return height >= 900 ? 12 : 8;
   if (width >= 768) return 8;
   return 6;
+}
+
+function getFavoriteGridColumnCount(viewMode, imageMode) {
+  if (typeof window === "undefined") return viewMode === "list" ? 1 : 6;
+
+  const width = window.innerWidth || 1280;
+
+  if (viewMode === "list") {
+    return width >= 1280 ? 2 : 1;
+  }
+
+  if (viewMode === "compact") {
+    if (imageMode === "backdrop") {
+      if (width >= 768) return 4;
+      if (width >= 640) return 3;
+      return 2;
+    }
+    if (width >= 1280) return 8;
+    if (width >= 1024) return 7;
+    if (width >= 768) return 6;
+    if (width >= 640) return 5;
+    return 4;
+  }
+
+  if (imageMode === "backdrop") {
+    if (width >= 768) return 3;
+    return 2;
+  }
+
+  if (width >= 1024) return 6;
+  if (width >= 768) return 5;
+  if (width >= 640) return 4;
+  return 3;
+}
+
+function getFavoriteRowEntryDelay(itemIndex, columnCount) {
+  const safeColumns = Math.max(1, columnCount || 1);
+  const rowIndex = Math.floor(itemIndex / safeColumns);
+  const columnIndex = itemIndex % safeColumns;
+
+  return Math.min(
+    rowIndex * FAVORITE_ROW_STAGGER_SECONDS +
+      columnIndex * FAVORITE_COLUMN_STAGGER_SECONDS,
+    FAVORITE_MAX_ENTRY_DELAY_SECONDS,
+  );
 }
 
 // ================== UTILS & CACHE ==================
@@ -971,7 +1020,7 @@ function SmartPoster({
       </div>
 
       {src ? (
-        <img
+        <OptimizedImage
           src={src}
           alt={title}
           loading={eager || priority ? "eager" : "lazy"}
@@ -1595,7 +1644,7 @@ function StatBox({
         className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
       >
         {imgSrc ? (
-          <img
+          <OptimizedImage
             src={imgSrc}
             alt={label}
             className={`w-auto object-contain opacity-85 shrink-0 transition-all duration-300 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
@@ -1830,6 +1879,7 @@ const FavoriteCard = memo(function FavoriteCard({
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
   animateEntry = true,
+  entryDelay,
   eagerImage = false,
   prioritizeImage = false,
   deferOffscreenContent = false,
@@ -1935,9 +1985,13 @@ const FavoriteCard = memo(function FavoriteCard({
     }
   }, [imdbScore, traktScore, loadingScores, item, type]);
 
-  const animDelay =
+  const fallbackAnimDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = animateEntry && index < 60;
+  const animDelay =
+    Number.isFinite(entryDelay) && entryDelay >= 0
+      ? entryDelay
+      : fallbackAnimDelay;
   const shellClassName = deferOffscreenContent
     ? "sv-favorite-card-deferred"
     : undefined;
@@ -2070,7 +2124,7 @@ const FavoriteCard = memo(function FavoriteCard({
                       <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                         {rating}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-TMDb.png"
                         alt=""
                         className="w-auto h-2.5 opacity-100"
@@ -2084,7 +2138,7 @@ const FavoriteCard = memo(function FavoriteCard({
                           ? imdbScore.toFixed(1)
                           : imdbScore}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-IMDb.svg"
                         alt=""
                         className="w-auto h-3 opacity-100"
@@ -2098,7 +2152,7 @@ const FavoriteCard = memo(function FavoriteCard({
                           ? traktScore.toFixed(1)
                           : traktScore}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-Trakt.png"
                         alt=""
                         className="w-auto h-2.5 opacity-100"
@@ -2186,7 +2240,7 @@ const FavoriteCard = memo(function FavoriteCard({
                     <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                       {rating}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-TMDb.png"
                       alt=""
                       className="w-auto h-2.5 opacity-100"
@@ -2200,7 +2254,7 @@ const FavoriteCard = memo(function FavoriteCard({
                         ? imdbScore.toFixed(1)
                         : imdbScore}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-IMDb.svg"
                       alt=""
                       className="w-auto h-3 opacity-100"
@@ -2214,7 +2268,7 @@ const FavoriteCard = memo(function FavoriteCard({
                         ? traktScore.toFixed(1)
                         : traktScore}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-Trakt.png"
                       alt=""
                       className="w-auto h-2.5 opacity-100"
@@ -2253,6 +2307,7 @@ const FavoriteCard = memo(function FavoriteCard({
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
   const { session, account, hydrated } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
   const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
   const [ratedItems, setRatedItems] = useState(
@@ -2322,17 +2377,22 @@ export default function FavoritesClient() {
   const [initialCardBudget, setInitialCardBudget] = useState(() =>
     getInitialFavoriteCardBudget(viewMode, imageMode),
   );
+  const [favoriteGridColumns, setFavoriteGridColumns] = useState(() =>
+    getFavoriteGridColumnCount(viewMode, imageMode),
+  );
 
   useEffect(() => {
-    const updateInitialCardBudget = () => {
+    const updateInitialGridMetrics = () => {
       setInitialCardBudget(getInitialFavoriteCardBudget(viewMode, imageMode));
+      setFavoriteGridColumns(getFavoriteGridColumnCount(viewMode, imageMode));
     };
 
-    updateInitialCardBudget();
-    window.addEventListener("resize", updateInitialCardBudget, {
+    updateInitialGridMetrics();
+    window.addEventListener("resize", updateInitialGridMetrics, {
       passive: true,
     });
-    return () => window.removeEventListener("resize", updateInitialCardBudget);
+    return () =>
+      window.removeEventListener("resize", updateInitialGridMetrics);
   }, [viewMode, imageMode]);
 
   useEffect(() => {
@@ -3140,6 +3200,8 @@ export default function FavoritesClient() {
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
   const isInitialFavoriteCard = (groupIndex, itemIndex) =>
     groupIndex < 2 && itemIndex < initialCardBudget;
+  const getFavoriteEntryDelay = (itemIndex) =>
+    getFavoriteRowEntryDelay(itemIndex, favoriteGridColumns);
   const getItemsGridClass = (withTopMargin = false) => {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
@@ -3203,7 +3265,7 @@ export default function FavoritesClient() {
               className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
             >
               <div className="mb-6">
-                <img
+                <OptimizedImage
                   src="/logo-TMDb.png"
                   alt="TMDb Logo"
                   className="w-24 h-24 object-contain shadow-lg shadow-blue-500/20 rounded-2xl"
@@ -4024,7 +4086,10 @@ export default function FavoritesClient() {
                                     traktScore={traktScores.get(
                                       getScoreItemKey(item),
                                     )}
-                                    animateEntry={initiallyVisible}
+                                    animateEntry={
+                                      initiallyVisible && !prefersReducedMotion
+                                    }
+                                    entryDelay={getFavoriteEntryDelay(idx)}
                                     eagerImage={initiallyVisible}
                                     prioritizeImage={
                                       initiallyVisible && idx < 2
@@ -4060,7 +4125,10 @@ export default function FavoritesClient() {
                               traktScore={traktScores.get(
                                 getScoreItemKey(item),
                               )}
-                              animateEntry={initiallyVisible}
+                              animateEntry={
+                                initiallyVisible && !prefersReducedMotion
+                              }
+                              entryDelay={getFavoriteEntryDelay(idx)}
                               eagerImage={initiallyVisible}
                               prioritizeImage={initiallyVisible && idx < 2}
                               deferOffscreenContent={!initiallyVisible}
@@ -4094,7 +4162,8 @@ export default function FavoritesClient() {
                     imageMode={imageMode}
                     imdbScore={imdbScores.get(getScoreItemKey(item))}
                     traktScore={traktScores.get(getScoreItemKey(item))}
-                    animateEntry={initiallyVisible}
+                    animateEntry={initiallyVisible && !prefersReducedMotion}
+                    entryDelay={getFavoriteEntryDelay(idx)}
                     eagerImage={initiallyVisible}
                     prioritizeImage={initiallyVisible && idx < 2}
                     deferOffscreenContent={!initiallyVisible}

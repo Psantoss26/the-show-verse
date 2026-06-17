@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
@@ -136,7 +138,7 @@ export default function TraktConnectModal({ open, onClose, onSuccess }) {
         <div className="space-y-4">
           {/* Título */}
           <div className="flex items-center gap-3">
-            <img src="/logo-Trakt.png" alt="Trakt" className="w-8 h-8" />
+            <OptimizedImage src="/logo-Trakt.png" alt="Trakt" className="w-8 h-8" />
             <h2 className="text-xl font-bold text-white">Conectar con Trakt</h2>
           </div>
 

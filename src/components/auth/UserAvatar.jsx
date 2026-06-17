@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -69,7 +71,7 @@ export default function UserAvatar() {
       className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
     >
       <div className="w-9 h-9 rounded-full overflow-hidden">
-        <img
+        <OptimizedImage
           src={traktAvatarUrl}
           alt="Usuario"
           className="w-full h-full object-cover"

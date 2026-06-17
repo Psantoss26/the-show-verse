@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
   useDeferredValue,
@@ -322,7 +324,7 @@ function StatBox({
         className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
       >
         {imgSrc ? (
-          <img
+          <OptimizedImage
             src={imgSrc}
             alt={label}
             className={`w-auto object-contain opacity-85 shrink-0 transition-all duration-300 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
@@ -792,7 +794,7 @@ function LibraryMediaCard({
       </div>
 
       {imageSrc && (
-        <img
+        <OptimizedImage
           key={imageSrc}
           src={imageSrc}
           alt={title}

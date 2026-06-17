@@ -1,4 +1,6 @@
 "use client";
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -212,7 +214,7 @@ function NotConnected() {
             animate={{ opacity: 1, y: 0 }}
             className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
           >
-            <img src="/logo-Trakt.png" alt="Trakt" className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl mb-6" />
+            <OptimizedImage src="/logo-Trakt.png" alt="Trakt" className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl mb-6" />
             <h2 className="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Trakt</h2>
             <p className="text-zinc-400 max-w-sm mb-8 text-sm">Para ver tu perfil y estadísticas necesitas iniciar sesión con Trakt.</p>
             <button
@@ -363,7 +365,7 @@ export default function ProfileClient() {
             <div className="flex items-start gap-5 sm:gap-6 min-w-0">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden flex-shrink-0 ring-2 ring-indigo-500/40 shadow-2xl shadow-indigo-500/10">
               {user.avatarUrl
-                ? <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                ? <OptimizedImage src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                 : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700"><span className="text-3xl font-black text-white">{(user.name || user.username || "?")[0].toUpperCase()}</span></div>
               }
               </div>
@@ -439,7 +441,7 @@ export default function ProfileClient() {
                 rel="noopener noreferrer"
                 className="self-start lg:self-center flex-shrink-0 flex items-center gap-1 px-4 py-2.5 rounded-xl bg-zinc-900/50 border border-white/10 text-xs font-bold hover:bg-zinc-800 transition-all backdrop-blur-xl"
               >
-                <img src="/logo-Trakt.png" alt="Trakt" className="w-4 h-4 rounded" />Trakt <ExternalLink className="w-3 h-3" />
+                <OptimizedImage src="/logo-Trakt.png" alt="Trakt" className="w-4 h-4 rounded" />Trakt <ExternalLink className="w-3 h-3" />
               </motion.a>
             )}
           </div>

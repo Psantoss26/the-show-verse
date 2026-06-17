@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1568,7 +1570,7 @@ export default function TraktEpisodesWatchedModal({
                         >
                           <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30 sm:w-32">
                             {img ? (
-                              <img
+                              <OptimizedImage
                                 src={img}
                                 alt=""
                                 className="w-full h-full object-cover"

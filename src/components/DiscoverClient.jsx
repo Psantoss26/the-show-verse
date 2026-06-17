@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -596,7 +598,7 @@ function DiscoverCard({ item }) {
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent border border-transparent shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group-hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)] group-hover:bg-white/5 group-hover:-translate-y-1 z-0 group-hover:z-10">
         <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/5 z-20 group-hover:border-white/20 transition-colors" />
-        <img
+        <OptimizedImage
           src={posterSrc(item)}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
@@ -651,7 +653,7 @@ function ProviderIcon({ provider, active, onToggle }) {
         }`}
     >
       {logo ? (
-        <img
+        <OptimizedImage
           src={logo}
           alt={provider.provider_name}
           className="w-full h-full object-cover"

@@ -1,6 +1,7 @@
 // /src/app/series/SeriesPageClient.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { useRef, useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -502,7 +503,7 @@ function PosterImage({ show, cache }) {
   return (
     <>
       {/* Tablet/desktop */}
-      <img
+      <OptimizedImage
         src={buildImg(posterPath, "w342")}
         alt={show.name || show.title}
         // CAMBIO: rounded-3xl -> rounded-lg
@@ -514,7 +515,7 @@ function PosterImage({ show, cache }) {
       {/* Mobile: contain + blur */}
       {/* CAMBIO: rounded-3xl -> rounded-lg */}
       <div className="relative w-full h-full rounded-lg overflow-hidden bg-neutral-900 md:hidden">
-        <img
+        <OptimizedImage
           src={buildImg(posterPath, "w342")}
           alt=""
           aria-hidden="true"
@@ -522,7 +523,7 @@ function PosterImage({ show, cache }) {
           loading="lazy"
           decoding="async"
         />
-        <img
+        <OptimizedImage
           src={buildImg(posterPath, "w342")}
           alt={show.name || show.title}
           className="absolute inset-0 w-full h-full object-contain"
@@ -605,7 +606,7 @@ function Top10MobileBackdropCardTV({ show, rank }) {
 
         {ready && src && (
           <>
-            <img
+            <OptimizedImage
               src={buildImg(backdropPath, "w780")}
               alt=""
               aria-hidden="true"
@@ -613,7 +614,7 @@ function Top10MobileBackdropCardTV({ show, rank }) {
               loading="lazy"
               decoding="async"
             />
-            <img
+            <OptimizedImage
               src={src}
               alt={show.name || show.title}
               className="absolute inset-0 w-full h-full object-contain"
@@ -926,7 +927,7 @@ function InlinePreviewCard({ show, heightClass }) {
         )}
 
         {!showTrailer && bgSrc && (
-          <img
+          <OptimizedImage
             key={bgSrc}
             src={bgSrc}
             alt={show.name || show.title}
@@ -1004,7 +1005,7 @@ function InlinePreviewCard({ show, heightClass }) {
               )}
 
               <span className="inline-flex items-center gap-1.5">
-                <img
+                <OptimizedImage
                   src="/logo-TMDb.png"
                   alt="TMDb"
                   className="h-3 w-auto"
@@ -1016,7 +1017,7 @@ function InlinePreviewCard({ show, heightClass }) {
 
               {typeof extras?.imdbRating === "number" && (
                 <span className="inline-flex items-center gap-1.5">
-                  <img
+                  <OptimizedImage
                     src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"

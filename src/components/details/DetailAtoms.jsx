@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { motion } from "framer-motion";
 
 export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
@@ -121,7 +123,7 @@ export function ScoreBadge({
         px-3 py-2 flex items-center gap-2 transition hover:bg-white/10`}
       >
         {logo ? (
-          <img
+          <OptimizedImage
             src={logo}
             alt={alt || label}
             className="h-3 w-auto opacity-90"

@@ -1,4 +1,6 @@
 "use client";
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from "react";
 import Link from "next/link";
 import { Film, Tv, Users } from "lucide-react";
@@ -55,7 +57,7 @@ export function PosterCard({
         className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src && !err ? (
-          <img
+          <OptimizedImage
             src={src}
             alt={item.title}
             className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500"
@@ -112,7 +114,7 @@ export function RankedPosterCard({ item, rank, type, accentColor = "yellow" }) {
         className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src ? (
-          <img
+          <OptimizedImage
             src={src}
             alt={title}
             loading="lazy"
@@ -158,7 +160,7 @@ export function WatchlistCard({ item }) {
     >
       <div className="relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 group-hover:border-indigo-500/50 transition-all duration-300">
         {src ? (
-          <img
+          <OptimizedImage
             src={src}
             alt={item.title}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -200,7 +202,7 @@ export function PersonCard({ person, accentColor = "yellow" }) {
         className={`relative isolate aspect-[2/3] rounded-xl overflow-hidden bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/50 border border-white/10 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] transform-gpu group-hover:bg-black/40 ${border} transition-all duration-300`}
       >
         {src ? (
-          <img
+          <OptimizedImage
             src={src}
             alt={person.name}
             className="w-full h-full object-cover group-hover:scale-110 transition duration-500"

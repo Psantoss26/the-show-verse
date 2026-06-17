@@ -1,6 +1,7 @@
 // /src/app/movies/MoviesPageClient.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { useRef, useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -527,7 +528,7 @@ function PosterImage({ movie, cache }) {
   return (
     <>
       {/* Desktop / tablet */}
-      <img
+      <OptimizedImage
         src={buildImg(posterPath, "w342")}
         alt={movie.title || movie.name}
         className="hidden md:block w-full h-full object-cover rounded-lg"
@@ -537,7 +538,7 @@ function PosterImage({ movie, cache }) {
 
       {/* Mobile: contain + blur */}
       <div className="relative w-full h-full rounded-lg overflow-hidden bg-neutral-900 md:hidden">
-        <img
+        <OptimizedImage
           src={buildImg(posterPath, "w342")}
           alt=""
           aria-hidden="true"
@@ -545,7 +546,7 @@ function PosterImage({ movie, cache }) {
           loading="lazy"
           decoding="async"
         />
-        <img
+        <OptimizedImage
           src={buildImg(posterPath, "w342")}
           alt={movie.title || movie.name}
           className="absolute inset-0 w-full h-full object-contain"
@@ -624,7 +625,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
 
         {ready && src && (
           <>
-            <img
+            <OptimizedImage
               src={buildImg(backdropPath, "w780")}
               alt=""
               aria-hidden="true"
@@ -632,7 +633,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
               loading="lazy"
               decoding="async"
             />
-            <img
+            <OptimizedImage
               src={src}
               alt={movie.title || movie.name}
               className="absolute inset-0 w-full h-full object-contain"
@@ -940,7 +941,7 @@ function InlinePreviewCard({ movie, heightClass }) {
         )}
 
         {!showTrailer && bgSrc && (
-          <img
+          <OptimizedImage
             key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
@@ -1018,7 +1019,7 @@ function InlinePreviewCard({ movie, heightClass }) {
               )}
 
               <span className="inline-flex items-center gap-1.5">
-                <img
+                <OptimizedImage
                   src="/logo-TMDb.png"
                   alt="TMDb"
                   className="h-3 w-auto"
@@ -1030,7 +1031,7 @@ function InlinePreviewCard({ movie, heightClass }) {
 
               {typeof extras?.imdbRating === "number" && (
                 <span className="inline-flex items-center gap-1.5">
-                  <img
+                  <OptimizedImage
                     src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"
