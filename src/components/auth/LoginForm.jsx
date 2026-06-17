@@ -21,26 +21,9 @@ export default function LoginForm({ next: nextProp }) {
     setErr("");
 
     try {
-      const res = await fetch("/api/tmdb/auth/request-token", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok)
-        throw new Error(json?.error || "No se pudo iniciar el login");
-
-      const token = json?.request_token;
-      const authenticateUrl = json?.authenticate_url;
-      if (!token || !authenticateUrl) throw new Error("Token inválido");
-
-      const finalUrl = new URL(authenticateUrl);
-      const redirectTo = finalUrl.searchParams.get("redirect_to");
-      if (redirectTo) {
-        const redirectUrl = new URL(redirectTo);
-        redirectUrl.searchParams.set("next", next);
-        finalUrl.searchParams.set("redirect_to", redirectUrl.toString());
-      }
-
-      window.location.href = finalUrl.toString();
+      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+        next,
+      )}`;
     } catch (e) {
       setErr(e?.message || "Error iniciando login TMDb");
       setLoading(false);

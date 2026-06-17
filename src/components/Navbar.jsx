@@ -450,9 +450,13 @@ export default function Navbar() {
     );
   };
 
-  // Menú inferior fijo: 6 iconos. Si no hay sesión, fav/watchlist llevan a login.
-  const favHref = hydrated && account ? "/favorites" : "/login";
-  const watchHref = hydrated && account ? "/watchlist" : "/login";
+  // Menú inferior fijo: las secciones siempre son accesibles; cada página muestra
+  // su conexión necesaria si la cuenta correspondiente no está enlazada.
+  const favHref = "/favorites";
+  const watchHref = "/watchlist";
+  const tmdbLoginHref = `/api/tmdb/auth/start?next=${encodeURIComponent(
+    pathname || "/",
+  )}`;
   const profileAuthLoading =
     !hydrated || (hydrated && !!account && !traktReady);
   const traktProfileConnectHref = "/api/trakt/auth/start?next=/profile";
@@ -569,36 +573,32 @@ export default function Navbar() {
 
               <TraktHistoryNavButton />
 
-              {hydrated && account && (
-                <>
-                  <Link
-                    href="/favorites"
-                    className={iconLinkClass("/favorites", "red")}
-                    aria-label="Favoritas"
-                  >
-                    <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                  </Link>
+              <Link
+                href="/favorites"
+                className={iconLinkClass("/favorites", "red")}
+                aria-label="Favoritas"
+              >
+                <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+              </Link>
 
-                  <Link
-                    href="/watchlist"
-                    className={iconLinkClass("/watchlist", "blue")}
-                    aria-label="Pendientes"
-                  >
-                    <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                  </Link>
-                </>
-              )}
+              <Link
+                href="/watchlist"
+                className={iconLinkClass("/watchlist", "blue")}
+                aria-label="Pendientes"
+              >
+                <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+              </Link>
             </div>
 
             {profileAuthLoading ? (
               <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
-              <Link
-                href="/login"
+              <a
+                href={tmdbLoginHref}
                 className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
               >
                 Iniciar sesión
-              </Link>
+              </a>
             ) : !traktConnected ? (
               <a
                 href={traktProfileConnectHref}
@@ -660,12 +660,12 @@ export default function Navbar() {
             {profileAuthLoading ? (
               <div className="w-9 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
-              <Link
-                href="/login"
+              <a
+                href={tmdbLoginHref}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
               >
                 Acceder
-              </Link>
+              </a>
             ) : !traktConnected ? (
               <a
                 href={traktProfileConnectHref}

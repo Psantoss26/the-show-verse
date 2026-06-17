@@ -1092,8 +1092,12 @@ function SkeletonCard({ viewMode = "cards" }) {
 // ----------------------------
 // MAIN PAGE
 // ----------------------------
-export default function InProgressClient() {
-  const [auth, setAuth] = useState({ loading: true, connected: false });
+export default function InProgressClient({
+  initialAuth = { loading: true, connected: false },
+}) {
+  const initialAuthLoading = !!initialAuth?.loading;
+  const initialAuthConnected = !!initialAuth?.connected;
+  const [auth, setAuth] = useState(initialAuth);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [items, setItems] = useState([]);
@@ -1219,22 +1223,71 @@ export default function InProgressClient() {
   }, []);
 
   useEffect(() => {
-    const cached = readSessionCache(
-      IN_PROGRESS_CACHE_KEY,
-      IN_PROGRESS_CACHE_TTL,
-    );
+    let cancelled = false;
 
-    if (cached?.items || cached?.stats) {
-      setItems(Array.isArray(cached?.items) ? cached.items : []);
-      setStats(cached?.stats || null);
+    const markDisconnected = () => {
+      clearSessionCache(IN_PROGRESS_CACHE_KEY);
+      clearSessionCache(COMPLETED_CACHE_KEY);
+      setItems([]);
+      setStats(null);
+      setCompletedItems([]);
+      setCompletedStats(null);
+      setCompletedLoaded(false);
       setDataLoaded(true);
-      setAuth({ loading: false, connected: true });
-      void loadData({ background: true });
-      return;
-    }
+      setLoading(false);
+      setCompletedLoading(false);
+      setAuth({ loading: false, connected: false });
+    };
 
-    void loadData();
-  }, [loadData]);
+    const bootstrap = async () => {
+      if (!initialAuthLoading && !initialAuthConnected) {
+        markDisconnected();
+        return;
+      }
+
+      try {
+        const statusRes = await fetch("/api/trakt/auth/status", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const status = await statusRes.json().catch(() => null);
+
+        if (cancelled) return;
+
+        if (!statusRes.ok || !status?.connected || status?.degraded) {
+          markDisconnected();
+          return;
+        }
+
+        const cached = readSessionCache(
+          IN_PROGRESS_CACHE_KEY,
+          IN_PROGRESS_CACHE_TTL,
+        );
+
+        setAuth({ loading: false, connected: true });
+
+        if (cached?.items || cached?.stats) {
+          setItems(Array.isArray(cached?.items) ? cached.items : []);
+          setStats(cached?.stats || null);
+          setDataLoaded(true);
+          void loadData({ background: true });
+          return;
+        }
+
+        void loadData();
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Error checking Trakt auth:", error);
+        markDisconnected();
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialAuthConnected, initialAuthLoading, loadData]);
 
   // Cargar completadas desde sessionStorage si hay caché disponible
   useEffect(() => {

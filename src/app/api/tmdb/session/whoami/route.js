@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 export async function GET() {
-  const jar = cookies()
+  const jar = await cookies()
   const session_id = jar.get('tmdb_session_id')?.value || null
   if (!session_id) {
     return new Response(JSON.stringify({ session_id: null }), { status: 200 })

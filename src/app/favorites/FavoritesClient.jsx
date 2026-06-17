@@ -1907,8 +1907,8 @@ const FavoriteCard = memo(function FavoriteCard({
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = animateEntry && index < 60;
   const shellClassName = deferOffscreenContent
-    ? "sv-favorite-card-deferred relative z-0 overflow-visible hover:z-[80] focus-within:z-[80]"
-    : "relative z-0 overflow-visible hover:z-[80] focus-within:z-[80]";
+    ? "sv-favorite-card-deferred relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]"
+    : "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
   const shellStyle = deferOffscreenContent
     ? {
         "--sv-favorite-card-intrinsic-size":
@@ -2220,9 +2220,10 @@ const FavoriteCard = memo(function FavoriteCard({
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
-  const { session, account, hydrated } = useAuth();
+  const { session, account, hydrated, logout } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
   const [ratedItems, setRatedItems] = useState(
     () => readFavoritesCache()?.ratedItems || [],
@@ -2288,6 +2289,7 @@ export default function FavoritesClient() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
+  const tmdbLogoutInFlightRef = useRef(false);
   const [initialCardBudget, setInitialCardBudget] = useState(() =>
     getInitialFavoriteCardBudget(viewMode, imageMode),
   );
@@ -2327,6 +2329,28 @@ export default function FavoritesClient() {
   const handleToggleImageMode = useCallback(() => {
     handleImageModeChange(imageMode === "poster" ? "backdrop" : "poster");
   }, [handleImageModeChange, imageMode]);
+
+  const handleTmdbLogout = useCallback(async () => {
+    if (logoutLoading) return;
+    tmdbLogoutInFlightRef.current = true;
+    setLogoutLoading(true);
+    try {
+      const res = await fetch("/auth/tmdb/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("No se pudo cerrar la sesión de TMDb");
+      setItems([]);
+      setRatedItems([]);
+      setLoading(false);
+      logout();
+    } catch (error) {
+      tmdbLogoutInFlightRef.current = false;
+      console.error("Error cerrando sesión TMDb:", error);
+      setLogoutLoading(false);
+      alert("No se pudo cerrar la sesión de TMDb. Inténtalo de nuevo.");
+    }
+  }, [logout, logoutLoading]);
 
   useEffect(() => {
     if (!suppressCachedEntryAnimations) return undefined;
@@ -2409,6 +2433,11 @@ export default function FavoritesClient() {
   // Load favorites
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const shouldIgnoreExpectedLogoutError = () =>
+      cancelled ||
+      controller.signal.aborted ||
+      tmdbLogoutInFlightRef.current;
 
     const getItemType = (item) =>
       item?.media_type || (item?.title ? "movie" : "tv");
@@ -2427,14 +2456,27 @@ export default function FavoritesClient() {
         // is available from the very first render — avoids the flash
         // of "Sin puntuar" when grouped by user_rating.
         const [favResponse, rated] = await Promise.all([
-          fetch("/api/tmdb/account/favorite"),
+          fetch("/api/tmdb/account/favorite", { signal: controller.signal }),
           fetchRatedForUser(account.id, session).catch((err) => {
+            if (shouldIgnoreExpectedLogoutError()) return [];
             console.error("Error loading rated items:", err);
             return [];
           }),
         ]);
 
+        if (shouldIgnoreExpectedLogoutError()) return;
+
         if (!favResponse.ok) {
+          if (
+            shouldIgnoreExpectedLogoutError() ||
+            favResponse.status === 401 ||
+            !session ||
+            !account?.id
+          ) {
+            setItems([]);
+            setRatedItems([]);
+            return;
+          }
           console.error(
             "API error:",
             favResponse.status,
@@ -2445,6 +2487,7 @@ export default function FavoritesClient() {
         }
 
         const text = await favResponse.text();
+        if (shouldIgnoreExpectedLogoutError()) return;
         if (!text) {
           console.error("Empty response from API");
           setItems([]);
@@ -2502,6 +2545,9 @@ export default function FavoritesClient() {
           }
         }
       } catch (error) {
+        if (shouldIgnoreExpectedLogoutError() || error?.name === "AbortError") {
+          return;
+        }
         console.error("Error loading favorites:", error);
         if (!cancelled) {
           setItems([]);
@@ -2516,6 +2562,7 @@ export default function FavoritesClient() {
     loadFavorites();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [session, account]);
 
@@ -3210,7 +3257,7 @@ export default function FavoritesClient() {
                 favoritos sincronizados.
               </p>
               <Link
-                href="/login?next=/favorites"
+                href="/api/tmdb/auth/start?next=/favorites"
                 className="px-8 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:from-blue-400 hover:to-blue-500 transition shadow-lg shadow-blue-500/20"
               >
                 Conectar ahora
@@ -3280,18 +3327,9 @@ export default function FavoritesClient() {
                     transition={{ duration: 0.4, delay: 0.4 }}
                   >
                     <LiquidButton
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          window.localStorage.removeItem("tmdb_session");
-                          window.localStorage.removeItem("tmdb_session_id");
-                          window.localStorage.removeItem("tmdb_account");
-                          document.cookie =
-                            "tmdb_session_id=; path=/; max-age=0";
-                          window.location.href = "/";
-                        }
-                      }}
-                      disabled={loading}
-                      loading={loading}
+                      onClick={handleTmdbLogout}
+                      disabled={loading || logoutLoading}
+                      loading={loading || logoutLoading}
                       activeColor="red"
                       groupId="favorites-header-actions"
                       title="Desconectar cuenta TMDb"

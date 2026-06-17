@@ -108,10 +108,10 @@ export default function CallbackPage() {
                             <div className="text-lg font-extrabold">No se pudo iniciar sesión</div>
                             <div className="text-sm text-zinc-400 mt-1">{err}</div>
                             <button
-                                onClick={() => router.replace('/login')}
+                                onClick={() => router.replace('/')}
                                 className="mt-5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm font-bold"
                             >
-                                Volver a login
+                                Volver al inicio
                             </button>
                         </div>
                     </div>

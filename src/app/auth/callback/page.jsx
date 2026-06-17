@@ -1,19 +1,24 @@
-// /src/app/auth/callback/page.jsx
-import { Suspense } from 'react'
-import CallbackClient from './CallbackClient'
+import { redirect } from "next/navigation";
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata = {
-    title: 'Conectando cuenta',
-}
+  title: "Conectando cuenta",
+};
 
-export default function CallbackPage() {
-    // fallback null = no “Cargando...” durante el prerender
-    return (
-        <Suspense fallback={null}>
-            <CallbackClient />
-        </Suspense>
-    )
+export default async function CallbackPage({ searchParams }) {
+  const sp = await Promise.resolve(searchParams);
+  const usp = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(sp || {})) {
+    if (Array.isArray(value)) {
+      value.forEach((entry) => usp.append(key, entry));
+    } else if (value != null) {
+      usp.set(key, value);
+    }
+  }
+
+  const qs = usp.toString();
+  redirect(`/api/tmdb/auth/callback${qs ? `?${qs}` : ""}`);
 }

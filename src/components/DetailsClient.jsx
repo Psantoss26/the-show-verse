@@ -1582,7 +1582,9 @@ export default function DetailsClient({
    */
   const requireLogin = () => {
     if (!session || !account?.id) {
-      window.location.href = "/login";
+      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+        window.location.pathname + window.location.search,
+      )}`;
       return true;
     }
     return false;
@@ -6222,7 +6224,9 @@ export default function DetailsClient({
   const handleUnifiedRate = async (value) => {
     // Sin sesion activa, redirigir a login
     if (!session) {
-      window.location.href = "/login";
+      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+        window.location.pathname + window.location.search,
+      )}`;
       return;
     }
 
@@ -9273,7 +9277,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   onRate={handleUnifiedRate}
                   connected={!!session || trakt.connected}
                   onConnect={() => {
-                    window.location.href = "/login";
+                    window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+                      window.location.pathname + window.location.search,
+                    )}`;
                   }}
                 />
 
@@ -10108,7 +10114,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
              ================================================================= */}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
-          <div className="mt-6 space-y-14">
+          <div className="mt-14 space-y-14">
             <section id="section-cast" ref={registerSection("cast")}>
               <AnimatedSection delay={0.04}>
                 {/* === REPARTO PRINCIPAL (Cast) === */}
