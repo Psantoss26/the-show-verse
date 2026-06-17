@@ -51,6 +51,11 @@ export default function LiquidButton({
       secondary: [253, 224, 71],
       glow: "rgba(234, 179, 8, 0.5)",
     },
+    amber: {
+      rgb: [245, 158, 11],
+      secondary: [253, 230, 138],
+      glow: "rgba(245, 158, 11, 0.5)",
+    },
     purple: {
       rgb: [168, 85, 247],
       secondary: [216, 180, 254],
