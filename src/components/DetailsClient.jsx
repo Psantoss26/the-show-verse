@@ -8834,6 +8834,13 @@ export default function DetailsClient({
                         <OptimizedImage
                           src={posterLowUrl}
                           alt={title}
+                          priority
+                          unoptimized
+                          sizes={
+                            isBackdropPoster
+                              ? "(max-width: 1024px) 100vw, 600px"
+                              : "(max-width: 1024px) 280px, 320px"
+                          }
                           loading="eager"
                           fetchPriority="high"
                           decoding="async"
@@ -8877,6 +8884,13 @@ ${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || curr
                           <OptimizedImage
                             src={posterHighUrl}
                             alt={title}
+                            priority
+                            unoptimized
+                            sizes={
+                              isBackdropPoster
+                                ? "(max-width: 1024px) 100vw, 600px"
+                                : "(max-width: 1024px) 280px, 320px"
+                            }
                             loading="eager"
                             decoding="async"
                             fetchPriority="high"

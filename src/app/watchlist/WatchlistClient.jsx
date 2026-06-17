@@ -117,6 +117,8 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v1";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v1";
+const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PLEX_LIBRARY_INDEX_CACHE_KEY = "showverse:plex-library-index:v1";
@@ -929,15 +931,79 @@ async function getBestPosterCached(type, id) {
   return p;
 }
 
+function readImageChoiceCache() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(IMAGE_CHOICE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function getStoredImageChoice(kind, key) {
+  const cache = readImageChoiceCache();
+  const entry = cache[`${kind}:${key}`];
+  if (!entry?.path) return null;
+  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS) return null;
+  return entry.path;
+}
+
+function writeImageChoice(kind, key, path) {
+  if (typeof window === "undefined" || !path) return;
+  try {
+    const cache = readImageChoiceCache();
+    cache[`${kind}:${key}`] = { path, t: Date.now() };
+    window.localStorage.setItem(IMAGE_CHOICE_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function getCachedSmartPosterUrl(item, mode = "poster") {
+  const type = item.media_type || (item.title ? "movie" : "tv");
+  const id = item.id;
+  const key = `${type}:${id}`;
+
+  if (mode === "backdrop") {
+    const cachedBackdrop = backdropChoiceCache.has(key)
+      ? backdropChoiceCache.get(key)
+      : null;
+    const storedBackdrop = getStoredImageChoice("backdrop", key);
+    const path = cachedBackdrop || storedBackdrop || null;
+    return path ? buildImg(path, "w1280") : null;
+  }
+
+  const preferredPoster = getPosterPreference(type, id);
+  const cachedPoster = posterChoiceCache.has(key)
+    ? posterChoiceCache.get(key)
+    : null;
+  const storedPoster = getStoredImageChoice("poster", key);
+  const path = preferredPoster || cachedPoster || storedPoster || null;
+  return path ? buildImg(path, "w500") : null;
+}
+
 function SmartPoster({ item, title, mode = "poster" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
+  const imageKey = `${type}:${id}`;
+  const initialSrc = getCachedSmartPosterUrl(item, mode);
 
-  const [src, setSrc] = useState(null);
-  const [ready, setReady] = useState(false);
+  const [src, setSrc] = useState(initialSrc);
+  const [ready, setReady] = useState(Boolean(initialSrc));
 
   useEffect(() => {
     let abort = false;
+
+    const cachedUrl = getCachedSmartPosterUrl(item, mode);
+    if (cachedUrl) {
+      setSrc(cachedUrl);
+      setReady(true);
+      return () => {
+        abort = true;
+      };
+    }
 
     setSrc(null);
     setReady(false);
@@ -950,6 +1016,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
         if (url) await preloadImage(url);
         if (!abort) {
+          writeImageChoice("backdrop", imageKey, finalPath);
           setSrc(url);
           setReady(!!url);
         }
@@ -961,6 +1028,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         const url = buildImg(pref, "w500");
         await preloadImage(url);
         if (!abort) {
+          writeImageChoice("poster", imageKey, pref);
           setSrc(url);
           setReady(true);
         }
@@ -972,6 +1040,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
       if (!abort) {
+        writeImageChoice("poster", imageKey, finalPath);
         setSrc(url);
         setReady(!!url);
       }
@@ -981,7 +1050,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, item.poster_path, item.backdrop_path]);
+  }, [mode, type, id, imageKey, item.poster_path, item.backdrop_path, item]);
 
   return (
     <div className="relative w-full h-full">
