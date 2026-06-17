@@ -2,11 +2,14 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 
 export async function POST() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('tmdb_session_id')
   const sessionId = sessionCookie?.value
 

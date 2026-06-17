@@ -1,24 +1,26 @@
-// /src/app/login/page.jsx
-import { Suspense } from 'react'
-import LoginClient from './LoginClient'
+import { redirect } from "next/navigation";
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata = {
-  title: 'Iniciar sesión',
+  title: "Conectando TMDb",
+};
+
+function sanitizeNextPath(nextPath) {
+  if (!nextPath || typeof nextPath !== "string") return "/";
+  if (!nextPath.startsWith("/")) return "/";
+  if (nextPath.startsWith("/login")) return "/";
+  if (nextPath.startsWith("/auth/callback")) return "/";
+  if (nextPath.startsWith("/auth/tmdb/callback")) return "/";
+  if (nextPath.startsWith("/api/tmdb/auth/")) return "/";
+  return nextPath;
 }
 
 export default async function LoginPage({ searchParams }) {
-  // Next (App Router) puede pasar searchParams como Promise
-  const sp = await Promise.resolve(searchParams)
+  const sp = await Promise.resolve(searchParams);
+  const rawNext = typeof sp?.next === "string" ? sp.next : "/";
+  const next = sanitizeNextPath(rawNext);
 
-  const rawNext = typeof sp?.next === 'string' ? sp.next : '/'
-  const next = rawNext.startsWith('/') ? rawNext : '/'
-
-  return (
-    <Suspense fallback={null}>
-      <LoginClient next={next} />
-    </Suspense>
-  )
+  redirect(`/api/tmdb/auth/start?next=${encodeURIComponent(next)}`);
 }

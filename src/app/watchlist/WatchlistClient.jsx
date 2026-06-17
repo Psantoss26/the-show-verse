@@ -1881,8 +1881,9 @@ const WatchlistCard = memo(function WatchlistCard({
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
-  const { session, account, hydrated } = useAuth();
+  const { session, account, hydrated, logout } = useAuth();
   const [loading, setLoading] = useState(() => !readWatchlistCache()?.items);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => readWatchlistCache()?.items || []);
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
@@ -1939,6 +1940,7 @@ export default function WatchlistClient() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
+  const tmdbLogoutInFlightRef = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -2010,8 +2012,36 @@ export default function WatchlistClient() {
     [groupBy],
   );
 
+  const handleTmdbLogout = useCallback(async () => {
+    if (logoutLoading) return;
+    tmdbLogoutInFlightRef.current = true;
+    setLogoutLoading(true);
+    try {
+      const res = await fetch("/auth/tmdb/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("No se pudo cerrar la sesión de TMDb");
+      setItems([]);
+      setLoading(false);
+      logout();
+    } catch (error) {
+      tmdbLogoutInFlightRef.current = false;
+      console.error("Error cerrando sesión TMDb:", error);
+      setLogoutLoading(false);
+      alert("No se pudo cerrar la sesión de TMDb. Inténtalo de nuevo.");
+    }
+  }, [logout, logoutLoading]);
+
   // Load watchlist
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const shouldIgnoreExpectedLogoutError = () =>
+      cancelled ||
+      controller.signal.aborted ||
+      tmdbLogoutInFlightRef.current;
+
     const loadWatchlist = async () => {
       if (!session || !account?.id) {
         setLoading(false);
@@ -2020,15 +2050,29 @@ export default function WatchlistClient() {
 
       try {
         setLoading(items.length === 0);
-        const response = await fetch("/api/tmdb/account/watchlist");
+        const response = await fetch("/api/tmdb/account/watchlist", {
+          signal: controller.signal,
+        });
+
+        if (shouldIgnoreExpectedLogoutError()) return;
 
         if (!response.ok) {
+          if (
+            shouldIgnoreExpectedLogoutError() ||
+            response.status === 401 ||
+            !session ||
+            !account?.id
+          ) {
+            setItems([]);
+            return;
+          }
           console.error("API error:", response.status, response.statusText);
           setItems([]);
           return;
         }
 
         const text = await response.text();
+        if (shouldIgnoreExpectedLogoutError()) return;
         if (!text) {
           console.error("Empty response from API");
           setItems([]);
@@ -2055,14 +2099,21 @@ export default function WatchlistClient() {
         setItems(watchlistWithIndex);
         writeWatchlistCache(watchlistWithIndex);
       } catch (error) {
+        if (shouldIgnoreExpectedLogoutError() || error?.name === "AbortError") {
+          return;
+        }
         console.error("Error loading watchlist:", error);
         setItems([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadWatchlist();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [session, account]);
 
   // Prefetch IMDb scores in background (non-blocking)
@@ -2652,7 +2703,7 @@ export default function WatchlistClient() {
                 títulos pendientes sincronizada.
               </p>
               <Link
-                href="/login?next=/watchlist"
+                href="/api/tmdb/auth/start?next=/watchlist"
                 className="px-8 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:from-blue-400 hover:to-blue-500 transition shadow-lg shadow-blue-500/20"
               >
                 Conectar ahora
@@ -2722,18 +2773,9 @@ export default function WatchlistClient() {
                     transition={{ duration: 0.4, delay: 0.4 }}
                   >
                     <LiquidButton
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          window.localStorage.removeItem("tmdb_session");
-                          window.localStorage.removeItem("tmdb_session_id");
-                          window.localStorage.removeItem("tmdb_account");
-                          document.cookie =
-                            "tmdb_session_id=; path=/; max-age=0";
-                          window.location.href = "/";
-                        }
-                      }}
-                      disabled={loading}
-                      loading={loading}
+                      onClick={handleTmdbLogout}
+                      disabled={loading || logoutLoading}
+                      loading={loading || logoutLoading}
                       activeColor="red"
                       groupId="watchlist-header-actions"
                       title="Desconectar cuenta TMDb"

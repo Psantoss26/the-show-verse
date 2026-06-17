@@ -806,7 +806,9 @@ function InlinePreviewCard({ show, heightClass }) {
 
   const requireLogin = () => {
     if (!session || !account?.id) {
-      window.location.href = "/login";
+      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+        window.location.pathname + window.location.search,
+      )}`;
       return true;
     }
     return false;

@@ -1,21 +1,14 @@
 "use client";
 
 export default function LoginButton() {
-  const handleLogin = async () => {
-    try {
-      const res = await fetch("/api/tmdb/auth/request-token", {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json?.authenticate_url) {
-        throw new Error(json?.error || "No se pudo iniciar el login");
-      }
-
-      window.location.href = json.authenticate_url;
-    } catch (e) {
-      console.error("Error iniciando login TMDb", e);
-      alert("No se pudo iniciar el inicio de sesión con TMDb");
-    }
+  const handleLogin = () => {
+    const next =
+      typeof window === "undefined"
+        ? "/"
+        : `${window.location.pathname}${window.location.search}`;
+    window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+      next,
+    )}`;
   };
 
   return (

@@ -1853,7 +1853,7 @@ export default function ListsPage() {
             personalizadas.
           </p>
           <Link
-            href="/login"
+            href="/api/tmdb/auth/start?next=/lists"
             className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition"
           >
             Iniciar Sesión

@@ -3239,31 +3239,38 @@ export default function HistoryClient() {
             )}
 
             {!auth.loading && !auth.connected ? (
-              <div className="flex flex-col items-center justify-center py-24 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed">
-                <div className="mb-6">
-                  <OptimizedImage
-                    src="/logo-Trakt.png"
-                    alt="Trakt Logo"
-                    className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
-                  />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Conecta tu cuenta de Trakt
-                </h2>
-                <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                  Para ver tu historial de visualizaciones sincronizado,
-                  necesitas iniciar sesión.
-                </p>
-                <button
-                  onClick={() =>
-                    window.location.assign(
-                      "/api/trakt/auth/start?next=/history",
-                    )
-                  }
-                  className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+              <div className="flex items-center justify-center py-12 lg:py-24">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
                 >
-                  Conectar ahora
-                </button>
+                  <div className="mb-6">
+                    <OptimizedImage
+                      src="/logo-Trakt.png"
+                      alt="Trakt Logo"
+                      className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
+                    />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    Conecta tu cuenta de Trakt
+                  </h2>
+                  <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+                    Para ver tu historial de visualizaciones sincronizado,
+                    necesitas iniciar sesión.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.location.assign(
+                        "/api/trakt/auth/start?next=/history",
+                      )
+                    }
+                    className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+                  >
+                    Conectar ahora
+                  </button>
+                </motion.div>
               </div>
             ) : !historyLoaded && loading ? null : historyLoaded &&
               filtered.length === 0 &&

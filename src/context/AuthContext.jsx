@@ -23,24 +23,44 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const storedSession =
+        let sessionFromCookie = false;
+        let storedSession =
           window.localStorage.getItem(SESSION_STORAGE_KEY) ||
           window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
         const storedAccount = window.localStorage.getItem(ACCOUNT_STORAGE_KEY);
+
+        if (!storedSession) {
+          try {
+            const sessionRes = await fetch("/api/tmdb/session/whoami", {
+              cache: "no-store",
+            });
+            const sessionJson = await sessionRes.json().catch(() => ({}));
+            if (sessionRes.ok && sessionJson?.session_id) {
+              storedSession = sessionJson.session_id;
+              sessionFromCookie = true;
+            }
+          } catch (e) {
+            console.warn("No se pudo leer la sesión TMDb desde cookie", e);
+          }
+        }
 
         if (storedSession) {
           window.localStorage.setItem(SESSION_STORAGE_KEY, storedSession);
           window.localStorage.setItem(LEGACY_SESSION_STORAGE_KEY, storedSession);
           if (!cancelled) setSession(storedSession);
-          // Asegurar que la cookie tiene el nombre correcto (tmdb_session_id)
-          document.cookie = `tmdb_session_id=${encodeURIComponent(
-            storedSession,
-          )}; path=/; max-age=31536000`;
-          // Limpiar cookie vieja si existe
-          document.cookie = "tmdb_session=; path=/; max-age=0";
+          if (!sessionFromCookie) {
+            // Asegurar que la cookie tiene el nombre correcto para sesiones legacy.
+            document.cookie = `tmdb_session_id=${encodeURIComponent(
+              storedSession,
+            )}; path=/; max-age=31536000`;
+            document.cookie = "tmdb_session=; path=/; max-age=0";
+          }
         }
 
-        if (storedAccount) {
+        if (!storedSession && storedAccount) {
+          window.localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+          if (!cancelled) setAccount(null);
+        } else if (storedAccount) {
           try {
             const parsedAccount = JSON.parse(storedAccount);
             if (!cancelled) setAccount(parsedAccount);
