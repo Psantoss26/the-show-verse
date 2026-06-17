@@ -107,6 +107,14 @@ body {
   .sv-details-sections > section {
     contain-intrinsic-size: auto none auto 620px;
   }
+
+  .sv-favorite-card-deferred {
+    content-visibility: auto;
+    contain-intrinsic-size: var(
+      --sv-favorite-card-intrinsic-size,
+      auto none auto 340px
+    );
+  }
 }
 
 @supports not (content-visibility: auto) {
