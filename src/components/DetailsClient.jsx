@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 // -- Hooks de React --
 import {
   Children,
@@ -1198,7 +1199,7 @@ function AwardCard({ item }) {
 
           {item?.groupImageUrl && (
             <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
-              <img
+              <OptimizedImage
                 src={item.groupImageUrl}
                 alt=""
                 className="h-full w-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)] rounded-lg"
@@ -8815,7 +8816,7 @@ export default function DetailsClient({
                             transition={{ duration: 0.45, ease: "easeInOut" }}
                             className="absolute inset-0 z-0"
                           >
-                            <img
+                            <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
                               alt={title}
                               className="absolute inset-0 w-full h-full object-cover"
@@ -8830,7 +8831,7 @@ export default function DetailsClient({
                     {posterLowUrl && !currentImgError && (
                       <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10">
                         {/* LOW */}
-                        <img
+                        <OptimizedImage
                           src={posterLowUrl}
                           alt={title}
                           loading="eager"
@@ -8873,7 +8874,7 @@ ${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || curr
 
                         {/* HIGH */}
                         {currentLowLoaded && posterHighUrl && (
-                          <img
+                          <OptimizedImage
                             src={posterHighUrl}
                             alt={title}
                             loading="eager"
@@ -9039,7 +9040,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           aria-label={p.provider_name}
                           className="group/provider relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
                         >
-                          <img
+                          <OptimizedImage
                             src={
                               p.logo_path?.startsWith("http")
                                 ? p.logo_path
@@ -9098,7 +9099,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             aria-label={link.label}
                             className="group/extlink relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
                           >
-                            <img
+                            <OptimizedImage
                               src={link.icon}
                               alt=""
                               className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
@@ -10121,7 +10122,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {actor.profile_path ? (
-                                  <img
+                                  <OptimizedImage
                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                     alt={actor.name}
                                     className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
@@ -10262,7 +10263,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 }
                               >
                                 <div className="aspect-[2/3] overflow-hidden relative">
-                                  <img
+                                  <OptimizedImage
                                     src={
                                       rec.poster_path
                                         ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
@@ -10303,7 +10304,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                                               {tmdbScore.toFixed(1)}
                                             </span>
-                                            <img
+                                            <OptimizedImage
                                               src="/logo-TMDb.png"
                                               alt=""
                                               className="w-auto h-2.5 opacity-100"
@@ -10317,7 +10318,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
                                               {Number(imdbScore).toFixed(1)}
                                             </span>
-                                            <img
+                                            <OptimizedImage
                                               src="/logo-IMDb.svg"
                                               alt=""
                                               className="w-auto h-3 opacity-100"
@@ -10437,7 +10438,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               >
                                 <div className="aspect-[2/3] overflow-hidden relative">
                                   {m.poster_path ? (
-                                    <img
+                                    <OptimizedImage
                                       src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
                                       alt={m.title}
                                       className={colImageClass}
@@ -11116,7 +11117,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           <div
                                             className={`relative w-full ${aspect} bg-black/40`}
                                           >
-                                            <img
+                                            <OptimizedImage
                                               src={imgSrc}
                                               srcSet={imgSrcSet}
                                               sizes={imgSizes}
@@ -11283,7 +11284,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
-                                        <img
+                                        <OptimizedImage
                                           src={thumb || fallback}
                                           alt={v.name || "Video"}
                                           className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
@@ -11457,7 +11458,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     >
                                       <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
                                         {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
-                                        <img
+                                        <OptimizedImage
                                           src={
                                             track.artworkUrl ||
                                             "/placeholder.png"
@@ -11470,7 +11471,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           aria-hidden="true"
                                         />
                                         {/* Portada completa sin recortes */}
-                                        <img
+                                        <OptimizedImage
                                           src={
                                             track.artworkUrl ||
                                             "/placeholder.png"
@@ -11562,7 +11563,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner">
-                                <img
+                                <OptimizedImage
                                   src="/logo-Trakt.png"
                                   alt="Trakt"
                                   className="h-full w-full object-cover"
@@ -11885,7 +11886,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className="relative isolate flex flex-col p-6 overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-white/5 gap-4"
                               >
                                 <div className="relative z-10 flex items-center gap-4">
-                                  <img
+                                  <OptimizedImage
                                     src={avatar}
                                     alt={r.author}
                                     className="w-12 h-12 rounded-full object-cover shadow-lg"
@@ -11993,7 +11994,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 >
                                   {/* Avatar */}
                                   <div className="shrink-0">
-                                    <img
+                                    <OptimizedImage
                                       src={avatar}
                                       alt={user?.username}
                                       className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
@@ -12154,7 +12155,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     {/* Footer */}
                                     <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <img
+                                        <OptimizedImage
                                           src={avatar}
                                           alt={username || "user"}
                                           className="h-6 w-6 rounded-full ring-1 ring-white/20"

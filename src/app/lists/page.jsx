@@ -1,6 +1,7 @@
 // /src/app/lists/page.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import {
   useEffect,
@@ -283,7 +284,7 @@ function TmdbImg({ filePath, size = "w780", alt, className = "" }) {
   }
 
   return (
-    <img
+    <OptimizedImage
       src={`https://image.tmdb.org/t/p/${size}${filePath}`}
       alt={alt}
       className={className}
@@ -715,7 +716,7 @@ const ListItemCard = memo(function ListItemCard({
         style={{ borderColor: "rgba(255, 255, 255, 0.05)" }}
       >
         {posterUrl && !imgFailed ? (
-          <img
+          <OptimizedImage
             src={posterUrl}
             alt={title}
             loading="lazy"
@@ -756,7 +757,7 @@ const ListItemCard = memo(function ListItemCard({
                 <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
                   {tmdbScore}
                 </span>
-                <img
+                <OptimizedImage
                   src="/logo-TMDb.png"
                   alt=""
                   className="h-2 w-auto sm:h-2.5"
@@ -770,7 +771,7 @@ const ListItemCard = memo(function ListItemCard({
                     ? imdbScore.toFixed(1)
                     : imdbScore}
                 </span>
-                <img
+                <OptimizedImage
                   src="/logo-IMDb.svg"
                   alt=""
                   className="h-2.5 w-auto sm:h-3"

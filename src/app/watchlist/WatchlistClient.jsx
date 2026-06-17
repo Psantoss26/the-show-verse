@@ -1,6 +1,7 @@
 // src/app/watchlist/WatchlistClient.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   useEffect,
   useState,
@@ -993,7 +994,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
       </div>
 
       {src ? (
-        <img
+        <OptimizedImage
           src={src}
           alt={title}
           loading="lazy"
@@ -1023,7 +1024,7 @@ function StatBox({
         className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
       >
         {imgSrc ? (
-          <img
+          <OptimizedImage
             src={imgSrc}
             alt={label}
             className={`w-auto object-contain opacity-85 shrink-0 transition-all duration-300 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
@@ -1665,7 +1666,7 @@ const WatchlistCard = memo(function WatchlistCard({
                       <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                         {rating}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-TMDb.png"
                         alt=""
                         className="w-auto h-2.5 opacity-100"
@@ -1679,7 +1680,7 @@ const WatchlistCard = memo(function WatchlistCard({
                           ? imdbScore.toFixed(1)
                           : imdbScore}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-IMDb.svg"
                         alt=""
                         className="w-auto h-3 opacity-100"
@@ -1693,7 +1694,7 @@ const WatchlistCard = memo(function WatchlistCard({
                           ? traktScore.toFixed(1)
                           : traktScore}
                       </span>
-                      <img
+                      <OptimizedImage
                         src="/logo-Trakt.png"
                         alt=""
                         className="w-auto h-2.5 opacity-100"
@@ -1768,7 +1769,7 @@ const WatchlistCard = memo(function WatchlistCard({
                     <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
                       {rating}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-TMDb.png"
                       alt=""
                       className="w-auto h-2.5 opacity-100"
@@ -1782,7 +1783,7 @@ const WatchlistCard = memo(function WatchlistCard({
                         ? imdbScore.toFixed(1)
                         : imdbScore}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-IMDb.svg"
                       alt=""
                       className="w-auto h-3 opacity-100"
@@ -1796,7 +1797,7 @@ const WatchlistCard = memo(function WatchlistCard({
                         ? traktScore.toFixed(1)
                         : traktScore}
                     </span>
-                    <img
+                    <OptimizedImage
                       src="/logo-Trakt.png"
                       alt=""
                       className="w-auto h-2.5 opacity-100"
@@ -2591,7 +2592,7 @@ export default function WatchlistClient() {
               className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
             >
               <div className="mb-6">
-                <img
+                <OptimizedImage
                   src="/logo-TMDb.png"
                   alt="TMDb Logo"
                   className="w-24 h-24 object-contain shadow-lg shadow-blue-500/20 rounded-2xl"

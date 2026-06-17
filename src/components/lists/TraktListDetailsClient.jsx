@@ -1,5 +1,7 @@
 'use client'
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -49,7 +51,7 @@ function Poster({ posterPath, alt }) {
     }
 
     return (
-        <img
+        <OptimizedImage
             src={`https://image.tmdb.org/t/p/w500${posterPath}`}
             alt={alt}
             className="w-full h-full object-cover"

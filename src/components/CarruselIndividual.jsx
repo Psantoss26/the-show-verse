@@ -1,5 +1,7 @@
 'use client'
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useRef, useEffect } from 'react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation } from 'swiper/modules'
@@ -43,7 +45,7 @@ export default function CarruselIndividual({ movies = [], title = '', type = 'mo
           <SwiperSlide key={movie.id}>
             <Link href={`/details/${type}/${movie.id}`}>
               <div className="cursor-pointer">
-                <img
+                <OptimizedImage
                   src={`https://image.tmdb.org/t/p/w300${movie.poster_path}`}
                   alt={movie.title}
                   className="w-full h-full object-cover rounded-lg"

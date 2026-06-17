@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   Children,
   useRef,
@@ -758,7 +760,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           {avatarUrl ? (
             <>
-              <img
+              <OptimizedImage
                 src={avatarUrl}
                 alt=""
                 aria-hidden="true"
@@ -768,7 +770,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
                 className="absolute inset-0 h-full w-full scale-105 object-cover object-top opacity-24 blur-xl"
               />
               <div className="absolute right-0 top-0 h-full w-[72%] [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] sm:w-[68%]">
-                <img
+                <OptimizedImage
                   src={avatarUrl}
                   alt=""
                   aria-hidden="true"
@@ -844,7 +846,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
       >
         <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10">
           {avatarUrl ? (
-            <img
+            <OptimizedImage
               src={avatarUrl}
               alt={displayName}
               width={112}
@@ -1154,7 +1156,7 @@ function ProfileUnifiedCard({
             <span className="text-emerald-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
               {Number(tmdbScore).toFixed(1)}
             </span>
-            <img
+            <OptimizedImage
               src="/logo-TMDb.png"
               alt=""
               className="w-auto h-2 sm:h-2.5 opacity-100"
@@ -1166,7 +1168,7 @@ function ProfileUnifiedCard({
             <span className="text-yellow-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
               {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
             </span>
-            <img
+            <OptimizedImage
               src="/logo-IMDb.svg"
               alt=""
               className="w-auto h-2.5 sm:h-3 opacity-100"
@@ -1180,7 +1182,7 @@ function ProfileUnifiedCard({
                 ? traktScore.toFixed(1)
                 : traktScore}
             </span>
-            <img
+            <OptimizedImage
               src="/logo-Trakt.png"
               alt=""
               className="w-auto h-2 sm:h-2.5 opacity-100"
@@ -1231,7 +1233,7 @@ function ProfileUnifiedCard({
         onFocus={handleHover}
       >
         {src && !err ? (
-          <img
+          <OptimizedImage
             src={src}
             alt={title}
             loading="lazy"
@@ -1728,7 +1730,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               className={`${PROFILE_GLASS_SURFACE} max-w-md w-full flex flex-col items-center justify-center py-12 rounded-3xl text-center px-4`}
             >
               <div className="mb-6">
-                <img
+                <OptimizedImage
                   src="/logo-Trakt.png"
                   alt="Trakt Logo"
                   className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"

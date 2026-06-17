@@ -1,6 +1,7 @@
 // /src/app/lists/[listId]/page.jsx
 'use client'
 
+import OptimizedImage from "@/components/OptimizedImage";
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -55,7 +56,7 @@ function TmdbPoster({ path, alt, className = '' }) {
     }
 
     return (
-        <img
+        <OptimizedImage
             src={`https://image.tmdb.org/t/p/w500${path}`}
             alt={alt}
             className={className}

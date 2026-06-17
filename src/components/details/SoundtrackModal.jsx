@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Loader2,
@@ -26,7 +28,7 @@ function SourceLinkIcon({ source, className = "" }) {
   const iconPath = sourceIconPath(source);
   if (iconPath) {
     return (
-      <img
+      <OptimizedImage
         src={iconPath}
         alt=""
         aria-hidden="true"
@@ -263,7 +265,7 @@ export default function SoundtrackModal({
             {/* --- PORTADA --- */}
             <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 mb-8 transition-transform duration-500 hover:scale-[1.02]">
               {selectedTrack.artworkUrl ? (
-                <img
+                <OptimizedImage
                   src={selectedTrack.artworkUrl}
                   alt={selectedTrack.trackName}
                   decoding="async"

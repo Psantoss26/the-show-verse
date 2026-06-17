@@ -1,6 +1,7 @@
 // /src/components/EpisodeDetailsClient.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   useMemo,
   useEffect,
@@ -1683,7 +1684,7 @@ export default function EpisodeDetailsClient({
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
-                          <img
+                          <OptimizedImage
                             src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                             alt={actor.name}
                             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
@@ -1737,7 +1738,7 @@ export default function EpisodeDetailsClient({
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
-                          <img
+                          <OptimizedImage
                             src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                             alt={actor.name}
                             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"

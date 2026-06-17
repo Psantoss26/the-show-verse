@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useState, useRef, useMemo } from "react";
 import {
   format,
@@ -59,7 +61,7 @@ function TmdbPoster({ path, alt, className = "" }) {
   }
 
   return (
-    <img
+    <OptimizedImage
       src={`https://image.tmdb.org/t/p/w342${path}`}
       alt={alt}
       className={className}
@@ -86,7 +88,7 @@ function TmdbBackdrop({ path, fallbackPath, alt, className = "" }) {
   const size = imagePath === fallbackPath && !path ? "w342" : "w780";
 
   return (
-    <img
+    <OptimizedImage
       src={`https://image.tmdb.org/t/p/${size}${imagePath}`}
       alt={alt}
       className={className}

@@ -1,5 +1,7 @@
 'use client'
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useTraktAuth } from '@/lib/trakt/useTraktAuth'
@@ -89,7 +91,7 @@ export default function TraktContinueWatching({ limit = 10 }) {
                         title={x.tmdb?.title}
                     >
                         <div className="relative rounded-xl overflow-hidden border border-white/10">
-                            <img
+                            <OptimizedImage
                                 src={posterSrc(x.tmdb)}
                                 alt={x.tmdb?.title || 'poster'}
                                 className="w-full h-auto block group-hover:opacity-90"

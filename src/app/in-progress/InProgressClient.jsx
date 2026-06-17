@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -393,7 +395,7 @@ function SmartPoster({ item, title }) {
         <Film className="w-8 h-8 text-neutral-700" />
       </div>
       {src && (
-        <img
+        <OptimizedImage
           src={src}
           alt={title}
           loading="lazy"
@@ -452,7 +454,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
         <Tv className="w-8 h-8 text-zinc-700" />
       </div>
       {src && (
-        <img
+        <OptimizedImage
           src={src}
           alt={title}
           loading="lazy"
@@ -1559,7 +1561,7 @@ export default function InProgressClient() {
               className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
             >
               <div className="mb-6">
-                <img
+                <OptimizedImage
                   src="/logo-Trakt.png"
                   alt="Trakt Logo"
                   className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"

@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -132,7 +134,7 @@ function RecommendationCard({ item, onNavigate }) {
     >
       <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
       {backdrop ? (
-        <img
+        <OptimizedImage
           src={backdrop}
           alt=""
           aria-hidden="true"
@@ -145,7 +147,7 @@ function RecommendationCard({ item, onNavigate }) {
 
       <div className="h-32 w-[86px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl shadow-black/50 sm:h-36 sm:w-24">
         {poster ? (
-          <img
+          <OptimizedImage
             src={poster}
             alt={item?.title || ""}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -459,7 +461,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
                               className="group grid grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[2rem] border border-transparent bg-black/20 backdrop-blur-md p-3 transition hover:bg-white/5"
                             >
                               {poster ? (
-                                <img
+                                <OptimizedImage
                                   src={poster}
                                   alt={item?.title}
                                   className="h-20 w-14 rounded-2xl object-cover"

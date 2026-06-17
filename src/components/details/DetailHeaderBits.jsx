@@ -1,6 +1,7 @@
 // src/components/details/DetailHeaderBits.jsx
 "use client";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
@@ -57,7 +58,7 @@ export function CompactBadge({
       <span
         className={`grid h-6 shrink-0 place-items-center ${logoWrapClassName}`}
       >
-        <img
+        <OptimizedImage
           src={logo}
           alt={label || "Provider"}
           draggable="false"
@@ -150,7 +151,7 @@ export function ExternalLinkButton({
       ].join(" ")}
       style={size ? { width: size, height: size } : undefined}
     >
-      <img
+      <OptimizedImage
         src={icon}
         alt=""
         style={

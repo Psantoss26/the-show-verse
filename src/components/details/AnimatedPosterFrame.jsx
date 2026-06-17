@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { ImageOff } from "lucide-react";
@@ -157,7 +159,7 @@ export default function AnimatedPosterFrame({
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
         <div className={`relative bg-neutral-950 overflow-hidden ${aspectClass}`}>
           {src ? (
-            <img
+            <OptimizedImage
               src={src}
               alt={alt}
               className={`absolute inset-0 w-full h-full object-cover transform-gpu ${imgClassName}`}

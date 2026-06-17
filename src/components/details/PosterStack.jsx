@@ -1,6 +1,7 @@
 // src/components/details/PosterStack.jsx
 'use client'
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from 'react'
 
 export default function PosterStack({ posters = [] }) {
@@ -58,7 +59,7 @@ export default function PosterStack({ posters = [] }) {
                 ${isAnyoneHovered && !isHover ? 'brightness-[0.4] blur-[0.5px]' : 'brightness-100'}
               `}
                         >
-                            <img
+                            <OptimizedImage
                                 src={src}
                                 alt="Poster"
                                 loading="lazy"

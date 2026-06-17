@@ -1,5 +1,7 @@
 "use client";
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import { useState } from "react";
 import { ImageOff } from "lucide-react";
@@ -19,7 +21,7 @@ function TmdbPoster({ posterPath, alt, enableHover = true }) {
   return (
     <>
       {!loaded && <div className="absolute inset-0 animate-pulse bg-zinc-900" />}
-      <img
+      <OptimizedImage
         src={`https://image.tmdb.org/t/p/w500${posterPath}`}
         alt={alt}
         className={`h-full w-full object-cover transition-all duration-500 ease-out transform-gpu ${
@@ -90,7 +92,7 @@ export default function ListPosterCard({
                   <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
                     {rating}
                   </span>
-                  <img src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" draggable={false} />
+                  <OptimizedImage src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" draggable={false} />
                 </div>
               ) : null}
               {imdb ? (
@@ -98,7 +100,7 @@ export default function ListPosterCard({
                   <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
                     {imdb}
                   </span>
-                  <img src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" draggable={false} />
+                  <OptimizedImage src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" draggable={false} />
                 </div>
               ) : null}
             </div>

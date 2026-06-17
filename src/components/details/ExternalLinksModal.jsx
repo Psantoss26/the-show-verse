@@ -1,5 +1,7 @@
 'use client'
 
+
+import OptimizedImage from "@/components/OptimizedImage";
 import { AnimatePresence, motion } from 'framer-motion'
 import { ExternalLink, X } from 'lucide-react'
 
@@ -76,7 +78,7 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                     >
                                         <div className="w-10 h-10 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center overflow-hidden">
                                             {it.icon ? (
-                                                <img src={it.icon} alt="" className="w-6 h-6 object-contain" />
+                                                <OptimizedImage src={it.icon} alt="" className="w-6 h-6 object-contain" />
                                             ) : (
                                                 <div className="w-6 h-6" />
                                             )}
