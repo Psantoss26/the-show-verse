@@ -117,7 +117,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v1";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v1";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v2";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -788,38 +788,24 @@ function preloadImage(src) {
   });
 }
 
-function getPosterPreference(type, id) {
-  if (typeof window === "undefined") return null;
-  const key =
-    type === "tv"
-      ? `showverse:tv:${id}:poster`
-      : `showverse:movie:${id}:poster`;
-  return window.localStorage.getItem(key) || null;
-}
-
 function pickBestPosterEN(posters) {
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const maxVotes = posters.reduce(
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const englishPosters = posters.filter((p) => norm(p?.iso_639_1) === "en");
+  if (!englishPosters.length) return null;
+
+  const maxVotes = englishPosters.reduce(
     (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
     0,
   );
-  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
+  const withMaxVotes = englishPosters.filter(
+    (p) => (p.vote_count || 0) === maxVotes,
+  );
   if (!withMaxVotes.length) return null;
 
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-
   return (
-    [...candidates].sort((a, b) => {
+    [...withMaxVotes].sort((a, b) => {
       const va = (b.vote_average || 0) - (a.vote_average || 0);
       if (va !== 0) return va;
       return (b.width || 0) - (a.width || 0);
@@ -839,16 +825,20 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
     return preferSet.has(norm(img?.iso_639_1));
   };
 
+  const englishPool = list.filter(isPreferredLang);
+  if (!englishPool.length) return null;
+
   const pool0 =
-    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
-  const pool = pool0.length ? pool0 : list;
+    minWidth > 0
+      ? englishPool.filter((b) => (b?.width || 0) >= minWidth)
+      : englishPool;
+  const pool = pool0.length ? pool0 : englishPool;
 
   const top3en = [];
   for (const b of pool) {
-    if (isPreferredLang(b)) top3en.push(b);
+    top3en.push(b);
     if (top3en.length === 3) break;
   }
-  if (!top3en.length) return null;
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
 
@@ -905,7 +895,7 @@ async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
@@ -975,12 +965,11 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     return path ? buildImg(path, "w1280") : null;
   }
 
-  const preferredPoster = getPosterPreference(type, id);
   const cachedPoster = posterChoiceCache.has(key)
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = preferredPoster || cachedPoster || storedPoster || null;
+  const path = cachedPoster || storedPoster || null;
   return path ? buildImg(path, "w500") : null;
 }
 
@@ -1019,18 +1008,6 @@ function SmartPoster({ item, title, mode = "poster" }) {
           writeImageChoice("backdrop", imageKey, finalPath);
           setSrc(url);
           setReady(!!url);
-        }
-        return;
-      }
-
-      const pref = getPosterPreference(type, id);
-      if (pref) {
-        const url = buildImg(pref, "w500");
-        await preloadImage(url);
-        if (!abort) {
-          writeImageChoice("poster", imageKey, pref);
-          setSrc(url);
-          setReady(true);
         }
         return;
       }
