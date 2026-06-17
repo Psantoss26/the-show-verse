@@ -36,6 +36,7 @@ import {
 } from "@/lib/api/traktClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
+import { translateGenre } from "@/lib/details/formatters";
 
 // ----------------------------
 // HELPERS
@@ -961,7 +962,7 @@ const InProgressCard = memo(function InProgressCard({
                     <>
                       <span className="text-zinc-600">·</span>
                       <span className="text-xs text-zinc-500">
-                        {item.genres.slice(0, 2).join(", ")}
+                        {item.genres.slice(0, 2).map(translateGenre).join(", ")}
                       </span>
                     </>
                   )}

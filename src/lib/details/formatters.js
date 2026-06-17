@@ -92,3 +92,107 @@ export const mixedCount = (a, b) => {
 }
 
 export const sumCount = (...vals) => vals.reduce((acc, v) => acc + (Number(v || 0) || 0), 0)
+
+const GENRE_TRANSLATIONS = {
+  "action": "Acción",
+  "accion": "Acción",
+  "adventure": "Aventura",
+  "aventura": "Aventura",
+  "animation": "Animación",
+  "animacion": "Animación",
+  "comedy": "Comedia",
+  "comedia": "Comedia",
+  "crime": "Crimen",
+  "crimen": "Crimen",
+  "documentary": "Documental",
+  "documental": "Documental",
+  "drama": "Drama",
+  "family": "Familiar",
+  "familiar": "Familiar",
+  "familia": "Familiar",
+  "fantasy": "Fantasía",
+  "fantasia": "Fantasía",
+  "history": "Historia",
+  "historia": "Historia",
+  "horror": "Terror",
+  "terror": "Terror",
+  "music": "Música",
+  "musica": "Música",
+  "mystery": "Misterio",
+  "misterio": "Misterio",
+  "romance": "Romance",
+  "science fiction": "Ciencia ficción",
+  "ciencia ficción": "Ciencia ficción",
+  "ciencia ficcion": "Ciencia ficción",
+  "sci-fi": "Ciencia ficción",
+  "tv movie": "Película de TV",
+  "película de tv": "Película de TV",
+  "pelicula de tv": "Película de TV",
+  "thriller": "Suspense",
+  "suspense": "Suspense",
+  "war": "Bélica",
+  "belica": "Bélica",
+  "western": "Western",
+  
+  // TV specific and variations
+  "action & adventure": "Acción y aventura",
+  "action and adventure": "Acción y aventura",
+  "acción y aventura": "Acción y aventura",
+  "accion y aventura": "Acción y aventura",
+  "kids": "Infantil",
+  "infantil": "Infantil",
+  "news": "Noticias",
+  "noticias": "Noticias",
+  "reality": "Reality",
+  "sci-fi & fantasy": "Ciencia ficción y fantasía",
+  "sci-fi and fantasy": "Ciencia ficción y fantasía",
+  "science fiction & fantasy": "Ciencia ficción y fantasía",
+  "science fiction and fantasy": "Ciencia ficción y fantasía",
+  "ciencia ficción y fantasía": "Ciencia ficción y fantasía",
+  "ciencia ficcion y fantasia": "Ciencia ficción y fantasía",
+  "soap": "Telenovela",
+  "telenovela": "Telenovela",
+  "talk": "Talk show",
+  "talk show": "Talk show",
+  "war & politics": "Bélica y política",
+  "war and politics": "Bélica y política",
+  "guerra y política": "Bélica y política",
+  "guerra y politica": "Bélica y política",
+  "bélica y política": "Bélica y política",
+  "belica y politica": "Bélica y política"
+};
+
+export function translateGenre(name) {
+  if (!name || typeof name !== 'string') return name;
+  const clean = name.trim().toLowerCase().replace(/\s+/g, ' ');
+  
+  if (GENRE_TRANSLATIONS[clean] !== undefined) {
+    return GENRE_TRANSLATIONS[clean];
+  }
+  
+  // Try mapping by replacing '&' with 'and' or vice versa, or removing accents
+  const cleanNorm = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace('&', 'and')
+    .replace(/\s+/g, ' ')
+    .trim();
+    
+  if (GENRE_TRANSLATIONS[cleanNorm] !== undefined) {
+    return GENRE_TRANSLATIONS[cleanNorm];
+  }
+
+  // Also replace 'and' with '&'
+  const cleanAmp = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\band\b/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (GENRE_TRANSLATIONS[cleanAmp] !== undefined) {
+    return GENRE_TRANSLATIONS[cleanAmp];
+  }
+
+  return name;
+}
