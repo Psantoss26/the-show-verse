@@ -3212,7 +3212,12 @@ export default function FavoritesClient() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 }}
+                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
+                >
                   <div className="relative z-10 mb-1 text-red-400">
                     <Heart className="w-6 h-6 md:w-7 md:h-7 fill-red-400" />
                   </div>
@@ -3222,8 +3227,13 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Total
                   </div>
-                </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.6 }}
+                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
+                >
                   <div className="relative z-10 mb-1 text-sky-400">
                     <Film className="w-6 h-6 md:w-7 md:h-7" />
                   </div>
@@ -3233,8 +3243,13 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Películas
                   </div>
-                </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.7 }}
+                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
+                >
                   <div className="relative z-10 mb-1 text-purple-400">
                     <TvGlyph className="w-6 h-6 md:w-7 md:h-7 text-purple-400" />
                   </div>
@@ -3244,20 +3259,26 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Series
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             )}
           </div>
         </motion.header>
 
-        {/* Filters */}
         <motion.div
-          ref={filtersRef}
-          className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          className="space-y-6 min-w-0"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
         >
+          {/* Filters */}
+          <motion.div
+            ref={filtersRef}
+            className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.5 }}
+          >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -3783,20 +3804,20 @@ export default function FavoritesClient() {
               </button>
             </div>
           </div>
-        </motion.div>
+          </motion.div>
 
-        {/* Scores load silently in background - no loading indicator */}
+          {/* Scores load silently in background - no loading indicator */}
 
-        {/* Content */}
-        {loading ? (
-          <div aria-hidden="true" className="sv-favorites-content-reserve" />
-        ) : sorted.length === 0 ? (
-          <motion.div
-            className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
+          {/* Content */}
+          {loading ? (
+            <div aria-hidden="true" className="sv-favorites-content-reserve" />
+          ) : sorted.length === 0 ? (
+            <motion.div
+              className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+            >
             <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
             <p className="text-zinc-500 font-medium">
               No se encontraron favoritos.
@@ -3809,8 +3830,8 @@ export default function FavoritesClient() {
                 Limpiar búsqueda
               </button>
             )}
-          </motion.div>
-        ) : grouped ? (
+            </motion.div>
+          ) : grouped ? (
           // Grouped view
           <div className="space-y-8">
             {grouped.map((group, groupIndex) => (
@@ -3818,15 +3839,11 @@ export default function FavoritesClient() {
                 key={group.key}
                 ref={(node) => setGroupSectionRef(group.key, node)}
                 className="overflow-visible scroll-mt-[148px]"
-                initial={
-                  suppressCachedEntryAnimations
-                    ? { opacity: 0.96, y: 6 }
-                    : { opacity: 0, y: 20 }
-                }
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  duration: suppressCachedEntryAnimations ? 0.18 : 0.4,
-                  delay: suppressCachedEntryAnimations ? 0 : groupIndex * 0.1,
+                  duration: 0.4,
+                  delay: groupIndex * 0.1,
                   ease: [0.25, 0.1, 0.25, 1],
                 }}
               >
@@ -3871,7 +3888,7 @@ export default function FavoritesClient() {
                               traktScore={traktScores.get(
                                 getScoreItemKey(item),
                               )}
-                              animateEntry={!suppressCachedEntryAnimations}
+                              animateEntry
                               eagerImage={
                                 suppressCachedEntryAnimations && idx < 40
                               }
@@ -3899,7 +3916,7 @@ export default function FavoritesClient() {
                         imageMode={imageMode}
                         imdbScore={imdbScores.get(getScoreItemKey(item))}
                         traktScore={traktScores.get(getScoreItemKey(item))}
-                        animateEntry={!suppressCachedEntryAnimations}
+                        animateEntry
                         eagerImage={suppressCachedEntryAnimations && idx < 40}
                         prioritizeImage={
                           suppressCachedEntryAnimations && idx < 2
@@ -3911,18 +3928,14 @@ export default function FavoritesClient() {
               </motion.div>
             ))}
           </div>
-        ) : (
-          <motion.div
-            key={`flat-grid-${viewMode}-${imageMode}`}
-            className={getItemsGridClass(false)}
-            initial={
-              suppressCachedEntryAnimations
-                ? { opacity: 0.96, y: 6 }
-                : false
-            }
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-          >
+          ) : (
+            <motion.div
+              key={`flat-grid-${viewMode}-${imageMode}`}
+              className={getItemsGridClass(false)}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+            >
             {sorted.map((item, idx) => (
               <FavoriteCard
                 key={getMediaKey(item)}
@@ -3933,13 +3946,14 @@ export default function FavoritesClient() {
                 imageMode={imageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
                 traktScore={traktScores.get(getScoreItemKey(item))}
-                animateEntry={!suppressCachedEntryAnimations}
+                animateEntry
                 eagerImage={suppressCachedEntryAnimations && idx < 40}
                 prioritizeImage={suppressCachedEntryAnimations && idx < 2}
               />
             ))}
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </motion.div>
       </div>
     </div>
   );

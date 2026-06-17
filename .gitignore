@@ -36,3 +36,4 @@ tmpclaude*
 # --- Cobertura / tests ---
 coverage/
 .nyc_output/
+.gstack/
