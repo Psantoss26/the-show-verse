@@ -9253,48 +9253,52 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
-            <FadeIn delay={0.06} className="mb-5 px-1">
+            <FadeIn delay={0.06} className="mb-5 px-1 flex flex-col items-center md:items-start text-center md:text-left">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-3 text-base md:text-lg font-medium text-zinc-300">
-                {yearIso && (
-                  <span className="text-white font-bold tracking-wide">
-                    {yearIso}
-                  </span>
-                )}
+              <div className="flex flex-col md:flex-row md:flex-wrap items-center gap-3 text-base md:text-lg font-medium text-zinc-300 w-full">
+                {/* Metadata: Año, Duración y Estado */}
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                  {yearIso && (
+                    <span className="text-white font-bold tracking-wide">
+                      {yearIso}
+                    </span>
+                  )}
 
-                {yearIso && displayRuntimeValue && (
-                  <span className="w-1 h-1 rounded-full bg-white/30" />
-                )}
+                  {yearIso && displayRuntimeValue && (
+                    <span className="w-1 h-1 rounded-full bg-white/30" />
+                  )}
 
-                {displayRuntimeValue && <span>{displayRuntimeValue}</span>}
+                  {displayRuntimeValue && <span>{displayRuntimeValue}</span>}
 
-                {(yearIso || displayRuntimeValue) && data.status && (
-                  <span className="w-1 h-1 rounded-full bg-white/30" />
-                )}
+                  {(yearIso || displayRuntimeValue) && data.status && (
+                    <span className="w-1 h-1 rounded-full bg-white/30" />
+                  )}
 
-                {data.status && (
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${
-                      data.status === "Ended" || data.status === "Canceled"
-                        ? "bg-red-500/10 border-red-500/20 text-red-300"
-                        : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                    }`}
-                  >
-                    {data.status}
-                  </span>
-                )}
+                  {data.status && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${
+                        data.status === "Ended" || data.status === "Canceled"
+                          ? "bg-red-500/10 border-red-500/20 text-red-300"
+                          : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                      }`}
+                    >
+                      {data.status}
+                    </span>
+                  )}
+                </div>
 
+                {/* Separador entre Metadata y Géneros (oculto en móvil, visible en md+) */}
                 {(yearIso || displayRuntimeValue || data.status) &&
                   data.genres?.length > 0 && (
-                    <span className="w-1 h-1 rounded-full bg-white/30" />
+                    <span className="hidden md:inline-block w-1 h-1 rounded-full bg-white/30" />
                   )}
 
                 {/* Géneros */}
                 {data.genres?.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                     {data.genres.slice(0, 3).map((g) => (
                       <span
                         key={g.id}
