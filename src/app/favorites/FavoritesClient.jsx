@@ -62,6 +62,63 @@ const cardVariants = {
   },
 };
 
+const FAVORITES_IMAGE_ROOT_MARGIN = "140px 0px";
+
+function useNearViewport({ disabled = false, rootMargin = "300px 0px" } = {}) {
+  const ref = useRef(null);
+  const [nearViewport, setNearViewport] = useState(disabled);
+
+  useEffect(() => {
+    if (disabled || nearViewport) return undefined;
+    const node = ref.current;
+    if (!node) return undefined;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setNearViewport(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin, threshold: 0.01 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [disabled, nearViewport, rootMargin]);
+
+  return { ref, nearViewport };
+}
+
+function getInitialFavoriteCardBudget(viewMode, imageMode) {
+  if (typeof window === "undefined") return 12;
+
+  const width = window.innerWidth || 1280;
+  const height = window.innerHeight || 900;
+
+  if (viewMode === "list") {
+    return width >= 1280 ? 4 : 3;
+  }
+
+  if (viewMode === "compact") {
+    if (imageMode === "backdrop") {
+      return width >= 1280 ? 8 : width >= 768 ? 6 : 4;
+    }
+    if (width >= 1280) return height >= 900 ? 16 : 12;
+    if (width >= 768) return 12;
+    return 8;
+  }
+
+  if (imageMode === "backdrop") return width >= 1280 ? 6 : width >= 768 ? 4 : 3;
+  if (width >= 1280) return height >= 900 ? 12 : 8;
+  if (width >= 768) return 8;
+  return 6;
+}
+
 // ================== UTILS & CACHE ==================
 // TMDb Genre mappings
 const MOVIE_GENRES = {
@@ -792,6 +849,19 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
   return path ? buildImg(path, "w500") : null;
 }
 
+function getImmediateSmartPosterUrl(item, mode = "poster") {
+  const cachedUrl = getCachedSmartPosterUrl(item, mode);
+  if (cachedUrl) return cachedUrl;
+
+  const path =
+    mode === "backdrop"
+      ? item.backdrop_path || item.poster_path
+      : item.poster_path || item.backdrop_path;
+
+  if (!path) return null;
+  return buildImg(path, mode === "backdrop" ? "w1280" : "w500");
+}
+
 function SmartPoster({
   item,
   title,
@@ -802,12 +872,26 @@ function SmartPoster({
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
   const imageKey = `${type}:${id}`;
-  const initialSrc = getCachedSmartPosterUrl(item, mode);
+  const shouldLoadImmediately = eager || priority;
+  const { ref, nearViewport } = useNearViewport({
+    disabled: shouldLoadImmediately,
+    rootMargin: FAVORITES_IMAGE_ROOT_MARGIN,
+  });
+  const shouldResolveImage = shouldLoadImmediately || nearViewport;
+  const initialSrc = shouldLoadImmediately
+    ? getImmediateSmartPosterUrl(item, mode)
+    : null;
 
   const [src, setSrc] = useState(initialSrc);
   const [ready, setReady] = useState(Boolean(initialSrc));
 
   useEffect(() => {
+    if (!shouldResolveImage) {
+      setSrc(null);
+      setReady(false);
+      return undefined;
+    }
+
     let abort = false;
 
     const cachedUrl = getCachedSmartPosterUrl(item, mode);
@@ -818,8 +902,9 @@ function SmartPoster({
         abort = true;
       };
     } else {
-      setSrc(null);
-      setReady(false);
+      const immediateUrl = getImmediateSmartPosterUrl(item, mode);
+      setSrc(immediateUrl);
+      setReady(Boolean(immediateUrl));
     }
 
     const load = async () => {
@@ -864,10 +949,19 @@ function SmartPoster({
     return () => {
       abort = true;
     };
-  }, [mode, type, id, imageKey, item.poster_path, item.backdrop_path, item]);
+  }, [
+    mode,
+    type,
+    id,
+    imageKey,
+    item.poster_path,
+    item.backdrop_path,
+    item,
+    shouldResolveImage,
+  ]);
 
   return (
-    <div className="relative w-full h-full">
+    <div ref={ref} className="relative w-full h-full">
       <div
         className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
           ready && src ? "opacity-0" : "opacity-100"
@@ -1738,6 +1832,7 @@ const FavoriteCard = memo(function FavoriteCard({
   animateEntry = true,
   eagerImage = false,
   prioritizeImage = false,
+  deferOffscreenContent = false,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1842,24 +1937,35 @@ const FavoriteCard = memo(function FavoriteCard({
 
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  const shouldAnimate = animateEntry && index < 60;
+  const shellClassName = deferOffscreenContent
+    ? "sv-favorite-card-deferred"
+    : undefined;
+  const shellStyle = deferOffscreenContent
+    ? {
+        "--sv-favorite-card-intrinsic-size":
+          viewMode === "list"
+            ? "auto none auto 150px"
+            : effectiveImageMode === "backdrop"
+              ? "auto none auto 230px"
+              : "auto none auto 340px",
+      }
+    : undefined;
 
   if (viewMode === "list") {
     return (
       <motion.div
-        initial={
-          animateEntry && shouldAnimate
-            ? { opacity: 0, y: 10, scale: 0.95 }
-            : false
-        }
+        className={shellClassName}
+        style={shellStyle}
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{
           duration: 0.25,
-          delay: animateEntry && shouldAnimate ? animDelay : 0,
+          delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={shouldAnimate}
       >
         <Link
           href={href}
@@ -1903,19 +2009,17 @@ const FavoriteCard = memo(function FavoriteCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        initial={
-          animateEntry && shouldAnimate
-            ? { opacity: 0, y: 10, scale: 0.95 }
-            : false
-        }
+        className={shellClassName}
+        style={shellStyle}
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         transition={{
           duration: 0.25,
-          delay: animateEntry && shouldAnimate ? animDelay : 0,
+          delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={shouldAnimate}
       >
         <Link href={href} className="block">
           <motion.div
@@ -2033,14 +2137,14 @@ const FavoriteCard = memo(function FavoriteCard({
   // Grid mode
   return (
     <motion.div
-      initial={
-        animateEntry && shouldAnimate ? { opacity: 0, scale: 0.95 } : false
-      }
+      className={shellClassName}
+      style={shellStyle}
+      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{
         duration: 0.2,
-        delay: animateEntry && shouldAnimate ? animDelay : 0,
+        delay: shouldAnimate ? animDelay : 0,
       }}
     >
       <Link href={href} className="block">
@@ -2215,6 +2319,21 @@ export default function FavoritesClient() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
+  const [initialCardBudget, setInitialCardBudget] = useState(() =>
+    getInitialFavoriteCardBudget(viewMode, imageMode),
+  );
+
+  useEffect(() => {
+    const updateInitialCardBudget = () => {
+      setInitialCardBudget(getInitialFavoriteCardBudget(viewMode, imageMode));
+    };
+
+    updateInitialCardBudget();
+    window.addEventListener("resize", updateInitialCardBudget, {
+      passive: true,
+    });
+    return () => window.removeEventListener("resize", updateInitialCardBudget);
+  }, [viewMode, imageMode]);
 
   useEffect(() => {
     if (!suppressCachedEntryAnimations) return undefined;
@@ -3019,6 +3138,8 @@ export default function FavoritesClient() {
   const resolveItemType = (item) =>
     item?.media_type || (item?.title ? "movie" : "tv");
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
+  const isInitialFavoriteCard = (groupIndex, itemIndex) =>
+    groupIndex < 2 && itemIndex < initialCardBudget;
   const getItemsGridClass = (withTopMargin = false) => {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
@@ -3832,102 +3953,126 @@ export default function FavoritesClient() {
             )}
             </motion.div>
           ) : grouped ? (
-          // Grouped view
-          <div className="space-y-8">
-            {grouped.map((group, groupIndex) => (
-              <motion.div
-                key={group.key}
-                ref={(node) => setGroupSectionRef(group.key, node)}
-                className="overflow-visible scroll-mt-[148px]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.4,
-                  delay: groupIndex * 0.1,
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-              >
-                <GroupDivider
-                  title={group.label}
-                  count={group.items.length}
-                  total={sorted.length}
-                  stats={group.stats}
-                  groupBy={groupBy}
-                  mobileFiltersOpen={mobileFiltersOpen}
-                  forceSticky={forcedStickyGroupKey === group.key}
-                  disableStickyAnimation={forcedStickyGroupKey === group.key}
-                  hasPreviousGroup={groupIndex > 0}
-                  hasNextGroup={groupIndex < grouped.length - 1}
-                  onPreviousGroup={() => scrollToPreviousGroup(group.key)}
-                  onNextGroup={() => scrollToNextGroup(group.key)}
-                />
-                {group.subgroups?.length ? (
-                  <div className="">
-                    {group.subgroups.map((subgroup) => (
+            // Grouped view
+            <div className="space-y-8">
+              {grouped.map((group, groupIndex) => {
+                const shouldAnimateGroup = groupIndex < 2;
+
+                return (
+                  <motion.div
+                    key={group.key}
+                    ref={(node) => setGroupSectionRef(group.key, node)}
+                    className="overflow-visible scroll-mt-[148px]"
+                    initial={
+                      shouldAnimateGroup ? { opacity: 0, y: 20 } : false
+                    }
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: shouldAnimateGroup ? groupIndex * 0.1 : 0,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                  >
+                    <GroupDivider
+                      title={group.label}
+                      count={group.items.length}
+                      total={sorted.length}
+                      stats={group.stats}
+                      groupBy={groupBy}
+                      mobileFiltersOpen={mobileFiltersOpen}
+                      forceSticky={forcedStickyGroupKey === group.key}
+                      disableStickyAnimation={
+                        forcedStickyGroupKey === group.key
+                      }
+                      hasPreviousGroup={groupIndex > 0}
+                      hasNextGroup={groupIndex < grouped.length - 1}
+                      onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                      onNextGroup={() => scrollToNextGroup(group.key)}
+                    />
+                    {group.subgroups?.length ? (
+                      <div className="">
+                        {group.subgroups.map((subgroup) => (
+                          <div
+                            key={`${group.key}-${subgroup.key}`}
+                            className="space-y-1 overflow-visible"
+                          >
+                            <SubGroupDivider
+                              title={subgroup.label}
+                              count={subgroup.items.length}
+                            />
+                            <div
+                              key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                              className={getItemsGridClass(true)}
+                            >
+                              {subgroup.items.map((item, idx) => {
+                                const initiallyVisible = isInitialFavoriteCard(
+                                  groupIndex,
+                                  idx,
+                                );
+
+                                return (
+                                  <FavoriteCard
+                                    key={getMediaKey(item)}
+                                    item={item}
+                                    index={idx}
+                                    totalItems={subgroup.items.length}
+                                    viewMode={viewMode}
+                                    imageMode={imageMode}
+                                    imdbScore={imdbScores.get(
+                                      getScoreItemKey(item),
+                                    )}
+                                    traktScore={traktScores.get(
+                                      getScoreItemKey(item),
+                                    )}
+                                    animateEntry={initiallyVisible}
+                                    eagerImage={initiallyVisible}
+                                    prioritizeImage={
+                                      initiallyVisible && idx < 2
+                                    }
+                                    deferOffscreenContent={!initiallyVisible}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
                       <div
-                        key={`${group.key}-${subgroup.key}`}
-                        className="space-y-1 overflow-visible"
+                        key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                        className={getItemsGridClass(true)}
                       >
-                        <SubGroupDivider
-                          title={subgroup.label}
-                          count={subgroup.items.length}
-                        />
-                        <div
-                          key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                          className={getItemsGridClass(true)}
-                        >
-                          {subgroup.items.map((item, idx) => (
+                        {group.items.map((item, idx) => {
+                          const initiallyVisible = isInitialFavoriteCard(
+                            groupIndex,
+                            idx,
+                          );
+
+                          return (
                             <FavoriteCard
                               key={getMediaKey(item)}
                               item={item}
                               index={idx}
-                              totalItems={subgroup.items.length}
+                              totalItems={group.items.length}
                               viewMode={viewMode}
                               imageMode={imageMode}
                               imdbScore={imdbScores.get(getScoreItemKey(item))}
                               traktScore={traktScores.get(
                                 getScoreItemKey(item),
                               )}
-                              animateEntry
-                              eagerImage={
-                                suppressCachedEntryAnimations && idx < 40
-                              }
-                              prioritizeImage={
-                                suppressCachedEntryAnimations && idx < 2
-                              }
+                              animateEntry={initiallyVisible}
+                              eagerImage={initiallyVisible}
+                              prioritizeImage={initiallyVisible && idx < 2}
+                              deferOffscreenContent={!initiallyVisible}
                             />
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div
-                    key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                    className={getItemsGridClass(true)}
-                  >
-                    {group.items.map((item, idx) => (
-                      <FavoriteCard
-                        key={getMediaKey(item)}
-                        item={item}
-                        index={idx}
-                        totalItems={group.items.length}
-                        viewMode={viewMode}
-                        imageMode={imageMode}
-                        imdbScore={imdbScores.get(getScoreItemKey(item))}
-                        traktScore={traktScores.get(getScoreItemKey(item))}
-                        animateEntry
-                        eagerImage={suppressCachedEntryAnimations && idx < 40}
-                        prioritizeImage={
-                          suppressCachedEntryAnimations && idx < 2
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
           ) : (
             <motion.div
               key={`flat-grid-${viewMode}-${imageMode}`}
@@ -3936,21 +4081,26 @@ export default function FavoritesClient() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             >
-            {sorted.map((item, idx) => (
-              <FavoriteCard
-                key={getMediaKey(item)}
-                item={item}
-                index={idx}
-                totalItems={sorted.length}
-                viewMode={viewMode}
-                imageMode={imageMode}
-                imdbScore={imdbScores.get(getScoreItemKey(item))}
-                traktScore={traktScores.get(getScoreItemKey(item))}
-                animateEntry
-                eagerImage={suppressCachedEntryAnimations && idx < 40}
-                prioritizeImage={suppressCachedEntryAnimations && idx < 2}
-              />
-            ))}
+              {sorted.map((item, idx) => {
+                const initiallyVisible = isInitialFavoriteCard(0, idx);
+
+                return (
+                  <FavoriteCard
+                    key={getMediaKey(item)}
+                    item={item}
+                    index={idx}
+                    totalItems={sorted.length}
+                    viewMode={viewMode}
+                    imageMode={imageMode}
+                    imdbScore={imdbScores.get(getScoreItemKey(item))}
+                    traktScore={traktScores.get(getScoreItemKey(item))}
+                    animateEntry={initiallyVisible}
+                    eagerImage={initiallyVisible}
+                    prioritizeImage={initiallyVisible && idx < 2}
+                    deferOffscreenContent={!initiallyVisible}
+                  />
+                );
+              })}
             </motion.div>
           )}
         </motion.div>
