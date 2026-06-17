@@ -8901,7 +8901,16 @@ export default function DetailsClient({
             }}
           >
             {/* Poster Card */}
-            <div className="relative">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{
+                duration: 0.64,
+                delay: 0.08,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="relative"
+            >
               {/* Wrapper: solo perspectiva + captura puntero */}
               <div
                 ref={posterWrapRef}
@@ -9110,7 +9119,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
             {(limitedProviders && limitedProviders.length > 0) ||
