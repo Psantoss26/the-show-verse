@@ -145,7 +145,7 @@ const MOVIE_GENRES = {
 };
 
 const TV_GENRES = {
-  10759: "Acción y Aventura",
+  10759: "Acción y aventura",
   16: "Animación",
   35: "Comedia",
   80: "Crimen",
@@ -156,10 +156,10 @@ const TV_GENRES = {
   9648: "Misterio",
   10763: "Noticias",
   10764: "Reality",
-  10765: "Sci-Fi & Fantasy",
+  10765: "Ciencia ficción y fantasía",
   10766: "Telenovela",
-  10767: "Talk Show",
-  10768: "Guerra y Política",
+  10767: "Talk show",
+  10768: "Bélica y política",
   37: "Western",
 };
 

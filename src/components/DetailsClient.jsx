@@ -172,6 +172,7 @@ import {
   formatDateTimeEs,
   mixedCount,
   sumCount,
+  translateGenre,
 } from "@/lib/details/formatters";
 
 // -- Gestion de listas de usuario en TMDb (CRUD) --
@@ -8850,7 +8851,7 @@ export default function DetailsClient({
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 items-start transform-gpu"
+          className="flex flex-col lg:flex-row gap-6 lg:gap-12 mb-12 items-start transform-gpu"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
@@ -9253,7 +9254,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
-            <FadeIn delay={0.06} className="mb-5 px-1 flex flex-col items-center md:items-start text-center md:text-left">
+            <FadeIn delay={0.06} className="mb-6 px-1 flex flex-col items-center md:items-start text-center md:text-left">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
@@ -9285,7 +9286,25 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
                       }`}
                     >
-                      {data.status}
+                      {data.status === "Released"
+                        ? "Estrenada"
+                        : data.status === "Ended"
+                          ? "Finalizada"
+                          : data.status === "Returning Series"
+                            ? "En emisión"
+                            : data.status === "Canceled"
+                              ? "Cancelada"
+                              : data.status === "In Production"
+                                ? "En producción"
+                                : data.status === "Post Production"
+                                  ? "Postproducción"
+                                  : data.status === "Planned"
+                                    ? "Planificada"
+                                    : data.status === "Rumored"
+                                      ? "Rumoreada"
+                                      : data.status === "Pilot"
+                                        ? "Piloto"
+                                        : data.status}
                     </span>
                   )}
                 </div>
@@ -9304,7 +9323,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         key={g.id}
                         className="inline-flex items-center px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 backdrop-blur-md shadow-sm"
                       >
-                        {g.name}
+                        {translateGenre(g.name)}
                       </span>
                     ))}
                   </div>
