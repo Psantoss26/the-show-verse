@@ -122,6 +122,9 @@ import {
   traktGetShowWatched,
   traktSetEpisodeWatched,
   traktGetComments,
+  traktAddComment,
+  traktUpdateComment,
+  traktDeleteComment,
   traktGetSentiments,
   traktGetLists,
   traktGetShowSeasons,
@@ -210,6 +213,7 @@ import {
 import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
+import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 
@@ -1825,6 +1829,7 @@ export default function DetailsClient({
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
   const [soundtrackModalOpen, setSoundtrackModalOpen] = useState(false);
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [activeSoundtrackId, setActiveSoundtrackId] = useState(null);
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
@@ -2025,6 +2030,7 @@ export default function DetailsClient({
     setVideoModalOpen(false);
     setActiveVideo(null);
     setSoundtrackModalOpen(false);
+    setCommentModalOpen(false);
     setActiveSoundtrackId(null);
     setSoundtrackTracks([]);
     setSoundtrackLoading(false);
@@ -3213,6 +3219,28 @@ export default function DetailsClient({
 
   // Estado principal de Trakt para este contenido
   const [trakt, setTrakt] = useState(buildInitialTraktState);
+  const [traktUsername, setTraktUsername] = useState(null);
+
+  useEffect(() => {
+    if (!trakt.connected) {
+      setTraktUsername(null);
+      return;
+    }
+    let ignore = false;
+    fetch("/api/trakt/profile?userOnly=1")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!ignore && data?.user?.username) {
+          setTraktUsername(data.user.username);
+        }
+      })
+      .catch((err) => console.error("Error fetching Trakt username:", err));
+
+    return () => {
+      ignore = true;
+    };
+  }, [trakt.connected]);
+
   const scoreboardLookupTraktId = trakt?.traktId ?? initialTraktId ?? null;
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
@@ -3821,6 +3849,86 @@ export default function DetailsClient({
     total: 0,
   });
   const COMMENTS_SECTION_LIMIT = 5;
+  const myComments = useMemo(() => {
+    return (tComments.items || []).filter(
+      (item) =>
+        item.user?.username === "Tú" ||
+        (traktUsername && item.user?.username === traktUsername)
+    );
+  }, [tComments.items, traktUsername]);
+
+  const handleCommentSubmit = async ({ comment, spoiler }) => {
+    const result = await traktAddComment({
+      type: traktType,
+      tmdbId: id,
+      comment,
+      spoiler,
+    });
+
+    // Si tiene éxito, actualizamos localmente el feed
+    setTComments((prev) => {
+      const newCommentItem = {
+        id: result?.id || Date.now(),
+        comment: result?.comment || comment,
+        spoiler: result?.spoiler ?? spoiler,
+        likes: 0,
+        created_at: result?.created_at || new Date().toISOString(),
+        user: result?.user || {
+          username: "Tú",
+          name: "Tú",
+          images: { avatar: { full: "" } }
+        }
+      };
+
+      return {
+        ...prev,
+        items: [newCommentItem, ...prev.items],
+        total: (prev.total || 0) + 1,
+      };
+    });
+  };
+
+  const handleCommentUpdate = async ({ commentId, comment, spoiler }) => {
+    const result = await traktUpdateComment({
+      commentId,
+      comment,
+      spoiler,
+    });
+
+    // Actualizar localmente el comentario editado
+    setTComments((prev) => {
+      const nextItems = (prev.items || []).map((item) => {
+        if (item.id === commentId) {
+          return {
+            ...item,
+            comment: result?.comment || comment,
+            spoiler: result?.spoiler ?? spoiler,
+            created_at: result?.created_at || new Date().toISOString(),
+          };
+        }
+        return item;
+      });
+      return {
+        ...prev,
+        items: nextItems,
+      };
+    });
+  };
+
+  const handleCommentDelete = async ({ commentId }) => {
+    await traktDeleteComment({ commentId });
+
+    // Eliminar localmente del feed
+    setTComments((prev) => {
+      const nextItems = (prev.items || []).filter((item) => item.id !== commentId);
+      return {
+        ...prev,
+        items: nextItems,
+        total: Math.max(0, (prev.total || 0) - 1),
+      };
+    });
+  };
+
 
   // -- Temporadas de Trakt (datos de temporadas para series TV) --
   const [tSeasons, setTSeasons] = useState({
@@ -9344,6 +9452,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     )}
                   </LiquidButton>
                 )}
+
+                {/* Botón de Reseñas / Comentarios en Trakt */}
+                {trakt.connected && (
+                  <LiquidButton
+                    onClick={() => setCommentModalOpen(true)}
+                    active={myComments.length > 0}
+                    activeColor="orange"
+                    groupId="details-actions"
+                    title="Escribir reseña en Trakt"
+                    aria-label="Escribir reseña en Trakt"
+                  >
+                    <MessageSquare />
+                  </LiquidButton>
+                )}
               </div>
             </FadeIn>
 
@@ -11979,6 +12101,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </div>
 
                         <div className="relative z-10 space-y-4 p-4 sm:p-6">
+
                           {!tComments.loading &&
                             (tComments.items || []).length === 0 && (
                               <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
@@ -12255,6 +12378,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         error={soundtrackError}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
+      />
+
+      <TraktCommentModal
+        open={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        onSubmit={handleCommentSubmit}
+        onUpdate={handleCommentUpdate}
+        onDelete={handleCommentDelete}
+        title={title}
+        myComments={myComments}
       />
 
       {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}

@@ -750,3 +750,35 @@ export async function traktAddEpisodePlay({
     throw new Error(json?.error || `Trakt episode play HTTP ${res.status}`);
   return json;
 }
+
+export async function traktAddComment({ type, tmdbId, comment, spoiler }) {
+  const res = await fetch("/api/trakt/community/comments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, tmdbId, comment, spoiler }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Error al publicar comentario");
+  return json;
+}
+
+export async function traktUpdateComment({ commentId, comment, spoiler }) {
+  const res = await fetch("/api/trakt/community/comments", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commentId, comment, spoiler }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Error al actualizar comentario");
+  return json;
+}
+
+export async function traktDeleteComment({ commentId }) {
+  const res = await fetch(`/api/trakt/community/comments?commentId=${encodeURIComponent(commentId)}`, {
+    method: "DELETE",
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Error al eliminar comentario");
+  return json;
+}
+
