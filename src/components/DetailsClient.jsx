@@ -8447,6 +8447,13 @@ export default function DetailsClient({
     posterRequestedModeRef.current = posterViewMode;
   }, [posterViewMode]);
 
+  // Sincronizar token de carga de poster durante el render para evitar desfases
+  const prevRenderPosterPathRef = useRef(displayPosterPath);
+  if (prevRenderPosterPathRef.current !== displayPosterPath) {
+    prevRenderPosterPathRef.current = displayPosterPath;
+    posterLoadTokenRef.current += 1;
+  }
+
   // Activar posterResolved cuando displayPosterPath este disponible
   useEffect(() => {
     // Activar posterResolved inmediatamente si tenemos un path valido (igual que el poster)
@@ -8510,7 +8517,6 @@ export default function DetailsClient({
   useEffect(() => {
     const prev = prevDisplayPosterRef.current;
     prevDisplayPosterRef.current = displayPosterPath;
-    posterLoadTokenRef.current += 1;
 
     // Manejar cambio de imagen (incluyendo de null a valor)
     if (prev !== displayPosterPath) {
@@ -8554,12 +8560,19 @@ export default function DetailsClient({
   // Resetear estados de carga del backdrop cuando cambia la vista o la imagen
   const prevDisplayBackdropRef = useRef(null);
   const backdropLoadTokenRef = useRef(0);
+
+  // Sincronizar token de carga de backdrop durante el render
+  const prevRenderBackdropPathRef = useRef(previewBackdropPath);
+  if (prevRenderBackdropPathRef.current !== previewBackdropPath) {
+    prevRenderBackdropPathRef.current = previewBackdropPath;
+    backdropLoadTokenRef.current += 1;
+  }
+
   const backdropLoadToken = backdropLoadTokenRef.current;
 
   useEffect(() => {
     const prev = prevDisplayBackdropRef.current;
     prevDisplayBackdropRef.current = previewBackdropPath;
-    backdropLoadTokenRef.current += 1;
 
     if (prev === previewBackdropPath) return;
 
@@ -8855,11 +8868,14 @@ export default function DetailsClient({
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out ${
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 ${
               isBackdropPoster
                 ? "max-w-full lg:max-w-[600px]"
                 : "max-w-[280px] lg:max-w-[320px]"
             }`}
+            style={{
+              transition: "max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)",
+            }}
           >
             {/* Poster Card */}
             <div className="relative">
@@ -8909,11 +8925,10 @@ export default function DetailsClient({
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
 
                   <div
-                    className={`relative bg-neutral-950 will-change-auto overflow-hidden ${
-                      isBackdropPoster ? "aspect-[16/9]" : "aspect-[2/3]"
-                    }`}
+                    className="relative bg-neutral-950 will-change-auto overflow-hidden w-full h-0"
                     style={{
-                      transition: "opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)",
+                      paddingBottom: isBackdropPoster ? "56.25%" : "150%",
+                      transition: "padding-bottom 500ms cubic-bezier(0.25, 1, 0.5, 1), opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)",
                       contain: "layout paint",
                     }}
                   >
@@ -9338,11 +9353,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
             <FadeIn delay={0.12} className="mb-6 px-1 w-full">
               <div
-                className="flex flex-nowrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 w-full
-                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[36px] [&>*:not(.separator)]:max-w-[60px] sm:[&>*:not(.separator)]:max-w-[52px]
-                [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square
-                [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px]
-                [&_[data-liquid-button]_.text-xl]:!text-[22px]"
+                className="flex flex-nowrap items-center justify-center sm:justify-start gap-1.5 sm:gap-3 w-full
+                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[48px] sm:[&>*:not(.separator)]:max-w-[52px]
+                [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]]:[container-type:inline-size]
+                [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]_svg]:!h-[46cqw] sm:[&_[data-liquid-button]_svg]:!w-[22px] sm:[&_[data-liquid-button]_svg]:!h-[22px]
+                [&_[data-liquid-button]_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]_.text-xl]:!text-[22px]
+                [&_[data-liquid-button]_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]_.text-2xl]:!text-[24px]
+                [&_[data-liquid-button]_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]_.text-lg]:!text-[18px]
+                [&_[data-liquid-button]_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]_.text-xs]:!text-[12px]"
               >
                 {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
                 <LiquidButton
