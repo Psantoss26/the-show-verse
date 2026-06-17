@@ -608,12 +608,12 @@ export default function LiquidButton({
           )}
       </div>
 
-      <div className="relative z-10 flex items-center justify-center">
+      <div className="relative z-10 w-full h-full flex items-center justify-center">
         {loading ? (
           <Loader2 className="w-6 h-6 animate-spin" />
         ) : playsCount > 0 ? (
           <span
-            className={`font-black leading-none translate-y-[1px] ${
+            className={`font-black leading-none ${
               String(playsCount).length === 1
                 ? "text-2xl"
                 : "text-xl tracking-tighter"
@@ -636,7 +636,7 @@ export default function LiquidButton({
                   ? "text-xl tracking-tight"
                   : "text-2xl";
             return (
-              <div className="flex items-baseline leading-none translate-y-[1px] gap-[1px]">
+              <div className="flex items-baseline leading-none gap-[1px]">
                 <span className={`font-black ${fontSizeClass} drop-shadow-md`}>
                   {numberPart}
                 </span>
