@@ -40,6 +40,8 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
+import LiquidButton from "@/components/LiquidButton";
+
 // Score fetching APIs
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
@@ -713,39 +715,41 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
 
   const actionButtons = (className = "") => (
     <div className={`flex items-center gap-2 ${className}`}>
-      <motion.button
-        type="button"
-        onClick={onSync}
-        disabled={syncing}
-        className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition disabled:opacity-50 backdrop-blur-md"
+      <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, delay: 0.3 }}
-        whileHover={{ scale: syncing ? 1 : 1.05 }}
-        whileTap={{ scale: syncing ? 1 : 0.95 }}
-        title="Sincronizar"
-        aria-label="Sincronizar perfil de Trakt"
       >
-        <RotateCcw
-          className={`w-5 h-5 text-white ${syncing ? "animate-spin" : ""}`}
-        />
-      </motion.button>
+        <LiquidButton
+          onClick={onSync}
+          disabled={syncing}
+          loading={syncing}
+          activeColor="green"
+          groupId="profile-header-actions"
+          title="Sincronizar"
+          className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+        >
+          <RotateCcw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
+        </LiquidButton>
+      </motion.div>
 
-      <motion.button
-        type="button"
-        onClick={onDisconnect}
-        disabled={syncing}
-        className="p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full transition disabled:opacity-50 backdrop-blur-md"
+      <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, delay: 0.4 }}
-        whileHover={{ scale: syncing ? 1 : 1.05 }}
-        whileTap={{ scale: syncing ? 1 : 0.95 }}
-        title="Desconectar"
-        aria-label="Desconectar Trakt"
       >
-        <LogOut className="w-5 h-5 text-red-400" />
-      </motion.button>
+        <LiquidButton
+          onClick={onDisconnect}
+          disabled={syncing}
+          loading={syncing}
+          activeColor="red"
+          groupId="profile-header-actions"
+          title="Desconectar"
+          className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+        >
+          <LogOut className="w-5 h-5" />
+        </LiquidButton>
+      </motion.div>
     </div>
   );
 
