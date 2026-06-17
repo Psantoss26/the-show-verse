@@ -64,9 +64,6 @@ const cardVariants = {
 };
 
 const FAVORITES_IMAGE_ROOT_MARGIN = "140px 0px";
-const FAVORITE_ROW_STAGGER_SECONDS = 0.12;
-const FAVORITE_COLUMN_STAGGER_SECONDS = 0.014;
-const FAVORITE_MAX_ENTRY_DELAY_SECONDS = 0.5;
 
 function useNearViewport({ disabled = false, rootMargin = "300px 0px" } = {}) {
   const ref = useRef(null);
@@ -121,51 +118,6 @@ function getInitialFavoriteCardBudget(viewMode, imageMode) {
   if (width >= 1280) return height >= 900 ? 12 : 8;
   if (width >= 768) return 8;
   return 6;
-}
-
-function getFavoriteGridColumnCount(viewMode, imageMode) {
-  if (typeof window === "undefined") return viewMode === "list" ? 1 : 6;
-
-  const width = window.innerWidth || 1280;
-
-  if (viewMode === "list") {
-    return width >= 1280 ? 2 : 1;
-  }
-
-  if (viewMode === "compact") {
-    if (imageMode === "backdrop") {
-      if (width >= 768) return 4;
-      if (width >= 640) return 3;
-      return 2;
-    }
-    if (width >= 1280) return 8;
-    if (width >= 1024) return 7;
-    if (width >= 768) return 6;
-    if (width >= 640) return 5;
-    return 4;
-  }
-
-  if (imageMode === "backdrop") {
-    if (width >= 768) return 3;
-    return 2;
-  }
-
-  if (width >= 1024) return 6;
-  if (width >= 768) return 5;
-  if (width >= 640) return 4;
-  return 3;
-}
-
-function getFavoriteRowEntryDelay(itemIndex, columnCount) {
-  const safeColumns = Math.max(1, columnCount || 1);
-  const rowIndex = Math.floor(itemIndex / safeColumns);
-  const columnIndex = itemIndex % safeColumns;
-
-  return Math.min(
-    rowIndex * FAVORITE_ROW_STAGGER_SECONDS +
-      columnIndex * FAVORITE_COLUMN_STAGGER_SECONDS,
-    FAVORITE_MAX_ENTRY_DELAY_SECONDS,
-  );
 }
 
 // ================== UTILS & CACHE ==================
@@ -899,16 +851,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
 }
 
 function getImmediateSmartPosterUrl(item, mode = "poster") {
-  const cachedUrl = getCachedSmartPosterUrl(item, mode);
-  if (cachedUrl) return cachedUrl;
-
-  const path =
-    mode === "backdrop"
-      ? item.backdrop_path || item.poster_path
-      : item.poster_path || item.backdrop_path;
-
-  if (!path) return null;
-  return buildImg(path, mode === "backdrop" ? "w1280" : "w500");
+  return getCachedSmartPosterUrl(item, mode);
 }
 
 function SmartPoster({
@@ -951,9 +894,8 @@ function SmartPoster({
         abort = true;
       };
     } else {
-      const immediateUrl = getImmediateSmartPosterUrl(item, mode);
-      setSrc(immediateUrl);
-      setReady(Boolean(immediateUrl));
+      setSrc(null);
+      setReady(false);
     }
 
     const load = async () => {
@@ -1879,7 +1821,6 @@ const FavoriteCard = memo(function FavoriteCard({
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
   animateEntry = true,
-  entryDelay,
   eagerImage = false,
   prioritizeImage = false,
   deferOffscreenContent = false,
@@ -1985,16 +1926,12 @@ const FavoriteCard = memo(function FavoriteCard({
     }
   }, [imdbScore, traktScore, loadingScores, item, type]);
 
-  const fallbackAnimDelay =
+  const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = animateEntry && index < 60;
-  const animDelay =
-    Number.isFinite(entryDelay) && entryDelay >= 0
-      ? entryDelay
-      : fallbackAnimDelay;
   const shellClassName = deferOffscreenContent
-    ? "sv-favorite-card-deferred"
-    : undefined;
+    ? "sv-favorite-card-deferred relative z-0 overflow-visible hover:z-[80] focus-within:z-[80]"
+    : "relative z-0 overflow-visible hover:z-[80] focus-within:z-[80]";
   const shellStyle = deferOffscreenContent
     ? {
         "--sv-favorite-card-intrinsic-size":
@@ -2080,7 +2017,7 @@ const FavoriteCard = memo(function FavoriteCard({
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
             whileHover={{
               scale: 1.15,
-              zIndex: 50,
+              zIndex: 100,
               boxShadow:
                 "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
               borderColor: "rgba(239, 68, 68, 0.4)",
@@ -2377,23 +2314,42 @@ export default function FavoritesClient() {
   const [initialCardBudget, setInitialCardBudget] = useState(() =>
     getInitialFavoriteCardBudget(viewMode, imageMode),
   );
-  const [favoriteGridColumns, setFavoriteGridColumns] = useState(() =>
-    getFavoriteGridColumnCount(viewMode, imageMode),
-  );
 
   useEffect(() => {
-    const updateInitialGridMetrics = () => {
+    const updateInitialCardBudget = () => {
       setInitialCardBudget(getInitialFavoriteCardBudget(viewMode, imageMode));
-      setFavoriteGridColumns(getFavoriteGridColumnCount(viewMode, imageMode));
     };
 
-    updateInitialGridMetrics();
-    window.addEventListener("resize", updateInitialGridMetrics, {
+    updateInitialCardBudget();
+    window.addEventListener("resize", updateInitialCardBudget, {
       passive: true,
     });
-    return () =>
-      window.removeEventListener("resize", updateInitialGridMetrics);
+    return () => window.removeEventListener("resize", updateInitialCardBudget);
   }, [viewMode, imageMode]);
+
+  const handleViewModeChange = useCallback(
+    (nextViewMode) => {
+      setInitialCardBudget(
+        getInitialFavoriteCardBudget(nextViewMode, imageMode),
+      );
+      setViewMode(nextViewMode);
+    },
+    [imageMode],
+  );
+
+  const handleImageModeChange = useCallback(
+    (nextImageMode) => {
+      setInitialCardBudget(
+        getInitialFavoriteCardBudget(viewMode, nextImageMode),
+      );
+      setImageMode(nextImageMode);
+    },
+    [viewMode],
+  );
+
+  const handleToggleImageMode = useCallback(() => {
+    handleImageModeChange(imageMode === "poster" ? "backdrop" : "poster");
+  }, [handleImageModeChange, imageMode]);
 
   useEffect(() => {
     if (!suppressCachedEntryAnimations) return undefined;
@@ -3200,8 +3156,6 @@ export default function FavoritesClient() {
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
   const isInitialFavoriteCard = (groupIndex, itemIndex) =>
     groupIndex < 2 && itemIndex < initialCardBudget;
-  const getFavoriteEntryDelay = (itemIndex) =>
-    getFavoriteRowEntryDelay(itemIndex, favoriteGridColumns);
   const getItemsGridClass = (withTopMargin = false) => {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
@@ -3691,7 +3645,7 @@ export default function FavoritesClient() {
                   <div className="flex-1 flex gap-2">
                     <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
-                        onClick={() => setViewMode("list")}
+                        onClick={() => handleViewModeChange("list")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "list"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3701,7 +3655,7 @@ export default function FavoritesClient() {
                         <List className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setViewMode("compact")}
+                        onClick={() => handleViewModeChange("compact")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3711,7 +3665,7 @@ export default function FavoritesClient() {
                         <Grid2X2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setViewMode("grid")}
+                        onClick={() => handleViewModeChange("grid")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "grid"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3722,11 +3676,7 @@ export default function FavoritesClient() {
                       </button>
                     </div>
                     <button
-                      onClick={() =>
-                        setImageMode(
-                          imageMode === "poster" ? "backdrop" : "poster",
-                        )
-                      }
+                      onClick={handleToggleImageMode}
                       className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                         imageMode === "backdrop"
                           ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
@@ -3933,7 +3883,7 @@ export default function FavoritesClient() {
 
             <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
-                onClick={() => setViewMode("list")}
+                onClick={() => handleViewModeChange("list")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3943,7 +3893,7 @@ export default function FavoritesClient() {
                 <List className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setViewMode("compact")}
+                onClick={() => handleViewModeChange("compact")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "compact"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3953,7 +3903,7 @@ export default function FavoritesClient() {
                 <Grid2X2 className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => handleViewModeChange("grid")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3966,7 +3916,7 @@ export default function FavoritesClient() {
 
             <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
-                onClick={() => setImageMode("poster")}
+                onClick={() => handleImageModeChange("poster")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "poster"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3976,7 +3926,7 @@ export default function FavoritesClient() {
                 <Film className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setImageMode("backdrop")}
+                onClick={() => handleImageModeChange("backdrop")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "backdrop"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -4017,21 +3967,18 @@ export default function FavoritesClient() {
           ) : grouped ? (
             // Grouped view
             <div className="space-y-8">
-              {grouped.map((group, groupIndex) => {
-                const shouldAnimateGroup = groupIndex < 2;
-
-                return (
+              {grouped.map((group, groupIndex) => (
                   <motion.div
                     key={group.key}
                     ref={(node) => setGroupSectionRef(group.key, node)}
                     className="overflow-visible scroll-mt-[148px]"
                     initial={
-                      shouldAnimateGroup ? { opacity: 0, y: 20 } : false
+                      prefersReducedMotion ? false : { opacity: 0, y: 20 }
                     }
                     animate={{ opacity: 1, y: 0 }}
                     transition={{
                       duration: 0.4,
-                      delay: shouldAnimateGroup ? groupIndex * 0.1 : 0,
+                      delay: prefersReducedMotion ? 0 : groupIndex * 0.1,
                       ease: [0.25, 0.1, 0.25, 1],
                     }}
                   >
@@ -4086,10 +4033,7 @@ export default function FavoritesClient() {
                                     traktScore={traktScores.get(
                                       getScoreItemKey(item),
                                     )}
-                                    animateEntry={
-                                      initiallyVisible && !prefersReducedMotion
-                                    }
-                                    entryDelay={getFavoriteEntryDelay(idx)}
+                                    animateEntry={!prefersReducedMotion}
                                     eagerImage={initiallyVisible}
                                     prioritizeImage={
                                       initiallyVisible && idx < 2
@@ -4125,10 +4069,7 @@ export default function FavoritesClient() {
                               traktScore={traktScores.get(
                                 getScoreItemKey(item),
                               )}
-                              animateEntry={
-                                initiallyVisible && !prefersReducedMotion
-                              }
-                              entryDelay={getFavoriteEntryDelay(idx)}
+                              animateEntry={!prefersReducedMotion}
                               eagerImage={initiallyVisible}
                               prioritizeImage={initiallyVisible && idx < 2}
                               deferOffscreenContent={!initiallyVisible}
@@ -4138,16 +4079,12 @@ export default function FavoritesClient() {
                       </div>
                     )}
                   </motion.div>
-                );
-              })}
+              ))}
             </div>
           ) : (
-            <motion.div
+            <div
               key={`flat-grid-${viewMode}-${imageMode}`}
               className={getItemsGridClass(false)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
             >
               {sorted.map((item, idx) => {
                 const initiallyVisible = isInitialFavoriteCard(0, idx);
@@ -4162,15 +4099,14 @@ export default function FavoritesClient() {
                     imageMode={imageMode}
                     imdbScore={imdbScores.get(getScoreItemKey(item))}
                     traktScore={traktScores.get(getScoreItemKey(item))}
-                    animateEntry={initiallyVisible && !prefersReducedMotion}
-                    entryDelay={getFavoriteEntryDelay(idx)}
+                    animateEntry={!prefersReducedMotion}
                     eagerImage={initiallyVisible}
                     prioritizeImage={initiallyVisible && idx < 2}
                     deferOffscreenContent={!initiallyVisible}
                   />
                 );
               })}
-            </motion.div>
+            </div>
           )}
         </motion.div>
       </div>

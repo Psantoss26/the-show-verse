@@ -39,7 +39,7 @@ export default function OptimizedImage({
 }) {
   if (!src) return null;
 
-  if (!canUseNextImage(src) || unoptimized) {
+  if (!canUseNextImage(src)) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt || ""} {...props} />;
   }
@@ -47,6 +47,7 @@ export default function OptimizedImage({
   const imageProps = {
     src,
     sizes: sizes || "(max-width: 768px) 100vw, 33vw",
+    unoptimized,
     ...props,
   };
 
