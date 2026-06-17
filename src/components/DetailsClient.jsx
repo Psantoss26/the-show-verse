@@ -8454,14 +8454,15 @@ export default function DetailsClient({
     posterLoadTokenRef.current += 1;
   }
 
-  // Activar posterResolved cuando displayPosterPath este disponible
+  // Activar posterResolved y backdropResolved cuando sus respectivos paths estén disponibles
   useEffect(() => {
-    // Activar posterResolved inmediatamente si tenemos un path valido (igual que el poster)
     if (displayPosterPath && !posterResolved) {
       setPosterResolved(true);
     }
-    // Incluimos artworkInitialized para evitar error de HMR "deps changed size"
-  }, [displayPosterPath, posterResolved, artworkInitialized]);
+    if (previewBackdropPath && !backdropResolved) {
+      setBackdropResolved(true);
+    }
+  }, [displayPosterPath, posterResolved, previewBackdropPath, backdropResolved]);
 
   // Fallback automatico: si backdrop falla, cambiar a poster
   useEffect(() => {
@@ -8533,29 +8534,51 @@ export default function DetailsClient({
           return testImg.complete && testImg.naturalWidth > 0;
         };
 
-        const isLowPreloaded = checkIfLoaded("w342");
-        const isHighPreloaded = checkIfLoaded("w780");
+        if (posterViewMode === "preview") {
+          const isLowPreloaded = checkIfLoaded("w780");
+          const isHighPreloaded = checkIfLoaded("w1280");
 
-        // Si esta precargada, marcar como cargada inmediatamente
-        if (isLowPreloaded) {
-          setPosterLowLoaded(true);
-          setPosterHighLoaded(isHighPreloaded); // Tambien verificar HIGH
+          if (isLowPreloaded) {
+            setBackdropLowLoaded(true);
+            setBackdropHighLoaded(isHighPreloaded);
+            setBackdropResolved(true);
+          } else {
+            setBackdropLowLoaded(false);
+            setBackdropHighLoaded(false);
+          }
+          setBackdropImgError(false);
         } else {
-          setPosterLowLoaded(false);
-          setPosterHighLoaded(false);
+          const isLowPreloaded = checkIfLoaded("w342");
+          const isHighPreloaded = checkIfLoaded("w780");
+
+          if (isLowPreloaded) {
+            setPosterLowLoaded(true);
+            setPosterHighLoaded(isHighPreloaded);
+            setPosterResolved(true);
+          } else {
+            setPosterLowLoaded(false);
+            setPosterHighLoaded(false);
+          }
+          setPosterImgError(false);
         }
 
         setPosterTransitioning(!!prev); // Solo transición si había imagen anterior
-        setPosterImgError(false);
       } else {
         // Si displayPosterPath es null, resetear estados
-        setPosterLowLoaded(false);
-        setPosterHighLoaded(false);
+        if (posterViewMode === "preview") {
+          setBackdropLowLoaded(false);
+          setBackdropHighLoaded(false);
+          setBackdropResolved(false);
+        } else {
+          setPosterLowLoaded(false);
+          setPosterHighLoaded(false);
+          setPosterResolved(false);
+        }
         setPosterTransitioning(false);
         setPrevPosterPath(null);
       }
     }
-  }, [displayPosterPath]);
+  }, [displayPosterPath, posterViewMode]);
 
   // Resetear estados de carga del backdrop cuando cambia la vista o la imagen
   const prevDisplayBackdropRef = useRef(null);
