@@ -528,7 +528,7 @@ export default function Navbar() {
                   alt="The Show Verse"
                   width={120}
                   height={48}
-                  className="h-full w-auto object-contain scale-[2.5] origin-left"
+                  className="h-full w-[120px] object-contain scale-[2.5] origin-left"
                 />
               </div>
             </Link>
@@ -652,7 +652,7 @@ export default function Navbar() {
                   alt="The Show Verse"
                   width={140}
                   height={40}
-                  className="h-full w-auto object-contain scale-[2.8] origin-center"
+                  className="h-full w-[140px] object-contain scale-[2.8] origin-center"
                 />
               </div>
             </Link>
