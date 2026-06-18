@@ -406,7 +406,7 @@ export default function ScoreboardBar({
         </div>
 
         {/* Separador */}
-        <div className="w-px h-6 bg-white/10 shrink-0" />
+        <div className="w-px h-6 bg-white/35 shrink-0" />
 
         {/* B) User rating */}
         <div className="flex items-center gap-3 shrink-0">

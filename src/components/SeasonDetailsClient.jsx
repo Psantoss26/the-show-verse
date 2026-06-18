@@ -1105,8 +1105,8 @@ export default function SeasonDetailsClient({
             }}
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-5 px-1">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
+            <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+              <div className="flex items-center justify-center lg:justify-start gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 <Layers className="w-4 h-4" />
                 <span>Serie</span>
               </div>
@@ -1116,7 +1116,7 @@ export default function SeasonDetailsClient({
               </h1>
 
               {/* sin nota TMDb aquí (solo en scoreboard) */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
                 <span className="text-white font-bold tracking-wide">
                   {showName}
                 </span>
@@ -1207,13 +1207,13 @@ export default function SeasonDetailsClient({
                 </div>
 
                 {/* separador */}
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="w-px h-6 bg-white/35 shrink-0" />
 
                 {/* spacer como DetailsClient */}
                 <div className="flex-1 min-w-0" />
 
                 {/* separador */}
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="hidden sm:block w-px h-6 bg-white/35 shrink-0" />
 
                 {/* C. Puntuación usuario */}
                 <div className="flex items-center gap-3 shrink-0 [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_.text-xl]:!text-[22px]">
