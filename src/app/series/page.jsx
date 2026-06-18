@@ -7,6 +7,7 @@ import {
   fetchTVSections,
   fetchRomanceSeriesWithGoodReviews,
   discoverTV,
+  fetchTrendingTVDay,
 } from "@/lib/api/tmdb";
 
 export const revalidate = 1800; // 30 min
@@ -102,15 +103,54 @@ function curateList(
   return sorted.slice(0, size);
 }
 
-/* ======== Carga de datos en el SERVIDOR para series ======== */
-async function getDashboardData() {
+/* ======== Carga de datos CRÍTICOS en el SERVIDOR para series ======== */
+async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const topImdbPromise = fetchTopRatedImdbTvServer();
+    const [popular, topImdbRaw, topES] = await Promise.all([
+      fetchPopularMedia({ type: "tv", language: lang }),
+      fetchTopRatedImdbTvServer(),
+      fetchTrendingTVDay(),
+    ]);
 
+    const curatedPopular = curateList(popular, {
+      minVotes: 1200,
+      minRating: 6.3,
+      minSize: 30,
+      maxSize: 80,
+    });
+
+    const curatedTopIMDb = curateList(topImdbRaw, {
+      minVotes: 8000,
+      minRating: 7.4,
+      minSize: 30,
+      maxSize: 80,
+    });
+
+    const curatedTopES = (topES || []).slice(0, 10);
+
+    return {
+      popular: curatedPopular,
+      top_imdb: curatedTopIMDb,
+      "Top 10 hoy en España": curatedTopES,
+    };
+  } catch (err) {
+    console.error("Error cargando datos críticos de series (SSR):", err);
+    return {
+      popular: [],
+      top_imdb: [],
+      "Top 10 hoy en España": [],
+    };
+  }
+}
+
+/* ======== Carga de datos DIFERIDOS en el SERVIDOR para series ======== */
+async function getDeferredDashboardData() {
+  const lang = "es-ES";
+
+  try {
     const [
-      popular,
       drama,
       scifi_fantasy,
       crime,
@@ -119,8 +159,6 @@ async function getDashboardData() {
       kDrama,
       baseSections,
     ] = await Promise.all([
-      // TMDb originales
-      fetchPopularMedia({ type: "tv", language: lang }),
       fetchMediaByGenre({
         type: "tv",
         genreId: 18,
@@ -158,22 +196,6 @@ async function getDashboardData() {
         ? fetchTVSections({ language: lang })
         : Promise.resolve({}),
     ]);
-
-    const top_imdb_raw = await topImdbPromise;
-
-    const curatedPopular = curateList(popular, {
-      minVotes: 1200,
-      minRating: 6.3,
-      minSize: 30,
-      maxSize: 80,
-    });
-
-    const curatedTopIMDb = curateList(top_imdb_raw, {
-      minVotes: 8000,
-      minRating: 7.4,
-      minSize: 30,
-      maxSize: 80,
-    });
 
     const curatedDrama = curateList(drama, {
       minVotes: 1000,
@@ -225,7 +247,6 @@ async function getDashboardData() {
       if (!Array.isArray(list)) continue;
 
       if (key === "Top 10 hoy en España") {
-        curatedBaseSections[key] = sortByVotes(list).slice(0, 10);
         continue;
       }
 
@@ -259,7 +280,6 @@ async function getDashboardData() {
           maxSize: 60,
         };
       } else if (key === "Por género") {
-        // Se trata más abajo
         continue;
       } else {
         params = {
@@ -288,11 +308,7 @@ async function getDashboardData() {
       curatedBaseSections["Por género"] = curatedByGenre;
     }
 
-    // Objeto final de dashboard que se envía al cliente
-    const dashboard = {
-      // TMDb originales
-      popular: curatedPopular,
-      top_imdb: curatedTopIMDb,
+    return {
       drama: curatedDrama,
       scifi_fantasy: curatedScifiFantasy,
       crime: curatedCrime,
@@ -301,16 +317,21 @@ async function getDashboardData() {
       animation: curatedAnimation,
       ...curatedBaseSections,
     };
-
-    return dashboard;
   } catch (err) {
-    console.error("Error cargando la página de series (SSR):", err);
+    console.error("Error cargando datos diferidos de series:", err);
     return {};
   }
 }
 
 /* =================== Componente de servidor =================== */
 export default async function SeriesPage() {
-  const dashboardData = await getDashboardData();
-  return <SeriesPageClient initialData={dashboardData} />;
+  const initialData = await getCriticalDashboardData();
+  const deferredDataPromise = getDeferredDashboardData();
+
+  return (
+    <SeriesPageClient
+      initialData={initialData}
+      deferredDataPromise={deferredDataPromise}
+    />
+  );
 }

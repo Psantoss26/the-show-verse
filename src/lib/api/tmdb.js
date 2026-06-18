@@ -254,6 +254,11 @@ export async function fetchTrendingTV() {
   return data?.results || [];
 }
 
+export async function fetchTrendingTVDay() {
+  const data = await tmdb("/trending/tv/day", { page: 1 });
+  return data?.results || [];
+}
+
 export async function fetchAiringTodayTV() {
   const data = await tmdb("/tv/airing_today", { page: 1 });
   return data?.results || [];
