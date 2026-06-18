@@ -146,6 +146,7 @@ import {
   readOmdbCache,
   writeOmdbCache,
   extractOmdbExtraScores,
+  extractOmdbImdbScore,
 } from "@/lib/details/omdbCache";
 
 // -- Utilidades de imagenes TMDb: seleccion inteligente de poster/backdrop --
@@ -6226,7 +6227,7 @@ export default function DetailsClient({
         // IMDb carga independiente y con timeout corto: no debe esperar a OMDb/premios.
         const imdbPromise = (async () => {
           const imdbDataset = await fetchImdbRatingByImdb(imdbId, {
-            timeoutMs: cached?.imdbRating != null ? 900 : 1400,
+            timeoutMs: cached?.imdbRating != null ? 1200 : 5000,
           });
           if (abort || !imdbDataset) return;
 
@@ -6254,10 +6255,16 @@ export default function DetailsClient({
           if (abort || !omdb) return;
 
           const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+          const {
+            imdbRating: omdbImdbRating,
+            imdbVotes: omdbImdbVotes,
+          } = extractOmdbImdbScore(omdb);
           const awards = normalizeOmdbAwards(omdb?.Awards);
 
           setExtras((prev) => ({
             ...prev,
+            imdbRating: prev.imdbRating ?? omdbImdbRating,
+            imdbVotes: prev.imdbVotes ?? omdbImdbVotes,
             awards,
             rtScore,
             mcScore,
@@ -6268,6 +6275,8 @@ export default function DetailsClient({
             awardsFetched: true,
             rtScore,
             mcScore,
+            imdbRating: omdbImdbRating,
+            imdbVotes: omdbImdbVotes,
           });
         })();
 

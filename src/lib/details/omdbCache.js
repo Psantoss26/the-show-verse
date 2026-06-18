@@ -79,3 +79,29 @@ export const extractOmdbExtraScores = (omdb) => {
 
     return { rtScore, mcScore }
 }
+
+export const parseOmdbScore0to10 = (value) => {
+    if (!value || value === 'N/A') return null
+    const s = String(value).trim()
+    const m = s.match(/(\d+(\.\d+)?)/)
+    if (!m) return null
+    const n = Number(m[1])
+    return Number.isFinite(n) && n > 0 && n <= 10 ? n : null
+}
+
+export const parseOmdbVotes = (value) => {
+    if (!value || value === 'N/A') return null
+    const digits = String(value).replace(/[^\d]/g, '')
+    if (!digits) return null
+    const n = Number(digits)
+    return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export const extractOmdbImdbScore = (omdb) => {
+    const rating =
+        parseOmdbScore0to10(omdb?.imdbRating) ??
+        parseOmdbScore0to10(omdbGetRatingValue(omdb, 'Internet Movie Database'))
+    const votes = parseOmdbVotes(omdb?.imdbVotes)
+
+    return { imdbRating: rating, imdbVotes: votes }
+}
