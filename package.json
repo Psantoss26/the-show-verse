@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "mw:search": "modern-web-guidance search",
+    "mw:retrieve": "modern-web-guidance retrieve"
   },
   "dependencies": {
     "@vercel/analytics": "^1.1.4",
@@ -35,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.7",
+    "modern-web-guidance": "^0.0.173",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
