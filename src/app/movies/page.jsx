@@ -114,9 +114,8 @@ async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const [popular, topImdbRaw, topES] = await Promise.all([
+    const [popular, topES] = await Promise.all([
       fetchPopularMedia({ type: "movie", language: lang }),
-      fetchTopRatedImdbServer(),
       discoverMovies({ region: "ES", sort_by: "popularity.desc", page: 1 }),
     ]);
 
@@ -127,36 +126,28 @@ async function getCriticalDashboardData() {
       maxSize: 80,
     });
 
-    const curatedTopIMDb = curateList(topImdbRaw, {
-      minVotes: 20000,
-      minRating: 7.3,
-      minSize: 30,
-      maxSize: 80,
-    });
-
     const curatedTopES = sortByVotes(topES).slice(0, 10);
 
     return {
       popular: curatedPopular,
-      top_imdb: curatedTopIMDb,
       "Top 10 hoy en España": curatedTopES,
     };
   } catch (err) {
     console.error("Error cargando datos críticos de películas (SSR):", err);
     return {
       popular: [],
-      top_imdb: [],
       "Top 10 hoy en España": [],
     };
   }
 }
 
 /* ======== Carga de datos DIFERIDOS en el SERVIDOR ======== */
-async function getDeferredDashboardData(topImdbIds = []) {
+async function getDeferredDashboardData() {
   const lang = "es-ES";
 
   try {
     const [
+      topImdbRaw,
       action,
       scifi,
       thrillers,
@@ -168,6 +159,7 @@ async function getDeferredDashboardData(topImdbIds = []) {
       blockbustersP3,
       baseSections,
     ] = await Promise.all([
+      fetchTopRatedImdbServer(),
       fetchMediaByGenre({
         type: "movie",
         genreId: 28,
@@ -206,6 +198,13 @@ async function getDeferredDashboardData(topImdbIds = []) {
         ? fetchMovieSections({ language: lang })
         : Promise.resolve({}),
     ]);
+
+    const curatedTopIMDb = curateList(topImdbRaw, {
+      minVotes: 20000,
+      minRating: 7.3,
+      minSize: 30,
+      maxSize: 80,
+    });
 
     const curatedAction = curateList(action, {
       minVotes: 2000,
@@ -309,7 +308,7 @@ async function getDeferredDashboardData(topImdbIds = []) {
       maxSize: 80,
     });
 
-    const imdbIdSet = new Set(topImdbIds);
+    const imdbIdSet = new Set(curatedTopIMDb.map((m) => m.id));
     if (curatedBaseSections["Más votadas"]) {
       curatedBaseSections["Más votadas"] = curatedBaseSections[
         "Más votadas"
@@ -326,6 +325,7 @@ async function getDeferredDashboardData(topImdbIds = []) {
     }
 
     return {
+      top_imdb: curatedTopIMDb,
       mind,
       action: curatedAction,
       scifi: curatedScifi,
@@ -343,8 +343,7 @@ async function getDeferredDashboardData(topImdbIds = []) {
 /* =================== Componente de servidor =================== */
 export default async function MoviesPage() {
   const initialData = await getCriticalDashboardData();
-  const topImdbIds = (initialData.top_imdb || []).map((m) => m.id);
-  const deferredDataPromise = getDeferredDashboardData(topImdbIds);
+  const deferredDataPromise = getDeferredDashboardData();
 
   return (
     <MoviesPageClient
@@ -353,4 +352,3 @@ export default async function MoviesPage() {
     />
   );
 }
-

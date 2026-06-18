@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Eye, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { traktAuthStatus } from "@/lib/api/traktClient";
@@ -78,12 +79,12 @@ export default function TraktHistoryNavButton({
 
   // ✅ Variante para navbar inferior móvil: misma clase exacta que navLinkClassMobileBottom
   if (variant === "mobile-bottom") {
-    const toneClass = iconToneClass({ active, tone: "green" });
+    const textClass = active ? "text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "text-neutral-400 hover:text-emerald-300";
     const mobileBottomClass =
-      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
-      "text-neutral-400 transition-all duration-300 ease-out " +
-      "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
-      toneClass;
+      "relative group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
+      "transition-all duration-300 ease-out " +
+      "hover:-translate-y-0.5 active:scale-95 focus:outline-none " +
+      textClass;
     return (
       <Link
         href={href}
@@ -92,11 +93,20 @@ export default function TraktHistoryNavButton({
         aria-label="Historial"
         prefetch={false}
       >
-        <Icon
-          className={loading ? "animate-spin" : ""}
-          width={iconSize}
-          height={iconSize}
-        />
+        {active && (
+          <motion.div
+            layoutId="activeTabMobileBottom"
+            className="absolute inset-0 rounded-full bg-emerald-500/25 border border-emerald-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(16,185,129,0.35)]"
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
+          />
+        )}
+        <span className="relative z-10 flex items-center justify-center">
+          <Icon
+            className={loading ? "animate-spin" : ""}
+            width={iconSize}
+            height={iconSize}
+          />
+        </span>
       </Link>
     );
   }
