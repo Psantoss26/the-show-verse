@@ -63,6 +63,62 @@ const cardVariants = {
   },
 };
 
+const FAVORITES_INITIAL_RENDER_LIMIT = 24;
+const FAVORITES_RENDER_CHUNK_SIZE = 36;
+
+function scheduleFavoritesRenderChunk(callback) {
+  if (typeof window === "undefined") return null;
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout: 220 });
+  }
+  return window.setTimeout(callback, 48);
+}
+
+function cancelFavoritesRenderChunk(handle) {
+  if (typeof window === "undefined" || handle == null) return;
+  if ("cancelIdleCallback" in window) {
+    window.cancelIdleCallback(handle);
+    return;
+  }
+  window.clearTimeout(handle);
+}
+
+function limitFavoriteGroupsForRender(groups, limit) {
+  if (!groups || limit == null) return groups;
+  let remaining = limit;
+  const limitedGroups = [];
+
+  for (const group of groups) {
+    if (remaining <= 0) break;
+
+    if (group.subgroups?.length) {
+      const limitedSubgroups = [];
+
+      for (const subgroup of group.subgroups) {
+        if (remaining <= 0) break;
+        const items = subgroup.items.slice(0, remaining);
+        if (items.length === 0) continue;
+
+        limitedSubgroups.push({ ...subgroup, items });
+        remaining -= items.length;
+      }
+
+      if (limitedSubgroups.length > 0) {
+        limitedGroups.push({ ...group, subgroups: limitedSubgroups });
+      }
+      continue;
+    }
+
+    const items = group.items.slice(0, remaining);
+    if (items.length === 0) continue;
+
+    limitedGroups.push({ ...group, items });
+    remaining -= items.length;
+  }
+
+  return limitedGroups;
+}
+
 // ================== UTILS & CACHE ==================
 // TMDb Genre mappings
 const MOVIE_GENRES = {
@@ -2966,6 +3022,49 @@ export default function FavoritesClient() {
     loadingProviders,
   ]);
 
+  const [renderLimit, setRenderLimit] = useState(FAVORITES_INITIAL_RENDER_LIMIT);
+
+  useEffect(() => {
+    if (loading) {
+      setRenderLimit(FAVORITES_INITIAL_RENDER_LIMIT);
+      return;
+    }
+
+    if (sorted.length === 0) return;
+    setRenderLimit((current) =>
+      Math.min(Math.max(current, FAVORITES_INITIAL_RENDER_LIMIT), sorted.length),
+    );
+  }, [loading, sorted.length]);
+
+  useEffect(() => {
+    if (loading || sorted.length === 0 || renderLimit >= sorted.length) return;
+
+    let cancelled = false;
+    const handle = scheduleFavoritesRenderChunk(() => {
+      if (cancelled) return;
+      startTransition(() => {
+        setRenderLimit((current) =>
+          Math.min(sorted.length, current + FAVORITES_RENDER_CHUNK_SIZE),
+        );
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelFavoritesRenderChunk(handle);
+    };
+  }, [loading, renderLimit, sorted.length]);
+
+  const renderedSorted = useMemo(
+    () => sorted.slice(0, Math.min(renderLimit, sorted.length)),
+    [renderLimit, sorted],
+  );
+
+  const renderedGrouped = useMemo(
+    () => limitFavoriteGroupsForRender(grouped, renderLimit),
+    [grouped, renderLimit],
+  );
+
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
   const [forcedStickyGroupKey, setForcedStickyGroupKey] = useState(null);
@@ -3832,7 +3931,7 @@ export default function FavoritesClient() {
           ) : grouped ? (
             // Grouped view
             <div className="space-y-8">
-              {grouped.map((group, groupIndex) => (
+              {renderedGrouped.map((group, groupIndex) => (
                 <motion.div
                   key={group.key}
                   ref={(node) => setGroupSectionRef(group.key, node)}
@@ -3851,7 +3950,7 @@ export default function FavoritesClient() {
                     forceSticky={forcedStickyGroupKey === group.key}
                     disableStickyAnimation={forcedStickyGroupKey === group.key}
                     hasPreviousGroup={groupIndex > 0}
-                    hasNextGroup={groupIndex < grouped.length - 1}
+                    hasNextGroup={groupIndex < renderedGrouped.length - 1}
                     onPreviousGroup={() => scrollToPreviousGroup(group.key)}
                     onNextGroup={() => scrollToNextGroup(group.key)}
                   />
@@ -3915,7 +4014,7 @@ export default function FavoritesClient() {
               key={`flat-grid-${viewMode}-${imageMode}`}
               className={getItemsGridClass(false)}
             >
-              {sorted.map((item, idx) => (
+              {renderedSorted.map((item, idx) => (
                 <FavoriteCard
                   key={getMediaKey(item)}
                   item={item}
