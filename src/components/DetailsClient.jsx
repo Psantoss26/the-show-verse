@@ -1302,7 +1302,11 @@ export default function DetailsClient({
     (seasonNumber) => {
       const sn = Number(seasonNumber);
       if (!Number.isFinite(sn)) return;
-      router.prefetch(`/details/tv/${id}/season/${sn}`);
+      const href = `/details/tv/${id}/season/${sn}`;
+      router.prefetch(href);
+      if (typeof window !== "undefined") {
+        fetch(href, { priority: "low" }).catch(() => {});
+      }
     },
     [router, id],
   );

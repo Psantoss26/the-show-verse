@@ -812,6 +812,9 @@ function InlinePreviewCard({ movie, heightClass }) {
 
   const prefetchHref = () => {
     router.prefetch(href);
+    if (typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
   };
 
   const navigateToDetails = () => {

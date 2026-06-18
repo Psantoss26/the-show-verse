@@ -997,6 +997,17 @@ export default function SeasonDetailsClient({
     [trakt?.connected, trakt.traktId, episodeBusyKey, showId],
   );
 
+  const prefetchEpisodeDetails = useCallback(
+    (epNum) => {
+      const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
+      router.prefetch(href);
+      if (typeof window !== "undefined") {
+        fetch(href, { priority: "low" }).catch(() => {});
+      }
+    },
+    [router, showId, seasonNumber],
+  );
+
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* Background */}
@@ -1424,6 +1435,9 @@ export default function SeasonDetailsClient({
                       <Link
                         key={`${seasonNumber}-${epNum}`}
                         href={href}
+                        onMouseEnter={() => prefetchEpisodeDetails(epNum)}
+                        onFocus={() => prefetchEpisodeDetails(epNum)}
+                        onTouchStart={() => prefetchEpisodeDetails(epNum)}
                         className="group relative block rounded-2xl bg-zinc-900/20 backdrop-blur-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)] hover:bg-zinc-800/30 hover:shadow-[0_8px_32px_rgba(234,179,8,0.15)] transition-all duration-500 overflow-hidden"
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-40 group-hover:from-yellow-400/10 transition-colors duration-500" />
@@ -1506,6 +1520,9 @@ export default function SeasonDetailsClient({
                       <Link
                         key={`grid-${seasonNumber}-${epNum}`}
                         href={href}
+                        onMouseEnter={() => prefetchEpisodeDetails(epNum)}
+                        onFocus={() => prefetchEpisodeDetails(epNum)}
+                        onTouchStart={() => prefetchEpisodeDetails(epNum)}
                         className="
                   group block rounded-2xl overflow-hidden
                   border border-white/10 bg-black/25

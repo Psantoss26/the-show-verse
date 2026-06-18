@@ -125,6 +125,12 @@ export default function ListPosterCard({
     </div>
   );
 
+  const handlePrefetch = () => {
+    if (href && typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
+  };
+
   if (!href) {
     return <div className="group/card relative block w-full select-none">{content}</div>;
   }
@@ -135,6 +141,9 @@ export default function ListPosterCard({
       className="group/card relative block w-full select-none focus:outline-none"
       draggable={false}
       onClick={onClick}
+      onMouseEnter={handlePrefetch}
+      onFocus={handlePrefetch}
+      onTouchStart={handlePrefetch}
     >
       {content}
     </Link>
