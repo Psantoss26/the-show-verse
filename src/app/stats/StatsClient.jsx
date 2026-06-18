@@ -609,12 +609,18 @@ function ProfileCardScroller({ children }) {
   return (
     <div
       className="-mx-4 sm:-mx-10 sm:px-10 xl:-mx-12 xl:px-12"
-      style={{ overflowX: "clip", overflowY: "visible" }}
+      style={{
+        overflowX: isMobile ? "clip" : "visible",
+        overflowY: "visible",
+      }}
     >
       <div className="relative z-0 px-3 hover:z-[200] sm:px-0">
         <div
           className="relative z-0"
-          style={{ overflowX: "visible", overflowY: "visible" }}
+          style={{
+            overflowX: isMobile ? "visible" : "clip",
+            overflowY: "visible",
+          }}
         >
           <Swiper
             slidesPerView={3}
