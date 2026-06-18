@@ -497,7 +497,6 @@ function SectionTitle({ icon: Icon, title, subtitle, color = "indigo", href }) {
 
 function ProfileCardScroller({ children }) {
   const swiperRef = useRef(null);
-  const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const isMobile = useIsMobileLayout(768);
@@ -511,17 +510,41 @@ function ProfileCardScroller({ children }) {
     1280: { slidesPerView: 7, spaceBetween: 18 },
   };
 
-  const updateNav = (swiper) => {
+  const updateNav = useCallback((swiper) => {
     if (!swiper) return;
     const hasOverflow = !swiper.isLocked;
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
-  };
+  }, []);
 
-  const handleSwiper = (swiper) => {
+  const handleSwiper = useCallback((swiper) => {
     swiperRef.current = swiper;
     updateNav(swiper);
-  };
+    requestAnimationFrame(() => {
+      swiper.update?.();
+      updateNav(swiper);
+    });
+  }, [updateNav]);
+
+  useEffect(() => {
+    const swiper = swiperRef.current;
+    if (!swiper) return undefined;
+
+    const refresh = () => {
+      swiper.update?.();
+      updateNav(swiper);
+    };
+
+    const raf = requestAnimationFrame(refresh);
+    const t1 = window.setTimeout(refresh, 120);
+    const t2 = window.setTimeout(refresh, 450);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [slides.length, updateNav]);
 
   const handlePrevClick = (e) => {
     e.preventDefault();
@@ -542,16 +565,12 @@ function ProfileCardScroller({ children }) {
     swiper.slideTo(target);
   };
 
-  const showPrev = isHoveredRow && canPrev;
-  const showNext = isHoveredRow && canNext;
+  const showPrev = canPrev;
+  const showNext = canNext;
 
   return (
-    <div className="-mx-4 sm:mx-0">
-      <div
-        className="relative z-0 px-3 hover:z-[200] sm:px-0"
-        onMouseEnter={() => setIsHoveredRow(true)}
-        onMouseLeave={() => setIsHoveredRow(false)}
-      >
+    <div className="-mx-4 overflow-visible sm:-mx-10 sm:px-10 xl:-mx-12 xl:px-12">
+      <div className="relative z-0 px-3 hover:z-[200] sm:px-0">
         <div
           className="relative z-0"
           style={{ overflowX: "clip", overflowY: "visible" }}
