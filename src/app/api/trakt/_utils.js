@@ -82,15 +82,6 @@ export function setTraktCookies(res, tokenPayload) {
       maxAge: 60 * 60 * 24 * 365,
     });
   }
-
-  // Client-accessible cookie for instant client-side connection checking
-  res.cookies.set("trakt_connected", "true", {
-    httpOnly: false,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
 }
 
 export function clearTraktCookies(res) {
@@ -105,13 +96,6 @@ export function clearTraktCookies(res) {
   res.cookies.set("trakt_expires_at", "", { ...common, maxAge: 0 });
   res.cookies.set("trakt_oauth_state", "", { ...common, maxAge: 0 });
   res.cookies.set("trakt_oauth_next", "", { ...common, maxAge: 0 });
-  res.cookies.set("trakt_connected", "", {
-    httpOnly: false,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
 }
 
 export async function exchangeCodeForTokens(code) {
