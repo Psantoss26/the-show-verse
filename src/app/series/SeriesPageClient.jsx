@@ -536,13 +536,17 @@ function PosterImage({ show, cache }) {
 }
 
 /* ====================================================================
- * TOP 10 (MÓVIL): Backdrop completo + número + 1 por vista
- * ✅ MANTENIDO DISEÑO ORIGINAL (rounded-3xl)
+ * TOP 10: Backdrop completo + número opcional para móvil.
  * ==================================================================== */
-function Top10MobileBackdropCardTV({ show, rank }) {
-  const initialBackdrop = show?.backdrop_path || show?.poster_path || null;
-  const [backdropPath, setBackdropPath] = useState(initialBackdrop);
-  const [ready, setReady] = useState(!!initialBackdrop);
+function Top10MobileBackdropCardTV({
+  show,
+  rank,
+  showRank = true,
+  frameClassName = "rounded-3xl aspect-[16/9]",
+  imageClassName = "object-contain",
+}) {
+  const [backdropPath, setBackdropPath] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let abort = false;
@@ -550,27 +554,22 @@ function Top10MobileBackdropCardTV({ show, rank }) {
     const load = async () => {
       if (!show?.id) return;
 
+      const revealBackdrop = (path) => {
+        if (abort) return;
+        setBackdropPath(path || null);
+        setReady(!!path);
+      };
+
       const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
       if (userBackdrop) {
         tvBackdropCache.set(show.id, userBackdrop);
-        if (!abort) {
-          setBackdropPath(userBackdrop);
-          setReady(true);
-        }
+        revealBackdrop(userBackdrop);
         return;
       }
 
       const cached = tvBackdropCache.get(show.id);
       if (cached !== undefined) {
-        if (!abort) {
-          setBackdropPath(cached || null);
-          setReady(!!cached);
-        }
-        return;
-      }
-
-      if (initialBackdrop) {
-        tvBackdropCache.set(show.id, initialBackdrop);
+        revealBackdrop(cached);
         return;
       }
 
@@ -578,17 +577,11 @@ function Top10MobileBackdropCardTV({ show, rank }) {
         const preferred = await fetchBestTVBackdrop(show.id);
         const chosen = preferred || getPreviewBackdropFallback(show);
         tvBackdropCache.set(show.id, chosen);
-        if (!abort) {
-          setBackdropPath(chosen);
-          setReady(!!chosen);
-        }
+        revealBackdrop(chosen);
       } catch {
         const fallback = getPreviewBackdropFallback(show);
         tvBackdropCache.set(show.id, fallback);
-        if (!abort) {
-          setBackdropPath(fallback);
-          setReady(!!fallback);
-        }
+        revealBackdrop(fallback);
       }
     };
 
@@ -596,15 +589,16 @@ function Top10MobileBackdropCardTV({ show, rank }) {
     return () => {
       abort = true;
     };
-  }, [show, initialBackdrop]);
+  }, [show]);
 
   const href = `/details/tv/${show.id}`;
   const src = backdropPath ? buildImg(backdropPath, "w1280") : null;
 
   return (
-    <Link href={href} className="block w-full">
-      {/* CAMBIO: Mantener rounded-3xl para Top 10 */}
-      <div className="relative w-full rounded-3xl overflow-hidden bg-neutral-900 aspect-[16/9]">
+    <Link href={href} className="block w-full h-full">
+      <div
+        className={`relative w-full overflow-hidden bg-neutral-900 ${frameClassName}`}
+      >
         {!ready && <div className="absolute inset-0 bg-neutral-900" />}
 
         {ready && src && (
@@ -620,26 +614,30 @@ function Top10MobileBackdropCardTV({ show, rank }) {
             <OptimizedImage
               src={src}
               alt={show.name || show.title}
-              className="absolute inset-0 w-full h-full object-contain"
+              className={`absolute inset-0 w-full h-full ${imageClassName}`}
               priority={rank === 1}
               decoding="async"
             />
           </>
         )}
 
-        <div className="absolute left-4 bottom-3 z-10 select-none">
-          <div
-            className="font-black leading-none text-[72px]
-              bg-gradient-to-b from-blue-900/50 via-blue-600/35 to-blue-400/25
-              bg-clip-text text-transparent
-              drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
-            style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
-          >
-            {rank}
+        {showRank && (
+          <div className="absolute left-4 bottom-3 z-10 select-none">
+            <div
+              className="font-black leading-none text-[72px]
+                bg-gradient-to-b from-blue-900/50 via-blue-600/35 to-blue-400/25
+                bg-clip-text text-transparent
+                drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
+              style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+            >
+              {rank}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+        {showRank && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+        )}
       </div>
     </Link>
   );
@@ -1335,15 +1333,18 @@ function Row({ title, items, isMobile, posterCacheRef }) {
         >
           {safeItems.map((s, i) => {
             const itemKey = `tv:${s.id}`;
-            const isActive = !isMobile && hoveredId === itemKey;
+            const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
 
             const base =
               "relative flex-shrink-0 transition-all duration-300 ease-in-out";
+            const cardBoxClass = isTop10 ? "aspect-[16/9]" : posterBoxClass;
 
             const sizeClasses = isMobile
               ? "w-full"
               : isActive
                 ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
+                : isTop10
+                  ? "w-[280px] sm:w-[320px] md:w-[390px] xl:w-[440px] z-10"
                 : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
 
             let transformClass = "";
@@ -1367,9 +1368,9 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
             const cardElement = (
               <div
-                className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
+                className={`${base} ${sizeClasses} ${cardBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                 onMouseEnter={() => {
-                  if (!isMobile) {
+                  if (!isMobile && !isTop10) {
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
@@ -1431,12 +1432,22 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                       className="w-full h-full"
                       style={{ willChange: "transform, opacity" }}
                     >
-                      <Link
-                        href={`/details/tv/${s.id}`}
-                        className="block w-full h-full"
-                      >
-                        <PosterImage show={s} cache={posterCacheRef} />
-                      </Link>
+                      {isTop10 ? (
+                        <Top10MobileBackdropCardTV
+                          show={s}
+                          rank={i + 1}
+                          showRank={false}
+                          frameClassName="h-full rounded-lg"
+                          imageClassName="object-contain"
+                        />
+                      ) : (
+                        <Link
+                          href={`/details/tv/${s.id}`}
+                          className="block w-full h-full"
+                        >
+                          <PosterImage show={s} cache={posterCacheRef} />
+                        </Link>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
