@@ -526,9 +526,9 @@ export default function Navbar() {
                 <OptimizedImage
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
-                  width={120}
+                  width={48}
                   height={48}
-                  className="h-full w-[120px] object-contain scale-[2.5] origin-left"
+                  className="h-full w-[48px] object-contain scale-[2.5] origin-left"
                 />
               </div>
             </Link>
