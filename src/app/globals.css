@@ -345,3 +345,18 @@ html {
 .animate-pulse-slow {
   animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ====================================================================
+   Optimización de fondos difuminados (glows) en pantallas móviles
+   ==================================================================== */
+@media (max-width: 767px) {
+  div.fixed.inset-0.pointer-events-none.overflow-hidden > div.absolute.rounded-full.aspect-square {
+    /* Escalado moderado para que se vean en las esquinas sin inundar la pantalla */
+    transform: scale(1.4) !important;
+    /* Difuminado suave con saturación y brillo controlados */
+    filter: blur(95px) saturate(1.3) brightness(1.1) !important;
+    /* Reducimos la opacidad para mantener el fondo principalmente oscuro y sutil */
+    opacity: 0.7 !important;
+  }
+}
+
