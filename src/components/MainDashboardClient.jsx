@@ -2602,7 +2602,10 @@ const AnticipatedSection = memo(function AnticipatedSection({
   if (empty) return null;
 
   // Número de skeletons para que el placeholder tenga la misma altura aprox.
-  const SKELETON_COUNT = isMobile ? 2 : 6;
+  const SKELETON_COUNT = isMobile ? 3 : 6;
+  const skeletonWidth = isMobile
+    ? "calc((100% - 24px) / 3)"
+    : "calc(16.666% - 10px)";
 
   return (
     <motion.div
@@ -2656,7 +2659,7 @@ const AnticipatedSection = memo(function AnticipatedSection({
               key={i}
               className="flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse"
               style={{
-                width: isMobile ? "calc(50% - 6px)" : "calc(16.666% - 10px)",
+                width: skeletonWidth,
                 aspectRatio: "2/3",
               }}
             />
@@ -2720,7 +2723,10 @@ const RecommendedSection = memo(function RecommendedSection({
 
   if (empty) return null;
 
-  const SKELETON_COUNT = isMobile ? 2 : 6;
+  const SKELETON_COUNT = isMobile ? 3 : 6;
+  const skeletonWidth = isMobile
+    ? "calc((100% - 24px) / 3)"
+    : "calc(16.666% - 10px)";
 
   return (
     <motion.div
@@ -2772,7 +2778,7 @@ const RecommendedSection = memo(function RecommendedSection({
               key={i}
               className="flex-shrink-0 rounded-xl bg-neutral-900 animate-pulse"
               style={{
-                width: isMobile ? "calc(50% - 6px)" : "calc(16.666% - 10px)",
+                width: skeletonWidth,
                 aspectRatio: "2/3",
               }}
             />

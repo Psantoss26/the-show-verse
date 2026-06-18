@@ -36,4 +36,9 @@ tmpclaude*
 # --- Cobertura / tests ---
 coverage/
 .nyc_output/
+
+# --- Herramientas locales de agentes / specs ---
+.agents/
 .gstack/
+.specify/
+specs/
