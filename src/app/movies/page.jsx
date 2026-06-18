@@ -3,6 +3,12 @@ import MoviesPageClient from "./MoviesPageClient";
 
 import {
   fetchPopularMedia,
+  // OJO: ya no usamos este helper porque hace fetch('/api/...') en server
+  // fetchTopRatedIMDb,
+  fetchMediaByGenre,
+  fetchMediaByKeyword,
+  fetchMovieSections,
+  fetchMindBendingMovies,
   discoverMovies,
 } from "@/lib/api/tmdb";
 
@@ -145,13 +151,205 @@ async function getCriticalDashboardData() {
   }
 }
 
+/* ======== Carga de datos DIFERIDOS en el SERVIDOR ======== */
+async function getDeferredDashboardData(topImdbIds = []) {
+  const lang = "es-ES";
+
+  try {
+    const [
+      action,
+      scifi,
+      thrillers,
+      romance,
+      vengeance,
+      mind,
+      blockbustersP1,
+      blockbustersP2,
+      blockbustersP3,
+      baseSections,
+    ] = await Promise.all([
+      fetchMediaByGenre({
+        type: "movie",
+        genreId: 28,
+        minVotes: 1000,
+        language: lang,
+      }),
+      fetchMediaByGenre({
+        type: "movie",
+        genreId: 878,
+        minVotes: 1000,
+        language: lang,
+      }),
+      fetchMediaByGenre({
+        type: "movie",
+        genreId: 53,
+        minVotes: 1000,
+        language: lang,
+      }),
+      fetchMediaByGenre({
+        type: "movie",
+        genreId: 10749,
+        minVotes: 1000,
+        language: lang,
+      }),
+      fetchMediaByKeyword({
+        type: "movie",
+        keywordId: 9715,
+        minVotes: 500,
+        language: lang,
+      }),
+      fetchMindBendingMovies(),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 1 }),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 2 }),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 3 }),
+      fetchMovieSections
+        ? fetchMovieSections({ language: lang })
+        : Promise.resolve({}),
+    ]);
+
+    const curatedAction = curateList(action, {
+      minVotes: 2000,
+      minRating: 6.2,
+      minSize: 25,
+      maxSize: 70,
+    });
+
+    const curatedScifi = curateList(scifi, {
+      minVotes: 1500,
+      minRating: 6.3,
+      minSize: 20,
+      maxSize: 60,
+    });
+
+    const curatedThrillers = curateList(thrillers, {
+      minVotes: 1500,
+      minRating: 6.3,
+      minSize: 20,
+      maxSize: 60,
+    });
+
+    const curatedRomance = curateList(romance, {
+      minVotes: 1500,
+      minRating: 6.2,
+      minSize: 20,
+      maxSize: 60,
+    });
+
+    const curatedVengeance = curateList(vengeance, {
+      minVotes: 800,
+      minRating: 6.0,
+      minSize: 20,
+      maxSize: 50,
+    });
+
+    const curatedBaseSections = {};
+    for (const [key, list] of Object.entries(baseSections || {})) {
+      if (!Array.isArray(list)) continue;
+
+      if (key === "Top 10 hoy en España") {
+        continue;
+      }
+
+      let params;
+      if (key === "Premiadas") {
+        params = {
+          minVotes: 1200,
+          minRating: 6.8,
+          minSize: 20,
+          maxSize: 60,
+        };
+      } else if (key === "Superéxito") {
+        params = {
+          minVotes: 3000,
+          minRating: 6.5,
+          minSize: 25,
+          maxSize: 60,
+        };
+      } else if (key.startsWith("Década de")) {
+        params = {
+          minVotes: 800,
+          minRating: 6.2,
+          minSize: 15,
+          maxSize: 60,
+        };
+      } else if (key === "Por género") {
+        continue;
+      } else {
+        params = {
+          minVotes: 700,
+          minRating: 6.0,
+          minSize: 20,
+          maxSize: 60,
+        };
+      }
+
+      curatedBaseSections[key] = curateList(list, params);
+    }
+
+    const curatedByGenre = {};
+    const byGenreRaw = baseSections?.["Por género"] || {};
+    for (const [gname, list] of Object.entries(byGenreRaw)) {
+      if (!Array.isArray(list) || list.length === 0) continue;
+      curatedByGenre[gname] = curateList(list, {
+        minVotes: 600,
+        minRating: 6.0,
+        minSize: 15,
+        maxSize: 50,
+      });
+    }
+    if (Object.keys(curatedByGenre).length > 0) {
+      curatedBaseSections["Por género"] = curatedByGenre;
+    }
+
+    const blockbustersRaw = [...blockbustersP1, ...blockbustersP2, ...blockbustersP3];
+    curatedBaseSections["Superéxito"] = curateList(blockbustersRaw, {
+      minVotes: 4000,
+      minRating: 6.5,
+      minSize: 25,
+      maxSize: 80,
+    });
+
+    const imdbIdSet = new Set(topImdbIds);
+    if (curatedBaseSections["Más votadas"]) {
+      curatedBaseSections["Más votadas"] = curatedBaseSections[
+        "Más votadas"
+      ].filter((m) => !imdbIdSet.has(m.id));
+    }
+    const seenAfterMostVoted = new Set([
+      ...imdbIdSet,
+      ...(curatedBaseSections["Más votadas"] || []).map((m) => m.id),
+    ]);
+    if (curatedBaseSections["Superéxito"]) {
+      curatedBaseSections["Superéxito"] = curatedBaseSections[
+        "Superéxito"
+      ].filter((m) => !seenAfterMostVoted.has(m.id));
+    }
+
+    return {
+      mind,
+      action: curatedAction,
+      scifi: curatedScifi,
+      thrillers: curatedThrillers,
+      romance: curatedRomance,
+      vengeance: curatedVengeance,
+      ...curatedBaseSections,
+    };
+  } catch (err) {
+    console.error("Error cargando datos diferidos de películas:", err);
+    return {};
+  }
+}
+
 /* =================== Componente de servidor =================== */
 export default async function MoviesPage() {
   const initialData = await getCriticalDashboardData();
+  const topImdbIds = (initialData.top_imdb || []).map((m) => m.id);
+  const deferredDataPromise = getDeferredDashboardData(topImdbIds);
 
   return (
     <MoviesPageClient
       initialData={initialData}
+      deferredDataPromise={deferredDataPromise}
     />
   );
 }
