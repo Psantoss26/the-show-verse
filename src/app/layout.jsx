@@ -49,7 +49,7 @@ export default function RootLayout({ children }) {
       >
         <AuthProvider>
           <Navbar />
-          <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
+          <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
           <PwaManager />
           <Analytics />
           <SpeedInsights />
