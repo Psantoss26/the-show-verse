@@ -9442,7 +9442,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </LiquidButton>
 
                 {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
-                <div className="w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
+                <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
 
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
                 <TraktWatchedControl
