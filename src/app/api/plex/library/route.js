@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlexAccessToken } from "@/lib/plex/auth";
+import { getPlexAccessToken, getActivePlexServer } from "@/lib/plex/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-static";
@@ -22,67 +22,7 @@ const MAX_RESPONSE_LIMIT = 10000;
 const PLEX_PAGE_SIZE = 200;
 const MAX_PLEX_PAGES = 200;
 
-function isPrivateOrLocalHost(hostname) {
-  if (!hostname) return false;
-  const host = String(hostname).toLowerCase();
-  if (host === "localhost") return true;
-  if (host.endsWith(".local")) return true;
-  if (/^127\./.test(host)) return true;
-  if (/^10\./.test(host)) return true;
-  if (/^192\.168\./.test(host)) return true;
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return true;
-  return false;
-}
-
-function normalizeBaseUrl(rawUrl) {
-  const value = String(rawUrl || "").trim();
-  if (!value) return null;
-  try {
-    const parsed = new URL(value);
-    const cleanPath =
-      parsed.pathname && parsed.pathname !== "/"
-        ? parsed.pathname.replace(/\/+$/, "")
-        : "";
-    return `${parsed.protocol}//${parsed.host}${cleanPath}`;
-  } catch {
-    return null;
-  }
-}
-
-function resolvePlexBaseUrls() {
-  const configuredUrls = [
-    process.env.PLEX_URL,
-    ...(process.env.PLEX_URLS || "").split(","),
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean);
-
-  const rawCandidates = configuredUrls.length
-    ? configuredUrls
-    : ["http://localhost:32400"];
-  const expandedCandidates = [];
-
-  for (const raw of rawCandidates) {
-    const normalized = normalizeBaseUrl(raw);
-    if (!normalized) continue;
-
-    expandedCandidates.push(normalized);
-
-    try {
-      const parsed = new URL(normalized);
-      if (
-        parsed.protocol === "https:" &&
-        isPrivateOrLocalHost(parsed.hostname)
-      ) {
-        expandedCandidates.push(`http://${parsed.host}`);
-      }
-    } catch {
-      // ignore invalid candidate
-    }
-  }
-
-  return Array.from(new Set(expandedCandidates));
-}
+// Helper functions isPrivateOrLocalHost, normalizeBaseUrl, and resolvePlexBaseUrls removed (now using common implementation in src/lib/plex/auth.js)
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -440,37 +380,8 @@ export async function GET(request) {
       );
     }
 
-    const plexUrls = resolvePlexBaseUrls();
-    if (!plexUrls.length) {
-      return NextResponse.json(
-        {
-          available: false,
-          message: "No hay URLs de Plex configuradas.",
-        },
-        { status: 503 },
-      );
-    }
-
-    let activePlexUrl = null;
-    let sectionsData = null;
-
-    for (const baseUrl of plexUrls) {
-      try {
-        const json = await fetchPlexJson({
-          baseUrl,
-          path: "/library/sections",
-          token: plexToken,
-          timeoutMs: 8000,
-        });
-        sectionsData = json;
-        activePlexUrl = baseUrl;
-        break;
-      } catch {
-        // try next URL
-      }
-    }
-
-    if (!activePlexUrl || !sectionsData) {
+    const activeServer = await getActivePlexServer(plexToken);
+    if (!activeServer) {
       return NextResponse.json(
         {
           available: false,
@@ -480,7 +391,27 @@ export async function GET(request) {
       );
     }
 
+    const activePlexUrl = activeServer.baseUrl;
+    let sectionsData = null;
+    try {
+      sectionsData = await fetchPlexJson({
+        baseUrl: activePlexUrl,
+        path: "/library/sections",
+        token: plexToken,
+        timeoutMs: 8000,
+      });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          available: false,
+          message: "No se pudieron obtener las secciones del servidor Plex.",
+        },
+        { status: 503 },
+      );
+    }
+
     const machineIdentifier =
+      activeServer.machineIdentifier ||
       (await getMachineIdentifier({
         baseUrl: activePlexUrl,
         token: plexToken,
