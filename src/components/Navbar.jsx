@@ -37,8 +37,18 @@ function SearchBar({ onResultClick, isMobile = false }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef(null);
+  const inputRef = useRef(null);
   const [showCollection, setShowCollection] = useState(false);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
+
+  useEffect(() => {
+    if (isMobile) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isMobile]);
 
   // Activar colección tras 600ms de pausa
   useEffect(() => {
@@ -210,6 +220,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
           />
 
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
