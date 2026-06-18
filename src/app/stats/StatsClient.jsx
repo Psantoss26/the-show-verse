@@ -501,21 +501,32 @@ function ProfileCardScroller({ children }) {
   const [canNext, setCanNext] = useState(false);
   const isMobile = useIsMobileLayout(768);
   const slides = Children.toArray(children);
+  const childrenCount = slides.length;
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: 12 },
     640: { slidesPerView: 4, spaceBetween: 14 },
     768: { slidesPerView: 4, spaceBetween: 16 },
     1024: { slidesPerView: 5, spaceBetween: 18 },
-    1280: { slidesPerView: 7, spaceBetween: 18 },
+    1280: { slidesPerView: 6, spaceBetween: 20 },
   };
+
+  const getStep = useCallback((swiper) => {
+    const current = swiper?.params?.slidesPerView;
+    return typeof current === "number" ? Math.max(1, Math.floor(current)) : 1;
+  }, []);
 
   const updateNav = useCallback((swiper) => {
     if (!swiper) return;
-    const hasOverflow = !swiper.isLocked;
+    const visibleSlides = getStep(swiper);
+    const slideCount = swiper.slides?.length || childrenCount;
+    const hasOverflow =
+      slideCount > visibleSlides ||
+      (Array.isArray(swiper.snapGrid) && swiper.snapGrid.length > 1) ||
+      !swiper.isLocked;
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
-  }, []);
+  }, [childrenCount, getStep]);
 
   const handleSwiper = useCallback((swiper) => {
     swiperRef.current = swiper;
@@ -544,26 +555,32 @@ function ProfileCardScroller({ children }) {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [slides.length, updateNav]);
+  }, [childrenCount, updateNav]);
 
-  const handlePrevClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const swiper = swiperRef.current;
-    if (!swiper) return;
-    const target = Math.max((swiper.activeIndex || 0) - 7, 0);
-    swiper.slideTo(target);
-  };
+  const handlePrevClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      swiper.slideTo(Math.max((swiper.activeIndex || 0) - getStep(swiper), 0));
+    },
+    [getStep],
+  );
 
-  const handleNextClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const swiper = swiperRef.current;
-    if (!swiper) return;
-    const maxIndex = swiper.slides.length - 1;
-    const target = Math.min((swiper.activeIndex || 0) + 7, maxIndex);
-    swiper.slideTo(target);
-  };
+  const handleNextClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const swiper = swiperRef.current;
+      if (!swiper) return;
+      const maxIndex = Math.max((swiper.slides?.length || 1) - 1, 0);
+      swiper.slideTo(
+        Math.min((swiper.activeIndex || 0) + getStep(swiper), maxIndex),
+      );
+    },
+    [getStep],
+  );
 
   const showPrev = canPrev;
   const showNext = canNext;
@@ -578,6 +595,9 @@ function ProfileCardScroller({ children }) {
           <Swiper
             slidesPerView={3}
             spaceBetween={12}
+            observer={true}
+            observeParents={true}
+            resizeObserver={true}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -620,7 +640,7 @@ function ProfileCardScroller({ children }) {
               exit={{ opacity: 0 }}
               type="button"
               onClick={handlePrevClick}
-              className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+              className="absolute inset-y-0 -left-8 z-[500] hidden w-7 items-center justify-center text-white/80 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
               aria-label="Anterior"
             >
               <motion.span
@@ -641,7 +661,7 @@ function ProfileCardScroller({ children }) {
               exit={{ opacity: 0 }}
               type="button"
               onClick={handleNextClick}
-              className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+              className="absolute inset-y-0 -right-8 z-[500] hidden w-7 items-center justify-center text-white/80 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
               aria-label="Siguiente"
             >
               <motion.span
@@ -1724,7 +1744,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
       <div className="min-h-screen bg-black text-zinc-100 pb-20 selection:bg-emerald-500/30">
         <ProfilePageBackground variant="connect" />
 
-        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -1796,7 +1816,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
         {headerReady ? (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
