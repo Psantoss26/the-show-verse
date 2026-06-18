@@ -560,9 +560,8 @@ function PosterImage({ movie, cache }) {
 
 // ✅ DISEÑO ORIGINAL: rounded-3xl para Top 10
 function Top10MobileBackdropCard({ movie, rank }) {
-  const initialBackdrop = movie?.backdrop_path || movie?.poster_path || null;
-  const [backdropPath, setBackdropPath] = useState(initialBackdrop);
-  const [ready, setReady] = useState(!!initialBackdrop);
+  const [backdropPath, setBackdropPath] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let abort = false;
@@ -570,9 +569,12 @@ function Top10MobileBackdropCard({ movie, rank }) {
     const load = async () => {
       if (!movie?.id) return;
 
+      setReady(false);
+
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       if (userBackdrop) {
         movieBackdropCache.set(movie.id, userBackdrop);
+        await preloadImage(buildImg(userBackdrop, "w1280"));
         if (!abort) {
           setBackdropPath(userBackdrop);
           setReady(true);
@@ -582,6 +584,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
 
       const cached = movieBackdropCache.get(movie.id);
       if (cached !== undefined) {
+        if (cached) await preloadImage(buildImg(cached, "w1280"));
         if (!abort) {
           setBackdropPath(cached || null);
           setReady(!!cached);
@@ -589,26 +592,20 @@ function Top10MobileBackdropCard({ movie, rank }) {
         return;
       }
 
-      if (initialBackdrop) {
-        movieBackdropCache.set(movie.id, initialBackdrop);
-        return;
-      }
-
+      let chosen = getPreviewBackdropFallback(movie);
       try {
         const preferred = await fetchBestBackdrop(movie.id);
-        const chosen = preferred || getPreviewBackdropFallback(movie);
-        movieBackdropCache.set(movie.id, chosen);
-        if (!abort) {
-          setBackdropPath(chosen);
-          setReady(!!chosen);
-        }
+        chosen = preferred || chosen;
       } catch {
-        const fallback = getPreviewBackdropFallback(movie);
-        movieBackdropCache.set(movie.id, fallback);
-        if (!abort) {
-          setBackdropPath(fallback);
-          setReady(!!fallback);
-        }
+        chosen = getPreviewBackdropFallback(movie);
+      }
+
+      movieBackdropCache.set(movie.id, chosen);
+
+      if (chosen) await preloadImage(buildImg(chosen, "w1280"));
+      if (!abort) {
+        setBackdropPath(chosen);
+        setReady(!!chosen);
       }
     };
 
@@ -616,7 +613,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
     return () => {
       abort = true;
     };
-  }, [movie, initialBackdrop]);
+  }, [movie]);
 
   const href = `/details/movie/${movie.id}`;
   const src = backdropPath ? buildImg(backdropPath, "w1280") : null;
@@ -640,7 +637,7 @@ function Top10MobileBackdropCard({ movie, rank }) {
               src={src}
               alt={movie.title || movie.name}
               className="absolute inset-0 w-full h-full object-contain"
-              priority={rank === 1}
+              loading="lazy"
               decoding="async"
             />
           </>
