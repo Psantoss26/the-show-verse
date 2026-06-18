@@ -1604,7 +1604,7 @@ const WatchlistCard = memo(function WatchlistCard({
 
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  const shouldAnimate = index < 24;
 
   if (viewMode === "list") {
     return (
@@ -3353,85 +3353,94 @@ export default function WatchlistClient() {
         ) : grouped ? (
           // Grouped view
           <div className="space-y-8">
-            {grouped.map((group, groupIndex) => (
-              <motion.div
-                key={group.key}
-                ref={(node) => setGroupSectionRef(group.key, node)}
-                className="overflow-visible scroll-mt-[148px]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
-              >
-                <GroupDivider
-                  title={group.label}
-                  count={group.items.length}
-                  total={sorted.length}
-                  stats={group.stats}
-                  groupBy={groupBy}
-                  mobileFiltersOpen={mobileFiltersOpen}
-                  forceSticky={forcedStickyGroupKey === group.key}
-                  disableStickyAnimation={forcedStickyGroupKey === group.key}
-                  hasPreviousGroup={groupIndex > 0}
-                  hasNextGroup={groupIndex < grouped.length - 1}
-                  onPreviousGroup={() => scrollToPreviousGroup(group.key)}
-                  onNextGroup={() => scrollToNextGroup(group.key)}
-                />
-                {group.subgroups?.length ? (
-                  <div className="">
-                    {group.subgroups.map((subgroup) => (
-                      <div
-                        key={`${group.key}-${subgroup.key}`}
-                        className="space-y-1 overflow-visible"
-                      >
-                        <SubGroupDivider
-                          title={subgroup.label}
-                          count={subgroup.items.length}
-                        />
+            {(() => {
+              let globalCardIndex = 0;
+              return grouped.map((group, groupIndex) => (
+                <motion.div
+                  key={group.key}
+                  ref={(node) => setGroupSectionRef(group.key, node)}
+                  className="overflow-visible scroll-mt-[148px]"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                >
+                  <GroupDivider
+                    title={group.label}
+                    count={group.items.length}
+                    total={sorted.length}
+                    stats={group.stats}
+                    groupBy={groupBy}
+                    mobileFiltersOpen={mobileFiltersOpen}
+                    forceSticky={forcedStickyGroupKey === group.key}
+                    disableStickyAnimation={forcedStickyGroupKey === group.key}
+                    hasPreviousGroup={groupIndex > 0}
+                    hasNextGroup={groupIndex < grouped.length - 1}
+                    onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                    onNextGroup={() => scrollToNextGroup(group.key)}
+                  />
+                  {group.subgroups?.length ? (
+                    <div className="">
+                      {group.subgroups.map((subgroup) => (
                         <div
-                          key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                          className={getItemsGridClass(true)}
+                          key={`${group.key}-${subgroup.key}`}
+                          className="space-y-1 overflow-visible"
                         >
-                          {subgroup.items.map((item, idx) => (
-                            <WatchlistCard
-                              key={getMediaKey(item)}
-                              item={item}
-                              index={idx}
-                              totalItems={subgroup.items.length}
-                              viewMode={viewMode}
-                              imageMode={imageMode}
-                              imdbScore={imdbScores.get(getScoreItemKey(item))}
-                              traktScore={traktScores.get(
-                                getScoreItemKey(item),
-                              )}
-                              userRating={item.user_rating}
-                            />
-                          ))}
+                          <SubGroupDivider
+                            title={subgroup.label}
+                            count={subgroup.items.length}
+                          />
+                          <div
+                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                            className={getItemsGridClass(true)}
+                          >
+                            {subgroup.items.map((item, idx) => {
+                              const currentGlobalIdx = globalCardIndex++;
+                              return (
+                                <WatchlistCard
+                                  key={getMediaKey(item)}
+                                  item={item}
+                                  index={currentGlobalIdx}
+                                  totalItems={sorted.length}
+                                  viewMode={viewMode}
+                                  imageMode={imageMode}
+                                  imdbScore={imdbScores.get(getScoreItemKey(item))}
+                                  traktScore={traktScores.get(
+                                    getScoreItemKey(item),
+                                  )}
+                                  userRating={item.user_rating}
+                                />
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div
-                    key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                    className={getItemsGridClass(true)}
-                  >
-                    {group.items.map((item, idx) => (
-                      <WatchlistCard
-                        key={getMediaKey(item)}
-                        item={item}
-                        index={idx}
-                        totalItems={group.items.length}
-                        viewMode={viewMode}
-                        imageMode={imageMode}
-                        imdbScore={imdbScores.get(getScoreItemKey(item))}
-                        traktScore={traktScores.get(getScoreItemKey(item))}
-                        userRating={item.user_rating}
-                      />
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            ))}
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                      className={getItemsGridClass(true)}
+                    >
+                      {group.items.map((item, idx) => {
+                        const currentGlobalIdx = globalCardIndex++;
+                        return (
+                          <WatchlistCard
+                            key={getMediaKey(item)}
+                            item={item}
+                            index={currentGlobalIdx}
+                            totalItems={sorted.length}
+                            viewMode={viewMode}
+                            imageMode={imageMode}
+                            imdbScore={imdbScores.get(getScoreItemKey(item))}
+                            traktScore={traktScores.get(getScoreItemKey(item))}
+                            userRating={item.user_rating}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              ));
+            })()}
           </div>
         ) : (
           <div

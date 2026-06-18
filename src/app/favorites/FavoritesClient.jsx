@@ -1914,7 +1914,7 @@ const FavoriteCard = memo(function FavoriteCard({
 
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  const shouldAnimate = index < 24;
   const shellClassName =
     "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
 
@@ -2108,7 +2108,7 @@ const FavoriteCard = memo(function FavoriteCard({
     >
       <Link href={href} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-all`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
           onMouseEnter={handleHover}
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
@@ -3891,83 +3891,92 @@ export default function FavoritesClient() {
           ) : grouped ? (
             // Grouped view
             <div className="space-y-8">
-              {renderedGrouped.map((group, groupIndex) => (
-                <motion.div
-                  key={group.key}
-                  ref={(node) => setGroupSectionRef(group.key, node)}
-                  className="overflow-visible scroll-mt-[148px]"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
-                >
-                  <GroupDivider
-                    title={group.label}
-                    count={group.items.length}
-                    total={sorted.length}
-                    stats={group.stats}
-                    groupBy={groupBy}
-                    mobileFiltersOpen={mobileFiltersOpen}
-                    forceSticky={forcedStickyGroupKey === group.key}
-                    disableStickyAnimation={forcedStickyGroupKey === group.key}
-                    hasPreviousGroup={groupIndex > 0}
-                    hasNextGroup={groupIndex < renderedGrouped.length - 1}
-                    onPreviousGroup={() => scrollToPreviousGroup(group.key)}
-                    onNextGroup={() => scrollToNextGroup(group.key)}
-                  />
-                  {group.subgroups?.length ? (
-                    <div className="">
-                      {group.subgroups.map((subgroup) => (
-                        <div
-                          key={`${group.key}-${subgroup.key}`}
-                          className="space-y-1 overflow-visible"
-                        >
-                          <SubGroupDivider
-                            title={subgroup.label}
-                            count={subgroup.items.length}
-                          />
+              {(() => {
+                let globalCardIndex = 0;
+                return renderedGrouped.map((group, groupIndex) => (
+                  <motion.div
+                    key={group.key}
+                    ref={(node) => setGroupSectionRef(group.key, node)}
+                    className="overflow-visible scroll-mt-[148px]"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                  >
+                    <GroupDivider
+                      title={group.label}
+                      count={group.items.length}
+                      total={sorted.length}
+                      stats={group.stats}
+                      groupBy={groupBy}
+                      mobileFiltersOpen={mobileFiltersOpen}
+                      forceSticky={forcedStickyGroupKey === group.key}
+                      disableStickyAnimation={forcedStickyGroupKey === group.key}
+                      hasPreviousGroup={groupIndex > 0}
+                      hasNextGroup={groupIndex < renderedGrouped.length - 1}
+                      onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                      onNextGroup={() => scrollToNextGroup(group.key)}
+                    />
+                    {group.subgroups?.length ? (
+                      <div className="">
+                        {group.subgroups.map((subgroup) => (
                           <div
-                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                            className={getItemsGridClass(true)}
+                            key={`${group.key}-${subgroup.key}`}
+                            className="space-y-1 overflow-visible"
                           >
-                            {subgroup.items.map((item, idx) => (
-                              <FavoriteCard
-                                key={getMediaKey(item)}
-                                item={item}
-                                index={idx}
-                                totalItems={subgroup.items.length}
-                                viewMode={viewMode}
-                                imageMode={imageMode}
-                                imdbScore={imdbScores.get(getScoreItemKey(item))}
-                                traktScore={traktScores.get(
-                                  getScoreItemKey(item),
-                                )}
-                              />
-                            ))}
+                            <SubGroupDivider
+                              title={subgroup.label}
+                              count={subgroup.items.length}
+                            />
+                            <div
+                              key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                              className={getItemsGridClass(true)}
+                            >
+                              {subgroup.items.map((item, idx) => {
+                                const currentGlobalIdx = globalCardIndex++;
+                                return (
+                                  <FavoriteCard
+                                    key={getMediaKey(item)}
+                                    item={item}
+                                    index={currentGlobalIdx}
+                                    totalItems={sorted.length}
+                                    viewMode={viewMode}
+                                    imageMode={imageMode}
+                                    imdbScore={imdbScores.get(getScoreItemKey(item))}
+                                    traktScore={traktScores.get(
+                                      getScoreItemKey(item),
+                                    )}
+                                  />
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div
-                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                      className={getItemsGridClass(true)}
-                    >
-                      {group.items.map((item, idx) => (
-                        <FavoriteCard
-                          key={getMediaKey(item)}
-                          item={item}
-                          index={idx}
-                          totalItems={group.items.length}
-                          viewMode={viewMode}
-                          imageMode={imageMode}
-                          imdbScore={imdbScores.get(getScoreItemKey(item))}
-                          traktScore={traktScores.get(getScoreItemKey(item))}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                        className={getItemsGridClass(true)}
+                      >
+                        {group.items.map((item, idx) => {
+                          const currentGlobalIdx = globalCardIndex++;
+                          return (
+                            <FavoriteCard
+                              key={getMediaKey(item)}
+                              item={item}
+                              index={currentGlobalIdx}
+                              totalItems={sorted.length}
+                              viewMode={viewMode}
+                              imageMode={imageMode}
+                              imdbScore={imdbScores.get(getScoreItemKey(item))}
+                              traktScore={traktScores.get(getScoreItemKey(item))}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </motion.div>
+                ));
+              })()}
             </div>
           ) : (
             <div
