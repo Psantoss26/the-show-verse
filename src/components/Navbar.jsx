@@ -698,7 +698,7 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] border border-white/10 flex items-center px-4">
+      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] border border-white/10 flex items-center px-4">
         <Link
           href="/movies"
           className={navLinkClassMobileBottom("/movies", "blue")}
