@@ -14,32 +14,6 @@ function isActivePath(pathname, href) {
   return false;
 }
 
-function iconToneClass({ active, tone = "green" }) {
-  const tones = {
-    green: {
-      hover:
-        "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
-      active:
-        "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
-    },
-    red: {
-      hover:
-        "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
-      active:
-        "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
-    },
-    blue: {
-      hover:
-        "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
-      active:
-        "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
-    },
-  };
-
-  const t = tones[tone] || tones.green;
-  return active ? t.active : t.hover;
-}
-
 /**
  * variant:
  * - "icon"  -> (default) botón redondo como desktop
@@ -111,29 +85,39 @@ export default function TraktHistoryNavButton({
     );
   }
 
-  // ✅ Mantiene EXACTO el estilo actual de escritorio
+  // ✅ Mantiene EXACTO el estilo actual de escritorio pero con indicador deslizante animado
   if (variant === "icon") {
     const base =
-      "group p-2 rounded-full transition-all duration-200 " +
-      "text-neutral-400 " +
-      "hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 " +
-      "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30";
+      "relative group p-2 rounded-full transition-all duration-300 ease-out " +
+      "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 " +
+      "focus:outline-none";
 
-    const tone = iconToneClass({ active, tone: "green" });
+    const textClass = active
+      ? "text-emerald-200"
+      : "text-neutral-400 hover:text-emerald-300 hover:bg-emerald-500/10 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]";
 
     return (
       <Link
         href={href}
         onClick={onClick}
-        className={`${base} ${tone} ${className}`}
+        className={`${base} ${textClass} ${className}`}
         aria-label="Historial"
         prefetch={false}
       >
-        <Icon
-          className={`${loading ? "animate-spin " : ""}transition-transform duration-200 group-hover:scale-110`}
-          width={iconSize}
-          height={iconSize}
-        />
+        {active && (
+          <motion.div
+            layoutId="activeTabDesktopIcon"
+            className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
+          />
+        )}
+        <span className="relative z-10 flex items-center justify-center">
+          <Icon
+            className={`${loading ? "animate-spin " : ""}transition-transform duration-200 group-hover:scale-110`}
+            width={iconSize}
+            height={iconSize}
+          />
+        </span>
       </Link>
     );
   }
