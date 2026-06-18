@@ -3,10 +3,6 @@ import SeriesPageClient from "./SeriesPageClient";
 
 import {
   fetchPopularMedia,
-  fetchMediaByGenre,
-  fetchTVSections,
-  fetchRomanceSeriesWithGoodReviews,
-  discoverTV,
   fetchTrendingTVDay,
 } from "@/lib/api/tmdb";
 
@@ -145,193 +141,13 @@ async function getCriticalDashboardData() {
   }
 }
 
-/* ======== Carga de datos DIFERIDOS en el SERVIDOR para series ======== */
-async function getDeferredDashboardData() {
-  const lang = "es-ES";
-
-  try {
-    const [
-      drama,
-      scifi_fantasy,
-      crime,
-      romance,
-      animation,
-      kDrama,
-      baseSections,
-    ] = await Promise.all([
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 18,
-        minVotes: 800,
-        language: lang,
-      }), // Drama
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 10765,
-        minVotes: 800,
-        language: lang,
-      }), // Sci-Fi & Fantasy
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 80,
-        minVotes: 800,
-        language: lang,
-      }), // Crimen
-      fetchRomanceSeriesWithGoodReviews({
-        language: lang,
-        pages: 1,
-      }), // Romance
-      fetchMediaByGenre({
-        type: "tv",
-        genreId: 16,
-        minVotes: 400,
-        language: lang,
-      }), // Animación
-      discoverTV({
-        with_original_language: "ko",
-        sort_by: "popularity.desc",
-        "vote_count.gte": 300,
-      }), // K-Drama
-      fetchTVSections
-        ? fetchTVSections({ language: lang })
-        : Promise.resolve({}),
-    ]);
-
-    const curatedDrama = curateList(drama, {
-      minVotes: 1000,
-      minRating: 6.5,
-      minSize: 25,
-      maxSize: 70,
-    });
-
-    const curatedScifiFantasy = curateList(scifi_fantasy, {
-      minVotes: 800,
-      minRating: 6.4,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedCrime = curateList(crime, {
-      minVotes: 800,
-      minRating: 6.4,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedRomance = curateList(romance, {
-      minVotes: 50,
-      minRating: 6.0,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedAnimation = curateList(animation, {
-      minVotes: 400,
-      minRating: 6.2,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedKDrama = curateList(kDrama, {
-      minVotes: 300,
-      minRating: 6.0,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedBaseSections = {};
-    const curatedByGenre = {};
-
-    // Curado de secciones base TMDb
-    for (const [key, list] of Object.entries(baseSections || {})) {
-      if (!Array.isArray(list)) continue;
-
-      if (key === "Top 10 hoy en España") {
-        continue;
-      }
-
-      let params;
-      if (key === "Premiadas") {
-        params = {
-          minVotes: 800,
-          minRating: 7.2,
-          minSize: 20,
-          maxSize: 60,
-        };
-      } else if (key === "Superéxito") {
-        params = {
-          minVotes: 1500,
-          minRating: 6.5,
-          minSize: 20,
-          maxSize: 60,
-        };
-      } else if (key === "Más votadas") {
-        params = {
-          minVotes: 600,
-          minRating: 6.2,
-          minSize: 20,
-          maxSize: 60,
-        };
-      } else if (key.startsWith("Década de")) {
-        params = {
-          minVotes: 600,
-          minRating: 6.2,
-          minSize: 15,
-          maxSize: 60,
-        };
-      } else if (key === "Por género") {
-        continue;
-      } else {
-        params = {
-          minVotes: 500,
-          minRating: 6.0,
-          minSize: 20,
-          maxSize: 60,
-        };
-      }
-
-      curatedBaseSections[key] = curateList(list, params);
-    }
-
-    // Curado de "Por género"
-    const byGenreRaw = baseSections?.["Por género"] || {};
-    for (const [gname, list] of Object.entries(byGenreRaw)) {
-      if (!Array.isArray(list) || list.length === 0) continue;
-      curatedByGenre[gname] = curateList(list, {
-        minVotes: 400,
-        minRating: 6.0,
-        minSize: 15,
-        maxSize: 50,
-      });
-    }
-    if (Object.keys(curatedByGenre).length > 0) {
-      curatedBaseSections["Por género"] = curatedByGenre;
-    }
-
-    return {
-      drama: curatedDrama,
-      scifi_fantasy: curatedScifiFantasy,
-      crime: curatedCrime,
-      kDrama: curatedKDrama,
-      romance: curatedRomance,
-      animation: curatedAnimation,
-      ...curatedBaseSections,
-    };
-  } catch (err) {
-    console.error("Error cargando datos diferidos de series:", err);
-    return {};
-  }
-}
-
 /* =================== Componente de servidor =================== */
 export default async function SeriesPage() {
   const initialData = await getCriticalDashboardData();
-  const deferredDataPromise = getDeferredDashboardData();
 
   return (
     <SeriesPageClient
       initialData={initialData}
-      deferredDataPromise={deferredDataPromise}
     />
   );
 }

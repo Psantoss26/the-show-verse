@@ -1521,19 +1521,22 @@ function GenreRows({ groups, isMobile, posterCacheRef }) {
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
-export default function MoviesPageClient({ initialData, deferredDataPromise }) {
+export default function MoviesPageClient({ initialData }) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
   const [deferredData, setDeferredData] = useState(null);
 
   useEffect(() => {
-    if (deferredDataPromise) {
-      Promise.resolve(deferredDataPromise)
-        .then(setDeferredData)
-        .catch(console.error);
-    }
-  }, [deferredDataPromise]);
+    if (!initialData) return;
+    const topImdbIds = (initialData.top_imdb || []).map((m) => m.id);
+    fetch(
+      `/api/dashboard/deferred?type=movie&topImdbIds=${topImdbIds.join(",")}`,
+    )
+      .then((res) => res.json())
+      .then(setDeferredData)
+      .catch(console.error);
+  }, [initialData]);
 
   const dashboardData = {
     ...(initialData || {}),
