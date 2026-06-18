@@ -457,20 +457,20 @@ export default function Navbar() {
 
     const tones = {
       red: {
-        active: "text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]",
-        inactive: "text-neutral-400 hover:text-red-300",
+        active: "text-red-400",
+        inactive: "text-neutral-400 hover:text-red-400",
       },
       blue: {
-        active: "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]",
-        inactive: "text-neutral-400 hover:text-sky-300",
+        active: "text-sky-400",
+        inactive: "text-neutral-400 hover:text-sky-400",
       },
       purple: {
-        active: "text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.5)]",
-        inactive: "text-neutral-400 hover:text-fuchsia-300",
+        active: "text-fuchsia-400",
+        inactive: "text-neutral-400 hover:text-fuchsia-400",
       },
       green: {
-        active: "text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]",
-        inactive: "text-neutral-400 hover:text-emerald-300",
+        active: "text-emerald-400",
+        inactive: "text-neutral-400 hover:text-emerald-400",
       },
     };
 
@@ -722,21 +722,18 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-white/[0.04] bg-gradient-to-b from-white/15 via-white/2 to-transparent backdrop-blur-[40px] saturate-[230%] shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.35),0_15px_35px_-5px_rgba(0,0,0,0.7)] border border-white/20 border-b-white/10 flex items-center px-4 overflow-visible">
+      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/30 bg-gradient-to-b from-white/10 to-transparent backdrop-blur-[30px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.2),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/12 flex items-center px-4 overflow-visible">
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
-        <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
 
         <Link
           href="/movies"
-          prefetch
-          onTouchStart={() => prefetchNavRoute("/movies")}
-          onFocus={() => prefetchNavRoute("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
         >
           {isActive("/movies") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-sky-500/25 border border-sky-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(56,189,248,0.35)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.15)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -752,7 +749,7 @@ export default function Navbar() {
           {isActive("/series") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-fuchsia-500/25 border border-fuchsia-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(217,70,239,0.35)]"
+              className="absolute inset-0 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(217,70,239,0.15)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -768,7 +765,7 @@ export default function Navbar() {
           {isActive("/in-progress") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-emerald-500/25 border border-emerald-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(16,185,129,0.35)]"
+              className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.15)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -789,7 +786,7 @@ export default function Navbar() {
           {isActive(favHref) && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-red-500/25 border border-red-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(239,68,68,0.35)]"
+              className="absolute inset-0 rounded-full bg-red-500/20 border border-red-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(239,68,68,0.15)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -805,7 +802,7 @@ export default function Navbar() {
           {isActive(watchHref) && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-sky-500/25 border border-sky-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(56,189,248,0.35)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.15)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
