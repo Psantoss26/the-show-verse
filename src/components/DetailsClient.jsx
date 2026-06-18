@@ -9561,8 +9561,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
-            <ScaleIn delay={0.18} className="mb-6">
-              <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] transform-gpu mb-6">
+            <ScaleIn delay={0.18} className={isBackdropPoster ? "" : "mb-6"}>
+              <div
+                className={`relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] transform-gpu ${
+                  isBackdropPoster ? "" : "mb-6"
+                }`}
+              >
                 <div
                   className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
                   style={{
@@ -10087,7 +10091,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <FadeIn delay={0.24} className="mt-6 w-full">
+          <FadeIn delay={0.24} className="mt-8 lg:mt-6 w-full">
             {/* --- MENÚ DE NAVEGACIÓN --- */}
             <DetailsTabsMenu
               tabs={[
