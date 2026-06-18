@@ -9,6 +9,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  startTransition,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -53,6 +54,26 @@ const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v2";
 const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v2";
 const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v1";
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
+
+function scheduleProfileDeferredOverview(callback) {
+  if (typeof window === "undefined") return null;
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, {
+      timeout: PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS,
+    });
+  }
+  return window.setTimeout(callback, 48);
+}
+
+function cancelProfileDeferredOverview(handle) {
+  if (typeof window === "undefined" || handle == null) return;
+  if ("cancelIdleCallback" in window) {
+    window.cancelIdleCallback(handle);
+    return;
+  }
+  window.clearTimeout(handle);
+}
 
 function readProfileSessionCache(key) {
   if (typeof window === "undefined") return null;
@@ -1391,14 +1412,18 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const [viewMode, setViewMode] = useState("overview"); // overview | patterns | yearly
   const [refreshTick, setRefreshTick] = useState(0);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [deferredOverviewReady, setDeferredOverviewReady] = useState(false);
+  const overviewDeferredOnceRef = useRef(false);
 
   const handleSyncProfile = useCallback(() => {
     clearProfileSessionCache();
+    overviewDeferredOnceRef.current = false;
     setError("");
     setNotConnected(false);
     setLoading(true);
     setPeopleLoading(false);
     setPeopleLoaded(false);
+    setDeferredOverviewReady(false);
     setRefreshTick((tick) => tick + 1);
   }, []);
 
@@ -1739,6 +1764,31 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const profileRowsReady = !!stats;
   const pageReady = headerReady && profileRowsReady;
 
+  useEffect(() => {
+    if (!pageReady) {
+      overviewDeferredOnceRef.current = false;
+      setDeferredOverviewReady(false);
+      return undefined;
+    }
+
+    if (viewMode !== "overview") return undefined;
+
+    if (overviewDeferredOnceRef.current) {
+      setDeferredOverviewReady(true);
+      return undefined;
+    }
+
+    setDeferredOverviewReady(false);
+    const handle = scheduleProfileDeferredOverview(() => {
+      overviewDeferredOnceRef.current = true;
+      startTransition(() => {
+        setDeferredOverviewReady(true);
+      });
+    });
+
+    return () => cancelProfileDeferredOverview(handle);
+  }, [pageReady, refreshTick, viewMode]);
+
   if (notConnected) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 pb-20 selection:bg-emerald-500/30">
@@ -1971,7 +2021,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </div>
                 )}
 
-                {profileRowsReady && recentHistory.length > 0 && (
+                {deferredOverviewReady && profileRowsReady && recentHistory.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -2002,7 +2052,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
                 )}
 
-                {profileRowsReady && recentRatings.length > 0 && (
+                {deferredOverviewReady && profileRowsReady && recentRatings.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -2033,7 +2083,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </motion.div>
                 )}
 
-                {profileRowsReady && watchlist.length > 0 && (
+                {deferredOverviewReady && profileRowsReady && watchlist.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -2065,7 +2115,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Main Charts Row */}
-                {stats && (
+                {deferredOverviewReady && stats && (
                   <div className="order-1 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Activity Chart - Spans 2 cols */}
                     <motion.div
@@ -2213,7 +2263,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Top Content Row */}
-                {stats && (stats.topMoviesReady || stats.topShowsReady) && (
+                {deferredOverviewReady && stats && (stats.topMoviesReady || stats.topShowsReady) && (
                   <div className="order-3 space-y-8 [content-visibility:auto] [contain-intrinsic-size:auto_720px]">
                     {/* Top Movies */}
                     {stats.topMoviesReady && (
@@ -2288,7 +2338,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Top People Row */}
-                {stats?.topActors?.length > 0 && (
+                {deferredOverviewReady && stats?.topActors?.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -2318,7 +2368,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 )}
 
                 {/* Top Directors Row */}
-                {stats?.topDirectors?.length > 0 && (
+                {deferredOverviewReady && stats?.topDirectors?.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
