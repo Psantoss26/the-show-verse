@@ -375,8 +375,6 @@ export default function Navbar() {
   );
 
   useEffect(() => {
-    if (pathname === "/movies") return undefined;
-
     const schedule =
       window.requestIdleCallback ||
       ((callback) => window.setTimeout(callback, 1200));
@@ -384,9 +382,13 @@ export default function Navbar() {
       window.cancelIdleCallback ||
       ((handle) => window.clearTimeout(handle));
 
-    const handle = schedule(() => prefetchNavRoute("/movies"), {
-      timeout: 1800,
-    });
+    const handle = schedule(
+      () => {
+        prefetchNavRoute("/movies");
+        prefetchNavRoute("/series");
+      },
+      { timeout: 1800 },
+    );
 
     return () => cancel(handle);
   }, [pathname, prefetchNavRoute]);
@@ -570,7 +572,13 @@ export default function Navbar() {
               >
                 Películas
               </Link>
-              <Link href="/series" className={navLinkClass("/series")}>
+              <Link
+                href="/series"
+                prefetch
+                onMouseEnter={() => prefetchNavRoute("/series")}
+                onFocus={() => prefetchNavRoute("/series")}
+                className={navLinkClass("/series")}
+              >
                 Series
               </Link>
               <Link href="/discover" className={navLinkClass("/discover")}>
@@ -728,6 +736,9 @@ export default function Navbar() {
 
         <Link
           href="/movies"
+          prefetch
+          onTouchStart={() => prefetchNavRoute("/movies")}
+          onFocus={() => prefetchNavRoute("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
         >
           {isActive("/movies") && (
@@ -744,6 +755,9 @@ export default function Navbar() {
 
         <Link
           href="/series"
+          prefetch
+          onTouchStart={() => prefetchNavRoute("/series")}
+          onFocus={() => prefetchNavRoute("/series")}
           className={navLinkClassMobileBottom("/series", "purple")}
         >
           {isActive("/series") && (
@@ -886,6 +900,8 @@ export default function Navbar() {
                 <Link
                   href="/series"
                   onClick={() => setMobileMenuOpen(false)}
+                  onMouseEnter={() => prefetchNavRoute("/series")}
+                  onFocus={() => prefetchNavRoute("/series")}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
                     isActive("/series")
                       ? "bg-white/10 text-white"

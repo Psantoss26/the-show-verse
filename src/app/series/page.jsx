@@ -108,9 +108,8 @@ async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const [popular, topImdbRaw, topES] = await Promise.all([
+    const [popular, topES] = await Promise.all([
       fetchPopularMedia({ type: "tv", language: lang }),
-      fetchTopRatedImdbTvServer(),
       fetchTrendingTVDay(),
     ]);
 
@@ -121,25 +120,16 @@ async function getCriticalDashboardData() {
       maxSize: 80,
     });
 
-    const curatedTopIMDb = curateList(topImdbRaw, {
-      minVotes: 8000,
-      minRating: 7.4,
-      minSize: 30,
-      maxSize: 80,
-    });
-
     const curatedTopES = (topES || []).slice(0, 10);
 
     return {
       popular: curatedPopular,
-      top_imdb: curatedTopIMDb,
       "Top 10 hoy en España": curatedTopES,
     };
   } catch (err) {
     console.error("Error cargando datos críticos de series (SSR):", err);
     return {
       popular: [],
-      top_imdb: [],
       "Top 10 hoy en España": [],
     };
   }
@@ -151,6 +141,7 @@ async function getDeferredDashboardData() {
 
   try {
     const [
+      topImdbRaw,
       drama,
       scifi_fantasy,
       crime,
@@ -159,6 +150,7 @@ async function getDeferredDashboardData() {
       kDrama,
       baseSections,
     ] = await Promise.all([
+      fetchTopRatedImdbTvServer(),
       fetchMediaByGenre({
         type: "tv",
         genreId: 18,
@@ -196,6 +188,13 @@ async function getDeferredDashboardData() {
         ? fetchTVSections({ language: lang })
         : Promise.resolve({}),
     ]);
+
+    const curatedTopIMDb = curateList(topImdbRaw, {
+      minVotes: 8000,
+      minRating: 7.4,
+      minSize: 30,
+      maxSize: 80,
+    });
 
     const curatedDrama = curateList(drama, {
       minVotes: 1000,
@@ -309,6 +308,7 @@ async function getDeferredDashboardData() {
     }
 
     return {
+      top_imdb: curatedTopIMDb,
       drama: curatedDrama,
       scifi_fantasy: curatedScifiFantasy,
       crime: curatedCrime,
