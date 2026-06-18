@@ -109,28 +109,28 @@ export default function UnifiedListDetailsLayout({
 
             <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 lg:py-12">
                 {/* --- TOP BAR --- */}
-                <div className="mb-8 flex items-center gap-4">
+                <div className="mb-6 flex items-center gap-2">
                     {backHref ? (
                         <Link
                             href={backHref}
-                            className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2.5 text-zinc-300 shadow-lg backdrop-blur-[28px] transition hover:bg-white/10 hover:text-white"
+                            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
                         >
-                            <ArrowLeft className="w-5 h-5" />
+                            <ArrowLeft className="w-4 h-4" />
                         </Link>
                     ) : (
                         <button
                             type="button"
                             onClick={() => router.back()}
-                            className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2.5 text-zinc-300 shadow-lg backdrop-blur-[28px] transition hover:bg-white/10 hover:text-white"
+                            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
                             aria-label="Volver"
                         >
-                            <ArrowLeft className="w-5 h-5" />
+                            <ArrowLeft className="w-4 h-4" />
                         </button>
                     )}
 
-                    <div className="h-8 w-[1px] bg-white/10" />
+                    <div className="h-6 w-[1px] bg-white/35 shrink-0" />
 
-                    <div className="ml-auto flex gap-2 [&>a]:!rounded-full [&>a]:!border-0 [&>a]:!bg-black/20 [&>a]:!bg-gradient-to-br [&>a]:!from-white/10 [&>a]:!via-transparent [&>a]:!to-black/40 [&>a]:!text-zinc-300 [&>a]:!shadow-lg [&>a]:!backdrop-blur-[28px] hover:[&>a]:!bg-white/10 hover:[&>a]:!text-white [&>button]:!rounded-full [&>button]:!border-0 [&>button]:!bg-black/20 [&>button]:!bg-gradient-to-br [&>button]:!from-white/10 [&>button]:!via-transparent [&>button]:!to-black/40 [&>button]:!text-zinc-300 [&>button]:!shadow-lg [&>button]:!backdrop-blur-[28px] hover:[&>button]:!bg-white/10 hover:[&>button]:!text-white">{rightActions}</div>
+                    <div className="ml-auto flex gap-2 [&>a]:!inline-flex [&>a]:!items-center [&>a]:!justify-center [&>a]:!rounded-full [&>a]:!border-0 [&>a]:!bg-black/40 [&>a]:!bg-gradient-to-br [&>a]:!from-white/10 [&>a]:!to-white/5 [&>a]:!shadow-lg [&>a]:!backdrop-blur-md [&>a]:!p-2 [&>a]:!text-zinc-200 hover:[&>a]:!bg-white/10 [&>a]:!transition [&>button]:!inline-flex [&>button]:!items-center [&>button]:!justify-center [&>button]:!rounded-full [&>button]:!border-0 [&>button]:!bg-black/40 [&>button]:!bg-gradient-to-br [&>button]:!from-white/10 [&>button]:!to-white/5 [&>button]:!shadow-lg [&>button]:!backdrop-blur-md [&>button]:!p-2 [&>button]:!text-zinc-200 hover:[&>button]:!bg-white/10 [&>button]:!transition [&_svg]:!w-4 [&_svg]:!h-4">{rightActions}</div>
                 </div>
 
                 {/* --- HERO, misma base visual que ActorDetails --- */}
@@ -163,7 +163,7 @@ export default function UnifiedListDetailsLayout({
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col w-full">
-                        <div className="mb-5 px-1">
+                        <div className="mb-5 px-1 flex flex-col items-center md:items-start text-center md:text-left w-full">
                             <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-yellow-300">
                                 <Film className="h-4 w-4" />
                                 {sourceLabel}
