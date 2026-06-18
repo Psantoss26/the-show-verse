@@ -79,7 +79,7 @@ export default function TraktHistoryNavButton({
 
   // ✅ Variante para navbar inferior móvil: misma clase exacta que navLinkClassMobileBottom
   if (variant === "mobile-bottom") {
-    const textClass = active ? "text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "text-neutral-400 hover:text-emerald-300";
+    const textClass = active ? "text-emerald-400" : "text-neutral-400 hover:text-emerald-400";
     const mobileBottomClass =
       "relative group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
       "transition-all duration-300 ease-out " +
@@ -96,7 +96,7 @@ export default function TraktHistoryNavButton({
         {active && (
           <motion.div
             layoutId="activeTabMobileBottom"
-            className="absolute inset-0 rounded-full bg-emerald-500/25 border border-emerald-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(16,185,129,0.35)]"
+            className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.15)]"
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
           />
         )}
