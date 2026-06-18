@@ -460,7 +460,7 @@ export default function Navbar() {
     const toneClass = active ? t.active : t.hover;
 
     return (
-      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-2xl " +
+      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
       "text-neutral-400 transition-all duration-300 ease-out " +
       "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
       `${toneClass}`
@@ -698,7 +698,7 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-0 left-0 z-30 w-full h-16 bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.8)] flex items-center">
+      <div className="lg:hidden fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] border border-white/10 flex items-center px-4">
         <Link
           href="/movies"
           className={navLinkClassMobileBottom("/movies", "blue")}

@@ -80,7 +80,7 @@ export default function TraktHistoryNavButton({
   if (variant === "mobile-bottom") {
     const toneClass = iconToneClass({ active, tone: "green" });
     const mobileBottomClass =
-      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-2xl " +
+      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
       "text-neutral-400 transition-all duration-300 ease-out " +
       "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
       toneClass;
