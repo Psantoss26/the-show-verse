@@ -448,6 +448,12 @@ export default function Navbar() {
         active:
           "text-fuchsia-200 bg-fuchsia-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(217,70,239,0.2)]",
       },
+      green: {
+        hover:
+          "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
+        active:
+          "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
+      },
     };
 
     const t = tones[tone] || tones.blue;
@@ -705,6 +711,13 @@ export default function Navbar() {
           className={navLinkClassMobileBottom("/series", "purple")}
         >
           <TvIcon className="w-6 h-6" />
+        </Link>
+
+        <Link
+          href="/in-progress"
+          className={navLinkClassMobileBottom("/in-progress", "green")}
+        >
+          <Play className="w-6 h-6" fill="currentColor" />
         </Link>
 
         <TraktHistoryNavButton
