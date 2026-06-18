@@ -1027,6 +1027,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
   const prefetchHref = () => {
     router.prefetch(href);
+    if (typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
   };
 
   const navigateToDetails = () => {
@@ -1523,6 +1526,9 @@ function InlinePreviewCardAnticipated({
 
   const prefetchHref = () => {
     router.prefetch(href);
+    if (typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
   };
 
   const navigateToDetails = () => {

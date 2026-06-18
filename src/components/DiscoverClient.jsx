@@ -582,6 +582,9 @@ function DiscoverCard({ item }) {
   const href = `/details/${item.media_type}/${item.id}`;
   const handlePrefetch = () => {
     router.prefetch(href);
+    if (typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
   };
 
   const typeColorClass = isMovie
