@@ -96,15 +96,6 @@ export function setTraktCookies(res, tokens) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365, // 1 año (debe durar lo mismo que refresh_token)
   });
-
-  // Client-accessible cookie for instant client-side connection checking
-  res.cookies.set("trakt_connected", "true", {
-    httpOnly: false,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365, // 1 año
-  });
 }
 
 export function clearTraktCookies(res) {
@@ -120,13 +111,6 @@ export function clearTraktCookies(res) {
   res.cookies.set("trakt_refresh_token", "", opts);
   res.cookies.set("trakt_expires_at", "", opts);
   res.cookies.set("trakt_oauth_state", "", opts);
-  res.cookies.set("trakt_connected", "", {
-    httpOnly: false,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
 }
 
 export function setOAuthStateCookie(res, state) {
