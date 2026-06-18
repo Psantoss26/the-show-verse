@@ -1485,18 +1485,19 @@ function GenreRows({ groups, isMobile, posterCacheRef }) {
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
-export default function SeriesPageClient({ initialData }) {
+export default function SeriesPageClient({ initialData, deferredDataPromise }) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
   const [deferredData, setDeferredData] = useState(null);
 
   useEffect(() => {
-    fetch(`/api/dashboard/deferred?type=tv`)
-      .then((res) => res.json())
-      .then(setDeferredData)
-      .catch(console.error);
-  }, []);
+    if (deferredDataPromise) {
+      Promise.resolve(deferredDataPromise)
+        .then(setDeferredData)
+        .catch(console.error);
+    }
+  }, [deferredDataPromise]);
 
   const dashboardData = {
     ...(initialData || {}),
