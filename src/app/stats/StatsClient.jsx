@@ -607,11 +607,14 @@ function ProfileCardScroller({ children }) {
   const showNext = canNext;
 
   return (
-    <div className="-mx-4 overflow-visible sm:-mx-10 sm:px-10 xl:-mx-12 xl:px-12">
+    <div
+      className="-mx-4 sm:-mx-10 sm:px-10 xl:-mx-12 xl:px-12"
+      style={{ overflowX: "clip", overflowY: "visible" }}
+    >
       <div className="relative z-0 px-3 hover:z-[200] sm:px-0">
         <div
           className="relative z-0"
-          style={{ overflowX: "clip", overflowY: "visible" }}
+          style={{ overflowX: "visible", overflowY: "visible" }}
         >
           <Swiper
             slidesPerView={3}
@@ -2026,7 +2029,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.18 }}
-                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
+                    className="relative order-2"
                   >
                     <SectionTitle
                       icon={Activity}
@@ -2057,7 +2060,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.22 }}
-                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
+                    className="relative order-2"
                   >
                     <SectionTitle
                       icon={Star}
@@ -2088,7 +2091,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.26 }}
-                    className="relative order-2 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
+                    className="relative order-2"
                   >
                     <SectionTitle
                       icon={BookMarked}
@@ -2264,7 +2267,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {/* Top Content Row */}
                 {deferredOverviewReady && stats && (stats.topMoviesReady || stats.topShowsReady) && (
-                  <div className="order-3 space-y-8 [content-visibility:auto] [contain-intrinsic-size:auto_720px]">
+                  <div className="order-3 space-y-8">
                     {/* Top Movies */}
                     {stats.topMoviesReady && (
                       <motion.div
@@ -2343,7 +2346,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.65 }}
-                    className="relative order-4 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
+                    className="relative order-4"
                   >
                     <SectionTitle
                       icon={Users}
@@ -2373,7 +2376,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7 }}
-                    className="relative order-4 [content-visibility:auto] [contain-intrinsic-size:auto_340px]"
+                    className="relative order-4"
                   >
                     <SectionTitle
                       icon={Film}
