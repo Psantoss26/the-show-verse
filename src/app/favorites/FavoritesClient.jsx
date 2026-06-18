@@ -13,7 +13,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchRatedForUser,
@@ -62,63 +62,6 @@ const cardVariants = {
     transition: { duration: 0.3, ease: "easeOut" },
   },
 };
-
-const FAVORITES_IMAGE_ROOT_MARGIN = "140px 0px";
-
-function useNearViewport({ disabled = false, rootMargin = "300px 0px" } = {}) {
-  const ref = useRef(null);
-  const [nearViewport, setNearViewport] = useState(disabled);
-
-  useEffect(() => {
-    if (disabled || nearViewport) return undefined;
-    const node = ref.current;
-    if (!node) return undefined;
-
-    if (typeof IntersectionObserver === "undefined") {
-      setNearViewport(true);
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting) return;
-        setNearViewport(true);
-        observer.disconnect();
-      },
-      { rootMargin, threshold: 0.01 },
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [disabled, nearViewport, rootMargin]);
-
-  return { ref, nearViewport };
-}
-
-function getInitialFavoriteCardBudget(viewMode, imageMode) {
-  if (typeof window === "undefined") return 12;
-
-  const width = window.innerWidth || 1280;
-  const height = window.innerHeight || 900;
-
-  if (viewMode === "list") {
-    return width >= 1280 ? 4 : 3;
-  }
-
-  if (viewMode === "compact") {
-    if (imageMode === "backdrop") {
-      return width >= 1280 ? 8 : width >= 768 ? 6 : 4;
-    }
-    if (width >= 1280) return height >= 900 ? 16 : 12;
-    if (width >= 768) return 12;
-    return 8;
-  }
-
-  if (imageMode === "backdrop") return width >= 1280 ? 6 : width >= 768 ? 4 : 3;
-  if (width >= 1280) return height >= 900 ? 12 : 8;
-  if (width >= 768) return 8;
-  return 6;
-}
 
 // ================== UTILS & CACHE ==================
 // TMDb Genre mappings
@@ -839,40 +782,16 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
   return path ? buildImg(path, "w500") : null;
 }
 
-function getImmediateSmartPosterUrl(item, mode = "poster") {
-  return getCachedSmartPosterUrl(item, mode);
-}
-
-function SmartPoster({
-  item,
-  title,
-  mode = "poster",
-  eager = false,
-  priority = false,
-}) {
+function SmartPoster({ item, title, mode = "poster" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
   const imageKey = `${type}:${id}`;
-  const shouldLoadImmediately = eager || priority;
-  const { ref, nearViewport } = useNearViewport({
-    disabled: shouldLoadImmediately,
-    rootMargin: FAVORITES_IMAGE_ROOT_MARGIN,
-  });
-  const shouldResolveImage = shouldLoadImmediately || nearViewport;
-  const initialSrc = shouldLoadImmediately
-    ? getImmediateSmartPosterUrl(item, mode)
-    : null;
+  const initialSrc = getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);
   const [ready, setReady] = useState(Boolean(initialSrc));
 
   useEffect(() => {
-    if (!shouldResolveImage) {
-      setSrc(null);
-      setReady(false);
-      return undefined;
-    }
-
     let abort = false;
 
     const cachedUrl = getCachedSmartPosterUrl(item, mode);
@@ -925,11 +844,10 @@ function SmartPoster({
     item.poster_path,
     item.backdrop_path,
     item,
-    shouldResolveImage,
   ]);
 
   return (
-    <div ref={ref} className="relative w-full h-full">
+    <div className="relative w-full h-full">
       <div
         className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
           ready && src ? "opacity-0" : "opacity-100"
@@ -942,8 +860,7 @@ function SmartPoster({
         <OptimizedImage
           src={src}
           alt={title}
-          loading={eager || priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : undefined}
+          loading="lazy"
           decoding="async"
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
             ready ? "opacity-100" : "opacity-0"
@@ -1798,9 +1715,6 @@ const FavoriteCard = memo(function FavoriteCard({
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
   animateEntry = true,
-  eagerImage = false,
-  prioritizeImage = false,
-  deferOffscreenContent = false,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1906,25 +1820,13 @@ const FavoriteCard = memo(function FavoriteCard({
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = animateEntry && index < 60;
-  const shellClassName = deferOffscreenContent
-    ? "sv-favorite-card-deferred relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]"
-    : "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
-  const shellStyle = deferOffscreenContent
-    ? {
-        "--sv-favorite-card-intrinsic-size":
-          viewMode === "list"
-            ? "auto none auto 150px"
-            : effectiveImageMode === "backdrop"
-              ? "auto none auto 230px"
-              : "auto none auto 340px",
-      }
-    : undefined;
+  const shellClassName =
+    "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
 
   if (viewMode === "list") {
     return (
       <motion.div
         className={shellClassName}
-        style={shellStyle}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1945,8 +1847,6 @@ const FavoriteCard = memo(function FavoriteCard({
                 item={item}
                 title={title}
                 mode={effectiveImageMode}
-                eager={eagerImage}
-                priority={prioritizeImage}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1978,7 +1878,6 @@ const FavoriteCard = memo(function FavoriteCard({
     return (
       <motion.div
         className={shellClassName}
-        style={shellStyle}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -2010,8 +1909,6 @@ const FavoriteCard = memo(function FavoriteCard({
               item={item}
               title={title}
               mode={effectiveImageMode}
-              eager={eagerImage}
-              priority={prioritizeImage}
             />
             <div
               className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -2106,7 +2003,6 @@ const FavoriteCard = memo(function FavoriteCard({
   return (
     <motion.div
       className={shellClassName}
-      style={shellStyle}
       initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -2126,8 +2022,6 @@ const FavoriteCard = memo(function FavoriteCard({
             item={item}
             title={title}
             mode={effectiveImageMode}
-            eager={eagerImage}
-            priority={prioritizeImage}
           />
           <div
             className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -2221,7 +2115,6 @@ const FavoriteCard = memo(function FavoriteCard({
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
   const { session, account, hydrated, logout } = useAuth();
-  const prefersReducedMotion = useReducedMotion();
   const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
@@ -2290,45 +2183,6 @@ export default function FavoritesClient() {
   const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
   const tmdbLogoutInFlightRef = useRef(false);
-  const [initialCardBudget, setInitialCardBudget] = useState(() =>
-    getInitialFavoriteCardBudget(viewMode, imageMode),
-  );
-
-  useEffect(() => {
-    const updateInitialCardBudget = () => {
-      setInitialCardBudget(getInitialFavoriteCardBudget(viewMode, imageMode));
-    };
-
-    updateInitialCardBudget();
-    window.addEventListener("resize", updateInitialCardBudget, {
-      passive: true,
-    });
-    return () => window.removeEventListener("resize", updateInitialCardBudget);
-  }, [viewMode, imageMode]);
-
-  const handleViewModeChange = useCallback(
-    (nextViewMode) => {
-      setInitialCardBudget(
-        getInitialFavoriteCardBudget(nextViewMode, imageMode),
-      );
-      setViewMode(nextViewMode);
-    },
-    [imageMode],
-  );
-
-  const handleImageModeChange = useCallback(
-    (nextImageMode) => {
-      setInitialCardBudget(
-        getInitialFavoriteCardBudget(viewMode, nextImageMode),
-      );
-      setImageMode(nextImageMode);
-    },
-    [viewMode],
-  );
-
-  const handleToggleImageMode = useCallback(() => {
-    handleImageModeChange(imageMode === "poster" ? "backdrop" : "poster");
-  }, [handleImageModeChange, imageMode]);
 
   const handleTmdbLogout = useCallback(async () => {
     if (logoutLoading) return;
@@ -3178,8 +3032,6 @@ export default function FavoritesClient() {
   const resolveItemType = (item) =>
     item?.media_type || (item?.title ? "movie" : "tv");
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
-  const isInitialFavoriteCard = (groupIndex, itemIndex) =>
-    groupIndex < 2 && itemIndex < initialCardBudget;
   const getItemsGridClass = (withTopMargin = false) => {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
@@ -3660,7 +3512,7 @@ export default function FavoritesClient() {
                   <div className="flex-1 flex gap-2">
                     <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
-                        onClick={() => handleViewModeChange("list")}
+                        onClick={() => setViewMode("list")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "list"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3670,7 +3522,7 @@ export default function FavoritesClient() {
                         <List className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleViewModeChange("compact")}
+                        onClick={() => setViewMode("compact")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3680,7 +3532,7 @@ export default function FavoritesClient() {
                         <Grid2X2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleViewModeChange("grid")}
+                        onClick={() => setViewMode("grid")}
                         className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
                           viewMode === "grid"
                             ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3691,7 +3543,11 @@ export default function FavoritesClient() {
                       </button>
                     </div>
                     <button
-                      onClick={handleToggleImageMode}
+                      onClick={() =>
+                        setImageMode(
+                          imageMode === "poster" ? "backdrop" : "poster",
+                        )
+                      }
                       className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                         imageMode === "backdrop"
                           ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
@@ -3898,7 +3754,7 @@ export default function FavoritesClient() {
 
             <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
-                onClick={() => handleViewModeChange("list")}
+                onClick={() => setViewMode("list")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3908,7 +3764,7 @@ export default function FavoritesClient() {
                 <List className="w-4 h-4" />
               </button>
               <button
-                onClick={() => handleViewModeChange("compact")}
+                onClick={() => setViewMode("compact")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "compact"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3918,7 +3774,7 @@ export default function FavoritesClient() {
                 <Grid2X2 className="w-4 h-4" />
               </button>
               <button
-                onClick={() => handleViewModeChange("grid")}
+                onClick={() => setViewMode("grid")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3931,7 +3787,7 @@ export default function FavoritesClient() {
 
             <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
-                onClick={() => handleImageModeChange("poster")}
+                onClick={() => setImageMode("poster")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "poster"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3941,7 +3797,7 @@ export default function FavoritesClient() {
                 <Film className="w-4 h-4" />
               </button>
               <button
-                onClick={() => handleImageModeChange("backdrop")}
+                onClick={() => setImageMode("backdrop")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "backdrop"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
@@ -3983,117 +3839,81 @@ export default function FavoritesClient() {
             // Grouped view
             <div className="space-y-8">
               {grouped.map((group, groupIndex) => (
-                  <motion.div
-                    key={group.key}
-                    ref={(node) => setGroupSectionRef(group.key, node)}
-                    className="overflow-visible scroll-mt-[148px]"
-                    initial={
-                      prefersReducedMotion ? false : { opacity: 0, y: 20 }
-                    }
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.4,
-                      delay: prefersReducedMotion ? 0 : groupIndex * 0.1,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
-                  >
-                    <GroupDivider
-                      title={group.label}
-                      count={group.items.length}
-                      total={sorted.length}
-                      stats={group.stats}
-                      groupBy={groupBy}
-                      mobileFiltersOpen={mobileFiltersOpen}
-                      forceSticky={forcedStickyGroupKey === group.key}
-                      disableStickyAnimation={
-                        forcedStickyGroupKey === group.key
-                      }
-                      hasPreviousGroup={groupIndex > 0}
-                      hasNextGroup={groupIndex < grouped.length - 1}
-                      onPreviousGroup={() => scrollToPreviousGroup(group.key)}
-                      onNextGroup={() => scrollToNextGroup(group.key)}
-                    />
-                    {group.subgroups?.length ? (
-                      <div className="">
-                        {group.subgroups.map((subgroup) => (
+                <motion.div
+                  key={group.key}
+                  ref={(node) => setGroupSectionRef(group.key, node)}
+                  className="overflow-visible scroll-mt-[148px]"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
+                >
+                  <GroupDivider
+                    title={group.label}
+                    count={group.items.length}
+                    total={sorted.length}
+                    stats={group.stats}
+                    groupBy={groupBy}
+                    mobileFiltersOpen={mobileFiltersOpen}
+                    forceSticky={forcedStickyGroupKey === group.key}
+                    disableStickyAnimation={forcedStickyGroupKey === group.key}
+                    hasPreviousGroup={groupIndex > 0}
+                    hasNextGroup={groupIndex < grouped.length - 1}
+                    onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                    onNextGroup={() => scrollToNextGroup(group.key)}
+                  />
+                  {group.subgroups?.length ? (
+                    <div className="">
+                      {group.subgroups.map((subgroup) => (
+                        <div
+                          key={`${group.key}-${subgroup.key}`}
+                          className="space-y-1 overflow-visible"
+                        >
+                          <SubGroupDivider
+                            title={subgroup.label}
+                            count={subgroup.items.length}
+                          />
                           <div
-                            key={`${group.key}-${subgroup.key}`}
-                            className="space-y-1 overflow-visible"
+                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                            className={getItemsGridClass(true)}
                           >
-                            <SubGroupDivider
-                              title={subgroup.label}
-                              count={subgroup.items.length}
-                            />
-                            <div
-                              key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                              className={getItemsGridClass(true)}
-                            >
-                              {subgroup.items.map((item, idx) => {
-                                const initiallyVisible = isInitialFavoriteCard(
-                                  groupIndex,
-                                  idx,
-                                );
-
-                                return (
-                                  <FavoriteCard
-                                    key={getMediaKey(item)}
-                                    item={item}
-                                    index={idx}
-                                    totalItems={subgroup.items.length}
-                                    viewMode={viewMode}
-                                    imageMode={imageMode}
-                                    imdbScore={imdbScores.get(
-                                      getScoreItemKey(item),
-                                    )}
-                                    traktScore={traktScores.get(
-                                      getScoreItemKey(item),
-                                    )}
-                                    animateEntry={!prefersReducedMotion}
-                                    eagerImage={initiallyVisible}
-                                    prioritizeImage={
-                                      initiallyVisible && idx < 2
-                                    }
-                                    deferOffscreenContent={!initiallyVisible}
-                                  />
-                                );
-                              })}
-                            </div>
+                            {subgroup.items.map((item, idx) => (
+                              <FavoriteCard
+                                key={getMediaKey(item)}
+                                item={item}
+                                index={idx}
+                                totalItems={subgroup.items.length}
+                                viewMode={viewMode}
+                                imageMode={imageMode}
+                                imdbScore={imdbScores.get(getScoreItemKey(item))}
+                                traktScore={traktScores.get(
+                                  getScoreItemKey(item),
+                                )}
+                              />
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                        className={getItemsGridClass(true)}
-                      >
-                        {group.items.map((item, idx) => {
-                          const initiallyVisible = isInitialFavoriteCard(
-                            groupIndex,
-                            idx,
-                          );
-
-                          return (
-                            <FavoriteCard
-                              key={getMediaKey(item)}
-                              item={item}
-                              index={idx}
-                              totalItems={group.items.length}
-                              viewMode={viewMode}
-                              imageMode={imageMode}
-                              imdbScore={imdbScores.get(getScoreItemKey(item))}
-                              traktScore={traktScores.get(
-                                getScoreItemKey(item),
-                              )}
-                              animateEntry={!prefersReducedMotion}
-                              eagerImage={initiallyVisible}
-                              prioritizeImage={initiallyVisible && idx < 2}
-                              deferOffscreenContent={!initiallyVisible}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </motion.div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                      className={getItemsGridClass(true)}
+                    >
+                      {group.items.map((item, idx) => (
+                        <FavoriteCard
+                          key={getMediaKey(item)}
+                          item={item}
+                          index={idx}
+                          totalItems={group.items.length}
+                          viewMode={viewMode}
+                          imageMode={imageMode}
+                          imdbScore={imdbScores.get(getScoreItemKey(item))}
+                          traktScore={traktScores.get(getScoreItemKey(item))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
               ))}
             </div>
           ) : (
@@ -4101,26 +3921,18 @@ export default function FavoritesClient() {
               key={`flat-grid-${viewMode}-${imageMode}`}
               className={getItemsGridClass(false)}
             >
-              {sorted.map((item, idx) => {
-                const initiallyVisible = isInitialFavoriteCard(0, idx);
-
-                return (
-                  <FavoriteCard
-                    key={getMediaKey(item)}
-                    item={item}
-                    index={idx}
-                    totalItems={sorted.length}
-                    viewMode={viewMode}
-                    imageMode={imageMode}
-                    imdbScore={imdbScores.get(getScoreItemKey(item))}
-                    traktScore={traktScores.get(getScoreItemKey(item))}
-                    animateEntry={!prefersReducedMotion}
-                    eagerImage={initiallyVisible}
-                    prioritizeImage={initiallyVisible && idx < 2}
-                    deferOffscreenContent={!initiallyVisible}
-                  />
-                );
-              })}
+              {sorted.map((item, idx) => (
+                <FavoriteCard
+                  key={getMediaKey(item)}
+                  item={item}
+                  index={idx}
+                  totalItems={sorted.length}
+                  viewMode={viewMode}
+                  imageMode={imageMode}
+                  imdbScore={imdbScores.get(getScoreItemKey(item))}
+                  traktScore={traktScores.get(getScoreItemKey(item))}
+                />
+              ))}
             </div>
           )}
         </motion.div>

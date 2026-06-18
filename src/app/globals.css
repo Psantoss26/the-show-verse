@@ -108,18 +108,6 @@ body {
     contain-intrinsic-size: auto none auto 620px;
   }
 
-  .sv-favorite-card-deferred {
-    content-visibility: auto;
-    contain-intrinsic-size: var(
-      --sv-favorite-card-intrinsic-size,
-      auto none auto 340px
-    );
-  }
-
-  .sv-favorite-card-deferred:hover,
-  .sv-favorite-card-deferred:focus-within {
-    content-visibility: visible;
-  }
 }
 
 @supports not (content-visibility: auto) {
