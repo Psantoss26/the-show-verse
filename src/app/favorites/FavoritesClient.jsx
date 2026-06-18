@@ -3022,48 +3022,8 @@ export default function FavoritesClient() {
     loadingProviders,
   ]);
 
-  const [renderLimit, setRenderLimit] = useState(FAVORITES_INITIAL_RENDER_LIMIT);
-
-  useEffect(() => {
-    if (loading) {
-      setRenderLimit(FAVORITES_INITIAL_RENDER_LIMIT);
-      return;
-    }
-
-    if (sorted.length === 0) return;
-    setRenderLimit((current) =>
-      Math.min(Math.max(current, FAVORITES_INITIAL_RENDER_LIMIT), sorted.length),
-    );
-  }, [loading, sorted.length]);
-
-  useEffect(() => {
-    if (loading || sorted.length === 0 || renderLimit >= sorted.length) return;
-
-    let cancelled = false;
-    const handle = scheduleFavoritesRenderChunk(() => {
-      if (cancelled) return;
-      startTransition(() => {
-        setRenderLimit((current) =>
-          Math.min(sorted.length, current + FAVORITES_RENDER_CHUNK_SIZE),
-        );
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      cancelFavoritesRenderChunk(handle);
-    };
-  }, [loading, renderLimit, sorted.length]);
-
-  const renderedSorted = useMemo(
-    () => sorted.slice(0, Math.min(renderLimit, sorted.length)),
-    [renderLimit, sorted],
-  );
-
-  const renderedGrouped = useMemo(
-    () => limitFavoriteGroupsForRender(grouped, renderLimit),
-    [grouped, renderLimit],
-  );
+  const renderedSorted = sorted;
+  const renderedGrouped = grouped;
 
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
