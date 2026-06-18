@@ -922,7 +922,11 @@ function InlinePreviewCard({ show, heightClass }) {
     : null;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
@@ -1101,7 +1105,7 @@ function InlinePreviewCard({ show, heightClass }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1147,6 +1151,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const isInView = useInView(rowRef, { once: true, margin: "-100px" });
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
@@ -1164,7 +1169,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
       }
     };
 
-    const timer = window.setTimeout(preloadBackdrops, 150);
+    const timer = window.setTimeout(preloadBackdrops, 300);
     return () => window.clearTimeout(timer);
   }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
 
@@ -1172,8 +1177,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const hasActivePreview = !!hoveredId;
 
   const heightClassDesktop =
-    "md:h-[220px] lg:h-[260px] xl:h-[300px] 2xl:h-[340px]";
-  const posterBoxClass = `aspect-[2/3] md:aspect-auto ${heightClassDesktop}`;
+    "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
   if (!hasItems) return null;
 
@@ -1234,8 +1239,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     e.stopPropagation();
     const swiper = swiperRef.current;
     if (!swiper) return;
-    const target = Math.max((swiper.activeIndex || 0) - 6, 0);
-    swiper.slideTo(target);
+    const slidesToMove = isMobile ? 1 : 3;
+    for (let i = 0; i < slidesToMove; i++) {
+      swiper.slidePrev();
+    }
   };
 
   const handleNextClick = (e) => {
@@ -1243,9 +1250,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     e.stopPropagation();
     const swiper = swiperRef.current;
     if (!swiper) return;
-    const maxIndex = swiper.slides.length - 1;
-    const target = Math.min((swiper.activeIndex || 0) + 6, maxIndex);
-    swiper.slideTo(target);
+    const slidesToMove = isMobile ? 1 : 3;
+    for (let i = 0; i < slidesToMove; i++) {
+      swiper.slideNext();
+    }
   };
 
   const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
@@ -1296,6 +1304,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           hoverIntentRef.current += 1;
           setIsHoveredRow(false);
           setHoveredId(null);
+          setHoveredIndex(null);
         }}
       >
         <Swiper
@@ -1325,31 +1334,48 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           breakpoints={breakpointsRow}
         >
           {safeItems.map((s, i) => {
-            const isActive = !isMobile && hoveredId === s.id;
-            const isLast = i === safeItems.length - 1;
+            const itemKey = `tv:${s.id}`;
+            const isActive = !isMobile && hoveredId === itemKey;
 
             const base =
               "relative flex-shrink-0 transition-all duration-300 ease-in-out";
 
-            const sizeClasses = isActive
-              ? "w-full md:w-[320px] lg:w-[380px] xl:w-[430px] 2xl:w-[480px] z-20"
-              : "w-full md:w-[140px] lg:w-[170px] xl:w-[190px] 2xl:w-[210px] z-10";
+            const sizeClasses = isMobile
+              ? "w-full"
+              : isActive
+                ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
+                : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
 
-            const transformClass =
-              !isMobile && isActive && isLast
-                ? "md:-translate-x-[190px] lg:-translate-x-[230px] xl:-translate-x-[260px] 2xl:-translate-x-[290px]"
-                : "";
+            let transformClass = "";
+            if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
+              const activeIndex = hoveredIndex;
+              const totalItems = safeItems.length;
+
+              if (activeIndex >= totalItems - 3 && i <= activeIndex) {
+                if (activeIndex === totalItems - 1) {
+                  transformClass =
+                    "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
+                } else if (activeIndex === totalItems - 2) {
+                  transformClass =
+                    "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
+                } else if (activeIndex === totalItems - 3) {
+                  transformClass =
+                    "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
+                }
+              }
+            }
 
             const cardElement = (
               <div
-                className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass}`}
+                className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                 onMouseEnter={() => {
                   if (!isMobile) {
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
+                    setHoveredIndex(i);
                     preparePreviewBackdrop(s).finally(() => {
                       if (hoverIntentRef.current === hoverToken) {
-                        setHoveredId(s.id);
+                        setHoveredId(itemKey);
                       }
                     });
                   }
@@ -1357,46 +1383,68 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                 onMouseLeave={() => {
                   hoverIntentRef.current += 1;
                   if (!isMobile)
-                    setHoveredId((prev) => (prev === s.id ? null : prev));
+                    setHoveredId((prev) => (prev === itemKey ? null : prev));
+                  setHoveredIndex(null);
                 }}
               >
-                {isActive ? (
-                  <AnimatePresence initial={false} mode="wait">
+                <AnimatePresence initial={false} mode="popLayout">
+                  {isActive ? (
                     <motion.div
                       key="preview"
-                      initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
+                      initial={
+                        reduceMotion ? false : { opacity: 0, scale: 0.98 }
+                      }
                       animate={{ opacity: 1, scale: 1 }}
-                      // CAMBIO: exit rápido
                       exit={{
                         opacity: 0,
-                        scale: 0.98,
-                        transition: { duration: 0.1 },
+                        scale: 0.95,
+                        transition: { duration: reduceMotion ? 0.08 : 0.12 },
                       }}
-                      // CAMBIO: entrada rápida lineal
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="w-full h-full hidden md:block"
+                      transition={{
+                        duration: reduceMotion ? 0.08 : 0.25,
+                        ease: [0.4, 0, 0.2, 1],
+                      }}
+                      className="w-full h-full hidden sm:block"
+                      style={{ willChange: "transform, opacity" }}
                     >
                       <InlinePreviewCard
                         show={s}
                         heightClass={heightClassDesktop}
                       />
                     </motion.div>
-                  </AnimatePresence>
-                ) : (
-                  <div className="w-full h-full">
-                    <Link
-                      href={`/details/tv/${s.id}`}
-                      className="block w-full h-full"
+                  ) : (
+                    <motion.div
+                      key="poster"
+                      initial={
+                        reduceMotion ? false : { opacity: 0, scale: 0.95 }
+                      }
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{
+                        opacity: 0,
+                        scale: 0.98,
+                        transition: { duration: reduceMotion ? 0.08 : 0.12 },
+                      }}
+                      transition={{
+                        duration: reduceMotion ? 0.08 : 0.18,
+                        ease: [0.4, 0, 0.2, 1],
+                      }}
+                      className="w-full h-full"
+                      style={{ willChange: "transform, opacity" }}
                     >
-                      <PosterImage show={s} cache={posterCacheRef} />
-                    </Link>
-                  </div>
-                )}
+                      <Link
+                        href={`/details/tv/${s.id}`}
+                        className="block w-full h-full"
+                      >
+                        <PosterImage show={s} cache={posterCacheRef} />
+                      </Link>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
 
             return (
-              <SwiperSlide key={s.id} className="select-none md:!w-auto">
+              <SwiperSlide key={itemKey} className="select-none md:!w-auto">
                 {isTop10 ? (
                   <div className="flex items-center">
                     <div
