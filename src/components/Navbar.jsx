@@ -2,9 +2,9 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
@@ -346,6 +346,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
 export default function Navbar() {
   const { account, hydrated } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
 
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -364,6 +365,31 @@ export default function Navbar() {
 
   const isActive = (href) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
+
+  const prefetchNavRoute = useCallback(
+    (href) => {
+      if (!href || pathname === href) return;
+      router.prefetch(href);
+    },
+    [pathname, router],
+  );
+
+  useEffect(() => {
+    if (pathname === "/movies") return undefined;
+
+    const schedule =
+      window.requestIdleCallback ||
+      ((callback) => window.setTimeout(callback, 1200));
+    const cancel =
+      window.cancelIdleCallback ||
+      ((handle) => window.clearTimeout(handle));
+
+    const handle = schedule(() => prefetchNavRoute("/movies"), {
+      timeout: 1800,
+    });
+
+    return () => cancel(handle);
+  }, [pathname, prefetchNavRoute]);
 
   const navLinkClass = (href) =>
     `px-3 py-2 rounded-xl text-sm font-bold transition-all duration-300 ease-out ${
@@ -431,38 +457,30 @@ export default function Navbar() {
 
     const tones = {
       red: {
-        hover:
-          "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
-        active:
-          "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
+        active: "text-red-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]",
+        inactive: "text-neutral-400 hover:text-red-300",
       },
       blue: {
-        hover:
-          "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
-        active:
-          "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
+        active: "text-sky-300 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]",
+        inactive: "text-neutral-400 hover:text-sky-300",
       },
       purple: {
-        hover:
-          "hover:text-fuchsia-300 hover:bg-fuchsia-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(217,70,239,0.15)]",
-        active:
-          "text-fuchsia-200 bg-fuchsia-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(217,70,239,0.2)]",
+        active: "text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.5)]",
+        inactive: "text-neutral-400 hover:text-fuchsia-300",
       },
       green: {
-        hover:
-          "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
-        active:
-          "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
+        active: "text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]",
+        inactive: "text-neutral-400 hover:text-emerald-300",
       },
     };
 
     const t = tones[tone] || tones.blue;
-    const toneClass = active ? t.active : t.hover;
+    const toneClass = active ? t.active : t.inactive;
 
     return (
-      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
-      "text-neutral-400 transition-all duration-300 ease-out " +
-      "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
+      "relative group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
+      "transition-all duration-300 ease-out " +
+      "hover:-translate-y-0.5 active:scale-95 focus:outline-none " +
       `${toneClass}`
     );
   };
@@ -543,7 +561,13 @@ export default function Navbar() {
               <Link href="/" className={navLinkClass("/")}>
                 Inicio
               </Link>
-              <Link href="/movies" className={navLinkClass("/movies")}>
+              <Link
+                href="/movies"
+                prefetch
+                onMouseEnter={() => prefetchNavRoute("/movies")}
+                onFocus={() => prefetchNavRoute("/movies")}
+                className={navLinkClass("/movies")}
+              >
                 Películas
               </Link>
               <Link href="/series" className={navLinkClass("/series")}>
@@ -698,26 +722,59 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/20 bg-gradient-to-tr from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] border border-white/10 flex items-center px-4">
+      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-white/[0.04] bg-gradient-to-b from-white/15 via-white/2 to-transparent backdrop-blur-[40px] saturate-[230%] shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.35),0_15px_35px_-5px_rgba(0,0,0,0.7)] border border-white/20 border-b-white/10 flex items-center px-4 overflow-visible">
+        {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
+        <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+
         <Link
           href="/movies"
+          prefetch
+          onTouchStart={() => prefetchNavRoute("/movies")}
+          onFocus={() => prefetchNavRoute("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
         >
-          <FilmIcon className="w-6 h-6" />
+          {isActive("/movies") && (
+            <motion.div
+              layoutId="activeTabMobileBottom"
+              className="absolute inset-0 rounded-full bg-sky-500/25 border border-sky-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(56,189,248,0.35)]"
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center justify-center">
+            <FilmIcon className="w-6 h-6" />
+          </span>
         </Link>
 
         <Link
           href="/series"
           className={navLinkClassMobileBottom("/series", "purple")}
         >
-          <TvIcon className="w-6 h-6" />
+          {isActive("/series") && (
+            <motion.div
+              layoutId="activeTabMobileBottom"
+              className="absolute inset-0 rounded-full bg-fuchsia-500/25 border border-fuchsia-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(217,70,239,0.35)]"
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center justify-center">
+            <TvIcon className="w-6 h-6" />
+          </span>
         </Link>
 
         <Link
           href="/in-progress"
           className={navLinkClassMobileBottom("/in-progress", "green")}
         >
-          <Play className="w-6 h-6" fill="currentColor" />
+          {isActive("/in-progress") && (
+            <motion.div
+              layoutId="activeTabMobileBottom"
+              className="absolute inset-0 rounded-full bg-emerald-500/25 border border-emerald-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(16,185,129,0.35)]"
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center justify-center">
+            <Play className="w-6 h-6" fill="currentColor" />
+          </span>
         </Link>
 
         <TraktHistoryNavButton
@@ -729,14 +786,32 @@ export default function Navbar() {
           href={favHref}
           className={navLinkClassMobileBottom("/favorites", "red")}
         >
-          <Heart className="w-6 h-6" />
+          {isActive(favHref) && (
+            <motion.div
+              layoutId="activeTabMobileBottom"
+              className="absolute inset-0 rounded-full bg-red-500/25 border border-red-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(239,68,68,0.35)]"
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center justify-center">
+            <Heart className="w-6 h-6" />
+          </span>
         </Link>
 
         <Link
           href={watchHref}
           className={navLinkClassMobileBottom("/watchlist", "blue")}
         >
-          <Bookmark className="w-6 h-6" />
+          {isActive(watchHref) && (
+            <motion.div
+              layoutId="activeTabMobileBottom"
+              className="absolute inset-0 rounded-full bg-sky-500/25 border border-sky-400/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_0_14px_rgba(56,189,248,0.35)]"
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center justify-center">
+            <Bookmark className="w-6 h-6" />
+          </span>
         </Link>
       </div>
 
@@ -799,6 +874,8 @@ export default function Navbar() {
                 <Link
                   href="/movies"
                   onClick={() => setMobileMenuOpen(false)}
+                  onMouseEnter={() => prefetchNavRoute("/movies")}
+                  onFocus={() => prefetchNavRoute("/movies")}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
                     isActive("/movies")
                       ? "bg-white/10 text-white"
