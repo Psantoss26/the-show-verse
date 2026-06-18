@@ -1098,7 +1098,15 @@ export default function InProgressClient({
 }) {
   const initialAuthLoading = !!initialAuth?.loading;
   const initialAuthConnected = !!initialAuth?.connected;
-  const [auth, setAuth] = useState(initialAuth);
+  const [auth, setAuth] = useState(() => {
+    if (typeof window !== "undefined") {
+      const hasCookie = document.cookie.includes("trakt_connected=true");
+      if (!hasCookie) {
+        return { loading: false, connected: false };
+      }
+    }
+    return initialAuth;
+  });
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1275,7 +1283,8 @@ export default function InProgressClient({
     };
 
     const bootstrap = async () => {
-      if (!initialAuthLoading && !initialAuthConnected) {
+      const hasCookie = typeof window !== "undefined" ? document.cookie.includes("trakt_connected=true") : true;
+      if (!hasCookie || (!initialAuthLoading && !initialAuthConnected)) {
         markDisconnected();
         return;
       }
