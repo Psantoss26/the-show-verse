@@ -721,8 +721,7 @@ export default function Navbar() {
         </Link>
 
         <TraktHistoryNavButton
-          className="mx-1 my-2 flex h-12 flex-1 items-center justify-center"
-          variant="icon"
+          variant="mobile-bottom"
           iconSize={24}
         />
 

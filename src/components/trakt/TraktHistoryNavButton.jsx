@@ -21,6 +21,18 @@ function iconToneClass({ active, tone = "green" }) {
       active:
         "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
     },
+    red: {
+      hover:
+        "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
+      active:
+        "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
+    },
+    blue: {
+      hover:
+        "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
+      active:
+        "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
+    },
   };
 
   const t = tones[tone] || tones.green;
@@ -64,6 +76,31 @@ export default function TraktHistoryNavButton({
 
   const Icon = loading ? Loader2 : Eye;
 
+  // ✅ Variante para navbar inferior móvil: misma clase exacta que navLinkClassMobileBottom
+  if (variant === "mobile-bottom") {
+    const toneClass = iconToneClass({ active, tone: "green" });
+    const mobileBottomClass =
+      "group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-2xl " +
+      "text-neutral-400 transition-all duration-300 ease-out " +
+      "hover:-translate-y-1 hover:scale-[1.05] active:scale-95 focus:outline-none " +
+      toneClass;
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        className={mobileBottomClass}
+        aria-label="Historial"
+        prefetch={false}
+      >
+        <Icon
+          className={loading ? "animate-spin" : ""}
+          width={iconSize}
+          height={iconSize}
+        />
+      </Link>
+    );
+  }
+
   // ✅ Mantiene EXACTO el estilo actual de escritorio
   if (variant === "icon") {
     const base =
@@ -73,7 +110,6 @@ export default function TraktHistoryNavButton({
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30";
 
     const tone = iconToneClass({ active, tone: "green" });
-    const ringBase = "ring-1 ring-transparent";
 
     return (
       <Link
