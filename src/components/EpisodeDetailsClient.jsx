@@ -1404,7 +1404,7 @@ export default function EpisodeDetailsClient({
             }}
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-5 px-1">
+            <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                 Episodio {episodeNumber} · Temporada {seasonNumber}
               </div>
@@ -1413,7 +1413,7 @@ export default function EpisodeDetailsClient({
                 {epName}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
                 <span className="text-white font-bold tracking-wide">
                   {showName}
                 </span>
@@ -1502,9 +1502,9 @@ export default function EpisodeDetailsClient({
                   )}
                 </div>
 
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="w-px h-6 bg-white/35 shrink-0" />
                 <div className="flex-1 min-w-0" />
-                <div className="w-px h-6 bg-white/10 shrink-0" />
+                <div className="hidden sm:block w-px h-6 bg-white/35 shrink-0" />
 
                 <div className="flex items-center gap-3 shrink-0 [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_.text-xl]:!text-[22px]">
                   {/* Botón de visionado — abre modal con historial de plays */}

@@ -9442,7 +9442,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </LiquidButton>
 
                 {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
-                <div className="w-px h-8 bg-white/10 mx-0.5 sm:mx-1 hidden sm:block shrink-0 separator" />
+                <div className="w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
 
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
                 <TraktWatchedControl
@@ -9706,7 +9706,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ========== Separador vertical 1 ========== */}
                   {/* Solo se muestra cuando NO estamos en modo backdrop */}
                   {!isBackdropPoster && (
-                    <div className="w-px h-6 bg-white/10 shrink-0" />
+                    <div className="w-px h-6 bg-white/35 shrink-0" />
                   )}
 
                   {/* ========== B. ENLACES EXTERNOS ========== */}
@@ -9772,7 +9772,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ========== Separador vertical 2 ========== */}
                   {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
                   {!isBackdropPoster && (
-                    <div className="hidden md:block w-px h-6 bg-white/10 shrink-0" />
+                    <div className="hidden md:block w-px h-6 bg-white/35 shrink-0" />
                   )}
 
                   {/* ========== Botón de Compartir ========== */}
