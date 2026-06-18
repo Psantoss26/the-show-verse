@@ -84,7 +84,7 @@ function MiniStat({ icon: Icon, value, tooltip }) {
       className="relative group/ministat flex shrink-0 items-center gap-1.5 text-xs text-zinc-400 transition-colors"
       aria-label={tooltip}
     >
-      <Icon className="h-3.5 w-3.5 text-zinc-500 transition-colors group-hover/ministat:text-zinc-300" />
+      <Icon className="h-4 w-4 text-zinc-500 transition-colors group-hover/ministat:text-zinc-300" />
       <span className="font-mono font-semibold leading-none tracking-tight text-zinc-300 transition-colors group-hover/ministat:text-zinc-100 [text-box:trim-both_cap_alphabetic]">
         {value}
       </span>
@@ -431,7 +431,7 @@ export default function ScoreboardBar({
               pr-[calc(1rem+env(safe-area-inset-right))]
             "
           >
-            <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
+            <div className="flex w-full min-w-0 items-center justify-start gap-4 sm:gap-6">
               <div className="shrink-0">
                 <MiniStat
                   icon={Eye}
