@@ -109,16 +109,54 @@ function curateList(
   return sorted.slice(0, size);
 }
 
-/* ======== Carga de datos en el SERVIDOR ======== */
-async function getDashboardData() {
+/* ======== Carga de datos CRÍTICOS en el SERVIDOR ======== */
+async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    // Lanzamos la llamada a IMDb en paralelo
-    const topImdbPromise = fetchTopRatedImdbServer();
+    const [popular, topImdbRaw, topES] = await Promise.all([
+      fetchPopularMedia({ type: "movie", language: lang }),
+      fetchTopRatedImdbServer(),
+      discoverMovies({ region: "ES", sort_by: "popularity.desc", page: 1 }),
+    ]);
 
+    const curatedPopular = curateList(popular, {
+      minVotes: 1500,
+      minRating: 6.2,
+      minSize: 30,
+      maxSize: 80,
+    });
+
+    const curatedTopIMDb = curateList(topImdbRaw, {
+      minVotes: 20000,
+      minRating: 7.3,
+      minSize: 30,
+      maxSize: 80,
+    });
+
+    const curatedTopES = sortByVotes(topES).slice(0, 10);
+
+    return {
+      popular: curatedPopular,
+      top_imdb: curatedTopIMDb,
+      "Top 10 hoy en España": curatedTopES,
+    };
+  } catch (err) {
+    console.error("Error cargando datos críticos de películas (SSR):", err);
+    return {
+      popular: [],
+      top_imdb: [],
+      "Top 10 hoy en España": [],
+    };
+  }
+}
+
+/* ======== Carga de datos DIFERIDOS en el SERVIDOR ======== */
+async function getDeferredDashboardData(topImdbIds = []) {
+  const lang = "es-ES";
+
+  try {
     const [
-      popular,
       action,
       scifi,
       thrillers,
@@ -130,8 +168,6 @@ async function getDashboardData() {
       blockbustersP3,
       baseSections,
     ] = await Promise.all([
-      // TMDb originales
-      fetchPopularMedia({ type: "movie", language: lang }),
       fetchMediaByGenre({
         type: "movie",
         genreId: 28,
@@ -170,22 +206,6 @@ async function getDashboardData() {
         ? fetchMovieSections({ language: lang })
         : Promise.resolve({}),
     ]);
-
-    const top_imdb_raw = await topImdbPromise;
-
-    const curatedPopular = curateList(popular, {
-      minVotes: 1500,
-      minRating: 6.2,
-      minSize: 30,
-      maxSize: 80,
-    });
-
-    const curatedTopIMDb = curateList(top_imdb_raw, {
-      minVotes: 20000,
-      minRating: 7.3,
-      minSize: 30,
-      maxSize: 80,
-    });
 
     const curatedAction = curateList(action, {
       minVotes: 2000,
@@ -227,7 +247,6 @@ async function getDashboardData() {
       if (!Array.isArray(list)) continue;
 
       if (key === "Top 10 hoy en España") {
-        curatedBaseSections[key] = sortByVotes(list).slice(0, 10);
         continue;
       }
 
@@ -282,7 +301,6 @@ async function getDashboardData() {
       curatedBaseSections["Por género"] = curatedByGenre;
     }
 
-    // Superéxito con pool amplio (3 páginas) para sobrevivir la deduplicación
     const blockbustersRaw = [...blockbustersP1, ...blockbustersP2, ...blockbustersP3];
     curatedBaseSections["Superéxito"] = curateList(blockbustersRaw, {
       minVotes: 4000,
@@ -291,8 +309,7 @@ async function getDashboardData() {
       maxSize: 80,
     });
 
-    // Deduplicación en cascada: cada sección elimina títulos ya vistos en las anteriores
-    const imdbIdSet = new Set((curatedTopIMDb || []).map((m) => m.id));
+    const imdbIdSet = new Set(topImdbIds);
     if (curatedBaseSections["Más votadas"]) {
       curatedBaseSections["Más votadas"] = curatedBaseSections[
         "Más votadas"
@@ -309,9 +326,6 @@ async function getDashboardData() {
     }
 
     return {
-      // TMDb originales
-      popular: curatedPopular,
-      top_imdb: curatedTopIMDb,
       mind,
       action: curatedAction,
       scifi: curatedScifi,
@@ -321,13 +335,22 @@ async function getDashboardData() {
       ...curatedBaseSections,
     };
   } catch (err) {
-    console.error("Error cargando la página de películas (SSR):", err);
+    console.error("Error cargando datos diferidos de películas:", err);
     return {};
   }
 }
 
 /* =================== Componente de servidor =================== */
 export default async function MoviesPage() {
-  const dashboardData = await getDashboardData();
-  return <MoviesPageClient initialData={dashboardData} />;
+  const initialData = await getCriticalDashboardData();
+  const topImdbIds = (initialData.top_imdb || []).map((m) => m.id);
+  const deferredDataPromise = getDeferredDashboardData(topImdbIds);
+
+  return (
+    <MoviesPageClient
+      initialData={initialData}
+      deferredDataPromise={deferredDataPromise}
+    />
+  );
 }
+

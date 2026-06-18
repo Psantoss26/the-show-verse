@@ -1518,15 +1518,29 @@ function GenreRows({ groups, isMobile, posterCacheRef }) {
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
-export default function MoviesPageClient({ initialData }) {
+export default function MoviesPageClient({ initialData, deferredDataPromise }) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
-  const dashboardData = initialData || {};
+  const [deferredData, setDeferredData] = useState(null);
 
-  if (!dashboardData || Object.keys(dashboardData).length === 0) {
+  useEffect(() => {
+    if (deferredDataPromise) {
+      Promise.resolve(deferredDataPromise)
+        .then(setDeferredData)
+        .catch(console.error);
+    }
+  }, [deferredDataPromise]);
+
+  const dashboardData = {
+    ...(initialData || {}),
+    ...(deferredData || {}),
+  };
+
+  if (!initialData || Object.keys(initialData).length === 0) {
     return <div className="h-screen bg-black" />;
   }
+
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-black px-4 py-6 text-white selection:bg-amber-500/30 sm:px-6">
