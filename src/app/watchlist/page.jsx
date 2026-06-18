@@ -6,8 +6,6 @@ export const metadata = {
     description: 'Títulos guardados para ver más tarde',
 }
 
-export const dynamic = 'force-dynamic'
-
 export default function WatchlistPage() {
     return <WatchlistClient />
 }

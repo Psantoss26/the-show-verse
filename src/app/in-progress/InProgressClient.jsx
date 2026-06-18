@@ -1100,17 +1100,51 @@ export default function InProgressClient({
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
   const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [items, setItems] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [items, setItems] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cached = readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
+      return Array.isArray(cached?.items) ? cached.items : [];
+    }
+    return [];
+  });
+  const [stats, setStats] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cached = readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
+      return cached?.stats || null;
+    }
+    return null;
+  });
+  const [dataLoaded, setDataLoaded] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
+    }
+    return false;
+  });
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
   // Tab: "inprogress" | "completed"
   const [activeTab, setActiveTab] = useState("inprogress");
-  const [completedItems, setCompletedItems] = useState([]);
-  const [completedStats, setCompletedStats] = useState(null);
+  const [completedItems, setCompletedItems] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
+      return Array.isArray(cached?.items) ? cached.items : [];
+    }
+    return [];
+  });
+  const [completedStats, setCompletedStats] = useState(() => {
+    if (typeof window !== "undefined") {
+      const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
+      return cached?.stats || null;
+    }
+    return null;
+  });
   const [completedLoading, setCompletedLoading] = useState(false);
-  const [completedLoaded, setCompletedLoaded] = useState(false);
+  const [completedLoaded, setCompletedLoaded] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
+    }
+    return false;
+  });
 
   // UI — fixed SSR-safe defaults to avoid hydration mismatch
   const [viewMode, setViewMode] = useState("cards");
@@ -2105,7 +2139,7 @@ export default function InProgressClient({
         {/* ========== CONTENT ========== */}
 
         {/* Loading state */}
-        {(currentLoading || auth.loading) && (
+        {(currentLoading || auth.loading) && filtered.length === 0 && (
           <div
             className={
               viewMode === "cards"
@@ -2153,7 +2187,7 @@ export default function InProgressClient({
         )}
 
         {/* Items */}
-        {!currentLoading && !auth.loading && filtered.length > 0 && (
+        {filtered.length > 0 && (
           <AnimatePresence mode="popLayout">
             {grouped && grouped.length > 0 ? (
               // Grouped view
