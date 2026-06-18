@@ -135,6 +135,8 @@ const FAVORITES_CACHE_KEY = "showverse:favorites:items:v1";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v2";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+let imageChoiceCacheMemory = null;
+let imageChoicePersistHandle = null;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PLEX_LIBRARY_INDEX_CACHE_KEY = "showverse:plex-library-index:v1";
@@ -732,23 +734,60 @@ async function getBestPosterCached(type, id) {
 
 function readImageChoiceCache() {
   if (typeof window === "undefined") return {};
+  if (imageChoiceCacheMemory) return imageChoiceCacheMemory;
   try {
     const raw = window.localStorage.getItem(IMAGE_CHOICE_CACHE_KEY);
-    if (!raw) return {};
+    if (!raw) {
+      imageChoiceCacheMemory = {};
+      return imageChoiceCacheMemory;
+    }
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed;
+    imageChoiceCacheMemory =
+      parsed && typeof parsed === "object" ? parsed : {};
+    return imageChoiceCacheMemory;
   } catch {
-    return {};
+    imageChoiceCacheMemory = {};
+    return imageChoiceCacheMemory;
   }
 }
 
 function getStoredImageChoice(kind, key) {
   const cache = readImageChoiceCache();
-  const entry = cache[`${kind}:${key}`];
+  const cacheKey = `${kind}:${key}`;
+  const entry = cache[cacheKey];
   if (!entry?.path) return null;
-  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS) return null;
+  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS) {
+    delete cache[cacheKey];
+    return null;
+  }
   return entry.path;
+}
+
+function persistImageChoiceCache(cache) {
+  if (typeof window === "undefined") return;
+
+  const write = () => {
+    imageChoicePersistHandle = null;
+    try {
+      window.localStorage.setItem(IMAGE_CHOICE_CACHE_KEY, JSON.stringify(cache));
+    } catch {}
+  };
+
+  if (imageChoicePersistHandle !== null) {
+    if (typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(imageChoicePersistHandle);
+    } else {
+      window.clearTimeout(imageChoicePersistHandle);
+    }
+  }
+
+  if (typeof window.requestIdleCallback === "function") {
+    imageChoicePersistHandle = window.requestIdleCallback(write, {
+      timeout: 1200,
+    });
+  } else {
+    imageChoicePersistHandle = window.setTimeout(write, 0);
+  }
 }
 
 function writeImageChoice(kind, key, path) {
@@ -756,7 +795,8 @@ function writeImageChoice(kind, key, path) {
   try {
     const cache = readImageChoiceCache();
     cache[`${kind}:${key}`] = { path, t: Date.now() };
-    window.localStorage.setItem(IMAGE_CHOICE_CACHE_KEY, JSON.stringify(cache));
+    imageChoiceCacheMemory = cache;
+    persistImageChoiceCache(cache);
   } catch {}
 }
 
@@ -1714,7 +1754,6 @@ const FavoriteCard = memo(function FavoriteCard({
   imageMode = "poster",
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
-  animateEntry = true,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1819,7 +1858,7 @@ const FavoriteCard = memo(function FavoriteCard({
 
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = animateEntry && index < 60;
+  const shouldAnimate = index < 60;
   const shellClassName =
     "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
 
@@ -1835,7 +1874,7 @@ const FavoriteCard = memo(function FavoriteCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout={shouldAnimate}
+        layout
       >
         <Link
           href={href}
@@ -1886,7 +1925,7 @@ const FavoriteCard = memo(function FavoriteCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout={shouldAnimate}
+        layout
       >
         <Link href={href} className="block">
           <motion.div
@@ -2121,8 +2160,6 @@ export default function FavoritesClient() {
   const [ratedItems, setRatedItems] = useState(
     () => readFavoritesCache()?.ratedItems || [],
   );
-  const [suppressCachedEntryAnimations, setSuppressCachedEntryAnimations] =
-    useState(() => Boolean(readFavoritesCache()?.items?.length));
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
@@ -2205,14 +2242,6 @@ export default function FavoritesClient() {
       alert("No se pudo cerrar la sesión de TMDb. Inténtalo de nuevo.");
     }
   }, [logout, logoutLoading]);
-
-  useEffect(() => {
-    if (!suppressCachedEntryAnimations) return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      setSuppressCachedEntryAnimations(false);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [suppressCachedEntryAnimations]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -3054,7 +3083,7 @@ export default function FavoritesClient() {
   };
 
   if (!hydrated) {
-    return <div className="min-h-screen bg-black sv-stable-auth-shell" />;
+    return <div className="min-h-screen bg-black" />;
   }
 
   if (!session || !account) {
@@ -3197,31 +3226,14 @@ export default function FavoritesClient() {
               </p>
             </div>
 
-            {loading ? (
-              <div
-                aria-hidden="true"
-                className="sv-favorites-stats-reserve flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              >
-                {[0, 1, 2].map((idx) => (
-                  <div
-                    key={idx}
-                    className="sv-favorites-stat-skeleton flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-white/5 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : (
+            {!loading && (
               <motion.div
-                className="sv-favorites-stats-reserve flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.5 }}
-                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
-                >
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-red-400">
                     <Heart className="w-6 h-6 md:w-7 md:h-7 fill-red-400" />
                   </div>
@@ -3231,13 +3243,8 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Total
                   </div>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.6 }}
-                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
-                >
+                </div>
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-sky-400">
                     <Film className="w-6 h-6 md:w-7 md:h-7" />
                   </div>
@@ -3247,13 +3254,8 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Películas
                   </div>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.7 }}
-                  className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
-                >
+                </div>
+                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-purple-400">
                     <TvGlyph className="w-6 h-6 md:w-7 md:h-7 text-purple-400" />
                   </div>
@@ -3263,26 +3265,20 @@ export default function FavoritesClient() {
                   <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
                     Series
                   </div>
-                </motion.div>
+                </div>
               </motion.div>
             )}
           </div>
         </motion.header>
 
+        {/* Filters */}
         <motion.div
-          className="space-y-6 min-w-0"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          ref={filtersRef}
+          className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Filters */}
-          <motion.div
-            ref={filtersRef}
-            className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.5 }}
-          >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -3813,27 +3809,25 @@ export default function FavoritesClient() {
           {/* Scores load silently in background - no loading indicator */}
 
           {/* Content */}
-          {loading ? (
-            <div aria-hidden="true" className="sv-favorites-content-reserve" />
-          ) : sorted.length === 0 ? (
+          {loading ? null : sorted.length === 0 ? (
             <motion.div
               className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
             >
-            <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
-            <p className="text-zinc-500 font-medium">
-              No se encontraron favoritos.
-            </p>
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                className="mt-4 text-red-500 text-sm font-bold hover:underline"
-              >
-                Limpiar búsqueda
-              </button>
-            )}
+              <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
+              <p className="text-zinc-500 font-medium">
+                No se encontraron favoritos.
+              </p>
+              {q && (
+                <button
+                  onClick={() => setQ("")}
+                  className="mt-4 text-red-500 text-sm font-bold hover:underline"
+                >
+                  Limpiar búsqueda
+                </button>
+              )}
             </motion.div>
           ) : grouped ? (
             // Grouped view
@@ -3935,7 +3929,6 @@ export default function FavoritesClient() {
               ))}
             </div>
           )}
-        </motion.div>
       </div>
     </div>
   );
