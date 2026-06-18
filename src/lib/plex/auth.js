@@ -268,3 +268,223 @@ export async function getPlexAccessToken() {
 
   return state.refreshPromise;
 }
+
+// ====== PLEX SERVER DYNAMIC CONNECTION DISCOVERY & CACHING ======
+
+let cachedActiveServer = null; // { baseUrl, machineIdentifier }
+let cacheTimestamp = 0;
+const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
+function isPrivateOrLocalHost(hostname) {
+  if (!hostname) return false;
+  const host = String(hostname).toLowerCase();
+  if (host === "localhost") return true;
+  if (host.endsWith(".local")) return true;
+  if (/^127\./.test(host)) return true;
+  if (/^10\./.test(host)) return true;
+  if (/^192\.168\./.test(host)) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return true;
+  return false;
+}
+
+function normalizeBaseUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    const cleanPath =
+      parsed.pathname && parsed.pathname !== "/"
+        ? parsed.pathname.replace(/\/+$/, "")
+        : "";
+    return `${parsed.protocol}//${parsed.host}${cleanPath}`;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 3000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...opts,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function verifyPlexUrl(url, token, timeoutMs) {
+  try {
+    const res = await fetchWithTimeout(
+      `${url}/identity?X-Plex-Token=${encodeURIComponent(token)}`,
+      { headers: { Accept: "application/json" } },
+      timeoutMs
+    );
+    if (res.ok) {
+      const body = await res.json().catch(() => null);
+      const machineIdentifier = body?.MediaContainer?.machineIdentifier || res.headers.get("x-plex-machine-identifier") || null;
+      return { ok: true, machineIdentifier };
+    }
+  } catch {
+    // try fallback to root
+  }
+
+  try {
+    const res = await fetchWithTimeout(
+      `${url}/?X-Plex-Token=${encodeURIComponent(token)}`,
+      { headers: { Accept: "application/json" } },
+      timeoutMs
+    );
+    if (res.ok) {
+      const body = await res.json().catch(() => null);
+      const machineIdentifier = body?.MediaContainer?.machineIdentifier || res.headers.get("x-plex-machine-identifier") || null;
+      return { ok: true, machineIdentifier };
+    }
+  } catch {
+    // ignore
+  }
+
+  return { ok: false, machineIdentifier: null };
+}
+
+async function getPlexUrlCandidates(token) {
+  const candidates = new Set();
+  const urlToMachineId = new Map();
+
+  // 1. Environment variables
+  const envUrls = [
+    process.env.PLEX_URL,
+    ...(process.env.PLEX_URLS || "").split(","),
+  ]
+    .map((val) => normalizeBaseUrl(val))
+    .filter(Boolean);
+
+  for (const url of envUrls) {
+    candidates.add(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "https:" && isPrivateOrLocalHost(parsed.hostname)) {
+        candidates.add(`http://${parsed.host}`);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Fetch from plex.tv resources
+  try {
+    const clientIdentifier = process.env.PLEX_CLIENT_IDENTIFIER || 'the-show-verse';
+    const res = await fetchWithTimeout(
+      `https://plex.tv/api/v2/resources?includeHttps=1&X-Plex-Token=${encodeURIComponent(token)}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X-Plex-Client-Identifier': clientIdentifier,
+          'X-Plex-Product': 'The Show Verse',
+          'X-Plex-Version': '1.0'
+        }
+      },
+      3000
+    );
+
+    if (res.ok) {
+      const devices = await res.json();
+      if (Array.isArray(devices)) {
+        for (const device of devices) {
+          const isServer = device.provides && device.provides.split(',').map(s => s.trim().toLowerCase()).includes('server');
+          if (isServer) {
+            const machineId = device.clientIdentifier;
+            if (device.connections && Array.isArray(device.connections)) {
+              for (const conn of device.connections) {
+                if (conn.uri) {
+                  const normalized = normalizeBaseUrl(conn.uri);
+                  if (normalized) {
+                    candidates.add(normalized);
+                    if (machineId) {
+                      urlToMachineId.set(normalized, machineId);
+                    }
+                    // If local connection is HTTPS, also add HTTP fallback
+                    try {
+                      const parsed = new URL(normalized);
+                      if (parsed.protocol === "https:" && isPrivateOrLocalHost(parsed.hostname)) {
+                        const httpFallback = `http://${parsed.host}`;
+                        candidates.add(httpFallback);
+                        if (machineId) {
+                          urlToMachineId.set(httpFallback, machineId);
+                        }
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Plex] Failed to fetch resources from plex.tv:", err);
+  }
+
+  // Fallback default
+  if (candidates.size === 0) {
+    candidates.add("http://localhost:32400");
+  }
+
+  return {
+    urls: Array.from(candidates),
+    urlToMachineId
+  };
+}
+
+async function findFirstResponsiveServer(urls, urlToMachineId, token) {
+  const promises = urls.map(async (url) => {
+    const { ok, machineIdentifier } = await verifyPlexUrl(url, token, 1500);
+    if (ok) {
+      return {
+        baseUrl: url,
+        machineIdentifier: machineIdentifier || urlToMachineId.get(url) || null
+      };
+    }
+    throw new Error(`Connection to ${url} failed`);
+  });
+
+  try {
+    return await Promise.any(promises);
+  } catch {
+    return null;
+  }
+}
+
+export async function getActivePlexServer(providedToken = null) {
+  const token = providedToken || (await getPlexAccessToken());
+  if (!token) return null;
+
+  const now = Date.now();
+  if (cachedActiveServer && (now - cacheTimestamp < CACHE_DURATION_MS)) {
+    // Quick verify of the cached server (500ms timeout)
+    const { ok } = await verifyPlexUrl(cachedActiveServer.baseUrl, token, 500);
+    if (ok) {
+      return cachedActiveServer;
+    }
+    // Cached server is dead, clear and rediscover
+    cachedActiveServer = null;
+  }
+
+  // Discover and test candidate URLs
+  const { urls, urlToMachineId } = await getPlexUrlCandidates(token);
+  if (urls.length === 0) return null;
+
+  const activeServer = await findFirstResponsiveServer(urls, urlToMachineId, token);
+  if (activeServer) {
+    cachedActiveServer = activeServer;
+    cacheTimestamp = Date.now();
+    return activeServer;
+  }
+
+  return null;
+}

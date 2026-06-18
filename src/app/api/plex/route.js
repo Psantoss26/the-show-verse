@@ -1,6 +1,6 @@
 // src/app/api/plex/route.js
 import { NextResponse } from "next/server";
-import { getPlexAccessToken } from "@/lib/plex/auth";
+import { getPlexAccessToken, getActivePlexServer } from "@/lib/plex/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,65 +42,6 @@ export async function GET(request) {
       );
     }
 
-    const configuredUrls = [
-      process.env.PLEX_URL,
-      ...(process.env.PLEX_URLS || "").split(","),
-    ]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-
-    function isPrivateOrLocalHost(hostname) {
-      if (!hostname) return false;
-      const host = String(hostname).toLowerCase();
-      if (host === "localhost") return true;
-      if (host.endsWith(".local")) return true;
-      if (/^127\./.test(host)) return true;
-      if (/^10\./.test(host)) return true;
-      if (/^192\.168\./.test(host)) return true;
-      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return true;
-      return false;
-    }
-
-    function normalizeBaseUrl(rawUrl) {
-      const value = String(rawUrl || "").trim();
-      if (!value) return null;
-      try {
-        const parsed = new URL(value);
-        const cleanPath =
-          parsed.pathname && parsed.pathname !== "/"
-            ? parsed.pathname.replace(/\/+$/, "")
-            : "";
-        return `${parsed.protocol}//${parsed.host}${cleanPath}`;
-      } catch {
-        return null;
-      }
-    }
-
-    const rawCandidates = configuredUrls.length
-      ? configuredUrls
-      : ["http://localhost:32400"];
-    const expandedCandidates = [];
-
-    for (const raw of rawCandidates) {
-      const normalized = normalizeBaseUrl(raw);
-      if (!normalized) continue;
-
-      expandedCandidates.push(normalized);
-
-      try {
-        const parsed = new URL(normalized);
-        if (
-          parsed.protocol === "https:" &&
-          isPrivateOrLocalHost(parsed.hostname)
-        ) {
-          expandedCandidates.push(`http://${parsed.host}`);
-        }
-      } catch {
-        // ignore invalid candidate
-      }
-    }
-
-    const plexUrls = Array.from(new Set(expandedCandidates));
     const plexToken = await getPlexAccessToken();
 
     if (!plexToken) {
@@ -113,6 +54,20 @@ export async function GET(request) {
         message: "Plex no configurado",
       });
     }
+
+    const activeServer = await getActivePlexServer(plexToken);
+
+    if (!activeServer) {
+      console.warn("[Plex] No active Plex server found/reachable");
+      return NextResponse.json({
+        available: false,
+        plexUrl: null,
+        message: "No se pudo conectar con el servidor Plex.",
+      });
+    }
+
+    const activePlexUrl = activeServer.baseUrl;
+    const machineIdentifier = activeServer.machineIdentifier;
 
     // Helper: intenta conseguir slug (para watch.plex.tv) vía metadata.provider.plex.tv
     async function getPlexSlug({ imdbId, tmdbId, type }) {
@@ -230,44 +185,27 @@ export async function GET(request) {
     }
 
     let matchedItem = null;
-    let activePlexUrl = null;
-    let machineIdentifier = null;
+    const searchUrl = `${activePlexUrl}/search?query=${encodeURIComponent(
+      title,
+    )}&X-Plex-Token=${plexToken}`;
 
-    for (const baseUrl of plexUrls) {
-      const searchUrl = `${baseUrl}/search?query=${encodeURIComponent(
-        title,
-      )}&X-Plex-Token=${plexToken}`;
+    try {
+      const response = await fetchWithTimeout(searchUrl, {
+        headers: { Accept: "application/json" },
+      });
 
-      try {
-        const response = await fetchWithTimeout(searchUrl, {
-          headers: { Accept: "application/json" },
-        });
-
-        if (!response.ok) {
-          console.warn(`[Plex] Search failed on ${baseUrl}: ${response.status}`);
-          continue;
-        }
-
+      if (response.ok) {
         const data = await response.json();
-        const machineIdFromHeader =
-          response.headers.get("x-plex-machine-identifier") || null;
-        const machineIdFromContainer =
-          data?.MediaContainer?.machineIdentifier || null;
         const candidate = pickBestMatch(data);
-        if (!candidate) continue;
-
-        matchedItem = candidate;
-        activePlexUrl = baseUrl;
-        machineIdentifier =
-          machineIdFromHeader ||
-          machineIdFromContainer ||
-          candidate?.machineIdentifier ||
-          (await getMachineIdentifier(baseUrl));
-        break;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.warn(`[Plex] Search error on ${baseUrl}: ${msg}`);
+        if (candidate) {
+          matchedItem = candidate;
+        }
+      } else {
+        console.warn(`[Plex] Search failed on ${activePlexUrl}: ${response.status}`);
       }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[Plex] Search error on ${activePlexUrl}: ${msg}`);
     }
 
     if (!matchedItem) {
@@ -275,10 +213,6 @@ export async function GET(request) {
         available: false,
         plexUrl: null,
       });
-    }
-
-    if (!activePlexUrl) {
-      activePlexUrl = plexUrls[0];
     }
 
     try {
