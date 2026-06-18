@@ -2,10 +2,15 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useReducedMotion,
+} from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +55,10 @@ const scaleIn = {
     transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   },
 };
+
+const INITIAL_VISIBLE_ROWS = 3;
+const ROW_REVEAL_BATCH_SIZE = 2;
+const EMPTY_ARRAY = [];
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -426,8 +435,9 @@ async function preparePreviewBackdrop(show) {
  * - >=md: cover
  * ==================================================================== */
 function PosterImage({ show, cache }) {
-  const [posterPath, setPosterPath] = useState(null);
-  const [ready, setReady] = useState(false);
+  const initialPosterPath = show?.poster_path || show?.backdrop_path || null;
+  const [posterPath, setPosterPath] = useState(initialPosterPath);
+  const [ready, setReady] = useState(!!initialPosterPath);
 
   useEffect(() => {
     let abort = false;
@@ -435,11 +445,13 @@ function PosterImage({ show, cache }) {
     const resolvePoster = async () => {
       if (!show) return;
 
+      const basePoster = show.poster_path || show.backdrop_path || null;
+      setPosterPath(basePoster);
+      setReady(!!basePoster);
+
       // 1) Preferencia usuario
       const { poster: userPoster } = getTVArtworkPreference(show.id);
       if (userPoster) {
-        const url = buildImg(userPoster, "w342");
-        await preloadImage(url);
         if (!abort) {
           cache.current.set(show.id, userPoster);
           setPosterPath(userPoster);
@@ -451,8 +463,6 @@ function PosterImage({ show, cache }) {
       // 2) Cache memoria
       const cached = cache.current.get(show.id);
       if (cached) {
-        const url = buildImg(cached, "w342");
-        await preloadImage(url);
         if (!abort) {
           setPosterPath(cached);
           setReady(true);
@@ -461,15 +471,8 @@ function PosterImage({ show, cache }) {
       }
 
       // 3) Usar primero el poster ya presente para no bloquear la primera pintura
-      const existingPoster = show.poster_path || show.backdrop_path || null;
-      if (existingPoster) {
-        const url = buildImg(existingPoster, "w342");
-        await preloadImage(url);
-        if (!abort) {
-          cache.current.set(show.id, existingPoster);
-          setPosterPath(existingPoster);
-          setReady(true);
-        }
+      if (basePoster) {
+        cache.current.set(show.id, basePoster);
         return;
       }
 
@@ -477,9 +480,6 @@ function PosterImage({ show, cache }) {
       setReady(false);
       const preferred = await fetchBestTVPoster(show.id);
       const chosen = preferred || null;
-
-      const url = chosen ? buildImg(chosen, "w342") : null;
-      await preloadImage(url);
 
       if (!abort) {
         cache.current.set(show.id, chosen);
@@ -1107,7 +1107,9 @@ function InlinePreviewCard({ show, heightClass }) {
 
 /* ---------- Fila reusable ---------- */
 function Row({ title, items, isMobile, posterCacheRef }) {
-  if (!items || items.length === 0) return null;
+  const reduceMotion = useReducedMotion();
+  const safeItems = Array.isArray(items) ? items : EMPTY_ARRAY;
+  const hasItems = safeItems.length > 0;
 
   // ✅ Detectar si es una fila de género específico
   const isGenreRow = ![
@@ -1149,10 +1151,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   useEffect(() => {
-    if (!isHoveredRow || !items?.length || isMobile) return;
+    if (!isHoveredRow || !hasItems || isMobile) return;
 
     const preloadBackdrops = async () => {
-      const toPreload = items
+      const toPreload = safeItems
         .slice(0, 5)
         .filter((show) => !preloadedBackdrops.has(show.id));
 
@@ -1164,7 +1166,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
     const timer = window.setTimeout(preloadBackdrops, 150);
     return () => window.clearTimeout(timer);
-  }, [isHoveredRow, items, isMobile, preloadedBackdrops]);
+  }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
 
   const isTop10 = title === "Top 10 hoy en España";
   const hasActivePreview = !!hoveredId;
@@ -1172,6 +1174,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const heightClassDesktop =
     "md:h-[220px] lg:h-[260px] xl:h-[300px] 2xl:h-[340px]";
   const posterBoxClass = `aspect-[2/3] md:aspect-auto ${heightClassDesktop}`;
+
+  if (!hasItems) return null;
 
   // ✅ TOP 10 SOLO MÓVIL (<768): backdrop completo + 1 por vista
   if (isTop10 && isMobile) {
@@ -1203,7 +1207,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           modules={[Navigation]}
           className="group relative"
         >
-          {items.map((s, i) => (
+          {safeItems.map((s, i) => (
             <SwiperSlide key={s.id} className="select-none">
               <Top10MobileBackdropCardTV show={s} rank={i + 1} />
             </SwiperSlide>
@@ -1246,6 +1250,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
   const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
+  const motionInitial = reduceMotion ? false : "hidden";
+  const motionAnimate = reduceMotion || isInView ? "visible" : "hidden";
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: isTop10 ? 16 : 12 },
@@ -1258,14 +1264,14 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   return (
     <motion.div
       ref={rowRef}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
+      initial={motionInitial}
+      animate={motionAnimate}
       variants={fadeInUp}
       className="relative group sv-deferred-row"
     >
       <motion.div
-        initial="hidden"
-        animate={isInView ? "visible" : "hidden"}
+        initial={motionInitial}
+        animate={motionAnimate}
         variants={scaleIn}
         className="mb-4 px-1 sm:px-0"
       >
@@ -1318,9 +1324,9 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           className="group relative"
           breakpoints={breakpointsRow}
         >
-          {items.map((s, i) => {
+          {safeItems.map((s, i) => {
             const isActive = !isMobile && hoveredId === s.id;
-            const isLast = i === items.length - 1;
+            const isLast = i === safeItems.length - 1;
 
             const base =
               "relative flex-shrink-0 transition-all duration-300 ease-in-out";
@@ -1354,11 +1360,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     setHoveredId((prev) => (prev === s.id ? null : prev));
                 }}
               >
-                <AnimatePresence initial={false} mode="wait">
-                  {isActive ? (
+                {isActive ? (
+                  <AnimatePresence initial={false} mode="wait">
                     <motion.div
                       key="preview"
-                      initial={{ opacity: 0, scale: 0.98 }}
+                      initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
                       // CAMBIO: exit rápido
                       exit={{
@@ -1375,28 +1381,17 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                         heightClass={heightClassDesktop}
                       />
                     </motion.div>
-                  ) : (
-                    <motion.div
-                      key="poster"
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.98,
-                        transition: { duration: 0.1 },
-                      }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="w-full h-full"
+                  </AnimatePresence>
+                ) : (
+                  <div className="w-full h-full">
+                    <Link
+                      href={`/details/tv/${s.id}`}
+                      className="block w-full h-full"
                     >
-                      <Link
-                        href={`/details/tv/${s.id}`}
-                        className="block w-full h-full"
-                      >
-                        <PosterImage show={s} cache={posterCacheRef} />
-                      </Link>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <PosterImage show={s} cache={posterCacheRef} />
+                    </Link>
+                  </div>
+                )}
               </div>
             );
 
@@ -1463,25 +1458,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   );
 }
 
-function GenreRows({ groups, isMobile, posterCacheRef }) {
-  if (!groups) return null;
-  return (
-    <>
-      {Object.entries(groups || {}).map(([gname, list]) =>
-        list?.length ? (
-          <Row
-            key={`genre-${gname}`}
-            title={`${gname}`}
-            items={list}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null,
-      )}
-    </>
-  );
-}
-
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
@@ -1490,6 +1466,7 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
 
   const posterCacheRef = useRef(new Map());
   const [deferredData, setDeferredData] = useState(null);
+  const [visibleRowCount, setVisibleRowCount] = useState(INITIAL_VISIBLE_ROWS);
 
   useEffect(() => {
     if (deferredDataPromise) {
@@ -1499,10 +1476,94 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
     }
   }, [deferredDataPromise]);
 
-  const dashboardData = {
-    ...(initialData || {}),
-    ...(deferredData || {}),
-  };
+  const dashboardData = useMemo(
+    () => ({
+      ...(initialData || {}),
+      ...(deferredData || {}),
+    }),
+    [initialData, deferredData],
+  );
+
+  const rowConfigs = useMemo(() => {
+    const rows = [];
+    const addRow = (key, title, items) => {
+      if (Array.isArray(items) && items.length > 0) {
+        rows.push({ key, title, items });
+      }
+    };
+
+    addRow(
+      "top-es",
+      "Top 10 hoy en España",
+      dashboardData["Top 10 hoy en España"],
+    );
+    addRow("popular", "Tendencias ahora mismo", dashboardData.popular);
+    addRow("top-imdb", "Series imprescindibles", dashboardData.top_imdb);
+    addRow(
+      "most-voted",
+      "Las más valoradas de la historia",
+      dashboardData["Más votadas"],
+    );
+    addRow("awarded", "Ganadoras de grandes premios", dashboardData["Premiadas"]);
+    addRow("blockbusters", "Fenómenos de audiencia", dashboardData["Superéxito"]);
+    addRow("drama", "Drama que te deja sin palabras", dashboardData.drama);
+    addRow(
+      "scifi-fantasy",
+      "Ciencia ficción y fantasía",
+      dashboardData.scifi_fantasy,
+    );
+    addRow("crime", "Crimen y suspense", dashboardData.crime);
+    addRow("k-drama", "K-Drama que engancha", dashboardData.kDrama);
+    addRow("romance", "Romance que atrapa", dashboardData.romance);
+    addRow("animation", "Animación para maratonear", dashboardData.animation);
+    addRow("decade-1990", "Clásicos de los 90", dashboardData["Década de 1990"]);
+    addRow(
+      "decade-2000",
+      "Favoritas de los 2000",
+      dashboardData["Década de 2000"],
+    );
+    addRow("decade-2010", "Hits de los 2010", dashboardData["Década de 2010"]);
+    addRow(
+      "decade-2020",
+      "Lo mejor de esta década",
+      dashboardData["Década de 2020"],
+    );
+
+    Object.entries(dashboardData["Por género"] || {}).forEach(
+      ([genreName, list]) => addRow(`genre-${genreName}`, genreName, list),
+    );
+
+    return rows;
+  }, [dashboardData]);
+
+  useEffect(() => {
+    if (visibleRowCount >= rowConfigs.length) return undefined;
+
+    let cancelled = false;
+    const schedule =
+      window.requestIdleCallback ||
+      ((callback) => window.setTimeout(callback, 120));
+    const cancel =
+      window.cancelIdleCallback ||
+      ((handle) => window.clearTimeout(handle));
+
+    const handle = schedule(
+      () => {
+        if (cancelled) return;
+        setVisibleRowCount((count) =>
+          Math.min(rowConfigs.length, count + ROW_REVEAL_BATCH_SIZE),
+        );
+      },
+      { timeout: 350 },
+    );
+
+    return () => {
+      cancelled = true;
+      cancel(handle);
+    };
+  }, [rowConfigs.length, visibleRowCount]);
+
+  const visibleRows = rowConfigs.slice(0, visibleRowCount);
 
   if (!initialData || Object.keys(initialData).length === 0) {
     return <div className="h-screen bg-black" />;
@@ -1518,155 +1579,15 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
       </div>
 
       <div className="relative z-10 space-y-12 pt-2">
-        {dashboardData["Top 10 hoy en España"]?.length ? (
+        {visibleRows.map(({ key, title, items }) => (
           <Row
-            title="Top 10 hoy en España"
-            items={dashboardData["Top 10 hoy en España"]}
+            key={key}
+            title={title}
+            items={items}
             isMobile={isMobile}
             posterCacheRef={posterCacheRef}
           />
-        ) : null}
-
-        {dashboardData.popular?.length > 0 && (
-          <Row
-            title="Tendencias ahora mismo"
-            items={dashboardData.popular}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.top_imdb?.length > 0 && (
-          <Row
-            title="Series imprescindibles"
-            items={dashboardData.top_imdb}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData["Más votadas"]?.length ? (
-          <Row
-            title="Las más valoradas de la historia"
-            items={dashboardData["Más votadas"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Premiadas"]?.length ? (
-          <Row
-            title="Ganadoras de grandes premios"
-            items={dashboardData["Premiadas"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Superéxito"]?.length ? (
-          <Row
-            title="Fenómenos de audiencia"
-            items={dashboardData["Superéxito"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData.drama?.length > 0 && (
-          <Row
-            title="Drama que te deja sin palabras"
-            items={dashboardData.drama}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.scifi_fantasy?.length > 0 && (
-          <Row
-            title="Ciencia ficción y fantasía"
-            items={dashboardData.scifi_fantasy}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.crime?.length > 0 && (
-          <Row
-            title="Crimen y suspense"
-            items={dashboardData.crime}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.kDrama?.length > 0 && (
-          <Row
-            title="K-Drama que engancha"
-            items={dashboardData.kDrama}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.romance?.length > 0 && (
-          <Row
-            title="Romance que atrapa"
-            items={dashboardData.romance}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData.animation?.length > 0 && (
-          <Row
-            title="Animación para maratonear"
-            items={dashboardData.animation}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        )}
-
-        {dashboardData["Década de 1990"]?.length ? (
-          <Row
-            title="Clásicos de los 90"
-            items={dashboardData["Década de 1990"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Década de 2000"]?.length ? (
-          <Row
-            title="Favoritas de los 2000"
-            items={dashboardData["Década de 2000"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Década de 2010"]?.length ? (
-          <Row
-            title="Hits de los 2010"
-            items={dashboardData["Década de 2010"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        {dashboardData["Década de 2020"]?.length ? (
-          <Row
-            title="Lo mejor de esta década"
-            items={dashboardData["Década de 2020"]}
-            isMobile={isMobile}
-            posterCacheRef={posterCacheRef}
-          />
-        ) : null}
-
-        <GenreRows
-          groups={dashboardData["Por género"]}
-          isMobile={isMobile}
-          posterCacheRef={posterCacheRef}
-        />
+        ))}
       </div>
     </div>
   );
