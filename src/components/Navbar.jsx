@@ -394,20 +394,23 @@ export default function Navbar() {
   }, [pathname, prefetchNavRoute]);
 
   const navLinkClass = (href) =>
-    `px-3 py-2 rounded-xl text-sm font-bold transition-all duration-300 ease-out ${
+    `relative px-3 py-2 rounded-xl text-sm font-bold transition-all duration-300 ease-out ${
       isActive(href)
-        ? "bg-white/10 text-white backdrop-blur-md shadow-sm"
+        ? "text-white"
         : isScrolled
           ? "text-zinc-100 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
           : "text-neutral-300 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
     } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
 
+  const getActiveTabStyle = () => {
+    return "bg-white/10 border border-white/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(255,255,255,0.02)]";
+  };
+
   const iconLinkClass = (href, tone = "neutral") => {
     const active = isActive(href);
 
     const base =
-      "group p-2 rounded-full transition-all duration-300 ease-out " +
-      "text-neutral-400 " +
+      "relative group p-2 rounded-full transition-all duration-300 ease-out " +
       "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 " +
       "focus:outline-none";
 
@@ -415,43 +418,37 @@ export default function Navbar() {
       red: {
         hover:
           "hover:text-red-300 hover:bg-red-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(239,68,68,0.15)]",
-        active:
-          "text-red-200 bg-red-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(239,68,68,0.2)]",
+        active: "text-red-200",
       },
       blue: {
         hover:
           "hover:text-sky-300 hover:bg-sky-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(14,165,233,0.15)]",
-        active:
-          "text-sky-200 bg-sky-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(14,165,233,0.2)]",
+        active: "text-sky-200",
       },
       purple: {
         hover:
           "hover:text-fuchsia-300 hover:bg-fuchsia-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(217,70,239,0.15)]",
-        active:
-          "text-fuchsia-200 bg-fuchsia-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(217,70,239,0.2)]",
+        active: "text-fuchsia-200",
       },
       green: {
         hover:
           "hover:text-emerald-300 hover:bg-emerald-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]",
-        active:
-          "text-emerald-200 bg-emerald-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]",
+        active: "text-emerald-200",
       },
       amber: {
         hover:
           "hover:text-amber-300 hover:bg-amber-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(245,158,11,0.15)]",
-        active:
-          "text-amber-200 bg-amber-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(245,158,11,0.2)]",
+        active: "text-amber-200",
       },
       indigo: {
         hover:
           "hover:text-indigo-300 hover:bg-indigo-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(99,102,241,0.15)]",
-        active:
-          "text-indigo-200 bg-indigo-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(99,102,241,0.2)]",
+        active: "text-indigo-200",
       },
     };
 
     const t = tones[tone] || tones.amber;
-    return `${base} ${active ? t.active : t.hover}`;
+    return `${base} ${active ? t.active : t.hover} ${active ? "" : "text-neutral-400"}`;
   };
 
   const navLinkClassMobileBottom = (href, tone = "blue") => {
@@ -561,7 +558,14 @@ export default function Navbar() {
 
             <div className="flex items-center gap-4">
               <Link href="/" className={navLinkClass("/")}>
-                Inicio
+                {isActive("/") && (
+                  <motion.div
+                    layoutId="activeTabDesktopText"
+                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10">Inicio</span>
               </Link>
               <Link
                 href="/movies"
@@ -570,7 +574,14 @@ export default function Navbar() {
                 onFocus={() => prefetchNavRoute("/movies")}
                 className={navLinkClass("/movies")}
               >
-                Películas
+                {isActive("/movies") && (
+                  <motion.div
+                    layoutId="activeTabDesktopText"
+                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10">Películas</span>
               </Link>
               <Link
                 href="/series"
@@ -579,13 +590,34 @@ export default function Navbar() {
                 onFocus={() => prefetchNavRoute("/series")}
                 className={navLinkClass("/series")}
               >
-                Series
+                {isActive("/series") && (
+                  <motion.div
+                    layoutId="activeTabDesktopText"
+                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10">Series</span>
               </Link>
               <Link href="/discover" className={navLinkClass("/discover")}>
-                Descubrir
+                {isActive("/discover") && (
+                  <motion.div
+                    layoutId="activeTabDesktopText"
+                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10">Descubrir</span>
               </Link>
               <Link href="/biblioteca" className={navLinkClass("/biblioteca")}>
-                Biblioteca
+                {isActive("/biblioteca") && (
+                  <motion.div
+                    layoutId="activeTabDesktopText"
+                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10">Biblioteca</span>
               </Link>
             </div>
           </div>
@@ -598,7 +630,16 @@ export default function Navbar() {
                 className={iconLinkClass("/lists", "purple")}
                 aria-label="Listas"
               >
-                <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                {isActive("/lists") && (
+                  <motion.div
+                    layoutId="activeTabDesktopIcon"
+                    className="absolute inset-0 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(217,70,239,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
               </Link>
 
               <Link
@@ -606,7 +647,16 @@ export default function Navbar() {
                 className={iconLinkClass("/calendar", "amber")}
                 aria-label="Calendario"
               >
-                <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                {isActive("/calendar") && (
+                  <motion.div
+                    layoutId="activeTabDesktopIcon"
+                    className="absolute inset-0 rounded-full bg-amber-500/20 border border-amber-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(245,158,11,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
               </Link>
 
               <Link
@@ -614,10 +664,19 @@ export default function Navbar() {
                 className={iconLinkClass("/in-progress", "green")}
                 aria-label="En Progreso"
               >
-                <Play
-                  className="w-5 h-5 transition-transform duration-200 group-hover:scale-110"
-                  fill="currentColor"
-                />
+                {isActive("/in-progress") && (
+                  <motion.div
+                    layoutId="activeTabDesktopIcon"
+                    className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <Play
+                    className="w-5 h-5 transition-transform duration-200 group-hover:scale-110"
+                    fill="currentColor"
+                  />
+                </span>
               </Link>
 
               <TraktHistoryNavButton />
@@ -627,7 +686,16 @@ export default function Navbar() {
                 className={iconLinkClass("/favorites", "red")}
                 aria-label="Favoritas"
               >
-                <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                {isActive("/favorites") && (
+                  <motion.div
+                    layoutId="activeTabDesktopIcon"
+                    className="absolute inset-0 rounded-full bg-red-500/20 border border-red-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(239,68,68,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
               </Link>
 
               <Link
@@ -635,7 +703,16 @@ export default function Navbar() {
                 className={iconLinkClass("/watchlist", "blue")}
                 aria-label="Pendientes"
               >
-                <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                {isActive("/watchlist") && (
+                  <motion.div
+                    layoutId="activeTabDesktopIcon"
+                    className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
               </Link>
             </div>
 
