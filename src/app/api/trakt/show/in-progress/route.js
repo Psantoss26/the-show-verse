@@ -9,6 +9,7 @@ import {
   setTraktCookies,
   traktFetch,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies, hasBackendCredentials } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,6 +88,7 @@ async function fetchTmdbShow(tmdbId) {
       name: n.name,
       logo_path: n.logo_path,
     })),
+    seasons: j?.seasons || [],
   };
 }
 
@@ -126,7 +128,115 @@ async function fetchShowProgress(
   return progressRes.json || null;
 }
 
-export async function GET() {
+export async function GET(request) {
+  if (hasBackendCredentials(request)) {
+    try {
+      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress");
+      if (backend.ok) {
+        const results = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const enriched = await mapLimit(results, 8, async (item) => {
+          const tmdbId = item.tmdbId;
+          const tmdb = await fetchTmdbShow(tmdbId).catch(() => null);
+          const historyRes = await backendFetchJson(request, `/v1/history/shows/${tmdbId}`).catch(() => null);
+          const episodes = Array.isArray(historyRes?.json?.episodes)
+            ? historyRes.json.episodes
+            : [];
+
+          const seasonMap = {};
+          if (tmdb?.seasons) {
+            for (const s of tmdb.seasons) {
+              if (s.season_number > 0) {
+                seasonMap[s.season_number] = s.episode_count;
+              }
+            }
+          }
+
+          const aired = tmdb?.number_of_episodes || 0;
+
+          const watchedKeys = new Set();
+          for (const ep of episodes) {
+            if (ep.season != null && ep.episode != null) {
+              watchedKeys.add(`${ep.season}-${ep.episode}`);
+            }
+          }
+          const completed = watchedKeys.size;
+          const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
+
+          const lastEp = episodes[0];
+          const lastEpisode = lastEp
+            ? {
+                season: lastEp.season,
+                number: lastEp.episode,
+                title: null,
+              }
+            : null;
+
+          let nextEpisode = null;
+          const sortedSeasonNumbers = Object.keys(seasonMap).map(Number).sort((a, b) => a - b);
+          for (const sNum of sortedSeasonNumbers) {
+            const maxEp = seasonMap[sNum];
+            for (let eNum = 1; eNum <= maxEp; eNum++) {
+              const key = `${sNum}-${eNum}`;
+              if (!watchedKeys.has(key)) {
+                nextEpisode = { season: sNum, number: eNum, title: null };
+                break;
+              }
+            }
+            if (nextEpisode) break;
+          }
+
+          return {
+            traktId: null,
+            tmdbId,
+            title: item.title || tmdb?.name || "Sin título",
+            title_es: tmdb?.name || item.title || null,
+            year: tmdb?.first_air_date ? String(tmdb.first_air_date).slice(0, 4) : null,
+            aired,
+            completed,
+            pct,
+            nextEpisode,
+            lastEpisode,
+            lastWatchedAt: item.lastWatchedAt || lastEp?.watchedAt || null,
+            poster_path: item.posterPath || tmdb?.poster_path || null,
+            backdrop_path: tmdb?.backdrop_path || null,
+            first_air_date: tmdb?.first_air_date || null,
+            vote_average: tmdb?.vote_average || null,
+            overview: tmdb?.overview || null,
+            number_of_seasons: tmdb?.number_of_seasons || null,
+            total_episodes: tmdb?.number_of_episodes || null,
+            genres: tmdb?.genres || [],
+            tmdb_status: tmdb?.status || null,
+            networks: tmdb?.networks || [],
+            detailsHref: `/details/tv/${tmdbId}`,
+          };
+        });
+
+        // Filter out fully completed shows or shows not started
+        const inProgress = enriched.filter(item => item.completed > 0 && item.completed < item.aired);
+
+        const responseData = {
+          connected: true,
+          items: inProgress,
+          stats: {
+            total: inProgress.length,
+            avgProgress:
+              inProgress.length > 0
+                ? Math.round(inProgress.reduce((s, x) => s + x.pct, 0) / inProgress.length)
+                : 0,
+            totalEpisodesWatched: inProgress.reduce((s, x) => s + x.completed, 0),
+            totalEpisodesRemaining: inProgress.reduce((s, x) => s + (x.aired - x.completed), 0),
+          },
+          source: "backend"
+        };
+        const res = NextResponse.json(responseData);
+        setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+        return res;
+      }
+    } catch (e) {
+      console.error("Failed to load in-progress from backend", e);
+    }
+  }
+
   const cookieStore = await cookies();
   const { accessToken, refreshToken, expiresAtMs } =
     readTraktCookies(cookieStore);

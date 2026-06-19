@@ -176,6 +176,7 @@ export default async function historyRoutes(fastify) {
       connected: true,
       found: episodes.length > 0,
       watchedBySeason,
+      episodes,
     });
   });
 

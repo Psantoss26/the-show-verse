@@ -511,6 +511,8 @@ export async function markAsFavorite({
   type,
   mediaId,
   favorite,
+  title,
+  posterPath,
 }) {
   // Route through our Next.js API so Trakt sync happens server-side
   const res = await offlineMutationFetch('/api/tmdb/account/favorite', {
@@ -522,6 +524,8 @@ export async function markAsFavorite({
       mediaType: type,
       mediaId,
       favorite,
+      title,
+      posterPath,
     }),
   }, {
     label: favorite ? 'Añadir favorito' : 'Quitar favorito',
@@ -541,6 +545,8 @@ export async function markInWatchlist({
   type,
   mediaId,
   watchlist,
+  title,
+  posterPath,
 }) {
   // Route through our Next.js API so Trakt sync happens server-side
   const res = await offlineMutationFetch('/api/tmdb/account/watchlist', {
@@ -552,6 +558,8 @@ export async function markInWatchlist({
       mediaType: type,
       mediaId,
       watchlist,
+      title,
+      posterPath,
     }),
   }, {
     label: watchlist ? 'Añadir pendiente' : 'Quitar pendiente',

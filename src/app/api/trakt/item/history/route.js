@@ -10,6 +10,12 @@ import {
     traktAddToHistory,
     traktRemoveHistoryEntries
 } from '@/lib/trakt/server'
+import {
+    backendFetchJson,
+    mediaTypeToBackend,
+    setBackendAuthCookies,
+    hasBackendCredentials,
+} from '@/lib/backend/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,10 +23,6 @@ export const dynamic = 'force-dynamic'
 export async function POST(request) {
     const cookieStore = await cookies()
     const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
-
-    if (!accessToken && !refreshToken) {
-        return NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 })
-    }
 
     let payload = null
     try {
@@ -34,6 +36,97 @@ export async function POST(request) {
     const tmdbId = payload?.tmdbId
     const watchedAt = payload?.watchedAt || null
     const historyId = payload?.historyId
+
+    if (hasBackendCredentials(request)) {
+        try {
+            const mediaType = mediaTypeToBackend(type);
+            let backendResult = null;
+
+            if (op === 'add') {
+                backendResult = await backendFetchJson(request, "/v1/history", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        tmdbId: Number(tmdbId),
+                        mediaType,
+                        watchedAt: watchedAt ? new Date(watchedAt).toISOString() : new Date().toISOString(),
+                        title: payload?.title || undefined,
+                        posterPath: payload?.posterPath || undefined,
+                    }),
+                });
+            } else if (op === 'remove') {
+                backendResult = await backendFetchJson(request, `/v1/history/${encodeURIComponent(historyId)}`, {
+                    method: "DELETE",
+                });
+            } else if (op === 'update') {
+                await backendFetchJson(request, `/v1/history/${encodeURIComponent(historyId)}`, {
+                    method: "DELETE",
+                });
+                backendResult = await backendFetchJson(request, "/v1/history", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        tmdbId: Number(tmdbId),
+                        mediaType,
+                        watchedAt: watchedAt ? new Date(watchedAt).toISOString() : new Date().toISOString(),
+                        title: payload?.title || undefined,
+                        posterPath: payload?.posterPath || undefined,
+                    }),
+                });
+            }
+
+            if (backendResult) {
+                if (!backendResult.ok) {
+                    const res = NextResponse.json({
+                        ok: false,
+                        error: backendResult.error || "Backend history operation failed",
+                    }, { status: backendResult.status });
+                    setBackendAuthCookies(res, backendResult, { secure: request.nextUrl?.protocol === "https:" });
+                    return res;
+                }
+
+                // Sincronización opcional hacia Trakt si está conectado
+                let token = accessToken;
+                let refreshedTokens = null;
+
+                if (token) {
+                    try {
+                        const ensureToken = async () => {
+                            if (!token || tokenIsExpired(expiresAtMs)) {
+                                if (refreshToken) {
+                                    refreshedTokens = await refreshAccessToken(refreshToken);
+                                    token = refreshedTokens.access_token;
+                                }
+                            }
+                        };
+                        await ensureToken();
+
+                        if (op === 'add') {
+                            const watchedAtIso = normalizeWatchedAt(watchedAt);
+                            await traktAddToHistory(token, { type, tmdbId, watchedAtIso });
+                        }
+                    } catch (traktErr) {
+                        console.warn("Failed to sync history to Trakt:", traktErr);
+                    }
+                }
+
+                const res = NextResponse.json({
+                    ok: true,
+                    historyId: backendResult.json?.item?.id || null,
+                    source: "backend",
+                });
+                if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+                setBackendAuthCookies(res, backendResult, { secure: request.nextUrl?.protocol === "https:" });
+                return res;
+            }
+        } catch (e) {
+            console.warn("Backend history operation failed:", e);
+            return NextResponse.json({ error: e?.message || "Backend history operation failed" }, { status: 500 });
+        }
+    }
+
+    if (!accessToken && !refreshToken) {
+        return NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 })
+    }
+
 
     if (op !== 'add' && op !== 'update' && op !== 'remove') {
         return NextResponse.json({ error: 'Invalid op. Use add|update|remove.' }, { status: 400 })
