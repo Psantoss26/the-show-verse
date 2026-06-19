@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import LoginForm from "@/components/auth/LoginForm";
 import { useAuth } from "@/context/AuthContext";
@@ -15,20 +14,8 @@ export default function LoginClient({ next }) {
     router.replace(next || "/");
   }, [authenticated, hydrated, next, router]);
 
-  if (!hydrated || authenticated) {
-    return (
-      <main className="relative flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-[#0a0a0a] px-4 text-white overflow-hidden">
-        {/* Decorative background blobs */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/5 blur-[120px] animate-pulse duration-[8s]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px] animate-pulse duration-[10s]" />
-        </div>
-        <div className="relative z-10 flex items-center gap-3 text-sm font-semibold text-zinc-400">
-          <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
-          Cargando sesión...
-        </div>
-      </main>
-    );
+  if (hydrated && authenticated) {
+    return null;
   }
 
   return (
