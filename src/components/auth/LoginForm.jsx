@@ -258,7 +258,7 @@ export default function LoginForm({ next: nextProp }) {
                   maxLength={30}
                   pattern="[A-Za-z0-9_-]+"
                   className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-                  placeholder="psantos26"
+                  placeholder="usuario"
                 />
               </div>
             </div>
