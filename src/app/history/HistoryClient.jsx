@@ -3274,19 +3274,19 @@ export default function HistoryClient() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="max-w-md w-full flex flex-col items-center justify-center py-12 bg-zinc-900/20 border border-white/5 rounded-3xl text-center px-4 border-dashed"
+                  className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
                 >
-                  <div className="mb-6">
-                    <OptimizedImage
-                      src="/logo-Trakt.png"
-                      alt="Trakt Logo"
-                      className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
+                  <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
+                    <img
+                      src="/logo-TSV-sinFondo.png"
+                      alt="The Show Verse"
+                      className="h-full w-auto object-contain scale-[1.6]"
                     />
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
+                  <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-md mb-2">
                     Inicia sesión
                   </h2>
-                  <p className="text-zinc-400 max-w-sm mb-8 text-sm">
+                  <p className="text-zinc-400 text-xs font-medium max-w-sm mb-6 leading-relaxed">
                     Inicia sesión para ver tu historial de visualizaciones.
                   </p>
                   <button
@@ -3296,7 +3296,7 @@ export default function HistoryClient() {
                         "/login?next=/history",
                       )
                     }
-                    className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
                   >
                     Iniciar sesión
                   </button>
