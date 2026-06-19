@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: the-show-verse-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false        # Lo introduces manualmente en el dashboard
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true   # Render lo genera automáticamente
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
