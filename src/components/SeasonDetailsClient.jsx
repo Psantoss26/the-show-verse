@@ -328,11 +328,6 @@ export default function SeasonDetailsClient({
     [parsedInitialScoreboard, hasNumericScoreboardStats],
   );
 
-  // Scroll al inicio al montar
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, []);
-
   // Trakt scoreboard
   const [tScoreboard, setTScoreboard] = useState(
     () => parsedInitialScoreboard || defaultScoreboard,

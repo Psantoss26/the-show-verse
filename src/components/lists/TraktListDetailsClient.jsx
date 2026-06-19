@@ -158,11 +158,6 @@ export default function TraktListDetailsClient({ username, listId }) {
     }, [username, listId])
 
     useEffect(() => {
-        if (typeof window === 'undefined') return
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    }, [username, listId])
-
-    useEffect(() => {
         document.title = formatPageTitle(state.list?.name || 'Lista')
     }, [state.list?.name])
 
