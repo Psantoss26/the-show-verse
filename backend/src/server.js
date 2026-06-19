@@ -7,8 +7,10 @@ import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyCookie from '@fastify/cookie';
-import fp from 'fastify-plugin';
+import { sql } from 'drizzle-orm';
 
+import { getAllowedOrigins, validateRuntimeEnv } from './config/env.js';
+import { db, closeDb } from './db/client.js';
 import authPlugin from './plugins/auth.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
@@ -21,9 +23,19 @@ import tmdbRoutes from './routes/tmdb.js';
 import importRoutes from './routes/import.js';
 import statsRoutes from './routes/stats.js';
 
-import { getRedis } from './lib/redis.js';
+import { closeRedis, getRedis } from './lib/redis.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
+validateRuntimeEnv();
+
+const allowedOrigins = getAllowedOrigins();
+const defaultDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultDevOrigins;
+  return origins.includes(origin);
+}
 
 const fastify = Fastify({
   logger: {
@@ -43,7 +55,10 @@ await fastify.register(fastifyHelmet, {
 });
 
 await fastify.register(fastifyCors, {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, cb) => {
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    return cb(new Error(`CORS origin not allowed: ${origin}`), false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
@@ -59,6 +74,7 @@ await fastify.register(fastifyRateLimit, {
   redis: await (async () => {
     try {
       const r = getRedis();
+      if (!r) return null;
       await r.ping();
       return r;
     } catch {
@@ -85,6 +101,42 @@ fastify.get('/health', async () => ({
   version: '1.0.0',
   timestamp: new Date().toISOString(),
 }));
+
+fastify.get('/ready', async (req, reply) => {
+  const checks = {
+    database: 'unknown',
+    redis: process.env.REDIS_URL ? 'unknown' : 'disabled',
+  };
+  const errors = {};
+
+  try {
+    await db.execute(sql`select 1`);
+    checks.database = 'ok';
+  } catch (err) {
+    checks.database = 'error';
+    errors.database = err.message;
+  }
+
+  if (process.env.REDIS_URL) {
+    try {
+      const redis = getRedis();
+      await redis.ping();
+      checks.redis = 'ok';
+    } catch (err) {
+      checks.redis = 'error';
+      errors.redis = err.message;
+    }
+  }
+
+  const ready = checks.database === 'ok' && checks.redis !== 'error';
+
+  return reply.status(ready ? 200 : 503).send({
+    status: ready ? 'ready' : 'not_ready',
+    checks,
+    ...(Object.keys(errors).length > 0 && { errors }),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // ────────────────────────────────────────────
 // Rutas de la API v1
@@ -145,8 +197,13 @@ try {
 }
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+async function shutdown(signal) {
+  console.log(`${signal} received. Shutting down gracefully...`);
   await fastify.close();
+  await closeRedis();
+  await closeDb();
   process.exit(0);
-});
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

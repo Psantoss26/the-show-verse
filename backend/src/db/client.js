@@ -50,4 +50,11 @@ export const migrationClient = postgres(directUrl, {
 
 export const db = drizzle(queryClient, { schema, logger: false });
 
+export async function closeDb() {
+  await Promise.allSettled([
+    queryClient.end({ timeout: 5 }),
+    migrationClient.end({ timeout: 5 }),
+  ]);
+}
+
 export default db;

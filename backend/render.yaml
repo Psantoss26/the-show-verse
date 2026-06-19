@@ -3,21 +3,33 @@ services:
     name: the-show-verse-api
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm run start
-    healthCheckPath: /health
+    healthCheckPath: /ready
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
         sync: false        # Lo introduces manualmente en el dashboard
+      - key: DATABASE_URL_UNPOOLED
+        sync: false        # URL directa de Neon para migraciones
       - key: REDIS_URL
         sync: false
       - key: JWT_ACCESS_SECRET
         generateValue: true   # Render lo genera automáticamente
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 30d
       - key: FRONTEND_URL
         sync: false
+      - key: FRONTEND_URLS
+        sync: false
       - key: TMDB_API_KEY
+        sync: false
+      - key: TRAKT_CLIENT_ID
+        sync: false
+      - key: TRAKT_CLIENT_SECRET
         sync: false
