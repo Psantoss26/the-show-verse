@@ -2,6 +2,19 @@
 
 Esta guia explica como levantar The Show Verse con el backend propio, PostgreSQL, Redis y el frontend para pruebas manuales.
 
+Referencia completa de API:
+
+```text
+.docs/backend_api_reference.md
+```
+
+Documentacion interactiva cuando el backend esta arrancado:
+
+```text
+http://localhost:3001/docs
+http://localhost:3001/openapi.json
+```
+
 ## Mapa rapido
 
 | Pieza | Ruta | Puerto |

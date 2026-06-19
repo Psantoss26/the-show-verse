@@ -24,6 +24,13 @@ For Next.js web development assistance, use the local agent profile at:
 .docs/agents/nextjs-web-agent.md
 ```
 
+For backend Node.js, Fastify, PostgreSQL/Neon, Redis, Drizzle, Railway deployment,
+and frontend-backend integration work, use the local agent profile at:
+
+```sh
+.docs/agents/backend-node-fastify-agent.md
+```
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
