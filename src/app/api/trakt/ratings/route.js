@@ -1,6 +1,12 @@
 // /src/app/api/trakt/ratings/route.js
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  backendFetchJson,
+  mediaTypeToBackend,
+  setBackendAuthCookies,
+  hasBackendCredentials,
+} from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +50,8 @@ function normalizeRating(val) {
   if (val === null || val === undefined) return null;
   const n = Number(val);
   if (!Number.isFinite(n)) return null;
-  const normalized = Math.round(Math.min(10, Math.max(1, n)));
+  const clamped = Math.min(10, Math.max(1, n));
+  const normalized = Math.round(clamped * 10) / 10;
   if (normalized < 1 || normalized > 10) {
     throw new Error("Rating must be 1..10 or null");
   }
@@ -177,6 +184,48 @@ export async function GET(req) {
   try {
     const url = new URL(req.url);
     const type = normalizeType(url.searchParams.get("type"));
+
+    if (hasBackendCredentials(req)) {
+      try {
+        const mediaType = mediaTypeToBackend(type);
+        if (type === "episode") {
+          const showTmdbId = Number(url.searchParams.get("tmdbId"));
+          const seasonNumber = Number(url.searchParams.get("season"));
+          const episodeNumber = Number(url.searchParams.get("episode"));
+
+          const backend = await backendFetchJson(req, "/v1/ratings?type=episode&limit=1000");
+          if (backend.ok) {
+            const items = backend.json?.results || [];
+            const found = items.find((it) => {
+              return Number(it.tmdbId) === showTmdbId &&
+                     Number(it.season) === seasonNumber &&
+                     Number(it.episode) === episodeNumber;
+            });
+            const res = NextResponse.json({
+              found: !!found,
+              rating: found ? found.rating : null,
+              source: "backend",
+            });
+            setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === "https:" });
+            return res;
+          }
+        } else if (type === "movie" || type === "show") {
+          const tmdbId = Number(url.searchParams.get("tmdbId"));
+          const backend = await backendFetchJson(req, `/v1/items/${encodeURIComponent(tmdbId)}/${mediaType}/status`);
+          if (backend.ok) {
+            const res = NextResponse.json({
+              found: backend.json?.rating != null,
+              rating: backend.json?.rating || null,
+              source: "backend",
+            });
+            setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === "https:" });
+            return res;
+          }
+        }
+      } catch (e) {
+        console.warn("Backend rating fetch failed; falling back to Trakt", e);
+      }
+    }
 
     const auth0 = await readTraktAuthCookies();
     const auth = await refreshIfNeeded(auth0);
@@ -363,6 +412,146 @@ export async function POST(req) {
     const auth = await refreshIfNeeded(auth0);
     const respond = (payload, status = 200) =>
       jsonWithCookies(payload, status, auth.cookiesToSet);
+
+    if (hasBackendCredentials(req)) {
+      try {
+        const mediaType = mediaTypeToBackend(type);
+        const rating = normalizeRating(body?.rating);
+        let backendResult = null;
+
+        if (type === "episode") {
+          const showTmdbId = Number(
+            body?.tmdbId ??
+              body?.showId ??
+              body?.tvId ??
+              body?.showTmdbId ??
+              body?.ids?.tmdb,
+          );
+          const seasonNumber = Number(body?.season ?? body?.seasonNumber);
+          const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
+
+          if (rating === null) {
+            const res = await backendFetchJson(
+              req,
+              `/v1/ratings/${encodeURIComponent(showTmdbId)}/episode?season=${seasonNumber}&episode=${episodeNumber}`,
+              { method: "DELETE" }
+            );
+            if (res.ok) backendResult = res;
+          } else {
+            const res = await backendFetchJson(req, "/v1/ratings", {
+              method: "POST",
+              body: JSON.stringify({
+                tmdbId: showTmdbId,
+                mediaType: "episode",
+                rating,
+                season: seasonNumber,
+                episode: episodeNumber,
+                title: body?.title || undefined,
+                posterPath: body?.posterPath || undefined,
+              }),
+            });
+            if (res.ok) backendResult = res;
+          }
+        } else if (type === "movie" || type === "show") {
+          const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
+          if (rating === null) {
+            const res = await backendFetchJson(req, `/v1/ratings/${encodeURIComponent(tmdbId)}/${mediaType}`, {
+              method: "DELETE",
+            });
+            if (res.ok) backendResult = res;
+          } else {
+            const res = await backendFetchJson(req, "/v1/ratings", {
+              method: "POST",
+              body: JSON.stringify({
+                tmdbId,
+                mediaType,
+                rating,
+                title: body?.title || undefined,
+                posterPath: body?.posterPath || undefined,
+              }),
+            });
+            if (res.ok) backendResult = res;
+          }
+        }
+
+        if (backendResult) {
+          // Sincronización opcional hacia Trakt si está conectado
+          const token = auth.accessToken;
+          if (token) {
+            try {
+              const isRemove = rating === null;
+              const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
+              if (type === "episode") {
+                const showTmdbId = Number(
+                  body?.tmdbId ??
+                    body?.showId ??
+                    body?.tvId ??
+                    body?.showTmdbId ??
+                    body?.ids?.tmdb,
+                );
+                const seasonNumber = Number(body?.season ?? body?.seasonNumber);
+                const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
+                const payload = {
+                  shows: [
+                    {
+                      ids: { tmdb: showTmdbId },
+                      seasons: [
+                        {
+                          number: seasonNumber,
+                          episodes: [
+                            isRemove
+                              ? { number: episodeNumber }
+                              : {
+                                  number: episodeNumber,
+                                  rating,
+                                  rated_at: new Date().toISOString(),
+                                },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                };
+                await traktFetch(endpoint, auth, { method: "POST", body: payload });
+              } else {
+                const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
+                const key = type === "movie" ? "movies" : "shows";
+                const payload = {
+                  [key]: [
+                    isRemove
+                      ? { ids: { tmdb: tmdbId } }
+                      : {
+                          ids: { tmdb: tmdbId },
+                          rating,
+                          rated_at: new Date().toISOString(),
+                        },
+                  ],
+                };
+                await traktFetch(endpoint, auth, { method: "POST", body: payload });
+              }
+            } catch (traktErr) {
+              console.warn("Failed to sync rating to Trakt:", traktErr);
+            }
+          }
+
+          const res = NextResponse.json({
+            ok: true,
+            removed: rating === null,
+            rating,
+            source: "backend",
+          });
+          if (auth.cookiesToSet) {
+            for (const c of auth.cookiesToSet) {
+              res.cookies.set(c.name, c.value, c.options);
+            }
+          }
+          setBackendAuthCookies(res, backendResult, { secure: req.nextUrl?.protocol === "https:" });
+          return res;
+        }
+      } catch (e) {
+        console.warn("Backend rating operation failed; falling back to Trakt", e);
+      }
+    }
 
     if (!auth.accessToken) return respond({ error: "Unauthorized" }, 401);
 

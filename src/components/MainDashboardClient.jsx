@@ -1060,6 +1060,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         type: mediaType,
         mediaId: movie.id,
         favorite: next,
+        title: movie.title || movie.name,
+        posterPath: movie.poster_path || movie.backdrop_path || null,
       });
     } catch {
       setFavorite((v) => !v);
@@ -1083,6 +1085,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         type: mediaType,
         mediaId: movie.id,
         watchlist: next,
+        title: movie.title || movie.name,
+        posterPath: movie.poster_path || movie.backdrop_path || null,
       });
     } catch {
       setWatchlist((v) => !v);
@@ -1559,6 +1563,8 @@ function InlinePreviewCardAnticipated({
         type: mediaType,
         mediaId: movie.id,
         favorite: next,
+        title: movie.title || movie.name,
+        posterPath: movie.poster_path || movie.backdrop_path || null,
       });
     } catch {
       setFavorite((v) => !v);
@@ -1582,6 +1588,8 @@ function InlinePreviewCardAnticipated({
         type: mediaType,
         mediaId: movie.id,
         watchlist: next,
+        title: movie.title || movie.name,
+        posterPath: movie.poster_path || movie.backdrop_path || null,
       });
     } catch {
       setWatchlist((v) => !v);

@@ -116,6 +116,7 @@ export default async function itemsRoutes(fastify) {
       lastWatchedAt,
       rating,
       ratedAt: ratingResult[0]?.ratedAt || null,
+      history: mediaType === 'movie' ? historyResult.map((h) => ({ id: h.id, watchedAt: h.watchedAt })) : [],
       // Solo para series:
       ...(mediaType === 'tv' && { watchedBySeason }),
     });

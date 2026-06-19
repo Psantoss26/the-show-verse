@@ -6,6 +6,7 @@ import {
     clearTraktCookies,
     traktApi
 } from '@/lib/trakt/server'
+import { hasBackendCredentials } from '@/lib/backend/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,14 @@ export async function GET(request) {
         const { token, refreshedTokens, shouldClear } = await getValidTraktToken(cookieStore)
 
         if (!token) {
+            if (hasBackendCredentials(request)) {
+                return NextResponse.json({
+                    connected: true,
+                    user: null,
+                    backendConnected: true,
+                    source: 'backend',
+                })
+            }
             const res = NextResponse.json({ connected: false })
             if (shouldClear) clearTraktCookies(res)
             return res
@@ -25,6 +34,14 @@ export async function GET(request) {
         if (!auth.ok) {
             // 401 = token inválido/revocado. 403/5xx puede ser bloqueo upstream (Cloudflare) u error temporal.
             if (auth.status === 401) {
+                if (hasBackendCredentials(request)) {
+                    return NextResponse.json({
+                        connected: true,
+                        user: null,
+                        backendConnected: true,
+                        source: 'backend',
+                    })
+                }
                 const res = NextResponse.json({ connected: false })
                 clearTraktCookies(res)
                 return res
@@ -51,6 +68,14 @@ export async function GET(request) {
         if (refreshedTokens) setTraktCookies(res, refreshedTokens)
         return res
     } catch (e) {
+        if (hasBackendCredentials(request)) {
+            return NextResponse.json({
+                connected: true,
+                user: null,
+                backendConnected: true,
+                source: 'backend',
+            })
+        }
         return NextResponse.json({ connected: false, error: e?.message || 'Status failed' }, { status: 500 })
     }
 }

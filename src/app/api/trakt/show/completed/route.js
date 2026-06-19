@@ -9,6 +9,7 @@ import {
   setTraktCookies,
   traktFetch,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies, hasBackendCredentials } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ async function fetchTmdbShow(tmdbId) {
       name: n.name,
       logo_path: n.logo_path,
     })),
+    seasons: j?.seasons || [],
   };
 }
 
@@ -96,6 +98,112 @@ async function mapLimit(arr, limit, fn) {
 }
 
 export async function GET(request) {
+  if (hasBackendCredentials(request)) {
+    try {
+      const backend = await backendFetchJson(request, "/v1/stats/shows/completed");
+      if (backend.ok) {
+        const results = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        
+        // 1.5 Fetch user ratings from backend in parallel if needed
+        let ratingsRes = await backendFetchJson(request, "/v1/ratings").catch(() => null);
+        const userRatingsMap = new Map();
+        if (ratingsRes?.ok && Array.isArray(ratingsRes.json?.results)) {
+          for (const ratingItem of ratingsRes.json.results) {
+            if (ratingItem.mediaType === "tv" && ratingItem.tmdbId && ratingItem.rating != null) {
+              userRatingsMap.set(Number(ratingItem.tmdbId), ratingItem.rating);
+            }
+          }
+        }
+
+        const enriched = await mapLimit(results, 8, async (item) => {
+          const tmdbId = item.tmdbId;
+          const tmdb = await fetchTmdbShow(tmdbId).catch(() => null);
+          const historyRes = await backendFetchJson(request, `/v1/history/shows/${tmdbId}`).catch(() => null);
+          const episodes = Array.isArray(historyRes?.json?.episodes)
+            ? historyRes.json.episodes
+            : [];
+
+          const seasonMap = {};
+          if (tmdb?.seasons) {
+            for (const s of tmdb.seasons) {
+              if (s.season_number > 0) {
+                seasonMap[s.season_number] = s.episode_count;
+              }
+            }
+          }
+
+          const aired = tmdb?.number_of_episodes || 0;
+
+          const watchedKeys = new Set();
+          for (const ep of episodes) {
+            if (ep.season != null && ep.episode != null) {
+              watchedKeys.add(`${ep.season}-${ep.episode}`);
+            }
+          }
+          const completed = watchedKeys.size;
+          const pct = 100; // it's completed
+
+          const lastEp = episodes[0];
+          const lastEpisode = lastEp
+            ? {
+                season: lastEp.season,
+                number: lastEp.episode,
+                title: null,
+              }
+            : null;
+
+          const userRating = userRatingsMap.get(Number(tmdbId)) || null;
+
+          return {
+            traktId: null,
+            tmdbId,
+            title: item.title || tmdb?.name || "Sin título",
+            title_es: tmdb?.name || item.title || null,
+            year: tmdb?.first_air_date ? String(tmdb.first_air_date).slice(0, 4) : null,
+            aired,
+            completed,
+            pct,
+            nextEpisode: null,
+            lastEpisode,
+            lastWatchedAt: item.lastWatchedAt || lastEp?.watchedAt || null,
+            user_rating: userRating,
+            poster_path: item.posterPath || tmdb?.poster_path || null,
+            backdrop_path: tmdb?.backdrop_path || null,
+            first_air_date: tmdb?.first_air_date || null,
+            vote_average: tmdb?.vote_average || null,
+            overview: tmdb?.overview || null,
+            number_of_seasons: tmdb?.number_of_seasons || null,
+            total_episodes: tmdb?.number_of_episodes || null,
+            genres: tmdb?.genres || [],
+            tmdb_status: tmdb?.status || null,
+            networks: tmdb?.networks || [],
+            detailsHref: `/details/tv/${tmdbId}`,
+          };
+        });
+
+        // Filter out shows that are not fully completed (or not completed in backend database)
+        const completedShows = enriched.filter(item => item.completed > 0 && item.completed >= item.aired);
+
+        const responseData = {
+          connected: true,
+          items: completedShows,
+          stats: {
+            total: completedShows.length,
+            avgProgress: 100,
+            totalEpisodesWatched: completedShows.reduce((s, x) => s + x.completed, 0),
+            totalEpisodesRemaining: 0,
+          },
+          source: "backend"
+        };
+        const res = NextResponse.json(responseData);
+        setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+        return res;
+      }
+    } catch (e) {
+      console.error("Failed to load completed from backend", e);
+    }
+  }
+
   const cookieStore = await cookies();
   const { accessToken, refreshToken, expiresAtMs } =
     readTraktCookies(cookieStore);

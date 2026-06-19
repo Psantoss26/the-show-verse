@@ -9,10 +9,11 @@ import { eq, and, desc, isNull } from 'drizzle-orm';
 const ratingSchema = z.object({
   tmdbId: z.number().int().positive(),
   mediaType: z.enum(['movie', 'tv', 'episode']),
-  rating: z.number().int().min(1).max(10),
+  rating: z.number().min(1).max(10),
   season: z.number().int().positive().optional(),
   episode: z.number().int().positive().optional(),
   title: z.string().optional(),
+  posterPath: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.mediaType === 'episode' && (!data.season || !data.episode)) {
     ctx.addIssue({
@@ -68,7 +69,7 @@ export default async function ratingsRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { tmdbId, mediaType, rating, season, episode, title } = parsed.data;
+    const { tmdbId, mediaType, rating, season, episode, title, posterPath } = parsed.data;
 
     const [existing] = await db
       .select({ id: userRatings.id })
@@ -84,6 +85,7 @@ export default async function ratingsRoutes(fastify) {
       season: season || null,
       episode: episode || null,
       title: title || null,
+      posterPath: posterPath || null,
       updatedAt: new Date(),
     };
 

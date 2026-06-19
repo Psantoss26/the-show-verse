@@ -1340,6 +1340,7 @@ export default function DetailsClient({
   const [wlLoading, setWlLoading] = useState(false); // Cargando accion de watchlist
   const [favorite, setFavorite] = useState(false); // Es favorito del usuario
   const [watchlist, setWatchlist] = useState(false); // Esta en la watchlist del usuario
+  const [hasBackendSession, setHasBackendSession] = useState(false);
 
   // -- Puntuacion del usuario en TMDb --
   const [userRating, setUserRating] = useState(null); // Rating actual (1-10)
@@ -1591,6 +1592,9 @@ export default function DetailsClient({
    * Devuelve true si se redirigió (para abortar la accion en curso).
    */
   const requireLogin = () => {
+    if (hasBackendSession) {
+      return false;
+    }
     if (!session || !account?.id) {
       window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
         window.location.pathname + window.location.search,
@@ -2984,6 +2988,8 @@ export default function DetailsClient({
         type,
         mediaId: id,
         favorite: next,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
       });
       setTrakt((prev) => {
         if (!prev?.connected) return prev;
@@ -3012,6 +3018,8 @@ export default function DetailsClient({
         type,
         mediaId: id,
         watchlist: next,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
       });
       setTrakt((prev) => {
         if (!prev?.connected) return prev;
@@ -4356,6 +4364,15 @@ export default function DetailsClient({
         );
         const normalizedJson = buildTraktStateFromHistory(json || {});
 
+        if (json?.source === "backend") {
+          setFavorite(!!json.favorite);
+          setWatchlist(!!json.watchlist || !!json.inWatchlist);
+          if (json.rating !== undefined) {
+            setUserRating(json.rating);
+          }
+          setHasBackendSession(true);
+        }
+
         let nextState = null;
         setTrakt((prev) => {
           if (requestId !== traktStatusRequestIdRef.current) {
@@ -4476,6 +4493,15 @@ export default function DetailsClient({
           8000,
         );
         const normalizedPayload = buildTraktStateFromHistory(payload || {});
+
+        if (payload?.source === "backend") {
+          setFavorite(!!payload.favorite);
+          setWatchlist(!!payload.watchlist || !!payload.inWatchlist);
+          if (payload.rating !== undefined) {
+            setUserRating(payload.rating);
+          }
+          setHasBackendSession(true);
+        }
 
         let nextState = null;
         setTrakt((prev) => {
@@ -5474,6 +5500,8 @@ export default function DetailsClient({
         type: traktType,
         tmdbId: id,
         watchedAt: yyyyMmDd,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
       });
       const optimisticId = pickMutationHistoryId(result, `temp-${Date.now()}`);
       invalidateTraktGetCache({
@@ -5519,6 +5547,8 @@ export default function DetailsClient({
         tmdbId: id,
         historyId,
         watchedAt: yyyyMmDd,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
       });
       const nextHistoryId = pickMutationHistoryId(result, historyId);
       invalidateTraktGetCache({
@@ -6344,6 +6374,37 @@ export default function DetailsClient({
    * Si no hay sesion, redirige a login.
    */
   const handleUnifiedRate = async (value) => {
+    if (hasBackendSession) {
+      try {
+        setRatingLoading(true);
+        setRatingError("");
+        const res = await fetch("/api/trakt/item/rating", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type,
+            tmdbId: id,
+            rating: value,
+            title,
+            posterPath: basePosterDisplayPath || data?.poster_path || null,
+          }),
+        });
+        if (!res.ok) throw new Error("Error al guardar puntuación en el backend");
+        const json = await res.json();
+        setUserRating(json.rating);
+        setTrakt((prev) => ({
+          ...prev,
+          rating: json.rating == null ? null : Number(json.rating),
+        }));
+        return true;
+      } catch (err) {
+        setRatingError(err?.message || "Error al guardar puntuación");
+        return false;
+      } finally {
+        setRatingLoading(false);
+      }
+    }
+
     // Sin sesion activa, redirigir a login
     if (!session) {
       window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
@@ -9441,7 +9502,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   max={10}
                   loading={accountStatesLoading || ratingLoading || !!traktBusy}
                   onRate={handleUnifiedRate}
-                  connected={!!session || trakt.connected}
+                  connected={!!session || trakt.connected || hasBackendSession}
                   onConnect={() => {
                     window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
                       window.location.pathname + window.location.search,

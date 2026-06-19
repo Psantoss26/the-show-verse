@@ -1,0 +1,1 @@
+ALTER TABLE "user_ratings" ADD COLUMN "poster_path" text;

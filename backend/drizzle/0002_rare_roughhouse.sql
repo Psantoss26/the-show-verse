@@ -1,0 +1,1 @@
+ALTER TABLE "user_ratings" ALTER COLUMN "rating" SET DATA TYPE real;

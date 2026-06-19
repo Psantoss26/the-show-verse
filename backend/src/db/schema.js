@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   index,
   check,
+  real,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -139,8 +140,9 @@ export const userRatings = pgTable('user_ratings', {
   mediaType: text('media_type').notNull(),                // 'movie' | 'tv' | 'episode'
   season: integer('season'),
   episode: integer('episode'),
-  rating: smallint('rating').notNull(),                   // 1–10
+  rating: real('rating').notNull(),                   // 1–10
   title: text('title'),
+  posterPath: text('poster_path'),
   ratedAt: timestamp('rated_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({

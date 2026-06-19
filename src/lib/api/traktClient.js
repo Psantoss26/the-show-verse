@@ -254,11 +254,15 @@ export async function traktHistoryOp({
   tmdbId,
   watchedAt,
   historyId,
+  title,
+  posterPath,
 }) {
   const payload = { op };
   if (type != null) payload.type = type;
   if (tmdbId != null) payload.tmdbId = tmdbId;
   if (historyId != null) payload.historyId = historyId;
+  if (title != null) payload.title = title;
+  if (posterPath != null) payload.posterPath = posterPath;
 
   const watchedAtYmd = normalizeWatchedAtForApi(watchedAt);
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
@@ -285,8 +289,8 @@ export async function traktHistoryOp({
   return json;
 }
 
-export async function traktAddWatchPlay({ type, tmdbId, watchedAt }) {
-  return traktHistoryOp({ op: "add", type, tmdbId, watchedAt });
+export async function traktAddWatchPlay({ type, tmdbId, watchedAt, title, posterPath }) {
+  return traktHistoryOp({ op: "add", type, tmdbId, watchedAt, title, posterPath });
 }
 
 export async function traktUpdateWatchPlay({
@@ -294,8 +298,10 @@ export async function traktUpdateWatchPlay({
   tmdbId,
   historyId,
   watchedAt,
+  title,
+  posterPath,
 }) {
-  return traktHistoryOp({ op: "update", type, tmdbId, historyId, watchedAt });
+  return traktHistoryOp({ op: "update", type, tmdbId, historyId, watchedAt, title, posterPath });
 }
 
 export async function traktRemoveWatchPlay({ historyId }) {

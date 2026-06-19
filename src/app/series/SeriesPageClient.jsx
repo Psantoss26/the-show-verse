@@ -832,6 +832,8 @@ function InlinePreviewCard({ show, heightClass }) {
         type: show.media_type || "tv",
         mediaId: show.id,
         favorite: next,
+        title: show.name || show.title,
+        posterPath: show.poster_path || show.backdrop_path || null,
       });
     } catch {
       setFavorite((v) => !v);
@@ -855,6 +857,8 @@ function InlinePreviewCard({ show, heightClass }) {
         type: show.media_type || "tv",
         mediaId: show.id,
         watchlist: next,
+        title: show.name || show.title,
+        posterPath: show.poster_path || show.backdrop_path || null,
       });
     } catch {
       setWatchlist((v) => !v);
