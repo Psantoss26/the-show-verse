@@ -15,13 +15,15 @@ export default function TraktWatchedControl({
 }) {
   // Deshabilitar mientras se está resolviendo el estado o hay una operación en curso
   const disabled = !!loading || !!busy;
+  const visibleWatched = !loading && !!watched;
 
   const badgeStr = typeof badge === "string" ? badge.trim() : "";
   const isSeries = badgeStr.includes("%");
 
   const playsCount =
-    !isSeries && watched && Number(plays || 0) > 0 ? Number(plays) : 0;
-  const progressPercent = isSeries && watched && badgeStr ? badgeStr : null;
+    !isSeries && visibleWatched && Number(plays || 0) > 0 ? Number(plays) : 0;
+  const progressPercent =
+    isSeries && visibleWatched && badgeStr ? badgeStr : null;
   const fillPercentage = progressPercent
     ? parseInt(progressPercent, 10)
     : undefined;
@@ -31,15 +33,16 @@ export default function TraktWatchedControl({
       <LiquidButton
         onClick={() => onOpen?.()}
         disabled={disabled}
-        active={watched}
+        active={visibleWatched}
         activeColor="green"
         groupId="details-actions"
+        loading={loading}
         title={
           loading
             ? "Cargando estado de Trakt..."
             : !connected
-              ? "Conecta Trakt para usar Vistos"
-              : watched
+              ? "Inicia sesión para usar Vistos"
+              : visibleWatched
                 ? "Ver historial de vistos (Trakt)"
                 : "Marcar / gestionar vistos (Trakt)"
         }
@@ -47,7 +50,11 @@ export default function TraktWatchedControl({
         progressPercent={progressPercent}
         fillPercentage={fillPercentage}
       >
-        {watched ? <Eye className="w-6 h-6" /> : <EyeOff className="w-6 h-6" />}
+        {visibleWatched ? (
+          <Eye className="w-6 h-6" />
+        ) : (
+          <EyeOff className="w-6 h-6" />
+        )}
       </LiquidButton>
     </div>
   );

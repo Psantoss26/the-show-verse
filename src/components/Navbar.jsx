@@ -8,7 +8,6 @@ import { usePathname, useRouter } from "next/navigation";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
-import { traktAuthStatus } from "@/lib/api/traktClient";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FilmIcon,
@@ -350,8 +349,6 @@ export default function Navbar() {
 
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [traktReady, setTraktReady] = useState(false);
-  const [traktConnected, setTraktConnected] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -488,12 +485,10 @@ export default function Navbar() {
   // su conexión necesaria si la cuenta correspondiente no está enlazada.
   const favHref = "/favorites";
   const watchHref = "/watchlist";
-  const tmdbLoginHref = `/api/tmdb/auth/start?next=${encodeURIComponent(
+  const loginHref = `/login?next=${encodeURIComponent(
     pathname || "/",
   )}`;
-  const profileAuthLoading =
-    !hydrated || (hydrated && !!account && !traktReady);
-  const traktProfileConnectHref = "/api/trakt/auth/start?next=/profile";
+  const profileAuthLoading = !hydrated;
 
   // Bloquear scroll cuando overlays están abiertos
   useEffect(() => {
@@ -503,38 +498,6 @@ export default function Navbar() {
       document.body.style.overflow = "";
     };
   }, [showMobileSearch, mobileMenuOpen]);
-
-  useEffect(() => {
-    let alive = true;
-
-    if (!hydrated) return undefined;
-
-    if (!account) {
-      setTraktConnected(false);
-      setTraktReady(true);
-      return undefined;
-    }
-
-    setTraktReady(false);
-    setTraktConnected(false);
-
-    (async () => {
-      try {
-        const status = await traktAuthStatus();
-        if (!alive) return;
-        setTraktConnected(!!status?.connected && !status?.degraded);
-      } catch {
-        if (!alive) return;
-        setTraktConnected(false);
-      } finally {
-        if (alive) setTraktReady(true);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [account, hydrated]);
 
   return (
     <>
@@ -720,14 +683,7 @@ export default function Navbar() {
               <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <a
-                href={tmdbLoginHref}
-                className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
-              >
-                Iniciar sesión
-              </a>
-            ) : !traktConnected ? (
-              <a
-                href={traktProfileConnectHref}
+                href={loginHref}
                 className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
               >
                 Iniciar sesión
@@ -787,14 +743,7 @@ export default function Navbar() {
               <div className="w-9 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
             ) : !account ? (
               <a
-                href={tmdbLoginHref}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
-              >
-                Acceder
-              </a>
-            ) : !traktConnected ? (
-              <a
-                href={traktProfileConnectHref}
+                href={loginHref}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
               >
                 Acceder

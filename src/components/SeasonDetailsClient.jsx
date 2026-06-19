@@ -794,7 +794,7 @@ export default function SeasonDetailsClient({
         );
 
         if (res.status === 401) {
-          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
+          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
           return false;
         }
 
@@ -890,7 +890,7 @@ export default function SeasonDetailsClient({
       }
 
       if (!connected) {
-        window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
+        window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
         return;
       }
 
@@ -920,7 +920,7 @@ export default function SeasonDetailsClient({
       } catch (error) {
         const needsReauth = /401|unauthorized/i.test(error?.message || "");
         if (needsReauth) {
-          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`;
+          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
           return;
         }
         await reloadSeasonTraktState({ background: true });
@@ -1229,7 +1229,7 @@ export default function SeasonDetailsClient({
                     loading={ratingLoading}
                     connected={traktConnected}
                     onConnect={() =>
-                      (window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}`)
+                      (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`)
                     }
                     onRating={handleRate}
                     onClearRating={() => handleRate(null)}

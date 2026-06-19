@@ -27,6 +27,15 @@ export function hasTmdbClientRuntime() {
   return Boolean(API_KEY);
 }
 
+function hasTmdbAccountSession(accountId, sessionId) {
+  return (
+    Boolean(accountId) &&
+    Boolean(sessionId) &&
+    sessionId !== "showverse" &&
+    /^\d+$/.test(String(accountId))
+  );
+}
+
 /**
  * Cliente TMDb con:
  * - Timeout
@@ -475,11 +484,32 @@ export async function getTvEpisodeRatings(
 export async function getMediaAccountStates(type, id, sessionOrOpts) {
   const empty = { favorite: false, watchlist: false, rated: null };
 
-  if (!API_KEY) return empty;
   if (!id) return empty;
 
   // account_states NO existe para "person"
   if (type !== "movie" && type !== "tv") return empty;
+
+  if (!IS_SERVER) {
+    try {
+      const res = await fetch(
+        `/api/tmdb/account/status/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
+        { cache: "no-store", credentials: "include" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return {
+          favorite: !!data.favorite,
+          watchlist: !!(data.watchlist ?? data.inWatchlist),
+          rated:
+            data.rating == null
+              ? null
+              : { value: Number(data.rating) },
+        };
+      }
+    } catch {}
+  }
+
+  if (!API_KEY) return empty;
 
   // Compat: acepta string (sessionId) o { sessionId, guestSessionId }
   const params = {};
@@ -574,7 +604,7 @@ export async function markInWatchlist({
 }
 
 export async function fetchFavoritesForUser(accountId, sessionId) {
-  if (!accountId || !sessionId) return [];
+  if (!hasTmdbAccountSession(accountId, sessionId)) return [];
 
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages
@@ -640,7 +670,7 @@ export async function fetchFavoritesForUser(accountId, sessionId) {
 }
 
 export async function fetchWatchlistForUser(accountId, sessionId) {
-  if (!accountId || !sessionId) return [];
+  if (!hasTmdbAccountSession(accountId, sessionId)) return [];
 
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages
@@ -706,7 +736,7 @@ export async function fetchWatchlistForUser(accountId, sessionId) {
 }
 
 export async function fetchRatedForUser(accountId, sessionId) {
-  if (!accountId || !sessionId) return [];
+  if (!hasTmdbAccountSession(accountId, sessionId)) return [];
 
   const fetchAllPages = async (path, mediaType) => {
     // First request to get total pages

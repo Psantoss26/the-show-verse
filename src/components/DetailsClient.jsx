@@ -1331,7 +1331,12 @@ export default function DetailsClient({
   const [useBackdrop, setUseBackdrop] = useState(true); // Alternar entre backdrop y poster como fondo
 
   // -- Autenticacion y permisos --
-  const { session, account } = useAuth();
+  const {
+    session,
+    account,
+    authenticated = false,
+    hydrated: authHydrated = true,
+  } = useAuth();
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
 
@@ -1354,7 +1359,9 @@ export default function DetailsClient({
   const [ratingError, setRatingError] = useState("");
 
   // Indica si se estan cargando los estados de cuenta (favorito, watchlist, rating)
-  const [accountStatesLoading, setAccountStatesLoading] = useState(!!session);
+  const [accountStatesLoading, setAccountStatesLoading] = useState(
+    !authHydrated || !!session,
+  );
 
   // Pestana activa en la seccion de metadatos (details/produccion/sinopsis/premios)
   const [activeTab, setActiveTab] = useState("details");
@@ -1598,11 +1605,11 @@ export default function DetailsClient({
    * Devuelve true si se redirigió (para abortar la accion en curso).
    */
   const requireLogin = () => {
-    if (hasBackendSession) {
+    if (authenticated || hasBackendSession) {
       return false;
     }
     if (!session || !account?.id) {
-      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+      window.location.href = `/login?next=${encodeURIComponent(
         window.location.pathname + window.location.search,
       )}`;
       return true;
@@ -2948,6 +2955,16 @@ export default function DetailsClient({
     let cancel = false;
 
     const load = async () => {
+      if (!authHydrated) {
+        setAccountStatesLoading(true);
+        return;
+      }
+
+      if (authenticated) {
+        setAccountStatesLoading(false);
+        return;
+      }
+
       // Sin sesion activa no hay datos de cuenta que cargar
       if (!session || !account?.id) {
         setAccountStatesLoading(false);
@@ -2979,7 +2996,7 @@ export default function DetailsClient({
     return () => {
       cancel = true;
     };
-  }, [type, id, session, account?.id]);
+  }, [type, id, session, account?.id, authHydrated, authenticated]);
 
   // Alterna el estado de favorito con actualizacion optimista (cambio inmediato + rollback si falla)
   const toggleFavorite = async () => {
@@ -3102,14 +3119,14 @@ export default function DetailsClient({
   // Envia una puntuacion a Trakt y opcionalmente sincroniza con TMDb
   const sendTraktRating = async (value) => {
     if (!trakt.connected) {
-      window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
+      window.location.href = `/login?next=/details/${type}/${id}`;
       return;
     }
     try {
       await setTraktRatingSafe(value);
     } catch (err) {
       if (err?.code === "TRAKT_REAUTH_REQUIRED" || err?.status === 401) {
-        window.location.href = `/api/trakt/auth/start?next=/details/${type}/${id}`;
+        window.location.href = `/login?next=/details/${type}/${id}`;
         return false;
       }
       throw err;
@@ -3145,6 +3162,14 @@ export default function DetailsClient({
       endpointType === "tv" && hasResolvedTraktBootstrap(initialShowWatched),
     [endpointType, initialShowWatched],
   );
+  const hasInitialActionState = useMemo(
+    () =>
+      hasInitialTraktStatus ||
+      (endpointType === "tv" && hasInitialShowWatched),
+    [endpointType, hasInitialShowWatched, hasInitialTraktStatus],
+  );
+  const [actionStateReady, setActionStateReady] =
+    useState(hasInitialActionState);
   const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(false);
   const [hasCachedShowWatched, setHasCachedShowWatched] = useState(false);
 
@@ -4434,6 +4459,9 @@ export default function DetailsClient({
           };
           return nextState;
         });
+        if (requestId === traktStatusRequestIdRef.current) {
+          setActionStateReady(true);
+        }
         return nextState;
       } catch (e) {
         const isTimeout = e?.message === "Timeout";
@@ -4561,6 +4589,9 @@ export default function DetailsClient({
           return nextState;
         });
 
+        if (requestId === movieWatchedRequestIdRef.current) {
+          setActionStateReady(true);
+        }
         return nextState;
       } catch (e) {
         const isTimeout = e?.message === "Timeout";
@@ -4979,15 +5010,21 @@ export default function DetailsClient({
     setTraktEpisodesOpen(false);
     setEpisodeBusyKey("");
     setTraktBusy("");
+    setActionStateReady(hasInitialActionState);
 
     setWatchedBySeason(nextWatchedBySeason);
-    setWatchedBySeasonLoaded(nextWatchedBySeasonLoaded);
+    setWatchedBySeasonLoaded(
+      hydratedShowWatched && !hasInitialShowWatched
+        ? false
+        : nextWatchedBySeasonLoaded,
+    );
     setHasCachedTraktStatus(hydratedStatus);
     setHasCachedShowWatched(hydratedShowWatched);
   }, [
     id,
     endpointType,
     buildInitialTraktState,
+    hasInitialActionState,
     initialWatchedBySeason,
     hasInitialShowWatched,
     hasInitialTraktStatus,
@@ -5072,60 +5109,22 @@ export default function DetailsClient({
   // Carga inicial del estado de Trakt para el contenido actual
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
-    if (endpointType === "movie") {
-      const hasMovieBootstrapData =
-        hasInitialTraktStatus || hasCachedTraktStatus;
-
-      traktBackgroundSyncAtRef.current = Date.now();
-      void loadTraktMovieWatched({
-        background: hasMovieBootstrapData,
-        force: false,
-      });
-
-      const fallbackTimer = window.setTimeout(() => {
-        void loadTraktMovieWatched({
-          background: true,
-          force: false,
-        });
-      }, 900);
-
-      const statusTimer = window.setTimeout(() => {
-        void reloadTraktStatus({ background: true });
-      }, 2800);
-
-      return () => {
-        window.clearTimeout(fallbackTimer);
-        window.clearTimeout(statusTimer);
-      };
-    }
-
-    const hasTraktBootstrapData =
-      hasInitialTraktStatus ||
-      hasCachedTraktStatus ||
-      (endpointType === "tv" &&
-        (hasInitialShowWatched || hasCachedShowWatched));
-
-    if (hasTraktBootstrapData) {
-      const timer = window.setTimeout(() => {
-        traktBackgroundSyncAtRef.current = Date.now();
-        // force:true para ignorar caché y preservación de estado obsoleto
-        void reloadTraktStatus({ background: true, force: true });
-      }, 2500);
-
-      return () => window.clearTimeout(timer);
-    }
-
     traktBackgroundSyncAtRef.current = Date.now();
+
+    if (endpointType === "movie") {
+      void loadTraktMovieWatched({
+        background: false,
+        force: true,
+      });
+      return;
+    }
+
     // force:true para obtener siempre datos frescos de Trakt en la carga inicial
     void reloadTraktStatus({ background: false, force: true });
   }, [
     loadTraktMovieWatched,
     reloadTraktStatus,
     endpointType,
-    hasInitialTraktStatus,
-    hasCachedTraktStatus,
-    hasInitialShowWatched,
-    hasCachedShowWatched,
   ]);
 
   useEffect(() => {
@@ -5248,7 +5247,7 @@ export default function DetailsClient({
 
     if (!connected) {
       window.location.assign(
-        `/api/trakt/auth/start?next=/details/${type}/${id}`,
+        `/login?next=/details/${type}/${id}`,
       );
       return;
     }
@@ -5286,14 +5285,11 @@ export default function DetailsClient({
   useEffect(() => {
     if (endpointType !== "tv") return;
     if (!trakt.connected) return;
-    if (hasInitialShowWatched || hasCachedShowWatched) return;
     loadTraktShowWatched();
   }, [
     endpointType,
     loadTraktShowWatched,
     trakt.connected,
-    hasInitialShowWatched,
-    hasCachedShowWatched,
   ]);
 
   /**
@@ -6375,70 +6371,50 @@ export default function DetailsClient({
     };
   }, [endpointType, id]);
 
-  /**
-   * Puntuacion unificada: envia la puntuacion a TMDb y Trakt simultaneamente.
-   * Si no hay sesion, redirige a login.
-   */
   const handleUnifiedRate = async (value) => {
-    if (hasBackendSession) {
-      try {
-        setRatingLoading(true);
-        setRatingError("");
-        const res = await fetch("/api/trakt/item/rating", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type,
-            tmdbId: id,
-            rating: value,
-            title,
-            posterPath: basePosterDisplayPath || data?.poster_path || null,
-          }),
-        });
-        if (!res.ok) throw new Error("Error al guardar puntuación en el backend");
-        const json = await res.json();
-        setUserRating(json.rating);
-        setTrakt((prev) => ({
-          ...prev,
-          rating: json.rating == null ? null : Number(json.rating),
-        }));
-        return true;
-      } catch (err) {
-        setRatingError(err?.message || "Error al guardar puntuación");
-        return false;
-      } finally {
-        setRatingLoading(false);
-      }
-    }
-
-    // Sin sesion activa, redirigir a login
-    if (!session) {
-      window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+    if (!authenticated && !hasBackendSession && !session) {
+      window.location.href = `/login?next=${encodeURIComponent(
         window.location.pathname + window.location.search,
       )}`;
-      return;
+      return false;
     }
 
     try {
+      setRatingLoading(true);
       setRatingError("");
-
-      // 1. Enviar a TMDb (skipSync para evitar doble sincronizacion)
-      if (value === null) {
-        await clearTmdbRating({ skipSync: true });
-      } else {
-        await sendTmdbRating(value, { skipSync: true });
+      const res = await fetch("/api/trakt/item/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type,
+          tmdbId: id,
+          rating: value,
+          title,
+          posterPath: basePosterDisplayPath || data?.poster_path || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(
+            window.location.pathname + window.location.search,
+          )}`;
+          return false;
+        }
+        throw new Error(json?.error || "Error al guardar puntuación");
       }
-
-      // 2. Enviar a Trakt si esta conectado (Trakt usa null para borrar)
-      if (trakt.connected) {
-        const traktOk = await sendTraktRating(value); // sendTraktRating ya maneja null internamente
-        if (traktOk === false) return false;
-      }
-
+      setUserRating(json.rating);
+      setTrakt((prev) => ({
+        ...prev,
+        rating: json.rating == null ? null : Number(json.rating),
+      }));
       return true;
     } catch (err) {
-      setRatingError(err?.message || "Error al sincronizar puntuacion");
+      setRatingError(err?.message || "Error al guardar puntuación");
       return false;
+    } finally {
+      setRatingLoading(false);
     }
   };
 
@@ -8858,6 +8834,24 @@ export default function DetailsClient({
   const isDataLoading =
     (!!session && accountStatesLoading) ||
     (trakt.loading && (trakt.connected || hasBackendSession));
+  const actionStateLoading =
+    !authHydrated || !actionStateReady || accountStatesLoading;
+  const watchedActionLoading =
+    actionStateLoading ||
+    (endpointType === "movie"
+      ? trakt.loading && !canOpenMovieTraktModalInstantly
+      : trakt.loading) ||
+    (endpointType === "tv" && !!trakt.connected && !watchedBySeasonLoaded);
+  const watchedActionValue = actionStateLoading ? false : !!trakt.watched;
+  const watchedActionPlays =
+    actionStateLoading || endpointType === "tv" ? 0 : trakt.plays;
+  const watchedActionBadge =
+    !actionStateLoading && endpointType === "tv" ? tvProgressBadge : null;
+  const ratingActionValue = actionStateLoading ? null : unifiedUserRating;
+  const favoriteActionValue = actionStateLoading ? false : favorite;
+  const watchlistActionValue = actionStateLoading ? false : watchlist;
+  const favoriteActionLoading = actionStateLoading || favLoading;
+  const watchlistActionLoading = actionStateLoading || wlLoading;
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
@@ -9490,31 +9484,27 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
                 <TraktWatchedControl
                   connected={trakt.connected}
-                  watched={trakt.watched}
-                  plays={endpointType === "tv" ? 0 : trakt.plays}
-                  badge={endpointType === "tv" ? tvProgressBadge : null}
+                  watched={watchedActionValue}
+                  plays={watchedActionPlays}
+                  badge={watchedActionBadge}
                   busy={!!traktBusy}
-                  loading={
-                    (endpointType === "movie"
-                      ? trakt.loading && !canOpenMovieTraktModalInstantly
-                      : trakt.loading) ||
-                    (endpointType === "tv" &&
-                      !!trakt.connected &&
-                      !watchedBySeasonLoaded)
-                  }
+                  loading={watchedActionLoading}
                   onOpen={handleOpenTraktWatched}
                 />
 
                 {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
                 {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
                 <StarRating
-                  rating={unifiedUserRating}
+                  rating={ratingActionValue}
                   max={10}
-                  loading={accountStatesLoading || ratingLoading || !!traktBusy}
+                  loading={actionStateLoading || ratingLoading || !!traktBusy}
                   onRate={handleUnifiedRate}
-                  connected={!!session || trakt.connected || hasBackendSession}
+                  connected={
+                    authHydrated &&
+                    (!!session || trakt.connected || hasBackendSession)
+                  }
                   onConnect={() => {
-                    window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+                    window.location.href = `/login?next=${encodeURIComponent(
                       window.location.pathname + window.location.search,
                     )}`;
                   }}
@@ -9523,43 +9513,61 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
                 <LiquidButton
                   onClick={toggleFavorite}
-                  disabled={favLoading}
-                  active={favorite}
+                  disabled={favoriteActionLoading}
+                  active={favoriteActionValue}
                   activeColor="red"
                   groupId="details-actions"
                   title={
-                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                    favoriteActionLoading
+                      ? "Cargando estado de favoritos..."
+                      : favoriteActionValue
+                        ? "Quitar de favoritos"
+                        : "Añadir a favoritos"
                   }
                   aria-label={
-                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                    favoriteActionLoading
+                      ? "Cargando estado de favoritos"
+                      : favoriteActionValue
+                        ? "Quitar de favoritos"
+                        : "Añadir a favoritos"
                   }
                 >
-                  {favLoading ? (
+                  {favoriteActionLoading ? (
                     <Loader2 className="animate-spin" />
                   ) : (
-                    <Heart className={`${favorite ? "fill-current" : ""}`} />
+                    <Heart
+                      className={`${favoriteActionValue ? "fill-current" : ""}`}
+                    />
                   )}
                 </LiquidButton>
 
                 {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
                 <LiquidButton
                   onClick={toggleWatchlist}
-                  disabled={wlLoading}
-                  active={watchlist}
+                  disabled={watchlistActionLoading}
+                  active={watchlistActionValue}
                   activeColor="blue"
                   groupId="details-actions"
                   title={
-                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                    watchlistActionLoading
+                      ? "Cargando estado de pendientes..."
+                      : watchlistActionValue
+                        ? "Quitar de pendientes"
+                        : "Añadir a pendientes"
                   }
                   aria-label={
-                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                    watchlistActionLoading
+                      ? "Cargando estado de pendientes"
+                      : watchlistActionValue
+                        ? "Quitar de pendientes"
+                        : "Añadir a pendientes"
                   }
                 >
-                  {wlLoading ? (
+                  {watchlistActionLoading ? (
                     <Loader2 className="animate-spin" />
                   ) : (
                     <BookmarkPlus
-                      className={`${watchlist ? "fill-current" : ""}`}
+                      className={`${watchlistActionValue ? "fill-current" : ""}`}
                     />
                   )}
                 </LiquidButton>
@@ -9662,14 +9670,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         href={trakt?.traktUrl}
                         animateOnMount={false}
                         disableHoverLift
-                        onClick={
-                          !trakt?.connected
-                            ? () =>
-                                window.location.assign(
-                                  `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                                )
-                            : undefined
-                        }
+                        onClick={undefined}
                         tooltip={trakt?.traktUrl ? "Ver en Trakt" : "Trakt"}
                       />
                     )}
@@ -9689,11 +9690,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           }
                           animateOnMount={false}
                           disableHoverLift
-                          onClick={() =>
-                            window.location.assign(
-                              `/api/trakt/auth/start?next=/details/${type}/${id}`,
-                            )
-                          }
+                          onClick={undefined}
                           tooltip="Ver en Trakt"
                         />
                       )}

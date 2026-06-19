@@ -8,6 +8,14 @@ const REFRESH_TOKEN_COOKIE_NAMES = [
   "backend_refresh_token",
   "refresh_token",
 ];
+export const BACKEND_ACCESS_TOKEN_COOKIE = "showverse_access_token";
+export const BACKEND_REFRESH_TOKEN_COOKIE = "showverse_refresh_token";
+export const BACKEND_AUTH_COOKIE_NAMES = [
+  ...ACCESS_TOKEN_COOKIE_NAMES,
+  ...REFRESH_TOKEN_COOKIE_NAMES,
+  "tmdb_session_id",
+  "tmdb_session",
+];
 
 function cleanBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -19,6 +27,56 @@ export function getBackendBaseUrl() {
       process.env.NEXT_PUBLIC_API_BASE_URL ||
       process.env.NEXT_PUBLIC_BACKEND_URL,
   );
+}
+
+export function getCookieSecure(request) {
+  const protocol =
+    request?.nextUrl?.protocol ||
+    request?.headers?.get?.("x-forwarded-proto") ||
+    "";
+  return String(protocol).startsWith("https");
+}
+
+export function setBackendTokenCookies(
+  response,
+  { accessToken, refreshToken } = {},
+  { secure = true } = {},
+) {
+  if (accessToken) {
+    response.cookies.set(BACKEND_ACCESS_TOKEN_COOKIE, accessToken, {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 15,
+    });
+  }
+
+  if (refreshToken) {
+    response.cookies.set(BACKEND_REFRESH_TOKEN_COOKIE, refreshToken, {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+
+  return response;
+}
+
+export function clearBackendAuthCookies(response, { secure = true } = {}) {
+  for (const name of BACKEND_AUTH_COOKIE_NAMES) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  }
+
+  return response;
 }
 
 export function getBackendAccessToken(request) {
@@ -137,27 +195,7 @@ export function setBackendAuthCookies(response, backendResult, { secure = true }
   const tokens = backendResult?.refreshedTokens;
   if (!tokens) return response;
 
-  if (tokens.accessToken) {
-    response.cookies.set("showverse_access_token", tokens.accessToken, {
-      httpOnly: true,
-      secure,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 15,
-    });
-  }
-
-  if (tokens.refreshToken) {
-    response.cookies.set("showverse_refresh_token", tokens.refreshToken, {
-      httpOnly: true,
-      secure,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-  }
-
-  return response;
+  return setBackendTokenCookies(response, tokens, { secure });
 }
 
 export function normalizeBackendStatus(json, requestedType) {

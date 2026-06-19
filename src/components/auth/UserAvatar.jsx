@@ -1,81 +1,39 @@
 "use client";
 
-
-import OptimizedImage from "@/components/OptimizedImage";
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import OptimizedImage from "@/components/OptimizedImage";
 
-export default function UserAvatar() {
-  const [traktAvatarUrl, setTraktAvatarUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [available, setAvailable] = useState(false);
+function getInitials(account) {
+  const source = account?.displayName || account?.name || account?.username || "TSV";
+  return String(source)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTraktAvatar() {
-      try {
-        const res = await fetch("/api/trakt/profile?userOnly=1", {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        const data = await res.json();
-        const url = data?.user?.avatarUrl;
-        if (!cancelled) {
-          setAvailable(!!url);
-          if (url) setTraktAvatarUrl(url);
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    loadTraktAvatar();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <Link
-        href="/profile"
-        aria-label="Mi perfil"
-        className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
-      >
-        <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-800">
-          <div className="w-full h-full animate-pulse" />
-        </div>
-      </Link>
-    );
-  }
-
-  if (!available) {
-    return (
-      <a
-        href="/api/trakt/auth/start?next=/profile"
-        className="flex-shrink-0 rounded-full bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 lg:px-4 lg:py-2"
-      >
-        <span className="hidden lg:inline">Iniciar sesión</span>
-        <span className="lg:hidden">Acceder</span>
-      </a>
-    );
-  }
+export default function UserAvatar({ account }) {
+  const avatarUrl = account?.avatarUrl || account?.avatar_path || null;
+  const label = account?.displayName || account?.name || account?.username || "Mi perfil";
 
   return (
     <Link
       href="/profile"
-      aria-label="Mi perfil"
+      aria-label={label}
+      title={label}
       className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
     >
-      <div className="w-9 h-9 rounded-full overflow-hidden">
-        <OptimizedImage
-          src={traktAvatarUrl}
-          alt="Usuario"
-          className="w-full h-full object-cover"
-        />
+      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-black text-white">
+        {avatarUrl ? (
+          <OptimizedImage
+            src={avatarUrl}
+            alt={label}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span>{getInitials(account)}</span>
+        )}
       </div>
     </Link>
   );

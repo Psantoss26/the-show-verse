@@ -1622,22 +1622,22 @@ export default function InProgressClient({
                 />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">
-                Conecta tu cuenta de Trakt
+                Inicia sesión
               </h2>
               <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Conecta tu cuenta de Trakt para ver las series que estás viendo
-                actualmente con su progreso detallado.
+                Inicia sesión para ver las series que estás viendo actualmente
+                con su progreso detallado.
               </p>
               <button
                 type="button"
                 onClick={() =>
                   window.location.assign(
-                    "/api/trakt/auth/start?next=/in-progress",
+                    "/login?next=/in-progress",
                   )
                 }
                 className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
               >
-                Conectar ahora
+                Iniciar sesión
               </button>
             </motion.div>
           </div>

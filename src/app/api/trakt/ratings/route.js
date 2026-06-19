@@ -187,6 +187,27 @@ export async function GET(req) {
 
     if (hasBackendCredentials(req)) {
       try {
+        if (!type) {
+          const limit = Number(url.searchParams.get("limit") || 1000);
+          const backend = await backendFetchJson(
+            req,
+            `/v1/ratings?limit=${encodeURIComponent(String(limit))}`,
+          );
+          if (backend.ok) {
+            const res = NextResponse.json({
+              results: Array.isArray(backend.json?.results)
+                ? backend.json.results
+                : [],
+              page: backend.json?.page || 1,
+              source: "backend",
+            });
+            setBackendAuthCookies(res, backend, {
+              secure: req.nextUrl?.protocol === "https:",
+            });
+            return res;
+          }
+        }
+
         const mediaType = mediaTypeToBackend(type);
         if (type === "episode") {
           const showTmdbId = Number(url.searchParams.get("tmdbId"));

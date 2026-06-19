@@ -578,7 +578,7 @@ export default function TraktEpisodesWatchedModal({
     setShowError("");
 
     if (!isConnected) {
-      setAddPlayError("Conecta Trakt para añadir visionados.");
+      setAddPlayError("Inicia sesión para añadir visionados.");
       return;
     }
     if (addPlayMode === "play" && !hasAddPlayHandler) {
@@ -790,7 +790,7 @@ export default function TraktEpisodesWatchedModal({
             {!isConnected ? (
               <div className="text-center py-8">
                 <p className="text-zinc-300 font-medium mb-4">
-                  Conecta Trakt para gestionar tu historial.
+                  Inicia sesión para gestionar tu historial.
                 </p>
                 <Link
                   href="/trakt"
