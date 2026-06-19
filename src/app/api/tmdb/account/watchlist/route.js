@@ -8,6 +8,7 @@ import {
   setTraktCookies,
   clearTraktCookies,
 } from '@/lib/trakt/server'
+import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -48,6 +49,29 @@ async function syncWatchlistToTrakt({ token, mediaType, tmdbId, watchlist }) {
 
 // GET: List all watchlist items (movies + TV shows)
 export async function GET(req) {
+  try {
+    const backend = await backendFetchJson(req, '/v1/watchlist?limit=200')
+    if (backend.ok) {
+      const watchlist = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
+        ...item,
+        media_type: item.mediaType,
+        media_id: item.tmdbId,
+        id: item.tmdbId,
+        title: item.title || null,
+        name: item.title || null,
+        poster_path: item.posterPath || null,
+      }))
+      const res = NextResponse.json({ watchlist, source: 'backend' })
+      setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
+      return res
+    }
+    if (!backend.skipped && backend.status !== 401) {
+      console.warn('Backend watchlist failed; falling back to TMDb', backend.error)
+    }
+  } catch (e) {
+    console.warn('Backend watchlist failed; falling back to TMDb', e)
+  }
+
   const cookieStore = await cookies()
   const sessionId = cookieStore.get('tmdb_session_id')?.value
 
@@ -69,14 +93,37 @@ export async function POST(req) {
   const cookieStore = await cookies()
   const sessionId = cookieStore.get('tmdb_session_id')?.value
 
-  if (!sessionId) {
-    return NextResponse.json({ error: 'NO_SESSION' }, { status: 401 })
-  }
-
   const body = await req.json()
   const { mediaType, mediaId, watchlist } = body // mediaType: 'movie' | 'tv'
 
   try {
+    const backend = watchlist
+      ? await backendFetchJson(req, '/v1/watchlist', {
+          method: 'POST',
+          body: JSON.stringify({
+            tmdbId: Number(mediaId),
+            mediaType,
+            title: body?.title,
+            posterPath: body?.posterPath,
+          }),
+        })
+      : await backendFetchJson(req, `/v1/watchlist/${encodeURIComponent(mediaId)}/${mediaType}`, {
+          method: 'DELETE',
+        })
+
+    if (backend.ok) {
+      const res = NextResponse.json({ ok: true, source: 'backend' })
+      setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
+      return res
+    }
+    if (!backend.skipped && backend.status !== 401) {
+      console.warn('Backend watchlist failed; falling back to TMDb/Trakt', backend.error)
+    }
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'NO_SESSION' }, { status: 401 })
+    }
+
     // ── 1. TMDb (primary, always required) ──────────────────────────────────
     const account = await getAccount(sessionId)
     const tmdbUrl = `${TMDB}/account/${account.id}/watchlist?api_key=${API_KEY}&session_id=${sessionId}`

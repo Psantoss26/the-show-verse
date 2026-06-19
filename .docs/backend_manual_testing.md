@@ -123,7 +123,37 @@ Abre:
 http://localhost:3000
 ```
 
-Nota importante: el frontend actual todavia no consume el backend propio de forma general. Muchas pantallas siguen usando rutas Next.js en `/api/*`. Para probar el backend propio hoy, usa las pruebas curl/Postman de esta guia.
+Nota importante: el frontend mantiene las mismas rutas Next.js en `/api/*`, pero las rutas core de usuario ahora intentan usar el backend propio primero y solo caen a TMDb/Trakt si no hay sesion propia o el backend no esta disponible.
+
+Para activar el modo backend-first en local, anade en `.env` de la raiz:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+BACKEND_API_BASE_URL=http://localhost:3001
+```
+
+En produccion, anade en Vercel:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://the-show-verse-production.up.railway.app
+BACKEND_API_BASE_URL=https://the-show-verse-production.up.railway.app
+```
+
+El flujo de login TMDb crea tambien cookies httpOnly del backend propio (`showverse_access_token` y `showverse_refresh_token`). Con esas cookies, estas rutas usan PostgreSQL/Neon como primera opcion:
+
+- `/api/trakt/item/status`
+- `/api/trakt/item/watched`
+- `/api/trakt/movie/watched`
+- `/api/trakt/show/watched`
+- `/api/trakt/episode/play`
+- `/api/trakt/episode/plays`
+- `/api/trakt/episode/watched`
+- `/api/trakt/history`
+- `/api/trakt/item/rating`
+- `/api/trakt/item/wathclist`
+- `/api/tmdb/account/favorite`
+- `/api/tmdb/account/watchlist`
+- `/api/tmdb/account/status/[type]/[id]`
 
 ## Opcion local: PostgreSQL + Redis con Docker
 

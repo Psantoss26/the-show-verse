@@ -11,6 +11,12 @@ import {
   traktFetch,
 } from "@/lib/trakt/server";
 import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
+import {
+  backendFetchJson,
+  mediaTypeToBackend,
+  normalizeBackendStatus,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +82,25 @@ export async function GET(request) {
       { error: "Missing tmdbId or traktId" },
       { status: 400 },
     );
+  }
+
+  if (tmdbId) {
+    try {
+      const backend = await backendFetchJson(
+        request,
+        `/v1/items/${encodeURIComponent(tmdbId)}/${mediaTypeToBackend(type)}/status`,
+      );
+      if (backend.ok) {
+        const res = NextResponse.json(normalizeBackendStatus(backend.json, type));
+        setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+        return noCacheHeaders(res);
+      }
+      if (!backend.skipped && backend.status !== 401 && backend.status !== 404) {
+        console.warn("Backend item status failed; falling back to Trakt", backend.error);
+      }
+    } catch (e) {
+      console.warn("Backend item status failed; falling back to Trakt", e);
+    }
   }
 
   const cookieStore = request.cookies;

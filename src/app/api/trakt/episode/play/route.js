@@ -9,14 +9,12 @@ import {
     normalizeWatchedAt,
     traktAddEpisodeToHistory,
 } from '@/lib/trakt/server'
+import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-    const cookieStore = await cookies()
-    const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
-
     const body = await request.json().catch(() => ({}))
     const { tmdbId, season, episode, watchedAt } = body || {}
 
@@ -25,6 +23,41 @@ export async function POST(request) {
     const en = Number(episode)
     if (!Number.isFinite(sn) || sn <= 0) return NextResponse.json({ error: 'Invalid season' }, { status: 400 })
     if (!Number.isFinite(en) || en <= 0) return NextResponse.json({ error: 'Invalid episode' }, { status: 400 })
+
+    try {
+        const watchedAtIso = normalizeWatchedAt(watchedAt)
+        const backend = await backendFetchJson(request, '/v1/history/episodes', {
+            method: 'POST',
+            body: JSON.stringify({
+                tmdbId: Number(tmdbId),
+                season: sn,
+                episode: en,
+                watched: true,
+                watchedAt: watchedAtIso || undefined,
+                title: body?.title,
+                posterPath: body?.posterPath,
+            }),
+        })
+
+        if (backend.ok) {
+            const res = NextResponse.json({
+                connected: true,
+                ok: true,
+                watchedBySeason: backend.json?.watchedBySeason || {},
+                source: 'backend',
+            })
+            setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === 'https:' })
+            return res
+        }
+        if (!backend.skipped && backend.status !== 401) {
+            console.warn('Backend episode play failed; falling back to Trakt', backend.error)
+        }
+    } catch (e) {
+        console.warn('Backend episode play failed; falling back to Trakt', e)
+    }
+
+    const cookieStore = await cookies()
+    const { accessToken, refreshToken, expiresAtMs } = readTraktCookies(cookieStore)
 
     if (!accessToken && !refreshToken) return NextResponse.json({ connected: false }, { status: 401 })
 

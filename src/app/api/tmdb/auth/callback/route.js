@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { getBackendBaseUrl } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +78,28 @@ async function createTmdbSession(requestToken) {
   throw new Error("No se pudo crear la sesión de TMDb");
 }
 
+async function createBackendSessionFromTmdb(sessionId) {
+  const backendBaseUrl = getBackendBaseUrl();
+  if (!backendBaseUrl) return null;
+
+  const res = await fetch(`${backendBaseUrl}/v1/auth/tmdb`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    cache: "no-store",
+    body: JSON.stringify({ sessionId }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error || `Backend auth failed (${res.status})`);
+  }
+
+  return json;
+}
+
 export async function GET(req) {
   const origin = await resolveOrigin(req);
   const { searchParams } = new URL(req.url);
@@ -98,6 +121,11 @@ export async function GET(req) {
 
   try {
     const sessionId = await createTmdbSession(requestToken);
+    const backendSession = await createBackendSessionFromTmdb(sessionId).catch((e) => {
+      console.warn("Backend TMDb session bootstrap failed:", e);
+      return null;
+    });
+
     const res = NextResponse.redirect(redirectUrl);
     res.cookies.set("tmdb_session_id", sessionId, {
       httpOnly: true,
@@ -106,6 +134,24 @@ export async function GET(req) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
+    if (backendSession?.accessToken) {
+      res.cookies.set("showverse_access_token", backendSession.accessToken, {
+        httpOnly: true,
+        secure: origin.startsWith("https://"),
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 15,
+      });
+    }
+    if (backendSession?.refreshToken) {
+      res.cookies.set("showverse_refresh_token", backendSession.refreshToken, {
+        httpOnly: true,
+        secure: origin.startsWith("https://"),
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
     return res;
   } catch (error) {
     console.error("TMDb OAuth callback failed:", error);

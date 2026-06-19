@@ -8,6 +8,7 @@ import {
   traktGetProgressWatchedForShow,
   mapProgressWatchedBySeason,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,31 @@ export async function GET(request) {
       { error: "Missing tmdbId or traktId" },
       { status: 400 },
     );
+  }
+
+  if (tmdbId) {
+    try {
+      const backend = await backendFetchJson(
+        request,
+        `/v1/history/shows/${encodeURIComponent(tmdbId)}`,
+      );
+      if (backend.ok) {
+        const res = NextResponse.json({
+          connected: true,
+          found: Boolean(backend.json?.found),
+          traktId: null,
+          watchedBySeason: backend.json?.watchedBySeason || {},
+          source: "backend",
+        });
+        setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+        return res;
+      }
+      if (!backend.skipped && backend.status !== 401 && backend.status !== 404) {
+        console.warn("Backend show watched failed; falling back to Trakt", backend.error);
+      }
+    } catch (e) {
+      console.warn("Backend show watched failed; falling back to Trakt", e);
+    }
   }
 
   const cookieStore = request.cookies;

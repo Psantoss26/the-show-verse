@@ -8,6 +8,7 @@ import {
   traktAddToHistory,
   traktRemoveFromHistory,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,71 @@ export async function POST(request) {
     }
     if (!tmdbId) {
       return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+    }
+
+    if (type === "movie") {
+      try {
+        if (watched) {
+          const backend = await backendFetchJson(request, "/v1/history", {
+            method: "POST",
+            body: JSON.stringify({
+              tmdbId: Number(tmdbId),
+              mediaType: "movie",
+              watchedAt: watchedAt ? normalizeWatchedAt(watchedAt) : undefined,
+              title: payload?.title,
+              posterPath: payload?.posterPath,
+            }),
+          });
+
+          if (backend.ok) {
+            const res = NextResponse.json({
+              ok: true,
+              watched: true,
+              lastWatchedAt: backend.json?.item?.watchedAt || null,
+              source: "backend",
+            });
+            setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+            return res;
+          }
+          if (!backend.skipped && backend.status !== 401) {
+            console.warn("Backend movie watched failed; falling back to Trakt", backend.error);
+          }
+        } else {
+          const current = await backendFetchJson(
+            request,
+            `/v1/history/movies/${encodeURIComponent(tmdbId)}`,
+          );
+          if (current.ok) {
+            const ids = Array.isArray(current.json?.history)
+              ? current.json.history.map((entry) => entry.id).filter(Boolean)
+              : [];
+
+            if (ids.length > 0) {
+              const removed = await backendFetchJson(request, "/v1/history/bulk", {
+                method: "DELETE",
+                body: JSON.stringify({ ids }),
+              });
+              if (!removed.ok) {
+                throw new Error(removed.error || "Backend history bulk delete failed");
+              }
+            }
+
+            const res = NextResponse.json({
+              ok: true,
+              watched: false,
+              lastWatchedAt: null,
+              source: "backend",
+            });
+            setBackendAuthCookies(res, current, { secure: request.nextUrl.protocol === "https:" });
+            return res;
+          }
+          if (!current.skipped && current.status !== 401 && current.status !== 404) {
+            console.warn("Backend movie history lookup failed; falling back to Trakt", current.error);
+          }
+        }
+      } catch (e) {
+        console.warn("Backend movie watched failed; falling back to Trakt", e);
+      }
     }
 
     try {
