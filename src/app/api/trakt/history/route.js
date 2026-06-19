@@ -9,6 +9,7 @@ import {
   traktFetch,
 } from "@/lib/trakt/server";
 import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
+import { enrichMediaItemsWithTmdb } from "@/app/api/_utils/tmdbMetadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,21 +137,25 @@ export async function GET(request) {
             : {}),
         };
       });
+      const enriched = await enrichMediaItemsWithTmdb(normalized, {
+        getId: (item) => item.tmdbId,
+        getType: (item) => item.type,
+      });
 
-      const plays = normalized.length;
-      const uniques = new Set(normalized.map((x) => `${x.type}:${x.tmdbId}`)).size;
-      const movies = normalized.filter((x) => x.type === "movie").length;
-      const shows = normalized.filter((x) => x.type === "show").length;
+      const plays = enriched.length;
+      const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size;
+      const movies = enriched.filter((x) => x.type === "movie").length;
+      const shows = enriched.filter((x) => x.type === "show").length;
 
       const res = NextResponse.json({
         connected: true,
-        items: normalized,
+        items: enriched,
         stats: { plays, uniques, movies, shows },
         pagination: {
           page,
           limit: perPage,
-          returned: normalized.length,
-          hasMore: normalized.length >= perPage,
+          returned: enriched.length,
+          hasMore: enriched.length >= perPage,
         },
         source: "backend",
       });
