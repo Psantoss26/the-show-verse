@@ -7,10 +7,13 @@ import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyCookie from '@fastify/cookie';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import { sql } from 'drizzle-orm';
 
 import { getAllowedOrigins, validateRuntimeEnv } from './config/env.js';
 import { db, closeDb } from './db/client.js';
+import { openApiDocument } from './docs/openapi.js';
 import authPlugin from './plugins/auth.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
@@ -67,6 +70,27 @@ await fastify.register(fastifyCookie, {
   secret: process.env.JWT_ACCESS_SECRET || 'dev-cookie-secret',
 });
 
+// ────────────────────────────────────────────
+// API documentation
+// ────────────────────────────────────────────
+await fastify.register(fastifySwagger, {
+  mode: 'static',
+  specification: {
+    document: openApiDocument,
+  },
+});
+
+await fastify.register(fastifySwaggerUi, {
+  routePrefix: '/docs',
+  uiConfig: {
+    docExpansion: 'list',
+    deepLinking: true,
+    persistAuthorization: true,
+  },
+  staticCSP: true,
+  transformStaticCSP: (header) => header,
+});
+
 // Rate limiting global
 await fastify.register(fastifyRateLimit, {
   max: 200,
@@ -102,7 +126,9 @@ fastify.get('/', async () => ({
   version: '1.0.0',
   status: 'online',
   health: '/health',
-  ready: '/ready'
+  ready: '/ready',
+  docs: '/docs',
+  openapi: '/openapi.json',
 }));
 
 fastify.get('/health', async () => ({
@@ -146,6 +172,8 @@ fastify.get('/ready', async (req, reply) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+fastify.get('/openapi.json', async () => fastify.swagger());
 
 // ────────────────────────────────────────────
 // Rutas de la API v1
