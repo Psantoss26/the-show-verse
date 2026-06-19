@@ -79,11 +79,6 @@ export default function CollectionDetailsClient({ collectionId }) {
     const imdbIdCacheRef = useRef({})
 
     useEffect(() => {
-        if (typeof window === 'undefined') return
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    }, [collectionId])
-
-    useEffect(() => {
         document.title = formatPageTitle(state.collection?.name || 'Colección')
     }, [state.collection?.name])
 

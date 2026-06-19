@@ -277,11 +277,6 @@ export default function ListDetailsPage() {
         document.title = formatPageTitle(data?.name || 'Lista')
     }, [data?.name])
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    }, [listId])
-
     // Search debounce
     useEffect(() => {
         if (tab !== 'add' || addMode !== 'search') return

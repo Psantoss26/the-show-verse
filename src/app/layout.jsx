@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
+import ScrollRestoration from "@/components/ScrollRestoration";
 import { anton, ptSans } from "./fonts";
 
 export const metadata = {
@@ -43,11 +44,12 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    <html lang="es" data-scroll-behavior="smooth">
       <body
         className={`${ptSans.className} ${ptSans.variable} ${anton.variable} bg-black text-white antialiased`}
       >
         <AuthProvider>
+          <ScrollRestoration />
           <Navbar />
           <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
           <PwaManager />

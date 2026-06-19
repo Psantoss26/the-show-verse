@@ -8050,34 +8050,6 @@ export default function DetailsClient({
     }
   }, [sectionItems, activeSection]);
 
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
-
-    let raf = 0;
-    raf = window.requestAnimationFrame(() => {
-      const contentEl = contentTopRef.current;
-      if (!contentEl) {
-        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-        return;
-      }
-
-      const navHeight =
-        document.querySelector("nav")?.getBoundingClientRect().height || 64;
-      const nextTop =
-        window.scrollY + contentEl.getBoundingClientRect().top - navHeight;
-
-      window.scrollTo({
-        top: Math.max(0, nextTop),
-        left: 0,
-        behavior: "auto",
-      });
-    });
-
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-    };
-  }, [type, id]);
-
   // =====================================================
   // IMDb para recomendaciones: solo hover (no auto)
   // =====================================================
