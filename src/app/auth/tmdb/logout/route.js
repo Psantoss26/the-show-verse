@@ -16,6 +16,8 @@ export async function POST() {
   if (!sessionId) {
     const res = NextResponse.json({ ok: true, message: 'No había sesión' })
     res.cookies.set('tmdb_session_id', '', { path: '/', maxAge: 0 })
+    res.cookies.set('showverse_access_token', '', { path: '/', maxAge: 0 })
+    res.cookies.set('showverse_refresh_token', '', { path: '/', maxAge: 0 })
     return res
   }
 
@@ -33,5 +35,7 @@ export async function POST() {
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set('tmdb_session_id', '', { path: '/', maxAge: 0 })
+  res.cookies.set('showverse_access_token', '', { path: '/', maxAge: 0 })
+  res.cookies.set('showverse_refresh_token', '', { path: '/', maxAge: 0 })
   return res
 }

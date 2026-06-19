@@ -9,6 +9,7 @@ import {
   mapHistoryEntries,
 } from "@/lib/trakt/server";
 import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,35 @@ export async function GET(request) {
       { error: "Missing tmdbId or traktId" },
       { status: 400 },
     );
+  }
+
+  if (tmdbId) {
+    try {
+      const backend = await backendFetchJson(
+        request,
+        `/v1/history/movies/${encodeURIComponent(tmdbId)}`,
+      );
+      if (backend.ok) {
+        const res = NextResponse.json({
+          connected: true,
+          found: Boolean(backend.json?.found),
+          watched: Boolean(backend.json?.watched),
+          plays: Number(backend.json?.plays || 0),
+          lastWatchedAt: backend.json?.lastWatchedAt || null,
+          history: Array.isArray(backend.json?.history) ? backend.json.history : [],
+          traktId: null,
+          traktUrl: null,
+          source: "backend",
+        });
+        setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+        return res;
+      }
+      if (!backend.skipped && backend.status !== 401 && backend.status !== 404) {
+        console.warn("Backend movie watched failed; falling back to Trakt", backend.error);
+      }
+    } catch (e) {
+      console.warn("Backend movie watched failed; falling back to Trakt", e);
+    }
   }
 
   const cookieStore = request.cookies;

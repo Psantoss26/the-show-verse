@@ -8,6 +8,7 @@ import {
   setTraktCookies,
   traktFetch,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,11 +74,6 @@ async function mapLimit(arr, limit, fn) {
 }
 
 export async function GET(request) {
-  // ✅ FIX: cookies() es Promise en tu Next
-  const cookieStore = await cookies();
-  const { accessToken, refreshToken, expiresAtMs } =
-    readTraktCookies(cookieStore);
-
   const type = request.nextUrl.searchParams.get("type") || "all"; // all|movies|shows
   const from = request.nextUrl.searchParams.get("from") || null;
   const to = request.nextUrl.searchParams.get("to") || null;
@@ -101,6 +97,77 @@ export async function GET(request) {
     ? Math.max(1, Math.min(200, numericLimit))
     : 200;
   const targetCount = hasNumericLimit ? Math.floor(numericLimit) : null;
+
+  try {
+    const qs = new URLSearchParams();
+    qs.set("page", String(page));
+    qs.set("limit", String(perPage));
+    if (type === "movies") qs.set("type", "movie");
+    if (type === "shows") qs.set("type", "tv");
+    if (from) qs.set("from", ymdToIsoStart(from));
+    if (to) qs.set("to", ymdToIsoEnd(to));
+
+    const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
+    if (backend.ok) {
+      const rows = Array.isArray(backend.json?.results) ? backend.json.results : [];
+      const normalized = rows.map((item) => {
+        const itemType = item.mediaType === "movie" ? "movie" : "show";
+        return {
+          id: item.id,
+          watched_at: item.watchedAt,
+          type: itemType,
+          tmdbId: item.tmdbId,
+          title: item.title || null,
+          title_es: item.title || null,
+          poster_path: item.posterPath || null,
+          year: null,
+          detailsHref: detailsHrefFor(itemType, item.tmdbId),
+          ...(item.mediaType === "tv" && item.season && item.episode
+            ? {
+                episode: {
+                  season: item.season,
+                  number: item.episode,
+                  title: null,
+                },
+                season: item.season,
+                number: item.episode,
+                episodeTitle: null,
+              }
+            : {}),
+        };
+      });
+
+      const plays = normalized.length;
+      const uniques = new Set(normalized.map((x) => `${x.type}:${x.tmdbId}`)).size;
+      const movies = normalized.filter((x) => x.type === "movie").length;
+      const shows = normalized.filter((x) => x.type === "show").length;
+
+      const res = NextResponse.json({
+        connected: true,
+        items: normalized,
+        stats: { plays, uniques, movies, shows },
+        pagination: {
+          page,
+          limit: perPage,
+          returned: normalized.length,
+          hasMore: normalized.length >= perPage,
+        },
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+      return res;
+    }
+    if (!backend.skipped && backend.status !== 401) {
+      console.warn("Backend history failed; falling back to Trakt", backend.error);
+    }
+  } catch (e) {
+    console.warn("Backend history failed; falling back to Trakt", e);
+  }
+
+  // ✅ FIX: cookies() es Promise en tu Next
+  const cookieStore = await cookies();
+  const { accessToken, refreshToken, expiresAtMs } =
+    readTraktCookies(cookieStore);
 
   if (!accessToken && !refreshToken) {
     return NextResponse.json({ connected: false, items: [], stats: null });

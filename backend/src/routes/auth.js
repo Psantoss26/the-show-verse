@@ -4,7 +4,7 @@
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { users, refreshTokens, userPreferences } from '../db/schema.js';
+import { users, refreshTokens, userPreferences, connectedAccounts } from '../db/schema.js';
 import {
   signAccessToken,
   signRefreshToken,
@@ -29,6 +29,61 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const tmdbSessionSchema = z.object({
+  sessionId: z.string().min(8),
+});
+
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+function normalizeUsername(value, fallback) {
+  const base = String(value || fallback || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+
+  return base && base.length >= 3 ? base : fallback;
+}
+
+async function uniqueUsername(preferred, providerUid) {
+  const base = normalizeUsername(preferred, `tmdb-${providerUid}`);
+
+  for (let i = 0; i < 20; i += 1) {
+    const candidate = i === 0 ? base : `${base}-${i}`;
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, candidate))
+      .limit(1);
+
+    if (!existing) return candidate;
+  }
+
+  return `tmdb-${providerUid}`;
+}
+
+async function getTmdbAccount(sessionId) {
+  if (!TMDB_API_KEY) {
+    throw new Error('TMDB_API_KEY is required for TMDb auth bootstrap');
+  }
+
+  const url = new URL(`${TMDB_BASE}/account`);
+  url.searchParams.set('api_key', TMDB_API_KEY);
+  url.searchParams.set('session_id', sessionId);
+
+  const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.success === false || !json?.id) {
+    const error = new Error(json?.status_message || `TMDb account failed (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
+
+  return json;
+}
+
 /**
  * Genera el par de tokens y guarda el refresh token hasheado en BD.
  */
@@ -49,6 +104,106 @@ async function issueTokenPair(userId, { deviceName, ipAddress } = {}) {
 }
 
 export default async function authRoutes(fastify) {
+  // ──────────────────────────────────────────────
+  // POST /auth/tmdb — Crea/recupera sesión propia desde una sesión TMDb válida
+  // ──────────────────────────────────────────────
+  fastify.post('/tmdb', async (req, reply) => {
+    const parsed = tmdbSessionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        issues: parsed.error.issues,
+      });
+    }
+
+    let account;
+    try {
+      account = await getTmdbAccount(parsed.data.sessionId);
+    } catch (e) {
+      return reply.status(e.status || 401).send({
+        error: e.message || 'Invalid TMDb session',
+      });
+    }
+
+    const providerUid = String(account.id);
+    const displayName = account.name || account.username || `TMDb ${providerUid}`;
+    const avatarPath = account.avatar?.tmdb?.avatar_path || null;
+
+    let user = null;
+    const [existingAccount] = await db
+      .select({ userId: connectedAccounts.userId })
+      .from(connectedAccounts)
+      .where(and(eq(connectedAccounts.provider, 'tmdb'), eq(connectedAccounts.providerUid, providerUid)))
+      .limit(1);
+
+    if (existingAccount) {
+      [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+        })
+        .from(users)
+        .where(eq(users.id, existingAccount.userId))
+        .limit(1);
+
+      await db
+        .update(connectedAccounts)
+        .set({
+          accessToken: parsed.data.sessionId,
+          metadata: account,
+        })
+        .where(and(eq(connectedAccounts.provider, 'tmdb'), eq(connectedAccounts.providerUid, providerUid)));
+    }
+
+    if (!user) {
+      const username = await uniqueUsername(account.username, providerUid);
+      const email = `tmdb-${providerUid}@users.theshowverse.local`;
+
+      [user] = await db
+        .insert(users)
+        .values({
+          email,
+          username,
+          displayName,
+          avatarUrl: avatarPath ? `https://image.tmdb.org/t/p/w185${avatarPath}` : null,
+          emailVerified: true,
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+        });
+
+      await db.insert(userPreferences).values({ userId: user.id }).onConflictDoNothing();
+      await db.insert(connectedAccounts).values({
+        userId: user.id,
+        provider: 'tmdb',
+        providerUid,
+        accessToken: parsed.data.sessionId,
+        metadata: account,
+      }).onConflictDoNothing();
+    }
+
+    const { accessToken, refreshToken } = await issueTokenPair(user.id, {
+      deviceName: req.headers['user-agent']?.slice(0, 100),
+      ipAddress: req.ip,
+    });
+
+    return reply.send({
+      user,
+      accessToken,
+      refreshToken,
+      provider: 'tmdb',
+    });
+  });
+
   // ──────────────────────────────────────────────
   // POST /auth/register
   // ──────────────────────────────────────────────

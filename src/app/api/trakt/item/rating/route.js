@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  backendFetchJson,
+  mediaTypeToBackend,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 
 const TRAKT_BASE = "https://api.trakt.tv";
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
@@ -28,10 +33,6 @@ function normalizeRating(val) {
 
 export async function POST(req) {
   try {
-    const token = await getTraktAccessTokenOrNull();
-    if (!token)
-      return NextResponse.json({ error: "Not connected" }, { status: 401 });
-
     const { type, tmdbId, rating } = await req.json();
     if (!["movie", "show"].includes(type))
       return NextResponse.json({ error: "Bad type" }, { status: 400 });
@@ -39,6 +40,42 @@ export async function POST(req) {
     const id = Number(tmdbId);
     if (!Number.isFinite(id))
       return NextResponse.json({ error: "Bad tmdbId" }, { status: 400 });
+
+    try {
+      const mediaType = mediaTypeToBackend(type);
+      const backend =
+        rating == null
+          ? await backendFetchJson(req, `/v1/ratings/${encodeURIComponent(id)}/${mediaType}`, {
+              method: "DELETE",
+            })
+          : await backendFetchJson(req, "/v1/ratings", {
+              method: "POST",
+              body: JSON.stringify({
+                tmdbId: id,
+                mediaType,
+                rating: normalizeRating(rating),
+              }),
+            });
+
+      if (backend.ok) {
+        const res = NextResponse.json({
+          ok: true,
+          rating: rating == null ? null : normalizeRating(rating),
+          source: "backend",
+        });
+        setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === "https:" });
+        return res;
+      }
+      if (!backend.skipped && backend.status !== 401) {
+        console.warn("Backend rating failed; falling back to Trakt", backend.error);
+      }
+    } catch (e) {
+      console.warn("Backend rating failed; falling back to Trakt", e);
+    }
+
+    const token = await getTraktAccessTokenOrNull();
+    if (!token)
+      return NextResponse.json({ error: "Not connected" }, { status: 401 });
 
     const payloadKey = type === "movie" ? "movies" : "shows";
 

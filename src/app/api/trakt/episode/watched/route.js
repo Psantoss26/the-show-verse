@@ -11,6 +11,7 @@ import {
   traktGetProgressWatchedForShow,
   mapProgressWatchedBySeason,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,41 @@ export async function POST(request) {
   }
   if (!Number.isFinite(en) || en <= 0) {
     return NextResponse.json({ error: "Invalid episode" }, { status: 400 });
+  }
+
+  try {
+    const watchedAtIso = normalizeWatchedAt(watchedAt);
+    const backend = await backendFetchJson(request, "/v1/history/episodes", {
+      method: "POST",
+      body: JSON.stringify({
+        tmdbId: Number(tmdbId),
+        season: sn,
+        episode: en,
+        watched: Boolean(watched),
+        watchedAt: watchedAtIso || undefined,
+        title: body?.title,
+        posterPath: body?.posterPath,
+      }),
+    });
+
+    if (backend.ok) {
+      const res = NextResponse.json({
+        connected: true,
+        ok: true,
+        watched: Boolean(watched),
+        found: true,
+        traktId: null,
+        watchedBySeason: backend.json?.watchedBySeason || {},
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+      return res;
+    }
+    if (!backend.skipped && backend.status !== 401) {
+      console.warn("Backend episode watched failed; falling back to Trakt", backend.error);
+    }
+  } catch (e) {
+    console.warn("Backend episode watched failed; falling back to Trakt", e);
   }
 
   const cookieStore = request.cookies;
