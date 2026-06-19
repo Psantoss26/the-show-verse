@@ -1,7 +1,7 @@
 // src/server.js
 // Punto de entrada del servidor Fastify
 
-import 'dotenv/config';
+import './config/load-env.js';
 import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';

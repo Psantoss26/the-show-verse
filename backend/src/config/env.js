@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './load-env.js';
 
 const DEV_SECRET_PREFIX = 'dev_';
 
@@ -37,4 +37,3 @@ export function validateRuntimeEnv() {
     }
   }
 }
-

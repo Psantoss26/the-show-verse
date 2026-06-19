@@ -42,11 +42,12 @@ import { Navigation, FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
 import LiquidButton from "@/components/LiquidButton";
+import { useAuth } from "@/context/AuthContext";
 
 // Score fetching APIs
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
-import { traktDisconnect, traktGetScoreboard } from "@/lib/api/traktClient";
+import { traktGetScoreboard } from "@/lib/api/traktClient";
 
 // Score caching system identical to favorites
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -103,6 +104,44 @@ function clearProfileSessionCache() {
     window.sessionStorage.removeItem(PROFILE_DATA_CACHE_KEY);
     window.sessionStorage.removeItem(PROFILE_USER_CACHE_KEY);
   } catch {}
+}
+
+function createEmptyProfileStatsData() {
+  return {
+    source: "showverse",
+    stats: {
+      movies: { watched: 0, plays: 0, minutes: 0, comments: 0, collected: 0 },
+      shows: { watched: 0, collected: 0, comments: 0 },
+      episodes: { watched: 0, plays: 0, minutes: 0, comments: 0, collected: 0 },
+      seasons: { comments: 0 },
+      ratings: { total: 0, distribution: {} },
+      network: { followers: 0, friends: 0 },
+    },
+    history: [],
+    genres: [],
+    watchedMovies: [],
+    watchedShows: [],
+    topActors: [],
+    topDirectors: [],
+  };
+}
+
+function toShowVerseProfileUser(user) {
+  if (!user) return null;
+  const username = user.username || "usuario";
+  return {
+    username,
+    name: user.displayName || username,
+    avatarUrl: user.avatarUrl || null,
+    about: null,
+    location: null,
+    joined_at: user.createdAt || null,
+    private: false,
+    vip: user.plan && user.plan !== "free",
+    vip_ep: false,
+    slug: username,
+    provider: "showverse",
+  };
 }
 
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -1411,6 +1450,12 @@ function ProfileUnifiedCard({
 // MAIN COMPONENT
 // -----------------------------------------------------------------------------
 export default function StatsClient({ connectNext = "/profile" }) {
+  const {
+    user: authUser,
+    authenticated,
+    hydrated: authHydrated,
+    logout,
+  } = useAuth();
   const [loading, setLoading] = useState(true);
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [peopleLoaded, setPeopleLoaded] = useState(false);
@@ -1423,6 +1468,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [deferredOverviewReady, setDeferredOverviewReady] = useState(false);
   const overviewDeferredOnceRef = useRef(false);
+  const showVerseProfileUser = useMemo(
+    () => toShowVerseProfileUser(authUser),
+    [authUser],
+  );
 
   const handleSyncProfile = useCallback(() => {
     clearProfileSessionCache();
@@ -1438,22 +1487,47 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
   const handleDisconnect = useCallback(async () => {
     try {
-      await traktDisconnect();
+      await logout();
       clearProfileSessionCache();
       setShowDisconnectModal(false);
       setNotConnected(true);
       setData(null);
       setProfileData(null);
-      window.location.href = "/";
+      window.location.href = `/login?next=${encodeURIComponent(connectNext)}`;
     } catch (e) {
-      console.error("Error desconectando Trakt:", e);
+      console.error("Error cerrando sesión:", e);
       setShowDisconnectModal(false);
-      alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
+      alert("Error al cerrar sesión. Por favor, inténtalo de nuevo.");
     }
-  }, []);
+  }, [connectNext, logout]);
 
   useEffect(() => {
     let ignore = false;
+
+    if (!authHydrated) {
+      return () => {
+        ignore = true;
+      };
+    }
+
+    if (!authenticated) {
+      clearProfileSessionCache();
+      setNotConnected(true);
+      setLoading(false);
+      setData(null);
+      setProfileData(null);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    setNotConnected(false);
+    if (showVerseProfileUser) {
+      setProfileData((prev) => ({
+        ...(prev || {}),
+        user: showVerseProfileUser,
+      }));
+    }
 
     const cachedStats = readProfileSessionCache(PROFILE_STATS_CACHE_KEY);
     const cachedProfile = readProfileSessionCache(PROFILE_DATA_CACHE_KEY);
@@ -1468,6 +1542,24 @@ export default function StatsClient({ connectNext = "/profile" }) {
     } else if (cachedUser?.user) {
       setProfileData(cachedUser);
     }
+    if (showVerseProfileUser) {
+      setProfileData((prev) => ({
+        ...(prev || {}),
+        user: showVerseProfileUser,
+      }));
+    }
+
+    const applyShowVerseFallback = () => {
+      clearProfileSessionCache();
+      if (showVerseProfileUser) {
+        setProfileData((prev) => ({
+          ...(prev || {}),
+          user: showVerseProfileUser,
+        }));
+      }
+      if (!cachedStats) setData(createEmptyProfileStatsData());
+      setLoading(false);
+    };
 
     const mergeStatsData = (json) => {
       setData((prev) => {
@@ -1549,8 +1641,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 });
                 if (ignore) return;
                 if (res.status === 401) {
-                  clearProfileSessionCache();
-                  setNotConnected(true);
+                  applyShowVerseFallback();
                   return;
                 }
                 if (!res.ok) return;
@@ -1576,13 +1667,14 @@ export default function StatsClient({ connectNext = "/profile" }) {
           );
           if (ignore) return;
           if (res.status === 401) {
-            clearProfileSessionCache();
-            setNotConnected(true);
+            applyShowVerseFallback();
             return;
           }
           if (!res.ok) {
             const json = await res.json().catch(() => ({}));
-            if (!cachedStats) {
+            if (authenticated) {
+              applyShowVerseFallback();
+            } else if (!cachedStats) {
               setError(
                 json?.error || "No se pudieron cargar las estadísticas.",
               );
@@ -1611,8 +1703,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
           });
           if (ignore) return;
           if (res.status === 401) {
-            clearProfileSessionCache();
-            setNotConnected(true);
+            applyShowVerseFallback();
             return;
           }
           if (!res.ok) return;
@@ -1637,10 +1728,11 @@ export default function StatsClient({ connectNext = "/profile" }) {
     return () => {
       ignore = true;
     };
-  }, [refreshTick]);
+  }, [authHydrated, authenticated, refreshTick, showVerseProfileUser]);
 
   useEffect(() => {
     if (!data || notConnected || peopleLoaded) return;
+    if (data.source === "showverse") return;
     if ((data.topActors || []).length || (data.topDirectors || []).length) {
       return;
     }
@@ -1765,7 +1857,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     return `${h}h ${m}m`;
   };
 
-  const profileUser = profileData?.user || null;
+  const profileUser = showVerseProfileUser || profileData?.user || null;
   const recentHistory = profileData?.recentHistory || [];
   const recentRatings = profileData?.recentRatings || [];
   const watchlist = profileData?.watchlist || [];
@@ -1821,7 +1913,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               <span className="text-emerald-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Tu actividad y estadísticas sincronizadas con Trakt.
+              Tu actividad, estadísticas y listas personales.
             </p>
           </motion.div>
 
@@ -1833,9 +1925,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
             >
               <div className="mb-6">
                 <OptimizedImage
-                  src="/logo-Trakt.png"
-                  alt="Trakt Logo"
-                  className="w-24 h-24 object-contain shadow-lg shadow-red-500/20 rounded-2xl"
+                  src="/logo-TSV-sinFondo.png"
+                  alt="The Show Verse"
+                  className="w-24 h-24 object-contain shadow-lg shadow-emerald-500/20 rounded-2xl"
                 />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">

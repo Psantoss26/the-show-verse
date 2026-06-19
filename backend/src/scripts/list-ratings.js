@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../config/load-env.js';
 import { db, closeDb } from '../db/client.js';
 import { userRatings } from '../db/schema.js';
 
