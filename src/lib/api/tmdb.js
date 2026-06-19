@@ -509,6 +509,11 @@ export async function getMediaAccountStates(type, id, sessionOrOpts) {
     } catch {}
   }
 
+  const isShowverse = sessionOrOpts === "showverse" || sessionOrOpts?.sessionId === "showverse";
+  if (isShowverse) {
+    return empty;
+  }
+
   if (!API_KEY) return empty;
 
   // Compat: acepta string (sessionId) o { sessionId, guestSessionId }
