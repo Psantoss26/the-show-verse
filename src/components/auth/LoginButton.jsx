@@ -6,7 +6,7 @@ export default function LoginButton() {
       typeof window === "undefined"
         ? "/"
         : `${window.location.pathname}${window.location.search}`;
-    window.location.href = `/api/tmdb/auth/start?next=${encodeURIComponent(
+    window.location.href = `/login?next=${encodeURIComponent(
       next,
     )}`;
   };

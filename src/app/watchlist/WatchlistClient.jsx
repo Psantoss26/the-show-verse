@@ -2690,23 +2690,22 @@ export default function WatchlistClient() {
             >
               <div className="mb-6">
                 <OptimizedImage
-                  src="/logo-TMDb.png"
-                  alt="TMDb Logo"
+                  src="/logo-TSV-sinFondo.png"
+                  alt="The Show Verse"
                   className="w-24 h-24 object-contain shadow-lg shadow-blue-500/20 rounded-2xl"
                 />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">
-                Conecta tu cuenta de TMDb
+                Inicia sesión
               </h2>
               <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Conecta tu cuenta de TMDb para ver y gestionar tu lista de
-                títulos pendientes sincronizada.
+                Inicia sesión para ver y gestionar tu lista de títulos pendientes.
               </p>
               <Link
-                href="/api/tmdb/auth/start?next=/watchlist"
+                href="/login?next=/watchlist"
                 className="px-8 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:from-blue-400 hover:to-blue-500 transition shadow-lg shadow-blue-500/20"
               >
-                Conectar ahora
+                Iniciar sesión
               </Link>
             </motion.div>
           </div>

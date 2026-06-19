@@ -1839,22 +1839,22 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">
-                Conecta tu cuenta de Trakt
+                Inicia sesión
               </h2>
               <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                Para ver tus estadísticas personales, historial detallado y
-                patrones de visualización, necesitas iniciar sesión.
+                Inicia sesión para ver tus estadísticas personales, historial
+                detallado y patrones de visualización.
               </p>
               <button
                 onClick={() =>
                   window.location.assign(
-                    `/api/trakt/auth/start?next=${encodeURIComponent(connectNext)}`,
+                    `/login?next=${encodeURIComponent(connectNext)}`,
                   )
                 }
                 type="button"
                 className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
               >
-                Conectar ahora
+                Iniciar sesión
               </button>
             </motion.div>
           </div>

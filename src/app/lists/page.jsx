@@ -1849,11 +1849,10 @@ export default function ListsPage() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-3">Mis Listas</h1>
           <p className="text-zinc-400 mb-8">
-            Inicia sesión con tu cuenta TMDb para gestionar tus listas
-            personalizadas.
+            Inicia sesión para gestionar tus listas personalizadas.
           </p>
           <Link
-            href="/api/tmdb/auth/start?next=/lists"
+            href="/login?next=/lists"
             className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition"
           >
             Iniciar Sesión

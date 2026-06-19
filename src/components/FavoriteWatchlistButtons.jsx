@@ -44,7 +44,7 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
         <div className="flex items-center gap-2">
           <LogIn className="w-4 h-4" />
           <span>
-            Inicia sesión en TMDb para guardar favoritos y pendientes.
+            Inicia sesión para guardar favoritos y pendientes.
           </span>
         </div>
       </div>

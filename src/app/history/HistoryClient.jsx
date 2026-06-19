@@ -3253,22 +3253,21 @@ export default function HistoryClient() {
                     />
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-2">
-                    Conecta tu cuenta de Trakt
+                    Inicia sesión
                   </h2>
                   <p className="text-zinc-400 max-w-sm mb-8 text-sm">
-                    Para ver tu historial de visualizaciones sincronizado,
-                    necesitas iniciar sesión.
+                    Inicia sesión para ver tu historial de visualizaciones.
                   </p>
                   <button
                     type="button"
                     onClick={() =>
                       window.location.assign(
-                        "/api/trakt/auth/start?next=/history",
+                        "/login?next=/history",
                       )
                     }
                     className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition shadow-lg shadow-white/10"
                   >
-                    Conectar ahora
+                    Iniciar sesión
                   </button>
                 </motion.div>
               </div>

@@ -839,7 +839,7 @@ export default function EpisodeDetailsClient({
         );
 
         if (res.status === 401) {
-          window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
           return;
         }
 
@@ -1249,7 +1249,7 @@ export default function EpisodeDetailsClient({
     }
 
     if (!connected) {
-      window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+      window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
       return;
     }
 
@@ -1279,7 +1279,7 @@ export default function EpisodeDetailsClient({
       console.error("Error al marcar episodio:", e);
       const needsReauth = /401|unauthorized/i.test(e?.message || "");
       if (needsReauth) {
-        window.location.href = `/api/trakt/auth/start?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+        window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
         return;
       }
       await reloadEpisodeTraktState({ background: true });
