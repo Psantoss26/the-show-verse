@@ -1340,7 +1340,13 @@ export default function DetailsClient({
   const [wlLoading, setWlLoading] = useState(false); // Cargando accion de watchlist
   const [favorite, setFavorite] = useState(false); // Es favorito del usuario
   const [watchlist, setWatchlist] = useState(false); // Esta en la watchlist del usuario
-  const [hasBackendSession, setHasBackendSession] = useState(false);
+  const [hasBackendSession, setHasBackendSession] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const cookie = document.cookie || "";
+    return cookie.includes("showverse_access_token=") ||
+           cookie.includes("backend_access_token=") ||
+           cookie.includes("access_token=");
+  });
 
   // -- Puntuacion del usuario en TMDb --
   const [userRating, setUserRating] = useState(null); // Rating actual (1-10)
@@ -1348,7 +1354,7 @@ export default function DetailsClient({
   const [ratingError, setRatingError] = useState("");
 
   // Indica si se estan cargando los estados de cuenta (favorito, watchlist, rating)
-  const [accountStatesLoading, setAccountStatesLoading] = useState(false);
+  const [accountStatesLoading, setAccountStatesLoading] = useState(!!session);
 
   // Pestana activa en la seccion de metadatos (details/produccion/sinopsis/premios)
   const [activeTab, setActiveTab] = useState("details");
@@ -8848,6 +8854,10 @@ export default function DetailsClient({
       posterAnimRafRef.current = 0;
     };
   }, [poster3dEnabled, displayPosterPath]);
+
+  const isDataLoading =
+    (!!session && accountStatesLoading) ||
+    (trakt.loading && (trakt.connected || hasBackendSession));
 
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
