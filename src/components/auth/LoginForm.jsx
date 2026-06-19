@@ -129,22 +129,19 @@ export default function LoginForm({ next: nextProp }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      className="w-full max-w-[400px] rounded-[2.5rem] border border-white/12 bg-zinc-900/40 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+      className="w-full max-w-[380px] rounded-[2.5rem] border border-white/12 bg-zinc-900/40 px-6 py-10 shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
     >
       <div className="mb-6 flex flex-col items-center">
-        <div className="relative mb-3 flex h-14 w-28 items-center justify-center overflow-hidden">
+        <div className="relative mb-4 flex h-24 w-48 items-center justify-center">
           <img
             src="/logo-TSV-sinFondo.png"
             alt="The Show Verse"
-            className="h-full w-auto object-contain scale-[2.2] origin-center"
+            className="h-full w-auto object-contain scale-[1.6]"
           />
         </div>
         <h1 className="text-2xl font-black text-white tracking-tight drop-shadow-md">
           {isRegister ? "Crear cuenta" : "Iniciar sesión"}
         </h1>
-        <p className="mt-1.5 text-xs font-medium text-zinc-400 max-w-[280px]">
-          Guarda favoritos, vistos, ratings y listas en tu cuenta de The Show Verse.
-        </p>
       </div>
 
       <a
