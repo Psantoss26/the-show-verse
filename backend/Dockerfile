@@ -1,13 +1,26 @@
 FROM node:20-alpine AS base
-WORKDIR /app
 ENV NODE_ENV=production
 
-# Instalar dependencias de producción
-COPY backend/package*.json ./
-RUN npm ci --omit=dev
+# Railway can build this Dockerfile with either the repository root or backend/
+# as the Docker build context. Normalize both shapes into /app.
+WORKDIR /workspace
+COPY . ./
 
-# Copiar código fuente
-COPY backend/src/ ./src/
+RUN set -eux; \
+  mkdir -p /app; \
+  if [ -f backend/package.json ]; then \
+    cp -R backend/. /app/; \
+  elif [ -f package.json ] && [ -d src ]; then \
+    cp -R . /app/; \
+  else \
+    echo "Backend package.json not found in Docker build context"; \
+    exit 1; \
+  fi; \
+  cd /; \
+  rm -rf /workspace
+
+WORKDIR /app
+RUN npm ci --omit=dev
 
 EXPOSE 3001
 
