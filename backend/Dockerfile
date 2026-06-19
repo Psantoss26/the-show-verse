@@ -8,7 +8,6 @@ RUN npm ci --omit=dev
 
 # Copiar código fuente
 COPY backend/src/ ./src/
-COPY backend/drizzle/ ./drizzle/
 
 EXPOSE 3001
 
