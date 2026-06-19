@@ -9,7 +9,8 @@ let redis = null;
 export function getRedis() {
   if (redis) return redis;
 
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
 
   // Upstash usa rediss:// (con TLS). ioredis lo detecta automáticamente.
   redis = new Redis(redisUrl, {
@@ -42,6 +43,7 @@ export function getRedis() {
 export async function cacheGet(key) {
   try {
     const r = getRedis();
+    if (!r) return null;
     const val = await r.get(key);
     if (!val) return null;
     return JSON.parse(val);
@@ -56,6 +58,7 @@ export async function cacheGet(key) {
 export async function cacheSet(key, value, ttlSeconds = 600) {
   try {
     const r = getRedis();
+    if (!r) return;
     await r.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   } catch {
     // Si Redis falla, seguimos sin caché
@@ -68,6 +71,7 @@ export async function cacheSet(key, value, ttlSeconds = 600) {
 export async function cacheDel(key) {
   try {
     const r = getRedis();
+    if (!r) return;
     await r.del(key);
   } catch {}
 }
@@ -84,6 +88,13 @@ export async function withCache(key, ttlSeconds, fetchFn) {
     await cacheSet(key, value, ttlSeconds);
   }
   return value;
+}
+
+export async function closeRedis() {
+  if (!redis) return;
+  const current = redis;
+  redis = null;
+  await current.quit().catch(() => current.disconnect());
 }
 
 export default getRedis;
