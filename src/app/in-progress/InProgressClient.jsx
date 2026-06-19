@@ -37,6 +37,7 @@ import {
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import { translateGenre } from "@/lib/details/formatters";
+import { useAuth } from "@/context/AuthContext";
 
 // ----------------------------
 // HELPERS
@@ -1096,6 +1097,7 @@ function SkeletonCard({ viewMode = "cards" }) {
 export default function InProgressClient({
   initialAuth = { loading: true, connected: false },
 }) {
+  const { session, account, hydrated } = useAuth();
   const initialAuthLoading = !!initialAuth?.loading;
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
@@ -1576,8 +1578,13 @@ export default function InProgressClient({
   // RENDER
   // ----------------------------
 
-  // Not connected state
-  if (!auth.loading && !auth.connected) {
+  if (!hydrated) {
+    return <div className="min-h-screen bg-black" />;
+  }
+
+  const showLoginPrompt = !session || !account || (!auth.loading && !auth.connected);
+
+  if (showLoginPrompt) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">

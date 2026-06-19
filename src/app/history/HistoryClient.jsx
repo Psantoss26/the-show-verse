@@ -38,6 +38,7 @@ import {
   traktDisconnect,
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
+import { useAuth } from "@/context/AuthContext";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
@@ -2289,6 +2290,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 // MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
+  const { session, account, hydrated: authHydrated } = useAuth();
   const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
@@ -2651,6 +2653,12 @@ export default function HistoryClient() {
   useEffect(() => {
     setExpandedGroups(new Set());
   }, [sorted, groupBy, typeFilter, q, selectedDay]);
+
+  if (!hydrated || !authHydrated) {
+    return <div className="min-h-screen bg-black" />;
+  }
+
+  const showLoginPrompt = !session || !account || (!auth.loading && !auth.connected);
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
@@ -3269,7 +3277,7 @@ export default function HistoryClient() {
               </motion.div>
             )}
 
-            {!auth.loading && !auth.connected ? (
+            {showLoginPrompt ? (
               <div className="flex items-center justify-center py-12 lg:py-24">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
