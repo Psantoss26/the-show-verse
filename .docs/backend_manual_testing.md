@@ -8,6 +8,12 @@ Referencia completa de API:
 .docs/backend_api_reference.md
 ```
 
+Configuracion de login con Google:
+
+```text
+.docs/google_auth_setup.md
+```
+
 Documentacion interactiva cuando el backend esta arrancado:
 
 ```text
@@ -39,6 +45,7 @@ La configuracion actual usa `backend/.env` con variables de Neon y Redis. No peg
   - `JWT_REFRESH_SECRET`
   - `FRONTEND_URL=http://localhost:3000`
   - `TMDB_API_KEY`
+  - `GOOGLE_CLIENT_ID` si quieres probar login con Google
 
 ## Opcion recomendada ahora: Neon + Redis configurados en `.env`
 

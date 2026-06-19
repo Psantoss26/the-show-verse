@@ -31,6 +31,38 @@ function getAuthErrorMessage(error, mode) {
   return error?.message || "No se pudo completar la autenticación.";
 }
 
+function getGoogleErrorMessage(value) {
+  if (!value) return "";
+  if (value === "missing_config") {
+    return "Google Login no está configurado todavía.";
+  }
+  if (value === "invalid_state") {
+    return "No se pudo verificar la sesión de Google. Inténtalo de nuevo.";
+  }
+  if (value === "access_denied") {
+    return "Has cancelado el inicio de sesión con Google.";
+  }
+  if (value === "backend_auth_failed") {
+    return "Google validó tu cuenta, pero no se pudo iniciar sesión en Show Verse.";
+  }
+  if (value === "backend_google_config") {
+    return "Falta GOOGLE_CLIENT_ID en el backend. Añádelo en backend/.env o Railway y reinicia el backend.";
+  }
+  if (value === "backend_missing_config") {
+    return "El frontend no encuentra BACKEND_API_BASE_URL para completar el login.";
+  }
+  if (value === "backend_unavailable") {
+    return "El backend no está disponible. Arráncalo en local o revisa BACKEND_API_BASE_URL.";
+  }
+  if (value === "google_audience_mismatch") {
+    return "El GOOGLE_CLIENT_ID del backend no coincide con el cliente OAuth usado por el frontend.";
+  }
+  if (value === "google_email_not_verified") {
+    return "Tu cuenta de Google no tiene el email verificado.";
+  }
+  return "No se pudo completar el inicio de sesión con Google.";
+}
+
 export default function LoginForm({ next: nextProp }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +81,9 @@ export default function LoginForm({ next: nextProp }) {
   const next = useMemo(() => {
     return sanitizeNextPath(nextProp || searchParams?.get("next") || "/");
   }, [nextProp, searchParams]);
+  const googleError = getGoogleErrorMessage(searchParams?.get("google_error"));
+  const visibleError = err || googleError;
+  const googleAuthHref = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -109,6 +144,24 @@ export default function LoginForm({ next: nextProp }) {
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
           Guarda favoritos, vistos, ratings y listas en tu cuenta de The Show Verse.
         </p>
+      </div>
+
+      <a
+        href={googleAuthHref}
+        className="mb-4 flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white px-4 text-sm font-black text-black transition hover:bg-zinc-100 active:scale-[0.99]"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black leading-none text-[#4285f4]">
+          G
+        </span>
+        Continuar con Google
+      </a>
+
+      <div className="mb-4 flex items-center gap-3" aria-hidden="true">
+        <div className="h-px flex-1 bg-white/10" />
+        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+          o
+        </span>
+        <div className="h-px flex-1 bg-white/10" />
       </div>
 
       <div className="mb-5 grid grid-cols-2 rounded-xl border border-white/10 bg-black/30 p-1">
@@ -209,7 +262,7 @@ export default function LoginForm({ next: nextProp }) {
       </div>
 
       <AnimatePresence>
-        {!!err && (
+        {!!visibleError && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -217,7 +270,7 @@ export default function LoginForm({ next: nextProp }) {
             className="mt-4 flex items-start gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-left text-xs text-red-200"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{err}</span>
+            <span>{visibleError}</span>
           </motion.div>
         )}
       </AnimatePresence>

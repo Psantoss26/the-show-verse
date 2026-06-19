@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../config/load-env.js';
 import { db, closeDb } from '../db/client.js';
 import { watchHistory } from '../db/schema.js';
 

@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, readdirSync } from 'fs';
-import 'dotenv/config';
+import '../config/load-env.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = process.env.MIGRATIONS_FOLDER || join(__dirname, '../../drizzle');

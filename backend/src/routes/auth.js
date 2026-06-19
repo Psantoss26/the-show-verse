@@ -33,8 +33,14 @@ const tmdbSessionSchema = z.object({
   sessionId: z.string().min(8),
 });
 
+const googleAuthSchema = z.object({
+  idToken: z.string().min(20),
+});
+
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
 function normalizeUsername(value, fallback) {
   const base = String(value || fallback || 'user')
@@ -78,6 +84,41 @@ async function getTmdbAccount(sessionId) {
   if (!res.ok || json?.success === false || !json?.id) {
     const error = new Error(json?.status_message || `TMDb account failed (${res.status})`);
     error.status = res.status;
+    throw error;
+  }
+
+  return json;
+}
+
+async function verifyGoogleIdToken(idToken) {
+  if (!GOOGLE_CLIENT_ID) {
+    throw new Error('GOOGLE_CLIENT_ID is required for Google auth');
+  }
+
+  const url = new URL(GOOGLE_TOKENINFO_URL);
+  url.searchParams.set('id_token', idToken);
+
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || !json?.sub) {
+    const error = new Error(json?.error_description || 'Invalid Google token');
+    error.status = 401;
+    throw error;
+  }
+
+  if (json.aud !== GOOGLE_CLIENT_ID) {
+    const error = new Error('Google token audience mismatch');
+    error.status = 401;
+    throw error;
+  }
+
+  if (json.email_verified !== 'true' && json.email_verified !== true) {
+    const error = new Error('Google email is not verified');
+    error.status = 403;
     throw error;
   }
 
@@ -201,6 +242,160 @@ export default async function authRoutes(fastify) {
       accessToken,
       refreshToken,
       provider: 'tmdb',
+    });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /auth/google — Crea/recupera sesión propia desde Google OAuth
+  // ──────────────────────────────────────────────
+  fastify.post('/google', async (req, reply) => {
+    const parsed = googleAuthSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        issues: parsed.error.issues,
+      });
+    }
+
+    let googleProfile;
+    try {
+      googleProfile = await verifyGoogleIdToken(parsed.data.idToken);
+    } catch (e) {
+      return reply.status(e.status || 401).send({
+        error: e.message || 'Invalid Google token',
+      });
+    }
+
+    const providerUid = String(googleProfile.sub);
+    const email = String(googleProfile.email || '').toLowerCase();
+    const displayName = googleProfile.name || googleProfile.given_name || email.split('@')[0] || 'Usuario';
+    const avatarUrl = googleProfile.picture || null;
+
+    if (!email) {
+      return reply.status(400).send({ error: 'Google account has no email' });
+    }
+
+    let user = null;
+    const [existingAccount] = await db
+      .select({ userId: connectedAccounts.userId })
+      .from(connectedAccounts)
+      .where(and(eq(connectedAccounts.provider, 'google'), eq(connectedAccounts.providerUid, providerUid)))
+      .limit(1);
+
+    if (existingAccount) {
+      [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(eq(users.id, existingAccount.userId))
+        .limit(1);
+    }
+
+    if (!user) {
+      [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+    }
+
+    if (user && !user.isActive) {
+      return reply.status(403).send({ error: 'Account disabled' });
+    }
+
+    if (!user) {
+      const username = await uniqueUsername(email.split('@')[0], `google-${providerUid.slice(0, 10)}`);
+      [user] = await db
+        .insert(users)
+        .values({
+          email,
+          username,
+          passwordHash: null,
+          displayName,
+          avatarUrl,
+          emailVerified: true,
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+        });
+
+      await db.insert(userPreferences).values({ userId: user.id }).onConflictDoNothing();
+    } else {
+      const updates = {
+        emailVerified: true,
+        updatedAt: new Date(),
+      };
+      if (!user.displayName && displayName) updates.displayName = displayName;
+      if (!user.avatarUrl && avatarUrl) updates.avatarUrl = avatarUrl;
+
+      [user] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, user.id))
+        .returning({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          plan: users.plan,
+        });
+    }
+
+    await db
+      .insert(connectedAccounts)
+      .values({
+        userId: user.id,
+        provider: 'google',
+        providerUid,
+        metadata: {
+          email,
+          name: googleProfile.name || null,
+          picture: avatarUrl,
+        },
+      })
+      .onConflictDoUpdate({
+        target: [connectedAccounts.provider, connectedAccounts.providerUid],
+        set: {
+          userId: user.id,
+          metadata: {
+            email,
+            name: googleProfile.name || null,
+            picture: avatarUrl,
+          },
+        },
+      });
+
+    const { accessToken, refreshToken } = await issueTokenPair(user.id, {
+      deviceName: req.headers['user-agent']?.slice(0, 100),
+      ipAddress: req.ip,
+    });
+
+    return reply.send({
+      user,
+      accessToken,
+      refreshToken,
+      provider: 'google',
     });
   });
 
