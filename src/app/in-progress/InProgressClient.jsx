@@ -1100,51 +1100,17 @@ export default function InProgressClient({
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState(() => {
-    if (typeof window !== "undefined") {
-      const cached = readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
-      return Array.isArray(cached?.items) ? cached.items : [];
-    }
-    return [];
-  });
-  const [stats, setStats] = useState(() => {
-    if (typeof window !== "undefined") {
-      const cached = readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
-      return cached?.stats || null;
-    }
-    return null;
-  });
-  const [dataLoaded, setDataLoaded] = useState(() => {
-    if (typeof window !== "undefined") {
-      return !!readSessionCache(IN_PROGRESS_CACHE_KEY, IN_PROGRESS_CACHE_TTL);
-    }
-    return false;
-  });
+  const [items, setItems] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
   // Tab: "inprogress" | "completed"
   const [activeTab, setActiveTab] = useState("inprogress");
-  const [completedItems, setCompletedItems] = useState(() => {
-    if (typeof window !== "undefined") {
-      const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
-      return Array.isArray(cached?.items) ? cached.items : [];
-    }
-    return [];
-  });
-  const [completedStats, setCompletedStats] = useState(() => {
-    if (typeof window !== "undefined") {
-      const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
-      return cached?.stats || null;
-    }
-    return null;
-  });
+  const [completedItems, setCompletedItems] = useState([]);
+  const [completedStats, setCompletedStats] = useState(null);
   const [completedLoading, setCompletedLoading] = useState(false);
-  const [completedLoaded, setCompletedLoaded] = useState(() => {
-    if (typeof window !== "undefined") {
-      return !!readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
-    }
-    return false;
-  });
+  const [completedLoaded, setCompletedLoaded] = useState(false);
 
   // UI — fixed SSR-safe defaults to avoid hydration mismatch
   const [viewMode, setViewMode] = useState("cards");

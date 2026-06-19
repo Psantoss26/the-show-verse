@@ -94,8 +94,17 @@ await fastify.register(fastifyRateLimit, {
 await fastify.register(authPlugin);
 
 // ────────────────────────────────────────────
-// Health check
 // ────────────────────────────────────────────
+// Health check & Root
+// ────────────────────────────────────────────
+fastify.get('/', async () => ({
+  name: 'The Show Verse API',
+  version: '1.0.0',
+  status: 'online',
+  health: '/health',
+  ready: '/ready'
+}));
+
 fastify.get('/health', async () => ({
   status: 'ok',
   version: '1.0.0',
