@@ -41,7 +41,7 @@ import LiquidButton from "@/components/LiquidButton";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
-const HISTORY_CACHE_KEY = "showverse:history:items:v1";
+const HISTORY_CACHE_KEY = "showverse:history:items:v2";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function isTraktUnavailableError(error) {
@@ -275,6 +275,18 @@ function getMainTitle(entry) {
 
 function getYear(entry) {
   return entry?.year || entry?.movie?.year || entry?.show?.year || null;
+}
+
+function getGenreLabel(entry) {
+  const genres = Array.isArray(entry?.genres) ? entry.genres : [];
+  const firstGenre = genres.find(Boolean);
+  if (!firstGenre) return null;
+  if (typeof firstGenre === "string") return firstGenre;
+  return firstGenre?.name || null;
+}
+
+function getYearGenreLabel(entry) {
+  return [getYear(entry), getGenreLabel(entry)].filter(Boolean).join(" • ");
 }
 
 function getHistoryId(entry) {
@@ -1336,6 +1348,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
   const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle;
 
   const year = getYear(entry);
+  const yearGenre = getYearGenreLabel(entry);
   const watchedDate = useMemo(() => {
     const d = new Date(entry?.watched_at);
     if (Number.isNaN(d.getTime())) return "";
@@ -1478,7 +1491,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
               ? `${groupCount} episodios agrupados`
               : type === "show" && epMeta?.title
                 ? epMeta.title
-                : year}
+                : yearGenre || year}
           </span>
         </div>
 
@@ -1602,12 +1615,11 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
   const baseTitle = getMainTitle(entry);
   const title = baseTitle;
-  const episodeTitle = type === "show" && epMeta?.title ? epMeta.title : null;
   const epBadge = type === "show" && epMeta ? formatEpisodeBadge(epMeta) : null;
   const isGroup = entry?._group && entry._group.length > 1;
   const groupCount = isGroup ? entry._group.length : 0;
   const { dayMonth } = formatWatchedLine(entry?.watched_at);
-  const year = getYear(entry);
+  const yearGenre = getYearGenreLabel(entry);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1695,6 +1707,12 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
             <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
               {title}
             </h5>
+
+            {yearGenre && (
+              <div className="text-[9px] text-zinc-300/85 font-medium mt-0.5 line-clamp-1">
+                {yearGenre}
+              </div>
+            )}
 
             {isGroup ? (
               <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
@@ -1827,6 +1845,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   const groupRange = isGroup ? getEpisodeRange(entry._group) : null;
 
   const { dayMonth } = formatWatchedLine(entry?.watched_at);
+  const yearGenre = getYearGenreLabel(entry);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1860,6 +1879,12 @@ const HistoryGridCard = memo(function HistoryGridCard({
       <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
         {title}
       </h5>
+
+      {yearGenre && (
+        <div className="mt-0.5 text-[10px] text-zinc-300/85 font-medium line-clamp-1">
+          {yearGenre}
+        </div>
+      )}
 
       <div className="mt-0.5 text-[10px] text-zinc-200/80">
         {isGroup ? (
@@ -1961,6 +1986,12 @@ const HistoryGridCard = memo(function HistoryGridCard({
             <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
               {title}
             </h5>
+
+            {yearGenre && (
+              <div className="mt-0.5 text-[10px] text-zinc-300/85 font-medium line-clamp-1">
+                {yearGenre}
+              </div>
+            )}
 
             {isGroup ? (
               <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">

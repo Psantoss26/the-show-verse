@@ -9,6 +9,7 @@ import {
   clearTraktCookies,
 } from '@/lib/trakt/server'
 import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
+import { enrichMediaItemsWithTmdb } from '@/app/api/_utils/tmdbMetadata'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -50,7 +51,7 @@ export async function GET(req) {
   try {
     const backend = await backendFetchJson(req, '/v1/favorites?limit=200')
     if (backend.ok) {
-      const favorites = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
+      const favoritesBase = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
         ...item,
         media_type: item.mediaType,
         media_id: item.tmdbId,
@@ -59,6 +60,10 @@ export async function GET(req) {
         name: item.title || null,
         poster_path: item.posterPath || null,
       }))
+      const favorites = await enrichMediaItemsWithTmdb(favoritesBase, {
+        getId: (item) => item.id,
+        getType: (item) => item.media_type,
+      })
       const res = NextResponse.json({ favorites, source: 'backend' })
       setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
       return res
