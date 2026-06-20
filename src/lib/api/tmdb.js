@@ -489,6 +489,12 @@ export async function getMediaAccountStates(type, id, sessionOrOpts) {
   // account_states NO existe para "person"
   if (type !== "movie" && type !== "tv") return empty;
 
+  const isShowverse =
+    sessionOrOpts === "showverse" || sessionOrOpts?.sessionId === "showverse";
+  if (isShowverse) {
+    return empty;
+  }
+
   if (!IS_SERVER) {
     try {
       const res = await fetch(
@@ -501,17 +507,12 @@ export async function getMediaAccountStates(type, id, sessionOrOpts) {
           favorite: !!data.favorite,
           watchlist: !!(data.watchlist ?? data.inWatchlist),
           rated:
-            data.rating == null
+            (data.rating ?? data.rated?.value) == null
               ? null
-              : { value: Number(data.rating) },
+              : { value: Number(data.rating ?? data.rated.value) },
         };
       }
     } catch {}
-  }
-
-  const isShowverse = sessionOrOpts === "showverse" || sessionOrOpts?.sessionId === "showverse";
-  if (isShowverse) {
-    return empty;
   }
 
   if (!API_KEY) return empty;
