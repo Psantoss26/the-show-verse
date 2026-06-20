@@ -209,10 +209,19 @@ const TARGET_PROVIDER_ORDER = new Map([
   ["plex", 7],
 ]);
 
-function readFavoritesCache() {
+function getUserCacheKey(baseKey, ownerId) {
+  if (!ownerId) return null;
+  return `${baseKey}:${ownerId}`;
+}
+
+function readFavoritesCache(ownerId) {
   if (typeof window === "undefined") return null;
+  const cacheKey = getUserCacheKey(FAVORITES_CACHE_KEY, ownerId);
+  if (!cacheKey) return null;
   try {
-    const raw = window.sessionStorage.getItem(FAVORITES_CACHE_KEY);
+    const raw =
+      window.localStorage.getItem(cacheKey) ||
+      window.sessionStorage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
@@ -226,17 +235,20 @@ function readFavoritesCache() {
   }
 }
 
-function writeFavoritesCache(items, ratedItems = []) {
+function writeFavoritesCache(items, ratedItems = [], ownerId) {
   if (typeof window === "undefined") return;
+  const cacheKey = getUserCacheKey(FAVORITES_CACHE_KEY, ownerId);
+  if (!cacheKey) return;
   try {
-    window.sessionStorage.setItem(
-      FAVORITES_CACHE_KEY,
-      JSON.stringify({
-        t: Date.now(),
-        items: Array.isArray(items) ? items : [],
-        ratedItems: Array.isArray(ratedItems) ? ratedItems : [],
-      }),
-    );
+    const payload = JSON.stringify({
+      t: Date.now(),
+      items: Array.isArray(items) ? items : [],
+      ratedItems: Array.isArray(ratedItems) ? ratedItems : [],
+    });
+    try {
+      window.localStorage.setItem(cacheKey, payload);
+    } catch {}
+    window.sessionStorage.setItem(cacheKey, payload);
   } catch {}
 }
 
@@ -2217,11 +2229,16 @@ const FavoriteCard = memo(function FavoriteCard({
 export default function FavoritesClient() {
   const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
+  const initialFavoritesCacheRef = useRef(null);
+  if (initialFavoritesCacheRef.current === null) {
+    initialFavoritesCacheRef.current = readFavoritesCache(account?.id) || false;
+  }
+  const initialFavoritesCache = initialFavoritesCacheRef.current || null;
+  const [loading, setLoading] = useState(() => !initialFavoritesCache?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
+  const [items, setItems] = useState(() => initialFavoritesCache?.items || []);
   const [ratedItems, setRatedItems] = useState(
-    () => readFavoritesCache()?.ratedItems || [],
+    () => initialFavoritesCache?.ratedItems || [],
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
@@ -2234,6 +2251,15 @@ export default function FavoritesClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
+
+  useEffect(() => {
+    if (!account?.id || items.length > 0) return;
+    const cached = readFavoritesCache(account.id);
+    if (!cached?.items?.length) return;
+    setItems(cached.items);
+    setRatedItems(cached.ratedItems || []);
+    setLoading(false);
+  }, [account?.id, items.length]);
 
   // Watch history for sorting
   const [watchDates, setWatchDates] = useState(new Map());
@@ -2427,7 +2453,8 @@ export default function FavoritesClient() {
       }
 
       try {
-        setLoading(items.length === 0);
+        const cached = readFavoritesCache(account?.id);
+        setLoading(items.length === 0 && !cached?.items?.length);
 
         const favResponse = await fetch("/api/tmdb/account/favorite", {
           signal: controller.signal,
@@ -2482,7 +2509,7 @@ export default function FavoritesClient() {
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
           setItems(favoritesWithMeta);
-          writeFavoritesCache(favoritesWithMeta, []);
+          writeFavoritesCache(favoritesWithMeta, [], account?.id);
 
           const isShowverse = session === "showverse" || account?.provider === "showverse";
           if (!isShowverse && !favoritesListSyncInFlight) {
@@ -2523,7 +2550,7 @@ export default function FavoritesClient() {
                     ...item,
                     user_rating: ratingMap.get(getRatingKey(item)) ?? item.user_rating ?? null,
                   }));
-                  writeFavoritesCache(merged, rated);
+                  writeFavoritesCache(merged, rated, account?.id);
                   return merged;
                 });
               })
@@ -2988,6 +3015,47 @@ export default function FavoritesClient() {
     return { total: filtered.length, movies, shows };
   }, [filtered]);
 
+  const [renderLimit, setRenderLimit] = useState(FAVORITES_INITIAL_RENDER_LIMIT);
+
+  useEffect(() => {
+    if (groupBy !== "none") {
+      setRenderLimit(sorted.length);
+      return undefined;
+    }
+
+    const initialLimit = Math.min(
+      FAVORITES_INITIAL_RENDER_LIMIT,
+      sorted.length,
+    );
+    setRenderLimit(initialLimit);
+
+    if (initialLimit >= sorted.length) return undefined;
+
+    let cancelled = false;
+    let handle = null;
+
+    const scheduleNext = () => {
+      handle = scheduleFavoritesRenderChunk(() => {
+        if (cancelled) return;
+        setRenderLimit((current) => {
+          const next = Math.min(
+            current + FAVORITES_RENDER_CHUNK_SIZE,
+            sorted.length,
+          );
+          if (next < sorted.length) scheduleNext();
+          return next;
+        });
+      });
+    };
+
+    scheduleNext();
+
+    return () => {
+      cancelled = true;
+      cancelFavoritesRenderChunk(handle);
+    };
+  }, [groupBy, sorted.length, typeFilter, q, sortBy, viewMode, imageMode]);
+
   // Grouping logic
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
@@ -3072,7 +3140,7 @@ export default function FavoritesClient() {
     loadingProviders,
   ]);
 
-  const renderedSorted = sorted;
+  const renderedSorted = sorted.slice(0, renderLimit);
   const renderedGrouped = grouped;
 
   const groupSectionRefs = useRef(new Map());

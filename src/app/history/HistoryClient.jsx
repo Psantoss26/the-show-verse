@@ -56,10 +56,19 @@ function isTraktUnavailableError(error) {
 // ----------------------------
 const pad2 = (n) => String(n).padStart(2, "0");
 
-function readHistoryCache() {
+function getUserCacheKey(baseKey, ownerId) {
+  if (!ownerId) return null;
+  return `${baseKey}:${ownerId}`;
+}
+
+function readHistoryCache(ownerId) {
   if (typeof window === "undefined") return null;
+  const cacheKey = getUserCacheKey(HISTORY_CACHE_KEY, ownerId);
+  if (!cacheKey) return null;
   try {
-    const raw = window.sessionStorage.getItem(HISTORY_CACHE_KEY);
+    const raw =
+      window.localStorage.getItem(cacheKey) ||
+      window.sessionStorage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
@@ -73,24 +82,30 @@ function readHistoryCache() {
   }
 }
 
-function writeHistoryCache(items, { hasMore = false } = {}) {
+function writeHistoryCache(items, { hasMore = false, ownerId = null } = {}) {
   if (typeof window === "undefined") return;
+  const cacheKey = getUserCacheKey(HISTORY_CACHE_KEY, ownerId);
+  if (!cacheKey) return;
   try {
-    window.sessionStorage.setItem(
-      HISTORY_CACHE_KEY,
-      JSON.stringify({
-        t: Date.now(),
-        items: Array.isArray(items) ? items : [],
-        hasMore: !!hasMore,
-      }),
-    );
+    const payload = JSON.stringify({
+      t: Date.now(),
+      items: Array.isArray(items) ? items : [],
+      hasMore: !!hasMore,
+    });
+    try {
+      window.localStorage.setItem(cacheKey, payload);
+    } catch {}
+    window.sessionStorage.setItem(cacheKey, payload);
   } catch {}
 }
 
-function clearHistoryCache() {
+function clearHistoryCache(ownerId) {
   if (typeof window === "undefined") return;
+  const cacheKey = getUserCacheKey(HISTORY_CACHE_KEY, ownerId);
+  if (!cacheKey) return;
   try {
-    window.sessionStorage.removeItem(HISTORY_CACHE_KEY);
+    window.localStorage.removeItem(cacheKey);
+    window.sessionStorage.removeItem(cacheKey);
   } catch {}
 }
 
@@ -2496,7 +2511,7 @@ export default function HistoryClient() {
   }, []);
 
   useEffect(() => {
-    const cached = readHistoryCache();
+    const cached = readHistoryCache(account?.id);
     if (cached?.items?.length) {
       setRaw(cached.items);
       setHistoryLoaded(true);
@@ -2518,7 +2533,7 @@ export default function HistoryClient() {
     if (savedSortBy) setSortBy(savedSortBy);
 
     setHydrated(true);
-  }, []);
+  }, [account?.id]);
 
   // Persistir estados de UI en localStorage
   useEffect(() => {
@@ -2591,7 +2606,10 @@ export default function HistoryClient() {
 
       setRaw((prev) => {
         if (reset) {
-          writeHistoryCache(sorted, { hasMore: nextHasMore });
+          writeHistoryCache(sorted, {
+            hasMore: nextHasMore,
+            ownerId: account?.id,
+          });
           return sorted;
         }
 
@@ -2607,7 +2625,10 @@ export default function HistoryClient() {
         const nextItems = merged.sort(
           (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
         );
-        writeHistoryCache(nextItems, { hasMore: nextHasMore });
+        writeHistoryCache(nextItems, {
+          hasMore: nextHasMore,
+          ownerId: account?.id,
+        });
         return nextItems;
       });
     } catch (error) {
@@ -2615,7 +2636,7 @@ export default function HistoryClient() {
         setAuth({ loading: false, connected: false });
         setRaw([]);
         setHistoryError("");
-        clearHistoryCache();
+        clearHistoryCache(account?.id);
       } else {
         setHistoryError("No se pudo cargar el historial.");
       }
@@ -2628,7 +2649,7 @@ export default function HistoryClient() {
       setLoadingMore(false);
       setHistoryLoaded(true);
     }
-  }, []);
+  }, [account?.id]);
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -2640,7 +2661,7 @@ export default function HistoryClient() {
       setHasMoreHistory(false);
       hasMoreHistoryRef.current = false;
       nextHistoryPageRef.current = 1;
-      clearHistoryCache();
+      clearHistoryCache(account?.id);
       setShowDisconnectModal(false);
       // Redirigir a la página principal
       window.location.href = "/";
@@ -2649,7 +2670,7 @@ export default function HistoryClient() {
       setShowDisconnectModal(false);
       alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
     }
-  }, []);
+  }, [account?.id]);
 
   useEffect(() => {
     loadAuth();
@@ -2684,7 +2705,10 @@ export default function HistoryClient() {
         const nextItems = (prev || []).filter(
           (x) => String(getHistoryId(x)) !== String(historyId),
         );
-        writeHistoryCache(nextItems, { hasMore: hasMoreHistoryRef.current });
+        writeHistoryCache(nextItems, {
+          hasMore: hasMoreHistoryRef.current,
+          ownerId: account?.id,
+        });
         return nextItems;
       });
     } catch {
@@ -2692,7 +2716,7 @@ export default function HistoryClient() {
     } finally {
       setMutatingId("");
     }
-  }, []);
+  }, [account?.id]);
 
   const filtered = useMemo(() => {
     const needle = (q || "").trim().toLowerCase();
