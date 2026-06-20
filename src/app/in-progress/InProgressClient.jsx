@@ -69,6 +69,21 @@ function formatEpCode(season, number) {
   return `S${String(season).padStart(2, "0")}E${String(number).padStart(2, "0")}`;
 }
 
+function getEpisodeProgress(item) {
+  const completed = Math.max(0, Number(item?.completed || 0));
+  const aired = Math.max(0, Number(item?.aired || item?.total_episodes || 0));
+  const hasKnownAired = item?.hasKnownAired !== false && aired > 0;
+  const remaining = hasKnownAired ? Math.max(0, aired - completed) : null;
+  const label = hasKnownAired
+    ? `${completed}/${aired} episodios`
+    : `${completed} episodios vistos`;
+  const longLabel = hasKnownAired
+    ? `${completed} de ${aired} episodios`
+    : `${completed} episodios vistos`;
+
+  return { completed, aired, hasKnownAired, remaining, label, longLabel };
+}
+
 function getProgressColor(pct) {
   if (pct >= 90)
     return {
@@ -699,7 +714,8 @@ const InProgressCard = memo(function InProgressCard({
     ? formatEpCode(item.lastEpisode.season, item.lastEpisode.number)
     : null;
   const lastWatched = formatLastWatched(item.lastWatchedAt);
-  const remaining = item.aired - item.completed;
+  const episodeProgress = getEpisodeProgress(item);
+  const remaining = episodeProgress.remaining;
 
   const animDelay = Math.min(index * 0.06, 0.5);
 
@@ -733,9 +749,7 @@ const InProgressCard = memo(function InProgressCard({
                 >
                   {item.pct}%
                 </span>
-                <span>
-                  {item.completed}/{item.aired} episodios
-                </span>
+                <span>{episodeProgress.label}</span>
                 {nextEpCode && (
                   <>
                     <span>•</span>
@@ -850,7 +864,7 @@ const InProgressCard = memo(function InProgressCard({
                       )}
 
                       <p className="text-sky-400 text-xs font-bold drop-shadow-md">
-                        {item.completed}/{item.aired} episodios
+                        {episodeProgress.label}
                       </p>
 
                       <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
@@ -981,7 +995,7 @@ const InProgressCard = memo(function InProgressCard({
                   Progreso
                 </span>
                 <span className="text-[11px] text-zinc-500">
-                  {item.completed} de {item.aired} episodios
+                  {episodeProgress.longLabel}
                 </span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-zinc-800/80 overflow-hidden relative">
@@ -1372,7 +1386,11 @@ export default function InProgressClient({
         );
         break;
       case "episodes-left":
-        list.sort((a, b) => a.aired - a.completed - (b.aired - b.completed));
+        list.sort((a, b) => {
+          const aRemaining = getEpisodeProgress(a).remaining;
+          const bRemaining = getEpisodeProgress(b).remaining;
+          return (aRemaining ?? Number.MAX_SAFE_INTEGER) - (bRemaining ?? Number.MAX_SAFE_INTEGER);
+        });
         break;
       default:
         break;
@@ -1460,8 +1478,11 @@ export default function InProgressClient({
         groupLabel = colors.label;
       } else if (groupBy === "remaining") {
         // Group by remaining episodes
-        const remaining = item.aired - item.completed;
-        if (remaining === 0) {
+        const remaining = getEpisodeProgress(item).remaining;
+        if (remaining == null) {
+          groupKey = "unknown";
+          groupLabel = "Total pendiente desconocido";
+        } else if (remaining === 0) {
           groupKey = "0";
           groupLabel = "Completas";
         } else if (remaining <= 5) {

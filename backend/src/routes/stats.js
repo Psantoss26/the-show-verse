@@ -93,15 +93,13 @@ export default async function statsRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/shows/in-progress', async (req, reply) => {
     const userId = req.user.id;
-    const rawLimit = Number(req.query?.limit || 50);
+    const rawLimit = Number(req.query?.limit || 1000);
     const limit = Number.isFinite(rawLimit)
-      ? Math.max(1, Math.min(200, Math.floor(rawLimit)))
-      : 50;
+      ? Math.max(1, Math.min(2000, Math.floor(rawLimit)))
+      : 1000;
 
-    // Series con al menos un episodio visto, sin tener todos vistos
-    // (simplificado: series con episodios vistos en los últimos 6 meses)
-    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
-
+    // Series con al menos un episodio visto. El filtrado final entre
+    // "en progreso" y "completadas" se hace en el BFF con metadatos de TMDb.
     const shows = await db
       .select({
         tmdbId: watchHistory.tmdbId,
@@ -116,8 +114,7 @@ export default async function statsRoutes(fastify) {
           eq(watchHistory.userId, userId),
           eq(watchHistory.mediaType, 'tv'),
           isNotNull(watchHistory.season),
-          isNotNull(watchHistory.episode),
-          gte(watchHistory.watchedAt, sixMonthsAgo)
+          isNotNull(watchHistory.episode)
         )
       )
       .groupBy(watchHistory.tmdbId, watchHistory.title, watchHistory.posterPath)

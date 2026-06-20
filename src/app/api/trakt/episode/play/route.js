@@ -26,13 +26,13 @@ export async function POST(request) {
 
     try {
         const watchedAtIso = normalizeWatchedAt(watchedAt)
-        const backend = await backendFetchJson(request, '/v1/history/episodes', {
+        const backend = await backendFetchJson(request, '/v1/history', {
             method: 'POST',
             body: JSON.stringify({
                 tmdbId: Number(tmdbId),
+                mediaType: 'tv',
                 season: sn,
                 episode: en,
-                watched: true,
                 watchedAt: watchedAtIso || undefined,
                 title: body?.title,
                 posterPath: body?.posterPath,
@@ -43,7 +43,7 @@ export async function POST(request) {
             const res = NextResponse.json({
                 connected: true,
                 ok: true,
-                watchedBySeason: backend.json?.watchedBySeason || {},
+                item: backend.json?.item || null,
                 source: 'backend',
             })
             setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === 'https:' })

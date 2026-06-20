@@ -341,6 +341,57 @@ export default async function historyRoutes(fastify) {
   });
 
   // ──────────────────────────────────────────────
+  // POST /history/episodes/bulk — Añadir plays de episodios sin deduplicar
+  // Usado para registrar un visionado completo o rewatch de una serie.
+  // ──────────────────────────────────────────────
+  fastify.post('/episodes/bulk', async (req, reply) => {
+    const schema = z.object({
+      tmdbId: z.number().int().positive(),
+      watchedAt: z.string().optional(),
+      title: z.string().optional(),
+      posterPath: z.string().optional(),
+      episodes: z.array(z.object({
+        season: z.number().int().positive(),
+        episode: z.number().int().positive(),
+        title: z.string().optional(),
+      })).min(1).max(1000),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    const { tmdbId, watchedAt, title, posterPath, episodes } = parsed.data;
+    const watchedAtDate = watchedAt ? new Date(watchedAt) : new Date();
+    if (Number.isNaN(watchedAtDate.getTime())) {
+      return reply.status(400).send({ error: 'Invalid watchedAt' });
+    }
+
+    const rows = episodes.map((ep) => ({
+      userId: req.user.id,
+      tmdbId,
+      mediaType: 'tv',
+      season: ep.season,
+      episode: ep.episode,
+      watchedAt: watchedAtDate,
+      title: ep.title || title || null,
+      posterPath: posterPath || null,
+    }));
+
+    const inserted = await db
+      .insert(watchHistory)
+      .values(rows)
+      .returning({ id: watchHistory.id });
+
+    return reply.status(201).send({
+      ok: true,
+      inserted: inserted.length,
+      ids: inserted.map((row) => row.id),
+    });
+  });
+
+  // ──────────────────────────────────────────────
   // POST /history/seasons — Marcar temporada completa
   // Replica de traktSetSeasonWatched
   // ──────────────────────────────────────────────

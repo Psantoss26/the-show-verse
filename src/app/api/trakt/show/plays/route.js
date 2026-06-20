@@ -8,10 +8,13 @@ import {
   setTraktCookies,
   traktFetch,
 } from "@/lib/trakt/server";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const TMDB_BASE = "https://api.themoviedb.org/3";
+const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_LIMIT = 200;
 const MAX_PAGES = 80;
 
@@ -20,6 +23,78 @@ const MAX_EPISODES_PER_CALL = 350;
 
 function buildEpisodeKey(sn, en) {
   return `${sn}x${en}`;
+}
+
+async function fetchTmdbShowSeasons(tmdbId) {
+  if (!TMDB_KEY) return [];
+
+  const url = `${TMDB_BASE}/tv/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(TMDB_KEY)}&language=es-ES`;
+  const res = await fetch(url, { cache: "force-cache", next: { revalidate: 60 * 60 * 24 } });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !Array.isArray(json?.seasons)) return [];
+
+  return json.seasons
+    .map((season) => {
+      const sn = Number(season?.season_number);
+      const count = Number(season?.episode_count || 0);
+      if (!Number.isFinite(sn) || sn <= 0 || !Number.isFinite(count) || count <= 0) {
+        return null;
+      }
+      return {
+        number: sn,
+        episodes: Array.from({ length: count }, (_, index) => ({ number: index + 1 })),
+      };
+    })
+    .filter(Boolean);
+}
+
+function mapBackendEpisodesToHistoryItems(episodes) {
+  return (Array.isArray(episodes) ? episodes : [])
+    .map((item) => {
+      const season = Number(item?.season);
+      const episode = Number(item?.episode);
+      const watchedAt = item?.watchedAt || item?.watched_at || null;
+      if (!watchedAt || !Number.isFinite(season) || !Number.isFinite(episode)) return null;
+
+      return {
+        id: item?.id ? String(item.id) : null,
+        watched_at: watchedAt,
+        episode: {
+          season,
+          number: episode,
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
+function collectEpisodesFromHistoryItems(historyItems) {
+  const episodeKeySet = new Set();
+  const canonicalBySeason = {};
+
+  for (const item of Array.isArray(historyItems) ? historyItems : []) {
+    const sn = Number(item?.episode?.season);
+    const en = Number(item?.episode?.number);
+    if (!Number.isFinite(sn) || sn <= 0 || !Number.isFinite(en) || en <= 0) {
+      continue;
+    }
+
+    episodeKeySet.add(buildEpisodeKey(sn, en));
+    if (!canonicalBySeason[sn]) canonicalBySeason[sn] = [];
+    canonicalBySeason[sn].push(en);
+  }
+
+  for (const sn of Object.keys(canonicalBySeason)) {
+    canonicalBySeason[Number(sn)] = [...new Set(canonicalBySeason[sn])].sort(
+      (a, b) => a - b,
+    );
+  }
+
+  return {
+    episodeKeySet,
+    canonicalBySeason,
+    totalEpisodes: episodeKeySet.size,
+  };
 }
 
 // Acepta ISO o YYYY-MM-DD (interpreta YYYY-MM-DD como medianoche UTC)
@@ -265,8 +340,8 @@ function computeWatchedBySeasonSince(
     const k = buildEpisodeKey(sn, en);
     if (!episodeKeySet.has(k)) continue;
 
-    const hid = Number(it?.id);
-    if (Number.isFinite(hid) && hid > 0) {
+    const hid = it?.id != null ? String(it.id) : "";
+    if (hid) {
       historyIds.push(hid);
       historyIdsByEpisode[`S${sn}E${en}`] = hid;
     }
@@ -310,17 +385,87 @@ function chunkSeasonsByEpisodeCount(payloadSeasons) {
   return batches;
 }
 
-export async function GET(request) {
-  const cookieStore = await cookies();
-  const { accessToken, refreshToken, expiresAtMs } =
-    readTraktCookies(cookieStore);
+function flattenPayloadSeasons(payloadSeasons) {
+  const out = [];
+  for (const season of Array.isArray(payloadSeasons) ? payloadSeasons : []) {
+    const sn = Number(season?.number);
+    if (!Number.isFinite(sn) || sn <= 0) continue;
 
+    for (const episode of Array.isArray(season?.episodes) ? season.episodes : []) {
+      const en = Number(episode?.number);
+      if (!Number.isFinite(en) || en <= 0) continue;
+      out.push({ season: sn, episode: en });
+    }
+  }
+  return out;
+}
+
+export async function GET(request) {
   const tmdbId = request.nextUrl.searchParams.get("tmdbId");
   const startAt = request.nextUrl.searchParams.get("startAt");
   const endBefore = request.nextUrl.searchParams.get("endBefore");
 
   if (!tmdbId)
     return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+
+  try {
+    const [backend, seasons] = await Promise.all([
+      backendFetchJson(request, `/v1/history/shows/${encodeURIComponent(tmdbId)}`),
+      fetchTmdbShowSeasons(tmdbId),
+    ]);
+
+    if (backend.ok) {
+      const historyAll = mapBackendEpisodesToHistoryItems(backend.json?.episodes);
+      const canonical =
+        seasons.length > 0
+          ? collectCanonicalEpisodes(seasons)
+          : collectEpisodesFromHistoryItems(historyAll);
+      const { episodeKeySet, totalEpisodes } = canonical;
+      const { showPlays, minPlays } = computeShowCompletions(historyAll, episodeKeySet);
+      const rewatchRuns = computeRewatchRuns(historyAll, episodeKeySet);
+      const startAtIso = normalizeWatchedAtIso(startAt);
+      const endBeforeIso = normalizeWatchedAtIso(endBefore);
+      const sinceData = startAtIso
+        ? computeWatchedBySeasonSince(
+            historyAll,
+            startAtIso,
+            episodeKeySet,
+            endBeforeIso || null,
+          )
+        : null;
+
+      const res = NextResponse.json({
+        connected: true,
+        found: Boolean(backend.json?.found),
+        traktId: null,
+        totalEpisodes,
+        minPlays,
+        completedPlays: showPlays.length,
+        showPlays,
+        plays: showPlays,
+        rewatchRuns,
+        watchedBySeasonSince: sinceData?.watchedBySeason || null,
+        historyIdsByEpisodeSince: sinceData?.historyIdsByEpisode || {},
+        historyIdsSince: sinceData?.historyIds || [],
+        startAt: startAtIso || null,
+        endBefore: endBeforeIso || null,
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+      return res;
+    }
+
+    if (!backend.skipped && backend.status !== 401) {
+      console.warn("Backend show plays failed; falling back to Trakt", backend.error);
+    }
+  } catch (e) {
+    console.warn("Backend show plays failed; falling back to Trakt", e);
+  }
+
+  const cookieStore = await cookies();
+  const { accessToken, refreshToken, expiresAtMs } =
+    readTraktCookies(cookieStore);
+
   if (!accessToken && !refreshToken)
     return NextResponse.json({ connected: false }, { status: 401 });
 
@@ -398,16 +543,74 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const cookieStore = await cookies();
-  const { accessToken, refreshToken, expiresAtMs } =
-    readTraktCookies(cookieStore);
-
   const body = await request.json().catch(() => ({}));
   const tmdbId = body?.tmdbId;
   const watchedAt = body?.watchedAt;
 
   if (!tmdbId)
     return NextResponse.json({ error: "Missing tmdbId" }, { status: 400 });
+
+  try {
+    const seasons = await fetchTmdbShowSeasons(tmdbId);
+    const { canonicalBySeason } = collectCanonicalEpisodes(seasons);
+    const payloadSeasons = Object.entries(canonicalBySeason).map(([number, episodes]) => ({
+      number: Number(number),
+      episodes: episodes.map((episode) => ({ number: episode })),
+    }));
+    const episodes = flattenPayloadSeasons(payloadSeasons);
+
+    if (episodes.length === 0) {
+      return NextResponse.json(
+        { connected: true, found: false, error: "No se pudieron resolver episodios de TMDb" },
+        { status: 404 },
+      );
+    }
+
+    const watchedAtIso = normalizeWatchedAtIso(watchedAt);
+    let inserted = 0;
+    let batches = 0;
+    let latestBackend = null;
+
+    for (let i = 0; i < episodes.length; i += MAX_EPISODES_PER_CALL) {
+      const chunk = episodes.slice(i, i + MAX_EPISODES_PER_CALL);
+      const backend = await backendFetchJson(request, "/v1/history/episodes/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          tmdbId: Number(tmdbId),
+          watchedAt: watchedAtIso || undefined,
+          title: body?.title,
+          posterPath: body?.posterPath,
+          episodes: chunk,
+        }),
+      });
+      latestBackend = backend;
+
+      if (!backend.ok) {
+        throw new Error(backend.error || "Backend show play failed");
+      }
+
+      inserted += Number(backend.json?.inserted || chunk.length);
+      batches += 1;
+    }
+
+    const res = NextResponse.json({
+      connected: true,
+      ok: true,
+      traktId: null,
+      inserted,
+      batches,
+      source: "backend",
+    });
+    setBackendAuthCookies(res, latestBackend, { secure: request.nextUrl.protocol === "https:" });
+    return res;
+  } catch (e) {
+    console.warn("Backend add show play failed; falling back to Trakt", e);
+  }
+
+  const cookieStore = await cookies();
+  const { accessToken, refreshToken, expiresAtMs } =
+    readTraktCookies(cookieStore);
+
   if (!accessToken && !refreshToken)
     return NextResponse.json({ connected: false }, { status: 401 });
 

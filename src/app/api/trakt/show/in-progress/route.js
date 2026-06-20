@@ -131,7 +131,7 @@ async function fetchShowProgress(
 export async function GET(request) {
   if (hasBackendCredentials(request)) {
     try {
-      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress?limit=50");
+      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress?limit=1000");
       if (backend.ok) {
         const results = Array.isArray(backend.json?.results) ? backend.json.results : [];
         const enriched = await mapLimit(results, 8, async (item) => {
@@ -151,7 +151,8 @@ export async function GET(request) {
             }
           }
 
-          const aired = tmdb?.number_of_episodes || 0;
+          const aired = Number(tmdb?.number_of_episodes || 0);
+          const hasKnownAired = aired > 0;
 
           const watchedKeys = new Set();
           for (const ep of episodes) {
@@ -160,7 +161,7 @@ export async function GET(request) {
             }
           }
           const completed = watchedKeys.size;
-          const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
+          const pct = hasKnownAired ? Math.min(100, Math.round((completed / aired) * 100)) : 0;
 
           const lastEp = episodes[0];
           const lastEpisode = lastEp
@@ -192,6 +193,7 @@ export async function GET(request) {
             title_es: tmdb?.name || item.title || null,
             year: tmdb?.first_air_date ? String(tmdb.first_air_date).slice(0, 4) : null,
             aired,
+            hasKnownAired,
             completed,
             pct,
             nextEpisode,
@@ -211,8 +213,15 @@ export async function GET(request) {
           };
         });
 
-        // Filter out fully completed shows or shows not started
-        const inProgress = enriched.filter(item => item.completed > 0 && item.completed < item.aired);
+        // Si TMDb no devuelve el total de episodios a tiempo, no ocultamos una
+        // serie con episodios vistos: es mejor mostrarla como pendiente que
+        // perderla de la página.
+        const inProgress = enriched.filter((item) => {
+          const completed = Number(item.completed || 0);
+          const aired = Number(item.aired || 0);
+          return completed > 0 && (aired <= 0 || completed < aired);
+        });
+        const itemsWithKnownProgress = inProgress.filter((item) => Number(item.aired || 0) > 0);
 
         const responseData = {
           connected: true,
@@ -220,11 +229,14 @@ export async function GET(request) {
           stats: {
             total: inProgress.length,
             avgProgress:
-              inProgress.length > 0
-                ? Math.round(inProgress.reduce((s, x) => s + x.pct, 0) / inProgress.length)
+              itemsWithKnownProgress.length > 0
+                ? Math.round(itemsWithKnownProgress.reduce((s, x) => s + x.pct, 0) / itemsWithKnownProgress.length)
                 : 0,
             totalEpisodesWatched: inProgress.reduce((s, x) => s + x.completed, 0),
-            totalEpisodesRemaining: inProgress.reduce((s, x) => s + (x.aired - x.completed), 0),
+            totalEpisodesRemaining: inProgress.reduce(
+              (s, x) => s + (Number(x.aired || 0) > 0 ? Math.max(0, x.aired - x.completed) : 0),
+              0,
+            ),
           },
           source: "backend"
         };

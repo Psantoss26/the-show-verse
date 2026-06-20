@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
 
 const TRAKT_API = 'https://api.trakt.tv'
 const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID
@@ -13,17 +14,15 @@ function traktHeaders(token) {
     }
 }
 
-// ⚠️ Ajusta esto a cómo guardas el token
-function getAccessToken() {
-    return cookies().get('trakt_access_token')?.value || null
+async function getAccessToken() {
+    const cookieStore = await cookies()
+    return cookieStore.get('trakt_access_token')?.value || null
 }
 
 export async function POST(req, { params }) {
     try {
-        const token = getAccessToken()
-        if (!token) return NextResponse.json({ error: 'Trakt no conectado' }, { status: 401 })
-
-        const tmdbId = Number(params.tmdbId)
+        const { tmdbId: tmdbParam } = await params
+        const tmdbId = Number(tmdbParam)
         if (!Number.isFinite(tmdbId)) return NextResponse.json({ error: 'tmdbId inválido' }, { status: 400 })
 
         const body = await req.json()
@@ -33,6 +32,37 @@ export async function POST(req, { params }) {
 
         if (!Number.isFinite(season) || season < 1) return NextResponse.json({ error: 'season inválida' }, { status: 400 })
         if (!Number.isFinite(episode) || episode < 1) return NextResponse.json({ error: 'episode inválido' }, { status: 400 })
+
+        const backend = await backendFetchJson(req, '/v1/history/episodes', {
+            method: 'POST',
+            body: JSON.stringify({
+                tmdbId,
+                season,
+                episode,
+                watched,
+                watchedAt: body?.watchedAt || undefined,
+                title: body?.title,
+                posterPath: body?.posterPath,
+            }),
+        })
+
+        if (backend.ok) {
+            const res = NextResponse.json({
+                connected: true,
+                ok: true,
+                watched,
+                watchedBySeason: backend.json?.watchedBySeason || {},
+                source: 'backend',
+            })
+            setBackendAuthCookies(res, backend, { secure: req.nextUrl.protocol === 'https:' })
+            return res
+        }
+        if (!backend.skipped && backend.status !== 401) {
+            console.warn('Backend show episode update failed; falling back to Trakt', backend.error)
+        }
+
+        const token = await getAccessToken()
+        if (!token) return NextResponse.json({ error: 'Trakt no conectado' }, { status: 401 })
 
         const payload = {
             shows: [{
