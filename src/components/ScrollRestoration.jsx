@@ -3,7 +3,15 @@
 import { useEffect, useRef } from "react";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
-const RESTORE_DELAYS_MS = [0, 80, 180, 360, 720, 1200, 1800, 2600];
+const USER_SCROLL_KEYS = new Set([
+  "ArrowDown",
+  "ArrowUp",
+  "End",
+  "Home",
+  "PageDown",
+  "PageUp",
+  " ",
+]);
 
 function getCurrentRouteKey() {
   return `${window.location.pathname}${window.location.search}` || "/";
@@ -77,8 +85,9 @@ export default function ScrollRestoration() {
   const scrollSaveRafRef = useRef(0);
   const scrollSaveLockRef = useRef(null);
   const urlChangeRafRef = useRef(0);
-  const restoreTimersRef = useRef([]);
   const historyNavigationUntilRef = useRef(0);
+  const navigationScrollRafRef = useRef(0);
+  const ignoreScrollEventsUntilRef = useRef(0);
 
   useEffect(() => {
     currentRouteKeyRef.current = getCurrentRouteKey();
@@ -92,9 +101,11 @@ export default function ScrollRestoration() {
       window.history.scrollRestoration = "manual";
     }
 
-    const clearRestoreTimers = () => {
-      restoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      restoreTimersRef.current = [];
+    const clearScheduledNavigationScroll = () => {
+      if (navigationScrollRafRef.current) {
+        window.cancelAnimationFrame(navigationScrollRafRef.current);
+        navigationScrollRafRef.current = 0;
+      }
     };
 
     const lockCurrentRouteAgainstAutomaticTopSave = () => {
@@ -126,11 +137,20 @@ export default function ScrollRestoration() {
       if (lockAfterSave) lockCurrentRouteAgainstAutomaticTopSave();
     };
 
+    const applyNavigationScroll = (callback) => {
+      clearScheduledNavigationScroll();
+      navigationScrollRafRef.current = window.requestAnimationFrame(() => {
+        navigationScrollRafRef.current = 0;
+        ignoreScrollEventsUntilRef.current = window.performance.now() + 250;
+        callback();
+      });
+    };
+
     const runNavigationScroll = (mode) => {
       const nextRouteKey = getCurrentRouteKey();
       if (nextRouteKey === currentRouteKeyRef.current) return;
 
-      clearRestoreTimers();
+      clearScheduledNavigationScroll();
 
       const previousPathKey = currentPathKeyRef.current;
       const nextPathKey = getCurrentPathKey();
@@ -145,14 +165,11 @@ export default function ScrollRestoration() {
         const savedPosition = readScrollPosition(nextRouteKey);
         scrollSaveLockRef.current = {
           routeKey: nextRouteKey,
-          expiresAt: window.performance.now() + 3200,
+          expiresAt: window.performance.now() + 900,
           skipAll: true,
         };
 
-        scrollToSavedPosition(savedPosition);
-        restoreTimersRef.current = RESTORE_DELAYS_MS.map((delay) =>
-          window.setTimeout(() => scrollToSavedPosition(savedPosition), delay),
-        );
+        applyNavigationScroll(() => scrollToSavedPosition(savedPosition));
         return;
       }
 
@@ -163,15 +180,12 @@ export default function ScrollRestoration() {
       if (hasVisitedPath) {
         const savedPosition = readScrollPosition(nextRouteKey);
         if (savedPosition) {
-          scrollToSavedPosition(savedPosition);
-          restoreTimersRef.current = RESTORE_DELAYS_MS.map((delay) =>
-            window.setTimeout(() => scrollToSavedPosition(savedPosition), delay),
-          );
+          applyNavigationScroll(() => scrollToSavedPosition(savedPosition));
         }
         return;
       }
 
-      scrollToPageStart();
+      applyNavigationScroll(scrollToPageStart);
     };
 
     const scheduleNavigationScroll = (mode) => {
@@ -190,6 +204,9 @@ export default function ScrollRestoration() {
 
       scrollSaveRafRef.current = window.requestAnimationFrame(() => {
         scrollSaveRafRef.current = 0;
+        if (window.performance.now() <= ignoreScrollEventsUntilRef.current) {
+          return;
+        }
         if (shouldSkipCurrentPositionSave()) return;
         saveCurrentPosition();
       });
@@ -225,16 +242,33 @@ export default function ScrollRestoration() {
     };
 
     const handleDocumentClick = () => {
+      clearScheduledNavigationScroll();
       saveCurrentPosition({ lockAfterSave: true });
+    };
+
+    const handleUserScrollIntent = (event) => {
+      if (event.type === "keydown" && !USER_SCROLL_KEYS.has(event.key)) return;
+      clearScheduledNavigationScroll();
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") saveCurrentPosition();
     };
 
-    const initialTopFrame = window.requestAnimationFrame(scrollToPageStart);
-
     document.addEventListener("click", handleDocumentClick, true);
+    window.addEventListener("wheel", handleUserScrollIntent, {
+      passive: true,
+      capture: true,
+    });
+    window.addEventListener("touchstart", handleUserScrollIntent, {
+      passive: true,
+      capture: true,
+    });
+    window.addEventListener("pointerdown", handleUserScrollIntent, {
+      passive: true,
+      capture: true,
+    });
+    window.addEventListener("keydown", handleUserScrollIntent, true);
     window.addEventListener("scroll", scheduleCurrentPositionSave, {
       passive: true,
     });
@@ -244,7 +278,6 @@ export default function ScrollRestoration() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.cancelAnimationFrame(initialTopFrame);
       if (scrollSaveRafRef.current) {
         window.cancelAnimationFrame(scrollSaveRafRef.current);
         scrollSaveRafRef.current = 0;
@@ -254,7 +287,7 @@ export default function ScrollRestoration() {
         urlChangeRafRef.current = 0;
       }
 
-      clearRestoreTimers();
+      clearScheduledNavigationScroll();
       saveCurrentPosition();
 
       window.history.pushState = originalPushState;
@@ -264,6 +297,10 @@ export default function ScrollRestoration() {
       }
 
       document.removeEventListener("click", handleDocumentClick, true);
+      window.removeEventListener("wheel", handleUserScrollIntent, true);
+      window.removeEventListener("touchstart", handleUserScrollIntent, true);
+      window.removeEventListener("pointerdown", handleUserScrollIntent, true);
+      window.removeEventListener("keydown", handleUserScrollIntent, true);
       window.removeEventListener("scroll", scheduleCurrentPositionSave);
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("pagehide", saveCurrentPosition);

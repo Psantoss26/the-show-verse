@@ -21,6 +21,12 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
+import {
+  getGenreName,
+  getTmdbIncludeImageLanguage,
+  pickBestImageByLocale,
+} from "@/lib/localization";
 
 import {
   getMediaAccountStates,
@@ -278,8 +284,11 @@ const getMediaTypeForItem = (item) =>
     ? "tv"
     : "movie";
 
-const getBackdropCacheKey = (item, mediaType = getMediaTypeForItem(item)) =>
-  `${mediaType}:${item?.id}`;
+const getBackdropCacheKey = (
+  item,
+  mediaType = getMediaTypeForItem(item),
+  locale = "es-ES",
+) => `${locale}:${mediaType}:${item?.id}`;
 
 const getPreviewBackdropFallback = (item) =>
   item?.backdrop_path || item?.poster_path || null;
@@ -448,76 +457,8 @@ function getArtworkPreference(movieId) {
   };
 }
 
-function pickBestPosterEN(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const englishPosters = posters.filter((p) => norm(p?.iso_639_1) === "en");
-  if (!englishPosters.length) return null;
-
-  const maxVotes = englishPosters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = englishPosters.filter(
-    (p) => (p.vote_count || 0) === maxVotes,
-  );
-  if (!withMaxVotes.length) return null;
-
-  return (
-    [...withMaxVotes].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
-}
-
-function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => {
-    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
-    return preferSet.has(norm(img?.iso_639_1));
-  };
-
-  const englishPool = list.filter(isPreferredLang);
-  if (!englishPool.length) return null;
-
-  const pool0 =
-    minWidth > 0
-      ? englishPool.filter((b) => (b?.width || 0) >= minWidth)
-      : englishPool;
-  const pool = pool0.length ? pool0 : englishPool;
-
-  const top3en = [];
-  for (const b of pool) {
-    top3en.push(b);
-    if (top3en.length === 3) break;
-  }
-
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
-
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
-  if (b1080) return b1080;
-
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
-  if (b1440) return b1440;
-
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
-  if (b4k) return b4k;
-
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
-  if (b720) return b720;
-
-  return top3en[0];
-}
-
-async function getMovieImages(itemId, mediaType = "movie") {
-  const cacheKey = `${mediaType}:${itemId}`;
+async function getMovieImages(itemId, mediaType = "movie", locale = "es-ES") {
+  const cacheKey = `${locale}:${mediaType}:${itemId}`;
   if (movieImagesCache.has(cacheKey)) return movieImagesCache.get(cacheKey);
 
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -532,7 +473,7 @@ async function getMovieImages(itemId, mediaType = "movie") {
     const url =
       `https://api.themoviedb.org/3/${type}/${itemId}/images` +
       `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,es,es-ES,null`;
+      `&include_image_language=${encodeURIComponent(getTmdbIncludeImageLanguage(locale))}`;
 
     const r = await fetch(url, { cache: "force-cache" });
     const j = await r.json();
@@ -549,30 +490,31 @@ async function getMovieImages(itemId, mediaType = "movie") {
   }
 }
 
-async function fetchBestBackdrop(itemId, mediaType = "movie") {
-  const { backdrops } = await getMovieImages(itemId, mediaType);
+async function fetchBestBackdrop(itemId, mediaType = "movie", locale = "es-ES") {
+  const { backdrops } = await getMovieImages(itemId, mediaType, locale);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
+  const best = pickBestImageByLocale(backdrops, {
+    locale,
+    kind: "backdrop",
     minWidth: 1200,
   });
 
   return best?.file_path || null;
 }
 
-async function preparePreviewBackdrop(item, backdropOverride) {
+async function preparePreviewBackdrop(item, backdropOverride, locale = "es-ES") {
   if (!item?.id) return null;
 
   const mediaType = getMediaTypeForItem(item);
-  const backdropCacheKey = getBackdropCacheKey(item, mediaType);
+  const backdropCacheKey = getBackdropCacheKey(item, mediaType, locale);
   let backdropPath =
     backdropOverride || movieBackdropCache.get(backdropCacheKey);
 
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestBackdrop(item.id, mediaType)) ||
+        (await fetchBestBackdrop(item.id, mediaType, locale)) ||
         getPreviewBackdropFallback(item);
     } catch {
       backdropPath = getPreviewBackdropFallback(item);
@@ -588,11 +530,11 @@ async function preparePreviewBackdrop(item, backdropOverride) {
   return backdropPath || null;
 }
 
-async function fetchBestPoster(itemId, mediaType = "movie") {
-  const { posters } = await getMovieImages(itemId, mediaType);
+async function fetchBestPoster(itemId, mediaType = "movie", locale = "es-ES") {
+  const { posters } = await getMovieImages(itemId, mediaType, locale);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestPosterEN(posters);
+  const best = pickBestImageByLocale(posters, { locale, kind: "poster" });
   return best?.file_path || null;
 }
 
@@ -676,6 +618,7 @@ async function getBestTrailerCached(itemId, mediaType = "movie") {
  * Portada (2:3) — SOLO en móvil: “3 por fila” completas (sin recorte)
  * ==================================================================== */
 function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
+  const { lang } = useTranslation();
   const [posterPath, setPosterPath] = useState(() => {
     if (!movie) return null;
     const mediaType =
@@ -684,7 +627,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       movie.first_air_date
         ? "tv"
         : "movie";
-    const posterCacheKey = `${mediaType}:${movie.id}`;
+    const posterCacheKey = `${lang}:${mediaType}:${movie.id}`;
 
     const { poster: userPoster } = getArtworkPreference(movie.id);
     if (userPoster) return userPoster;
@@ -700,7 +643,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       movie.first_air_date
         ? "tv"
         : "movie";
-    const posterCacheKey = `${mediaType}:${movie.id}`;
+    const posterCacheKey = `${lang}:${mediaType}:${movie.id}`;
 
     const { poster: userPoster } = getArtworkPreference(movie.id);
     if (userPoster) return true;
@@ -720,7 +663,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         movie.first_air_date
           ? "tv"
           : "movie";
-      const posterCacheKey = `${mediaType}:${movie.id}`;
+      const posterCacheKey = `${lang}:${mediaType}:${movie.id}`;
 
       const { poster: userPoster } = getArtworkPreference(movie.id);
       if (userPoster) {
@@ -767,7 +710,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         movie.poster_path || movie.backdrop_path || movie.profile_path || null;
 
       // Fallback final: si posterOverride es null, intentamos fetchBestPoster individualmente o usamos existingPoster
-      const preferred = await fetchBestPoster(movie.id, mediaType);
+      const preferred = await fetchBestPoster(movie.id, mediaType, lang);
       const chosen = preferred || existingPoster || null;
 
       const url = chosen ? buildImg(chosen, "w342") : null;
@@ -783,7 +726,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
     return () => {
       abort = true;
     };
-  }, [movie, cache, posterOverride]);
+  }, [movie, cache, posterOverride, lang]);
 
   const boxClass = isMobile ? "aspect-[2/3]" : heightClass;
 
@@ -856,6 +799,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
  * ==================================================================== */
 function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   const { session, account } = useAuth();
+  const { lang } = useTranslation();
   const router = useRouter();
 
   const [extras, setExtras] = useState({
@@ -868,7 +812,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
     if (userBackdrop) return userBackdrop;
     const mediaType = getMediaTypeForItem(movie);
-    const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
+    const backdropCacheKey = getBackdropCacheKey(movie, mediaType, lang);
     const cached = movieBackdropCache.get(backdropCacheKey);
     if (cached !== undefined) return cached;
     return null;
@@ -878,7 +822,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
     if (userBackdrop) return true;
     const mediaType = getMediaTypeForItem(movie);
-    const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
+    const backdropCacheKey = getBackdropCacheKey(movie, mediaType, lang);
     const cached = movieBackdropCache.get(backdropCacheKey);
     if (cached !== undefined) return !!cached;
     return false;
@@ -942,7 +886,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
 
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       const mediaType = getMediaTypeForItem(movie);
-      const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
+      const backdropCacheKey = getBackdropCacheKey(movie, mediaType, lang);
 
       if (userBackdrop) {
         movieBackdropCache.set(backdropCacheKey, userBackdrop);
@@ -971,7 +915,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       const fallback = getPreviewBackdropFallback(movie);
 
       try {
-        const preferred = await fetchBestBackdrop(movie.id, mediaType);
+        const preferred = await fetchBestBackdrop(movie.id, mediaType, lang);
         const chosen = preferred || fallback;
         movieBackdropCache.set(backdropCacheKey, chosen);
         revealBackdrop(chosen);
@@ -1049,7 +993,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     return () => {
       abort = true;
     };
-  }, [movie, backdropOverride]);
+  }, [movie, backdropOverride, lang]);
 
   const mediaType =
     movie.media_type === "tv" ||
@@ -1170,7 +1114,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const names = ids.map((id) => GENRES[id]).filter(Boolean);
+    const mediaType = getMediaTypeForItem(movie);
+    const names = ids.map((id) => getGenreName(mediaType, id, lang)).filter(Boolean);
     return names.slice(0, 2).join(" • ");
   })();
 
@@ -1226,7 +1171,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             onError={() => {
               const fallback = getPreviewBackdropFallback(movie);
               if (fallback && fallback !== backdropPath) {
-                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+              movieBackdropCache.set(getBackdropCacheKey(movie, undefined, lang), fallback);
                 setBackdropPath(fallback);
                 setBackdropReady(true);
                 return;
@@ -1403,6 +1348,7 @@ function InlinePreviewCardAnticipated({
   backdropOverride,
 }) {
   const { session, account } = useAuth();
+  const { lang } = useTranslation();
   const router = useRouter();
 
   const [extras, setExtras] = useState({
@@ -1475,7 +1421,7 @@ function InlinePreviewCardAnticipated({
       // Backdrop (igual que tu preview normal)
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       const mediaTypeForBackdrop = getMediaTypeForItem(movie);
-      const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop);
+      const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop, lang);
       if (userBackdrop) {
         movieBackdropCache.set(backdropCacheKey, userBackdrop);
         revealBackdrop(userBackdrop);
@@ -1491,6 +1437,7 @@ function InlinePreviewCardAnticipated({
             const preferred = await fetchBestBackdrop(
               movie.id,
               mediaTypeForBackdrop,
+              lang,
             );
             const chosen = preferred || getPreviewBackdropFallback(movie);
 
@@ -1552,7 +1499,7 @@ function InlinePreviewCardAnticipated({
     return () => {
       abort = true;
     };
-  }, [movie, backdropOverride]);
+  }, [movie, backdropOverride, lang]);
 
   const mediaType =
     movie.media_type === "tv" ||
@@ -1669,7 +1616,8 @@ function InlinePreviewCardAnticipated({
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const names = ids.map((id) => GENRES[id]).filter(Boolean);
+    const mediaType = getMediaTypeForItem(movie);
+    const names = ids.map((id) => getGenreName(mediaType, id, lang)).filter(Boolean);
     return names.slice(0, 2).join(" • ");
   })();
 
@@ -1716,7 +1664,7 @@ function InlinePreviewCardAnticipated({
             onError={() => {
               const fallback = getPreviewBackdropFallback(movie);
               if (fallback && fallback !== backdropPath) {
-                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                movieBackdropCache.set(getBackdropCacheKey(movie, undefined, lang), fallback);
                 setBackdropPath(fallback);
                 setBackdropReady(true);
                 return;
@@ -2038,6 +1986,7 @@ function Row({
   sectionHref,
   reserveWhileEmpty = false,
 }) {
+  const { lang } = useTranslation();
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
 
@@ -2099,7 +2048,7 @@ function Row({
 
       for (const movie of toPreload) {
         const backdropOverride = backdropOverrides?.[movie.id];
-        await preparePreviewBackdrop(movie, backdropOverride);
+        await preparePreviewBackdrop(movie, backdropOverride, lang);
         setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
       }
     };
@@ -2113,6 +2062,7 @@ function Row({
     isMobile,
     backdropOverrides,
     preloadedBackdrops,
+    lang,
   ]);
 
   const hasActivePreview = !!hoveredId;
@@ -2326,7 +2276,7 @@ function Row({
                         const hoverToken = hoverIntentRef.current + 1;
                         hoverIntentRef.current = hoverToken;
                         setHoveredIndex(i);
-                        preparePreviewBackdrop(m, backdropOverride).finally(
+                        preparePreviewBackdrop(m, backdropOverride, lang).finally(
                           () => {
                             if (hoverIntentRef.current === hoverToken) {
                               setHoveredId(itemKey);
@@ -2858,6 +2808,7 @@ function TopRatedHero({
   hydrated,
   backdropOverrides,
 }) {
+  const { lang } = useTranslation();
   const [activeTab, setActiveTab] = useState("movies");
   const items = activeTab === "movies" ? movieItems : tvItems;
 
@@ -2911,14 +2862,14 @@ function TopRatedHero({
               return [id, userBackdrop];
             }
 
-            // Siempre buscar el mejor backdrop EN (nunca usar backdrop_path directamente)
+            // Buscar el mejor backdrop para el idioma seleccionado.
             const mediaType =
               movie.media_type === "tv" ||
               (movie.name && !movie.title) ||
               movie.first_air_date
                 ? "tv"
                 : "movie";
-            let chosen = await fetchBestBackdrop(id, mediaType);
+            let chosen = await fetchBestBackdrop(id, mediaType, lang);
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
             if (chosen) await preloadImage(buildImg(chosen, "w780"));
@@ -2952,7 +2903,7 @@ function TopRatedHero({
     return () => {
       canceled = true;
     };
-  }, [allItems, backdropOverrides]);
+  }, [allItems, backdropOverrides, lang]);
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -3187,9 +3138,14 @@ function TopRatedHero({
 
 /* =================== MainDashboard (CLIENTE) =================== */
 export default function MainDashboardClient({ initialData }) {
+  const { t } = useTranslation();
   const isMobile = useIsMobileLayout(768);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
+
+  useEffect(() => {
+    document.title = `${t("home_title")} • TSV`;
+  }, [t]);
 
   const posterCacheRef = useRef(new Map());
   const seededMoviesAnticipated = Array.isArray(
@@ -3628,7 +3584,7 @@ export default function MainDashboardClient({ initialData }) {
 
           {/* Tendencias unificadas (Trakt/TMDb) */}
           <RowWithSourceFilter
-            title="Tendencias"
+            title={t("row_dashboard_trending")}
             traktData={dashboardData.traktTrending || EMPTY_ARRAY}
             tmdbData={dashboardData.trending || EMPTY_ARRAY}
             isMobile={isMobile}
@@ -3641,7 +3597,7 @@ export default function MainDashboardClient({ initialData }) {
 
           {/* Populares unificados (Trakt/TMDb) */}
           <RowWithSourceFilter
-            title="Populares"
+            title={t("row_dashboard_popular")}
             traktData={dashboardData.traktPopular || EMPTY_ARRAY}
             tmdbData={dashboardData.popular || EMPTY_ARRAY}
             isMobile={isMobile}
@@ -3654,8 +3610,8 @@ export default function MainDashboardClient({ initialData }) {
           />
 
           <Row
-            title="Premiadas y nominadas"
-            labelText="GALARDONADAS"
+            title={t("row_dashboard_awarded")}
+            labelText={t("row_dashboard_awarded_label")}
             items={dashboardData.awarded}
             isMobile={isMobile}
             hydrated={hydrated}
@@ -3666,7 +3622,7 @@ export default function MainDashboardClient({ initialData }) {
           />
 
           <Row
-            title="Dramas que enganchan"
+            title={t("row_dashboard_drama")}
             items={dashboardData.dramaTV}
             isMobile={isMobile}
             hydrated={hydrated}
@@ -3678,7 +3634,7 @@ export default function MainDashboardClient({ initialData }) {
 
           {/* Trakt: Más reproducidas (con selector de período) */}
           <RowWithTimeFilter
-            title="Más reproducidas"
+            title={t("row_dashboard_played")}
             weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
             monthlyData={dashboardData.traktPlayedMonthly || EMPTY_ARRAY}
             yearlyData={EMPTY_ARRAY}
@@ -3692,7 +3648,7 @@ export default function MainDashboardClient({ initialData }) {
 
           {/* Trakt: Más vistas (con selector de período) */}
           <RowWithTimeFilter
-            title="Más vistas"
+            title={t("row_dashboard_watched")}
             weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
             monthlyData={dashboardData.traktWatchedMonthly || EMPTY_ARRAY}
             yearlyData={EMPTY_ARRAY}
@@ -3706,7 +3662,7 @@ export default function MainDashboardClient({ initialData }) {
 
           {/* Trakt: Más coleccionadas (con selector de período) */}
           <RowWithTimeFilter
-            title="Más coleccionadas"
+            title={t("row_dashboard_collected")}
             weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}
             monthlyData={dashboardData.traktCollectedMonthly || EMPTY_ARRAY}
             yearlyData={EMPTY_ARRAY}

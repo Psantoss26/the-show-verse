@@ -16,6 +16,13 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import {
+  getGenreName,
+  getNoGenreLabel,
+  getTmdbIncludeImageLanguage,
+  pickBestImageByLocale,
+} from "@/lib/localization";
+import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
 import { getWatchProviders } from "@/lib/api/tmdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
@@ -82,48 +89,6 @@ function cancelWatchlistRenderChunk(handle) {
   window.clearTimeout(handle);
 }
 
-// TMDb Genre mappings
-const MOVIE_GENRES = {
-  28: "Acción",
-  12: "Aventura",
-  16: "Animación",
-  35: "Comedia",
-  80: "Crimen",
-  99: "Documental",
-  18: "Drama",
-  10751: "Familiar",
-  14: "Fantasía",
-  36: "Historia",
-  27: "Terror",
-  10402: "Música",
-  9648: "Misterio",
-  10749: "Romance",
-  878: "Ciencia ficción",
-  10770: "Película de TV",
-  53: "Suspense",
-  10752: "Bélica",
-  37: "Western",
-};
-
-const TV_GENRES = {
-  10759: "Acción y aventura",
-  16: "Animación",
-  35: "Comedia",
-  80: "Crimen",
-  99: "Documental",
-  18: "Drama",
-  10751: "Familiar",
-  10762: "Infantil",
-  9648: "Misterio",
-  10763: "Noticias",
-  10764: "Reality",
-  10765: "Ciencia ficción y fantasía",
-  10766: "Telenovela",
-  10767: "Talk show",
-  10768: "Bélica y política",
-  37: "Western",
-};
-
 const posterChoiceCache = new Map();
 const posterInFlight = new Map();
 
@@ -138,7 +103,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v2";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v3";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -486,19 +451,19 @@ function buildWatchlistGroupMetas(
     providersByItem,
     ratingStep = 0.5,
     ratingOffset = 0,
+    locale = "es-ES",
   },
 ) {
   if (groupBy === "none") return [];
 
   if (groupBy === "genre") {
     const type = item.media_type || (item.title ? "movie" : "tv");
-    const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
     const genreIds = item.genre_ids || [];
     if (genreIds.length === 0)
-      return [{ key: "no_genre", label: "Sin género" }];
+      return [{ key: "no_genre", label: getNoGenreLabel(locale) }];
     return genreIds.map((genreId) => ({
       key: String(genreId),
-      label: genreMap[genreId] || `Género ${genreId}`,
+      label: getGenreName(type, genreId, locale),
     }));
   }
 
@@ -890,16 +855,17 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   return top3en[0];
 }
 
-async function fetchBestBackdropEN(type, id) {
+async function fetchBestBackdropEN(type, id, locale = "es-ES") {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    const best = pickBestBackdropByLangResVotes(j?.backdrops, {
-      preferLangs: ["en", "en-US"],
+    const best = pickBestImageByLocale(j?.backdrops, {
+      locale,
+      kind: "backdrop",
       minWidth: 1200,
     });
     return best?.file_path || null;
@@ -908,13 +874,13 @@ async function fetchBestBackdropEN(type, id) {
   }
 }
 
-async function getBestBackdropCached(type, id) {
-  const key = `${type}:${id}`;
+async function getBestBackdropCached(type, id, locale = "es-ES") {
+  const key = `${locale}:${type}:${id}`;
   if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key);
   if (backdropInFlight.has(key)) return backdropInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id);
+    const chosen = await fetchBestBackdropEN(type, id, locale);
     backdropChoiceCache.set(key, chosen || null);
     backdropInFlight.delete(key);
     return chosen || null;
@@ -924,27 +890,30 @@ async function getBestBackdropCached(type, id) {
   return p;
 }
 
-async function fetchBestPosterEN(type, id) {
+async function fetchBestPosterEN(type, id, locale = "es-ES") {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    return pickBestPosterEN(j?.posters)?.file_path || null;
+    return pickBestImageByLocale(j?.posters, {
+      locale,
+      kind: "poster",
+    })?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id) {
-  const key = `${type}:${id}`;
+async function getBestPosterCached(type, id, locale = "es-ES") {
+  const key = `${locale}:${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id);
+    const chosen = await fetchBestPosterEN(type, id, locale);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -984,22 +953,17 @@ function writeImageChoice(kind, key, path) {
   } catch {}
 }
 
-function getCachedSmartPosterUrl(item, mode = "poster") {
+function getCachedSmartPosterUrl(item, mode = "poster", locale = "es-ES") {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
-  const key = `${type}:${id}`;
+  const key = `${locale}:${type}:${id}`;
 
   if (mode === "backdrop") {
     const cachedBackdrop = backdropChoiceCache.has(key)
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path =
-      cachedBackdrop ||
-      storedBackdrop ||
-      item.backdrop_path ||
-      item.poster_path ||
-      null;
+    const path = cachedBackdrop || storedBackdrop || null;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -1007,15 +971,15 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || item.poster_path || item.backdrop_path || null;
+  const path = cachedPoster || storedPoster || null;
   return path ? buildImg(path, "w500") : null;
 }
 
-function SmartPoster({ item, title, mode = "poster" }) {
+function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
-  const imageKey = `${type}:${id}`;
-  const initialSrc = getCachedSmartPosterUrl(item, mode);
+  const imageKey = `${locale}:${type}:${id}`;
+  const initialSrc = getCachedSmartPosterUrl(item, mode, locale);
 
   const [src, setSrc] = useState(initialSrc);
   const [ready, setReady] = useState(Boolean(initialSrc));
@@ -1023,7 +987,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
   useEffect(() => {
     let abort = false;
 
-    const cachedUrl = getCachedSmartPosterUrl(item, mode);
+    const cachedUrl = getCachedSmartPosterUrl(item, mode, locale);
     if (cachedUrl) {
       setSrc(cachedUrl);
       setReady(true);
@@ -1037,7 +1001,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
 
     const load = async () => {
       if (mode === "backdrop") {
-        const bestBackdrop = await getBestBackdropCached(type, id);
+        const bestBackdrop = await getBestBackdropCached(type, id, locale);
         const finalPath =
           bestBackdrop || item.backdrop_path || item.poster_path || null;
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
@@ -1050,7 +1014,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         return;
       }
 
-      const best = item.poster_path ? null : await getBestPosterCached(type, id);
+      const best = await getBestPosterCached(type, id, locale);
       const finalPath = best || item.poster_path || item.backdrop_path || null;
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
@@ -1065,7 +1029,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, imageKey, item.poster_path, item.backdrop_path, item]);
+  }, [mode, type, id, imageKey, item.poster_path, item.backdrop_path, item, locale]);
 
   return (
     <div className="relative w-full h-full">
@@ -1539,6 +1503,7 @@ const WatchlistCard = memo(function WatchlistCard({
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
   userRating,
+  locale = "es-ES",
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1546,8 +1511,8 @@ const WatchlistCard = memo(function WatchlistCard({
     item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
   const genreIds = item.genre_ids || [];
-  const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
-  const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
+  const firstGenre =
+    genreIds.length > 0 ? getGenreName(type, genreIds[0], locale) : null;
 
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
   const [traktScore, setTraktScore] = useState(initialTraktScore);
@@ -1667,6 +1632,7 @@ const WatchlistCard = memo(function WatchlistCard({
                 item={item}
                 title={title}
                 mode={effectiveImageMode}
+                locale={locale}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1724,7 +1690,12 @@ const WatchlistCard = memo(function WatchlistCard({
             }}
             onMouseEnter={handleHover}
           >
-            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            <SmartPoster
+              item={item}
+              title={title}
+              mode={effectiveImageMode}
+              locale={locale}
+            />
             <div
               className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
                 type === "movie"
@@ -1827,7 +1798,12 @@ const WatchlistCard = memo(function WatchlistCard({
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
           onMouseEnter={handleHover}
         >
-          <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          <SmartPoster
+            item={item}
+            title={title}
+            mode={effectiveImageMode}
+            locale={locale}
+          />
           <div
             className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
               type === "movie"
@@ -1919,14 +1895,17 @@ const WatchlistCard = memo(function WatchlistCard({
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
-  const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
-  const { t } = useTranslation();
+  const { session, account, hydrated, logout, preferences, loadingPreferences, updatePreference, authenticated } = useAuth();
+  const { t, lang } = useTranslation();
   const initialWatchlistCacheRef = useRef(null);
   if (initialWatchlistCacheRef.current === null) {
     initialWatchlistCacheRef.current = readWatchlistCache(account?.id) || false;
   }
   const initialWatchlistCache = initialWatchlistCacheRef.current || null;
   const [loading, setLoading] = useState(() => !initialWatchlistCache?.items);
+  const [initialLoadResolved, setInitialLoadResolved] = useState(
+    () => !!initialWatchlistCache?.items,
+  );
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => initialWatchlistCache?.items || []);
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
@@ -1940,19 +1919,26 @@ export default function WatchlistClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
+  const [uiReady, setUiReady] = useState(false);
 
   useEffect(() => {
     if (!account?.id || items.length > 0) return;
     const cached = readWatchlistCache(account.id);
     if (!cached?.items?.length) return;
     setItems(cached.items);
+    setInitialLoadResolved(true);
     setLoading(false);
   }, [account?.id, items.length]);
+
+  useEffect(() => {
+    document.title = `${t("watch_title")} • TSV`;
+  }, [t]);
 
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState("grid");
 
   useEffect(() => {
+    if (!hydrated || loadingPreferences) return;
     if (preferences?.defaultView) {
       setViewModeState(preferences.defaultView);
     } else {
@@ -1961,7 +1947,8 @@ export default function WatchlistClient() {
         setViewModeState(saved);
       }
     }
-  }, [preferences?.defaultView]);
+    setUiReady(true);
+  }, [hydrated, loadingPreferences, preferences?.defaultView]);
 
   const setViewMode = useCallback((mode) => {
     setViewModeState(mode);
@@ -2105,6 +2092,7 @@ export default function WatchlistClient() {
 
     const loadWatchlist = async () => {
       if (!session || !account?.id) {
+        setInitialLoadResolved(true);
         setLoading(false);
         return;
       }
@@ -2126,10 +2114,12 @@ export default function WatchlistClient() {
             !account?.id
           ) {
             setItems([]);
+            setInitialLoadResolved(true);
             return;
           }
           console.error("API error:", response.status, response.statusText);
           setItems([]);
+          setInitialLoadResolved(true);
           return;
         }
 
@@ -2138,6 +2128,7 @@ export default function WatchlistClient() {
         if (!text) {
           console.error("Empty response from API");
           setItems([]);
+          setInitialLoadResolved(true);
           return;
         }
 
@@ -2159,6 +2150,7 @@ export default function WatchlistClient() {
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
         setItems(watchlistWithIndex);
+        setInitialLoadResolved(true);
         writeWatchlistCache(watchlistWithIndex, account?.id);
       } catch (error) {
         if (shouldIgnoreExpectedLogoutError() || error?.name === "AbortError") {
@@ -2166,8 +2158,12 @@ export default function WatchlistClient() {
         }
         console.error("Error loading watchlist:", error);
         setItems([]);
+        setInitialLoadResolved(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setInitialLoadResolved(true);
+          setLoading(false);
+        }
       }
     };
 
@@ -2343,9 +2339,11 @@ export default function WatchlistClient() {
   }, [items, needsTraktScores]);
 
   // Filter and sort
+  const localizedItems = useLocalizedMediaItems(items, lang, { limit: 160 });
+
   const filtered = useMemo(() => {
     const needle = normText(q);
-    return items.filter((item) => {
+    return localizedItems.filter((item) => {
       const type = item.media_type || (item.title ? "movie" : "tv");
       if (typeFilter === "movies" && type !== "movie") return false;
       if (typeFilter === "shows" && type !== "tv") return false;
@@ -2355,7 +2353,7 @@ export default function WatchlistClient() {
       }
       return true;
     });
-  }, [items, q, typeFilter]);
+  }, [localizedItems, q, typeFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -2559,6 +2557,7 @@ export default function WatchlistClient() {
       imdbScores: layoutImdbScores,
       traktScores: layoutTraktScores,
       providersByItem: layoutProvidersByItem,
+      locale: lang,
     };
 
     for (const item of sorted) {
@@ -2632,6 +2631,7 @@ export default function WatchlistClient() {
     layoutTraktScores,
     layoutProvidersByItem,
     loadingProviders,
+    lang,
   ]);
 
   const groupSectionRefs = useRef(new Map());
@@ -2750,7 +2750,7 @@ export default function WatchlistClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
-  if (!hydrated) {
+  if (!hydrated || !uiReady) {
     return <div className="min-h-screen bg-black" />;
   }
 
@@ -2893,7 +2893,7 @@ export default function WatchlistClient() {
               </p>
             </div>
 
-            {!loading && (
+            {!loading && initialLoadResolved && (
               <motion.div
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
@@ -3432,7 +3432,7 @@ export default function WatchlistClient() {
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
-        {loading ? null : sorted.length === 0 ? (
+        {loading || !initialLoadResolved ? null : sorted.length === 0 ? (
           <motion.div
             className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -3504,8 +3504,9 @@ export default function WatchlistClient() {
                                   index={currentGlobalIdx}
                                   totalItems={sorted.length}
                                   viewMode={viewMode}
-                                  imageMode={imageMode}
-                                  imdbScore={imdbScores.get(getScoreItemKey(item))}
+                                    imageMode={imageMode}
+                                    locale={lang}
+                                    imdbScore={imdbScores.get(getScoreItemKey(item))}
                                   traktScore={traktScores.get(
                                     getScoreItemKey(item),
                                   )}
@@ -3531,8 +3532,9 @@ export default function WatchlistClient() {
                             index={currentGlobalIdx}
                             totalItems={sorted.length}
                             viewMode={viewMode}
-                            imageMode={imageMode}
-                            imdbScore={imdbScores.get(getScoreItemKey(item))}
+                              imageMode={imageMode}
+                              locale={lang}
+                              imdbScore={imdbScores.get(getScoreItemKey(item))}
                             traktScore={traktScores.get(getScoreItemKey(item))}
                             userRating={item.user_rating}
                           />
@@ -3556,8 +3558,9 @@ export default function WatchlistClient() {
                 index={idx}
                 totalItems={sorted.length}
                 viewMode={viewMode}
-                imageMode={imageMode}
-                imdbScore={imdbScores.get(getScoreItemKey(item))}
+                  imageMode={imageMode}
+                  locale={lang}
+                  imdbScore={imdbScores.get(getScoreItemKey(item))}
                 traktScore={traktScores.get(getScoreItemKey(item))}
                 userRating={item.user_rating}
               />
