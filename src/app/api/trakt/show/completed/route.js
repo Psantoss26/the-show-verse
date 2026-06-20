@@ -18,6 +18,7 @@ export const maxDuration = 45;
 const TMDB_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const TMDB_FETCH_TIMEOUT_MS = 1000;
 
 // ---------------------------------------------------------------------------
 // Caché en memoria del lado servidor (misma instancia Node).
@@ -58,10 +59,22 @@ async function safeJson(res) {
   }
 }
 
+function timeoutSignal(timeoutMs = TMDB_FETCH_TIMEOUT_MS) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
+
 async function fetchTmdbShow(tmdbId) {
   if (!TMDB_KEY || !tmdbId) return null;
   const url = `${TMDB_BASE}/tv/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(TMDB_KEY)}&language=es-ES`;
-  const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
+  const res = await fetch(url, {
+    next: { revalidate: 60 * 60 * 24 },
+    signal: timeoutSignal(),
+  });
   if (!res.ok) return null;
   const j = await safeJson(res);
   if (!j) return null;

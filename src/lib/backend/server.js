@@ -16,6 +16,16 @@ export const BACKEND_AUTH_COOKIE_NAMES = [
   "tmdb_session_id",
   "tmdb_session",
 ];
+const BACKEND_FETCH_TIMEOUT_MS = 8000;
+
+function backendTimeoutSignal(timeoutMs = BACKEND_FETCH_TIMEOUT_MS) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
 
 function cleanBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -124,6 +134,7 @@ async function refreshBackendAccessToken(baseUrl, refreshToken) {
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: backendTimeoutSignal(),
     body: JSON.stringify({ refreshToken }),
   });
 
@@ -137,6 +148,7 @@ async function refreshBackendAccessToken(baseUrl, refreshToken) {
 }
 
 async function fetchBackendOnce(baseUrl, path, init, accessToken) {
+  const { timeoutMs, ...fetchInit } = init;
   const headers = new Headers(init.headers || {});
   headers.set("Accept", "application/json");
   headers.set("Authorization", `Bearer ${accessToken}`);
@@ -146,9 +158,10 @@ async function fetchBackendOnce(baseUrl, path, init, accessToken) {
   }
 
   const res = await fetch(`${baseUrl}${path}`, {
-    ...init,
+    ...fetchInit,
     headers,
     cache: "no-store",
+    signal: init.signal || backendTimeoutSignal(timeoutMs),
   });
 
   const json = await res.json().catch(() => null);

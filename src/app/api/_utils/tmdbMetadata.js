@@ -6,6 +6,8 @@ const BACKEND_BASE = (
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   ""
 ).replace(/\/+$/, "");
+const DEFAULT_FETCH_TIMEOUT_MS = 1200;
+const DEFAULT_ENRICH_TIME_BUDGET_MS = 2500;
 
 function safeMediaType(mediaType) {
   if (mediaType === "movie") return "movie";
@@ -25,36 +27,52 @@ async function safeJson(res) {
   }
 }
 
-async function fetchFromBackendCache(tmdbId, type) {
+function timeoutSignal(timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
+
+async function fetchFromBackendCache(tmdbId, type, { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS } = {}) {
   if (!BACKEND_BASE) return null;
 
   const res = await fetch(
     `${BACKEND_BASE}/v1/tmdb/${type}/${encodeURIComponent(tmdbId)}`,
-    { next: { revalidate: 60 * 60 * 24 } },
+    {
+      next: { revalidate: 60 * 60 * 24 },
+      signal: timeoutSignal(timeoutMs),
+    },
   );
   if (!res.ok) return null;
   return safeJson(res);
 }
 
-async function fetchFromTmdbDirect(tmdbId, type) {
+async function fetchFromTmdbDirect(tmdbId, type, { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS } = {}) {
   if (!TMDB_KEY) return null;
 
   const url = `${TMDB_BASE}/${type}/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(
     TMDB_KEY,
   )}&language=es-ES`;
 
-  const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
+  const res = await fetch(url, {
+    next: { revalidate: 60 * 60 * 24 },
+    signal: timeoutSignal(timeoutMs),
+  });
   if (!res.ok) return null;
   return safeJson(res);
 }
 
-export async function fetchTmdbMetadata(tmdbId, mediaType) {
+export async function fetchTmdbMetadata(tmdbId, mediaType, options = {}) {
   const type = safeMediaType(mediaType);
   if (!tmdbId || !type) return null;
 
   const data =
-    (await fetchFromBackendCache(tmdbId, type).catch(() => null)) ||
-    (await fetchFromTmdbDirect(tmdbId, type).catch(() => null));
+    (await fetchFromBackendCache(tmdbId, type, options).catch(() => null)) ||
+    (await fetchFromTmdbDirect(tmdbId, type, options).catch(() => null));
   if (!data) return null;
 
   const isMovie = type === "movie";
@@ -109,7 +127,9 @@ export async function enrichMediaItemsWithTmdb(
   {
     getId = (item) => item.id || item.tmdbId,
     getType = (item) => item.media_type || item.mediaType,
-    concurrency = 8,
+    concurrency = 6,
+    timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+    timeBudgetMs = DEFAULT_ENRICH_TIME_BUDGET_MS,
   } = {},
 ) {
   if (!Array.isArray(items) || items.length === 0 || (!BACKEND_BASE && !TMDB_KEY)) return items;
@@ -117,6 +137,7 @@ export async function enrichMediaItemsWithTmdb(
   const enriched = new Array(items.length);
   let cursor = 0;
   const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  const deadline = Date.now() + Math.max(250, Number(timeBudgetMs) || DEFAULT_ENRICH_TIME_BUDGET_MS);
 
   const workers = Array.from({ length: workerCount }, async () => {
     while (cursor < items.length) {
@@ -124,7 +145,12 @@ export async function enrichMediaItemsWithTmdb(
       cursor += 1;
 
       const item = items[index];
-      const metadata = await fetchTmdbMetadata(getId(item), getType(item)).catch(
+      if (Date.now() > deadline) {
+        enriched[index] = item;
+        continue;
+      }
+
+      const metadata = await fetchTmdbMetadata(getId(item), getType(item), { timeoutMs }).catch(
         () => null,
       );
       enriched[index] = mergeMetadata(item, metadata);
@@ -132,5 +158,5 @@ export async function enrichMediaItemsWithTmdb(
   });
 
   await Promise.all(workers);
-  return enriched;
+  return enriched.map((item, index) => item || items[index]);
 }
