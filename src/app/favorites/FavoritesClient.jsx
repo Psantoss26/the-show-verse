@@ -187,7 +187,7 @@ const SCORE_CACHE_ACTIVE_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_RECENT_TTL_MS = 12 * 60 * 60 * 1000;
 const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const FAVORITES_CACHE_KEY = "showverse:favorites:items:v2";
+const FAVORITES_CACHE_KEY = "showverse:favorites:items:v3";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v2";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -866,7 +866,12 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path = cachedBackdrop || storedBackdrop || null;
+    const path =
+      cachedBackdrop ||
+      storedBackdrop ||
+      item.backdrop_path ||
+      item.poster_path ||
+      null;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -874,7 +879,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || null;
+  const path = cachedPoster || storedPoster || item.poster_path || item.backdrop_path || null;
   return path ? buildImg(path, "w500") : null;
 }
 
@@ -917,7 +922,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         return;
       }
 
-      const best = await getBestPosterCached(type, id);
+      const best = item.poster_path ? null : await getBestPosterCached(type, id);
       const finalPath = best || item.poster_path || item.backdrop_path || null;
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
@@ -2412,21 +2417,9 @@ export default function FavoritesClient() {
       try {
         setLoading(items.length === 0);
 
-        // Fetch favorites and rated items in parallel so user_rating
-        // is available from the very first render — avoids the flash
-        // of "Sin puntuar" when grouped by user_rating.
-        const [favResponse, rated] = await Promise.all([
-          fetch("/api/tmdb/account/favorite", { signal: controller.signal }),
-          loadBackendRatings()
-            .then((backendRated) =>
-              backendRated ?? fetchRatedForUser(account.id, session),
-            )
-            .catch((err) => {
-              if (shouldIgnoreExpectedLogoutError()) return [];
-              console.error("Error loading rated items:", err);
-              return [];
-            }),
-        ]);
+        const favResponse = await fetch("/api/tmdb/account/favorite", {
+          signal: controller.signal,
+        });
 
         if (shouldIgnoreExpectedLogoutError()) return;
 
@@ -2461,16 +2454,9 @@ export default function FavoritesClient() {
         const data = JSON.parse(text);
         const favorites = data?.favorites || [];
 
-        // Build rating map from rated items
-        const ratingMap = new Map();
-        rated.forEach((item) => {
-          ratingMap.set(getRatingKey(item), item.user_rating);
-        });
-
-        // Merge user_rating into favorites from the start
         const favoritesWithMeta = favorites.map((item, index) => ({
           ...item,
-          user_rating: ratingMap.get(getRatingKey({ ...item })) ?? null,
+          user_rating: item.user_rating ?? null,
           _addedIndex: index,
         }));
 
@@ -2483,9 +2469,8 @@ export default function FavoritesClient() {
           const cachedTrakt = readScoreCache("trakt");
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
-          setRatedItems(rated);
           setItems(favoritesWithMeta);
-          writeFavoritesCache(favoritesWithMeta, rated);
+          writeFavoritesCache(favoritesWithMeta, []);
 
           const isShowverse = session === "showverse" || account?.provider === "showverse";
           if (!isShowverse && !favoritesListSyncInFlight) {
@@ -2506,6 +2491,33 @@ export default function FavoritesClient() {
               })
               .finally(() => {
                 favoritesListSyncInFlight = null;
+              });
+          }
+
+          if (!isShowverse) {
+            void loadBackendRatings()
+              .then((backendRated) =>
+                backendRated ?? fetchRatedForUser(account.id, session),
+              )
+              .then((rated) => {
+                if (cancelled || !Array.isArray(rated) || rated.length === 0) return;
+                const ratingMap = new Map();
+                rated.forEach((item) => {
+                  ratingMap.set(getRatingKey(item), item.user_rating);
+                });
+                setRatedItems(rated);
+                setItems((prev) => {
+                  const merged = prev.map((item) => ({
+                    ...item,
+                    user_rating: ratingMap.get(getRatingKey(item)) ?? item.user_rating ?? null,
+                  }));
+                  writeFavoritesCache(merged, rated);
+                  return merged;
+                });
+              })
+              .catch((err) => {
+                if (shouldIgnoreExpectedLogoutError()) return;
+                console.error("Error loading rated items:", err);
               });
           }
         }

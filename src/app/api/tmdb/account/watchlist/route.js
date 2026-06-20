@@ -9,7 +9,6 @@ import {
   clearTraktCookies,
 } from '@/lib/trakt/server'
 import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
-import { enrichMediaItemsWithTmdb } from '@/app/api/_utils/tmdbMetadata'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -48,24 +47,34 @@ async function syncWatchlistToTrakt({ token, mediaType, tmdbId, watchlist }) {
   return result
 }
 
+function mapBackendMediaItem(item) {
+  const mediaType = item.mediaType === 'movie' ? 'movie' : 'tv'
+  return {
+    ...item,
+    media_type: mediaType,
+    media_id: item.tmdbId,
+    id: item.tmdbId,
+    title: item.title || null,
+    name: item.title || null,
+    poster_path: item.posterPath || null,
+    backdrop_path: item.backdropPath || null,
+    release_date: item.releaseDate || null,
+    first_air_date: item.firstAirDate || null,
+    year: item.year || null,
+    genre_ids: Array.isArray(item.genreIds) ? item.genreIds : [],
+    genres: Array.isArray(item.genres) ? item.genres : [],
+    overview: item.overview || null,
+    vote_average: item.voteAverage ?? null,
+    user_rating: item.userRating ?? null,
+  }
+}
+
 // GET: List all watchlist items (movies + TV shows)
 export async function GET(req) {
   try {
     const backend = await backendFetchJson(req, '/v1/watchlist?limit=500')
     if (backend.ok) {
-      const watchlistBase = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
-        ...item,
-        media_type: item.mediaType,
-        media_id: item.tmdbId,
-        id: item.tmdbId,
-        title: item.title || null,
-        name: item.title || null,
-        poster_path: item.posterPath || null,
-      }))
-      const watchlist = await enrichMediaItemsWithTmdb(watchlistBase, {
-        getId: (item) => item.id,
-        getType: (item) => item.media_type,
-      })
+      const watchlist = (Array.isArray(backend.json?.results) ? backend.json.results : []).map(mapBackendMediaItem)
       const res = NextResponse.json({ watchlist, source: 'backend' })
       setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
       return res

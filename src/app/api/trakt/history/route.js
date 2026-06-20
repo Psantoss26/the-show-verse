@@ -9,7 +9,6 @@ import {
   traktFetch,
 } from "@/lib/trakt/server";
 import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
-import { enrichMediaItemsWithTmdb } from "@/app/api/_utils/tmdbMetadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +21,43 @@ function detailsHrefFor(type, tmdbId) {
   if (!tmdbId) return null;
   const mediaType = type === "movie" ? "movie" : "tv";
   return `/details/${mediaType}/${tmdbId}`;
+}
+
+function mapBackendHistoryItem(item) {
+  const itemType = item.mediaType === "movie" ? "movie" : "show";
+  const title = item.title || null;
+  const firstAirDate = item.firstAirDate || null;
+  const releaseDate = item.releaseDate || null;
+  return {
+    id: item.id,
+    watched_at: item.watchedAt,
+    type: itemType,
+    tmdbId: item.tmdbId,
+    title,
+    title_es: title,
+    poster_path: item.posterPath || null,
+    backdrop_path: item.backdropPath || null,
+    release_date: releaseDate,
+    first_air_date: firstAirDate,
+    year: item.year || null,
+    genre_ids: Array.isArray(item.genreIds) ? item.genreIds : [],
+    genres: Array.isArray(item.genres) ? item.genres : [],
+    overview: item.overview || null,
+    vote_average: item.voteAverage ?? null,
+    detailsHref: detailsHrefFor(itemType, item.tmdbId),
+    ...(item.mediaType === "tv" && item.season && item.episode
+      ? {
+          episode: {
+            season: item.season,
+            number: item.episode,
+            title: null,
+          },
+          season: item.season,
+          number: item.episode,
+          episodeTitle: null,
+        }
+      : {}),
+  };
 }
 
 function ymdToIsoStart(ymd) {
@@ -111,36 +147,7 @@ export async function GET(request) {
     const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
     if (backend.ok) {
       const rows = Array.isArray(backend.json?.results) ? backend.json.results : [];
-      const normalized = rows.map((item) => {
-        const itemType = item.mediaType === "movie" ? "movie" : "show";
-        return {
-          id: item.id,
-          watched_at: item.watchedAt,
-          type: itemType,
-          tmdbId: item.tmdbId,
-          title: item.title || null,
-          title_es: item.title || null,
-          poster_path: item.posterPath || null,
-          year: null,
-          detailsHref: detailsHrefFor(itemType, item.tmdbId),
-          ...(item.mediaType === "tv" && item.season && item.episode
-            ? {
-                episode: {
-                  season: item.season,
-                  number: item.episode,
-                  title: null,
-                },
-                season: item.season,
-                number: item.episode,
-                episodeTitle: null,
-              }
-            : {}),
-        };
-      });
-      const enriched = await enrichMediaItemsWithTmdb(normalized, {
-        getId: (item) => item.tmdbId,
-        getType: (item) => item.type,
-      });
+      const enriched = rows.map(mapBackendHistoryItem);
 
       const plays = enriched.length;
       const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size;

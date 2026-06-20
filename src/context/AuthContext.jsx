@@ -124,7 +124,8 @@ export const AuthProvider = ({ children }) => {
     [applyUser],
   );
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options = {}) => {
+    const redirectTo = options?.redirectTo || null;
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
@@ -135,6 +136,10 @@ export const AuthProvider = ({ children }) => {
       console.warn("No se pudo cerrar la sesión en backend", e);
     } finally {
       cleanLegacyStorage();
+      if (redirectTo && typeof window !== "undefined") {
+        window.location.replace(redirectTo);
+        return;
+      }
       applyUser(null);
       setHydrated(true);
     }
