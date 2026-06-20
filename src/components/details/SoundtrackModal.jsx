@@ -65,7 +65,7 @@ export default function SoundtrackModal({
   const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(0.3);
   const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
@@ -103,6 +103,14 @@ export default function SoundtrackModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, open]);
 
+  // Sincronizar volumen e inicializar el reproductor con el volumen correcto
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.muted = isMuted;
+    }
+  }, [selectedId, open, volume, isMuted]);
+
   // Controles del reproductor de audio
   const togglePlay = () => {
     if (!selectedTrack?.previewUrl) return;
@@ -121,6 +129,8 @@ export default function SoundtrackModal({
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.muted = isMuted;
       setDuration(audioRef.current.duration);
     }
   };
