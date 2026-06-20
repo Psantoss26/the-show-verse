@@ -63,6 +63,9 @@ export async function GET(req) {
       const favorites = await enrichMediaItemsWithTmdb(favoritesBase, {
         getId: (item) => item.id,
         getType: (item) => item.media_type,
+        concurrency: 6,
+        timeoutMs: 900,
+        timeBudgetMs: 2200,
       })
       const res = NextResponse.json({ favorites, source: 'backend' })
       setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })

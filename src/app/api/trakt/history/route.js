@@ -140,6 +140,9 @@ export async function GET(request) {
       const enriched = await enrichMediaItemsWithTmdb(normalized, {
         getId: (item) => item.tmdbId,
         getType: (item) => item.type,
+        concurrency: 6,
+        timeoutMs: 900,
+        timeBudgetMs: 2200,
       });
 
       const plays = enriched.length;
