@@ -72,7 +72,7 @@ function mapBackendMediaItem(item) {
 // GET: List all watchlist items (movies + TV shows)
 export async function GET(req) {
   try {
-    const backend = await backendFetchJson(req, '/v1/watchlist?limit=500')
+    const backend = await backendFetchJson(req, '/v1/watchlist?limit=1000')
     if (backend.ok) {
       const watchlist = (Array.isArray(backend.json?.results) ? backend.json.results : []).map(mapBackendMediaItem)
       const res = NextResponse.json({ watchlist, source: 'backend' })
