@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
+import { useTranslation } from "@/lib/i18n";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FilmIcon,
@@ -31,6 +32,7 @@ import WatchNextAssistant from "@/components/WatchNextAssistant";
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
 function SearchBar({ onResultClick, isMobile = false }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -185,13 +187,13 @@ function SearchBar({ onResultClick, isMobile = false }) {
   const getMediaTypeLabel = (mediaType) => {
     switch (mediaType) {
       case "movie":
-        return "Película";
+        return t("search_badge_movie", "Película");
       case "tv":
-        return "Serie";
+        return t("search_badge_tv", "Serie");
       case "person":
-        return "Persona";
+        return t("search_badge_person", "Persona");
       case "collection":
-        return "Colección";
+        return t("search_badge_collection", "Colección");
       default:
         return mediaType;
     }
@@ -225,7 +227,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.trim() && setShowDropdown(true)}
               placeholder={
-                  isMobile ? "Buscar..." : "Buscar películas, series, actores o colecciones..."
+                  isMobile ? t("search_mobile_placeholder", "Buscar...") : t("search_placeholder", "Buscar películas, series, actores o colecciones...")
                 }
             className={`
               flex-1 w-full bg-transparent border-none focus:ring-0 shadow-none outline-none
@@ -344,6 +346,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
  * ==================================================================== */
 export default function Navbar() {
   const { account, hydrated } = useAuth();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -528,7 +531,7 @@ export default function Navbar() {
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">Inicio</span>
+                <span className="relative z-10">{t("nav_home", "Inicio")}</span>
               </Link>
               <Link
                 href="/movies"
@@ -544,7 +547,7 @@ export default function Navbar() {
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">Películas</span>
+                <span className="relative z-10">{t("nav_movies", "Películas")}</span>
               </Link>
               <Link
                 href="/series"
@@ -560,7 +563,7 @@ export default function Navbar() {
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">Series</span>
+                <span className="relative z-10">{t("nav_series", "Series")}</span>
               </Link>
               <Link href="/discover" className={navLinkClass("/discover")}>
                 {isActive("/discover") && (
@@ -570,7 +573,7 @@ export default function Navbar() {
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">Descubrir</span>
+                <span className="relative z-10">{t("nav_discover", "Descubrir")}</span>
               </Link>
               <Link href="/biblioteca" className={navLinkClass("/biblioteca")}>
                 {isActive("/biblioteca") && (
@@ -580,7 +583,7 @@ export default function Navbar() {
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
                 )}
-                <span className="relative z-10">Biblioteca</span>
+                <span className="relative z-10">{t("nav_library", "Biblioteca")}</span>
               </Link>
             </div>
           </div>
@@ -686,7 +689,7 @@ export default function Navbar() {
                 href={loginHref}
                 className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
               >
-                Iniciar sesión
+                {t("nav_login", "Iniciar sesión")}
               </a>
             ) : (
               <UserAvatar account={account} />
@@ -905,7 +908,7 @@ export default function Navbar() {
                   }`}
                 >
                   <HomeIcon className="w-5 h-5" />
-                  <span>Inicio</span>
+                  <span>{t("nav_home", "Inicio")}</span>
                 </Link>
 
                 <Link
@@ -920,7 +923,7 @@ export default function Navbar() {
                   }`}
                 >
                   <FilmIcon className="w-5 h-5" />
-                  <span>Películas</span>
+                  <span>{t("nav_movies", "Películas")}</span>
                 </Link>
 
                 <Link
@@ -935,7 +938,7 @@ export default function Navbar() {
                   }`}
                 >
                   <TvIcon className="w-5 h-5" />
-                  <span>Series</span>
+                  <span>{t("nav_series", "Series")}</span>
                 </Link>
 
                 <Link
@@ -948,7 +951,7 @@ export default function Navbar() {
                   }`}
                 >
                   <Compass className="w-5 h-5" />
-                  <span>Descubrir</span>
+                  <span>{t("nav_discover", "Descubrir")}</span>
                 </Link>
 
                 <Link
@@ -961,7 +964,7 @@ export default function Navbar() {
                   }`}
                 >
                   <FolderKanban className="w-5 h-5" />
-                  <span>Biblioteca</span>
+                  <span>{t("nav_library", "Biblioteca")}</span>
                 </Link>
 
                 <div className="my-3 h-px bg-neutral-800" />
@@ -976,7 +979,7 @@ export default function Navbar() {
                   }`}
                 >
                   <Play className="w-5 h-5" fill="currentColor" />
-                  <span>En Progreso</span>
+                  <span>{t("nav_in_progress", "En Progreso")}</span>
                 </Link>
 
                 <TraktHistoryNavButton
@@ -996,7 +999,7 @@ export default function Navbar() {
                   }`}
                 >
                   <Heart className="w-5 h-5" />
-                  <span>Favoritas</span>
+                  <span>{t("nav_favorites", "Favoritas")}</span>
                 </Link>
 
                 <Link
@@ -1009,7 +1012,7 @@ export default function Navbar() {
                   }`}
                 >
                   <Bookmark className="w-5 h-5" />
-                  <span>Pendientes</span>
+                  <span>{t("nav_watchlist", "Pendientes")}</span>
                 </Link>
 
                 <div className="my-3 h-px bg-neutral-800" />
@@ -1024,7 +1027,7 @@ export default function Navbar() {
                   }`}
                 >
                   <ListVideo className="w-5 h-5" />
-                  <span>Listas</span>
+                  <span>{t("nav_lists", "Listas")}</span>
                 </Link>
 
                 <Link
@@ -1037,7 +1040,7 @@ export default function Navbar() {
                   }`}
                 >
                   <CalendarDaysIcon className="w-5 h-5" />
-                  <span>Calendario</span>
+                  <span>{t("nav_calendar", "Calendario")}</span>
                 </Link>
               </div>
             </motion.aside>

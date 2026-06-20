@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
 import {
   fetchRatedForUser,
   getWatchProviders,
@@ -2214,7 +2215,8 @@ const FavoriteCard = memo(function FavoriteCard({
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
-  const { session, account, hydrated, logout } = useAuth();
+  const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
@@ -2238,13 +2240,28 @@ export default function FavoritesClient() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Filter states with localStorage persistence
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return "grid";
-    const saved = window.localStorage.getItem("showverse:favorites:viewMode");
-    return saved === "list" || saved === "grid" || saved === "compact"
-      ? saved
-      : "grid";
-  });
+  const [viewMode, setViewModeState] = useState("grid");
+
+  useEffect(() => {
+    if (preferences?.defaultView) {
+      setViewModeState(preferences.defaultView);
+    } else {
+      const saved = window.localStorage.getItem("showverse:favorites:viewMode");
+      if (saved === "list" || saved === "grid" || saved === "compact") {
+        setViewModeState(saved);
+      }
+    }
+  }, [preferences?.defaultView]);
+
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("showverse:favorites:viewMode", mode);
+    }
+    if (authenticated) {
+      updatePreference({ defaultView: mode });
+    }
+  }, [authenticated, updatePreference]);
 
   const [typeFilter, setTypeFilter] = useState(() => {
     if (typeof window === "undefined") return "all";
@@ -2327,11 +2344,6 @@ export default function FavoritesClient() {
     sortBy === "rating-desc";
 
   // Persist filter states
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("showverse:favorites:viewMode", viewMode);
-  }, [viewMode]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("showverse:favorites:typeFilter", typeFilter);

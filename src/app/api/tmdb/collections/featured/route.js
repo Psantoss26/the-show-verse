@@ -1,5 +1,5 @@
-// /src/app/api/tmdb/collections/featured/route.js
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
@@ -59,10 +59,12 @@ const FEATURED_COLLECTION_IDS = [
   5039, // Rambo
 ];
 
-function buildTmdbUrl(path, params = {}) {
+async function buildTmdbUrl(path, params = {}) {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
   const url = new URL(`${TMDB_API}${path}`);
   url.searchParams.set("api_key", TMDB_KEY || "");
-  url.searchParams.set("language", "es-ES");
+  url.searchParams.set("language", locale);
   Object.entries(params).forEach(
     ([k, v]) => v != null && url.searchParams.set(k, String(v)),
   );
@@ -90,7 +92,8 @@ export async function GET() {
     const collections = await Promise.all(
       uniqueIds.map(async (id) => {
         try {
-          const c = await fetchJson(buildTmdbUrl(`/collection/${id}`), {
+          const tmdbUrl = await buildTmdbUrl(`/collection/${id}`);
+          const c = await fetchJson(tmdbUrl, {
             cache: "force-cache",
             next: { revalidate: 3600 }, // 1 hora
           });

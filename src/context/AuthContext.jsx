@@ -7,6 +7,43 @@ const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
 const COMPAT_SESSION_VALUE = "showverse";
 
+const DEFAULT_PREFERENCES = {
+  defaultView: "grid",
+  language: "es-ES",
+  adultContent: false,
+  notificationSettings: {
+    weeklySummary: false,
+  },
+  uiSettings: {
+    profileAutoRefresh: true,
+    compactProfileCards: false,
+    syncTraktActions: false,
+  },
+};
+
+function mergePreferences(value) {
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...(value || {}),
+    notificationSettings: {
+      ...DEFAULT_PREFERENCES.notificationSettings,
+      ...(value?.notificationSettings || {}),
+    },
+    uiSettings: {
+      ...DEFAULT_PREFERENCES.uiSettings,
+      ...(value?.uiSettings || {}),
+    },
+  };
+}
+
+function setCookie(name, value, days = 365) {
+  if (typeof window === "undefined") return;
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "; expires=" + date.toUTCString();
+  document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax; Secure";
+}
+
 function cleanLegacyStorage() {
   if (typeof window === "undefined") return;
   for (const key of LEGACY_STORAGE_KEYS) {
@@ -42,12 +79,68 @@ async function readJsonResponse(response) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [hydrated, setHydrated] = useState(false);
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [loadingPreferences, setLoadingPreferences] = useState(false);
 
   const applyUser = useCallback((nextUser) => {
     const normalized = nextUser || null;
     setUser(normalized);
     return normalized;
   }, []);
+
+  const syncPreferenceCookies = useCallback((prefs) => {
+    if (prefs?.language) {
+      setCookie("showverse_locale", prefs.language);
+    }
+    if (prefs?.defaultView) {
+      setCookie("showverse_default_view", prefs.defaultView);
+    }
+  }, []);
+
+  const loadPreferences = useCallback(async () => {
+    setLoadingPreferences(true);
+    try {
+      const res = await fetch("/api/user/preferences", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.preferences) {
+        const merged = mergePreferences(json.preferences);
+        setPreferences(merged);
+        syncPreferenceCookies(merged);
+      }
+    } catch (err) {
+      console.warn("No se pudieron cargar las preferencias", err);
+    } finally {
+      setLoadingPreferences(false);
+    }
+  }, [syncPreferenceCookies]);
+
+  const savePreferences = useCallback(async (nextPreferences) => {
+    setPreferences(nextPreferences);
+    syncPreferenceCookies(nextPreferences);
+    try {
+      const res = await fetch("/api/user/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextPreferences),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.preferences) {
+        const merged = mergePreferences(json.preferences);
+        setPreferences(merged);
+        syncPreferenceCookies(merged);
+      }
+    } catch (err) {
+      console.error("Error al guardar preferencias:", err);
+    }
+  }, [syncPreferenceCookies]);
+
+  const updatePreference = useCallback((patch) => {
+    const next = mergePreferences({
+      ...preferences,
+      ...patch,
+    });
+    savePreferences(next);
+  }, [preferences, savePreferences]);
 
   const refreshMe = useCallback(async () => {
     const res = await fetch("/api/auth/me", {
@@ -59,8 +152,25 @@ export const AuthProvider = ({ children }) => {
     const nextUser = json?.authenticated ? json.user || null : null;
     applyUser(nextUser);
     setHydrated(true);
+    if (nextUser) {
+      loadPreferences();
+    }
     return nextUser;
-  }, [applyUser]);
+  }, [applyUser, loadPreferences]);
+
+  useEffect(() => {
+    // Sincronizar cookies iniciales desde localStorage/defaults si no hay cookies
+    if (typeof window !== "undefined") {
+      const localeMatch = document.cookie.match(/showverse_locale=([^;]+)/);
+      if (!localeMatch) {
+        setCookie("showverse_locale", "es-ES");
+      }
+      const viewMatch = document.cookie.match(/showverse_default_view=([^;]+)/);
+      if (!viewMatch) {
+        setCookie("showverse_default_view", "grid");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +185,20 @@ export const AuthProvider = ({ children }) => {
         });
         const json = await res.json().catch(() => ({}));
         if (cancelled) return;
-        applyUser(json?.authenticated ? json.user || null : null);
+        const loggedUser = applyUser(json?.authenticated ? json.user || null : null);
+        if (loggedUser) {
+          fetch("/api/user/preferences", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((prefJson) => {
+              if (cancelled) return;
+              if (prefJson?.preferences) {
+                const merged = mergePreferences(prefJson.preferences);
+                setPreferences(merged);
+                syncPreferenceCookies(merged);
+              }
+            })
+            .catch(() => {});
+        }
       } catch (e) {
         console.warn("No se pudo hidratar la sesión propia", e);
         if (!cancelled) applyUser(null);
@@ -88,7 +211,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [applyUser]);
+  }, [applyUser, syncPreferenceCookies]);
 
   const login = useCallback(
     async (credentials) => {
@@ -102,9 +225,13 @@ export const AuthProvider = ({ children }) => {
       });
       const json = await readJsonResponse(res);
       setHydrated(true);
-      return applyUser(json.user || null);
+      const loggedUser = applyUser(json.user || null);
+      if (loggedUser) {
+        loadPreferences();
+      }
+      return loggedUser;
     },
-    [applyUser],
+    [applyUser, loadPreferences],
   );
 
   const register = useCallback(
@@ -119,9 +246,13 @@ export const AuthProvider = ({ children }) => {
       });
       const json = await readJsonResponse(res);
       setHydrated(true);
-      return applyUser(json.user || null);
+      const loggedUser = applyUser(json.user || null);
+      if (loggedUser) {
+        loadPreferences();
+      }
+      return loggedUser;
     },
-    [applyUser],
+    [applyUser, loadPreferences],
   );
 
   const logout = useCallback(async (options = {}) => {
@@ -136,6 +267,9 @@ export const AuthProvider = ({ children }) => {
       console.warn("No se pudo cerrar la sesión en backend", e);
     } finally {
       cleanLegacyStorage();
+      setPreferences(DEFAULT_PREFERENCES);
+      setCookie("showverse_locale", "es-ES");
+      setCookie("showverse_default_view", "grid");
       if (redirectTo && typeof window !== "undefined") {
         window.location.replace(redirectTo);
         return;
@@ -160,8 +294,24 @@ export const AuthProvider = ({ children }) => {
       register,
       logout,
       refreshMe,
+      preferences,
+      loadingPreferences,
+      updatePreference,
     }),
-    [account, authenticated, hydrated, login, logout, refreshMe, register, session, user],
+    [
+      account,
+      authenticated,
+      hydrated,
+      login,
+      logout,
+      refreshMe,
+      register,
+      session,
+      user,
+      preferences,
+      loadingPreferences,
+      updatePreference,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -181,6 +331,9 @@ export const useAuth = () => {
       register: async () => null,
       logout: async () => {},
       refreshMe: async () => null,
+      preferences: DEFAULT_PREFERENCES,
+      loadingPreferences: false,
+      updatePreference: () => {},
     };
   }
   return ctx;
