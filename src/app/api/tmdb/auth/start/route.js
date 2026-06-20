@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 
 const TMDB = "https://api.themoviedb.org/3";
 const API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const RETRYABLE_TMDB_STATUSES = new Set([500, 502, 503, 504]);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function cleanOrigin(s) {
   return String(s || "").replace(/\/+$/, "");
@@ -57,6 +60,46 @@ function nextPathFromReferer(req, origin) {
   }
 }
 
+async function fetchTmdbRequestToken() {
+  const tokenUrl = `${TMDB}/authentication/token/new?api_key=${encodeURIComponent(API_KEY)}`;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const tokenRes = await fetch(tokenUrl, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    const contentType = tokenRes.headers.get("content-type") || "";
+    const tokenJson = contentType.includes("application/json")
+      ? await tokenRes.json().catch(() => ({}))
+      : {};
+
+    if (tokenRes.ok && tokenJson?.success && tokenJson?.request_token) {
+      return tokenJson.request_token;
+    }
+
+    lastError = {
+      status: tokenRes.status,
+      message:
+        tokenJson?.status_message ||
+        (contentType.includes("text/html")
+          ? "TMDb no está disponible temporalmente"
+          : `TMDb ${tokenRes.status}`),
+    };
+
+    if (RETRYABLE_TMDB_STATUSES.has(tokenRes.status) && attempt < 3) {
+      await sleep(350 * attempt);
+      continue;
+    }
+
+    break;
+  }
+
+  const err = new Error(lastError?.message || "No se pudo conectar con TMDb");
+  err.status = lastError?.status || 502;
+  throw err;
+}
+
 export async function GET(req) {
   if (!API_KEY) {
     return NextResponse.json({ error: "Missing TMDB API key" }, { status: 500 });
@@ -68,17 +111,19 @@ export async function GET(req) {
     nextFromQuery || nextPathFromReferer(req, origin),
   );
 
-  const tokenUrl = `${TMDB}/authentication/token/new?api_key=${encodeURIComponent(API_KEY)}`;
-  const tokenRes = await fetch(tokenUrl, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  });
-  const tokenJson = await tokenRes.json().catch(() => ({}));
-
-  if (!tokenRes.ok || !tokenJson?.success || !tokenJson?.request_token) {
+  let requestToken;
+  try {
+    requestToken = await fetchTmdbRequestToken();
+  } catch (error) {
     return NextResponse.json(
-      { error: tokenJson?.status_message || `TMDb ${tokenRes.status}` },
-      { status: tokenRes.ok ? 500 : tokenRes.status },
+      {
+        error:
+          error?.status >= 500
+            ? "TMDb no está disponible temporalmente. Inténtalo de nuevo en unos minutos."
+            : error?.message || "No se pudo iniciar la conexión con TMDb.",
+        details: error?.message || null,
+      },
+      { status: error?.status || 502 },
     );
   }
 
@@ -86,7 +131,7 @@ export async function GET(req) {
   callbackUrl.searchParams.set("next", nextPath);
 
   const authorizeUrl =
-    `https://www.themoviedb.org/authenticate/${tokenJson.request_token}` +
+    `https://www.themoviedb.org/authenticate/${requestToken}` +
     `?redirect_to=${encodeURIComponent(callbackUrl.toString())}`;
 
   return NextResponse.redirect(authorizeUrl);

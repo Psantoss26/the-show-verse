@@ -216,6 +216,29 @@ function mapTmdbCollectionItem(item, userId) {
   };
 }
 
+function mapTmdbRatingItem(item, userId) {
+  const mediaType =
+    item?.media_type === 'tv' ? 'tv' : item?.media_type === 'movie' ? 'movie' : null;
+  const tmdbId = Number(item?.id || item?.media_id || item?.tmdbId);
+  const rating = Number(item?.rating ?? item?.account_rating);
+
+  if (!mediaType || !Number.isInteger(tmdbId) || tmdbId <= 0) return null;
+  if (!Number.isFinite(rating) || rating < 1 || rating > 10) return null;
+
+  return {
+    userId,
+    tmdbId,
+    mediaType,
+    season: null,
+    episode: null,
+    rating,
+    title: item?.title || item?.name || item?.original_title || item?.original_name || null,
+    posterPath: item?.poster_path || item?.posterPath || null,
+    ratedAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 function makeStep(status, data = {}) {
   return {
     status,
@@ -288,6 +311,10 @@ async function importRatingValues(userId, traktRatings = []) {
     ratingKey,
   );
 
+  return importNormalizedRatingValues(userId, sourceValues, traktRatings.length);
+}
+
+async function importNormalizedRatingValues(userId, sourceValues = [], fetched = 0) {
   const existing = await db.select().from(userRatings).where(eq(userRatings.userId, userId));
   const existingByKey = new Map(existing.map((item) => [ratingKey(item), item]));
 
@@ -302,6 +329,7 @@ async function importRatingValues(userId, traktRatings = []) {
         .set({
           rating: item.rating,
           title: item.title,
+          posterPath: item.posterPath || null,
           ratedAt: item.ratedAt,
           updatedAt: new Date(),
         })
@@ -315,7 +343,7 @@ async function importRatingValues(userId, traktRatings = []) {
 
   return {
     status: 'done',
-    fetched: traktRatings.length,
+    fetched,
     imported: inserted,
     updated,
   };
@@ -364,6 +392,15 @@ async function importTmdbCollectionValues(userId, collection, items = []) {
     imported,
     skipped: sourceValues.length - imported,
   };
+}
+
+async function importTmdbRatingValues(userId, items = []) {
+  const sourceValues = dedupeBy(
+    items.map((item) => mapTmdbRatingItem(item, userId)).filter(Boolean),
+    ratingKey,
+  );
+
+  return importNormalizedRatingValues(userId, sourceValues, Array.isArray(items) ? items.length : 0);
 }
 
 async function importLists(userId, accessToken) {
@@ -577,19 +614,20 @@ export default async function importRoutes(fastify) {
     return reply.send(progress || { status: 'idle', steps: {} });
   });
 
-  // POST /import/tmdb/data/chunk - importa favoritos y pendientes de TMDb por lotes.
+  // POST /import/tmdb/data/chunk - importa favoritos, pendientes y puntuaciones de TMDb por lotes.
   fastify.post('/tmdb/data/chunk', async (req, reply) => {
     const {
       favorites: favoriteItems = [],
       watchlist: watchlistItems = [],
+      ratings: ratingItems = [],
       done = false,
       reset = false,
     } = req.body || {};
 
-    if (!Array.isArray(favoriteItems) || !Array.isArray(watchlistItems)) {
-      return reply.status(400).send({ error: 'favorites and watchlist must be arrays' });
+    if (!Array.isArray(favoriteItems) || !Array.isArray(watchlistItems) || !Array.isArray(ratingItems)) {
+      return reply.status(400).send({ error: 'favorites, watchlist and ratings must be arrays' });
     }
-    if (favoriteItems.length > 1000 || watchlistItems.length > 1000) {
+    if (favoriteItems.length > 1000 || watchlistItems.length > 1000 || ratingItems.length > 1000) {
       return reply.status(413).send({ error: 'Import chunk is too large' });
     }
 
@@ -603,7 +641,7 @@ export default async function importRoutes(fastify) {
     if (reset || !current || current.status !== 'running') {
       importProgress.set(key, {
         status: 'running',
-        mode: 'favorites_watchlist',
+        mode: 'favorites_watchlist_ratings',
         startedAt: new Date(),
         completedAt: null,
         steps: {},
@@ -626,6 +664,13 @@ export default async function importRoutes(fastify) {
         progress.steps.watchlist = mergeStepData(progress.steps.watchlist, result);
       } else if (!progress.steps.watchlist) {
         progress.steps.watchlist = makeStep('done', { fetched: 0, imported: 0, skipped: 0 });
+      }
+
+      if (ratingItems.length > 0) {
+        const result = await importTmdbRatingValues(userId, ratingItems);
+        progress.steps.ratings = mergeStepData(progress.steps.ratings, result);
+      } else if (!progress.steps.ratings) {
+        progress.steps.ratings = makeStep('done', { fetched: 0, imported: 0, updated: 0 });
       }
 
       if (done) {
