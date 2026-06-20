@@ -1360,7 +1360,7 @@ export default function DetailsClient({
 
   // Indica si se estan cargando los estados de cuenta (favorito, watchlist, rating)
   const [accountStatesLoading, setAccountStatesLoading] = useState(
-    !authHydrated || !!session,
+    !authHydrated || (!!session && session !== "showverse"),
   );
 
   // Pestana activa en la seccion de metadatos (details/produccion/sinopsis/premios)
@@ -5006,11 +5006,18 @@ export default function DetailsClient({
     }
 
     setTrakt(nextTrakt);
+    setFavorite(!!nextTrakt.favorite);
+    setWatchlist(!!nextTrakt.inWatchlist);
+    setUserRating(
+      typeof nextTrakt.rating === "number" ? nextTrakt.rating : null,
+    );
     setTraktWatchedOpen(false);
     setTraktEpisodesOpen(false);
     setEpisodeBusyKey("");
     setTraktBusy("");
-    setActionStateReady(hasInitialActionState);
+    setActionStateReady(
+      hasInitialActionState || hydratedStatus || hydratedShowWatched,
+    );
 
     setWatchedBySeason(nextWatchedBySeason);
     setWatchedBySeasonLoaded(
@@ -5110,21 +5117,29 @@ export default function DetailsClient({
   // (visto, rating, historial, watchlist, progreso)
   useEffect(() => {
     traktBackgroundSyncAtRef.current = Date.now();
+    const hasUsableInitialState =
+      hasInitialTraktStatus ||
+      hasCachedTraktStatus ||
+      (endpointType === "tv" && (hasInitialShowWatched || hasCachedShowWatched));
 
     if (endpointType === "movie") {
       void loadTraktMovieWatched({
-        background: false,
+        background: hasUsableInitialState,
         force: true,
       });
       return;
     }
 
     // force:true para obtener siempre datos frescos de Trakt en la carga inicial
-    void reloadTraktStatus({ background: false, force: true });
+    void reloadTraktStatus({ background: hasUsableInitialState, force: true });
   }, [
     loadTraktMovieWatched,
     reloadTraktStatus,
     endpointType,
+    hasInitialTraktStatus,
+    hasCachedTraktStatus,
+    hasInitialShowWatched,
+    hasCachedShowWatched,
   ]);
 
   useEffect(() => {
@@ -8102,80 +8117,67 @@ export default function DetailsClient({
   const recImdbTimersRef = useRef({});
   const recImdbIdCacheRef = useRef({});
   const [recAccountStates, setRecAccountStates] = useState({});
+  const recAccountStatesRef = useRef({});
+  const recAccountStateInFlightRef = useRef(new Set());
 
   useEffect(() => {
     recImdbRatingsRef.current = recImdbRatings;
   }, [recImdbRatings]);
 
   useEffect(() => {
+    recAccountStatesRef.current = recAccountStates;
+  }, [recAccountStates]);
+
+  useEffect(() => {
     // reset al cambiar de item
     setRecImdbRatings({});
+    setRecAccountStates({});
     recImdbInFlightRef.current = new Set();
     recImdbTimersRef.current = {};
     recImdbIdCacheRef.current = {};
+    recAccountStatesRef.current = {};
+    recAccountStateInFlightRef.current = new Set();
   }, [id, type]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const prefetchRecAccountState = useCallback(
+    async (rec) => {
+      if (!rec?.id) return;
+      if (!session || !account?.id) return;
+      if (session === "showverse") return;
 
-    const loadRecommendationStates = async () => {
-      if (!session || !account?.id || !Array.isArray(recommendations)) {
-        setRecAccountStates({});
-        return;
-      }
+      const mediaType =
+        rec.media_type === "movie" || rec.media_type === "tv"
+          ? rec.media_type
+          : type === "tv"
+            ? "tv"
+            : "movie";
+      const key = `${mediaType}:${rec.id}`;
+      if (recAccountStatesRef.current[key]) return;
+      if (recAccountStateInFlightRef.current.has(key)) return;
 
-      const visibleRecs = recommendations.slice(0, 15).filter((rec) => rec?.id);
-      if (visibleRecs.length === 0) {
-        setRecAccountStates({});
-        return;
-      }
-
+      recAccountStateInFlightRef.current.add(key);
       try {
-        const entries = await Promise.all(
-          visibleRecs.map(async (rec) => {
-            const mediaType =
-              rec.media_type === "movie" || rec.media_type === "tv"
-                ? rec.media_type
-                : type === "tv"
-                  ? "tv"
-                  : "movie";
-            const key = `${mediaType}:${rec.id}`;
-            try {
-              const st = await getMediaAccountStates(
-                mediaType,
-                rec.id,
-                session,
-              );
-              return [
-                key,
-                {
-                  favorite: !!st?.favorite,
-                  watchlist: !!st?.watchlist,
-                  rating:
-                    st?.rated && typeof st.rated.value === "number"
-                      ? st.rated.value
-                      : null,
-                },
-              ];
-            } catch {
-              return [key, { favorite: false, watchlist: false, rating: null }];
-            }
-          }),
-        );
-
-        if (!cancelled) {
-          setRecAccountStates(Object.fromEntries(entries));
-        }
+        const st = await getMediaAccountStates(mediaType, rec.id, session);
+        const next = {
+          favorite: !!st?.favorite,
+          watchlist: !!st?.watchlist,
+          rating:
+            st?.rated && typeof st.rated.value === "number"
+              ? st.rated.value
+              : null,
+        };
+        setRecAccountStates((prev) => ({ ...prev, [key]: next }));
       } catch {
-        if (!cancelled) setRecAccountStates({});
+        setRecAccountStates((prev) => ({
+          ...prev,
+          [key]: { favorite: false, watchlist: false, rating: null },
+        }));
+      } finally {
+        recAccountStateInFlightRef.current.delete(key);
       }
-    };
-
-    loadRecommendationStates();
-    return () => {
-      cancelled = true;
-    };
-  }, [recommendations, session, account?.id, type]);
+    },
+    [account?.id, session, type],
+  );
 
   const prefetchRecImdb = useCallback(
     (rec) => {
@@ -10525,12 +10527,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className={recCardClass}
                                 onMouseEnter={
                                   enableHover
-                                    ? () => prefetchRecImdb(rec)
+                                    ? () => {
+                                        prefetchRecImdb(rec);
+                                        void prefetchRecAccountState(rec);
+                                      }
                                     : undefined
                                 }
                                 onFocus={
                                   enableHover
-                                    ? () => prefetchRecImdb(rec)
+                                    ? () => {
+                                        prefetchRecImdb(rec);
+                                        void prefetchRecAccountState(rec);
+                                      }
                                     : undefined
                                 }
                               >
