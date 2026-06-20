@@ -375,35 +375,30 @@ function SmartPoster({ item, title }) {
     setReady(false);
 
     const load = async () => {
-      const cachedPath = item.poster_path || item.backdrop_path || null;
-      if (cachedPath) {
-        const url = buildImg(cachedPath, "w500");
-        await preloadImage(url);
-        if (!abort) {
-          setSrc(url);
-          setReady(true);
-        }
-        return;
-      }
-
+      const key = `${type}:${id}`;
+      const hasCache = posterChoiceCache.has(key);
+      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
       const pref = getPosterPreference(type, id);
-      if (pref) {
-        const url = buildImg(pref, "w500");
-        await preloadImage(url);
+      const initialPath = memoryBest || pref || item.poster_path || item.backdrop_path || null;
+
+      if (initialPath) {
+        const url = buildImg(initialPath, "w500");
         if (!abort) {
           setSrc(url);
           setReady(true);
         }
-        return;
       }
 
-      const best = await getBestPosterCached(type, id);
-      const finalPath = best || item.poster_path || item.backdrop_path || null;
-      const url = finalPath ? buildImg(finalPath, "w500") : null;
-      if (url) await preloadImage(url);
-      if (!abort) {
-        setSrc(url);
-        setReady(!!url);
+      if (!hasCache) {
+        const best = await getBestPosterCached(type, id);
+        if (best && best !== initialPath && !abort) {
+          const url = buildImg(best, "w500");
+          await preloadImage(url);
+          if (!abort) {
+            setSrc(url);
+            setReady(true);
+          }
+        }
       }
     };
 
@@ -454,26 +449,29 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     setReady(false);
 
     const load = async () => {
-      const cachedPath = item.backdrop_path || item.poster_path || null;
-      if (cachedPath) {
-        const url = buildImg(cachedPath, item.backdrop_path ? "w1280" : "w500");
-        await preloadImage(url);
+      const key = `${type}:${id}`;
+      const hasCache = backdropChoiceCache.has(key);
+      const memoryBest = hasCache ? backdropChoiceCache.get(key) : null;
+      const initialPath = memoryBest || item.backdrop_path || item.poster_path || null;
+
+      if (initialPath) {
+        const url = buildImg(initialPath, (memoryBest || item.backdrop_path) ? "w1280" : "w500");
         if (!abort) {
           setSrc(url);
           setReady(true);
         }
-        return;
       }
 
-      const best = await getBestBackdropCached(type, id);
-      const finalPath = best || item.backdrop_path || item.poster_path || null;
-      const url = finalPath
-        ? buildImg(finalPath, best || item.backdrop_path ? "w1280" : "w500")
-        : null;
-      if (url) await preloadImage(url);
-      if (!abort) {
-        setSrc(url);
-        setReady(!!url);
+      if (!hasCache) {
+        const best = await getBestBackdropCached(type, id);
+        if (best && best !== initialPath && !abort) {
+          const url = buildImg(best, "w1280");
+          await preloadImage(url);
+          if (!abort) {
+            setSrc(url);
+            setReady(true);
+          }
+        }
       }
     };
 
