@@ -40,13 +40,21 @@ function ratingIdentity(userId, tmdbId, mediaType, season, episode) {
   return and(...conditions);
 }
 
+function clampPageLimit(value, { fallback = 250, max = 2000 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(max, Math.floor(n));
+}
+
 export default async function ratingsRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
   // GET /ratings — Todos los ratings del usuario
   fastify.get('/', async (req, reply) => {
     const { type, page = 1, limit = 100 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const safeLimit = clampPageLimit(limit);
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const offset = (safePage - 1) * safeLimit;
 
     const conditions = [eq(userRatings.userId, req.user.id)];
     if (type) conditions.push(eq(userRatings.mediaType, type));
@@ -56,10 +64,10 @@ export default async function ratingsRoutes(fastify) {
       .from(userRatings)
       .where(and(...conditions))
       .orderBy(desc(userRatings.ratedAt))
-      .limit(Number(limit))
+      .limit(safeLimit)
       .offset(offset);
 
-    return reply.send({ results: items, page: Number(page) });
+    return reply.send({ results: items, page: safePage, limit: safeLimit });
   });
 
   // POST /ratings — Dar o actualizar rating

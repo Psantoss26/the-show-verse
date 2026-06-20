@@ -49,7 +49,7 @@ async function syncFavoriteToTrakt({ token, mediaType, tmdbId, favorite }) {
 // GET: List all favorites (movies + TV shows)
 export async function GET(req) {
   try {
-    const backend = await backendFetchJson(req, '/v1/favorites?limit=200')
+    const backend = await backendFetchJson(req, '/v1/favorites?limit=500')
     if (backend.ok) {
       const favoritesBase = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
         ...item,

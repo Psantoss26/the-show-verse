@@ -131,7 +131,7 @@ async function fetchShowProgress(
 export async function GET(request) {
   if (hasBackendCredentials(request)) {
     try {
-      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress");
+      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress?limit=50");
       if (backend.ok) {
         const results = Array.isArray(backend.json?.results) ? backend.json.results : [];
         const enriched = await mapLimit(results, 8, async (item) => {

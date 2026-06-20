@@ -51,7 +51,7 @@ async function syncWatchlistToTrakt({ token, mediaType, tmdbId, watchlist }) {
 // GET: List all watchlist items (movies + TV shows)
 export async function GET(req) {
   try {
-    const backend = await backendFetchJson(req, '/v1/watchlist?limit=200')
+    const backend = await backendFetchJson(req, '/v1/watchlist?limit=500')
     if (backend.ok) {
       const watchlistBase = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
         ...item,

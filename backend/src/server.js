@@ -25,6 +25,7 @@ import itemsRoutes from './routes/items.js';
 import tmdbRoutes from './routes/tmdb.js';
 import importRoutes from './routes/import.js';
 import statsRoutes from './routes/stats.js';
+import usersRoutes from './routes/users.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
 
@@ -189,6 +190,7 @@ const apiV1 = async (app) => {
   app.register(tmdbRoutes, { prefix: '/tmdb' });
   app.register(importRoutes, { prefix: '/import' });
   app.register(statsRoutes, { prefix: '/stats' });
+  app.register(usersRoutes, { prefix: '/users' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });

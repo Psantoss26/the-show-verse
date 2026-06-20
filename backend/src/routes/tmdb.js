@@ -1,8 +1,11 @@
 // src/routes/tmdb.js
-// Proxy de TMDb con caché Redis
+// Proxy de TMDb con caché Redis + PostgreSQL
 // Reemplaza las llamadas directas a TMDb desde el frontend y elimina la dependencia de JustWatch
 
-import { withCache } from '../lib/redis.js';
+import { and, eq, gt } from 'drizzle-orm';
+import { db } from '../db/client.js';
+import { tmdbCache } from '../db/schema.js';
+import { cacheGet, cacheSet } from '../lib/redis.js';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -40,13 +43,70 @@ async function tmdbFetch(path, params = {}) {
   return res.json();
 }
 
+async function getDbCache(cacheKey) {
+  const [hit] = await db
+    .select({ data: tmdbCache.data, expiresAt: tmdbCache.expiresAt })
+    .from(tmdbCache)
+    .where(andCacheKeyFresh(cacheKey))
+    .limit(1);
+
+  return hit?.data ?? null;
+}
+
+function andCacheKeyFresh(cacheKey) {
+  return and(eq(tmdbCache.cacheKey, cacheKey), gt(tmdbCache.expiresAt, new Date()));
+}
+
+async function setDbCache(cacheKey, data, ttlSeconds) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
+
+  await db
+    .insert(tmdbCache)
+    .values({
+      cacheKey,
+      data,
+      fetchedAt: now,
+      expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: tmdbCache.cacheKey,
+      set: {
+        data,
+        fetchedAt: now,
+        expiresAt,
+      },
+    });
+}
+
+async function withPersistentTmdbCache(cacheKey, ttlSeconds, fetchFn) {
+  const redisHit = await cacheGet(cacheKey);
+  if (redisHit !== null) return redisHit;
+
+  const dbHit = await getDbCache(cacheKey).catch(() => null);
+  if (dbHit !== null) {
+    await cacheSet(cacheKey, dbHit, ttlSeconds);
+    return dbHit;
+  }
+
+  const value = await fetchFn();
+  if (value !== null && value !== undefined) {
+    await Promise.allSettled([
+      cacheSet(cacheKey, value, ttlSeconds),
+      setDbCache(cacheKey, value, ttlSeconds),
+    ]);
+  }
+
+  return value;
+}
+
 export default async function tmdbRoutes(fastify) {
   // ──────────────────────────────────────────────
   // GET /tmdb/movie/:id
   // ──────────────────────────────────────────────
   fastify.get('/movie/:id', async (req, reply) => {
     const { id } = req.params;
-    const data = await withCache(`tmdb:movie:${id}`, TTL.details, () =>
+    const data = await withPersistentTmdbCache(`tmdb:movie:${id}`, TTL.details, () =>
       tmdbFetch(`/movie/${id}`, {
         append_to_response: 'external_ids,credits,videos,images,recommendations,watch/providers',
         include_image_language: 'es,en,null',
@@ -61,7 +121,7 @@ export default async function tmdbRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/tv/:id', async (req, reply) => {
     const { id } = req.params;
-    const data = await withCache(`tmdb:tv:${id}`, TTL.details, () =>
+    const data = await withPersistentTmdbCache(`tmdb:tv:${id}`, TTL.details, () =>
       tmdbFetch(`/tv/${id}`, {
         append_to_response: 'external_ids,credits,videos,images,recommendations,watch/providers',
         include_image_language: 'es,en,null',
@@ -76,7 +136,7 @@ export default async function tmdbRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/person/:id', async (req, reply) => {
     const { id } = req.params;
-    const data = await withCache(`tmdb:person:${id}`, TTL.person, () =>
+    const data = await withPersistentTmdbCache(`tmdb:person:${id}`, TTL.person, () =>
       tmdbFetch(`/person/${id}`, {
         append_to_response: 'combined_credits,external_ids,images',
       })
@@ -98,7 +158,7 @@ export default async function tmdbRoutes(fastify) {
       : '/search/person';
 
     const cacheKey = `tmdb:search:${endpoint}:${q}:${page}`;
-    const data = await withCache(cacheKey, TTL.search, () =>
+    const data = await withPersistentTmdbCache(cacheKey, TTL.search, () =>
       tmdbFetch(endpoint, { query: q, page })
     );
 
@@ -111,7 +171,7 @@ export default async function tmdbRoutes(fastify) {
   fastify.get('/discover/movies', async (req, reply) => {
     const params = req.query;
     const cacheKey = `tmdb:discover:movie:${JSON.stringify(params)}`;
-    const data = await withCache(cacheKey, TTL.discover, () =>
+    const data = await withPersistentTmdbCache(cacheKey, TTL.discover, () =>
       tmdbFetch('/discover/movie', params)
     );
     return reply.send(data || { results: [] });
@@ -123,7 +183,7 @@ export default async function tmdbRoutes(fastify) {
   fastify.get('/discover/tv', async (req, reply) => {
     const params = req.query;
     const cacheKey = `tmdb:discover:tv:${JSON.stringify(params)}`;
-    const data = await withCache(cacheKey, TTL.discover, () =>
+    const data = await withPersistentTmdbCache(cacheKey, TTL.discover, () =>
       tmdbFetch('/discover/tv', params)
     );
     return reply.send(data || { results: [] });
@@ -135,7 +195,7 @@ export default async function tmdbRoutes(fastify) {
   fastify.get('/trending', async (req, reply) => {
     const { type = 'all', window = 'week' } = req.query;
     const cacheKey = `tmdb:trending:${type}:${window}`;
-    const data = await withCache(cacheKey, TTL.trending, () =>
+    const data = await withPersistentTmdbCache(cacheKey, TTL.trending, () =>
       tmdbFetch(`/trending/${type}/${window}`)
     );
     return reply.send(data || { results: [] });
@@ -154,7 +214,7 @@ export default async function tmdbRoutes(fastify) {
     }
 
     const cacheKey = `tmdb:providers:${type}:${id}:${region}`;
-    const raw = await withCache(cacheKey, TTL.providers, () =>
+    const raw = await withPersistentTmdbCache(cacheKey, TTL.providers, () =>
       tmdbFetch(`/${type}/${id}/watch/providers`)
     );
 

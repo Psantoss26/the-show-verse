@@ -31,6 +31,7 @@ export const openApiDocument = {
     { name: 'TMDb', description: 'Cached TMDb metadata proxy.' },
     { name: 'Import', description: 'One-time import flows from external providers.' },
     { name: 'Stats', description: 'User stats computed from private backend data.' },
+    { name: 'Users', description: 'Authenticated user preferences and profile settings.' },
   ],
   externalDocs: {
     description: 'Manual backend testing guide',
@@ -235,6 +236,17 @@ export const openApiDocument = {
         additionalProperties: true,
         description: 'Raw TMDb-compatible response proxied and cached by the backend.',
       },
+      UserPreferences: {
+        type: 'object',
+        properties: {
+          defaultView: { type: 'string', enum: ['grid', 'list', 'compact'], default: 'grid' },
+          language: { type: 'string', example: 'es-ES' },
+          adultContent: { type: 'boolean', default: false },
+          notificationSettings: { type: 'object', additionalProperties: true },
+          uiSettings: { type: 'object', additionalProperties: true },
+          updatedAt: { type: 'string', format: 'date-time', nullable: true },
+        },
+      },
     },
     responses: {
       Unauthorized: {
@@ -356,6 +368,31 @@ export const openApiDocument = {
         responses: {
           200: { description: 'Backend session created.', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthTokens' } } } },
           401: { description: 'TMDb session is invalid.' },
+        },
+      },
+    },
+    '/v1/auth/tmdb/connect': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Connect TMDb to the current authenticated user',
+        description: 'Links a valid TMDb session to the existing Show Verse user without replacing the active backend identity.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['sessionId'],
+                properties: { sessionId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'TMDb account connected to current user.' },
+          400: { $ref: '#/components/responses/ValidationError' },
+          401: { $ref: '#/components/responses/Unauthorized' },
         },
       },
     },
@@ -971,6 +1008,7 @@ export const openApiDocument = {
       post: {
         tags: ['Import'],
         summary: 'Start Trakt import for authenticated user',
+        description: 'Starts a background import from a temporary Trakt access token into the authenticated ShowVerse account. The default mode imports watch history and ratings only.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -979,7 +1017,15 @@ export const openApiDocument = {
               schema: {
                 type: 'object',
                 required: ['accessToken'],
-                properties: { accessToken: { type: 'string', description: 'Temporary Trakt access token used only for import.' } },
+                properties: {
+                  accessToken: { type: 'string', description: 'Temporary Trakt access token used only for import.' },
+                  mode: {
+                    type: 'string',
+                    enum: ['history_ratings', 'all'],
+                    default: 'history_ratings',
+                    description: 'Import scope. all also attempts favorites, watchlist, and custom lists.',
+                  },
+                },
               },
             },
           },
@@ -993,6 +1039,142 @@ export const openApiDocument = {
         summary: 'Get current Trakt import status',
         security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Import status.' } },
+      },
+    },
+    '/v1/import/trakt/data': {
+      post: {
+        tags: ['Import'],
+        summary: 'Start Trakt import from pre-fetched data',
+        description: 'Internal BFF endpoint. Next.js fetches Trakt with the user OAuth cookies, then sends raw history and rating arrays here so the backend only writes to PostgreSQL.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  mode: { type: 'string', enum: ['history_ratings'], default: 'history_ratings' },
+                  history: { type: 'array', items: { type: 'object' } },
+                  ratings: { type: 'array', items: { type: 'object' } },
+                },
+              },
+            },
+          },
+        },
+        responses: { 202: { description: 'Import started.' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+      },
+    },
+    '/v1/import/trakt/data/chunk': {
+      post: {
+        tags: ['Import'],
+        summary: 'Import one pre-fetched Trakt data chunk',
+        description: 'Internal BFF endpoint used to avoid large payloads. It imports a small page of history or ratings and accumulates progress.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  reset: { type: 'boolean' },
+                  done: { type: 'boolean' },
+                  mode: { type: 'string', enum: ['history_ratings'], default: 'history_ratings' },
+                  history: { type: 'array', items: { type: 'object' } },
+                  ratings: { type: 'array', items: { type: 'object' } },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Updated import progress.' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+      },
+    },
+    '/v1/import/tmdb/data/chunk': {
+      post: {
+        tags: ['Import'],
+        summary: 'Import one pre-fetched TMDb data chunk',
+        description: 'Internal BFF endpoint used to import TMDb favorites and watchlist pages into the backend database.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  reset: { type: 'boolean' },
+                  done: { type: 'boolean' },
+                  favorites: { type: 'array', items: { type: 'object' } },
+                  watchlist: { type: 'array', items: { type: 'object' } },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Updated import progress.' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+      },
+    },
+    '/v1/import/tmdb/status': {
+      get: {
+        tags: ['Import'],
+        summary: 'Get current TMDb import status',
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'TMDb import status.' } },
+      },
+    },
+    '/v1/users/preferences': {
+      get: {
+        tags: ['Users'],
+        summary: 'Get authenticated user preferences',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'User preferences.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    preferences: { $ref: '#/components/schemas/UserPreferences' },
+                  },
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+      patch: {
+        tags: ['Users'],
+        summary: 'Update authenticated user preferences',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UserPreferences' },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Updated user preferences.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    preferences: { $ref: '#/components/schemas/UserPreferences' },
+                  },
+                },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/ValidationError' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
       },
     },
     '/v1/stats': {
