@@ -62,26 +62,6 @@ const cardVariants = {
   },
 };
 
-const WATCHLIST_INITIAL_RENDER_LIMIT = 24;
-const WATCHLIST_RENDER_CHUNK_SIZE = 36;
-
-function scheduleWatchlistRenderChunk(callback) {
-  if (typeof window === "undefined") return null;
-  if ("requestIdleCallback" in window) {
-    return window.requestIdleCallback(callback, { timeout: 220 });
-  }
-  return window.setTimeout(callback, 48);
-}
-
-function cancelWatchlistRenderChunk(handle) {
-  if (typeof window === "undefined" || handle == null) return;
-  if ("cancelIdleCallback" in window) {
-    window.cancelIdleCallback(handle);
-    return;
-  }
-  window.clearTimeout(handle);
-}
-
 // TMDb Genre mappings
 const MOVIE_GENRES = {
   28: "Acción",
@@ -155,19 +135,10 @@ const TARGET_PROVIDER_ORDER = new Map([
   ["plex", 7],
 ]);
 
-function getUserCacheKey(baseKey, ownerId) {
-  if (!ownerId) return null;
-  return `${baseKey}:${ownerId}`;
-}
-
-function readWatchlistCache(ownerId) {
+function readWatchlistCache() {
   if (typeof window === "undefined") return null;
-  const cacheKey = getUserCacheKey(WATCHLIST_CACHE_KEY, ownerId);
-  if (!cacheKey) return null;
   try {
-    const raw =
-      window.localStorage.getItem(cacheKey) ||
-      window.sessionStorage.getItem(cacheKey);
+    const raw = window.sessionStorage.getItem(WATCHLIST_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
@@ -180,19 +151,16 @@ function readWatchlistCache(ownerId) {
   }
 }
 
-function writeWatchlistCache(items, ownerId) {
+function writeWatchlistCache(items) {
   if (typeof window === "undefined") return;
-  const cacheKey = getUserCacheKey(WATCHLIST_CACHE_KEY, ownerId);
-  if (!cacheKey) return;
   try {
-    const payload = JSON.stringify({
-      t: Date.now(),
-      items: Array.isArray(items) ? items : [],
-    });
-    try {
-      window.localStorage.setItem(cacheKey, payload);
-    } catch {}
-    window.sessionStorage.setItem(cacheKey, payload);
+    window.sessionStorage.setItem(
+      WATCHLIST_CACHE_KEY,
+      JSON.stringify({
+        t: Date.now(),
+        items: Array.isArray(items) ? items : [],
+      }),
+    );
   } catch {}
 }
 
@@ -1921,14 +1889,9 @@ const WatchlistCard = memo(function WatchlistCard({
 export default function WatchlistClient() {
   const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
-  const initialWatchlistCacheRef = useRef(null);
-  if (initialWatchlistCacheRef.current === null) {
-    initialWatchlistCacheRef.current = readWatchlistCache(account?.id) || false;
-  }
-  const initialWatchlistCache = initialWatchlistCacheRef.current || null;
-  const [loading, setLoading] = useState(() => !initialWatchlistCache?.items);
+  const [loading, setLoading] = useState(() => !readWatchlistCache()?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => initialWatchlistCache?.items || []);
+  const [items, setItems] = useState(() => readWatchlistCache()?.items || []);
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
@@ -1940,14 +1903,6 @@ export default function WatchlistClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
-
-  useEffect(() => {
-    if (!account?.id || items.length > 0) return;
-    const cached = readWatchlistCache(account.id);
-    if (!cached?.items?.length) return;
-    setItems(cached.items);
-    setLoading(false);
-  }, [account?.id, items.length]);
 
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState("grid");
@@ -2110,8 +2065,7 @@ export default function WatchlistClient() {
       }
 
       try {
-        const cached = readWatchlistCache(account?.id);
-        setLoading(items.length === 0 && !cached?.items?.length);
+        setLoading(items.length === 0);
         const response = await fetch("/api/tmdb/account/watchlist", {
           signal: controller.signal,
         });
@@ -2159,7 +2113,7 @@ export default function WatchlistClient() {
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
         setItems(watchlistWithIndex);
-        writeWatchlistCache(watchlistWithIndex, account?.id);
+        writeWatchlistCache(watchlistWithIndex);
       } catch (error) {
         if (shouldIgnoreExpectedLogoutError() || error?.name === "AbortError") {
           return;
@@ -2508,47 +2462,6 @@ export default function WatchlistClient() {
     }
     return { total: filtered.length, movies, shows };
   }, [filtered]);
-
-  const [renderLimit, setRenderLimit] = useState(WATCHLIST_INITIAL_RENDER_LIMIT);
-
-  useEffect(() => {
-    if (groupBy !== "none") {
-      setRenderLimit(sorted.length);
-      return undefined;
-    }
-
-    const initialLimit = Math.min(
-      WATCHLIST_INITIAL_RENDER_LIMIT,
-      sorted.length,
-    );
-    setRenderLimit(initialLimit);
-
-    if (initialLimit >= sorted.length) return undefined;
-
-    let cancelled = false;
-    let handle = null;
-
-    const scheduleNext = () => {
-      handle = scheduleWatchlistRenderChunk(() => {
-        if (cancelled) return;
-        setRenderLimit((current) => {
-          const next = Math.min(
-            current + WATCHLIST_RENDER_CHUNK_SIZE,
-            sorted.length,
-          );
-          if (next < sorted.length) scheduleNext();
-          return next;
-        });
-      });
-    };
-
-    scheduleNext();
-
-    return () => {
-      cancelled = true;
-      cancelWatchlistRenderChunk(handle);
-    };
-  }, [groupBy, sorted.length, typeFilter, q, sortBy, viewMode, imageMode]);
 
   // Grouping logic (sin user_rating)
   const grouped = useMemo(() => {
@@ -3549,7 +3462,7 @@ export default function WatchlistClient() {
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
           >
-            {sorted.slice(0, renderLimit).map((item, idx) => (
+            {sorted.map((item, idx) => (
               <WatchlistCard
                 key={getMediaKey(item)}
                 item={item}

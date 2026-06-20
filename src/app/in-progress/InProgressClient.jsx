@@ -324,25 +324,15 @@ const getPosterPreference = (type, id) => {
   return window.localStorage.getItem(key) || null;
 };
 
-function getUserCacheKey(baseKey, ownerId) {
-  if (!ownerId) return null;
-  return `${baseKey}:${ownerId}`;
-}
-
-function readSessionCache(key, ttlMs, ownerId) {
+function readSessionCache(key, ttlMs) {
   if (typeof window === "undefined") return null;
-  const cacheKey = getUserCacheKey(key, ownerId);
-  if (!cacheKey) return null;
   try {
-    const raw =
-      window.localStorage.getItem(cacheKey) ||
-      window.sessionStorage.getItem(cacheKey);
+    const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const ts = Number(parsed?.ts || 0);
     if (!ts || Date.now() - ts > ttlMs) {
-      window.localStorage.removeItem(cacheKey);
-      window.sessionStorage.removeItem(cacheKey);
+      window.sessionStorage.removeItem(key);
       return null;
     }
     return parsed?.data ?? null;
@@ -351,26 +341,20 @@ function readSessionCache(key, ttlMs, ownerId) {
   }
 }
 
-function writeSessionCache(key, data, ownerId) {
+function writeSessionCache(key, data) {
   if (typeof window === "undefined") return;
-  const cacheKey = getUserCacheKey(key, ownerId);
-  if (!cacheKey) return;
   try {
-    const payload = JSON.stringify({ ts: Date.now(), data });
-    try {
-      window.localStorage.setItem(cacheKey, payload);
-    } catch {}
-    window.sessionStorage.setItem(cacheKey, payload);
+    window.sessionStorage.setItem(
+      key,
+      JSON.stringify({ ts: Date.now(), data }),
+    );
   } catch {}
 }
 
-function clearSessionCache(key, ownerId) {
+function clearSessionCache(key) {
   if (typeof window === "undefined") return;
-  const cacheKey = getUserCacheKey(key, ownerId);
-  if (!cacheKey) return;
   try {
-    window.localStorage.removeItem(cacheKey);
-    window.sessionStorage.removeItem(cacheKey);
+    window.sessionStorage.removeItem(key);
   } catch {}
 }
 
@@ -1230,7 +1214,7 @@ export default function InProgressClient({
       setAuth({ loading: false, connected });
 
       if (!connected) {
-        clearSessionCache(IN_PROGRESS_CACHE_KEY, account?.id);
+        clearSessionCache(IN_PROGRESS_CACHE_KEY);
         setItems([]);
         setStats(null);
         setDataLoaded(true);
@@ -1246,14 +1230,14 @@ export default function InProgressClient({
       writeSessionCache(IN_PROGRESS_CACHE_KEY, {
         items: nextItems,
         stats: nextStats,
-      }, account?.id);
+      });
     } catch (e) {
       console.error("Error loading in-progress:", e);
       setAuth((prev) => ({ ...prev, loading: false }));
     } finally {
       if (!background) setLoading(false);
     }
-  }, [account?.id]);
+  }, []);
 
   const loadCompleted = useCallback(async ({ background = false } = {}) => {
     if (!background) setCompletedLoading(true);
@@ -1266,21 +1250,21 @@ export default function InProgressClient({
       writeSessionCache(COMPLETED_CACHE_KEY, {
         items: nextItems,
         stats: nextStats,
-      }, account?.id);
+      });
     } catch (e) {
       console.error("Error loading completed:", e);
     } finally {
       if (!background) setCompletedLoading(false);
       setCompletedLoaded(true);
     }
-  }, [account?.id]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const markDisconnected = () => {
-      clearSessionCache(IN_PROGRESS_CACHE_KEY, account?.id);
-      clearSessionCache(COMPLETED_CACHE_KEY, account?.id);
+      clearSessionCache(IN_PROGRESS_CACHE_KEY);
+      clearSessionCache(COMPLETED_CACHE_KEY);
       setItems([]);
       setStats(null);
       setCompletedItems([]);
@@ -1299,7 +1283,6 @@ export default function InProgressClient({
           const cached = readSessionCache(
             IN_PROGRESS_CACHE_KEY,
             IN_PROGRESS_CACHE_TTL,
-            account?.id,
           );
           if (cached?.items || cached?.stats) {
             setItems(Array.isArray(cached?.items) ? cached.items : []);
@@ -1333,7 +1316,6 @@ export default function InProgressClient({
         const cached = readSessionCache(
           IN_PROGRESS_CACHE_KEY,
           IN_PROGRESS_CACHE_TTL,
-          account?.id,
         );
 
         setAuth({ loading: false, connected: true });
@@ -1359,22 +1341,18 @@ export default function InProgressClient({
     return () => {
       cancelled = true;
     };
-  }, [account?.id, account?.provider, initialAuthConnected, initialAuthLoading, loadData, session]);
+  }, [account?.provider, initialAuthConnected, initialAuthLoading, loadData, session]);
 
   // Cargar completadas desde sessionStorage si hay caché disponible
   useEffect(() => {
     if (!auth.connected) return;
-    const cached = readSessionCache(
-      COMPLETED_CACHE_KEY,
-      COMPLETED_CACHE_TTL,
-      account?.id,
-    );
+    const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
     if (cached?.items || cached?.stats) {
       setCompletedItems(Array.isArray(cached?.items) ? cached.items : []);
       setCompletedStats(cached?.stats || null);
       setCompletedLoaded(true);
     }
-  }, [account?.id, auth.connected]);
+  }, [auth.connected]);
 
   // Precargar completadas en segundo plano cuando los datos de "En progreso" ya están listos
   useEffect(() => {
@@ -1640,8 +1618,7 @@ export default function InProgressClient({
   const handleDisconnect = async () => {
     try {
       await traktDisconnect();
-      clearSessionCache(IN_PROGRESS_CACHE_KEY, account?.id);
-      clearSessionCache(COMPLETED_CACHE_KEY, account?.id);
+      clearSessionCache(IN_PROGRESS_CACHE_KEY);
       setAuth({ loading: false, connected: false });
       setItems([]);
       setStats(null);
