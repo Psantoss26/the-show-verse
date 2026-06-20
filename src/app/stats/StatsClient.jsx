@@ -1888,7 +1888,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className={`${PROFILE_GLASS_PANEL} min-w-0 lg:col-span-2 rounded-3xl p-6`}
+                      className={`${PROFILE_GLASS_PANEL} min-w-0 lg:col-span-2 rounded-3xl p-4 sm:p-6`}
                     >
                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
                       <SectionTitle
@@ -1904,8 +1904,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             data={stats.monthlyData}
                             margin={{
                               top: 10,
-                              right: 10,
-                              left: -20,
+                              right: 5,
+                              left: -28,
                               bottom: 0,
                             }}
                           >
@@ -2174,7 +2174,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
               >
                 <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
                   {/* Hour of Day */}
-                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}>
+                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6`}>
                     <SectionTitle
                       icon={Clock}
                       title="Hora del Día"
@@ -2183,7 +2183,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ChartFrame>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart data={stats.hourOfDayData}>
+                        <BarChart
+                          data={stats.hourOfDayData}
+                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                        >
                           <CartesianGrid
                             strokeDasharray="3 3"
                             vertical={false}
@@ -2211,7 +2214,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   </div>
 
                   {/* Day of Week */}
-                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}>
+                  <div className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6`}>
                     <SectionTitle
                       icon={CalendarIcon}
                       title="Día de la Semana"
@@ -2220,7 +2223,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ChartFrame>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart data={stats.dayOfWeekData}>
+                        <BarChart
+                          data={stats.dayOfWeekData}
+                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                        >
                           <CartesianGrid
                             strokeDasharray="3 3"
                             vertical={false}
@@ -2252,7 +2258,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
                   {/* Genres - Radar */}
                   <motion.div
-                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}
+                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6`}
                   >
                     <SectionTitle
                       icon={Target}
@@ -2298,7 +2304,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                   {/* Ratings - Bar */}
                   <motion.div
-                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6`}
+                    className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6`}
                   >
                     <SectionTitle
                       icon={Award}
@@ -2308,7 +2314,11 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     />
                     <ChartFrame>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart data={stats.ratingData} barSize={20}>
+                        <BarChart
+                          data={stats.ratingData}
+                          barSize={20}
+                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                        >
                           <CartesianGrid
                             strokeDasharray="3 3"
                             vertical={false}
