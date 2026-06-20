@@ -246,6 +246,64 @@ export default async function authRoutes(fastify) {
   });
 
   // ──────────────────────────────────────────────
+  // POST /auth/tmdb/connect — Vincula TMDb al usuario autenticado actual
+  // ──────────────────────────────────────────────
+  fastify.post('/tmdb/connect', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const parsed = tmdbSessionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        issues: parsed.error.issues,
+      });
+    }
+
+    let account;
+    try {
+      account = await getTmdbAccount(parsed.data.sessionId);
+    } catch (e) {
+      return reply.status(e.status || 401).send({
+        error: e.message || 'Invalid TMDb session',
+      });
+    }
+
+    const providerUid = String(account.id);
+
+    const [connected] = await db
+      .insert(connectedAccounts)
+      .values({
+        userId: req.user.id,
+        provider: 'tmdb',
+        providerUid,
+        accessToken: parsed.data.sessionId,
+        metadata: account,
+      })
+      .onConflictDoUpdate({
+        target: [connectedAccounts.provider, connectedAccounts.providerUid],
+        set: {
+          userId: req.user.id,
+          accessToken: parsed.data.sessionId,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          metadata: account,
+        },
+      })
+      .returning({
+        provider: connectedAccounts.provider,
+        providerUid: connectedAccounts.providerUid,
+        userId: connectedAccounts.userId,
+      });
+
+    return reply.send({
+      connected: true,
+      provider: 'tmdb',
+      providerUid,
+      userId: req.user.id,
+      account,
+      connection: connected,
+    });
+  });
+
+  // ──────────────────────────────────────────────
   // POST /auth/google — Crea/recupera sesión propia desde Google OAuth
   // ──────────────────────────────────────────────
   fastify.post('/google', async (req, reply) => {

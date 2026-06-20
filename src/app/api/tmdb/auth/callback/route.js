@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { getBackendBaseUrl } from "@/lib/backend/server";
+import {
+  backendFetchJson,
+  getBackendBaseUrl,
+  getCookieSecure,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,6 +105,13 @@ async function createBackendSessionFromTmdb(sessionId) {
   return json;
 }
 
+async function connectTmdbToCurrentUser(req, sessionId) {
+  return backendFetchJson(req, "/v1/auth/tmdb/connect", {
+    method: "POST",
+    body: JSON.stringify({ sessionId }),
+  });
+}
+
 export async function GET(req) {
   const origin = await resolveOrigin(req);
   const { searchParams } = new URL(req.url);
@@ -121,10 +133,22 @@ export async function GET(req) {
 
   try {
     const sessionId = await createTmdbSession(requestToken);
-    const backendSession = await createBackendSessionFromTmdb(sessionId).catch((e) => {
-      console.warn("Backend TMDb session bootstrap failed:", e);
+    const backendConnection = await connectTmdbToCurrentUser(req, sessionId).catch((e) => {
+      console.warn("Backend TMDb connection failed:", e);
       return null;
     });
+
+    let backendSession = null;
+    if (!backendConnection?.ok && backendConnection?.status !== 401 && backendConnection?.status !== 0) {
+      throw new Error(backendConnection?.error || "No se pudo conectar TMDb a tu cuenta");
+    }
+
+    if (!backendConnection?.ok) {
+      backendSession = await createBackendSessionFromTmdb(sessionId).catch((e) => {
+        console.warn("Backend TMDb session bootstrap failed:", e);
+        return null;
+      });
+    }
 
     const res = NextResponse.redirect(redirectUrl);
     res.cookies.set("tmdb_session_id", sessionId, {
@@ -134,6 +158,10 @@ export async function GET(req) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
+    if (backendConnection?.ok) {
+      setBackendAuthCookies(res, backendConnection, { secure: getCookieSecure(req) });
+      return res;
+    }
     if (backendSession?.accessToken) {
       res.cookies.set("showverse_access_token", backendSession.accessToken, {
         httpOnly: true,

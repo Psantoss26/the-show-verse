@@ -3,7 +3,7 @@
 
 import { db } from '../db/client.js';
 import { watchHistory, favorites, watchlist, userRatings } from '../db/schema.js';
-import { eq, and, desc, gte, lte, count, sql, isNotNull } from 'drizzle-orm';
+import { eq, and, gte, lte, count, sql, isNotNull } from 'drizzle-orm';
 
 export default async function statsRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
@@ -93,6 +93,10 @@ export default async function statsRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/shows/in-progress', async (req, reply) => {
     const userId = req.user.id;
+    const rawLimit = Number(req.query?.limit || 50);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(200, Math.floor(rawLimit)))
+      : 50;
 
     // Series con al menos un episodio visto, sin tener todos vistos
     // (simplificado: series con episodios vistos en los últimos 6 meses)
@@ -118,9 +122,9 @@ export default async function statsRoutes(fastify) {
       )
       .groupBy(watchHistory.tmdbId, watchHistory.title, watchHistory.posterPath)
       .orderBy(sql`MAX(watched_at) DESC`)
-      .limit(20);
+      .limit(limit);
 
-    return reply.send({ results: shows });
+    return reply.send({ results: shows, limit });
   });
 
   // ──────────────────────────────────────────────

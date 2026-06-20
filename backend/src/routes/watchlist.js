@@ -14,13 +14,21 @@ const itemSchema = z.object({
   priority: z.number().int().min(0).max(9999).optional(),
 });
 
+function clampPageLimit(value, { fallback = 100, max = 1000 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(max, Math.floor(n));
+}
+
 export default async function watchlistRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
   // GET /watchlist
   fastify.get('/', async (req, reply) => {
     const { type, page = 1, limit = 50, sort = 'added_at' } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const safeLimit = clampPageLimit(limit);
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const offset = (safePage - 1) * safeLimit;
 
     const conditions = [eq(watchlist.userId, req.user.id)];
     if (type === 'movie' || type === 'tv') {
@@ -34,10 +42,10 @@ export default async function watchlistRoutes(fastify) {
       .from(watchlist)
       .where(and(...conditions))
       .orderBy(desc(orderCol))
-      .limit(Number(limit))
+      .limit(safeLimit)
       .offset(offset);
 
-    return reply.send({ results: items, page: Number(page) });
+    return reply.send({ results: items, page: safePage, limit: safeLimit });
   });
 
   // POST /watchlist — Añadir a watchlist

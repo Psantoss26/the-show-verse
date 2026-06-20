@@ -17,6 +17,12 @@ const addHistorySchema = z.object({
   posterPath: z.string().optional(),
 });
 
+function clampPageLimit(value, { fallback = 100, max = 2000 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(max, Math.floor(n));
+}
+
 function buildWatchedBySeason(rows) {
   const watchedBySeason = {};
   for (const ep of rows) {
@@ -37,7 +43,9 @@ export default async function historyRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/', async (req, reply) => {
     const { type, from, to, page = 1, limit = 50 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const safeLimit = clampPageLimit(limit);
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const offset = (safePage - 1) * safeLimit;
 
     const conditions = [eq(watchHistory.userId, req.user.id)];
     if (type === 'movie' || type === 'tv') {
@@ -51,10 +59,10 @@ export default async function historyRoutes(fastify) {
       .from(watchHistory)
       .where(and(...conditions))
       .orderBy(desc(watchHistory.watchedAt))
-      .limit(Number(limit))
+      .limit(safeLimit)
       .offset(offset);
 
-    return reply.send({ results: items, page: Number(page) });
+    return reply.send({ results: items, page: safePage, limit: safeLimit });
   });
 
   // ──────────────────────────────────────────────

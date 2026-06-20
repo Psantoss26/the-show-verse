@@ -1,5 +1,11 @@
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const BACKEND_BASE = (
+  process.env.BACKEND_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  ""
+).replace(/\/+$/, "");
 
 function safeMediaType(mediaType) {
   if (mediaType === "movie") return "movie";
@@ -19,9 +25,19 @@ async function safeJson(res) {
   }
 }
 
-export async function fetchTmdbMetadata(tmdbId, mediaType) {
-  const type = safeMediaType(mediaType);
-  if (!TMDB_KEY || !tmdbId || !type) return null;
+async function fetchFromBackendCache(tmdbId, type) {
+  if (!BACKEND_BASE) return null;
+
+  const res = await fetch(
+    `${BACKEND_BASE}/v1/tmdb/${type}/${encodeURIComponent(tmdbId)}`,
+    { next: { revalidate: 60 * 60 * 24 } },
+  );
+  if (!res.ok) return null;
+  return safeJson(res);
+}
+
+async function fetchFromTmdbDirect(tmdbId, type) {
+  if (!TMDB_KEY) return null;
 
   const url = `${TMDB_BASE}/${type}/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(
     TMDB_KEY,
@@ -29,8 +45,16 @@ export async function fetchTmdbMetadata(tmdbId, mediaType) {
 
   const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
   if (!res.ok) return null;
+  return safeJson(res);
+}
 
-  const data = await safeJson(res);
+export async function fetchTmdbMetadata(tmdbId, mediaType) {
+  const type = safeMediaType(mediaType);
+  if (!tmdbId || !type) return null;
+
+  const data =
+    (await fetchFromBackendCache(tmdbId, type).catch(() => null)) ||
+    (await fetchFromTmdbDirect(tmdbId, type).catch(() => null));
   if (!data) return null;
 
   const isMovie = type === "movie";
@@ -88,7 +112,7 @@ export async function enrichMediaItemsWithTmdb(
     concurrency = 8,
   } = {},
 ) {
-  if (!Array.isArray(items) || items.length === 0 || !TMDB_KEY) return items;
+  if (!Array.isArray(items) || items.length === 0 || (!BACKEND_BASE && !TMDB_KEY)) return items;
 
   const enriched = new Array(items.length);
   let cursor = 0;

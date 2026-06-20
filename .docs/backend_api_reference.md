@@ -102,6 +102,7 @@ Paginacion habitual:
 | `POST` | `/v1/auth/register` | No | Registro por email/password |
 | `POST` | `/v1/auth/login` | No | Login por email/password |
 | `POST` | `/v1/auth/tmdb` | No | Crea/recupera usuario backend desde sesion TMDb valida |
+| `POST` | `/v1/auth/tmdb/connect` | Si | Vincula TMDb al usuario autenticado actual sin cambiar de cuenta |
 | `POST` | `/v1/auth/refresh` | No | Rota refresh token y devuelve access token nuevo |
 | `POST` | `/v1/auth/logout` | No | Revoca un refresh token |
 | `POST` | `/v1/auth/logout/all` | Si | Revoca todas las sesiones del usuario |
@@ -170,6 +171,13 @@ Paginacion habitual:
 | --- | --- | --- |
 | `GET` | `/v1/items/{tmdbId}/{mediaType}/status` | Estado privado de item: favorito, watchlist, visto, rating y episodios vistos |
 
+### Preferencias
+
+| Metodo | Ruta | Descripcion |
+| --- | --- | --- |
+| `GET` | `/v1/users/preferences` | Lee preferencias personales del usuario autenticado |
+| `PATCH` | `/v1/users/preferences` | Actualiza preferencias personales: vista por defecto, idioma, contenido adulto, notificaciones y ajustes UI |
+
 ## TMDb cache/proxy
 
 | Metodo | Ruta | Descripcion |
@@ -187,8 +195,10 @@ Paginacion habitual:
 
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
-| `POST` | `/v1/import/trakt` | Inicia importacion desde Trakt |
+| `POST` | `/v1/import/trakt` | Inicia importacion desde Trakt. Body: `{ accessToken, mode?: "history_ratings" \| "all" }` |
 | `GET` | `/v1/import/trakt/status` | Estado de importacion |
+| `POST` | `/v1/import/tmdb/data/chunk` | Importa un lote de favoritos/pendientes de TMDb descargado por Next |
+| `GET` | `/v1/import/tmdb/status` | Estado de importacion TMDb |
 
 ## Estadisticas
 

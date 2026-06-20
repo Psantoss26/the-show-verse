@@ -146,7 +146,8 @@ export const userRatings = pgTable('user_ratings', {
   ratedAt: timestamp('rated_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
-  uniqueRating: uniqueIndex('idx_ratings_unique').on(t.userId, t.tmdbId, t.mediaType, t.season, t.episode),
+  uniqueTitleRating: uniqueIndex('idx_ratings_unique_title').on(t.userId, t.tmdbId, t.mediaType).where(sql`media_type IN ('movie', 'tv') AND season IS NULL AND episode IS NULL`),
+  uniqueEpisodeRating: uniqueIndex('idx_ratings_unique_episode').on(t.userId, t.tmdbId, t.season, t.episode).where(sql`media_type = 'episode' AND season IS NOT NULL AND episode IS NOT NULL`),
   userIdIdx: index('idx_ratings_user_id').on(t.userId),
   mediaTypeCheck: check('chk_ratings_media_type', sql`media_type IN ('movie', 'tv', 'episode')`),
   ratingCheck: check('chk_ratings_value', sql`rating BETWEEN 1 AND 10`),

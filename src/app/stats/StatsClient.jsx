@@ -35,6 +35,7 @@ import {
   LogOut,
   RotateCcw,
   MonitorPlay,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -823,6 +824,23 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
 
   const actionButtons = (className = "") => (
     <div className={`flex items-center gap-2 ${className}`}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+      >
+        <LiquidButton
+          onClick={() => window.location.assign("/profile/settings")}
+          disabled={syncing}
+          activeColor="teal"
+          groupId="profile-header-actions"
+          title="Configuracion"
+          className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+        >
+          <Settings className="w-5 h-5" />
+        </LiquidButton>
+      </motion.div>
+
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}

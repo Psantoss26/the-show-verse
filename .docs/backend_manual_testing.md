@@ -380,20 +380,92 @@ watchlist
 
 ## Probar importacion desde Trakt
 
-La importacion requiere un access token de Trakt del usuario. En este momento el backend no inicia el OAuth de Trakt, solo acepta el token.
+La importacion normal se lanza desde la app, en `/profile`, usando las cookies OAuth de Trakt y la sesion propia de ShowVerse. El flujo recomendado es:
+
+1. Inicia sesion en The Show Verse con una cuenta propia.
+2. Conecta Trakt desde el panel "Importar desde Trakt" del perfil.
+3. Pulsa "Importar ahora".
+4. Mantén la pagina abierta para ver el progreso de historial y puntuaciones.
+
+Tambien se puede lanzar desde el BFF de Next.js, siempre que el navegador tenga cookies `showverse_*` y `trakt_*` validas:
+
+```bash
+curl -sS -X POST http://localhost:3000/api/trakt/import/start \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"history_ratings"}'
+```
+
+Consultar progreso desde Next.js:
+
+```bash
+curl -sS http://localhost:3000/api/trakt/import/status
+```
+
+El backend mantiene tambien el endpoint directo para pruebas avanzadas con un access token temporal de Trakt:
 
 ```bash
 curl -sS -X POST http://localhost:3001/v1/import/trakt \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"accessToken":"<trakt_access_token_del_usuario>"}'
+  -d '{"accessToken":"<trakt_access_token_del_usuario>","mode":"history_ratings"}'
+```
+
+Consultar progreso directo:
+
+```bash
+curl -sS http://localhost:3001/v1/import/trakt/status \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+## Probar importacion desde TMDb
+
+La importacion de TMDb migra favoritos y pendientes antiguos hacia el backend propio. Se lanza desde `/profile/settings`, usando la cookie `tmdb_session_id` si el usuario conecto TMDb anteriormente.
+
+1. Inicia sesion en The Show Verse con una cuenta propia.
+2. En `/profile/settings`, usa el panel "Importar desde TMDb".
+3. Si no hay sesion TMDb, pulsa "Conectar TMDb" y vuelve a `/profile/settings`.
+4. Pulsa "Importar TMDb" y espera a que termine el progreso de favoritos y pendientes.
+
+Importante: si ya hay una sesion Show Verse activa, el callback de TMDb debe llamar a `/v1/auth/tmdb/connect`. No debe reemplazar las cookies `showverse_access_token` y `showverse_refresh_token` por una cuenta creada desde TMDb, porque la importacion escribiria en otro `userId`.
+
+Tambien se puede lanzar desde el BFF de Next.js, siempre que el navegador tenga cookies `showverse_*` y `tmdb_session_id` validas:
+
+```bash
+curl -sS -X POST http://localhost:3000/api/tmdb/import/start
 ```
 
 Consultar progreso:
 
 ```bash
-curl -sS http://localhost:3001/v1/import/trakt/status \
+curl -sS http://localhost:3000/api/tmdb/import/status
+```
+
+## Probar preferencias de usuario
+
+La pagina `/profile/settings` lee y guarda preferencias personales en `user_preferences`.
+
+```bash
+curl -sS http://localhost:3001/v1/users/preferences \
   -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```bash
+curl -sS -X PATCH http://localhost:3001/v1/users/preferences \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "defaultView": "grid",
+    "language": "es-ES",
+    "adultContent": false,
+    "uiSettings": {
+      "profileAutoRefresh": true,
+      "compactProfileCards": false,
+      "syncTraktActions": false
+    },
+    "notificationSettings": {
+      "weeklySummary": false
+    }
+  }'
 ```
 
 ## Troubleshooting
