@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const TMDB = "https://api.themoviedb.org/3";
 const API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const RETRYABLE_TMDB_STATUSES = new Set([500, 502, 503, 504]);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,18 +67,27 @@ async function createTmdbSession(requestToken) {
       cache: "no-store",
       body: JSON.stringify({ request_token: requestToken }),
     });
-    const json = await res.json().catch(() => ({}));
+    const contentType = res.headers.get("content-type") || "";
+    const json = contentType.includes("application/json")
+      ? await res.json().catch(() => ({}))
+      : {};
 
     if (res.ok && json?.success && json?.session_id) return json.session_id;
 
-    const message = json?.status_message || `TMDb ${res.status}`;
+    const message =
+      json?.status_message ||
+      (contentType.includes("text/html")
+        ? "TMDb no está disponible temporalmente"
+        : `TMDb ${res.status}`);
     const retriable = json?.status_code === 17 || /session denied/i.test(message);
-    if (retriable && attempt < maxAttempts) {
+    if ((retriable || RETRYABLE_TMDB_STATUSES.has(res.status)) && attempt < maxAttempts) {
       await sleep(250 * attempt);
       continue;
     }
 
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
   }
 
   throw new Error("No se pudo crear la sesión de TMDb");

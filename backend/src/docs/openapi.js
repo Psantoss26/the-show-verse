@@ -1095,7 +1095,7 @@ export const openApiDocument = {
       post: {
         tags: ['Import'],
         summary: 'Import one pre-fetched TMDb data chunk',
-        description: 'Internal BFF endpoint used to import TMDb favorites and watchlist pages into the backend database.',
+        description: 'Internal BFF endpoint used to import TMDb favorites, watchlist, and ratings pages into the backend database. TMDb ratings overwrite existing title ratings for the same user/item.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1108,6 +1108,7 @@ export const openApiDocument = {
                   done: { type: 'boolean' },
                   favorites: { type: 'array', items: { type: 'object' } },
                   watchlist: { type: 'array', items: { type: 'object' } },
+                  ratings: { type: 'array', items: { type: 'object' } },
                 },
               },
             },

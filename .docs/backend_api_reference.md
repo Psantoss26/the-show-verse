@@ -197,7 +197,7 @@ Paginacion habitual:
 | --- | --- | --- |
 | `POST` | `/v1/import/trakt` | Inicia importacion desde Trakt. Body: `{ accessToken, mode?: "history_ratings" \| "all" }` |
 | `GET` | `/v1/import/trakt/status` | Estado de importacion |
-| `POST` | `/v1/import/tmdb/data/chunk` | Importa un lote de favoritos/pendientes de TMDb descargado por Next |
+| `POST` | `/v1/import/tmdb/data/chunk` | Importa un lote de favoritos, pendientes y puntuaciones de TMDb descargado por Next. Las puntuaciones sobrescriben ratings existentes |
 | `GET` | `/v1/import/tmdb/status` | Estado de importacion TMDb |
 
 ## Estadisticas

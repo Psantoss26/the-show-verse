@@ -41,7 +41,12 @@ async function getTmdbAccount(sessionId) {
 }
 
 async function fetchTmdbPage({ accountId, sessionId, collection, mediaType, page }) {
-  const bucket = collection === "watchlist" ? "watchlist" : "favorite";
+  const bucket =
+    collection === "watchlist"
+      ? "watchlist"
+      : collection === "ratings"
+        ? "rated"
+        : "favorite";
   const typePath = mediaType === "tv" ? "tv" : "movies";
   const json = await tmdbJson(
     `/account/${encodeURIComponent(accountId)}/${bucket}/${typePath}?session_id=${encodeURIComponent(sessionId)}&sort_by=created_at.desc&page=${page}`,
@@ -65,18 +70,21 @@ async function sendImportChunk(request, payload) {
   if (backend.status === 413) {
     const favoriteItems = Array.isArray(payload.favorites) ? payload.favorites : [];
     const watchlistItems = Array.isArray(payload.watchlist) ? payload.watchlist : [];
+    const ratingItems = Array.isArray(payload.ratings) ? payload.ratings : [];
     if (favoriteItems.length > 1) {
       const mid = Math.ceil(favoriteItems.length / 2);
       const first = await sendImportChunk(request, {
         ...payload,
         favorites: favoriteItems.slice(0, mid),
         watchlist: [],
+        ratings: [],
       });
       const second = await sendImportChunk(request, {
         ...payload,
         reset: false,
         favorites: favoriteItems.slice(mid),
         watchlist: [],
+        ratings: [],
       });
       return second.ok ? second : first;
     }
@@ -86,12 +94,31 @@ async function sendImportChunk(request, payload) {
         ...payload,
         favorites: [],
         watchlist: watchlistItems.slice(0, mid),
+        ratings: [],
       });
       const second = await sendImportChunk(request, {
         ...payload,
         reset: false,
         favorites: [],
         watchlist: watchlistItems.slice(mid),
+        ratings: [],
+      });
+      return second.ok ? second : first;
+    }
+    if (ratingItems.length > 1) {
+      const mid = Math.ceil(ratingItems.length / 2);
+      const first = await sendImportChunk(request, {
+        ...payload,
+        favorites: [],
+        watchlist: [],
+        ratings: ratingItems.slice(0, mid),
+      });
+      const second = await sendImportChunk(request, {
+        ...payload,
+        reset: false,
+        favorites: [],
+        watchlist: [],
+        ratings: ratingItems.slice(mid),
       });
       return second.ok ? second : first;
     }
@@ -115,6 +142,7 @@ async function importCollectionPages(request, { accountId, sessionId, collection
       lastBackend = await sendImportChunk(request, {
         favorites: collection === "favorites" ? results : [],
         watchlist: collection === "watchlist" ? results : [],
+        ratings: collection === "ratings" ? results : [],
       });
       if (!lastBackend.ok) return lastBackend;
     }
@@ -149,6 +177,7 @@ export async function POST(request) {
       reset: true,
       favorites: [],
       watchlist: [],
+      ratings: [],
     });
     if (!backend.ok) throw Object.assign(new Error(backend.error), { status: backend.status });
 
@@ -157,6 +186,8 @@ export async function POST(request) {
       ["favorites", "tv"],
       ["watchlist", "movie"],
       ["watchlist", "tv"],
+      ["ratings", "movie"],
+      ["ratings", "tv"],
     ];
 
     for (const [collection, mediaType] of imports) {
@@ -175,6 +206,7 @@ export async function POST(request) {
       done: true,
       favorites: [],
       watchlist: [],
+      ratings: [],
     });
   } catch (error) {
     return NextResponse.json(

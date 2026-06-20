@@ -592,7 +592,7 @@ function ProfileSettingsClient() {
             />
             <ImportPanel
               title="Importar desde TMDb"
-              description="Trae tus favoritos y pendientes antiguos a The Show Verse."
+              description="Trae tus favoritos, pendientes y puntuaciones antiguas a The Show Verse."
               color="sky"
               connectHref={`/api/tmdb/auth/start?next=${encodeURIComponent("/profile/settings")}`}
               connectLabel="Conectar TMDb"
@@ -602,6 +602,7 @@ function ProfileSettingsClient() {
               stepsConfig={[
                 { key: "favorites", label: "Favoritos" },
                 { key: "watchlist", label: "Pendientes" },
+                { key: "ratings", label: "Puntuaciones" },
               ]}
             />
           </div>

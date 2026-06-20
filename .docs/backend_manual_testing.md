@@ -419,12 +419,12 @@ curl -sS http://localhost:3001/v1/import/trakt/status \
 
 ## Probar importacion desde TMDb
 
-La importacion de TMDb migra favoritos y pendientes antiguos hacia el backend propio. Se lanza desde `/profile/settings`, usando la cookie `tmdb_session_id` si el usuario conecto TMDb anteriormente.
+La importacion de TMDb migra favoritos, pendientes y puntuaciones antiguas hacia el backend propio. Se lanza desde `/profile/settings`, usando la cookie `tmdb_session_id` si el usuario conecto TMDb anteriormente. Las puntuaciones importadas desde TMDb sobrescriben la puntuacion propia existente para el mismo titulo.
 
 1. Inicia sesion en The Show Verse con una cuenta propia.
 2. En `/profile/settings`, usa el panel "Importar desde TMDb".
 3. Si no hay sesion TMDb, pulsa "Conectar TMDb" y vuelve a `/profile/settings`.
-4. Pulsa "Importar TMDb" y espera a que termine el progreso de favoritos y pendientes.
+4. Pulsa "Importar TMDb" y espera a que termine el progreso de favoritos, pendientes y puntuaciones.
 
 Importante: si ya hay una sesion Show Verse activa, el callback de TMDb debe llamar a `/v1/auth/tmdb/connect`. No debe reemplazar las cookies `showverse_access_token` y `showverse_refresh_token` por una cuenta creada desde TMDb, porque la importacion escribiria en otro `userId`.
 
