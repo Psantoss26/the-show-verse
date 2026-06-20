@@ -99,6 +99,8 @@ import LiquidButton from "@/components/LiquidButton";
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
 import {
+  getImages,
+  getVideos,
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
@@ -154,7 +156,6 @@ import {
   mergeUniqueImages,
   buildOriginalImageUrl,
   preloadTmdb,
-  fetchTVImages,
   pickBestImage,
   pickBestNeutralPosterByResVotes,
   pickBestBackdropByLangResVotes,
@@ -293,6 +294,20 @@ const formatCreditNames = (list) =>
         .filter(Boolean)
         .join(", ")
     : null;
+
+function normalizePlayableVideos(rawVideos) {
+  const source = Array.isArray(rawVideos?.results)
+    ? rawVideos.results
+    : Array.isArray(rawVideos)
+      ? rawVideos
+      : [];
+
+  const merged = uniqBy(source, (v) => `${v?.site}:${v?.key}`).filter(
+    isPlayableVideo,
+  );
+  merged.sort((a, b) => rankVideo(a) - rankVideo(b));
+  return merged;
+}
 
 /**
  * Obtiene el scoreboard publico (puntuaciones agregadas de multiples fuentes).
@@ -1317,6 +1332,10 @@ export default function DetailsClient({
   const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
   const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Año de estreno
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "").trim())}&stype=title`;
+  const initialVideos = useMemo(
+    () => normalizePlayableVideos(data?.videos?.results),
+    [data?.videos?.results],
+  );
 
   // URLs de TMDb para enlace externo y pagina de "donde ver"
   const tmdbDetailUrl =
@@ -1845,9 +1864,13 @@ export default function DetailsClient({
   // por relevancia y permite reproducirlos en un modal.
   // =====================================================================
 
-  const [videos, setVideos] = useState([]); // Lista de videos disponibles
-  const [videosLoading, setVideosLoading] = useState(() => !!TMDB_API_KEY);
-  const [videosResolved, setVideosResolved] = useState(() => !TMDB_API_KEY);
+  const [videos, setVideos] = useState(initialVideos); // Lista de videos disponibles
+  const [videosLoading, setVideosLoading] = useState(
+    () => !!TMDB_API_KEY && initialVideos.length === 0,
+  );
+  const [videosResolved, setVideosResolved] = useState(
+    () => !TMDB_API_KEY || initialVideos.length > 0,
+  );
   const [videosError, setVideosError] = useState("");
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
@@ -2101,18 +2124,18 @@ export default function DetailsClient({
 
   useLayoutEffect(() => {
     if (!TMDB_API_KEY || !id) {
-      setVideos([]);
+      setVideos(initialVideos);
       setVideosError("");
       setVideosLoading(false);
       setVideosResolved(true);
       return;
     }
 
-    setVideos([]);
+    setVideos(initialVideos);
     setVideosError("");
-    setVideosLoading(true);
-    setVideosResolved(false);
-  }, [id, endpointType]);
+    setVideosLoading(initialVideos.length === 0);
+    setVideosResolved(initialVideos.length > 0);
+  }, [id, endpointType, initialVideos]);
 
   // Carga los videos de TMDb en espanol e ingles, los fusiona eliminando
   // duplicados, filtra los reproducibles y los ordena por relevancia.
@@ -2123,10 +2146,7 @@ export default function DetailsClient({
     const safeFetchVideos = async (language) => {
       if (!TMDB_API_KEY) return [];
       try {
-        const url = `https://api.themoviedb.org/3/${endpointType}/${id}/videos?api_key=${TMDB_API_KEY}&language=${language}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        if (!res.ok) return [];
+        const json = await getVideos(endpointType, id, language);
         return Array.isArray(json?.results) ? json.results : [];
       } catch {
         return [];
@@ -2142,7 +2162,7 @@ export default function DetailsClient({
         return;
       }
 
-      setVideosLoading(true);
+      setVideosLoading(initialVideos.length === 0);
       setVideosError("");
 
       try {
@@ -2153,14 +2173,16 @@ export default function DetailsClient({
         if (ignore) return;
 
         const merged = uniqBy(
-          [...es, ...en],
+          [...initialVideos, ...es, ...en],
           (v) => `${v.site}:${v.key}`,
         ).filter(isPlayableVideo);
 
         merged.sort((a, b) => rankVideo(a) - rankVideo(b));
         setVideos(merged);
       } catch (e) {
-        if (!ignore) setVideosError(e?.message || "Error cargando vídeos");
+        if (!ignore && initialVideos.length === 0) {
+          setVideosError(e?.message || "Error cargando vídeos");
+        }
       } finally {
         if (!ignore) {
           setVideosLoading(false);
@@ -2173,7 +2195,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, endpointType]);
+  }, [id, endpointType, initialVideos]);
 
   // =====================================================================
   // FILTROS DE PORTADAS Y FONDOS
@@ -2574,6 +2596,7 @@ export default function DetailsClient({
       (typeof window !== "undefined"
         ? window.localStorage.getItem(posterStorageKey)
         : null) ||
+      data?.poster_path ||
       data?.profile_path ||
       null;
 
@@ -2592,7 +2615,9 @@ export default function DetailsClient({
       posters: data.poster_path
         ? [{ file_path: data.poster_path, from: "main" }]
         : [],
-      backdrops: [], // No inicializar con data.backdrop_path - esperar a initArtwork
+      backdrops: data.backdrop_path
+        ? [{ file_path: data.backdrop_path, from: "main" }]
+        : [],
     });
     setImagesLoading(false);
     setImagesError("");
@@ -2649,7 +2674,7 @@ export default function DetailsClient({
     const initArtwork = async () => {
       setArtworkInitialized(false);
 
-      let poster = data.profile_path || null;
+      let poster = data.poster_path || data.profile_path || null;
       let backdrop = data.backdrop_path || null;
 
       if (data?.images) {
@@ -2682,10 +2707,7 @@ export default function DetailsClient({
             setImagesLoading(true);
             setImagesError("");
 
-            const fetched = await fetchTVImages({
-              showId: id,
-              apiKey: TMDB_API_KEY,
-            });
+            const fetched = await getImages(endpointType, id);
 
             if (!cancelled) {
               const bestPoster = pickBestEnglishPoster(fetched.posters);
@@ -2765,12 +2787,7 @@ export default function DetailsClient({
           setImagesLoading(true);
           setImagesError("");
 
-          const url = `https://api.themoviedb.org/3/movie/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null,es`;
-          const res = await fetch(url);
-          const json = await res.json();
-          if (!res.ok)
-            throw new Error(json?.status_message || "Error al cargar imágenes");
-
+          const json = await getImages(endpointType, id);
           const posters = json.posters || [];
           const backdrops = json.backdrops || [];
 
@@ -2850,6 +2867,7 @@ export default function DetailsClient({
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
+    asTmdbPath(data?.poster_path) ||
     asTmdbPath(data?.profile_path) ||
     null;
 
@@ -2940,6 +2958,7 @@ export default function DetailsClient({
         : selectedBackgroundPath || // En peliculas respetamos la seleccion manual
           mobileNeutralPosterPath ||
           basePosterPath ||
+          data.poster_path ||
           data.profile_path ||
           desktop ||
           null;
@@ -11406,7 +11425,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 isPriority ? "eager" : "lazy"
                                               }
                                               fetchPriority={
-                                                isPriority ? "high" : "auto"
+                                                isPriority ? "high" : undefined
                                               }
                                               decoding="async"
                                               className="w-full h-full object-cover transition-transform duration-700 transform-gpu
