@@ -398,8 +398,9 @@ function ProfileSettingsClient() {
   }
 
   const tabs = [
-    { id: "personalization", label: t("settings_personal", "Ajustes personales"), icon: SlidersHorizontal },
+    { id: "personalization", label: t("settings_personal", "Preferencias"), icon: SlidersHorizontal },
     { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
+    { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
 
   return (
@@ -409,14 +410,14 @@ function ProfileSettingsClient() {
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 lg:py-12">
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Link
-              href="/profile"
-              className="mb-4 inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-zinc-400 transition hover:text-white group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400"
-            >
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" aria-hidden="true" />
-              {t("settings_back", "Volver al perfil")}
-            </Link>
-            <div className="mb-1.5 flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-2">
+              <Link
+                href="/profile"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-zinc-300 shadow-lg backdrop-blur-lg transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 shrink-0"
+                aria-label={t("settings_back", "Volver al perfil")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
               <div className="h-px w-10 bg-emerald-500" />
               <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
                 {t("settings_account", "Tu cuenta")}
@@ -473,7 +474,7 @@ function ProfileSettingsClient() {
         </div>
 
         {/* Primary Settings Workspace */}
-        <div className="grid gap-8 lg:grid-cols-[260px_1fr] items-start">
+        <div className="grid gap-6 lg:grid-cols-[200px_1fr] items-start">
           {/* Navigation Sidebar */}
           <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 gap-1.5 border-b lg:border-b-0 lg:border-r border-white/5 scrollbar-none shrink-0 z-10">
             {tabs.map((tab) => {
@@ -645,6 +646,148 @@ function ProfileSettingsClient() {
                     ]}
                     logoSrc="/logo-TMDb.png"
                   />
+                </motion.div>
+              )}
+
+              {activeTab === "connections" && (
+                <motion.div
+                  key="connections"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  {/* Plex Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-amber-500/10 ring-amber-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Plex.png" alt="Plex" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Plex</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Conecta tu servidor Plex local o remoto para indexar tu biblioteca y reproducir contenidos directamente en la aplicación.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
+                    >
+                      Conectar
+                    </button>
+                  </div>
+
+                  {/* Spotify Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-emerald-500/10 ring-emerald-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/spotify.png" alt="Spotify" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Spotify</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Vincula tu cuenta de Spotify para acceder a las bandas sonoras originales de tus películas y series directamente desde sus fichas.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
+                    >
+                      Conectar
+                    </button>
+                  </div>
+
+                  {/* Trakt Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Trakt.png" alt="Trakt" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Trakt.tv</h3>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Vincula tu cuenta de Trakt para registrar automáticamente tu historial de visionado, listas y calificaciones en tiempo real.
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
+                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                    >
+                      Conectar
+                    </Link>
+                  </div>
+
+                  {/* Letterboxd Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-orange-500/10 ring-orange-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Letterboxd.png" alt="Letterboxd" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Importa tu diario cinéfilo y películas valoradas desde Letterboxd mediante archivo CSV o integración directa.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
+                    >
+                      Conectar
+                    </button>
+                  </div>
+
+                  {/* Filmaffinity Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-blue-500/10 ring-blue-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/logoFilmaffinity.png" alt="Filmaffinity" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Filmaffinity</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Sincroniza tus calificaciones e historial de visionado desde Filmaffinity importando tus listas directamente.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
+                    >
+                      Conectar
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
