@@ -1262,6 +1262,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     hydrated: authHydrated,
     logout,
   } = useAuth();
+  const isMobile = useIsMobileLayout(768);
   const [loading, setLoading] = useState(true);
   const [notConnected, setNotConnected] = useState(false);
   const [data, setData] = useState(null);
@@ -1520,6 +1521,24 @@ export default function StatsClient({ connectNext = "/profile" }) {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return `${h}h ${m}m`;
+  };
+
+  const formatGenreTick = (value) => {
+    if (!value) return "";
+    const mappings = {
+      "Ciencia ficción": "C. Ficción",
+      "Science Fiction": "Sci-Fi",
+      "Ciencia ficción y Fantasía": "C. Ficc/Fant",
+      "Science Fiction & Fantasy": "Sci-Fi/Fant",
+      "Sci-Fi & Fantasy": "Sci-Fi/Fant",
+      "Acción y aventura": "Acción/Aven.",
+      "Action & Adventure": "Action/Adv.",
+      "Película de TV": "Peli TV",
+      "TV Movie": "TV Movie",
+      "Documental": "Docu",
+      "Documentary": "Docu",
+    };
+    return mappings[value] || value;
   };
 
   const profileUser = showVerseProfileUser || profileData?.user || null;
@@ -2266,7 +2285,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus categorías más frecuentes"
                       color="lime"
                     />
-                    <ChartFrame>
+                     <ChartFrame>
                       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <RadarChart
                           cx="50%"
@@ -2277,9 +2296,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                           <PolarGrid stroke={CHART_THEME.grid} />
                           <PolarAngleAxis
                             dataKey="name"
+                            tickFormatter={formatGenreTick}
                             tick={{
                               fill: CHART_THEME.text,
-                              fontSize: 13,
+                              fontSize: isMobile ? 11 : 14,
                               fontWeight: 500,
                             }}
                           />
