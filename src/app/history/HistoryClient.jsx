@@ -362,6 +362,8 @@ const tmdbCache = new Map();
 const tmdbInflight = new Map();
 const backdropCache = new Map();
 const backdropInflight = new Map();
+const posterChoiceCache = new Map();
+const posterInFlight = new Map();
 
 function preloadImage(src) {
   return new Promise((resolve) => {
@@ -433,6 +435,65 @@ async function getBestBackdropCached(type, id) {
   })();
 
   backdropInflight.set(key, p);
+  return p;
+}
+
+function pickBestPosterEN(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) return null;
+
+  const maxVotes = posters.reduce(
+    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
+    0,
+  );
+  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
+  if (!withMaxVotes.length) return null;
+
+  const preferredLangs = new Set(["en", "en-US"]);
+  const enGroup = withMaxVotes.filter(
+    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
+  );
+  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
+  const candidates = enGroup.length
+    ? enGroup
+    : nullLang.length
+      ? nullLang
+      : withMaxVotes;
+
+  return (
+    [...candidates].sort((a, b) => {
+      const va = (b.vote_average || 0) - (a.vote_average || 0);
+      if (va !== 0) return va;
+      return (b.width || 0) - (a.width || 0);
+    })[0] || null
+  );
+}
+
+async function fetchBestPosterEN(type, id) {
+  if (!TMDB_API_KEY || !type || !id) return null;
+  try {
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US,null`;
+    const r = await fetch(url, { cache: "force-cache" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return pickBestPosterEN(j?.posters)?.file_path || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getBestPosterCached(type, id) {
+  const key = `${type}:${id}`;
+  if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
+  if (posterInFlight.has(key)) return posterInFlight.get(key);
+
+  const p = (async () => {
+    const chosen = await fetchBestPosterEN(type, id);
+    posterChoiceCache.set(key, chosen || null);
+    posterInFlight.delete(key);
+    return chosen || null;
+  })();
+
+  posterInFlight.set(key, p);
   return p;
 }
 
@@ -1186,33 +1247,52 @@ function CalendarPanel({
 // History Item Component
 // ----------------------------
 function Poster({ entry, className = "" }) {
-  const [posterPath, setPosterPath] = useState(entry?.poster_path || null);
+  const [posterPath, setPosterPath] = useState(null);
+  const [ready, setReady] = useState(false);
   const { ref, hasBeenInView } = useInView({
     threshold: 0.01,
     rootMargin: "350px",
   });
 
-  useEffect(() => {
-    setPosterPath(entry?.poster_path || null);
-  }, [entry?.poster_path]);
+  const type = getItemType(entry);
+  const id = getTmdbId(entry);
 
   useEffect(() => {
-    if (!hasBeenInView) return;
-    let ignore = false;
-    const run = async () => {
-      if (posterPath) return;
-      const t = getItemType(entry);
-      const id = getTmdbId(entry);
-      if (!t || !id) return;
-      const r = await fetchTmdbPoster({ type: t, tmdbId: id });
-      if (ignore) return;
-      if (r?.poster_path) setPosterPath(r.poster_path);
+    let abort = false;
+    if (!hasBeenInView || !type || !id) return;
+
+    const load = async () => {
+      const tmdbType = type === "show" ? "tv" : "movie";
+      const key = `${tmdbType}:${id}`;
+      const hasCache = posterChoiceCache.has(key);
+      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
+      const initialPath = memoryBest || entry?.poster_path || null;
+
+      if (initialPath) {
+        setPosterPath(initialPath);
+        setReady(true);
+      }
+
+      if (!hasCache) {
+        const best = await getBestPosterCached(tmdbType, id);
+        if (best && best !== initialPath && !abort) {
+          setPosterPath(best);
+          setReady(true);
+        } else if (!best && !initialPath && !abort) {
+          const r = await fetchTmdbPoster({ type, tmdbId: id });
+          if (r?.poster_path && !abort) {
+            setPosterPath(r.poster_path);
+            setReady(true);
+          }
+        }
+      }
     };
-    run();
+
+    load();
     return () => {
-      ignore = true;
+      abort = true;
     };
-  }, [posterPath, entry, hasBeenInView]);
+  }, [entry, hasBeenInView, type, id]);
 
   const src = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
@@ -1253,62 +1333,81 @@ function SmartPoster({ entry, title, mode = "poster" }) {
 
     const load = async () => {
       const tmdbType = type === "show" ? "tv" : "movie";
+      const key = `${tmdbType}:${id}`;
 
       // BACKDROP MODE
       if (mode === "backdrop") {
-        const cachedPath = entry?.backdrop_path || entry?.poster_path || null;
-        if (cachedPath) {
-          const url = `https://image.tmdb.org/t/p/w780${cachedPath}`;
-          await preloadImage(url);
+        const hasCache = backdropCache.has(key);
+        const memoryBest = hasCache ? backdropCache.get(key) : null;
+        const initialPath = memoryBest || entry?.backdrop_path || entry?.poster_path || null;
+
+        if (initialPath) {
+          const url = `https://image.tmdb.org/t/p/w780${initialPath}`;
           if (!abort) {
             setSrc(url);
             setReady(true);
           }
-          return;
         }
 
-        const bestBackdrop = await getBestBackdropCached(tmdbType, id);
-        const r = await fetchTmdbPoster({ type, tmdbId: id });
-        const finalPath =
-          bestBackdrop ||
-          r?.backdrop_path ||
-          r?.poster_path ||
-          entry?.backdrop_path ||
-          entry?.poster_path ||
-          null;
-        const url = finalPath
-          ? `https://image.tmdb.org/t/p/w780${finalPath}`
-          : null;
-        if (url) await preloadImage(url);
-        if (!abort) {
-          setSrc(url);
-          setReady(!!url);
+        if (!hasCache) {
+          const bestBackdrop = await getBestBackdropCached(tmdbType, id);
+          if (bestBackdrop && bestBackdrop !== initialPath && !abort) {
+            const url = `https://image.tmdb.org/t/p/w780${bestBackdrop}`;
+            await preloadImage(url);
+            if (!abort) {
+              setSrc(url);
+              setReady(true);
+            }
+          } else if (!bestBackdrop && !initialPath && !abort) {
+            const r = await fetchTmdbPoster({ type, tmdbId: id });
+            const finalPath = r?.backdrop_path || r?.poster_path || null;
+            if (finalPath) {
+              const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
+              await preloadImage(url);
+              if (!abort) {
+                setSrc(url);
+                setReady(true);
+              }
+            }
+          }
         }
         return;
       }
 
       // POSTER MODE
-      if (entry?.poster_path || entry?.backdrop_path) {
-        const finalPath = entry.poster_path || entry.backdrop_path;
-        const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
-        await preloadImage(url);
+      const hasCache = posterChoiceCache.has(key);
+      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
+      const initialPath = memoryBest || entry?.poster_path || entry?.backdrop_path || null;
+
+      if (initialPath) {
+        const url = `https://image.tmdb.org/t/p/w342${initialPath}`;
         if (!abort) {
           setSrc(url);
           setReady(true);
         }
-        return;
       }
 
-      const r = await fetchTmdbPoster({ type, tmdbId: id });
-      const finalPath =
-        r?.poster_path || entry?.poster_path || entry?.backdrop_path || null;
-      const url = finalPath
-        ? `https://image.tmdb.org/t/p/w342${finalPath}`
-        : null;
-      if (url) await preloadImage(url);
-      if (!abort) {
-        setSrc(url);
-        setReady(!!url);
+      if (!hasCache) {
+        const best = await getBestPosterCached(tmdbType, id);
+        if (best && best !== initialPath && !abort) {
+          const url = `https://image.tmdb.org/t/p/w342${best}`;
+          await preloadImage(url);
+          if (!abort) {
+            setSrc(url);
+            setReady(true);
+          }
+        } else if (!best && !initialPath && !abort) {
+          const r = await fetchTmdbPoster({ type, tmdbId: id });
+          const finalPath = r?.poster_path || null;
+          if (finalPath) {
+            const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
+            await preloadImage(url);
+            if (!abort) {
+              setSrc(url);
+              setReady(true);
+            }
+          }
+        }
       }
     };
 
@@ -1417,23 +1516,40 @@ const HistoryItemCard = memo(function HistoryItemCard({
       if (!t || !id) return;
 
       const tmdbType = t === "show" ? "tv" : "movie";
-      const bestBackdrop = await getBestBackdropCached(tmdbType, id);
-      const r = await fetchTmdbPoster({ type: t, tmdbId: id });
-      const finalPath =
-        bestBackdrop ||
-        r?.backdrop_path ||
-        r?.poster_path ||
-        entry?.backdrop_path ||
-        entry?.poster_path ||
-        null;
-      const url = finalPath
-        ? `https://image.tmdb.org/t/p/w780${finalPath}`
-        : null;
+      const key = `${tmdbType}:${id}`;
+      const hasCache = backdropCache.has(key);
+      const memoryBest = hasCache ? backdropCache.get(key) : null;
+      const initialPath = memoryBest || entry?.backdrop_path || entry?.poster_path || null;
 
-      if (url) await preloadImage(url);
-      if (!abort) {
-        setPosterSrc(url);
-        setBackdropReady(!!url);
+      if (initialPath) {
+        const url = `https://image.tmdb.org/t/p/w780${initialPath}`;
+        if (!abort) {
+          setPosterSrc(url);
+          setBackdropReady(true);
+        }
+      }
+
+      if (!hasCache) {
+        const best = await getBestBackdropCached(tmdbType, id);
+        if (best && best !== initialPath && !abort) {
+          const url = `https://image.tmdb.org/t/p/w780${best}`;
+          await preloadImage(url);
+          if (!abort) {
+            setPosterSrc(url);
+            setBackdropReady(true);
+          }
+        } else if (!best && !initialPath && !abort) {
+          const r = await fetchTmdbPoster({ type: t, tmdbId: id });
+          const finalPath = r?.backdrop_path || r?.poster_path || null;
+          if (finalPath) {
+            const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
+            await preloadImage(url);
+            if (!abort) {
+              setPosterSrc(url);
+              setBackdropReady(true);
+            }
+          }
+        }
       }
     };
     load();

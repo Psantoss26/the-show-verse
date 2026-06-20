@@ -17,11 +17,11 @@ function canonicalKey(mediaType, tmdbId) {
 function cacheKeys(mediaType, tmdbId) {
   const key = canonicalKey(mediaType, tmdbId);
   if (!key) return [];
-  return [`tmdb:${key}`, key];
+  return [`bare:${key}`, `tmdb:${key}`, key];
 }
 
 function cacheKeyToCanonical(cacheKey) {
-  return String(cacheKey || '').replace(/^tmdb:/, '');
+  return String(cacheKey || '').replace(/^(tmdb|bare):/, '');
 }
 
 export async function getMediaMetadataMap(rows = [], options = {}) {
@@ -42,6 +42,52 @@ export async function getMediaMetadataMap(rows = [], options = {}) {
   for (const hit of hits) {
     map.set(cacheKeyToCanonical(hit.cacheKey), hit.data || {});
   }
+
+  // Find cache misses and fetch them on the fly
+  const missing = [];
+  for (const row of rows) {
+    const type = normalizedType(getMediaType(row));
+    const id = getTmdbId(row);
+    if (type && id && !map.has(`${type}:${id}`)) {
+      missing.push({ type, id });
+    }
+  }
+
+  if (missing.length > 0 && process.env.TMDB_API_KEY) {
+    await Promise.all(
+      missing.map(async ({ type, id }) => {
+        try {
+          const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${process.env.TMDB_API_KEY}&language=es-ES`;
+          const res = await fetch(url);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data) {
+            const cacheKey = `bare:${type}:${id}`;
+            const now = new Date();
+            const expiresAt = new Date(now.getTime() + 600 * 1000); // 10 minutes cache TTL
+            await db
+              .insert(tmdbCache)
+              .values({
+                cacheKey,
+                data,
+                fetchedAt: now,
+                expiresAt,
+              })
+              .onConflictDoUpdate({
+                target: tmdbCache.cacheKey,
+                set: { data, fetchedAt: now, expiresAt },
+              })
+              .catch(() => {});
+            
+            map.set(`${type}:${id}`, data);
+          }
+        } catch (e) {
+          console.warn(`Failed to prefetch metadata for ${type}:${id} in getMediaMetadataMap:`, e);
+        }
+      })
+    );
+  }
+
   return map;
 }
 
