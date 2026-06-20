@@ -1,54 +1,67 @@
 import { NextResponse } from "next/server";
 import {
-  getValidTraktToken,
-  setTraktCookies,
-  clearTraktCookies,
-  traktRemoveHistoryEntries,
-} from "@/lib/trakt/server";
+  backendFetchJson,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * POST /api/trakt/history/remove
+ *
+ * Body: { ids: string[] }  — UUIDs del historial propio (backend)
+ *
+ * - 1 ID  → DELETE /v1/history/:id
+ * - N IDs → DELETE /v1/history/bulk  con body { ids }
+ */
 export async function POST(req) {
+  let body;
   try {
-    const cookieStore = req.cookies;
-    const { token, refreshedTokens, shouldClear } =
-      await getValidTraktToken(cookieStore);
+    body = await req.json();
+  } catch {
+    body = {};
+  }
 
-    if (!token) {
-      const res = NextResponse.json(
-        { error: "No autorizado", code: "TRAKT_REAUTH_REQUIRED" },
-        { status: 401 },
-      );
-      if (shouldClear) clearTraktCookies(res);
-      return res;
-    }
+  const ids = Array.isArray(body?.ids)
+    ? body.ids.map((x) => String(x)).filter(Boolean)
+    : [];
 
-    const body = await req.json().catch(() => ({}));
-    const ids = Array.isArray(body?.ids)
-      ? body.ids.map((x) => Number(x)).filter(Boolean)
-      : [];
-
-    if (!ids.length) {
-      return NextResponse.json(
-        { error: "ids debe ser un array con history ids" },
-        { status: 400 },
-      );
-    }
-
-    const data = await traktRemoveHistoryEntries(token, { ids });
-    const res = NextResponse.json({ ok: true, data });
-    if (refreshedTokens) setTraktCookies(res, refreshedTokens);
-    return res;
-  } catch (e) {
-    const status = Number(e?.status || 500);
-    const needsReauth = status === 401 || status === 403;
+  if (!ids.length) {
     return NextResponse.json(
-      {
-        error: e?.message || "Error eliminando del historial",
-        ...(needsReauth ? { code: "TRAKT_REAUTH_REQUIRED" } : {}),
-      },
+      { error: "ids debe ser un array con al menos un history id" },
+      { status: 400 },
+    );
+  }
+
+  // Usar el endpoint bulk si hay más de 1 ID; si no, DELETE individual
+  const isBulk = ids.length > 1;
+  const path = isBulk
+    ? "/v1/history/bulk"
+    : `/v1/history/${encodeURIComponent(ids[0])}`;
+
+  const init = isBulk
+    ? { method: "DELETE", body: JSON.stringify({ ids }), headers: { "Content-Type": "application/json" } }
+    : { method: "DELETE" };
+
+  const result = await backendFetchJson(req, path, init);
+
+  if (result.skipped) {
+    return NextResponse.json(
+      { error: "Backend no disponible o no autenticado", code: "BACKEND_UNAVAILABLE" },
+      { status: 503 },
+    );
+  }
+
+  if (!result.ok) {
+    const status = result.status === 404 ? 404 : result.status >= 400 ? result.status : 500;
+    return NextResponse.json(
+      { error: result.error || "Error al eliminar del historial" },
       { status },
     );
   }
+
+  const res = NextResponse.json({ ok: true, deleted: ids });
+  setBackendAuthCookies(res, result, { secure: req.nextUrl.protocol === "https:" });
+  return res;
 }
