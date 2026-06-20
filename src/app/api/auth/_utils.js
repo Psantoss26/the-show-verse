@@ -12,16 +12,6 @@ export const AUTH_JSON_HEADERS = {
   Accept: "application/json",
   "Content-Type": "application/json",
 };
-const AUTH_BACKEND_TIMEOUT_MS = 8000;
-
-function authBackendTimeoutSignal(timeoutMs = AUTH_BACKEND_TIMEOUT_MS) {
-  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
-    return AbortSignal.timeout(timeoutMs);
-  }
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), timeoutMs);
-  return controller.signal;
-}
 
 export function authError(message, status = 500, request = null) {
   const response = NextResponse.json({ error: message }, { status });
@@ -57,15 +47,13 @@ export async function backendAuthRequest(path, init = {}) {
     };
   }
 
-  const { timeoutMs, ...fetchInit } = init;
   const response = await fetch(`${baseUrl}${path}`, {
-    ...fetchInit,
+    ...init,
     headers: {
       ...AUTH_JSON_HEADERS,
       ...(init.headers || {}),
     },
     cache: "no-store",
-    signal: init.signal || authBackendTimeoutSignal(timeoutMs),
   });
   const json = await response.json().catch(() => null);
 
