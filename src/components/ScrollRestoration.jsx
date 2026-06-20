@@ -9,6 +9,10 @@ function getCurrentRouteKey() {
   return `${window.location.pathname}${window.location.search}` || "/";
 }
 
+function getCurrentPathKey() {
+  return window.location.pathname || "/";
+}
+
 function getStorageKey(routeKey) {
   return `${STORAGE_PREFIX}${routeKey}`;
 }
@@ -68,6 +72,8 @@ function scrollToSavedPosition(position) {
 
 export default function ScrollRestoration() {
   const currentRouteKeyRef = useRef("");
+  const currentPathKeyRef = useRef("");
+  const visitedPathKeysRef = useRef(new Set());
   const scrollSaveRafRef = useRef(0);
   const scrollSaveLockRef = useRef(null);
   const urlChangeRafRef = useRef(0);
@@ -76,6 +82,8 @@ export default function ScrollRestoration() {
 
   useEffect(() => {
     currentRouteKeyRef.current = getCurrentRouteKey();
+    currentPathKeyRef.current = getCurrentPathKey();
+    visitedPathKeysRef.current.add(currentPathKeyRef.current);
 
     const previousScrollRestoration = "scrollRestoration" in window.history
       ? window.history.scrollRestoration
@@ -124,7 +132,14 @@ export default function ScrollRestoration() {
 
       clearRestoreTimers();
 
+      const previousPathKey = currentPathKeyRef.current;
+      const nextPathKey = getCurrentPathKey();
+      const isSamePageUpdate = nextPathKey === previousPathKey;
+      const hasVisitedPath = visitedPathKeysRef.current.has(nextPathKey);
+
       currentRouteKeyRef.current = nextRouteKey;
+      currentPathKeyRef.current = nextPathKey;
+      visitedPathKeysRef.current.add(nextPathKey);
 
       if (mode === "history") {
         const savedPosition = readScrollPosition(nextRouteKey);
@@ -142,6 +157,20 @@ export default function ScrollRestoration() {
       }
 
       scrollSaveLockRef.current = null;
+
+      if (isSamePageUpdate) return;
+
+      if (hasVisitedPath) {
+        const savedPosition = readScrollPosition(nextRouteKey);
+        if (savedPosition) {
+          scrollToSavedPosition(savedPosition);
+          restoreTimersRef.current = RESTORE_DELAYS_MS.map((delay) =>
+            window.setTimeout(() => scrollToSavedPosition(savedPosition), delay),
+          );
+        }
+        return;
+      }
+
       scrollToPageStart();
     };
 
