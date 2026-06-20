@@ -2658,7 +2658,69 @@ export default function HistoryClient() {
     return <div className="min-h-screen bg-black" />;
   }
 
-  const showLoginPrompt = !session || !account || (!auth.loading && !auth.connected);
+  if (!session || !account) {
+    return (
+      <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
+          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
+        </div>
+
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+          <motion.header
+            className="mb-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-12 bg-emerald-500" />
+              <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
+                REGISTRO
+              </span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+              Historial<span className="text-emerald-500">.</span>
+            </h1>
+            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+              Registro cronológico de todo lo que has visto.
+            </p>
+          </motion.header>
+
+          <div className="flex items-center justify-center py-12 lg:py-24">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+            >
+              <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
+                <img
+                  src="/logo-TSV-sinFondo.png"
+                  alt="The Show Verse"
+                  className="h-full w-auto object-contain scale-[1.6]"
+                />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-md mb-2">
+                Inicia sesión
+              </h2>
+              <p className="text-zinc-400 text-xs font-medium max-w-sm mb-6 leading-relaxed">
+                Inicia sesión para ver tu historial de visualizaciones.
+              </p>
+              <a
+                href="/login?next=/history"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
+              >
+                Iniciar sesión
+              </a>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const showLoginPrompt = !auth.loading && !auth.connected;
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
