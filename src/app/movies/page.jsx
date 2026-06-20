@@ -1,4 +1,5 @@
 // /src/app/movies/page.jsx
+import { cookies } from "next/headers";
 import MoviesPageClient from "./MoviesPageClient";
 
 import {
@@ -11,13 +12,22 @@ import {
   fetchMindBendingMovies,
   discoverMovies,
 } from "@/lib/api/tmdb";
+import { normalizeLocale } from "@/lib/localization";
 
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
 
-export const metadata = {
-  title: "Películas",
-};
+export async function generateMetadata() {
+  const locale = await getUserLocale();
+  return {
+    title: locale === "en-US" ? "Movies" : "Peliculas",
+  };
+}
+
+async function getUserLocale() {
+  const cookieStore = await cookies();
+  return normalizeLocale(cookieStore.get("showverse_locale")?.value);
+}
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
@@ -110,9 +120,7 @@ function curateList(
 }
 
 /* ======== Carga de datos CRÍTICOS en el SERVIDOR ======== */
-async function getCriticalDashboardData() {
-  const lang = "es-ES";
-
+async function getCriticalDashboardData(lang) {
   try {
     const [popular, topES] = await Promise.all([
       fetchPopularMedia({ type: "movie", language: lang }),
@@ -142,9 +150,7 @@ async function getCriticalDashboardData() {
 }
 
 /* ======== Carga de datos DIFERIDOS en el SERVIDOR ======== */
-async function getDeferredDashboardData() {
-  const lang = "es-ES";
-
+async function getDeferredDashboardData(lang) {
   try {
     const [
       topImdbRaw,
@@ -342,11 +348,13 @@ async function getDeferredDashboardData() {
 
 /* =================== Componente de servidor =================== */
 export default async function MoviesPage() {
-  const initialData = await getCriticalDashboardData();
-  const deferredDataPromise = getDeferredDashboardData();
+  const lang = await getUserLocale();
+  const initialData = await getCriticalDashboardData(lang);
+  const deferredDataPromise = getDeferredDashboardData(lang);
 
   return (
     <MoviesPageClient
+      language={lang}
       initialData={initialData}
       deferredDataPromise={deferredDataPromise}
     />

@@ -1,5 +1,6 @@
 // /lib/api/tmdb.js
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+import { getTmdbIncludeImageLanguage } from "@/lib/localization";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -152,9 +153,10 @@ async function tmdb(path, params = {}, options = {}) {
 }
 
 /* -------------------- Películas (Movies) -------------------- */
-export async function fetchTopRatedMovies(minVotes = 1000) {
+export async function fetchTopRatedMovies(minVotes = 1000, language = "es-ES") {
   // Usar /discover en lugar de /top_rated para poder filtrar por votos mínimos
   const data = await tmdb("/discover/movie", {
+    language,
     sort_by: "vote_average.desc",
     "vote_count.gte": minVotes,
     page: 1,
@@ -162,13 +164,13 @@ export async function fetchTopRatedMovies(minVotes = 1000) {
   return data?.results || [];
 }
 
-export async function fetchTrendingMovies() {
-  const data = await tmdb("/trending/movie/week");
+export async function fetchTrendingMovies(language = "es-ES") {
+  const data = await tmdb("/trending/movie/week", { language });
   return data?.results || [];
 }
 
-export async function fetchPopularMovies() {
-  const data = await tmdb("/movie/popular", { page: 1 });
+export async function fetchPopularMovies(language = "es-ES") {
+  const data = await tmdb("/movie/popular", { language, page: 1 });
   return data?.results || [];
 }
 
@@ -282,9 +284,10 @@ export async function fetchPopularTV() {
   return data?.results || [];
 }
 
-export async function fetchTopRatedTV(minVotes = 500) {
+export async function fetchTopRatedTV(minVotes = 500, language = "es-ES") {
   // Usar /discover en lugar de /top_rated para poder filtrar por votos mínimos
   const data = await tmdb("/discover/tv", {
+    language,
     sort_by: "vote_average.desc",
     "vote_count.gte": minVotes,
     page: 1,
@@ -390,7 +393,7 @@ export async function getDetails(type, id, params = {}) {
     includeImageLanguage ??
     include_image_language ??
     (typeof resolvedAppend === "string" && resolvedAppend.includes("images")
-      ? "es,en,null"
+      ? getTmdbIncludeImageLanguage(restParams.language)
       : undefined);
 
   const requestParams = {
@@ -415,7 +418,7 @@ export async function getDetails(type, id, params = {}) {
 export async function getLogos(type, id) {
   const data = await tmdb(`/${type}/${id}/images`, {
     // recibimos todos y filtramos
-    include_image_language: "es,en,null",
+    include_image_language: getTmdbIncludeImageLanguage(),
   });
   const logos = data?.logos || [];
   if (!logos.length) return null;
@@ -434,7 +437,7 @@ export async function getLogos(type, id) {
 export async function getImages(
   type,
   id,
-  includeImageLanguage = "en,en-US,es,es-ES,null",
+  includeImageLanguage = getTmdbIncludeImageLanguage(),
 ) {
   if (!type || !id) return { posters: [], backdrops: [] };
   const data = await tmdb(
@@ -1053,9 +1056,11 @@ export async function discoverTV(params = {}) {
 export async function fetchMovieSections({
   pageRand = 1,
   genreIds = [35, 16, 12, 10751, 36, 27],
+  language = "es-ES",
 } = {}) {
   const makeDecade = (from, to) =>
     discoverMovies({
+      language,
       "primary_release_date.gte": `${from}-01-01`,
       "primary_release_date.lte": `${to}-12-31`,
       sort_by: "popularity.desc",
@@ -1065,6 +1070,7 @@ export async function fetchMovieSections({
   const queries = [
     // Más votadas — los títulos con más valoraciones (blockbusters mainstream)
     discoverMovies({
+      language,
       sort_by: "vote_count.desc",
       "vote_average.gte": 6.5,
       page: pageRand,
@@ -1078,6 +1084,7 @@ export async function fetchMovieSections({
 
     // Premiadas (proxy: muy bien valoradas y con muchos votos)
     discoverMovies({
+      language,
       "vote_average.gte": 7.5,
       "vote_count.gte": 2000,
       sort_by: "vote_average.desc",
@@ -1085,10 +1092,11 @@ export async function fetchMovieSections({
     }),
 
     // Top 10 hoy en España (popularidad en región ES)
-    discoverMovies({ region: "ES", sort_by: "popularity.desc", page: 1 }),
+    discoverMovies({ language, region: "ES", sort_by: "popularity.desc", page: 1 }),
 
     // Superéxito (blockbusters)
     discoverMovies({
+      language,
       "vote_count.gte": 5000,
       sort_by: "popularity.desc",
       page: pageRand,
@@ -1098,6 +1106,7 @@ export async function fetchMovieSections({
   // Por género (varios grupos)
   const genrePromises = genreIds.map((gid) =>
     discoverMovies({
+      language,
       with_genres: gid,
       sort_by: "popularity.desc",
       page: pageRand,
@@ -1149,9 +1158,11 @@ export async function fetchMovieSections({
 export async function fetchTVSections({
   pageRand = 1,
   genreIds = [35, 9648, 10764, 10759, 99],
+  language = "es-ES",
 } = {}) {
   const makeDecade = (from, to) =>
     discoverTV({
+      language,
       "first_air_date.gte": `${from}-01-01`,
       "first_air_date.lte": `${to}-12-31`,
       sort_by: "popularity.desc",
@@ -1161,6 +1172,7 @@ export async function fetchTVSections({
   const queries = [
     // Más votadas (tv)
     discoverTV({
+      language,
       sort_by: "vote_average.desc",
       "vote_count.gte": 500,
       page: pageRand,
@@ -1174,6 +1186,7 @@ export async function fetchTVSections({
 
     // Premiadas (proxy TV)
     discoverTV({
+      language,
       "vote_average.gte": 7.8,
       "vote_count.gte": 1000,
       sort_by: "vote_average.desc",
@@ -1181,10 +1194,11 @@ export async function fetchTVSections({
     }),
 
     // Top 10 hoy en España — aproximación usando trending (TV no admite region en trending)
-    tmdb("/trending/tv/day", { page: 1 }),
+    tmdb("/trending/tv/day", { language, page: 1 }),
 
     // Superéxito (muchos votos)
     discoverTV({
+      language,
       "vote_count.gte": 2000,
       sort_by: "popularity.desc",
       page: pageRand,
@@ -1194,6 +1208,7 @@ export async function fetchTVSections({
   // Por género
   const genrePromises = genreIds.map((gid) =>
     discoverTV({
+      language,
       with_genres: gid,
       sort_by: "popularity.desc",
       page: pageRand,

@@ -38,6 +38,12 @@ import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
+import {
+  getTmdbIncludeImageLanguage,
+  pickBestImageByLocale,
+} from "@/lib/localization";
+import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
 
 // ----------------------------
 // HELPERS
@@ -187,57 +193,32 @@ function preloadImage(src) {
   });
 }
 
-function pickBestPosterEN(posters) {
+function pickBestPosterEN(posters, locale = "es-ES") {
   if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const maxVotes = posters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
-  if (!withMaxVotes.length) return null;
-
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-
-  return (
-    [...candidates].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
+  return pickBestImageByLocale(posters, { locale, kind: "poster" });
 }
 
-async function fetchBestPosterEN(type, id) {
+async function fetchBestPosterEN(type, id, locale = "es-ES") {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    return pickBestPosterEN(j?.posters)?.file_path || null;
+    return pickBestPosterEN(j?.posters, locale)?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id) {
-  const key = `${type}:${id}`;
+async function getBestPosterCached(type, id, locale = "es-ES") {
+  const key = `${locale}:${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id);
+    const chosen = await fetchBestPosterEN(type, id, locale);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -281,16 +262,17 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   return top3en[0];
 }
 
-async function fetchBestBackdropEN(type, id) {
+async function fetchBestBackdropEN(type, id, locale = "es-ES") {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    const best = pickBestBackdropByLangResVotes(j?.backdrops, {
-      preferLangs: ["en", "en-US"],
+    const best = pickBestImageByLocale(j?.backdrops, {
+      locale,
+      kind: "backdrop",
       minWidth: 1200,
     });
     return best?.file_path || null;
@@ -299,13 +281,13 @@ async function fetchBestBackdropEN(type, id) {
   }
 }
 
-async function getBestBackdropCached(type, id) {
-  const key = `${type}:${id}`;
+async function getBestBackdropCached(type, id, locale = "es-ES") {
+  const key = `${locale}:${type}:${id}`;
   if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key);
   if (backdropInFlight.has(key)) return backdropInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id);
+    const chosen = await fetchBestBackdropEN(type, id, locale);
     backdropChoiceCache.set(key, chosen || null);
     backdropInFlight.delete(key);
     return chosen || null;
@@ -378,6 +360,7 @@ function clearSessionCache(key, ownerId) {
 // SMART POSTER COMPONENT
 // ----------------------------
 function SmartPoster({ item, title }) {
+  const { lang } = useTranslation();
   const type = "tv"; // In Progress is always TV
   const id = item.tmdbId;
 
@@ -391,11 +374,11 @@ function SmartPoster({ item, title }) {
     setReady(false);
 
     const load = async () => {
-      const key = `${type}:${id}`;
+      const key = `${lang}:${type}:${id}`;
       const hasCache = posterChoiceCache.has(key);
       const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
       const pref = getPosterPreference(type, id);
-      const initialPath = memoryBest || pref || item.poster_path || item.backdrop_path || null;
+      const initialPath = memoryBest || pref || null;
 
       if (initialPath) {
         const url = buildImg(initialPath, "w500");
@@ -406,7 +389,7 @@ function SmartPoster({ item, title }) {
       }
 
       if (!hasCache) {
-        const best = await getBestPosterCached(type, id);
+        const best = await getBestPosterCached(type, id, lang);
         if (best && best !== initialPath && !abort) {
           const url = buildImg(best, "w500");
           await preloadImage(url);
@@ -422,7 +405,7 @@ function SmartPoster({ item, title }) {
     return () => {
       abort = true;
     };
-  }, [type, id, item.poster_path, item.backdrop_path]);
+  }, [type, id, item.poster_path, item.backdrop_path, lang]);
 
   return (
     <div className="relative w-full h-full">
@@ -452,6 +435,7 @@ function SmartPoster({ item, title }) {
 // SMART BACKDROP COMPONENT
 // ----------------------------
 function SmartBackdrop({ item, title, imgClassName = "" }) {
+  const { lang } = useTranslation();
   const type = "tv";
   const id = item.tmdbId;
 
@@ -465,10 +449,10 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     setReady(false);
 
     const load = async () => {
-      const key = `${type}:${id}`;
+      const key = `${lang}:${type}:${id}`;
       const hasCache = backdropChoiceCache.has(key);
       const memoryBest = hasCache ? backdropChoiceCache.get(key) : null;
-      const initialPath = memoryBest || item.backdrop_path || item.poster_path || null;
+      const initialPath = memoryBest || null;
 
       if (initialPath) {
         const url = buildImg(initialPath, (memoryBest || item.backdrop_path) ? "w1280" : "w500");
@@ -479,7 +463,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
       }
 
       if (!hasCache) {
-        const best = await getBestBackdropCached(type, id);
+        const best = await getBestBackdropCached(type, id, lang);
         if (best && best !== initialPath && !abort) {
           const url = buildImg(best, "w1280");
           await preloadImage(url);
@@ -495,7 +479,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, item.backdrop_path, item.poster_path]);
+  }, [type, id, item.backdrop_path, item.poster_path, lang]);
 
   return (
     <div className="relative w-full h-full">
@@ -1148,6 +1132,7 @@ export default function InProgressClient({
   initialAuth = { loading: true, connected: false },
 }) {
   const { session, account, hydrated } = useAuth();
+  const { t, lang } = useTranslation();
   const initialAuthLoading = !!initialAuth?.loading;
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
@@ -1171,6 +1156,7 @@ export default function InProgressClient({
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [uiReady, setUiReady] = useState(false);
 
   // Restore preferences from localStorage after mount (avoids SSR/client hydration mismatch)
   useEffect(() => {
@@ -1192,26 +1178,30 @@ export default function InProgressClient({
       "showverse:inprogress:groupBy",
     );
     if (savedGroup) setGroupBy(savedGroup);
+    setUiReady(true);
   }, []);
 
   // Persist
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:viewMode", viewMode);
-  }, [viewMode]);
+  }, [uiReady, viewMode]);
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);
-  }, [sortBy]);
+  }, [uiReady, sortBy]);
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:groupBy", groupBy);
-  }, [groupBy]);
+  }, [groupBy, uiReady]);
 
   // Update document title when tab changes
   useEffect(() => {
     document.title =
       activeTab === "completed"
-        ? formatPageTitle("Completadas")
-        : formatPageTitle("En progreso");
-  }, [activeTab]);
+        ? formatPageTitle(t("completed_title"))
+        : formatPageTitle(t("in_progress_title"));
+  }, [activeTab, t]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -1392,6 +1382,9 @@ export default function InProgressClient({
 
   // Active data based on tab
   const currentItems = activeTab === "completed" ? completedItems : items;
+  const localizedCurrentItems = useLocalizedMediaItems(currentItems, lang, {
+    limit: 120,
+  });
   const currentStats = activeTab === "completed" ? completedStats : stats;
   const currentLoading = activeTab === "completed" ? completedLoading : loading;
   const currentDataLoaded =
@@ -1399,7 +1392,7 @@ export default function InProgressClient({
 
   // Filter + Sort
   const filtered = useMemo(() => {
-    let list = [...currentItems];
+    let list = [...localizedCurrentItems];
 
     // Search
     if (q.trim()) {
@@ -1456,7 +1449,7 @@ export default function InProgressClient({
     }
 
     return list;
-  }, [currentItems, q, sortBy]);
+  }, [localizedCurrentItems, q, sortBy]);
 
   const allSortLabels = {
     recent: "Recientes",
@@ -1659,7 +1652,7 @@ export default function InProgressClient({
   // RENDER
   // ----------------------------
 
-  if (!hydrated) {
+  if (!hydrated || !uiReady) {
     return <div className="min-h-screen bg-black" />;
   }
 
@@ -2192,7 +2185,7 @@ export default function InProgressClient({
         {/* ========== CONTENT ========== */}
 
         {/* Loading state */}
-        {(currentLoading || auth.loading) && filtered.length === 0 && (
+        {(!currentDataLoaded || currentLoading || auth.loading) && filtered.length === 0 && (
           <div
             className={
               viewMode === "cards"
@@ -2209,7 +2202,7 @@ export default function InProgressClient({
         )}
 
         {/* Empty state */}
-        {!currentLoading && !auth.loading && filtered.length === 0 && (
+        {currentDataLoaded && !currentLoading && !auth.loading && filtered.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

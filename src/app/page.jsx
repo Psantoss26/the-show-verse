@@ -1,4 +1,5 @@
 // /src/app/page.jsx
+import { cookies } from "next/headers";
 import MainDashboardClient from "@/components/MainDashboardClient";
 
 import {
@@ -9,14 +10,23 @@ import {
   discoverMovies,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
+import { normalizeLocale } from "@/lib/localization";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
 export const maxDuration = 60; // Vercel Pro = 60s; Hobby = 10s (máximo posible)
 
-export const metadata = {
-  title: "Inicio",
-};
+export async function generateMetadata() {
+  const locale = await getUserLocale();
+  return {
+    title: locale === "en-US" ? "Home" : "Inicio",
+  };
+}
+
+async function getUserLocale() {
+  const cookieStore = await cookies();
+  return normalizeLocale(cookieStore.get("showverse_locale")?.value);
+}
 
 /* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
 const sortByVotes = (list = []) =>
@@ -63,7 +73,7 @@ function curateList(
 }
 
 /* ======== Carga de datos en el SERVIDOR ======== */
-async function getDashboardData() {
+async function getDashboardData(language) {
   try {
     const [
       topRatedMovies,
@@ -73,9 +83,10 @@ async function getDashboardData() {
       trending,
       popular,
     ] = await Promise.all([
-      fetchTopRatedMovies(5000),
-      fetchTopRatedTV(5000),
+      fetchTopRatedMovies(5000, language),
+      fetchTopRatedTV(5000, language),
       discoverMovies({
+        language,
         "vote_average.gte": 7.5,
         "vote_count.gte": 2000,
         sort_by: "vote_average.desc",
@@ -85,10 +96,10 @@ async function getDashboardData() {
         type: "tv",
         genreId: 18,
         minVotes: 800,
-        language: "es-ES",
+        language,
       }),
-      fetchTrendingMovies(),
-      fetchPopularMovies(),
+      fetchTrendingMovies(language),
+      fetchPopularMovies(language),
     ]);
 
     // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
@@ -152,6 +163,7 @@ async function getDashboardData() {
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  const dashboardData = await getDashboardData();
-  return <MainDashboardClient initialData={dashboardData} />;
+  const language = await getUserLocale();
+  const dashboardData = await getDashboardData(language);
+  return <MainDashboardClient language={language} initialData={dashboardData} />;
 }

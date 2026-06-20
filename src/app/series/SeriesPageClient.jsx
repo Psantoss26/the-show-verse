@@ -23,6 +23,13 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
+import {
+  getGenreName,
+  getTmdbIncludeImageLanguage,
+  pickBestImageByLocale,
+} from "@/lib/localization";
+import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
 
 import {
   getMediaAccountStates,
@@ -132,25 +139,6 @@ const dashboardPreviewBackdropFadeStyle = {
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
   maskImage:
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
-};
-
-const TV_GENRES = {
-  10759: "Acción y aventura",
-  16: "Animación",
-  35: "Comedia",
-  80: "Crimen",
-  99: "Documental",
-  18: "Drama",
-  10751: "Familia",
-  10762: "Infantil",
-  9648: "Misterio",
-  10763: "Noticias",
-  10764: "Reality",
-  10765: "Ciencia ficción y fantasía",
-  10766: "Telenovela",
-  10767: "Talk show",
-  10768: "Bélica y política",
-  37: "Western",
 };
 
 /* --------- Precargar imagen --------- */
@@ -271,13 +259,14 @@ function getTVArtworkPreference(showId) {
 }
 
 /* ========= Fetch genérico de imágenes TV desde TMDb ========= */
-async function getShowImages(showId) {
-  if (tvImagesCache.has(showId)) return tvImagesCache.get(showId);
+async function getShowImages(showId, locale = "es-ES") {
+  const cacheKey = `${locale}:${showId}`;
+  if (tvImagesCache.has(cacheKey)) return tvImagesCache.get(cacheKey);
 
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !showId) {
     const fallback = { posters: [], backdrops: [] };
-    tvImagesCache.set(showId, fallback);
+    tvImagesCache.set(cacheKey, fallback);
     return fallback;
   }
 
@@ -285,7 +274,7 @@ async function getShowImages(showId) {
     const url =
       `https://api.themoviedb.org/3/tv/${showId}/images` +
       `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,null`;
+      `&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
 
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) throw new Error("TMDb TV images error");
@@ -296,11 +285,11 @@ async function getShowImages(showId) {
       backdrops: Array.isArray(j?.backdrops) ? j.backdrops : [],
     };
 
-    tvImagesCache.set(showId, data);
+    tvImagesCache.set(cacheKey, data);
     return data;
   } catch {
     const fallback = { posters: [], backdrops: [] };
-    tvImagesCache.set(showId, fallback);
+    tvImagesCache.set(cacheKey, fallback);
     return fallback;
   }
 }
@@ -377,42 +366,44 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
 }
 
 /* ========= Poster preferido TV ========= */
-async function fetchBestTVPoster(showId) {
-  const { posters } = await getShowImages(showId);
+async function fetchBestTVPoster(showId, locale = "es-ES") {
+  const { posters } = await getShowImages(showId, locale);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestPosterEN(posters);
+  const best = pickBestImageByLocale(posters, { locale, kind: "poster" });
   return best?.file_path || null;
 }
 
 /* ========= Backdrop preferido TV ========= */
-async function fetchBestTVBackdrop(showId) {
-  const { backdrops } = await getShowImages(showId);
+async function fetchBestTVBackdrop(showId, locale = "es-ES") {
+  const { backdrops } = await getShowImages(showId, locale);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
+  const best = pickBestImageByLocale(backdrops, {
+    locale,
+    kind: "backdrop",
     minWidth: 1200,
   });
 
   return best?.file_path || null;
 }
 
-async function preparePreviewBackdrop(show) {
+async function preparePreviewBackdrop(show, locale = "es-ES") {
   if (!show?.id) return null;
 
-  let backdropPath = tvBackdropCache.get(show.id);
+  const cacheKey = `${locale}:${show.id}`;
+  let backdropPath = tvBackdropCache.get(cacheKey);
 
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestTVBackdrop(show.id)) ||
+        (await fetchBestTVBackdrop(show.id, locale)) ||
         getPreviewBackdropFallback(show);
     } catch {
       backdropPath = getPreviewBackdropFallback(show);
     }
 
-    tvBackdropCache.set(show.id, backdropPath);
+    tvBackdropCache.set(cacheKey, backdropPath);
   }
 
   if (backdropPath) {
@@ -427,7 +418,7 @@ async function preparePreviewBackdrop(show) {
  * - <md: contain + blur
  * - >=md: cover
  * ==================================================================== */
-function PosterImage({ show, cache }) {
+function PosterImage({ show, cache, locale = "es-ES" }) {
   const [posterPath, setPosterPath] = useState(() => {
     if (!show) return null;
     const { poster: userPoster } = getTVArtworkPreference(show.id);
@@ -473,7 +464,7 @@ function PosterImage({ show, cache }) {
       }
 
       // 3) Buscamos la alternativa en inglés (fetchBestTVPoster)
-      const preferred = await fetchBestTVPoster(show.id);
+      const preferred = await fetchBestTVPoster(show.id, locale);
       const basePoster = show.poster_path || show.backdrop_path || null;
       const chosen = preferred || basePoster || null;
 
@@ -488,7 +479,7 @@ function PosterImage({ show, cache }) {
     return () => {
       abort = true;
     };
-  }, [show, cache]);
+  }, [show, cache, locale]);
 
   if (!ready || !posterPath) {
     return (
@@ -657,9 +648,10 @@ function Top10MobileBackdropCardTV({
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) para TV + TRAILER
  * ==================================================================== */
-function InlinePreviewCard({ show, heightClass }) {
+function InlinePreviewCard({ show, heightClass, locale = "es-ES" }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const backdropCacheKey = show?.id ? `${locale}:${show.id}` : null;
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -670,7 +662,7 @@ function InlinePreviewCard({ show, heightClass }) {
     if (!show) return null;
     const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
     if (userBackdrop) return userBackdrop;
-    const cached = tvBackdropCache.get(show.id);
+    const cached = tvBackdropCache.get(backdropCacheKey);
     if (cached !== undefined) return cached;
     return null;
   });
@@ -678,7 +670,7 @@ function InlinePreviewCard({ show, heightClass }) {
     if (!show) return false;
     const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
     if (userBackdrop) return true;
-    const cached = tvBackdropCache.get(show.id);
+    const cached = tvBackdropCache.get(backdropCacheKey);
     if (cached !== undefined) return !!cached;
     return false;
   });
@@ -742,21 +734,21 @@ function InlinePreviewCard({ show, heightClass }) {
       const userPreferredBackdrop = userBackdrop || null;
 
       if (userPreferredBackdrop) {
-        tvBackdropCache.set(show.id, userPreferredBackdrop);
+        tvBackdropCache.set(backdropCacheKey, userPreferredBackdrop);
         revealBackdrop(userPreferredBackdrop);
       } else {
-        const cachedBackdrop = tvBackdropCache.get(show.id);
+        const cachedBackdrop = tvBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           const fallback = getPreviewBackdropFallback(show);
           try {
-            const preferred = await fetchBestTVBackdrop(show.id);
+            const preferred = await fetchBestTVBackdrop(show.id, locale);
             const chosen = preferred || fallback;
-            tvBackdropCache.set(show.id, chosen);
+            tvBackdropCache.set(backdropCacheKey, chosen);
             revealBackdrop(chosen);
           } catch {
-            tvBackdropCache.set(show.id, fallback);
+            tvBackdropCache.set(backdropCacheKey, fallback);
             revealBackdrop(fallback);
           }
         }
@@ -770,7 +762,7 @@ function InlinePreviewCard({ show, heightClass }) {
           let runtime = null;
           try {
             const details = await getDetails("tv", show.id, {
-              language: "es-ES",
+              language: locale,
             });
             runtime = details?.episode_run_time?.[0] ?? null;
           } catch {}
@@ -816,7 +808,7 @@ function InlinePreviewCard({ show, heightClass }) {
     return () => {
       abort = true;
     };
-  }, [show]);
+  }, [show, locale, backdropCacheKey]);
 
   const href = `/details/tv/${show.id}`;
 
@@ -931,7 +923,7 @@ function InlinePreviewCard({ show, heightClass }) {
     const ids =
       show.genre_ids ||
       (Array.isArray(show.genres) ? show.genres.map((g) => g.id) : []);
-    const names = ids.map((id) => TV_GENRES[id]).filter(Boolean);
+    const names = ids.map((id) => getGenreName("tv", id, locale)).filter(Boolean);
     return names.slice(0, 2).join(" • ");
   })();
 
@@ -1135,39 +1127,26 @@ function InlinePreviewCard({ show, heightClass }) {
 }
 
 /* ---------- Fila reusable ---------- */
-function Row({ title, items, isMobile, posterCacheRef }) {
+function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
+  const { t, lang } = useTranslation();
   const reduceMotion = useReducedMotion();
   const safeItems = Array.isArray(items) ? items : EMPTY_ARRAY;
-  const hasItems = safeItems.length > 0;
+  const localizedItems = useLocalizedMediaItems(safeItems, lang, { limit: 80 });
+  const hasItems = localizedItems.length > 0;
 
-  // ✅ Detectar si es una fila de género específico
-  const isGenreRow = ![
-    "Populares",
-    "Tendencias ahora mismo",
-    "Series imprescindibles",
-    "En emisión ahora mismo",
-    "Aclamadas por la crítica",
-    "Top 10 hoy en España",
-    "En Emisión",
-  ].includes(title);
-
-  // ✅ Determinar etiqueta específica según el título
-  let labelText = null;
-  if (title === "Tendencias ahora mismo") {
-    labelText = "TENDENCIAS";
-  } else if (title === "Series imprescindibles") {
-    labelText = "IMPRESCINDIBLES";
-  } else if (title === "Top 10 hoy en España") {
-    labelText = "TOP 10";
-  } else if (title === "Lo mejor de esta década") {
-    labelText = "AÑOS 2020";
-  } else if (title && title.toLowerCase().includes("2010")) {
-    labelText = "AÑOS 2010";
-  } else if (title && title.toLowerCase().includes("2020")) {
-    labelText = "AÑOS 2020";
-  } else if (isGenreRow) {
-    labelText = "GÉNERO";
-  }
+  const isGenreRow = String(rowKey || "").startsWith("genre-");
+  const labelText =
+    rowKey === "popular"
+      ? "TENDENCIAS"
+      : rowKey === "top-imdb"
+        ? "IMPRESCINDIBLES"
+        : rowKey === "top-es"
+          ? "TOP 10"
+          : String(rowKey || "").startsWith("decade-")
+            ? lang === "en-US" ? "DECADE" : "DECADA"
+            : isGenreRow
+              ? t("media_genre").toUpperCase()
+              : null;
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -1184,21 +1163,21 @@ function Row({ title, items, isMobile, posterCacheRef }) {
     if (!isHoveredRow || !hasItems || isMobile) return;
 
     const preloadBackdrops = async () => {
-      const toPreload = safeItems
+      const toPreload = localizedItems
         .slice(0, 5)
         .filter((show) => !preloadedBackdrops.has(show.id));
 
       for (const show of toPreload) {
-        await preparePreviewBackdrop(show);
+        await preparePreviewBackdrop(show, lang);
         setPreloadedBackdrops((prev) => new Set([...prev, show.id]));
       }
     };
 
     const timer = window.setTimeout(preloadBackdrops, 300);
     return () => window.clearTimeout(timer);
-  }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
+  }, [isHoveredRow, hasItems, localizedItems, isMobile, preloadedBackdrops, lang]);
 
-  const isTop10 = title === "Top 10 hoy en España";
+  const isTop10 = rowKey === "top-es";
   const hasActivePreview = !!hoveredId;
 
   const heightClassDesktop =
@@ -1220,7 +1199,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
             </span>
           </div>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Top 10 hoy en España<span className="text-emerald-500">.</span>
+            {title}<span className="text-emerald-500">.</span>
           </h3>
         </div>
         <Swiper
@@ -1237,7 +1216,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           modules={[Navigation]}
           className="group relative"
         >
-          {safeItems.map((s, i) => (
+          {localizedItems.map((s, i) => (
             <SwiperSlide key={s.id} className="select-none">
               <Top10MobileBackdropCardTV show={s} rank={i + 1} />
             </SwiperSlide>
@@ -1358,7 +1337,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           className="group relative"
           breakpoints={breakpointsRow}
         >
-          {safeItems.map((s, i) => {
+          {localizedItems.map((s, i) => {
             const itemKey = `tv:${s.id}`;
             const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
 
@@ -1377,7 +1356,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
             let transformClass = "";
             if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
               const activeIndex = hoveredIndex;
-              const totalItems = safeItems.length;
+              const totalItems = localizedItems.length;
 
               if (activeIndex >= totalItems - 3 && i <= activeIndex) {
                 if (activeIndex === totalItems - 1) {
@@ -1401,7 +1380,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
-                    preparePreviewBackdrop(s).finally(() => {
+                    preparePreviewBackdrop(s, lang).finally(() => {
                       if (hoverIntentRef.current === hoverToken) {
                         setHoveredId(itemKey);
                       }
@@ -1438,6 +1417,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                       <InlinePreviewCard
                         show={s}
                         heightClass={heightClassDesktop}
+                        locale={lang}
                       />
                     </motion.div>
                   ) : (
@@ -1472,7 +1452,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                           href={`/details/tv/${s.id}`}
                           className="block w-full h-full"
                         >
-                          <PosterImage show={s} cache={posterCacheRef} />
+                          <PosterImage
+                            show={s}
+                            cache={posterCacheRef}
+                            locale={lang}
+                          />
                         </Link>
                       )}
                     </motion.div>
@@ -1548,6 +1532,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
 export default function SeriesPageClient({ initialData, deferredDataPromise }) {
+  const { t } = useTranslation();
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
@@ -1561,6 +1546,10 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
         .catch(console.error);
     }
   }, [deferredDataPromise]);
+
+  useEffect(() => {
+    document.title = `${t("series_title")} • TSV`;
+  }, [t]);
 
   const dashboardData = useMemo(
     () => ({
@@ -1580,38 +1569,38 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
 
     addRow(
       "top-es",
-      "Top 10 hoy en España",
+      t("row_top_spain"),
       dashboardData["Top 10 hoy en España"],
     );
-    addRow("popular", "Tendencias ahora mismo", dashboardData.popular);
-    addRow("top-imdb", "Series imprescindibles", dashboardData.top_imdb);
+    addRow("popular", t("row_trending_now"), dashboardData.popular);
+    addRow("top-imdb", t("row_series_top_imdb"), dashboardData.top_imdb);
     addRow(
       "most-voted",
-      "Las más valoradas de la historia",
+      t("row_most_voted_series"),
       dashboardData["Más votadas"],
     );
-    addRow("awarded", "Ganadoras de grandes premios", dashboardData["Premiadas"]);
-    addRow("blockbusters", "Fenómenos de audiencia", dashboardData["Superéxito"]);
-    addRow("drama", "Drama que te deja sin palabras", dashboardData.drama);
+    addRow("awarded", t("row_awarded_series"), dashboardData["Premiadas"]);
+    addRow("blockbusters", t("row_blockbusters_series"), dashboardData["Superéxito"]);
+    addRow("drama", t("row_drama_series"), dashboardData.drama);
     addRow(
       "scifi-fantasy",
-      "Ciencia ficción y fantasía",
+      t("row_scifi_series"),
       dashboardData.scifi_fantasy,
     );
-    addRow("crime", "Crimen y suspense", dashboardData.crime);
-    addRow("k-drama", "K-Drama que engancha", dashboardData.kDrama);
-    addRow("romance", "Romance que atrapa", dashboardData.romance);
-    addRow("animation", "Animación para maratonear", dashboardData.animation);
-    addRow("decade-1990", "Clásicos de los 90", dashboardData["Década de 1990"]);
+    addRow("crime", t("row_crime_series"), dashboardData.crime);
+    addRow("k-drama", t("row_kdrama_series"), dashboardData.kDrama);
+    addRow("romance", t("row_romance_series"), dashboardData.romance);
+    addRow("animation", t("row_animation_series"), dashboardData.animation);
+    addRow("decade-1990", t("row_decade_1990"), dashboardData["Década de 1990"]);
     addRow(
       "decade-2000",
-      "Favoritas de los 2000",
+      t("row_decade_2000"),
       dashboardData["Década de 2000"],
     );
-    addRow("decade-2010", "Hits de los 2010", dashboardData["Década de 2010"]);
+    addRow("decade-2010", t("row_decade_2010"), dashboardData["Década de 2010"]);
     addRow(
       "decade-2020",
-      "Lo mejor de esta década",
+      t("row_decade_2020"),
       dashboardData["Década de 2020"],
     );
 
@@ -1620,7 +1609,7 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
     );
 
     return rows;
-  }, [dashboardData]);
+  }, [dashboardData, t]);
 
   useEffect(() => {
     if (visibleRowCount >= rowConfigs.length) return undefined;
@@ -1668,6 +1657,7 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
         {visibleRows.map(({ key, title, items }) => (
           <Row
             key={key}
+            rowKey={key}
             title={title}
             items={items}
             isMobile={isMobile}
