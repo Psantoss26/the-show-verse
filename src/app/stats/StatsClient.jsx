@@ -912,13 +912,13 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   return (
     <div className="flex min-w-0 items-center gap-4 sm:gap-5 w-full">
       {/* Clean Avatar Box */}
-      <div className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 flex-shrink-0 overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
+      <div className="h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32 flex-shrink-0 overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
         {avatarUrl ? (
           <OptimizedImage
             src={avatarUrl}
             alt={displayName}
-            width={112}
-            height={112}
+            width={128}
+            height={128}
             loading="eager"
             fetchPriority="high"
             decoding="sync"
@@ -926,7 +926,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-            <span className="text-3xl sm:text-4xl font-black text-white">
+            <span className="text-4xl sm:text-5xl font-black text-white">
               {displayName[0]?.toUpperCase() || "?"}
             </span>
           </div>
