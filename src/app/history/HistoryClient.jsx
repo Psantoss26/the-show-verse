@@ -42,7 +42,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
-const HISTORY_CACHE_KEY = "showverse:history:items:v2";
+const HISTORY_CACHE_KEY = "showverse:history:items:v3";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function isTraktUnavailableError(error) {
@@ -1256,6 +1256,17 @@ function SmartPoster({ entry, title, mode = "poster" }) {
 
       // BACKDROP MODE
       if (mode === "backdrop") {
+        const cachedPath = entry?.backdrop_path || entry?.poster_path || null;
+        if (cachedPath) {
+          const url = `https://image.tmdb.org/t/p/w780${cachedPath}`;
+          await preloadImage(url);
+          if (!abort) {
+            setSrc(url);
+            setReady(true);
+          }
+          return;
+        }
+
         const bestBackdrop = await getBestBackdropCached(tmdbType, id);
         const r = await fetchTmdbPoster({ type, tmdbId: id });
         const finalPath =
@@ -1277,6 +1288,17 @@ function SmartPoster({ entry, title, mode = "poster" }) {
       }
 
       // POSTER MODE
+      if (entry?.poster_path || entry?.backdrop_path) {
+        const finalPath = entry.poster_path || entry.backdrop_path;
+        const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
+        await preloadImage(url);
+        if (!abort) {
+          setSrc(url);
+          setReady(true);
+        }
+        return;
+      }
+
       const r = await fetchTmdbPoster({ type, tmdbId: id });
       const finalPath =
         r?.poster_path || entry?.poster_path || entry?.backdrop_path || null;
@@ -2398,13 +2420,18 @@ export default function HistoryClient() {
   }, []);
 
   const loadAuth = useCallback(async () => {
+    if (session === "showverse" || account?.provider === "showverse") {
+      setAuth({ loading: false, connected: true });
+      return;
+    }
+
     try {
       const st = await traktAuthStatus();
       setAuth({ loading: false, connected: !!st?.connected && !st?.degraded });
     } catch {
       setAuth({ loading: false, connected: false });
     }
-  }, []);
+  }, [account?.provider, session]);
 
   const loadHistory = useCallback(async ({ reset = true } = {}) => {
     if (loadingHistoryRef.current) return;

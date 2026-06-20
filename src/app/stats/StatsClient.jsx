@@ -45,16 +45,9 @@ import "swiper/swiper-bundle.css";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 
-// Score fetching APIs
-import { getExternalIds } from "@/lib/api/tmdb";
-import { fetchOmdbByImdb } from "@/lib/api/omdb";
-import { traktGetScoreboard } from "@/lib/api/traktClient";
-
-// Score caching system identical to favorites
-const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v2";
-const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v2";
-const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v1";
+const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v7";
+const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v7";
+const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v2";
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
 
@@ -167,43 +160,6 @@ const useIsMobileLayout = (breakpointPx = 768) => {
   return isMobile;
 };
 
-function readScoreCache(source) {
-  if (typeof window === "undefined") return new Map();
-  try {
-    const key = `showverse:scores:${source}`;
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return new Map();
-
-    const parsed = JSON.parse(raw);
-    const now = Date.now();
-    const cache = new Map();
-
-    Object.entries(parsed).forEach(([id, entry]) => {
-      if (entry.t && now - entry.t < SCORE_CACHE_TTL_MS) {
-        cache.set(id, entry.score);
-      }
-    });
-
-    return cache;
-  } catch {
-    return new Map();
-  }
-}
-
-function updateScoreCache(source, id, score) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = `showverse:scores:${source}`;
-    const raw = window.localStorage.getItem(key);
-    const data = raw ? JSON.parse(raw) : {};
-
-    data[id] = { score, t: Date.now() };
-
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to update score cache:", e);
-  }
-}
 import {
   AreaChart,
   Area,
@@ -253,8 +209,84 @@ const CHART_THEME = {
   tooltipBorder: "#27272a",
 };
 
-const tmdbImg = (path, size = "w342") =>
-  path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+function privateMediaUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const lower = raw.toLowerCase();
+  if (lower.startsWith("data:image/")) {
+    return raw;
+  }
+
+  if (raw.startsWith("//")) {
+    return `https:${raw}`;
+  }
+
+  if (lower.startsWith("http://") || lower.startsWith("https://")) {
+    return raw;
+  }
+
+  if (
+    raw.startsWith("/uploads/") ||
+    raw.startsWith("/avatars/") ||
+    raw.startsWith("/profile/") ||
+    raw.startsWith("/images/") ||
+    raw.startsWith("/placeholder")
+  ) {
+    return raw;
+  }
+
+  if (/^\/[A-Za-z0-9_.-]+\.(avif|gif|jpe?g|png|webp)$/i.test(raw)) {
+    return `https://image.tmdb.org/t/p/w342${raw}`;
+  }
+
+  if (/^[A-Za-z0-9_.-]+\.(avif|gif|jpe?g|png|webp)$/i.test(raw)) {
+    return `https://image.tmdb.org/t/p/w342/${raw}`;
+  }
+
+  return null;
+}
+
+function fallbackPosterDataUrl(title, type, sectionColor = "indigo") {
+  const palette = {
+    emerald: ["#052e2b", "#10b981"],
+    yellow: ["#332400", "#eab308"],
+    indigo: ["#111827", "#6366f1"],
+    blue: ["#061b33", "#3b82f6"],
+    purple: ["#1f1235", "#a855f7"],
+    rose: ["#33111c", "#f43f5e"],
+  };
+  const [bg, accent] = palette[sectionColor] || palette.indigo;
+  const label = type === "movie" ? "PELICULA" : type === "person" ? "PERSONA" : "SERIE";
+  const words = String(title || "Sin titulo").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > 18 && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+    if (lines.length === 2) break;
+  }
+  if (current && lines.length < 3) lines.push(current);
+  const safeLines = (lines.length ? lines : ["Sin titulo"]).slice(0, 3);
+  const escapeSvgText = (value) =>
+    String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const text = safeLines
+    .map((line, index) => {
+      const y = 226 + index * 34;
+      return `<text x="32" y="${y}" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800">${escapeSvgText(line)}</text>`;
+    })
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="342" height="513" viewBox="0 0 342 513"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity=".55"/><stop offset=".42" stop-color="${bg}"/><stop offset="1" stop-color="#030712"/></linearGradient></defs><rect width="342" height="513" fill="url(#g)"/><rect x="24" y="24" width="294" height="465" rx="22" fill="none" stroke="${accent}" stroke-opacity=".35"/><text x="32" y="78" fill="${accent}" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900" letter-spacing="3">${label}</text>${text}<circle cx="286" cy="430" r="28" fill="${accent}" fill-opacity=".22"/><path d="M274 414 L302 430 L274 446 Z" fill="${accent}" fill-opacity=".9"/></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
@@ -271,13 +303,6 @@ const fmtDateShort = (iso) => {
     day: "numeric",
     month: "short",
   });
-};
-
-const starColor = (rating) => {
-  if (rating >= 9) return COLORS.yellow;
-  if (rating >= 7) return COLORS.emerald;
-  if (rating >= 5) return COLORS.indigo;
-  return COLORS.red;
 };
 
 const COLOR_STYLES = {
@@ -404,8 +429,13 @@ const processMonthlyActivity = (historyData) => {
 
 const processGenreDistribution = (genres) => {
   if (!genres) return [];
-  return Object.entries(genres)
-    .map(([name, value]) => ({ name, value }))
+  const entries = Array.isArray(genres)
+    ? genres.map((item) => [item?.name, item?.value ?? item?.count ?? 0])
+    : Object.entries(genres);
+
+  return entries
+    .map(([name, value]) => ({ name, value: Number(value || 0) }))
+    .filter((item) => item.name && item.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6); // Top 6 for Radar
 };
@@ -416,7 +446,7 @@ const processRatings = (ratingDist) => {
       name: rating,
       value: count,
     }))
-    .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+    .sort((a, b) => Number(a.name) - Number(b.name));
 };
 
 const processDayOfWeek = (historyData) => {
@@ -819,7 +849,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
     return null;
   }
 
-  const avatarUrl = user?.avatarUrl || null;
+  const avatarUrl = privateMediaUrl(user?.avatarUrl);
   const displayName = user.name || user.username || "Usuario";
 
   const actionButtons = (className = "") => (
@@ -852,7 +882,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           loading={syncing}
           activeColor="green"
           groupId="profile-header-actions"
-          title="Sincronizar"
+          title="Actualizar"
           className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
         >
           <RotateCcw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
@@ -870,7 +900,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           loading={syncing}
           activeColor="red"
           groupId="profile-header-actions"
-          title="Desconectar"
+          title="Cerrar sesión"
           className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
         >
           <LogOut className="w-5 h-5" />
@@ -1134,10 +1164,6 @@ function ProfileUnifiedCard({
   isScrollable = false,
 }) {
   const [err, setErr] = useState(false);
-  const [imdbScore, setImdbScore] = useState(null);
-  const [traktScore, setTraktScore] = useState(null);
-  const [loadingScores, setLoadingScores] = useState(false);
-
   // Extract media properties safely
   const media =
     type === "movie"
@@ -1158,13 +1184,6 @@ function ProfileUnifiedCard({
     Number.isFinite(Number(episodeSeason)) &&
     Number.isFinite(Number(episodeNumber));
 
-  // Extract TMDb score
-  const tmdbScore =
-    item?.episode?.vote_average ||
-    media?.vote_average ||
-    item?.vote_average ||
-    null;
-
   // Resolve links
   let href = "#";
   const mediaType = (type || item.type) === "movie" ? "movie" : "tv";
@@ -1177,151 +1196,6 @@ function ProfileUnifiedCard({
   } else {
     if (tmdbId) href = `/details/${mediaType}/${tmdbId}`;
   }
-
-  // Image source path
-  let path = media?.poster_path || media?.profile_path || null;
-  const src = tmdbImg(path, "w342");
-
-  // Load scores on hover if not in cache
-  const handleHover = useCallback(async () => {
-    if (
-      type === "person" ||
-      loadingScores ||
-      (imdbScore && traktScore) ||
-      !tmdbId
-    )
-      return;
-
-    setLoadingScores(true);
-
-    try {
-      const scoreType = isEpisodeCard ? "episode" : mediaType;
-      const itemId = isEpisodeCard
-        ? `${tmdbId}:s${episodeSeason}:e${episodeNumber}`
-        : String(tmdbId);
-
-      // Load IMDb score
-      if (!imdbScore) {
-        const cachedImdb = readScoreCache("imdb");
-        if (cachedImdb.has(itemId)) {
-          setImdbScore(cachedImdb.get(itemId));
-        } else {
-          try {
-            const imdbId = isEpisodeCard
-              ? item?.episode?.imdb_id
-              : (await getExternalIds(mediaType, tmdbId))?.imdb_id;
-
-            if (imdbId) {
-              const omdbData = await fetchOmdbByImdb(imdbId);
-              const imdbRating = omdbData?.imdbRating;
-
-              if (imdbRating && imdbRating !== "N/A") {
-                const numRating = parseFloat(imdbRating);
-                if (!isNaN(numRating)) {
-                  setImdbScore(numRating);
-                  updateScoreCache("imdb", itemId, numRating);
-                }
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch IMDb score for ${itemId}:`, err);
-          }
-        }
-      }
-
-      // Load Trakt score
-      if (!traktScore) {
-        const cachedTrakt = readScoreCache("trakt");
-        if (cachedTrakt.has(itemId)) {
-          setTraktScore(cachedTrakt.get(itemId));
-        } else {
-          try {
-            const traktData = await traktGetScoreboard({
-              type: scoreType,
-              tmdbId,
-              season: isEpisodeCard ? episodeSeason : undefined,
-              episode: isEpisodeCard ? episodeNumber : undefined,
-            });
-            const traktRating = traktData?.community?.rating;
-
-            if (
-              traktRating &&
-              typeof traktRating === "number" &&
-              !isNaN(traktRating)
-            ) {
-              setTraktScore(traktRating);
-              updateScoreCache("trakt", itemId, traktRating);
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch Trakt score for ${itemId}:`, err);
-          }
-        }
-      }
-    } finally {
-      setLoadingScores(false);
-    }
-  }, [
-    episodeNumber,
-    episodeSeason,
-    imdbScore,
-    isEpisodeCard,
-    item?.episode?.imdb_id,
-    loadingScores,
-    mediaType,
-    tmdbId,
-    traktScore,
-    type,
-  ]);
-
-  // Render top right badge
-  const renderTopRight = () => {
-    if (type === "person") {
-      return null;
-    }
-
-    return (
-      <div className="flex flex-col items-end gap-1">
-        {tmdbScore && (
-          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-            <span className="text-emerald-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
-              {Number(tmdbScore).toFixed(1)}
-            </span>
-            <OptimizedImage
-              src="/logo-TMDb.png"
-              alt=""
-              className="w-auto h-2 sm:h-2.5 opacity-100"
-            />
-          </div>
-        )}
-        {imdbScore && (
-          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-            <span className="text-yellow-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
-              {typeof imdbScore === "number" ? imdbScore.toFixed(1) : imdbScore}
-            </span>
-            <OptimizedImage
-              src="/logo-IMDb.svg"
-              alt=""
-              className="w-auto h-2.5 sm:h-3 opacity-100"
-            />
-          </div>
-        )}
-        {traktScore && (
-          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-            <span className="text-pink-400 text-[10px] sm:text-xs font-black font-mono tracking-tight">
-              {typeof traktScore === "number"
-                ? traktScore.toFixed(1)
-                : traktScore}
-            </span>
-            <OptimizedImage
-              src="/logo-Trakt.png"
-              alt=""
-              className="w-auto h-2 sm:h-2.5 opacity-100"
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const itemType = type || item.type;
   const isMedia =
@@ -1342,6 +1216,23 @@ function ProfileUnifiedCard({
     `0 10px 24px -18px rgba(${hoverShadowRgb}, 0.58)`,
     "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
   ].join(", ");
+  const path =
+    media?.poster_path ||
+    media?.posterPath ||
+    media?.profile_path ||
+    item?.poster_path ||
+    item?.posterPath ||
+    item?.profilePosterPath ||
+    media?.backdrop_path ||
+    item?.backdrop_path ||
+    null;
+  const fallbackSrc = fallbackPosterDataUrl(title, itemType, sectionColor);
+  const resolvedSrc = privateMediaUrl(path);
+  const src = err ? fallbackSrc : resolvedSrc || fallbackSrc;
+
+  useEffect(() => {
+    setErr(false);
+  }, [resolvedSrc, fallbackSrc]);
 
   return (
     <Link
@@ -1359,10 +1250,8 @@ function ProfileUnifiedCard({
         }}
         whileTap={{ y: -2 }}
         transition={{ type: "spring", stiffness: 360, damping: 26 }}
-        onMouseEnter={handleHover}
-        onFocus={handleHover}
       >
-        {src && !err ? (
+        {src ? (
           <OptimizedImage
             src={src}
             alt={title}
@@ -1405,11 +1294,6 @@ function ProfileUnifiedCard({
             #{rank}
           </div>
         )}
-
-        {/* Top hover overlay badges */}
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end p-3 opacity-0 transition-all duration-300 transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <div>{renderTopRight()}</div>
-        </div>
 
         {/* Bottom gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -1475,8 +1359,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
     logout,
   } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [peopleLoading, setPeopleLoading] = useState(false);
-  const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [data, setData] = useState(null);
   const [profileData, setProfileData] = useState(null);
@@ -1497,27 +1379,21 @@ export default function StatsClient({ connectNext = "/profile" }) {
     setError("");
     setNotConnected(false);
     setLoading(true);
-    setPeopleLoading(false);
-    setPeopleLoaded(false);
     setDeferredOverviewReady(false);
     setRefreshTick((tick) => tick + 1);
   }, []);
 
   const handleDisconnect = useCallback(async () => {
     try {
-      await logout();
       clearProfileSessionCache();
       setShowDisconnectModal(false);
-      setNotConnected(true);
-      setData(null);
-      setProfileData(null);
-      window.location.href = `/login?next=${encodeURIComponent(connectNext)}`;
+      await logout({ redirectTo: "/login" });
     } catch (e) {
       console.error("Error cerrando sesión:", e);
       setShowDisconnectModal(false);
       alert("Error al cerrar sesión. Por favor, inténtalo de nuevo.");
     }
-  }, [connectNext, logout]);
+  }, [logout]);
 
   useEffect(() => {
     let ignore = false;
@@ -1579,167 +1455,84 @@ export default function StatsClient({ connectNext = "/profile" }) {
       setLoading(false);
     };
 
-    const mergeStatsData = (json) => {
-      setData((prev) => {
-        const nextMoviesHaveArtwork = (json?.watchedMovies || []).some(
-          (item) => item?.movie?.poster_path,
-        );
-        const prevMoviesHaveArtwork = (prev?.watchedMovies || []).some(
-          (item) => item?.movie?.poster_path,
-        );
-        const nextShowsHaveArtwork = (json?.watchedShows || []).some(
-          (item) => item?.show?.poster_path,
-        );
-        const prevShowsHaveArtwork = (prev?.watchedShows || []).some(
-          (item) => item?.show?.poster_path,
-        );
-        const merged = {
-          ...json,
-          watchedMovies:
-            !nextMoviesHaveArtwork && prevMoviesHaveArtwork
-              ? prev.watchedMovies
-              : json?.watchedMovies || prev?.watchedMovies || [],
-          watchedShows:
-            !nextShowsHaveArtwork && prevShowsHaveArtwork
-              ? prev.watchedShows
-              : json?.watchedShows || prev?.watchedShows || [],
-          topActors:
-            Array.isArray(json?.topActors) && json.topActors.length
-              ? json.topActors
-              : prev?.topActors || [],
-          topDirectors:
-            Array.isArray(json?.topDirectors) && json.topDirectors.length
-              ? json.topDirectors
-              : prev?.topDirectors || [],
-        };
-        writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
-        return merged;
-      });
-    };
-
-    const refreshTopArtwork = async () => {
-      try {
-        const res = await fetch(
-          "/api/trakt/user-stats?historyLimit=0&includePeople=0&localizeTitles=1",
-          { cache: "no-store" },
-        );
-        if (ignore || !res.ok) return;
-        const json = await res.json();
-        if (ignore) return;
-        setData((prev) => {
-          if (!prev) return prev;
-          const merged = {
-            ...prev,
-            watchedMovies: Array.isArray(json?.watchedMovies)
-              ? json.watchedMovies
-              : prev.watchedMovies,
-            watchedShows: Array.isArray(json?.watchedShows)
-              ? json.watchedShows
-              : prev.watchedShows,
-          };
-          writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
-          return merged;
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
     const fetchData = async () => {
       setError("");
       if (!cachedStats) setLoading(true);
 
-      const userPromise =
-        cachedProfile?.user || cachedUser?.user
-          ? Promise.resolve()
-          : (async () => {
-              try {
-                const res = await fetch("/api/trakt/profile?userOnly=1", {
-                  cache: "no-store",
-                });
-                if (ignore) return;
-                if (res.status === 401) {
-                  applyShowVerseFallback();
-                  return;
-                }
-                if (!res.ok) return;
-                const json = await res.json();
-                if (ignore || !json?.user) return;
-                setProfileData((prev) => ({
-                  ...(prev || {}),
-                  user: json.user,
-                }));
-                writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
-                  user: json.user,
-                });
-              } catch (e) {
-                console.error(e);
-              }
-            })();
-
-      const statsPromise = (async () => {
-        try {
-          const res = await fetch(
-            "/api/trakt/user-stats?historyLimit=1500&includePeople=0&localizeTitles=0",
-            { cache: "no-store" },
-          );
-          if (ignore) return;
-          if (res.status === 401) {
+      try {
+        const res = await fetch("/api/profile", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (ignore) return;
+        if (res.status === 401) {
+          applyShowVerseFallback();
+          return;
+        }
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          if (authenticated) {
+            console.warn(
+              "No se pudo cargar el perfil desde el backend propio:",
+              json?.error || res.status,
+            );
             applyShowVerseFallback();
-            return;
-          }
-          if (!res.ok) {
-            const json = await res.json().catch(() => ({}));
-            if (authenticated) {
-              applyShowVerseFallback();
-            } else if (!cachedStats) {
-              setError(
-                json?.error || "No se pudieron cargar las estadísticas.",
-              );
-            }
-            return;
-          }
-
-          const json = await res.json();
-          if (ignore) return;
-          mergeStatsData(json);
-          refreshTopArtwork();
-        } catch (e) {
-          console.error(e);
-          if (!ignore && !cachedStats) {
+          } else if (!cachedStats) {
             setError("No se pudieron cargar las estadísticas.");
           }
-        } finally {
-          if (!ignore) setLoading(false);
+          return;
         }
-      })();
 
-      const profilePromise = (async () => {
-        try {
-          const res = await fetch("/api/trakt/profile?compact=1", {
-            cache: "no-store",
+        const json = await res.json();
+        if (ignore) return;
+
+        const profile = {
+          user: json.user || showVerseProfileUser,
+          recentHistory: Array.isArray(json.recentHistory)
+            ? json.recentHistory
+            : [],
+          recentRatings: Array.isArray(json.recentRatings)
+            ? json.recentRatings
+            : [],
+          watchlist: Array.isArray(json.watchlist) ? json.watchlist : [],
+        };
+
+        const statsPayload = {
+          ...createEmptyProfileStatsData(),
+          ...json,
+          source: "showverse",
+          stats: {
+            ...createEmptyProfileStatsData().stats,
+            ...(json.stats || {}),
+          },
+          history: Array.isArray(json.history) ? json.history : [],
+          watchedMovies: Array.isArray(json.watchedMovies)
+            ? json.watchedMovies
+            : [],
+          watchedShows: Array.isArray(json.watchedShows)
+            ? json.watchedShows
+            : [],
+          topActors: [],
+          topDirectors: [],
+        };
+
+        setProfileData(profile);
+        setData(statsPayload);
+        writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, profile);
+        writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, statsPayload);
+        if (profile.user) {
+          writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
+            user: profile.user,
           });
-          if (ignore) return;
-          if (res.status === 401) {
-            applyShowVerseFallback();
-            return;
-          }
-          if (!res.ok) return;
-          const json = await res.json();
-          if (ignore) return;
-          setProfileData(json);
-          writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, json);
-          if (json?.user) {
-            writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
-              user: json.user,
-            });
-          }
-        } catch (e) {
-          console.error(e);
         }
-      })();
-
-      await Promise.allSettled([userPromise, statsPromise, profilePromise]);
+      } catch (e) {
+        console.error(e);
+        if (!ignore && !cachedStats) {
+          setError("No se pudieron cargar las estadísticas.");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
     };
     fetchData();
 
@@ -1747,52 +1540,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
       ignore = true;
     };
   }, [authHydrated, authenticated, refreshTick, showVerseProfileUser]);
-
-  useEffect(() => {
-    if (!data || notConnected || peopleLoaded) return;
-    if (data.source === "showverse") return;
-    if ((data.topActors || []).length || (data.topDirectors || []).length) {
-      return;
-    }
-
-    let ignore = false;
-
-    const fetchPeople = async () => {
-      setPeopleLoading(true);
-      try {
-        const res = await fetch(
-          "/api/trakt/user-stats?peopleOnly=1&historyLimit=0&localizeTitles=0",
-          { cache: "no-store" },
-        );
-        if (!res.ok) return;
-        const json = await res.json();
-        if (ignore) return;
-        setData((prev) => {
-          if (!prev) return prev;
-          const merged = {
-            ...prev,
-            topActors: json.topActors || [],
-            topDirectors: json.topDirectors || [],
-          };
-          writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, merged);
-          return merged;
-        });
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (!ignore) {
-          setPeopleLoaded(true);
-          setPeopleLoading(false);
-        }
-      }
-    };
-
-    fetchPeople();
-
-    return () => {
-      ignore = true;
-    };
-  }, [data, notConnected, peopleLoaded]);
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -1855,12 +1602,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
       topShows: (data.watchedShows || [])
         .sort((a, b) => b.plays - a.plays)
         .slice(0, 15),
-      topMoviesReady: (data.watchedMovies || []).some(
-        (item) => item?.movie?.poster_path,
-      ),
-      topShowsReady: (data.watchedShows || []).some(
-        (item) => item?.show?.poster_path,
-      ),
+      topMoviesReady: (data.watchedMovies || []).length > 0,
+      topShowsReady: (data.watchedShows || []).length > 0,
       years: [
         ...new Set(history.map((h) => new Date(h.watched_at).getFullYear())),
       ].sort((a, b) => b - a),
@@ -2400,7 +2143,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         />
                         <ProfileCardScroller>
                           {stats.topMovies
-                            .filter((item) => item?.movie?.poster_path)
                             .slice(0, 15)
                             .map((item, idx) => (
                               <ProfileCardScrollerItem
@@ -2435,7 +2177,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         />
                         <ProfileCardScroller>
                           {stats.topShows
-                            .filter((item) => item?.show?.poster_path)
                             .slice(0, 15)
                             .map((item, idx) => (
                               <ProfileCardScrollerItem
@@ -2471,7 +2212,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="yellow"
                     />
                     <ProfileCardScroller>
-                      {stats.topActors.slice(0, 15).map((person, idx) => (
+                      {stats.topActors.slice(0, 15).map((person) => (
                         <ProfileCardScrollerItem key={person.id}>
                           <ProfileUnifiedCard
                             item={person}
@@ -2501,7 +2242,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       color="rose"
                     />
                     <ProfileCardScroller>
-                      {stats.topDirectors.slice(0, 15).map((person, idx) => (
+                      {stats.topDirectors.slice(0, 15).map((person) => (
                         <ProfileCardScrollerItem key={person.id}>
                           <ProfileUnifiedCard
                             item={person}
@@ -2685,18 +2426,21 @@ export default function StatsClient({ connectNext = "/profile" }) {
                             name="Votos"
                             radius={[4, 4, 0, 0]}
                           >
-                            {stats.ratingData.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={
-                                  index > 6
-                                    ? COLORS.teal
-                                    : index > 4
-                                      ? COLORS.yellow
-                                      : COLORS.rose
-                                }
-                              />
-                            ))}
+                            {stats.ratingData.map((entry, index) => {
+                              const rating = Number(entry.name);
+                              return (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    rating >= 7.5
+                                      ? COLORS.teal
+                                      : rating >= 5
+                                        ? COLORS.yellow
+                                        : COLORS.rose
+                                  }
+                                />
+                              );
+                            })}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
@@ -2766,10 +2510,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
             >
               <LogOut className="mx-auto mb-4 h-10 w-10 text-red-500" />
               <h2 className="mb-2 text-lg font-bold text-white">
-                ¿Desconectar Trakt?
+                ¿Cerrar sesión?
               </h2>
               <p className="mb-6 text-sm text-zinc-400">
-                Se eliminará la conexión con tu cuenta de Trakt.
+                Saldrás de tu cuenta de The Show Verse en este dispositivo.
               </p>
               <div className="flex gap-3">
                 <button
@@ -2784,7 +2528,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   onClick={handleDisconnect}
                   className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500"
                 >
-                  Desconectar
+                  Cerrar sesión
                 </button>
               </div>
             </motion.div>

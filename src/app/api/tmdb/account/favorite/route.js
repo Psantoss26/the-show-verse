@@ -9,7 +9,6 @@ import {
   clearTraktCookies,
 } from '@/lib/trakt/server'
 import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
-import { enrichMediaItemsWithTmdb } from '@/app/api/_utils/tmdbMetadata'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -46,24 +45,34 @@ async function syncFavoriteToTrakt({ token, mediaType, tmdbId, favorite }) {
   })
 }
 
+function mapBackendMediaItem(item) {
+  const mediaType = item.mediaType === 'movie' ? 'movie' : 'tv'
+  return {
+    ...item,
+    media_type: mediaType,
+    media_id: item.tmdbId,
+    id: item.tmdbId,
+    title: item.title || null,
+    name: item.title || null,
+    poster_path: item.posterPath || null,
+    backdrop_path: item.backdropPath || null,
+    release_date: item.releaseDate || null,
+    first_air_date: item.firstAirDate || null,
+    year: item.year || null,
+    genre_ids: Array.isArray(item.genreIds) ? item.genreIds : [],
+    genres: Array.isArray(item.genres) ? item.genres : [],
+    overview: item.overview || null,
+    vote_average: item.voteAverage ?? null,
+    user_rating: item.userRating ?? null,
+  }
+}
+
 // GET: List all favorites (movies + TV shows)
 export async function GET(req) {
   try {
     const backend = await backendFetchJson(req, '/v1/favorites?limit=500')
     if (backend.ok) {
-      const favoritesBase = (Array.isArray(backend.json?.results) ? backend.json.results : []).map((item) => ({
-        ...item,
-        media_type: item.mediaType,
-        media_id: item.tmdbId,
-        id: item.tmdbId,
-        title: item.title || null,
-        name: item.title || null,
-        poster_path: item.posterPath || null,
-      }))
-      const favorites = await enrichMediaItemsWithTmdb(favoritesBase, {
-        getId: (item) => item.id,
-        getType: (item) => item.media_type,
-      })
+      const favorites = (Array.isArray(backend.json?.results) ? backend.json.results : []).map(mapBackendMediaItem)
       const res = NextResponse.json({ favorites, source: 'backend' })
       setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
       return res

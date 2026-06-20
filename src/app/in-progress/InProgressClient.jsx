@@ -161,9 +161,9 @@ function getProgressColor(pct) {
 // ----------------------------
 // SHARED CACHE / IMAGES
 // ----------------------------
-const IN_PROGRESS_CACHE_KEY = "showverse:trakt:in-progress:v1";
+const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v2";
 const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
-const COMPLETED_CACHE_KEY = "showverse:trakt:completed:v1";
+const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v2";
 const COMPLETED_CACHE_TTL = 1000 * 60 * 10;
 
 const buildImg = (path, size = "w500") => {
@@ -375,6 +375,17 @@ function SmartPoster({ item, title }) {
     setReady(false);
 
     const load = async () => {
+      const cachedPath = item.poster_path || item.backdrop_path || null;
+      if (cachedPath) {
+        const url = buildImg(cachedPath, "w500");
+        await preloadImage(url);
+        if (!abort) {
+          setSrc(url);
+          setReady(true);
+        }
+        return;
+      }
+
       const pref = getPosterPreference(type, id);
       if (pref) {
         const url = buildImg(pref, "w500");
@@ -443,6 +454,17 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     setReady(false);
 
     const load = async () => {
+      const cachedPath = item.backdrop_path || item.poster_path || null;
+      if (cachedPath) {
+        const url = buildImg(cachedPath, item.backdrop_path ? "w1280" : "w500");
+        await preloadImage(url);
+        if (!abort) {
+          setSrc(url);
+          setReady(true);
+        }
+        return;
+      }
+
       const best = await getBestBackdropCached(type, id);
       const finalPath = best || item.backdrop_path || item.poster_path || null;
       const url = finalPath
@@ -1257,12 +1279,29 @@ export default function InProgressClient({
     };
 
     const bootstrap = async () => {
-      if (!initialAuthLoading && !initialAuthConnected) {
-        markDisconnected();
-        return;
-      }
-
       try {
+        if (session === "showverse" || account?.provider === "showverse") {
+          setAuth({ loading: false, connected: true });
+          const cached = readSessionCache(
+            IN_PROGRESS_CACHE_KEY,
+            IN_PROGRESS_CACHE_TTL,
+          );
+          if (cached?.items || cached?.stats) {
+            setItems(Array.isArray(cached?.items) ? cached.items : []);
+            setStats(cached?.stats || null);
+            setDataLoaded(true);
+            void loadData({ background: true });
+          } else {
+            void loadData();
+          }
+          return;
+        }
+
+        if (!initialAuthLoading && !initialAuthConnected) {
+          markDisconnected();
+          return;
+        }
+
         const statusRes = await fetch("/api/trakt/auth/status", {
           cache: "no-store",
           credentials: "include",
@@ -1304,7 +1343,7 @@ export default function InProgressClient({
     return () => {
       cancelled = true;
     };
-  }, [initialAuthConnected, initialAuthLoading, loadData]);
+  }, [account?.provider, initialAuthConnected, initialAuthLoading, loadData, session]);
 
   // Cargar completadas desde sessionStorage si hay caché disponible
   useEffect(() => {

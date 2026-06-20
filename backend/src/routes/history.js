@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { watchHistory } from '../db/schema.js';
 import { eq, and, desc, gte, lte, inArray, isNotNull } from 'drizzle-orm';
+import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
 
 const addHistorySchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -62,7 +63,10 @@ export default async function historyRoutes(fastify) {
       .limit(safeLimit)
       .offset(offset);
 
-    return reply.send({ results: items, page: safePage, limit: safeLimit });
+    const metadataByKey = await getMediaMetadataMap(items);
+    const results = items.map((item) => hydrateMediaRow(item, metadataByKey));
+
+    return reply.send({ results, page: safePage, limit: safeLimit });
   });
 
   // ──────────────────────────────────────────────

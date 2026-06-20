@@ -3,8 +3,9 @@
 
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { watchlist } from '../db/schema.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { watchlist, userRatings } from '../db/schema.js';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
 
 const itemSchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -45,7 +46,29 @@ export default async function watchlistRoutes(fastify) {
       .limit(safeLimit)
       .offset(offset);
 
-    return reply.send({ results: items, page: safePage, limit: safeLimit });
+    const tmdbIds = [...new Set(items.map((item) => item.tmdbId).filter(Boolean))];
+    const [metadataByKey, ratings] = await Promise.all([
+      getMediaMetadataMap(items),
+      tmdbIds.length
+        ? db
+            .select({
+              tmdbId: userRatings.tmdbId,
+              mediaType: userRatings.mediaType,
+              rating: userRatings.rating,
+            })
+            .from(userRatings)
+            .where(and(eq(userRatings.userId, req.user.id), inArray(userRatings.tmdbId, tmdbIds)))
+        : [],
+    ]);
+    const ratingByKey = new Map(
+      ratings.map((rating) => [`${rating.mediaType}:${rating.tmdbId}`, rating.rating])
+    );
+    const results = items.map((item) => ({
+      ...hydrateMediaRow(item, metadataByKey),
+      userRating: ratingByKey.get(`${item.mediaType}:${item.tmdbId}`) ?? null,
+    }));
+
+    return reply.send({ results, page: safePage, limit: safeLimit });
   });
 
   // POST /watchlist — Añadir a watchlist

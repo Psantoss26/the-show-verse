@@ -115,7 +115,7 @@ const SCORE_CACHE_ACTIVE_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_RECENT_TTL_MS = 12 * 60 * 60 * 1000;
 const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v2";
+const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v2";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -961,7 +961,12 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path = cachedBackdrop || storedBackdrop || null;
+    const path =
+      cachedBackdrop ||
+      storedBackdrop ||
+      item.backdrop_path ||
+      item.poster_path ||
+      null;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -969,7 +974,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || null;
+  const path = cachedPoster || storedPoster || item.poster_path || item.backdrop_path || null;
   return path ? buildImg(path, "w500") : null;
 }
 
@@ -1012,7 +1017,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         return;
       }
 
-      const best = await getBestPosterCached(type, id);
+      const best = item.poster_path ? null : await getBestPosterCached(type, id);
       const finalPath = best || item.poster_path || item.backdrop_path || null;
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
