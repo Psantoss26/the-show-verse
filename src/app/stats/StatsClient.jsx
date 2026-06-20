@@ -912,13 +912,13 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   return (
     <div className="flex min-w-0 items-center gap-4 sm:gap-5 w-full">
       {/* Clean Avatar Box */}
-      <div className="h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32 flex-shrink-0 overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
+      <div className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 flex-shrink-0 overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
         {avatarUrl ? (
           <OptimizedImage
             src={avatarUrl}
             alt={displayName}
-            width={128}
-            height={128}
+            width={144}
+            height={144}
             loading="eager"
             fetchPriority="high"
             decoding="sync"
@@ -926,7 +926,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-            <span className="text-4xl sm:text-5xl font-black text-white">
+            <span className="text-4xl sm:text-5xl md:text-6xl font-black text-white">
               {displayName[0]?.toUpperCase() || "?"}
             </span>
           </div>
@@ -953,7 +953,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           )}
           {actionButtons("shrink-0")}
         </div>
-        <p className="mt-1 text-xs sm:text-sm font-medium text-zinc-500">
+        <p className="mt-1 text-xs sm:text-sm font-medium text-zinc-500 hidden sm:block">
           @{user.username}
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 font-medium">
