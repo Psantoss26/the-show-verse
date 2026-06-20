@@ -2487,7 +2487,8 @@ export default function FavoritesClient() {
           setItems(favoritesWithMeta);
           writeFavoritesCache(favoritesWithMeta, rated);
 
-          if (!favoritesListSyncInFlight) {
+          const isShowverse = session === "showverse" || account?.provider === "showverse";
+          if (!isShowverse && !favoritesListSyncInFlight) {
             favoritesListSyncInFlight = syncOverflowFavoritesToTraktList(
               favoritesWithMeta,
             )

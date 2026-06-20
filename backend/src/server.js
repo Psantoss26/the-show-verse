@@ -92,10 +92,19 @@ await fastify.register(fastifySwaggerUi, {
   transformStaticCSP: (header) => header,
 });
 
-// Rate limiting global
+
+
+// ────────────────────────────────────────────
+// Plugin de autenticación
+// ────────────────────────────────────────────
+await fastify.register(authPlugin);
+
+// Rate limiting global (ejecutado en preHandler para tener req.user disponible)
 await fastify.register(fastifyRateLimit, {
   max: 200,
   timeWindow: '1 minute',
+  hook: 'preHandler',
+  allowList: (req) => req.user?.username === 'psantos26',
   redis: await (async () => {
     try {
       const r = getRedis();
@@ -112,11 +121,6 @@ await fastify.register(fastifyRateLimit, {
     message: 'Rate limit exceeded. Please wait before retrying.',
   }),
 });
-
-// ────────────────────────────────────────────
-// Plugin de autenticación
-// ────────────────────────────────────────────
-await fastify.register(authPlugin);
 
 // ────────────────────────────────────────────
 // ────────────────────────────────────────────
