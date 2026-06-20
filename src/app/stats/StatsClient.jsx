@@ -910,169 +910,73 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   );
 
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        className={`${PROFILE_GLASS_SURFACE} flex min-h-[184px] min-w-0 flex-col justify-end rounded-[2rem] px-5 py-5 sm:min-h-[200px] sm:px-6 sm:py-6 lg:hidden`}
-      >
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          {avatarUrl ? (
-            <>
-              <OptimizedImage
-                src={avatarUrl}
-                alt=""
-                aria-hidden="true"
-                loading="eager"
-                fetchPriority="high"
-                decoding="sync"
-                className="absolute inset-0 h-full w-full scale-105 object-cover object-top opacity-24 blur-xl"
-              />
-              <div className="absolute right-0 top-0 h-full w-[72%] [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.05)_18%,rgba(0,0,0,0.28)_34%,rgba(0,0,0,0.7)_54%,black_76%)] sm:w-[68%]">
-                <OptimizedImage
-                  src={avatarUrl}
-                  alt=""
-                  aria-hidden="true"
-                  loading="eager"
-                  decoding="async"
-                  className="h-full w-full object-cover object-top opacity-95 [mask-image:linear-gradient(to_bottom,black_0%,black_42%,rgba(0,0,0,0.64)_66%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_42%,rgba(0,0,0,0.64)_66%,transparent_100%)]"
-                />
-              </div>
-            </>
-          ) : (
-            <div className="absolute right-0 top-0 h-full w-[68%] [mask-image:linear-gradient(to_right,transparent,black_45%)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_45%)]">
-              <div className="h-full w-full bg-gradient-to-r from-transparent via-indigo-600/20 to-purple-700/25 [mask-image:linear-gradient(to_bottom,black_0%,black_48%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_48%,transparent_100%)]" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(99,102,241,0.12),transparent_42%),linear-gradient(90deg,rgba(10,10,10,0.98)_0%,rgba(10,10,10,0.9)_34%,rgba(10,10,10,0.54)_58%,rgba(10,10,10,0.16)_100%)]" />
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/58 to-transparent [mask-image:linear-gradient(to_right,black_0%,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0%,black_50%,transparent_100%)]" />
-        </div>
-
-        <div className="relative z-10 min-w-0 pr-24 sm:pr-28">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="h-px w-12 bg-indigo-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
-              Tu cuenta
+    <div className="flex min-w-0 items-center gap-4 sm:gap-5 w-full">
+      {/* Clean Avatar Box */}
+      <div className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 flex-shrink-0 overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
+        {avatarUrl ? (
+          <OptimizedImage
+            src={avatarUrl}
+            alt={displayName}
+            width={112}
+            height={112}
+            loading="eager"
+            fetchPriority="high"
+            decoding="sync"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
+            <span className="text-3xl sm:text-4xl font-black text-white">
+              {displayName[0]?.toUpperCase() || "?"}
             </span>
           </div>
-          <div className="flex min-w-0 items-center">
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <h1 className="min-w-0 truncate text-4xl font-black tracking-tighter leading-none text-white md:text-6xl">
-                  {displayName}
-                  <span className="text-indigo-500">.</span>
-                </h1>
-                {user.vip && (
-                  <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
-                    VIP
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <p className="mt-1 text-sm font-medium text-zinc-500">
-            @{user.username}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-            {user.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {user.location}
-              </span>
-            )}
-            {user.joined_at && (
-              <span className="flex items-center gap-1">
-                <CalendarIcon className="h-3 w-3" />
-                Desde {fmtDate(user.joined_at)}
-              </span>
-            )}
-          </div>
-          {user.about && (
-            <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
-              {user.about}
-            </p>
-          )}
+        )}
+      </div>
+
+      {/* User text details & Inline actions */}
+      <div className="min-w-0 flex-1">
+        <div className="mb-1.5 flex items-center gap-3">
+          <div className="h-px w-10 bg-indigo-500" />
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-indigo-400">
+            Tu cuenta
+          </span>
         </div>
-
-        {actionButtons("absolute bottom-5 right-5 z-20 sm:bottom-6 sm:right-6")}
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        className="hidden min-w-0 items-center gap-5 lg:flex"
-      >
-        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-3xl ring-2 ring-indigo-500/35 shadow-2xl shadow-indigo-500/10">
-          {avatarUrl ? (
-            <OptimizedImage
-              src={avatarUrl}
-              alt={displayName}
-              width={112}
-              height={112}
-              loading="eager"
-              fetchPriority="high"
-              decoding="sync"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-              <span className="text-4xl font-black text-white">
-                {displayName[0]?.toUpperCase() || "?"}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="h-px w-12 bg-indigo-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
-              Tu cuenta
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 min-w-0">
+          <h1 className="min-w-0 truncate text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-none text-white">
+            {displayName}
+            <span className="text-indigo-500">.</span>
+          </h1>
+          {user.vip && (
+            <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase text-yellow-400">
+              VIP
             </span>
-          </div>
-          <div className="flex min-w-0 items-center gap-5">
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <h1 className="min-w-0 truncate text-6xl font-black tracking-tighter leading-none text-white">
-                  {displayName}
-                  <span className="text-indigo-500">.</span>
-                </h1>
-                {user.vip && (
-                  <span className="shrink-0 rounded-full border border-yellow-500/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-400">
-                    VIP
-                  </span>
-                )}
-              </div>
-            </div>
-            {actionButtons("shrink-0")}
-          </div>
-          <p className="mt-2 text-sm font-medium text-zinc-500">
-            @{user.username}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-            {user.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {user.location}
-              </span>
-            )}
-            {user.joined_at && (
-              <span className="flex items-center gap-1">
-                <CalendarIcon className="h-3 w-3" />
-                Desde {fmtDate(user.joined_at)}
-              </span>
-            )}
-          </div>
-          {user.about && (
-            <p className="mt-2 line-clamp-1 max-w-lg text-sm text-zinc-400">
-              {user.about}
-            </p>
+          )}
+          {actionButtons("shrink-0")}
+        </div>
+        <p className="mt-1 text-xs sm:text-sm font-medium text-zinc-500">
+          @{user.username}
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 font-medium">
+          {user.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {user.location}
+            </span>
+          )}
+          {user.joined_at && (
+            <span className="flex items-center gap-1">
+              <CalendarIcon className="h-3 w-3" />
+              Desde {fmtDate(user.joined_at)}
+            </span>
           )}
         </div>
-      </motion.div>
-    </>
+        {user.about && (
+          <p className="mt-2 line-clamp-1 max-w-lg text-xs sm:text-sm text-zinc-400">
+            {user.about}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
