@@ -50,71 +50,96 @@ async function tmdb(path, params = {}, options = {}) {
 
   // En servidor: timeout más corto, caching por defecto
   // En cliente: dejamos más margen al usuario
-  const { timeoutMs = 8000, ...fetchOptions } = options;
+  const { timeoutMs = 8000, retries = 1, ...fetchOptions } = options;
+  const attempts = Math.max(1, Number(retries || 0) + 1);
+  let lastError = null;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    // En servidor: cacheamos y revalidamos cada 10 min por defecto.
-    // En cliente: no-store (el browser ya gestiona su propio cache HTTP).
-    const baseInit = IS_SERVER
-      ? {
-          cache: "force-cache",
-          next: { revalidate: 60 * 10 }, // 10 minutos
+    try {
+      // En servidor: cacheamos y revalidamos cada 10 min por defecto.
+      // En cliente: no-store (el browser ya gestiona su propio cache HTTP).
+      const baseInit = IS_SERVER
+        ? {
+            cache: "force-cache",
+            next: { revalidate: 60 * 10 }, // 10 minutos
+          }
+        : {
+            cache: "no-store",
+          };
+
+      const res = await fetch(buildUrl(path, params), {
+        ...baseInit,
+        ...fetchOptions, // permite override: cache, next, headers...
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const text = await res.text().catch(() => "");
+      let json = {};
+      if (text) {
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = {};
         }
-      : {
-          cache: "no-store",
-        };
+      }
 
-    const res = await fetch(buildUrl(path, params), {
-      ...baseInit,
-      ...fetchOptions, // permite override: cache, next, headers...
-      signal: controller.signal,
-    });
+      if (!res.ok) {
+        // 404 / status_code 34 => recurso inexistente
+        if (res.status === 404 || json?.status_code === 34) {
+          return null;
+        }
 
-    clearTimeout(timeoutId);
+        if (res.status >= 500 && attempt < attempts - 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 250 * (attempt + 1)),
+          );
+          continue;
+        }
 
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      // 404 / status_code 34 => recurso inexistente
-      if (res.status === 404 || json?.status_code === 34) {
-        // Si quieres ver algo en dev, descomenta:
-        // if (process.env.NODE_ENV === 'development') {
-        //   console.warn('TMDb recurso no encontrado:', path)
-        // }
+        console.warn("TMDb error:", res.status, path, json);
         return null;
       }
 
-      console.error("TMDb error:", res.status, json);
+      return json;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      lastError = e;
+      const code = e?.code || e?.cause?.code;
+
+      if (
+        attempt < attempts - 1 &&
+        e?.name !== "AbortError" &&
+        code !== "UND_ERR_ABORTED"
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 250 * (attempt + 1)),
+        );
+        continue;
+      }
+
+      // Abort típico por cambio de ruta / navegación / timeout
+      if (e?.name === "AbortError" || code === "UND_ERR_ABORTED") {
+        return null;
+      }
+
+      // Timeout de conexión real hasta TMDb
+      if (code === "UND_ERR_CONNECT_TIMEOUT") {
+        console.warn("[TMDb] Timeout de conexión con TMDb en", path);
+        return null;
+      }
+
+      console.error("TMDb fetch error:", path, e);
       return null;
     }
-
-    return json;
-  } catch (e) {
-    clearTimeout(timeoutId);
-    const code = e?.code || e?.cause?.code;
-
-    // Abort típico por cambio de ruta / navegación / timeout
-    if (e?.name === "AbortError" || code === "UND_ERR_ABORTED") {
-      // Estos aborts son normales al navegar, NO queremos ruido:
-      // Si quieres debug, puedes activar el log:
-      // if (process.env.NODE_ENV === 'development') {
-      //   console.warn('[TMDb] Petición abortada (timeout/navegación):', path)
-      // }
-      return null;
-    }
-
-    // Timeout de conexión real hasta TMDb
-    if (code === "UND_ERR_CONNECT_TIMEOUT") {
-      console.warn("[TMDb] Timeout de conexión con TMDb en", path);
-      return null;
-    }
-
-    console.error("TMDb fetch error:", path, e);
-    return null;
   }
+
+  if (lastError) console.error("TMDb fetch error:", path, lastError);
+  return null;
 }
 
 /* -------------------- Películas (Movies) -------------------- */
@@ -287,28 +312,13 @@ export async function fetchDramaTV() {
   return data?.results || [];
 }
 
-export async function getWatchProviders(type, id, region = "ES") {
-  if (!API_KEY) {
-    return { providers: [], link: null };
-  }
-
-  const res = await fetch(
-    `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`,
-    { next: { revalidate: 60 * 60 } }, // opcional: cache 1h
-  );
-
-  if (!res.ok) {
-    console.error("Error watch/providers", await res.text());
-    return { providers: [], link: null };
-  }
-
-  const data = await res.json();
-
+export function normalizeWatchProvidersData(data, region = "ES") {
+  const results = data?.results || {};
   // Elegimos el país: primero region (ES), luego US, luego el primero que haya
   const country =
-    data.results?.[region] ??
-    data.results?.US ??
-    Object.values(data.results || {})[0];
+    results?.[region] ??
+    results?.US ??
+    Object.values(results)[0];
 
   if (!country) return { providers: [], link: null };
 
@@ -339,6 +349,20 @@ export async function getWatchProviders(type, id, region = "ES") {
   );
 
   return { providers, link: baseLink };
+}
+
+export async function getWatchProviders(type, id, region = "ES") {
+  if (!API_KEY || !type || !id) {
+    return { providers: [], link: null };
+  }
+
+  const data = await tmdb(
+    `/${type}/${id}/watch/providers`,
+    { language: undefined },
+    { next: { revalidate: 60 * 60 }, retries: 2 },
+  );
+
+  return normalizeWatchProvidersData(data || {}, region);
 }
 
 /* -------------------- Detalles / Imágenes / IDs externos -------------------- */
@@ -396,6 +420,38 @@ export async function getLogos(type, id) {
     pool[0],
   );
   return best?.file_path || null;
+}
+
+export async function getImages(
+  type,
+  id,
+  includeImageLanguage = "en,en-US,es,es-ES,null",
+) {
+  if (!type || !id) return { posters: [], backdrops: [] };
+  const data = await tmdb(
+    `/${type}/${id}/images`,
+    {
+      language: undefined,
+      include_image_language: includeImageLanguage,
+    },
+    { retries: 2 },
+  );
+  return {
+    posters: Array.isArray(data?.posters) ? data.posters : [],
+    backdrops: Array.isArray(data?.backdrops) ? data.backdrops : [],
+  };
+}
+
+export async function getVideos(type, id, language = "es-ES") {
+  if (!type || !id) return { results: [] };
+  const data = await tmdb(
+    `/${type}/${id}/videos`,
+    { language },
+    { retries: 2 },
+  );
+  return {
+    results: Array.isArray(data?.results) ? data.results : [],
+  };
 }
 
 export async function getRecommendations(type, id) {

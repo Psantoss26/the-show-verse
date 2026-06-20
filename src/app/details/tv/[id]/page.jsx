@@ -3,6 +3,9 @@ import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
 export const revalidate = 600;
 
+const DETAILS_APPEND_TO_RESPONSE =
+  "external_ids,images,videos,credits,reviews";
+
 export async function generateMetadata({ params }) {
   const p = await params;
   const id = p?.id;
@@ -24,7 +27,7 @@ export default async function TvDetailsPage({ params }) {
   }
 
   const data = await getDetails("tv", id, {
-    appendToResponse: "external_ids",
+    appendToResponse: DETAILS_APPEND_TO_RESPONSE,
   });
 
   if (!data) {
