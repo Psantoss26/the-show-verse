@@ -1130,7 +1130,16 @@ function InlinePreviewCard({ movie, heightClass }) {
 /* ---------- Sección reusable (cada fila) ---------- */
 function Row({ title, items, isMobile, posterCacheRef }) {
   const reduceMotion = useReducedMotion();
-  const safeItems = Array.isArray(items) ? items : EMPTY_ARRAY;
+  const safeItems = useMemo(() => {
+    if (!Array.isArray(items)) return EMPTY_ARRAY;
+    const seen = new Set();
+    return items.filter((m) => {
+      if (!m || m.id === undefined) return false;
+      if (seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
+  }, [items]);
   const hasItems = safeItems.length > 0;
 
   // ✅ Detectar si es una fila de género específico
