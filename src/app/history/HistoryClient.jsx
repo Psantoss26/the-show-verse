@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
@@ -2428,7 +2429,8 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 // MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
-  const { session, account, hydrated: authHydrated } = useAuth();
+  const { session, account, hydrated: authHydrated, preferences, updatePreference, authenticated } = useAuth();
+  const { t } = useTranslation();
   const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
@@ -2445,7 +2447,29 @@ export default function HistoryClient() {
   const hasMoreHistoryRef = useRef(false);
 
   // UI States
-  const [viewMode, setViewMode] = useState("compact");
+  const [viewMode, setViewModeState] = useState("compact");
+
+  useEffect(() => {
+    if (preferences?.defaultView) {
+      setViewModeState(preferences.defaultView);
+    } else {
+      const saved = window.localStorage.getItem("showverse:history:viewMode");
+      if (saved === "list" || saved === "grid" || saved === "compact") {
+        setViewModeState(saved);
+      }
+    }
+  }, [preferences?.defaultView]);
+
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("showverse:history:viewMode", mode);
+    }
+    if (authenticated) {
+      updatePreference({ defaultView: mode });
+    }
+  }, [authenticated, updatePreference]);
+
   const [groupBy, setGroupBy] = useState("day");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date-desc");
@@ -2480,17 +2504,6 @@ export default function HistoryClient() {
       hasMoreHistoryRef.current = cached.hasMore;
     }
 
-    const savedViewMode = window.localStorage.getItem(
-      "showverse:history:viewMode",
-    );
-    if (
-      savedViewMode === "list" ||
-      savedViewMode === "grid" ||
-      savedViewMode === "compact"
-    ) {
-      setViewMode(savedViewMode);
-    }
-
     const savedGroupBy = window.localStorage.getItem(
       "showverse:history:groupBy",
     );
@@ -2508,10 +2521,6 @@ export default function HistoryClient() {
   }, []);
 
   // Persistir estados de UI en localStorage
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem("showverse:history:viewMode", viewMode);
-  }, [hydrated, viewMode]);
   useEffect(() => {
     if (!hydrated) return;
     window.localStorage.setItem("showverse:history:groupBy", groupBy);

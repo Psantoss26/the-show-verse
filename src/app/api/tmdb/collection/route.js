@@ -1,13 +1,17 @@
 // /src/app/api/tmdb/collection/route.js
 import { NextResponse } from 'next/server'
 
+import { cookies } from 'next/headers'
+
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 const TMDB_API = 'https://api.themoviedb.org/3'
 
-function buildTmdbUrl(path, params = {}) {
+async function buildTmdbUrl(path, params = {}) {
+    const cookieStore = await cookies()
+    const locale = cookieStore.get('showverse_locale')?.value || 'es-ES'
     const url = new URL(`${TMDB_API}${path}`)
     url.searchParams.set('api_key', TMDB_KEY || '')
-    url.searchParams.set('language', 'es-ES')
+    url.searchParams.set('language', locale)
     Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)))
     return url.toString()
 }
@@ -27,7 +31,8 @@ export async function GET(req) {
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
-        const c = await fetchJson(buildTmdbUrl(`/collection/${id}`), { cache: 'no-store' })
+        const tmdbUrl = await buildTmdbUrl(`/collection/${id}`)
+        const c = await fetchJson(tmdbUrl, { cache: 'no-store' })
         const parts = Array.isArray(c?.parts) ? c.parts : []
 
         // orden natural por fecha si existe

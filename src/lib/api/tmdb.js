@@ -6,6 +6,14 @@ const BASE_URL = "https://api.themoviedb.org/3";
 const IS_SERVER = typeof window === "undefined";
 
 /* -------------------- Helper unificado -------------------- */
+function getLocaleFromCookie() {
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    const match = document.cookie.match(/showverse_locale=([^;]+)/);
+    if (match) return match[1];
+  }
+  return "es-ES";
+}
+
 function buildUrl(path, params = {}) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
@@ -13,7 +21,8 @@ function buildUrl(path, params = {}) {
   url.searchParams.set("api_key", API_KEY || "");
 
   if (!("language" in params)) {
-    url.searchParams.set("language", "es-ES");
+    const locale = getLocaleFromCookie();
+    url.searchParams.set("language", locale);
   }
 
   Object.entries(params).forEach(([k, v]) => {

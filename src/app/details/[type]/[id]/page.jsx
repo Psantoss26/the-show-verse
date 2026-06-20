@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
+import { cookies } from "next/headers";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -15,7 +16,10 @@ export async function generateMetadata({ params }) {
     return { title: "Detalles" };
   }
 
-  const data = await getDetails(type, id).catch(() => null);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
+
+  const data = await getDetails(type, id, { language: locale }).catch(() => null);
   return {
     title: data?.title || data?.name || "Detalles",
   };
@@ -30,8 +34,12 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
+
   const data = await getDetails(type, id, {
     appendToResponse: DETAILS_APPEND_TO_RESPONSE,
+    language: locale,
   });
 
   if (!data) {

@@ -1,13 +1,15 @@
-// /src/app/api/tmdb/collections/search/route.js
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
 
-function buildTmdbUrl(path, params = {}) {
+async function buildTmdbUrl(path, params = {}) {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
   const url = new URL(`${TMDB_API}${path}`);
   url.searchParams.set("api_key", TMDB_KEY || "");
-  url.searchParams.set("language", "es-ES");
+  url.searchParams.set("language", locale);
   Object.entries(params).forEach(
     ([k, v]) => v != null && url.searchParams.set(k, String(v)),
   );
@@ -34,8 +36,9 @@ export async function GET(request) {
     }
 
     // Buscar colecciones que coincidan
+    const searchUrl = await buildTmdbUrl("/search/collection", { query, page: 1 });
     const searchRes = await fetchJson(
-      buildTmdbUrl("/search/collection", { query, page: 1 }),
+      searchUrl,
       { cache: "force-cache", next: { revalidate: 3600 } },
     );
 
@@ -45,7 +48,8 @@ export async function GET(request) {
     const collections = await Promise.all(
       results.slice(0, 20).map(async (item) => {
         try {
-          const c = await fetchJson(buildTmdbUrl(`/collection/${item.id}`), {
+          const detailUrl = await buildTmdbUrl(`/collection/${item.id}`);
+          const c = await fetchJson(detailUrl, {
             cache: "force-cache",
             next: { revalidate: 3600 },
           });

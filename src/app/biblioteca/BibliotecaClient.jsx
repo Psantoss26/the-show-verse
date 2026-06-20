@@ -35,6 +35,9 @@ import {
   Star,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/lib/i18n";
+
 
 // ================== CONSTANTS ==================
 
@@ -999,6 +1002,9 @@ function LibraryMediaCard({
 // ================== MAIN COMPONENT ==================
 
 export default function BibliotecaClient() {
+  const { preferences, updatePreference, authenticated } = useAuth();
+  const { t } = useTranslation();
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -1009,12 +1015,29 @@ export default function BibliotecaClient() {
   const [resFilter, setResFilter] = useState("all");
   const [sortBy, setSortBy] = useState("added-desc");
   const [groupBy, setGroupBy] = useState("none");
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return "grid";
-    return (
-      window.localStorage.getItem("showverse:biblioteca:viewMode") || "grid"
-    );
-  });
+  const [viewMode, setViewModeState] = useState("grid");
+
+  useEffect(() => {
+    if (preferences?.defaultView) {
+      setViewModeState(preferences.defaultView);
+    } else {
+      const saved = window.localStorage.getItem("showverse:biblioteca:viewMode");
+      if (saved === "list" || saved === "grid" || saved === "compact") {
+        setViewModeState(saved);
+      }
+    }
+  }, [preferences?.defaultView]);
+
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("showverse:biblioteca:viewMode", mode);
+    }
+    if (authenticated) {
+      updatePreference({ defaultView: mode });
+    }
+  }, [authenticated, updatePreference]);
+
   const [imageMode, setImageMode] = useState(() => {
     if (typeof window === "undefined") return "poster";
     return (
@@ -1049,12 +1072,6 @@ export default function BibliotecaClient() {
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  // Persist view preferences
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("showverse:biblioteca:viewMode", viewMode);
-  }, [viewMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

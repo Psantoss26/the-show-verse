@@ -1,0 +1,157 @@
+import { useAuth } from "@/context/AuthContext";
+
+const translations = {
+  "es-ES": {
+    nav_home: "Inicio",
+    nav_movies: "Películas",
+    nav_series: "Series",
+    nav_discover: "Descubrir",
+    nav_library: "Biblioteca",
+    nav_lists: "Listas",
+    nav_calendar: "Calendario",
+    nav_in_progress: "En Progreso",
+    nav_history: "Historial",
+    nav_favorites: "Favoritas",
+    nav_watchlist: "Pendientes",
+    nav_login: "Iniciar sesión",
+    nav_access: "Acceder",
+    nav_logout: "Cerrar sesión",
+    nav_settings: "Configuración",
+    search_placeholder: "Buscar películas, series, actores o colecciones...",
+    search_mobile_placeholder: "Buscar...",
+    
+    // Detail pages
+    detail_overview: "Sinopsis",
+    detail_cast: "Reparto principal",
+    detail_videos: "Videos y Tráilers",
+    detail_reviews: "Reseñas de la comunidad",
+    detail_status: "Estado",
+    detail_release_date: "Fecha de estreno",
+    detail_seasons: "Temporadas",
+    detail_episodes: "Episodios",
+    detail_genres: "Géneros",
+    detail_duration: "Duración",
+    
+    // Library / Lists
+    lib_title: "Tu Biblioteca",
+    lib_search: "Buscar en tu biblioteca...",
+    fav_title: "Tus Favoritos",
+    watch_title: "Tu Lista de Pendientes",
+    hist_title: "Tu Historial de Visionado",
+    view_grid: "Grid",
+    view_list: "Lista",
+    view_compact: "Compacta",
+    empty_state: "No se encontraron elementos",
+    
+    // Settings
+    settings_title: "Configuración",
+    settings_account: "Tu cuenta",
+    settings_back: "Volver al perfil",
+    settings_personal: "Ajustes personales",
+    settings_def_view: "Vista por defecto",
+    settings_lang: "Idioma",
+    settings_adult: "Contenido adulto",
+    settings_adult_desc: "Permite incluir contenido adulto en búsquedas y recomendaciones compatibles.",
+    settings_refresh: "Autorefresco del perfil",
+    settings_refresh_desc: "Actualiza estadísticas cuando vuelves desde una importación o cambio importante.",
+    settings_compact: "Tarjetas compactas",
+    settings_compact_desc: "Preferencia preparada para vistas de perfil y biblioteca con más densidad visual.",
+    settings_sync_trakt: "Sincronizar acciones con Trakt",
+    settings_sync_trakt_desc: "Mantiene Trakt como integración opcional para acciones nuevas cuando esté conectado.",
+    settings_weekly: "Resumen semanal",
+    settings_weekly_desc: "Preferencia de notificaciones para futuros correos o paneles semanales.",
+    settings_imports: "Importaciones",
+    settings_import_trakt: "Importar desde Trakt",
+    settings_import_trakt_desc: "Trae tu historial de visionado y tus puntuaciones a The Show Verse.",
+    settings_import_tmdb: "Importar desde TMDb",
+    settings_import_tmdb_desc: "Trae tus favoritos, pendientes y puntuaciones antiguas a The Show Verse.",
+    settings_connect: "Conectar",
+    settings_import_now: "Importar ahora",
+    settings_importing: "Importando...",
+    settings_imported: "Importado",
+    settings_saving: "Guardando",
+    settings_saved: "Guardado"
+  },
+  "en-US": {
+    nav_home: "Home",
+    nav_movies: "Movies",
+    nav_series: "TV Shows",
+    nav_discover: "Discover",
+    nav_library: "Library",
+    nav_lists: "Lists",
+    nav_calendar: "Calendar",
+    nav_in_progress: "In Progress",
+    nav_history: "History",
+    nav_favorites: "Favorites",
+    nav_watchlist: "Watchlist",
+    nav_login: "Log in",
+    nav_access: "Access",
+    nav_logout: "Log out",
+    nav_settings: "Settings",
+    search_placeholder: "Search movies, shows, actors or collections...",
+    search_mobile_placeholder: "Search...",
+    
+    // Detail pages
+    detail_overview: "Overview",
+    detail_cast: "Main Cast",
+    detail_videos: "Videos & Trailers",
+    detail_reviews: "Community Reviews",
+    detail_status: "Status",
+    detail_release_date: "Release Date",
+    detail_seasons: "Seasons",
+    detail_episodes: "Episodes",
+    detail_genres: "Genres",
+    detail_duration: "Duration",
+    
+    // Library / Lists
+    lib_title: "Your Library",
+    lib_search: "Search in library...",
+    fav_title: "Your Favorites",
+    watch_title: "Your Watchlist",
+    hist_title: "Your Watch History",
+    view_grid: "Grid",
+    view_list: "List",
+    view_compact: "Compact",
+    empty_state: "No items found",
+    
+    // Settings
+    settings_title: "Settings",
+    settings_account: "Your account",
+    settings_back: "Back to Profile",
+    settings_personal: "Personal settings",
+    settings_def_view: "Default view",
+    settings_lang: "Language",
+    settings_adult: "Adult content",
+    settings_adult_desc: "Allows adult content in compatible searches and recommendations.",
+    settings_refresh: "Auto-refresh profile",
+    settings_refresh_desc: "Update stats when returning from an import or major change.",
+    settings_compact: "Compact cards",
+    settings_compact_desc: "Preference for profile and library views with higher visual density.",
+    settings_sync_trakt: "Sync actions with Trakt",
+    settings_sync_trakt_desc: "Keep Trakt as an optional integration for new actions when connected.",
+    settings_weekly: "Weekly summary",
+    settings_weekly_desc: "Notification preference for future weekly emails or dashboards.",
+    settings_imports: "Imports",
+    settings_import_trakt: "Import from Trakt",
+    settings_import_trakt_desc: "Bring your watch history and ratings to The Show Verse.",
+    settings_import_tmdb: "Import from TMDb",
+    settings_import_tmdb_desc: "Bring your favorites, watchlist and old ratings to The Show Verse.",
+    settings_connect: "Connect",
+    settings_import_now: "Import now",
+    settings_importing: "Importing...",
+    settings_imported: "Imported",
+    settings_saving: "Saving",
+    settings_saved: "Saved"
+  }
+};
+
+export function useTranslation() {
+  const { preferences } = useAuth();
+  const lang = preferences?.language === "en-US" ? "en-US" : "es-ES";
+
+  const t = (key, defaultText) => {
+    return translations[lang]?.[key] || defaultText || key;
+  };
+
+  return { t, lang };
+}
