@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import TraktHistoryNavButton from "@/components/trakt/TraktHistoryNavButton";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
+import NetflixSyncListener from "@/components/NetflixSyncListener";
 
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
@@ -1085,6 +1086,7 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+      <NetflixSyncListener />
     </>
   );
 }

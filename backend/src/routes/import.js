@@ -1,7 +1,7 @@
 // src/routes/import.js
 // Importacion puntual desde Trakt.tv hacia la base de datos propia.
 
-import { eq } from 'drizzle-orm';
+import { eq, and, desc, gt } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   favorites,
@@ -10,6 +10,7 @@ import {
   userRatings,
   watchHistory,
   watchlist,
+  connectedAccounts,
 } from '../db/schema.js';
 
 const TRAKT_BASE = 'https://api.trakt.tv';
@@ -247,6 +248,31 @@ function makeStep(status, data = {}) {
   };
 }
 
+function mapNetflixHistoryItem(item, userId) {
+  const tmdbId = Number(item?.tmdbId);
+  const mediaType = item?.mediaType === 'tv' ? 'tv' : item?.mediaType === 'movie' ? 'movie' : null;
+  if (!tmdbId || !mediaType) return null;
+
+  const watchedAt = item?.watchedAt ? new Date(item.watchedAt) : new Date();
+  if (Number.isNaN(watchedAt.getTime())) return null;
+
+  const season = item?.season ? Number(item.season) : null;
+  const episode = item?.episode ? Number(item.episode) : null;
+  if (mediaType === 'tv' && (!season || !episode)) return null;
+
+  return {
+    userId,
+    tmdbId,
+    mediaType,
+    season: mediaType === 'tv' ? season : null,
+    episode: mediaType === 'tv' ? episode : null,
+    watchedAt,
+    runtimeMins: item?.runtimeMins ? Number(item.runtimeMins) : null,
+    title: item?.title || null,
+    posterPath: item?.posterPath || null,
+  };
+}
+
 function mergeStepData(current = {}, next = {}) {
   return {
     status: next.status || current.status || 'done',
@@ -292,6 +318,25 @@ async function importHistoryValues(userId, traktHistory = []) {
     fetched: traktHistory.length,
     imported,
     skipped: sourceValues.length - values.length,
+  };
+}
+
+async function importNetflixHistoryValues(userId, netflixHistory = []) {
+  const sourceValues = dedupeBy(
+    netflixHistory.map((item) => mapNetflixHistoryItem(item, userId)).filter(Boolean),
+    historyKey,
+  );
+
+  const existing = await db.select().from(watchHistory).where(eq(watchHistory.userId, userId));
+  const existingKeys = new Set(existing.map(historyKey));
+  const values = sourceValues.filter((item) => !existingKeys.has(historyKey(item)));
+  const imported = values.length ? await insertInChunks(watchHistory, values) : 0;
+
+  return {
+    status: 'done',
+    fetched: netflixHistory.length,
+    imported,
+    skipped: netflixHistory.length - imported,
   };
 }
 
@@ -461,6 +506,89 @@ function normalizeMode(mode) {
   if (mode === 'all') return 'all';
   return 'history_ratings';
 }
+
+const netflixSimulateList = [
+  {
+    tmdbId: 66732, // Stranger Things
+    mediaType: 'tv',
+    season: 4,
+    episode: 2,
+    title: 'Stranger Things: Capítulo dos: La maldición de Vecna',
+    posterPath: '/49WJfeN0mhmmQ9R6w4DjaRrk7uP.jpg',
+  },
+  {
+    tmdbId: 66732, // Stranger Things
+    mediaType: 'tv',
+    season: 4,
+    episode: 3,
+    title: 'Stranger Things: Capítulo tres: El monstruo y la superheroína',
+    posterPath: '/49WJfeN0mhmmQ9R6w4DjaRrk7uP.jpg',
+  },
+  {
+    tmdbId: 119051, // Wednesday
+    mediaType: 'tv',
+    season: 1,
+    episode: 2,
+    title: 'Miércoles: El sombrío encanto de la soledad',
+    posterPath: '/9pf1T92r66mdmV9ehw584n5767P.jpg',
+  },
+  {
+    tmdbId: 119051, // Wednesday
+    mediaType: 'tv',
+    season: 1,
+    episode: 3,
+    title: 'Miércoles: Amistad, penuria y problemas',
+    posterPath: '/9pf1T92r66mdmV9ehw584n5767P.jpg',
+  },
+  {
+    tmdbId: 93405, // Squid Game
+    mediaType: 'tv',
+    season: 1,
+    episode: 2,
+    title: 'El juego del calamar: Infierno',
+    posterPath: '/zN4170sl4F4Ty5A8l7V946IOypZ.jpg',
+  },
+  {
+    tmdbId: 76900, // Cobra Kai
+    mediaType: 'tv',
+    season: 5,
+    episode: 1,
+    title: 'Cobra Kai: Largo camino a casa',
+    posterPath: '/z71oeG8U26N2x9eBv87DIB955Wg.jpg',
+  },
+  {
+    tmdbId: 96677, // Lupin
+    mediaType: 'tv',
+    season: 1,
+    episode: 1,
+    title: 'Lupin: Capítulo 1',
+    posterPath: '/sg7ahr0Yj99n7fSvtcu80HBsVMU.jpg',
+  },
+  {
+    tmdbId: 60735, // Peaky Blinders
+    mediaType: 'tv',
+    season: 6,
+    episode: 1,
+    title: 'Peaky Blinders: Un día negro',
+    posterPath: '/bOGk429ekjJg9251Q26TjO4HOEw.jpg',
+  },
+  {
+    tmdbId: 108978, // Los Bridgerton
+    mediaType: 'tv',
+    season: 2,
+    episode: 1,
+    title: 'Los Bridgerton: Un libertino con todas las letras',
+    posterPath: '/7uQz4aMv5241n7wE5W44BwL6A0G.jpg',
+  },
+  {
+    tmdbId: 82856, // The Witcher
+    mediaType: 'tv',
+    season: 3,
+    episode: 1,
+    title: 'The Witcher: Festival de la reina de mayo',
+    posterPath: '/9G55zN3H37O6N281W4F4N279B.jpg',
+  }
+];
 
 export default async function importRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
@@ -691,6 +819,115 @@ export default async function importRoutes(fastify) {
   fastify.get('/tmdb/status', async (req, reply) => {
     const progress = importProgress.get(progressKey(req.user.id, 'tmdb'));
     return reply.send(progress || { status: 'idle', steps: {} });
+  });
+
+  // POST /import/netflix/data/chunk - importa historial de Netflix ya resuelto a IDs de TMDb.
+  fastify.post('/netflix/data/chunk', async (req, reply) => {
+    const { history = [] } = req.body || {};
+    if (!Array.isArray(history)) {
+      return reply.status(400).send({ error: 'history must be an array' });
+    }
+    if (history.length > 1000) {
+      return reply.status(413).send({ error: 'Import chunk is too large' });
+    }
+
+    const userId = req.user.id;
+    const key = progressKey(userId, 'netflix');
+    importProgress.set(key, {
+      status: 'running',
+      mode: 'history',
+      startedAt: new Date(),
+      completedAt: null,
+      steps: {
+        history: makeStep('loading', { fetched: history.length }),
+      },
+      error: null,
+      source: 'netflix-csv',
+    });
+
+    const progress = importProgress.get(key);
+    try {
+      const result = await importNetflixHistoryValues(userId, history);
+      progress.steps.history = makeStep('done', result);
+      progress.status = 'done';
+      progress.completedAt = new Date();
+      return reply.send(progress);
+    } catch (err) {
+      progress.status = 'error';
+      progress.error = err.message;
+      progress.completedAt = new Date();
+      req.log.error({ err, userId }, 'Netflix import failed');
+      return reply.status(500).send(progress);
+    }
+  });
+
+  fastify.get('/netflix/status', async (req, reply) => {
+    const progress = importProgress.get(progressKey(req.user.id, 'netflix'));
+    return reply.send(progress || { status: 'idle', steps: {} });
+  });
+
+  // POST /import/netflix/simulate - Simular visionado de Netflix
+  fastify.post('/netflix/simulate', async (req, reply) => {
+    const randomIndex = Math.floor(Math.random() * netflixSimulateList.length);
+    const item = netflixSimulateList[randomIndex];
+    const watchedAt = new Date();
+
+    const [inserted] = await db
+      .insert(watchHistory)
+      .values({
+        userId: req.user.id,
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+        season: item.season || null,
+        episode: item.episode || null,
+        watchedAt,
+        title: item.title,
+        posterPath: item.posterPath,
+      })
+      .returning();
+
+    return reply.send({
+      success: true,
+      item: inserted,
+    });
+  });
+
+  // GET /import/netflix/poll - Polling para nuevos visionados de Netflix
+  fastify.get('/netflix/poll', async (req, reply) => {
+    const { since } = req.query;
+    const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 1000);
+
+    // Verificar si Netflix está conectado para este usuario
+    const [netflixConn] = await db
+      .select()
+      .from(connectedAccounts)
+      .where(
+        and(
+          eq(connectedAccounts.userId, req.user.id),
+          eq(connectedAccounts.provider, 'netflix')
+        )
+      )
+      .limit(1);
+
+    if (!netflixConn) {
+      return reply.send({ results: [], polledAt: new Date().toISOString() });
+    }
+
+    const recentItems = await db
+      .select()
+      .from(watchHistory)
+      .where(
+        and(
+          eq(watchHistory.userId, req.user.id),
+          gt(watchHistory.watchedAt, sinceDate)
+        )
+      )
+      .orderBy(desc(watchHistory.watchedAt));
+
+    return reply.send({
+      results: recentItems,
+      polledAt: new Date().toISOString(),
+    });
   });
 }
 

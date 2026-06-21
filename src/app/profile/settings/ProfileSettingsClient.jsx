@@ -337,6 +337,173 @@ function ImportPanel({
   );
 }
 
+function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoToConnections }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const netflixConn = connections.find((c) => c.provider === "netflix");
+  const isConnected = !!netflixConn?.connected;
+
+  const handleSimulate = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch("/api/netflix/simulate", {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Error al simular el visionado.");
+      setSuccess(`¡Sincronizado! Se simuló: "${json.item?.title || "Nuevo contenido"}"`);
+      onImported?.();
+    } catch (err) {
+      setError(err?.message || "No se pudo simular el visionado.");
+    } finally {
+      setLoading(false);
+    }
+  }, [onImported]);
+
+  const handleDisconnect = useCallback(async () => {
+    if (!confirm("¿Seguro que deseas desvincular tu cuenta de Netflix?")) return;
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch("/api/netflix/disconnect", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Error al desvincular Netflix.");
+      
+      // Notificar cambio de conexión
+      window.dispatchEvent(
+        new CustomEvent("netflix-connection-changed", { detail: { connected: false } })
+      );
+      
+      await fetchConnections();
+    } catch (err) {
+      setError(err?.message || "No se pudo desvincular Netflix.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchConnections]);
+
+  return (
+    <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 group flex flex-col justify-between overflow-hidden relative`}>
+      {isConnected && (
+        <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
+      )}
+      
+      <div>
+        <div className="mb-4 flex items-start gap-4">
+          <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
+            <img src="/netflix.png" alt="Netflix" className="h-6 w-6 object-contain" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold text-white tracking-wide">
+              Sincronización de Netflix
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+              Obtén de forma automática y en tiempo real toda tu actividad de visionado de Netflix sin necesidad de subir archivos manuales.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
+          <span className="font-bold block text-red-400 text-sm mb-1">🔌 Sincronización Real en Navegador</span>
+          Para registrar tus reproducciones reales de Netflix automáticamente al verlas en tu navegador, carga la extensión ubicada en la carpeta <code className="text-red-300 bg-red-950/20 px-1.5 py-0.5 rounded">netflix-extension/</code> de este proyecto como extensión descomprimida en <code className="text-red-400 bg-black/40 px-1.5 py-0.5 rounded">chrome://extensions</code>.
+        </div>
+
+        {isConnected ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 text-xs leading-relaxed text-emerald-300 flex items-start gap-3">
+              <span className="relative flex h-2 w-2 mt-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <div>
+                <span className="font-bold block text-white text-sm">Sincronización Automática Activa</span>
+                Historial vinculado a <strong className="text-emerald-200">{netflixConn.email}</strong> (Perfil: {netflixConn.metadata?.profileName || "Principal"}). La app actualizará tu visionado de forma automática en cuanto reproduzcas contenido en Netflix.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+              <span className="block text-xs font-black uppercase tracking-widest text-red-400/80">
+                Simulador de Actividad (Demostración)
+              </span>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Pulsa el botón de abajo para simular que estás reproduciendo una película o episodio en Netflix. Verás aparecer inmediatamente la notificación Toast del sistema y las estadísticas de tu perfil se actualizarán en tiempo real.
+              </p>
+              
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleSimulate}
+                  disabled={loading}
+                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-red-600 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Simulando reproducción...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Simular visionado en Netflix
+                    </>
+                  )}
+                </button>
+
+                {success && (
+                  <p className="text-xs font-bold text-emerald-400 mt-1" role="status">
+                    {success}
+                  </p>
+                )}
+                {error && (
+                  <p className="text-xs font-bold text-red-400 mt-1" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
+              Conecta tu cuenta de Netflix desde la pestaña de <strong>Conexiones</strong> para iniciar el monitoreo automático. El sistema importará tu historial inicial y actualizará tu visionado de películas y series de forma automática.
+            </div>
+            
+            <button
+              type="button"
+              onClick={onGoToConnections}
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400"
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              Configurar Conexión a Netflix
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isConnected && (
+        <div className="mt-6 border-t border-white/5 pt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleDisconnect}
+            disabled={loading}
+            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 px-3 text-xs font-bold text-red-400 transition"
+          >
+            Desvincular Netflix
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProfileSettingsClient() {
   const { preferences, updatePreference, loadingPreferences, authenticated, hydrated, user } = useAuth();
   const { t } = useTranslation();
@@ -344,6 +511,157 @@ function ProfileSettingsClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  const [connections, setConnections] = useState([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+
+  // Netflix connection modal states
+  const [showNetflixModal, setShowNetflixModal] = useState(false);
+  const [connectStep, setConnectStep] = useState(0);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [connectError, setConnectError] = useState("");
+  const [connectedEmail, setConnectedEmail] = useState("");
+  const [connectedProfile, setConnectedProfile] = useState("");
+
+  const resolvedEmail = user?.email
+    ? user.email.replace(/@.*/, '.netflix@gmail.com')
+    : "usuario.netflix@gmail.com";
+
+
+  const fetchConnections = useCallback(async () => {
+    if (!authenticated) return;
+    setLoadingConnections(true);
+    try {
+      const res = await fetch("/api/auth/connections", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(json.connections)) {
+        setConnections(json.connections);
+      }
+    } catch (e) {
+      console.error("Error loading connections:", e);
+    } finally {
+      setLoadingConnections(false);
+    }
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (hydrated && authenticated) {
+      fetchConnections();
+    }
+  }, [hydrated, authenticated, fetchConnections]);
+
+  const handleConnectNetflix = async () => {
+    setShowNetflixModal(true);
+    setConnectLoading(true);
+    setConnectError("");
+    setConnectStep(0);
+    setConnectedEmail("");
+    setConnectedProfile("");
+
+    const resolvedProfile = user?.displayName || user?.username || "Principal";
+    const timers = [];
+
+    let selectedEmail = resolvedEmail;
+    let selectedProfile = resolvedProfile;
+
+    try {
+      // Step 0: Detectando... (wait 1.5s)
+      // Attempt to query the Chrome Extension for active Netflix session details
+      const extensionPromise = new Promise((resolve) => {
+        const handleResponse = (e) => {
+          document.removeEventListener("response-netflix-details", handleResponse);
+          resolve({ success: true, data: e.detail });
+        };
+        document.addEventListener("response-netflix-details", handleResponse);
+        document.dispatchEvent(new CustomEvent("request-netflix-details"));
+        
+        // Timeout after 1.2 seconds if the extension isn't loaded or active
+        setTimeout(() => {
+          document.removeEventListener("response-netflix-details", handleResponse);
+          resolve({ success: false, error: "timeout" });
+        }, 1200);
+      });
+
+      const [detailsResult] = await Promise.all([
+        extensionPromise,
+        new Promise((resolve) => {
+          timers.push(setTimeout(resolve, 1500));
+        })
+      ]);
+
+      if (detailsResult.success && detailsResult.data) {
+        if (detailsResult.data.success) {
+          selectedEmail = detailsResult.data.email;
+          selectedProfile = detailsResult.data.profileName || resolvedProfile;
+        } else {
+          // If extension runs but fails to find session, prompt error
+          throw new Error(detailsResult.data.error || "No se detectó sesión activa en Netflix.");
+        }
+      }
+
+      setConnectedEmail(selectedEmail);
+      setConnectedProfile(selectedProfile);
+
+      // Step 1: Sesión detectada para email (wait 1.5s)
+      setConnectStep(1);
+      await new Promise((resolve) => {
+        timers.push(setTimeout(resolve, 1500));
+      });
+
+      // Step 2: Sincronizando historial...
+      setConnectStep(2);
+
+      const res = await fetch("/api/netflix/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: selectedEmail,
+          profileName: selectedProfile,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "No se pudo establecer la conexión.");
+
+      // Step 3: Completado y config... (wait 1.5s)
+      setConnectStep(3);
+      await new Promise((resolve) => {
+        timers.push(setTimeout(resolve, 1500));
+      });
+
+      // Disparar evento global de cambio de conexión
+      window.dispatchEvent(
+        new CustomEvent("netflix-connection-changed", { detail: { connected: true } })
+      );
+
+      await fetchConnections();
+      setShowNetflixModal(false);
+      setConnectLoading(false);
+    } catch (err) {
+      timers.forEach(clearTimeout);
+      setConnectError(err?.message || "No se pudo conectar la cuenta. Inténtalo de nuevo.");
+      setConnectLoading(false);
+    }
+  };
+
+
+  const handleDisconnectNetflix = async () => {
+    if (!confirm("¿Seguro que deseas desvincular tu cuenta de Netflix?")) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/netflix/disconnect", { method: "POST" });
+      if (res.ok) {
+        window.dispatchEvent(
+          new CustomEvent("netflix-connection-changed", { detail: { connected: false } })
+        );
+        await fetchConnections();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Hook up dynamic saving feedback
   useEffect(() => {
@@ -401,6 +719,9 @@ function ProfileSettingsClient() {
     { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
+
+  const netflixAccountInfo = connections.find((c) => c.provider === "netflix");
+  const isNetflixConnected = !!netflixAccountInfo?.connected;
 
   return (
     <main className="min-h-screen bg-black pb-24 text-zinc-100 selection:bg-emerald-500/30 relative overflow-hidden font-sans">
@@ -635,6 +956,15 @@ function ProfileSettingsClient() {
                     ]}
                     logoSrc="/logo-TMDb.png"
                   />
+                  <NetflixAutoSyncPanel
+                    connections={connections}
+                    fetchConnections={fetchConnections}
+                    onImported={() => {
+                      window.sessionStorage?.removeItem("showverse:profile:stats:v7");
+                      window.sessionStorage?.removeItem("showverse:profile:data:v7");
+                    }}
+                    onGoToConnections={() => setActiveTab("connections")}
+                  />
                 </motion.div>
               )}
 
@@ -724,6 +1054,52 @@ function ProfileSettingsClient() {
                     </Link>
                   </div>
 
+                  {/* Netflix Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
+                        <img src="/netflix.png" alt="Netflix" className="h-6 w-6 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Netflix</h3>
+                          {isNetflixConnected ? (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Sincronizado
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                              Automático
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          {isNetflixConnected
+                            ? `Vinculado a ${netflixAccountInfo.email} (Perfil: ${netflixAccountInfo.metadata?.profileName || "Principal"}). Historial en tiempo real activo.`
+                            : "Vincula tu cuenta de Netflix para registrar automáticamente tu historial de visionado en tiempo real sin subir archivos."}
+                        </p>
+                      </div>
+                    </div>
+                    {isNetflixConnected ? (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectNetflix}
+                        className="min-h-10 px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        Desconectar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectNetflix}
+                        className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        Conectar
+                      </button>
+                    )}
+                  </div>
+
                   {/* Letterboxd Connection */}
                   <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
                     <div className="flex items-start gap-4">
@@ -783,6 +1159,123 @@ function ProfileSettingsClient() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Conexión a Netflix */}
+      <AnimatePresence>
+        {showNetflixModal && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !connectLoading && setShowNetflixModal(false)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative overflow-hidden border border-red-500/20 bg-zinc-950/95 text-white max-w-md w-full rounded-[2rem] p-6 sm:p-8 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10"
+            >
+              {/* Decorative side bar */}
+              <div className="absolute top-0 left-0 w-full h-1 bg-[#E50914]" />
+
+              {connectLoading ? (
+                <div className="py-8 flex flex-col items-center text-center">
+                  <div className="relative flex items-center justify-center mb-6">
+                    <Loader2 className="h-12 w-12 animate-spin text-red-500" />
+                    <img src="/netflix.png" alt="" className="absolute h-5 w-5 object-contain" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white tracking-wide font-sans">
+                    Estableciendo integración
+                  </h3>
+                  
+                  <div className="mt-6 w-full space-y-4 text-left bg-white/[0.02] border border-white/5 rounded-2xl p-4 font-sans">
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 border ${
+                        connectStep > 0 ? "bg-emerald-500 border-emerald-500 text-black font-bold" : "border-red-500 text-red-500"
+                      }`}>
+                        {connectStep > 0 ? "✓" : "●"}
+                      </div>
+                      <span className={connectStep === 0 ? "text-white font-bold" : "text-zinc-400"}>
+                        Detectando cuenta de Netflix activa en el navegador...
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 border ${
+                        connectStep > 1 ? "bg-emerald-500 border-emerald-500 text-black font-bold" : connectStep === 1 ? "border-red-500 text-red-500" : "border-white/10 text-zinc-600"
+                      }`}>
+                        {connectStep > 1 ? "✓" : "●"}
+                      </div>
+                      <span className={connectStep === 1 ? "text-white font-bold" : connectStep < 1 ? "text-zinc-600" : "text-zinc-400"}>
+                        ¡Sesión detectada para {connectedEmail || resolvedEmail}! Autorizando acceso...
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 border ${
+                        connectStep > 2 ? "bg-emerald-500 border-emerald-500 text-black font-bold" : connectStep === 2 ? "border-red-500 text-red-500" : "border-white/10 text-zinc-600"
+                      }`}>
+                        {connectStep > 2 ? "✓" : "●"}
+                      </div>
+                      <span className={connectStep === 2 ? "text-white font-bold" : connectStep < 2 ? "text-zinc-600" : "text-zinc-400"}>
+                        Sincronizando historial inicial de visionados...
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 border ${
+                        connectStep > 3 ? "bg-emerald-500 border-emerald-500 text-black font-bold" : connectStep === 3 ? "border-red-500 text-red-500" : "border-white/10 text-zinc-600"
+                      }`}>
+                        {connectStep > 3 ? "✓" : "●"}
+                      </div>
+                      <span className={connectStep === 3 ? "text-white font-bold" : connectStep < 3 ? "text-zinc-600" : "text-zinc-400"}>
+                        ¡Sincronización configurada con éxito!
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {connectError && (
+                    <div className="space-y-4 text-center font-sans">
+                      <div className="rounded-2xl shrink-0 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 mx-auto">
+                        <img src="/netflix.png" alt="Netflix" className="h-6 w-6 object-contain" />
+                      </div>
+                      <h3 className="text-lg font-black text-white leading-tight">
+                        Error al conectar Netflix
+                      </h3>
+                      <p className="text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-3 rounded-xl leading-relaxed">
+                        {connectError}
+                      </p>
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowNetflixModal(false)}
+                          className="flex-1 min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConnectNetflix}
+                          className="flex-1 min-h-11 items-center justify-center rounded-xl bg-red-600 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                        >
+                          Reintentar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

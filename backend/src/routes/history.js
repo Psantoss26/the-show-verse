@@ -73,8 +73,10 @@ export default async function historyRoutes(fastify) {
   // POST /history — Añadir entrada al historial
   // ──────────────────────────────────────────────
   fastify.post('/', async (req, reply) => {
+    console.log('[Backend /v1/history] POST request body:', JSON.stringify(req.body));
     const parsed = addHistorySchema.safeParse(req.body);
     if (!parsed.success) {
+      console.error('[Backend /v1/history] Zod validation failed:', parsed.error.issues);
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 

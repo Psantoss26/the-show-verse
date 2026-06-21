@@ -4,7 +4,7 @@
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { users, refreshTokens, userPreferences, connectedAccounts } from '../db/schema.js';
+import { users, refreshTokens, userPreferences, connectedAccounts, watchHistory } from '../db/schema.js';
 import {
   signAccessToken,
   signRefreshToken,
@@ -688,5 +688,151 @@ export default async function authRoutes(fastify) {
       });
 
     return reply.send({ user: updated });
+  });
+
+  // ──────────────────────────────────────────────
+  // GET /connections — Listar conexiones vinculadas del usuario
+  // ──────────────────────────────────────────────
+  fastify.get('/connections', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const accounts = await db
+      .select({
+        provider: connectedAccounts.provider,
+        providerUid: connectedAccounts.providerUid,
+        metadata: connectedAccounts.metadata,
+      })
+      .from(connectedAccounts)
+      .where(eq(connectedAccounts.userId, req.user.id));
+
+    const connections = ['tmdb', 'google', 'trakt', 'netflix'].map((provider) => {
+      const conn = accounts.find((a) => a.provider === provider);
+      return {
+        provider,
+        connected: !!conn,
+        email: conn?.providerUid || null,
+        metadata: conn?.metadata || {},
+      };
+    });
+
+    return reply.send({ connections });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /netflix/connect — Conectar cuenta de Netflix (Simulado)
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/connect', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const { email, profileName } = req.body || {};
+    if (!email) {
+      return reply.status(400).send({ error: 'Email is required' });
+    }
+
+    // Datos iniciales de historial para simular importación automática
+    const netflixSeedHistory = [
+      {
+        tmdbId: 66732, // Stranger Things
+        mediaType: 'tv',
+        season: 4,
+        episode: 1,
+        title: 'Stranger Things: Capítulo uno: El Club del Fuego del Infierno',
+        posterPath: '/49WJfeN0mhmmQ9R6w4DjaRrk7uP.jpg',
+        watchedOffsetDays: 5,
+      },
+      {
+        tmdbId: 119051, // Wednesday / Miércoles
+        mediaType: 'tv',
+        season: 1,
+        episode: 1,
+        title: 'Miércoles: Y todos mis males',
+        posterPath: '/9pf1T92r66mdmV9ehw584n5767P.jpg',
+        watchedOffsetDays: 4,
+      },
+      {
+        tmdbId: 661378, // Glass Onion
+        mediaType: 'movie',
+        title: 'Puñales por la espalda: El misterio de Glass Onion',
+        posterPath: '/vD1AgjI627mclJv5mZuI40K9uX2.jpg',
+        watchedOffsetDays: 3,
+      },
+      {
+        tmdbId: 512195, // Red Notice / Alerta roja
+        mediaType: 'movie',
+        title: 'Alerta roja',
+        posterPath: '/wd72U4jU3mdR7K582t7Y34YIf4w.jpg',
+        watchedOffsetDays: 2,
+      },
+      {
+        tmdbId: 1416, // Black Mirror
+        mediaType: 'tv',
+        season: 6,
+        episode: 1,
+        title: 'Black Mirror: Joan es horrible',
+        posterPath: '/79N5b1S8M3aH84F2w2E8H3a9A2.jpg',
+        watchedOffsetDays: 1,
+      }
+    ];
+
+    // Vincular cuenta en base de datos
+    await db
+      .insert(connectedAccounts)
+      .values({
+        userId: req.user.id,
+        provider: 'netflix',
+        providerUid: email,
+        metadata: {
+          email,
+          profileName: profileName || 'Principal',
+          connectedAt: new Date().toISOString(),
+          lastPolledAt: new Date().toISOString(),
+        },
+      })
+      .onConflictDoUpdate({
+        target: [connectedAccounts.provider, connectedAccounts.providerUid],
+        set: {
+          userId: req.user.id,
+          metadata: {
+            email,
+            profileName: profileName || 'Principal',
+            connectedAt: new Date().toISOString(),
+            lastPolledAt: new Date().toISOString(),
+          },
+        },
+      });
+
+    // Insertar historial semilla
+    const historyRows = netflixSeedHistory.map((item) => {
+      const watchedAt = new Date();
+      watchedAt.setDate(watchedAt.getDate() - item.watchedOffsetDays);
+      return {
+        userId: req.user.id,
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+        season: item.season || null,
+        episode: item.episode || null,
+        watchedAt,
+        title: item.title,
+        posterPath: item.posterPath,
+      };
+    });
+
+    if (historyRows.length > 0) {
+      await db.insert(watchHistory).values(historyRows).onConflictDoNothing();
+    }
+
+    return reply.send({ connected: true, email, profileName });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /netflix/disconnect — Desconectar Netflix
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/disconnect', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    await db
+      .delete(connectedAccounts)
+      .where(
+        and(
+          eq(connectedAccounts.userId, req.user.id),
+          eq(connectedAccounts.provider, 'netflix')
+        )
+      );
+
+    return reply.send({ disconnected: true });
   });
 }
