@@ -54,6 +54,7 @@ const netflixSyncSchema = z.object({
   posterPath: z.string().max(300).nullable().optional(),
   netflixVideoId: z.string().max(80).optional(),
   netflixTitle: z.string().max(300).optional(),
+  platform: z.string().max(40).optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -878,6 +879,7 @@ export default async function authRoutes(fastify) {
           ...(account.metadata || {}),
           lastSyncedAt: new Date().toISOString(),
           lastNetflixVideoId: parsed.data.netflixVideoId || null,
+          lastPlatform: parsed.data.platform || 'netflix',
         },
       })
       .where(eq(connectedAccounts.id, account.id));

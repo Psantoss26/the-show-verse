@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "The Show Verse - Netflix Sync",
-  "version": "1.2",
-  "description": "Sincroniza automáticamente lo que ves en Netflix con tu cuenta de The Show Verse en tiempo real.",
+  "name": "The Show Verse - Streaming Sync",
+  "version": "1.3",
+  "description": "Sincroniza automáticamente lo que ves en Netflix, Prime Video, Max, Disney+ y Plex con tu cuenta de The Show Verse en tiempo real.",
   "permissions": [
     "cookies",
     "storage",
@@ -30,7 +30,19 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.netflix.com/*"],
+      "matches": [
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://www.amazon.com/gp/video/*",
+        "https://www.amazon.es/gp/video/*",
+        "https://www.amazon.co.uk/gp/video/*",
+        "https://www.amazon.de/gp/video/*",
+        "https://play.max.com/*",
+        "https://*.max.com/*",
+        "https://play.hbomax.com/*",
+        "https://*.disneyplus.com/*",
+        "https://app.plex.tv/*"
+      ],
       "js": ["content.js"]
     },
     {

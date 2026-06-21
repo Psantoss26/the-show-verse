@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Database,
   Link2,
+  Chrome,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -58,6 +59,46 @@ function sendNetflixExtensionMessage(message) {
       resolve(null);
     }
   });
+}
+
+// La extensión instalada marca su presencia en cada página de la app mediante el
+// content script (atributo en <html> + evento). Esto permite detectar si está
+// instalada sin depender del ID público.
+const EXT_PRESENCE_ATTR = "data-tsv-netflix-ext";
+
+function isNetflixExtensionPresent() {
+  return (
+    typeof document !== "undefined" &&
+    document.documentElement.hasAttribute(EXT_PRESENCE_ATTR)
+  );
+}
+
+function waitForExtensionPresence(timeout = 800) {
+  return new Promise((resolve) => {
+    if (isNetflixExtensionPresent()) {
+      resolve(true);
+      return;
+    }
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("tsv-netflix-ext-ready", onReady);
+      resolve(value);
+    };
+    const onReady = () => finish(true);
+    document.addEventListener("tsv-netflix-ext-ready", onReady);
+    window.setTimeout(() => finish(isNetflixExtensionPresent()), timeout);
+  });
+}
+
+// Comprueba si la extensión está instalada. La mensajería externa (por ID)
+// funciona incluso en pestañas ya abiertas justo tras instalarla desde la Store;
+// el atributo del content script es la señal secundaria.
+async function detectNetflixExtension() {
+  const ping = await sendNetflixExtensionMessage({ action: "ping" });
+  if (ping?.installed || ping?.success) return true;
+  return waitForExtensionPresence(800);
 }
 
 function SettingsBackground() {
@@ -628,7 +669,8 @@ function ProfileSettingsClient() {
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [connectedEmail, setConnectedEmail] = useState("");
-  const [extensionInstallNeeded, setExtensionInstallNeeded] = useState(false);
+  // Esperando a que el usuario instale la extensión desde la Chrome Web Store.
+  const [awaitingInstall, setAwaitingInstall] = useState(false);
 
   const fetchConnections = useCallback(async () => {
     if (!authenticated) return;
@@ -716,13 +758,13 @@ function ProfileSettingsClient() {
     window.open(NETFLIX_EXTENSION_INSTALL_URL, "_blank", "noopener,noreferrer");
   }, []);
 
-  const handleConnectNetflix = async () => {
-    setShowNetflixModal(true);
+  // Realiza la conexión propiamente dicha asumiendo que la extensión ya está
+  // instalada: detecta la sesión de Netflix, genera el token y lo vincula.
+  const proceedNetflixConnect = useCallback(async () => {
+    setAwaitingInstall(false);
     setConnectLoading(true);
     setConnectError("");
     setConnectStep(0);
-    setConnectedEmail("");
-    setExtensionInstallNeeded(false);
 
     const timers = [];
 
@@ -731,21 +773,19 @@ function ProfileSettingsClient() {
         requestNetflixExtensionDetails(),
         new Promise((resolve) => {
           timers.push(window.setTimeout(resolve, 900));
-        })
+        }),
       ]);
 
+      // La extensión no respondió: probablemente aún no está instalada/activa.
       if (!detailsResult) {
-        setExtensionInstallNeeded(true);
-        throw new Error(
-          NETFLIX_EXTENSION_INSTALL_URL
-            ? "Necesitas instalar la extensión oficial de The Show Verse para activar la sincronización automática de Netflix. La abriremos en una pestaña nueva y podrás reintentar al volver."
-            : "No se detectó la extensión de The Show Verse y no hay una URL pública configurada para instalarla.",
-        );
+        timers.forEach(clearTimeout);
+        setConnectLoading(false);
+        setAwaitingInstall(true);
+        return;
       }
       if (!detailsResult.success) {
         throw new Error(detailsResult.error || "No se detectó una sesión activa en Netflix.");
       }
-      setExtensionInstallNeeded(false);
 
       const selectedEmail = detailsResult.email;
       const selectedProfile = detailsResult.profileName || "Principal";
@@ -787,7 +827,7 @@ function ProfileSettingsClient() {
       });
 
       window.dispatchEvent(
-        new CustomEvent("netflix-connection-changed", { detail: { connected: true } })
+        new CustomEvent("netflix-connection-changed", { detail: { connected: true } }),
       );
 
       await fetchConnections();
@@ -798,7 +838,51 @@ function ProfileSettingsClient() {
       setConnectError(err?.message || "No se pudo conectar la cuenta. Inténtalo de nuevo.");
       setConnectLoading(false);
     }
-  };
+  }, [requestNetflixExtensionDetails, bindNetflixExtension, fetchConnections]);
+
+  const handleConnectNetflix = useCallback(async () => {
+    setShowNetflixModal(true);
+    setConnectError("");
+    setConnectStep(0);
+    setConnectedEmail("");
+    setConnectLoading(true);
+    setAwaitingInstall(false);
+
+    const present = await detectNetflixExtension();
+    if (!present) {
+      // No instalada: abrimos la Chrome Web Store para instalación de un clic y
+      // pasamos a estado de espera; un poller continuará en cuanto se instale.
+      setConnectLoading(false);
+      setAwaitingInstall(true);
+      if (NETFLIX_EXTENSION_INSTALL_URL) {
+        window.open(NETFLIX_EXTENSION_INSTALL_URL, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+
+    await proceedNetflixConnect();
+  }, [proceedNetflixConnect]);
+
+  // Mientras esperamos la instalación, sondeamos la presencia de la extensión y
+  // continuamos automáticamente en cuanto el usuario la añade desde la Store.
+  useEffect(() => {
+    if (!showNetflixModal || !awaitingInstall) return undefined;
+
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      const present = await detectNetflixExtension();
+      if (present && !cancelled) {
+        window.clearInterval(intervalId);
+        setAwaitingInstall(false);
+        proceedNetflixConnect();
+      }
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [showNetflixModal, awaitingInstall, proceedNetflixConnect]);
 
 
   const handleDisconnectNetflix = async () => {
@@ -1359,7 +1443,43 @@ function ProfileSettingsClient() {
               {/* Decorative side bar */}
               <div className="absolute top-0 left-0 w-full h-1 bg-[#E50914]" />
 
-              {connectLoading ? (
+              {awaitingInstall ? (
+                <div className="py-6 flex flex-col items-center text-center font-sans">
+                  <div className="rounded-2xl h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-1 ring-red-500/20 mb-5">
+                    <Chrome className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-black text-white leading-tight">
+                    Instala la extensión oficial
+                  </h3>
+                  <p className="mt-3 text-xs leading-relaxed text-zinc-400">
+                    {NETFLIX_EXTENSION_INSTALL_URL
+                      ? "Te hemos abierto la Chrome Web Store en una pestaña nueva. Pulsa «Añadir a Chrome» y, en cuanto se instale, continuaremos la conexión automáticamente — no tienes que hacer nada más aquí."
+                      : "La extensión oficial todavía no está publicada en la Chrome Web Store. Configura NEXT_PUBLIC_NETFLIX_EXTENSION_ID (o NEXT_PUBLIC_NETFLIX_EXTENSION_URL) para habilitar la instalación de un clic."}
+                  </p>
+                  <div className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-zinc-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                    Esperando la instalación…
+                  </div>
+                  <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setShowNetflixModal(false)}
+                      className="flex-1 min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
+                    >
+                      Cancelar
+                    </button>
+                    {NETFLIX_EXTENSION_INSTALL_URL && (
+                      <button
+                        type="button"
+                        onClick={openNetflixExtensionInstall}
+                        className="inline-flex flex-1 min-h-11 items-center justify-center rounded-xl bg-red-600 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                      >
+                        Abrir Chrome Web Store
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : connectLoading ? (
                 <div className="py-8 flex flex-col items-center text-center">
                   <div className="relative flex items-center justify-center mb-6">
                     <Loader2 className="h-12 w-12 animate-spin text-red-500" />
@@ -1436,15 +1556,6 @@ function ProfileSettingsClient() {
                         >
                           Cancelar
                         </button>
-                        {extensionInstallNeeded && NETFLIX_EXTENSION_INSTALL_URL && (
-                          <button
-                            type="button"
-                            onClick={openNetflixExtensionInstall}
-                            className="inline-flex flex-1 min-h-11 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-xs sm:text-sm font-bold text-red-100 transition hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
-                          >
-                            Instalar extensión
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={handleConnectNetflix}
