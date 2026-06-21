@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
-import { cookies } from "next/headers";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -13,10 +12,7 @@ export async function generateMetadata({ params }) {
 
   if (!id) return { title: "Detalles" };
 
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
-
-  const data = await getDetails("tv", id, { language: locale }).catch(() => null);
+  const data = await getDetails("tv", id, { language: "es-ES" }).catch(() => null);
   return {
     title: data?.name || data?.title || "Detalles",
   };
@@ -30,12 +26,9 @@ export default async function TvDetailsPage({ params }) {
     notFound();
   }
 
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
-
   const data = await getDetails("tv", id, {
     appendToResponse: DETAILS_APPEND_TO_RESPONSE,
-    language: locale,
+    language: "es-ES",
   });
 
   if (!data) {

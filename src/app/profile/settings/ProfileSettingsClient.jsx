@@ -8,7 +8,6 @@ import {
   Check,
   DownloadCloud,
   Eye,
-  Globe2,
   LayoutGrid,
   Loader2,
   RotateCcw,
@@ -340,7 +339,7 @@ function ImportPanel({
 
 function ProfileSettingsClient() {
   const { preferences, updatePreference, loadingPreferences, authenticated, hydrated, user } = useAuth();
-  const { t, lang } = useTranslation();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("personalization");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -529,16 +528,6 @@ function ProfileSettingsClient() {
                       ]}
                       onChange={(defaultView) => updatePreference({ defaultView })}
                     />
-                    <SegmentedField
-                      label={t("settings_lang", "Idioma")}
-                      value={preferences.language}
-                      disabled={saving}
-                      options={[
-                        { value: "es-ES", label: "Español" },
-                        { value: "en-US", label: "English" },
-                      ]}
-                      onChange={(language) => updatePreference({ language })}
-                    />
                   </div>
 
                   <div className="space-y-4">
@@ -587,7 +576,7 @@ function ProfileSettingsClient() {
                       }
                     />
                     <ToggleRow
-                      icon={Globe2}
+                      icon={Bell}
                       title={t("settings_weekly", "Resumen semanal")}
                       description={t("settings_weekly_desc", "Preferencia de notificaciones para futuros correos o paneles semanales.")}
                       checked={Boolean(preferences.notificationSettings.weeklySummary)}

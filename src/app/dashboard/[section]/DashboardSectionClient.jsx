@@ -95,6 +95,7 @@ const GROUP_OPTIONS = [
 
 const VIEW_MODE_STORAGE_KEY = "showverse:dashboard-section:viewMode:v2";
 const IMAGE_MODE_STORAGE_KEY = "showverse:dashboard-section:imageMode";
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function normText(value) {
   return String(value || "")
@@ -210,6 +211,37 @@ function sortGroups(groups, groupBy) {
 
 function imgUrl(path, size = "w500") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : "";
+}
+
+function pickDashboardBackdrop(backdrops = []) {
+  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
+  const normLang = (value) =>
+    value ? String(value).toLowerCase().split("-")[0] : null;
+  const area = (img) => (img?.width || 0) * (img?.height || 0);
+  const pickLargest = (list) =>
+    list.reduce((best, img) => (area(img) > area(best) ? img : best), list[0]);
+  const english = backdrops.filter((img) =>
+    ["en", "en-us"].includes(String(img?.iso_639_1 || "").toLowerCase()),
+  );
+  if (english.length) return pickLargest(english)?.file_path || null;
+  const withLanguage = backdrops.filter((img) => normLang(img?.iso_639_1));
+  if (withLanguage.length) return pickLargest(withLanguage)?.file_path || null;
+  return pickLargest(backdrops)?.file_path || null;
+}
+
+async function fetchDashboardBackdrop(type, id) {
+  if (!TMDB_API_KEY || !type || !id) return null;
+  try {
+    const url =
+      `https://api.themoviedb.org/3/${type}/${id}/images` +
+      `?api_key=${TMDB_API_KEY}&include_image_language=en,en-US,null`;
+    const response = await fetch(url, { cache: "force-cache" });
+    if (!response.ok) return null;
+    const json = await response.json();
+    return pickDashboardBackdrop(json?.backdrops || []);
+  } catch {
+    return null;
+  }
 }
 
 function dashboardImageKey(item) {
@@ -795,27 +827,13 @@ export default function DashboardSectionClient({ section }) {
           const ids = Array.from(idsSet);
           if (!ids.length) return;
 
-          let response = null;
-          try {
-            response = await fetch("/api/tmdb/localized-images", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ type, ids, kind: "backdrop" }),
-            });
-          } catch {
-            response = null;
-          }
-
-          if (!response?.ok) {
-            for (const id of ids) entries.push([`${type}:${id}`, null]);
-            return;
-          }
-
-          const json = await response.json().catch(() => null);
-          const map = json?.map || {};
-          for (const id of ids) {
-            entries.push([`${type}:${id}`, map[id] || null]);
-          }
+          const pairs = await Promise.all(
+            ids.map(async (id) => [
+              `${type}:${id}`,
+              await fetchDashboardBackdrop(type, id),
+            ]),
+          );
+          entries.push(...pairs);
         }),
       );
 

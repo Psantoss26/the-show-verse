@@ -1,5 +1,3 @@
-import { useAuth } from "@/context/AuthContext";
-
 const translations = {
   "es-ES": {
     nav_home: "Inicio",
@@ -49,7 +47,6 @@ const translations = {
     settings_back: "Volver al perfil",
     settings_personal: "Preferencias",
     settings_def_view: "Vista por defecto",
-    settings_lang: "Idioma",
     settings_adult: "Contenido adulto",
     settings_adult_desc: "Permite incluir contenido adulto en búsquedas y recomendaciones compatibles.",
     settings_refresh: "Autorefresco del perfil",
@@ -122,7 +119,6 @@ const translations = {
     settings_back: "Back to Profile",
     settings_personal: "Preferences",
     settings_def_view: "Default view",
-    settings_lang: "Language",
     settings_adult: "Adult content",
     settings_adult_desc: "Allows adult content in compatible searches and recommendations.",
     settings_refresh: "Auto-refresh profile",
@@ -150,8 +146,7 @@ const translations = {
 };
 
 export function useTranslation() {
-  const { preferences } = useAuth();
-  const lang = preferences?.language === "en-US" ? "en-US" : "es-ES";
+  const lang = "es-ES";
 
   const t = (key, defaultText) => {
     return translations[lang]?.[key] || defaultText || key;

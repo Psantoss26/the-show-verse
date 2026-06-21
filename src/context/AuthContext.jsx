@@ -9,7 +9,6 @@ const COMPAT_SESSION_VALUE = "showverse";
 
 const DEFAULT_PREFERENCES = {
   defaultView: "grid",
-  language: "es-ES",
   adultContent: false,
   notificationSettings: {
     weeklySummary: false,
@@ -89,9 +88,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const syncPreferenceCookies = useCallback((prefs) => {
-    if (prefs?.language) {
-      setCookie("showverse_locale", prefs.language);
-    }
     if (prefs?.defaultView) {
       setCookie("showverse_default_view", prefs.defaultView);
     }
@@ -161,10 +157,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Sincronizar cookies iniciales desde localStorage/defaults si no hay cookies
     if (typeof window !== "undefined") {
-      const localeMatch = document.cookie.match(/showverse_locale=([^;]+)/);
-      if (!localeMatch) {
-        setCookie("showverse_locale", "es-ES");
-      }
       const viewMatch = document.cookie.match(/showverse_default_view=([^;]+)/);
       if (!viewMatch) {
         setCookie("showverse_default_view", "grid");
@@ -268,7 +260,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       cleanLegacyStorage();
       setPreferences(DEFAULT_PREFERENCES);
-      setCookie("showverse_locale", "es-ES");
       setCookie("showverse_default_view", "grid");
       if (redirectTo && typeof window !== "undefined") {
         window.location.replace(redirectTo);

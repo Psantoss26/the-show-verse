@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export const revalidate = 86400;
 
@@ -7,9 +6,7 @@ const TMDB_API_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 async function tmdbFetch(path) {
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
-  const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=${locale}`;
+  const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=es-ES`;
   const res = await fetch(url, { next: { revalidate } });
   const json = await res.json().catch(() => ({}));
   if (!res.ok)

@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
 
-async function buildTmdbUrl(path, params = {}) {
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("showverse_locale")?.value || "es-ES";
+function buildTmdbUrl(path, params = {}) {
   const url = new URL(`${TMDB_API}${path}`);
   url.searchParams.set("api_key", TMDB_KEY || "");
-  url.searchParams.set("language", locale);
+  url.searchParams.set("language", "es-ES");
   Object.entries(params).forEach(
     ([k, v]) => v != null && url.searchParams.set(k, String(v)),
   );
