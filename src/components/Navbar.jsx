@@ -354,6 +354,11 @@ export default function Navbar() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  // Destino marcado de forma optimista al pulsar un enlace: el indicador del
+  // navbar resalta de inmediato la sección a la que vas, sin esperar a que la
+  // transición de ruta haga commit (lo que dejaba el indicador en la página de
+  // origen mientras se montaban las páginas pesadas como Favoritos/Pendientes).
+  const [pendingHref, setPendingHref] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -364,8 +369,15 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Una vez la URL refleja el destino (o cambia por cualquier motivo), se limpia
+  // el destino optimista para volver a basarse en el pathname real.
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const activePath = pendingHref || pathname;
   const isActive = (href) =>
-    pathname === href || (href !== "/" && pathname?.startsWith(href));
+    activePath === href || (href !== "/" && activePath?.startsWith(href));
 
   const prefetchNavRoute = useCallback(
     (href) => {
@@ -373,6 +385,19 @@ export default function Navbar() {
       router.prefetch(href);
     },
     [pathname, router],
+  );
+
+  // Prefetch por intención del puntero/foco: cuando el usuario apunta o enfoca
+  // un enlace de sección, su chunk ya empieza a descargarse, de modo que al
+  // pulsar la navegación es instantánea (sin esperar a descargar la página).
+  const navPrefetchHandlers = useCallback(
+    (href) => ({
+      onMouseEnter: () => prefetchNavRoute(href),
+      onFocus: () => prefetchNavRoute(href),
+      onTouchStart: () => prefetchNavRoute(href),
+      onClick: () => setPendingHref(href),
+    }),
+    [prefetchNavRoute],
   );
 
   useEffect(() => {
@@ -385,8 +410,14 @@ export default function Navbar() {
 
     const handle = schedule(
       () => {
+        // Secciones siempre visibles en la navbar/barra inferior. Se precargan
+        // en tiempo de inactividad para que el clic sea instantáneo también en
+        // móvil, donde no hay hover previo.
         prefetchNavRoute("/movies");
         prefetchNavRoute("/series");
+        prefetchNavRoute("/in-progress");
+        prefetchNavRoute("/favorites");
+        prefetchNavRoute("/watchlist");
       },
       { timeout: 1800 },
     );
@@ -566,7 +597,12 @@ export default function Navbar() {
                 )}
                 <span className="relative z-10">{t("nav_series", "Series")}</span>
               </Link>
-              <Link href="/discover" className={navLinkClass("/discover")}>
+              <Link
+                href="/discover"
+                prefetch
+                {...navPrefetchHandlers("/discover")}
+                className={navLinkClass("/discover")}
+              >
                 {isActive("/discover") && (
                   <motion.div
                     layoutId="activeTabDesktopText"
@@ -576,7 +612,12 @@ export default function Navbar() {
                 )}
                 <span className="relative z-10">{t("nav_discover", "Descubrir")}</span>
               </Link>
-              <Link href="/biblioteca" className={navLinkClass("/biblioteca")}>
+              <Link
+                href="/biblioteca"
+                prefetch
+                {...navPrefetchHandlers("/biblioteca")}
+                className={navLinkClass("/biblioteca")}
+              >
                 {isActive("/biblioteca") && (
                   <motion.div
                     layoutId="activeTabDesktopText"
@@ -594,6 +635,8 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <Link
                 href="/lists"
+                prefetch
+                {...navPrefetchHandlers("/lists")}
                 className={iconLinkClass("/lists", "purple")}
                 aria-label="Listas"
               >
@@ -611,6 +654,8 @@ export default function Navbar() {
 
               <Link
                 href="/calendar"
+                prefetch
+                {...navPrefetchHandlers("/calendar")}
                 className={iconLinkClass("/calendar", "amber")}
                 aria-label="Calendario"
               >
@@ -628,6 +673,8 @@ export default function Navbar() {
 
               <Link
                 href="/in-progress"
+                prefetch
+                {...navPrefetchHandlers("/in-progress")}
                 className={iconLinkClass("/in-progress", "green")}
                 aria-label="En Progreso"
               >
@@ -650,6 +697,8 @@ export default function Navbar() {
 
               <Link
                 href="/favorites"
+                prefetch
+                {...navPrefetchHandlers("/favorites")}
                 className={iconLinkClass("/favorites", "red")}
                 aria-label="Favoritas"
               >
@@ -667,6 +716,8 @@ export default function Navbar() {
 
               <Link
                 href="/watchlist"
+                prefetch
+                {...navPrefetchHandlers("/watchlist")}
                 className={iconLinkClass("/watchlist", "blue")}
                 aria-label="Pendientes"
               >
@@ -804,6 +855,8 @@ export default function Navbar() {
 
         <Link
           href="/in-progress"
+          prefetch
+          {...navPrefetchHandlers("/in-progress")}
           className={navLinkClassMobileBottom("/in-progress", "green")}
         >
           {isActive("/in-progress") && (
@@ -825,6 +878,8 @@ export default function Navbar() {
 
         <Link
           href={favHref}
+          prefetch
+          {...navPrefetchHandlers(favHref)}
           className={navLinkClassMobileBottom("/favorites", "red")}
         >
           {isActive(favHref) && (
@@ -841,6 +896,8 @@ export default function Navbar() {
 
         <Link
           href={watchHref}
+          prefetch
+          {...navPrefetchHandlers(watchHref)}
           className={navLinkClassMobileBottom("/watchlist", "blue")}
         >
           {isActive(watchHref) && (

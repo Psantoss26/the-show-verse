@@ -97,6 +97,74 @@ async function fetchTmdbLocalized({ type, tmdbId }) {
   return { title, poster_path, year };
 }
 
+async function fetchTmdbSeasonEpisodes({ tmdbId, season }) {
+  if (!TMDB_KEY || !tmdbId || season == null) return null;
+  const url = `${TMDB_BASE}/tv/${encodeURIComponent(tmdbId)}/season/${encodeURIComponent(
+    season,
+  )}?api_key=${encodeURIComponent(TMDB_KEY)}&language=es-ES`;
+
+  const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
+  if (!res.ok) return null;
+  const j = await safeJson(res);
+  if (!j || !Array.isArray(j.episodes)) return null;
+
+  const episodesByNumber = new Map();
+  for (const episode of j.episodes) {
+    const number = Number(episode?.episode_number);
+    if (!Number.isFinite(number)) continue;
+    episodesByNumber.set(number, {
+      title: episode?.name || null,
+      still_path: episode?.still_path || null,
+    });
+  }
+  return episodesByNumber;
+}
+
+async function enrichBackendEpisodeTitles(items) {
+  const seasonKeys = new Set();
+  for (const item of items) {
+    if (item?.type !== "show" || !item?.episode || !item?.tmdbId) continue;
+    const season = Number(item.episode.season);
+    if (!Number.isFinite(season)) continue;
+    seasonKeys.add(`${item.tmdbId}:${season}`);
+  }
+
+  if (seasonKeys.size === 0) return items;
+
+  const seasonMaps = new Map();
+  await mapLimit(Array.from(seasonKeys), 6, async (key) => {
+    const [tmdbId, season] = key.split(":").map(Number);
+    const episodeMap = await fetchTmdbSeasonEpisodes({ tmdbId, season }).catch(
+      () => null,
+    );
+    if (episodeMap) seasonMaps.set(key, episodeMap);
+  });
+
+  return items.map((item) => {
+    if (item?.type !== "show" || !item?.episode || !item?.tmdbId) return item;
+
+    const season = Number(item.episode.season);
+    const number = Number(item.episode.number);
+    const episodeMap = seasonMaps.get(`${item.tmdbId}:${season}`);
+    const episodeMeta = episodeMap?.get(number);
+    const episodeTitle =
+      item.episode.title || item.episodeTitle || episodeMeta?.title || null;
+
+    if (!episodeTitle && !episodeMeta?.still_path) return item;
+
+    return {
+      ...item,
+      episode: {
+        ...item.episode,
+        title: episodeTitle,
+        still_path: episodeMeta?.still_path || item.episode.still_path || null,
+      },
+      episodeTitle,
+      still_path: episodeMeta?.still_path || item.still_path || null,
+    };
+  });
+}
+
 async function mapLimit(arr, limit, fn) {
   const out = new Array(arr.length);
   let i = 0;
@@ -147,7 +215,9 @@ export async function GET(request) {
     const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
     if (backend.ok) {
       const rows = Array.isArray(backend.json?.results) ? backend.json.results : [];
-      const enriched = rows.map(mapBackendHistoryItem);
+      const enriched = await enrichBackendEpisodeTitles(
+        rows.map(mapBackendHistoryItem),
+      );
 
       const plays = enriched.length;
       const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size;

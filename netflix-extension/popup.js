@@ -9,7 +9,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const logsList = document.getElementById("logs-list");
 
   // 1. Fetch dynamic host origin and check session
-  chrome.storage.local.get(["showVerseOrigin", "logs"], (result) => {
+  chrome.storage.local.get([
+    "showVerseOrigin",
+    "logs",
+    "netflixSyncToken",
+    "netflixAccountEmail",
+    "netflixProfileName"
+  ], (result) => {
     const origin = result.showVerseOrigin || "http://localhost:3000";
     console.log("[The Show Verse Popup] Querying auth status from:", origin);
 
@@ -33,16 +39,30 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Verify authentication cookies
+    if (result.netflixSyncToken) {
+      statusDot.className = "dot dot-green";
+      statusText.textContent = "Sincronización activa";
+
+      userInfo.style.display = "block";
+      userEmail.textContent = `${result.netflixAccountEmail || "Netflix"} · ${result.netflixProfileName || "Principal"}`;
+
+      actionBtn.style.display = "block";
+      actionBtn.textContent = "Ir a Configuración";
+      actionBtn.href = `${origin}/profile/settings`;
+      return;
+    }
+
+    // Verify app authentication as a helpful setup hint. Extension service workers
+    // cannot rely on app cookies for long-lived background sync.
     fetch(`${origin}/api/auth/me`, { credentials: "include" })
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
         if (res.ok && json.user) {
-          statusDot.className = "dot dot-green";
-          statusText.textContent = "Sincronización activa";
+          statusDot.className = "dot dot-orange";
+          statusText.textContent = "Pendiente de conectar Netflix";
           
           userInfo.style.display = "block";
-          userEmail.textContent = json.user.displayName || json.user.username || json.user.email;
+          userInfo.innerHTML = "Pulsa Conectar Netflix en The Show Verse para activar la sincronización automática.";
           
           actionBtn.style.display = "block";
           actionBtn.textContent = "Ir a Configuración";

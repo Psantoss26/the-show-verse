@@ -43,7 +43,7 @@ import { useTranslation } from "@/lib/i18n";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
-const HISTORY_CACHE_KEY = "showverse:history:items:v3";
+const HISTORY_CACHE_KEY = "showverse:history:items:v4";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function isTraktUnavailableError(error) {
@@ -56,17 +56,28 @@ function isTraktUnavailableError(error) {
 // ----------------------------
 const pad2 = (n) => String(n).padStart(2, "0");
 
+// Persisted in localStorage (survives across sessions) and served
+// stale-while-revalidate: cached items paint instantly on the first visit of a
+// new session, then a background refresh replaces them. A hard age cap drops
+// data that is too old to be useful.
+const HISTORY_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
 function readHistoryCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(HISTORY_CACHE_KEY);
+    const raw = window.localStorage.getItem(HISTORY_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
+    const age = Date.now() - Number(parsed.t || 0);
+    if (age > HISTORY_CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(HISTORY_CACHE_KEY);
+      return null;
+    }
     return {
       items: parsed.items,
       hasMore: !!parsed.hasMore,
-      fresh: Date.now() - Number(parsed.t || 0) < HISTORY_CACHE_TTL_MS,
+      fresh: age < HISTORY_CACHE_TTL_MS,
     };
   } catch {
     return null;
@@ -76,7 +87,7 @@ function readHistoryCache() {
 function writeHistoryCache(items, { hasMore = false } = {}) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       HISTORY_CACHE_KEY,
       JSON.stringify({
         t: Date.now(),
@@ -90,7 +101,7 @@ function writeHistoryCache(items, { hasMore = false } = {}) {
 function clearHistoryCache() {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.removeItem(HISTORY_CACHE_KEY);
+    window.localStorage.removeItem(HISTORY_CACHE_KEY);
   } catch {}
 }
 

@@ -13,7 +13,7 @@ const isShowVerse =
 
 if (isShowVerse) {
   const origin = window.location.origin;
-  chrome.runtime.sendMessage({ action: "registerOrigin", origin }, (response) => {
+  chrome.runtime.sendMessage({ action: "registerOrigin", origin }, () => {
     console.log("[The Show Verse Extension] Registered host origin:", origin);
   });
 }
@@ -27,6 +27,44 @@ document.addEventListener("request-netflix-details", () => {
     
     // Dispatch the response back to the webpage
     document.dispatchEvent(new CustomEvent("response-netflix-details", {
+      detail: response
+    }));
+  });
+});
+
+document.addEventListener("request-netflix-bind", (event) => {
+  console.log("[The Show Verse Extension] Web page requested Netflix sync binding.");
+  const detail = event.detail || {};
+
+  chrome.runtime.sendMessage({
+    action: "storeSyncConfig",
+    origin: window.location.origin,
+    syncToken: detail.syncToken,
+    email: detail.email,
+    profileName: detail.profileName
+  }, (response) => {
+    document.dispatchEvent(new CustomEvent("response-netflix-bind", {
+      detail: response
+    }));
+  });
+});
+
+document.addEventListener("request-netflix-unbind", () => {
+  chrome.runtime.sendMessage({ action: "clearSyncConfig" }, (response) => {
+    document.dispatchEvent(new CustomEvent("response-netflix-unbind", {
+      detail: response
+    }));
+  });
+});
+
+// Sincronización manual del historial real de Netflix solicitada desde la web.
+document.addEventListener("request-netflix-sync", (event) => {
+  const detail = event.detail || {};
+  chrome.runtime.sendMessage({
+    action: "syncNetflixActivity",
+    full: Boolean(detail.full)
+  }, (response) => {
+    document.dispatchEvent(new CustomEvent("response-netflix-sync", {
       detail: response
     }));
   });

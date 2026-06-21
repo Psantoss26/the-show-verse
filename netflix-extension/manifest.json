@@ -1,19 +1,32 @@
 {
   "manifest_version": 3,
   "name": "The Show Verse - Netflix Sync",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Sincroniza automáticamente lo que ves en Netflix con tu cuenta de The Show Verse en tiempo real.",
   "permissions": [
     "cookies",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "http://localhost/*",
     "http://127.0.0.1/*",
+    "https://*.vercel.app/*",
+    "https://theshowverse.com/*",
+    "https://www.theshowverse.com/*",
     "https://*.netflix.com/*"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://*.vercel.app/*",
+      "https://theshowverse.com/*",
+      "https://www.theshowverse.com/*"
+    ]
   },
   "content_scripts": [
     {
@@ -21,7 +34,13 @@
       "js": ["content.js"]
     },
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*.vercel.app/*",
+        "https://theshowverse.com/*",
+        "https://www.theshowverse.com/*"
+      ],
       "js": ["content-showverse.js"]
     }
   ],

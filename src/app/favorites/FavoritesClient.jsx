@@ -216,17 +216,28 @@ const TARGET_PROVIDER_ORDER = new Map([
   ["plex", 7],
 ]);
 
+// Persisted in localStorage (survives across sessions) and served
+// stale-while-revalidate: cached favorites paint instantly on the first visit of
+// a new session, then a background refresh updates them. A hard age cap drops
+// data that is too old to be useful.
+const FAVORITES_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
 function readFavoritesCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(FAVORITES_CACHE_KEY);
+    const raw = window.localStorage.getItem(FAVORITES_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
+    const age = Date.now() - Number(parsed.t || 0);
+    if (age > FAVORITES_CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(FAVORITES_CACHE_KEY);
+      return null;
+    }
     return {
       items: parsed.items,
       ratedItems: Array.isArray(parsed.ratedItems) ? parsed.ratedItems : [],
-      fresh: Date.now() - Number(parsed.t || 0) < FAVORITES_CACHE_TTL_MS,
+      fresh: age < FAVORITES_CACHE_TTL_MS,
     };
   } catch {
     return null;
@@ -236,7 +247,7 @@ function readFavoritesCache() {
 function writeFavoritesCache(items, ratedItems = []) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       FAVORITES_CACHE_KEY,
       JSON.stringify({
         t: Date.now(),
@@ -597,7 +608,7 @@ function getCanonicalProviders(providers = [], plexAvailable = false) {
 function readPlexLibraryIndexCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(PLEX_LIBRARY_INDEX_CACHE_KEY);
+    const raw = window.localStorage.getItem(PLEX_LIBRARY_INDEX_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (
@@ -616,7 +627,7 @@ function readPlexLibraryIndexCache() {
 function writePlexLibraryIndexCache(index) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       PLEX_LIBRARY_INDEX_CACHE_KEY,
       JSON.stringify({ t: Date.now(), keys: Array.from(index || []) }),
     );
@@ -2221,23 +2232,38 @@ const FavoriteCard = memo(function FavoriteCard({
 export default function FavoritesClient() {
   const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
+  // Read each persistent cache only once on mount. These JSON.parse and build
+  // Maps from localStorage; calling them several times (favorites x3,
+  // providers x2) blocked the first render and added a perceptible delay to the
+  // route transition into this page.
+  const [initialCache] = useState(() => ({
+    favorites: readFavoritesCache(),
+    providers: readProvidersCache(),
+  }));
+  const [loading, setLoading] = useState(() => !initialCache.favorites?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => readFavoritesCache()?.items || []);
+  const [items, setItems] = useState(() => initialCache.favorites?.items || []);
   const [ratedItems, setRatedItems] = useState(
-    () => readFavoritesCache()?.ratedItems || [],
+    () => initialCache.favorites?.ratedItems || [],
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
-  const [providersByItem, setProvidersByItem] = useState(() =>
-    readProvidersCache(),
+  const [providersByItem, setProvidersByItem] = useState(
+    () => initialCache.providers,
   );
-  const [layoutProvidersByItem] = useState(() => readProvidersCache());
+  const [layoutProvidersByItem] = useState(() => initialCache.providers);
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
+
+  // Render the cards in chunks: only the first batch mounts on the initial
+  // render, so navigating into the page commits cheaply (instant redirect) while
+  // those first cards animate in immediately — same fluid entrance as the other
+  // pages. The remaining cards fill in during idle time. Starts small on every
+  // mount, so the entrance feels consistent every visit.
+  const [renderLimit, setRenderLimit] = useState(FAVORITES_INITIAL_RENDER_LIMIT);
 
   // Watch history for sorting
   const [watchDates, setWatchDates] = useState(new Map());
@@ -3065,8 +3091,33 @@ export default function FavoritesClient() {
     loadingProviders,
   ]);
 
-  const renderedSorted = sorted;
+  const renderedSorted = useMemo(
+    () => sorted.slice(0, renderLimit),
+    [sorted, renderLimit],
+  );
   const renderedGrouped = grouped;
+
+  // Only start expanding the render window AFTER the entrance animation of the
+  // first batch has finished, so growing the list never interrupts (and janks)
+  // that animation or the navbar selector transition. Until then the page just
+  // shows the first cards animating in, exactly like History / In-Progress.
+  const [canExpandRender, setCanExpandRender] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setCanExpandRender(true), 450);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Grow the render window up to the full list during idle time, so the rest of
+  // the cards appear shortly after the (cheap, fast) first paint.
+  useEffect(() => {
+    if (!canExpandRender || renderLimit >= sorted.length) return;
+    const handle = scheduleFavoritesRenderChunk(() => {
+      setRenderLimit((prev) =>
+        Math.min(prev + FAVORITES_RENDER_CHUNK_SIZE, sorted.length),
+      );
+    });
+    return () => cancelFavoritesRenderChunk(handle);
+  }, [canExpandRender, renderLimit, sorted.length]);
 
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
@@ -3975,6 +4026,7 @@ export default function FavoritesClient() {
                             >
                               {subgroup.items.map((item, idx) => {
                                 const currentGlobalIdx = globalCardIndex++;
+                                if (currentGlobalIdx >= renderLimit) return null;
                                 return (
                                   <FavoriteCard
                                     key={getMediaKey(item)}
@@ -4001,6 +4053,7 @@ export default function FavoritesClient() {
                       >
                         {group.items.map((item, idx) => {
                           const currentGlobalIdx = globalCardIndex++;
+                          if (currentGlobalIdx >= renderLimit) return null;
                           return (
                             <FavoriteCard
                               key={getMediaKey(item)}
