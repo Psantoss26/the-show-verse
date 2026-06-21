@@ -24,6 +24,19 @@ export default function DetailsSectionMenu({
   const [fits, setFits] = useState(true);
 
   const colors = useMemo(() => {
+    if (colorScheme === "indigo") {
+      return {
+        focusRing: "focus-visible:ring-indigo-500/50",
+        activeBg:
+          "bg-black/20 from-indigo-500/40 via-white/10 to-indigo-500/10 shadow-[0_10px_30px_-10px_rgba(129,140,248,0.55)]",
+        iconActive:
+          "text-indigo-300 drop-shadow-[0_0_6px_rgba(129,140,248,0.75)]",
+        badgeBg: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+        indicator:
+          "from-indigo-500 via-violet-400 to-cyan-400 shadow-[0_0_8px_rgba(129,140,248,0.65)]",
+      };
+    }
+
     if (colorScheme === "emerald") {
       return {
         focusRing: "focus-visible:ring-emerald-500/50",
