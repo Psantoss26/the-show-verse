@@ -84,6 +84,16 @@ function getEpisodeProgress(item) {
   return { completed, aired, hasKnownAired, remaining, label, longLabel };
 }
 
+function getProgressPct(item) {
+  const { completed, aired, hasKnownAired } = getEpisodeProgress(item);
+  if (hasKnownAired && aired > 0) {
+    return Math.min(100, Math.max(0, Math.round((completed / aired) * 100)));
+  }
+
+  const pct = Number(item?.pct);
+  return Number.isFinite(pct) ? Math.min(100, Math.max(0, Math.round(pct))) : 0;
+}
+
 function getProgressColor(pct) {
   if (pct >= 90)
     return {
@@ -161,10 +171,19 @@ function getProgressColor(pct) {
 // ----------------------------
 // SHARED CACHE / IMAGES
 // ----------------------------
-const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v2";
+const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v3";
 const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
 const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v2";
 const COMPLETED_CACHE_TTL = 1000 * 60 * 10;
+const IN_PROGRESS_VIEW_MODES = new Set(["cards", "compact", "poster"]);
+
+function readStoredInProgressValue(key, fallback, validValues = null) {
+  if (typeof window === "undefined") return fallback;
+  const saved = window.localStorage.getItem(key);
+  if (!saved) return fallback;
+  if (validValues && !validValues.has(saved)) return fallback;
+  return saved;
+}
 
 const buildImg = (path, size = "w500") => {
   if (!path) return null;
@@ -379,7 +398,7 @@ function SmartPoster({ item, title }) {
       const hasCache = posterChoiceCache.has(key);
       const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
       const pref = getPosterPreference(type, id);
-      const initialPath = memoryBest || pref || item.poster_path || item.backdrop_path || null;
+      const initialPath = memoryBest || pref || null;
 
       if (initialPath) {
         const url = buildImg(initialPath, "w500");
@@ -389,15 +408,14 @@ function SmartPoster({ item, title }) {
         }
       }
 
-      if (!hasCache) {
+      if (!hasCache && !pref) {
         const best = await getBestPosterCached(type, id);
-        if (best && best !== initialPath && !abort) {
-          const url = buildImg(best, "w500");
-          await preloadImage(url);
-          if (!abort) {
-            setSrc(url);
-            setReady(true);
-          }
+        const finalPath = best || item.poster_path || item.backdrop_path || null;
+        if (finalPath && !abort) {
+          const url = buildImg(finalPath, "w500");
+          if (!initialPath) await preloadImage(url);
+          if (!abort) setSrc(url);
+          if (!abort) setReady(true);
         }
       }
     };
@@ -406,7 +424,7 @@ function SmartPoster({ item, title }) {
     return () => {
       abort = true;
     };
-  }, [type, id, item.poster_path, item.backdrop_path]);
+  }, [type, id]);
 
   return (
     <div className="relative w-full h-full">
@@ -452,10 +470,10 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
       const key = `${type}:${id}`;
       const hasCache = backdropChoiceCache.has(key);
       const memoryBest = hasCache ? backdropChoiceCache.get(key) : null;
-      const initialPath = memoryBest || item.backdrop_path || item.poster_path || null;
+      const initialPath = memoryBest || null;
 
       if (initialPath) {
-        const url = buildImg(initialPath, (memoryBest || item.backdrop_path) ? "w1280" : "w500");
+        const url = buildImg(initialPath, "w1280");
         if (!abort) {
           setSrc(url);
           setReady(true);
@@ -464,13 +482,12 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
 
       if (!hasCache) {
         const best = await getBestBackdropCached(type, id);
-        if (best && best !== initialPath && !abort) {
-          const url = buildImg(best, "w1280");
-          await preloadImage(url);
-          if (!abort) {
-            setSrc(url);
-            setReady(true);
-          }
+        const finalPath = best || item.backdrop_path || item.poster_path || null;
+        if (finalPath && !abort) {
+          const url = buildImg(finalPath, "w1280");
+          if (!initialPath) await preloadImage(url);
+          if (!abort) setSrc(url);
+          if (!abort) setReady(true);
         }
       }
     };
@@ -479,7 +496,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, item.backdrop_path, item.poster_path]);
+  }, [type, id]);
 
   return (
     <div className="relative w-full h-full">
@@ -726,7 +743,8 @@ const InProgressCard = memo(function InProgressCard({
   const title = item.title_es || item.title || "Sin título";
   const href =
     item.detailsHref || `/details/${itemType}/${item.tmdbId || item.id}`;
-  const colors = getProgressColor(item.pct);
+  const progressPct = getProgressPct(item);
+  const colors = getProgressColor(progressPct);
   const nextEpCode = item.nextEpisode
     ? formatEpCode(item.nextEpisode.season, item.nextEpisode.number)
     : null;
@@ -767,7 +785,7 @@ const InProgressCard = memo(function InProgressCard({
                 <span
                   className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}
                 >
-                  {item.pct}%
+                  {progressPct}%
                 </span>
                 <span>{episodeProgress.label}</span>
                 {nextEpCode && (
@@ -791,7 +809,7 @@ const InProgressCard = memo(function InProgressCard({
                 <motion.div
                   className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
                   initial={{ width: 0 }}
-                  animate={{ width: `${item.pct}%` }}
+                  animate={{ width: `${progressPct}%` }}
                   transition={{
                     duration: 0.8,
                     delay: animDelay + 0.2,
@@ -856,7 +874,7 @@ const InProgressCard = memo(function InProgressCard({
                     <span
                       className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}
                     >
-                      {item.pct}
+                      {progressPct}
                     </span>
                     <span
                       className={`text-sm font-bold ${colors.text} opacity-80`}
@@ -958,7 +976,7 @@ const InProgressCard = memo(function InProgressCard({
                     />
                   ) : (
                     <CircularProgress
-                      pct={item.pct}
+                      pct={progressPct}
                       colors={colors}
                       size={40}
                     />
@@ -1022,7 +1040,7 @@ const InProgressCard = memo(function InProgressCard({
                 <motion.div
                   className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
                   initial={{ width: 0 }}
-                  animate={{ width: `${item.pct}%` }}
+                  animate={{ width: `${progressPct}%` }}
                   transition={{
                     duration: 1,
                     delay: animDelay + 0.3,
@@ -1135,7 +1153,7 @@ export default function InProgressClient({
   const initialAuthLoading = !!initialAuth?.loading;
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [stats, setStats] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -1148,46 +1166,42 @@ export default function InProgressClient({
   const [completedLoading, setCompletedLoading] = useState(false);
   const [completedLoaded, setCompletedLoaded] = useState(false);
 
-  // UI — fixed SSR-safe defaults to avoid hydration mismatch
-  const [viewMode, setViewMode] = useState("cards");
-  const [sortBy, setSortBy] = useState("recent");
-  const [groupBy, setGroupBy] = useState("none");
+  // UI
+  const [viewMode, setViewMode] = useState(() =>
+    readStoredInProgressValue(
+      "showverse:inprogress:viewMode",
+      "cards",
+      IN_PROGRESS_VIEW_MODES,
+    ),
+  );
+  const [sortBy, setSortBy] = useState(() =>
+    readStoredInProgressValue("showverse:inprogress:sortBy", "recent"),
+  );
+  const [groupBy, setGroupBy] = useState(() =>
+    readStoredInProgressValue("showverse:inprogress:groupBy", "none"),
+  );
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [uiReady, setUiReady] = useState(false);
 
-  // Restore preferences from localStorage after mount (avoids SSR/client hydration mismatch)
   useEffect(() => {
-    const savedView = window.localStorage.getItem(
-      "showverse:inprogress:viewMode",
-    );
-    if (
-      savedView === "cards" ||
-      savedView === "compact" ||
-      savedView === "poster"
-    ) {
-      setViewMode(savedView);
-    }
-    const savedSort = window.localStorage.getItem(
-      "showverse:inprogress:sortBy",
-    );
-    if (savedSort) setSortBy(savedSort);
-    const savedGroup = window.localStorage.getItem(
-      "showverse:inprogress:groupBy",
-    );
-    if (savedGroup) setGroupBy(savedGroup);
+    setUiReady(true);
   }, []);
 
   // Persist
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:viewMode", viewMode);
-  }, [viewMode]);
+  }, [uiReady, viewMode]);
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);
-  }, [sortBy]);
+  }, [sortBy, uiReady]);
   useEffect(() => {
+    if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:groupBy", groupBy);
-  }, [groupBy]);
+  }, [groupBy, uiReady]);
 
   // Update document title when tab changes
   useEffect(() => {
@@ -1205,7 +1219,7 @@ export default function InProgressClient({
     return () => mq.removeEventListener?.("change", apply);
   }, []);
 
-  const loadData = useCallback(async ({ background = false } = {}) => {
+  const loadData = useCallback(async ({ background = false, fallbackCache = null } = {}) => {
     if (!background) setLoading(true);
     try {
       const json = await traktGetInProgress();
@@ -1234,6 +1248,13 @@ export default function InProgressClient({
     } catch (e) {
       console.error("Error loading in-progress:", e);
       setAuth((prev) => ({ ...prev, loading: false }));
+      if (fallbackCache?.items || fallbackCache?.stats) {
+        setItems(Array.isArray(fallbackCache?.items) ? fallbackCache.items : []);
+        setStats(fallbackCache?.stats || null);
+        setDataLoaded(true);
+      } else {
+        setDataLoaded(true);
+      }
     } finally {
       if (!background) setLoading(false);
     }
@@ -1284,14 +1305,7 @@ export default function InProgressClient({
             IN_PROGRESS_CACHE_KEY,
             IN_PROGRESS_CACHE_TTL,
           );
-          if (cached?.items || cached?.stats) {
-            setItems(Array.isArray(cached?.items) ? cached.items : []);
-            setStats(cached?.stats || null);
-            setDataLoaded(true);
-            void loadData({ background: true });
-          } else {
-            void loadData();
-          }
+          void loadData({ fallbackCache: cached });
           return;
         }
 
@@ -1320,15 +1334,7 @@ export default function InProgressClient({
 
         setAuth({ loading: false, connected: true });
 
-        if (cached?.items || cached?.stats) {
-          setItems(Array.isArray(cached?.items) ? cached.items : []);
-          setStats(cached?.stats || null);
-          setDataLoaded(true);
-          void loadData({ background: true });
-          return;
-        }
-
-        void loadData();
+        void loadData({ fallbackCache: cached });
       } catch (error) {
         if (cancelled) return;
         console.error("Error checking Trakt auth:", error);
@@ -1374,6 +1380,37 @@ export default function InProgressClient({
   const currentLoading = activeTab === "completed" ? completedLoading : loading;
   const currentDataLoaded =
     activeTab === "completed" ? completedLoaded : dataLoaded;
+  const contentPending = auth.loading || currentLoading || !currentDataLoaded;
+  const displayStats = useMemo(() => {
+    const base = currentStats || {};
+    if (!currentItems.length) return base;
+
+    const progressItems = currentItems.filter(
+      (item) => getEpisodeProgress(item).hasKnownAired,
+    );
+    const totalEpisodesWatched = currentItems.reduce(
+      (sum, item) => sum + getEpisodeProgress(item).completed,
+      0,
+    );
+    const totalEpisodesRemaining = currentItems.reduce((sum, item) => {
+      const remaining = getEpisodeProgress(item).remaining;
+      return sum + (remaining ?? 0);
+    }, 0);
+
+    return {
+      ...base,
+      total: currentItems.length || base.total || 0,
+      avgProgress:
+        progressItems.length > 0
+          ? Math.round(
+              progressItems.reduce((sum, item) => sum + getProgressPct(item), 0) /
+                progressItems.length,
+            )
+          : (base.avgProgress ?? 0),
+      totalEpisodesWatched,
+      totalEpisodesRemaining,
+    };
+  }, [currentItems, currentStats]);
 
   // Filter + Sort
   const filtered = useMemo(() => {
@@ -1403,10 +1440,10 @@ export default function InProgressClient({
         );
         break;
       case "progress-high":
-        list.sort((a, b) => b.pct - a.pct);
+        list.sort((a, b) => getProgressPct(b) - getProgressPct(a));
         break;
       case "progress-low":
-        list.sort((a, b) => a.pct - b.pct);
+        list.sort((a, b) => getProgressPct(a) - getProgressPct(b));
         break;
       case "rating-high":
         list.sort((a, b) => {
@@ -1491,7 +1528,7 @@ export default function InProgressClient({
 
       if (groupBy === "progress") {
         // Group by progress ranges: 0-20%, 20-40%, 40-60%, 60-80%, 80-100%
-        const pct = item.pct || 0;
+        const pct = getProgressPct(item);
         if (pct < 20) {
           groupKey = "0-20";
           groupLabel = "0-20%";
@@ -1510,7 +1547,7 @@ export default function InProgressClient({
         }
       } else if (groupBy === "status") {
         // Group by status label
-        const colors = getProgressColor(item.pct || 0);
+        const colors = getProgressColor(getProgressPct(item));
         groupKey = colors.label;
         groupLabel = colors.label;
       } else if (groupBy === "remaining") {
@@ -1565,7 +1602,7 @@ export default function InProgressClient({
     // Calculate average progress for each group
     for (const group of groups.values()) {
       const totalProgress = group.items.reduce(
-        (sum, item) => sum + (item.pct || 0),
+        (sum, item) => sum + getProgressPct(item),
         0,
       );
       group.avgProgress =
@@ -1640,7 +1677,8 @@ export default function InProgressClient({
     return <div className="min-h-screen bg-black" />;
   }
 
-  const showLoginPrompt = !session || !account || (!auth.loading && !auth.connected);
+  const showLoginPrompt =
+    !session || !account || (dataLoaded && !auth.loading && !auth.connected);
 
   if (showLoginPrompt) {
     return (
@@ -1806,7 +1844,7 @@ export default function InProgressClient({
               >
                 <StatCard
                   label="Series"
-                  value={currentStats?.total ?? 0}
+                  value={displayStats?.total ?? 0}
                   loading={!currentDataLoaded}
                   icon={Tv}
                   colorClass="text-emerald-400"
@@ -1820,7 +1858,7 @@ export default function InProgressClient({
               >
                 <StatCard
                   label="Progreso Medio"
-                  value={`${currentStats?.avgProgress ?? 0}%`}
+                  value={`${displayStats?.avgProgress ?? 0}%`}
                   loading={!currentDataLoaded}
                   icon={TrendingUp}
                   colorClass="text-purple-400"
@@ -1834,7 +1872,7 @@ export default function InProgressClient({
               >
                 <StatCard
                   label="Eps. Vistos"
-                  value={currentStats?.totalEpisodesWatched ?? 0}
+                  value={displayStats?.totalEpisodesWatched ?? 0}
                   loading={!currentDataLoaded}
                   icon={Eye}
                   colorClass="text-sky-400"
@@ -1848,7 +1886,7 @@ export default function InProgressClient({
               >
                 <StatCard
                   label="Eps. Restantes"
-                  value={currentStats?.totalEpisodesRemaining ?? 0}
+                  value={displayStats?.totalEpisodesRemaining ?? 0}
                   loading={!currentDataLoaded}
                   icon={Layers}
                   colorClass="text-amber-400"
@@ -2168,25 +2206,8 @@ export default function InProgressClient({
 
         {/* ========== CONTENT ========== */}
 
-        {/* Loading state */}
-        {(currentLoading || auth.loading) && filtered.length === 0 && (
-          <div
-            className={
-              viewMode === "cards"
-                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6"
-                : viewMode === "poster"
-                  ? "grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
-                  : "grid grid-cols-1 xl:grid-cols-2 gap-4"
-            }
-          >
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} viewMode={viewMode} />
-            ))}
-          </div>
-        )}
-
         {/* Empty state */}
-        {!currentLoading && !auth.loading && filtered.length === 0 && (
+        {!contentPending && filtered.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -2217,7 +2238,7 @@ export default function InProgressClient({
         )}
 
         {/* Items */}
-        {filtered.length > 0 && (
+        {!contentPending && filtered.length > 0 && (
           <AnimatePresence mode="popLayout">
             {grouped && grouped.length > 0 ? (
               // Grouped view

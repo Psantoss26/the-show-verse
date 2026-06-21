@@ -66,6 +66,13 @@ const cardVariants = {
 
 const FAVORITES_INITIAL_RENDER_LIMIT = 24;
 const FAVORITES_RENDER_CHUNK_SIZE = 36;
+const FAVORITES_VIEW_MODES = new Set(["list", "grid", "compact"]);
+
+function readInitialFavoritesViewMode() {
+  if (typeof window === "undefined") return "grid";
+  const saved = window.localStorage.getItem("showverse:favorites:viewMode");
+  return FAVORITES_VIEW_MODES.has(saved) ? saved : "grid";
+}
 
 function scheduleFavoritesRenderChunk(callback) {
   if (typeof window === "undefined") return null;
@@ -190,7 +197,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVORITES_CACHE_KEY = "showverse:favorites:items:v3";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v2";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v4";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let imageChoiceCacheMemory = null;
 let imageChoicePersistHandle = null;
@@ -867,12 +874,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path =
-      cachedBackdrop ||
-      storedBackdrop ||
-      item.backdrop_path ||
-      item.poster_path ||
-      null;
+    const path = cachedBackdrop || storedBackdrop || null;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -880,7 +882,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || item.poster_path || item.backdrop_path || null;
+  const path = cachedPoster || storedPoster || null;
   return path ? buildImg(path, "w500") : null;
 }
 
@@ -888,6 +890,17 @@ function SmartPoster({ item, title, mode = "poster" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
   const imageKey = `${type}:${id}`;
+  const fallbackKey = `${mode}:${type}:${id}`;
+  const fallbackPathRef = useRef(null);
+  if (fallbackPathRef.current?.key !== fallbackKey) {
+    fallbackPathRef.current = {
+      key: fallbackKey,
+      path:
+        mode === "backdrop"
+          ? item.backdrop_path || item.poster_path || null
+          : item.poster_path || item.backdrop_path || null,
+    };
+  }
   const initialSrc = getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);
@@ -911,8 +924,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     const load = async () => {
       if (mode === "backdrop") {
         const bestBackdrop = await getBestBackdropCached(type, id);
-        const finalPath =
-          bestBackdrop || item.backdrop_path || item.poster_path || null;
+        const finalPath = bestBackdrop || fallbackPathRef.current?.path || null;
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
         if (url) await preloadImage(url);
         if (!abort) {
@@ -923,8 +935,8 @@ function SmartPoster({ item, title, mode = "poster" }) {
         return;
       }
 
-      const best = item.poster_path ? null : await getBestPosterCached(type, id);
-      const finalPath = best || item.poster_path || item.backdrop_path || null;
+      const best = await getBestPosterCached(type, id);
+      const finalPath = best || fallbackPathRef.current?.path || null;
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
       if (!abort) {
@@ -938,15 +950,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [
-    mode,
-    type,
-    id,
-    imageKey,
-    item.poster_path,
-    item.backdrop_path,
-    item,
-  ]);
+  }, [mode, type, id, imageKey]);
 
   return (
     <div className="relative w-full h-full">
@@ -2215,7 +2219,7 @@ const FavoriteCard = memo(function FavoriteCard({
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
-  const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
+  const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(() => !readFavoritesCache()?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -2240,18 +2244,7 @@ export default function FavoritesClient() {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Filter states with localStorage persistence
-  const [viewMode, setViewModeState] = useState("grid");
-
-  useEffect(() => {
-    if (preferences?.defaultView) {
-      setViewModeState(preferences.defaultView);
-    } else {
-      const saved = window.localStorage.getItem("showverse:favorites:viewMode");
-      if (saved === "list" || saved === "grid" || saved === "compact") {
-        setViewModeState(saved);
-      }
-    }
-  }, [preferences?.defaultView]);
+  const [viewMode, setViewModeState] = useState(readInitialFavoritesViewMode);
 
   const setViewMode = useCallback((mode) => {
     setViewModeState(mode);

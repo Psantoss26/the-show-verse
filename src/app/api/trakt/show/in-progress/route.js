@@ -25,11 +25,12 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 // Clave: primeros 24 caracteres del access token (suficiente para unicidad).
 // ---------------------------------------------------------------------------
 const _progressCache = new Map(); // cacheKey -> { ts, data }
+const CACHE_VERSION = "v2";
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
 
 function _getCacheKey(token) {
   return typeof token === "string" && token.length > 0
-    ? token.slice(0, 24)
+    ? `${CACHE_VERSION}:${token.slice(0, 24)}`
     : null;
 }
 
@@ -92,6 +93,75 @@ async function fetchTmdbShow(tmdbId) {
   };
 }
 
+function positiveNumber(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function getRegularEpisodeCount(tmdb) {
+  const seasons = Array.isArray(tmdb?.seasons) ? tmdb.seasons : [];
+  const total = seasons.reduce((sum, season) => {
+    const seasonNumber = Number(season?.season_number);
+    const episodeCount = positiveNumber(season?.episode_count);
+    return seasonNumber > 0 ? sum + episodeCount : sum;
+  }, 0);
+
+  return total || positiveNumber(tmdb?.number_of_episodes);
+}
+
+function getItemTmdbId(item) {
+  return positiveNumber(item?.tmdbId || item?.tmdb_id || item?.id);
+}
+
+function calculateProgressPct(completed, total, fallbackPct) {
+  if (total > 0) {
+    return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+  }
+
+  const pct = Number(fallbackPct);
+  return Number.isFinite(pct) ? Math.min(100, Math.max(0, Math.round(pct))) : 0;
+}
+
+async function normalizeBackendInProgressItem(item) {
+  const tmdbId = getItemTmdbId(item);
+  const currentAired = positiveNumber(item?.aired);
+  const currentTotal = positiveNumber(item?.total_episodes || item?.totalEpisodes);
+  const needsEpisodeTotal = tmdbId && !currentAired && !currentTotal;
+  const tmdb = needsEpisodeTotal
+    ? await fetchTmdbShow(tmdbId).catch(() => null)
+    : null;
+
+  const completed = positiveNumber(item?.completed);
+  const episodeTotal =
+    currentAired || currentTotal || getRegularEpisodeCount(tmdb);
+  const pct = calculateProgressPct(completed, episodeTotal, item?.pct);
+
+  return {
+    ...item,
+    tmdbId: item?.tmdbId || tmdbId || null,
+    aired: episodeTotal || currentAired,
+    completed,
+    pct,
+    hasKnownAired: episodeTotal > 0,
+    title_es: item?.title_es || tmdb?.name || null,
+    poster_path: item?.poster_path || tmdb?.poster_path || null,
+    backdrop_path: item?.backdrop_path || tmdb?.backdrop_path || null,
+    first_air_date: item?.first_air_date || tmdb?.first_air_date || null,
+    vote_average: item?.vote_average ?? tmdb?.vote_average ?? null,
+    overview: item?.overview || tmdb?.overview || null,
+    number_of_seasons: item?.number_of_seasons || tmdb?.number_of_seasons || null,
+    total_episodes: episodeTotal || null,
+    genres: Array.isArray(item?.genres) && item.genres.length > 0
+      ? item.genres
+      : (tmdb?.genres || []),
+    tmdb_status: item?.tmdb_status || tmdb?.status || null,
+    networks: Array.isArray(item?.networks) && item.networks.length > 0
+      ? item.networks
+      : (tmdb?.networks || []),
+    detailsHref: item?.detailsHref || (tmdbId ? `/details/tv/${tmdbId}` : null),
+  };
+}
+
 async function mapLimit(arr, limit, fn) {
   const out = new Array(arr.length);
   let i = 0;
@@ -133,7 +203,12 @@ export async function GET(request) {
     try {
       const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress?limit=1000");
       if (backend.ok) {
-        const inProgress = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const backendItems = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const inProgress = (
+          await mapLimit(backendItems, 8, normalizeBackendInProgressItem)
+        ).filter((item) => (
+          item.completed > 0 && (!item.hasKnownAired || item.completed < item.aired)
+        ));
         const itemsWithKnownProgress = inProgress.filter((item) => Number(item.aired || 0) > 0);
 
         const responseData = {
