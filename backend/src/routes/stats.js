@@ -191,6 +191,27 @@ function findNextEpisode(watchedKeys, seasonEpisodeCounts) {
   return null;
 }
 
+function filterWatchedKeysByAvailableEpisodes(watchedKeys, seasonEpisodeCounts) {
+  const filtered = new Set();
+  for (const key of watchedKeys || []) {
+    const [seasonRaw, episodeRaw] = String(key).split('-');
+    const season = Number(seasonRaw);
+    const episode = Number(episodeRaw);
+    const maxEpisode = Number(seasonEpisodeCounts?.[season] || 0);
+    if (
+      Number.isInteger(season) &&
+      Number.isInteger(episode) &&
+      season > 0 &&
+      episode > 0 &&
+      maxEpisode > 0 &&
+      episode <= maxEpisode
+    ) {
+      filtered.add(`${season}-${episode}`);
+    }
+  }
+  return filtered;
+}
+
 function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = new Map()) {
   const byShow = new Map();
 
@@ -229,11 +250,20 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
   return [...byShow.values()]
     .map((show) => {
       const metadata = showMetadataFor(metadataByKey, show.tmdbId);
-      const aired = Number(metadata?.number_of_episodes || 0);
-      const completed = show.watchedKeys.size;
-      const hasKnownAired = aired > 0;
-      const pct = hasKnownAired ? Math.min(100, Math.round((completed / aired) * 100)) : 0;
       const seasonEpisodeCounts = buildSeasonEpisodeCounts(metadata);
+      const aired = Object.values(seasonEpisodeCounts).reduce(
+        (sum, count) => sum + Number(count || 0),
+        0,
+      );
+      const hasKnownAired = aired > 0;
+      const validWatchedKeys = hasKnownAired
+        ? filterWatchedKeysByAvailableEpisodes(
+            show.watchedKeys,
+            seasonEpisodeCounts,
+          )
+        : show.watchedKeys;
+      const completed = validWatchedKeys.size;
+      const pct = hasKnownAired ? Math.min(100, Math.round((completed / aired) * 100)) : 0;
       const firstAirDate = metadata?.first_air_date || null;
       const title = showTitleFromMetadata(metadata) || show.title || 'Sin título';
 
@@ -247,7 +277,7 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
         hasKnownAired,
         completed,
         pct,
-        nextEpisode: findNextEpisode(show.watchedKeys, seasonEpisodeCounts),
+        nextEpisode: findNextEpisode(validWatchedKeys, seasonEpisodeCounts),
         lastEpisode: show.latestEpisode
           ? {
               season: show.latestEpisode.season,

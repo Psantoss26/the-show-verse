@@ -25,7 +25,7 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 // Clave: primeros 24 caracteres del access token (suficiente para unicidad).
 // ---------------------------------------------------------------------------
 const _progressCache = new Map(); // cacheKey -> { ts, data }
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v5";
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
 
 function _getCacheKey(token) {
@@ -122,18 +122,29 @@ function calculateProgressPct(completed, total, fallbackPct) {
   return Number.isFinite(pct) ? Math.min(100, Math.max(0, Math.round(pct))) : 0;
 }
 
+function mergeBackendProgressCandidates(...lists) {
+  const byTmdbId = new Map();
+
+  for (const item of lists.flat()) {
+    const tmdbId = getItemTmdbId(item);
+    if (!tmdbId) continue;
+
+    const existing = byTmdbId.get(tmdbId);
+    byTmdbId.set(tmdbId, existing ? { ...item, ...existing } : item);
+  }
+
+  return Array.from(byTmdbId.values());
+}
+
 async function normalizeBackendInProgressItem(item) {
   const tmdbId = getItemTmdbId(item);
   const currentAired = positiveNumber(item?.aired);
   const currentTotal = positiveNumber(item?.total_episodes || item?.totalEpisodes);
-  const needsEpisodeTotal = tmdbId && !currentAired && !currentTotal;
-  const tmdb = needsEpisodeTotal
-    ? await fetchTmdbShow(tmdbId).catch(() => null)
-    : null;
+  const tmdb = tmdbId ? await fetchTmdbShow(tmdbId).catch(() => null) : null;
 
   const completed = positiveNumber(item?.completed);
   const episodeTotal =
-    currentAired || currentTotal || getRegularEpisodeCount(tmdb);
+    getRegularEpisodeCount(tmdb) || currentTotal || currentAired;
   const pct = calculateProgressPct(completed, episodeTotal, item?.pct);
 
   return {
@@ -201,14 +212,34 @@ async function fetchShowProgress(
 export async function GET(request) {
   if (hasBackendCredentials(request)) {
     try {
-      const backend = await backendFetchJson(request, "/v1/stats/shows/in-progress?limit=1000");
+      const [backend, completedBackend] = await Promise.all([
+        backendFetchJson(request, "/v1/stats/shows/in-progress?limit=1000"),
+        backendFetchJson(request, "/v1/stats/shows/completed"),
+      ]);
       if (backend.ok) {
-        const backendItems = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const backendItems = Array.isArray(backend.json?.results)
+          ? backend.json.results
+          : [];
+        const completedItems =
+          completedBackend.ok && Array.isArray(completedBackend.json?.results)
+            ? completedBackend.json.results
+            : [];
+        const candidates = mergeBackendProgressCandidates(
+          backendItems,
+          completedItems,
+        );
         const inProgress = (
-          await mapLimit(backendItems, 8, normalizeBackendInProgressItem)
-        ).filter((item) => (
-          item.completed > 0 && (!item.hasKnownAired || item.completed < item.aired)
-        ));
+          await mapLimit(candidates, 8, normalizeBackendInProgressItem)
+        ).filter(
+          (item) =>
+            item.completed > 0 &&
+            (!item.hasKnownAired || item.completed < item.aired),
+        );
+        inProgress.sort((a, b) => {
+          const ta = new Date(a.lastWatchedAt || 0).getTime();
+          const tb = new Date(b.lastWatchedAt || 0).getTime();
+          return tb - ta;
+        });
         const itemsWithKnownProgress = inProgress.filter((item) => Number(item.aired || 0) > 0);
 
         const responseData = {
@@ -305,8 +336,7 @@ export async function GET(request) {
         const aired = progress?.aired || 0;
         const completed = progress?.completed || 0;
 
-        // Solo series en progreso (al menos 1 episodio visto pero no completada)
-        if (completed <= 0 || completed >= aired) return null;
+        if (completed <= 0) return null;
 
         const pct = aired > 0 ? Math.round((completed / aired) * 100) : 0;
         const nextEp = progress?.next_episode || null;
@@ -353,10 +383,17 @@ export async function GET(request) {
     });
 
     // 3. Enriquecer con datos de TMDb (ya están en caché ISR de Next.js)
-    const enriched = await mapLimit(inProgress, 8, async (item) => {
+    const enrichedItems = await mapLimit(inProgress, 8, async (item) => {
       const tmdb = await fetchTmdbShow(item.tmdbId).catch(() => null);
+      const episodeTotal =
+        getRegularEpisodeCount(tmdb) || positiveNumber(item.aired);
+      const pct = calculateProgressPct(item.completed, episodeTotal, item.pct);
+
       return {
         ...item,
+        aired: episodeTotal || item.aired,
+        pct,
+        hasKnownAired: episodeTotal > 0,
         title_es: tmdb?.name || null,
         poster_path: tmdb?.poster_path || null,
         backdrop_path: tmdb?.backdrop_path || null,
@@ -364,13 +401,18 @@ export async function GET(request) {
         vote_average: tmdb?.vote_average || null,
         overview: tmdb?.overview || null,
         number_of_seasons: tmdb?.number_of_seasons || null,
-        total_episodes: tmdb?.number_of_episodes || null,
+        total_episodes: episodeTotal || null,
         genres: tmdb?.genres || [],
         tmdb_status: tmdb?.status || null,
         networks: tmdb?.networks || [],
         detailsHref: `/details/tv/${item.tmdbId}`,
       };
     });
+    const enriched = enrichedItems.filter(
+      (item) =>
+        item.completed > 0 &&
+        (!item.hasKnownAired || item.completed < item.aired),
+    );
 
     const responseData = {
       connected: true,

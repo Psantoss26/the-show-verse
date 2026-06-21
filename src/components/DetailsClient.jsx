@@ -2311,14 +2311,14 @@ export default function DetailsClient({
    * Evita parpadeos: no devuelve fallback generico hasta que la inicializacion termine.
    */
   const previewBackdropFallback = useMemo(() => {
+    // Durante la inicializacion no mostramos el backdrop base de TMDb:
+    // puede ser una imagen secundaria que sera reemplazada por la seleccion final.
+    if (!artworkInitialized) return null;
+
     // 1. Combinar todas las fuentes posibles de backdrops.
-    //    Solo usamos data.images si artworkInitialized es true
-    //    para evitar mostrar un backdrop que luego sera reemplazado.
     const allBackdrops = [
       ...(imagesState?.backdrops || []),
-      ...(artworkInitialized && data?.images?.backdrops
-        ? data.images.backdrops
-        : []),
+      ...(data?.images?.backdrops ? data.images.backdrops : []),
     ];
 
     // 2. Aplicar el filtro inteligente para encontrar el mejor backdrop
@@ -2327,11 +2327,7 @@ export default function DetailsClient({
       if (bestPath) return bestPath;
     }
 
-    // 3. Si aun estamos inicializando, devolvemos null (se muestra skeleton)
-    //    para evitar parpadeo de imagen incorrecta que luego se reemplaza.
-    if (!artworkInitialized) return null;
-
-    // 4. Fallback final: si ya terminamos y no hay nada mejor, usamos el generico
+    // 3. Fallback final: si ya terminamos y no hay nada mejor, usamos el generico
     return data?.backdrop_path || null;
   }, [
     imagesState?.backdrops,
@@ -2595,17 +2591,12 @@ export default function DetailsClient({
     const initialPoster =
       (typeof window !== "undefined"
         ? window.localStorage.getItem(posterStorageKey)
-        : null) ||
-      data?.poster_path ||
-      data?.profile_path ||
-      null;
+        : null) || null;
 
     const initialBackdrop =
       (typeof window !== "undefined"
         ? window.localStorage.getItem(backgroundStorageKey)
-        : null) ||
-      data?.backdrop_path ||
-      null;
+        : null) || null;
 
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
@@ -2862,18 +2853,20 @@ export default function DetailsClient({
   // Cadena de prioridad: seleccion del usuario > calculada > datos de TMDb
   // ---------------------------------------------------------------------------
 
-  // Poster a mostrar: seleccion manual > calculado. No usar data.poster_path
-  // como fallback inicial porque puede venir localizado en espanol.
+  // Poster a mostrar: seleccion manual > calculado > fallback final.
+  // Mientras initArtwork no termina, no usamos data.poster_path/profile_path:
+  // puede ser una imagen secundaria que se reemplaza enseguida.
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
-    asTmdbPath(data?.poster_path) ||
-    asTmdbPath(data?.profile_path) ||
+    (artworkInitialized
+      ? asTmdbPath(data?.poster_path) || asTmdbPath(data?.profile_path)
+      : null) ||
     null;
 
   // Backdrop para modo preview: seleccion manual > fallback inteligente
   const previewBackdropPath =
-    (artworkInitialized ? asTmdbPath(selectedPreviewBackdropPath) : null) ||
+    asTmdbPath(selectedPreviewBackdropPath) ||
     asTmdbPath(previewBackdropFallback) ||
     null;
 
@@ -2912,11 +2905,12 @@ export default function DetailsClient({
     [posterLayoutMode, displayPosterPath, isBackdropPath],
   );
 
-  // Backdrop de fondo: seleccion manual > calculado > datos originales
+  // Backdrop de fondo: seleccion manual > calculado > fallback final.
+  // Evita pintar data.backdrop_path antes de saber cual es la imagen final.
   const displayBackdropPath =
     asTmdbPath(selectedBackgroundPath) ||
     asTmdbPath(baseBackdropPath) ||
-    asTmdbPath(data?.backdrop_path) ||
+    (artworkInitialized ? asTmdbPath(data?.backdrop_path) : null) ||
     null;
 
   // Mejor poster neutro (sin idioma) para uso en movil como fondo.
@@ -3375,6 +3369,27 @@ export default function DetailsClient({
     [normalizeWatchedBySeasonMap],
   );
 
+  const getAvailableEpisodeTotal = useCallback((season) => {
+    const total = Number(season?.episode_count || 0);
+    return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+  }, []);
+
+  const getWatchedEpisodeCountForSeason = useCallback(
+    (value, seasonNumber, total) => {
+      const normalized = normalizeWatchedBySeasonMap(value);
+      const episodes = normalized?.[seasonNumber] || [];
+      if (!Array.isArray(episodes) || total <= 0) return 0;
+
+      return new Set(
+        episodes.filter(
+          (episode) =>
+            Number.isInteger(episode) && episode >= 1 && episode <= total,
+        ),
+      ).size;
+    },
+    [normalizeWatchedBySeasonMap],
+  );
+
   const applyWatchedBySeasonState = useCallback(
     (nextValue, { loaded = true } = {}) => {
       const normalized = normalizeWatchedBySeasonMap(nextValue);
@@ -3629,15 +3644,17 @@ export default function DetailsClient({
     if (usable.length === 0) return null;
 
     const totalEpisodes = usable.reduce(
-      (acc, s) => acc + Math.max(0, Number(s?.episode_count || 0)),
+      (acc, s) => acc + getAvailableEpisodeTotal(s),
       0,
     );
     if (totalEpisodes <= 0) return null;
 
     const watchedEpisodes = usable.reduce((acc, s) => {
       const sn = s.season_number;
-      const arr = watchedBySeason?.[sn];
-      return acc + (Array.isArray(arr) ? arr.length : 0);
+      const total = getAvailableEpisodeTotal(s);
+      return (
+        acc + getWatchedEpisodeCountForSeason(watchedBySeason, sn, total)
+      );
     }, 0);
 
     const pct = Math.round((watchedEpisodes / totalEpisodes) * 100);
@@ -3650,6 +3667,8 @@ export default function DetailsClient({
     watchedBySeasonLoaded,
     data?.seasons,
     watchedBySeason,
+    getAvailableEpisodeTotal,
+    getWatchedEpisodeCountForSeason,
   ]);
 
   // Sincroniza trakt.watched con el estado real de episodios vistos.
@@ -11993,11 +12012,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               );
                               const totalEp =
                                 Number(tmdbSeason?.episode_count || 0) || null;
-                              const watchedEp = Array.isArray(
-                                watchedBySeason?.[sn],
-                              )
-                                ? watchedBySeason[sn].length
-                                : 0;
+                              const watchedEp = getWatchedEpisodeCountForSeason(
+                                watchedBySeason,
+                                sn,
+                                totalEp || 0,
+                              );
                               const percentage = totalEp
                                 ? Math.round((watchedEp / totalEp) * 100)
                                 : 0;

@@ -23,11 +23,12 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 // Caché en memoria del lado servidor (misma instancia Node).
 // ---------------------------------------------------------------------------
 const _completedCache = new Map();
+const CACHE_VERSION = "v3";
 const CACHE_TTL_MS = 3 * 60 * 1000;
 
 function _getCacheKey(token) {
   return typeof token === "string" && token.length > 0
-    ? token.slice(0, 24)
+    ? `${CACHE_VERSION}:${token.slice(0, 24)}`
     : null;
 }
 
@@ -84,6 +85,22 @@ async function fetchTmdbShow(tmdbId) {
   };
 }
 
+function positiveNumber(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function getRegularEpisodeCount(tmdb) {
+  const seasons = Array.isArray(tmdb?.seasons) ? tmdb.seasons : [];
+  const total = seasons.reduce((sum, season) => {
+    const seasonNumber = Number(season?.season_number);
+    const episodeCount = positiveNumber(season?.episode_count);
+    return seasonNumber > 0 ? sum + episodeCount : sum;
+  }, 0);
+
+  return total || positiveNumber(tmdb?.number_of_episodes);
+}
+
 async function mapLimit(arr, limit, fn) {
   const out = new Array(arr.length);
   let i = 0;
@@ -102,7 +119,31 @@ export async function GET(request) {
     try {
       const backend = await backendFetchJson(request, "/v1/stats/shows/completed");
       if (backend.ok) {
-        const completedShows = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const backendItems = Array.isArray(backend.json?.results) ? backend.json.results : [];
+        const completedShows = (
+          await mapLimit(backendItems, 8, async (item) => {
+            const tmdbId = positiveNumber(item?.tmdbId || item?.tmdb_id || item?.id);
+            const tmdb = tmdbId ? await fetchTmdbShow(tmdbId).catch(() => null) : null;
+            const episodeTotal =
+              getRegularEpisodeCount(tmdb) ||
+              positiveNumber(item?.total_episodes || item?.totalEpisodes) ||
+              positiveNumber(item?.aired);
+
+            return {
+              ...item,
+              tmdbId: item?.tmdbId || tmdbId || null,
+              aired: episodeTotal || positiveNumber(item?.aired),
+              total_episodes: episodeTotal || null,
+              hasKnownAired: episodeTotal > 0,
+              completed: positiveNumber(item?.completed),
+            };
+          })
+        ).filter(
+          (item) =>
+            item.completed > 0 &&
+            item.hasKnownAired &&
+            item.completed >= item.aired,
+        );
 
         const responseData = {
           connected: true,
@@ -209,8 +250,7 @@ export async function GET(request) {
         const aired = progress?.aired || 0;
         const completed = progress?.completed || 0;
 
-        // Solo series completadas (todos los episodios emitidos vistos)
-        if (completed <= 0 || completed < aired) return null;
+        if (completed <= 0) return null;
 
         const pct = 100;
 
@@ -254,10 +294,16 @@ export async function GET(request) {
     });
 
     // 3. Enriquecer con datos de TMDb
-    const enriched = await mapLimit(completedShows, 8, async (item) => {
+    const enrichedItems = await mapLimit(completedShows, 8, async (item) => {
       const tmdb = await fetchTmdbShow(item.tmdbId).catch(() => null);
+      const episodeTotal =
+        getRegularEpisodeCount(tmdb) || positiveNumber(item.aired);
+
       return {
         ...item,
+        aired: episodeTotal || item.aired,
+        total_episodes: episodeTotal || null,
+        hasKnownAired: episodeTotal > 0,
         title_es: tmdb?.name || null,
         poster_path: tmdb?.poster_path || null,
         backdrop_path: tmdb?.backdrop_path || null,
@@ -265,13 +311,16 @@ export async function GET(request) {
         vote_average: tmdb?.vote_average || null,
         overview: tmdb?.overview || null,
         number_of_seasons: tmdb?.number_of_seasons || null,
-        total_episodes: tmdb?.number_of_episodes || null,
         genres: tmdb?.genres || [],
         tmdb_status: tmdb?.status || null,
         networks: tmdb?.networks || [],
         detailsHref: `/details/tv/${item.tmdbId}`,
       };
     });
+    const enriched = enrichedItems.filter(
+      (item) =>
+        item.completed > 0 && item.hasKnownAired && item.completed >= item.aired,
+    );
 
     const responseData = {
       connected: true,
