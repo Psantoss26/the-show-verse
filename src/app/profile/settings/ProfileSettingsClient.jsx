@@ -16,7 +16,6 @@ import {
   SlidersHorizontal,
   User,
   Bell,
-  RefreshCw,
   Layers,
   ChevronRight,
   Database,
@@ -449,241 +448,6 @@ function ImportPanel({
   );
 }
 
-function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoToConnections }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const netflixConn = connections.find((c) => c.provider === "netflix");
-  const isConnected = !!netflixConn?.connected;
-
-  const requestActivitySync = useCallback(() => {
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (value) => {
-        if (done) return;
-        done = true;
-        document.removeEventListener("response-netflix-sync", handleResponse);
-        resolve(value);
-      };
-      const handleResponse = (event) => finish(event.detail || null);
-
-      document.addEventListener("response-netflix-sync", handleResponse);
-      document.dispatchEvent(new CustomEvent("request-netflix-sync", { detail: { full: true } }));
-
-      sendNetflixExtensionMessage({ action: "syncNetflixActivity", full: true }).then((response) => {
-        if (response) finish(response);
-      });
-
-      // La lectura del historial completo puede tardar; damos margen amplio.
-      window.setTimeout(() => finish(null), 60000);
-    });
-  }, []);
-
-  const handleSyncNow = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const response = await requestActivitySync();
-      if (!response) {
-        throw new Error(
-          "No se pudo contactar con la extensión. Asegúrate de tener la sesión de Netflix abierta y la extensión instalada.",
-        );
-      }
-      if (!response.success) {
-        throw new Error(response.error || "No se pudo leer la actividad de Netflix.");
-      }
-      const imported = Number(response.imported || 0);
-      setSuccess(
-        imported > 0
-          ? `¡Sincronizado! Se añadieron ${imported} visionado(s) desde Netflix.`
-          : "Tu historial ya estaba al día con Netflix.",
-      );
-      if (imported > 0) onImported?.();
-    } catch (err) {
-      setError(err?.message || "No se pudo sincronizar con Netflix.");
-    } finally {
-      setLoading(false);
-    }
-  }, [onImported, requestActivitySync]);
-
-  const handleSimulate = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const res = await fetch("/api/netflix/simulate", {
-        method: "POST",
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || "Error al simular el visionado.");
-      setSuccess(`¡Sincronizado! Se simuló: "${json.item?.title || "Nuevo contenido"}"`);
-      onImported?.();
-    } catch (err) {
-      setError(err?.message || "No se pudo simular el visionado.");
-    } finally {
-      setLoading(false);
-    }
-  }, [onImported]);
-
-  const handleDisconnect = useCallback(async () => {
-    if (!confirm("¿Seguro que deseas desvincular tu cuenta de Netflix?")) return;
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const res = await fetch("/api/netflix/disconnect", {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Error al desvincular Netflix.");
-      document.dispatchEvent(new CustomEvent("request-netflix-unbind"));
-      void sendNetflixExtensionMessage({ action: "clearSyncConfig" });
-      
-      // Notificar cambio de conexión
-      window.dispatchEvent(
-        new CustomEvent("netflix-connection-changed", { detail: { connected: false } })
-      );
-      
-      await fetchConnections();
-    } catch (err) {
-      setError(err?.message || "No se pudo desvincular Netflix.");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchConnections]);
-
-  return (
-    <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 group flex flex-col justify-between overflow-hidden relative`}>
-      {isConnected && (
-        <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
-      )}
-      
-      <div>
-        <div className="mb-4 flex items-start gap-4">
-          <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
-            <Layers className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div>
-            <h3 className="text-base font-extrabold text-white tracking-wide">
-              Sincronización de streaming
-            </h3>
-            <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Obtén de forma automática y en tiempo real todo lo que ves en tus plataformas, sin subir archivos manuales.
-            </p>
-          </div>
-        </div>
-
-        <PlatformBadges
-          activeId={isConnected ? netflixConn?.metadata?.lastPlatform || null : null}
-          className="mb-4"
-        />
-
-        <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
-          <span className="font-bold block text-red-400 text-sm mb-1">Sincronización real en navegador</span>
-          The Show Verse usa una extensión oficial y revocable para detectar lo que reproduces desde tu propio navegador. La app no guarda contraseñas ni cookies de las plataformas.
-        </div>
-
-        {isConnected ? (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 text-xs leading-relaxed text-emerald-300 flex items-start gap-3">
-              <span className="relative flex h-2 w-2 mt-1.5 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <div>
-                <span className="font-bold block text-white text-sm">Sincronización Automática Activa</span>
-                Historial vinculado a <strong className="text-emerald-200">{netflixConn.email}</strong>. La app actualizará tu visionado de forma automática en cuanto reproduzcas contenido en cualquiera de tus plataformas.
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-              <span className="block text-xs font-black uppercase tracking-widest text-red-400/80">
-                Sincronización del historial
-              </span>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Tu historial se importa automáticamente al conectar y se actualiza en segundo plano. Usa este botón si quieres forzar una sincronización inmediata con tu actividad real de Netflix.
-              </p>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleSyncNow}
-                  disabled={loading}
-                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-red-600 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Leyendo tu actividad de Netflix...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Sincronizar historial de Netflix ahora
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSimulate}
-                  disabled={loading}
-                  className="flex min-h-9 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-[11px] font-bold text-zinc-400 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Diagnóstico: simular visionado
-                </button>
-
-                {success && (
-                  <p className="text-xs font-bold text-emerald-400 mt-1" role="status">
-                    {success}
-                  </p>
-                )}
-                {error && (
-                  <p className="text-xs font-bold text-red-400 mt-1" role="alert">
-                    {error}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
-              Conecta tu cuenta de Netflix desde la pestaña de <strong>Conexiones</strong> para iniciar el monitoreo automático. El sistema importará tu historial inicial y actualizará tu visionado de películas y series de forma automática.
-            </div>
-            
-            <button
-              type="button"
-              onClick={onGoToConnections}
-              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400"
-            >
-              <Link2 className="mr-2 h-4 w-4" />
-              Configurar Conexión a Netflix
-            </button>
-          </div>
-        )}
-      </div>
-
-      {isConnected && (
-        <div className="mt-6 border-t border-white/5 pt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={handleDisconnect}
-            disabled={loading}
-            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 px-3 text-xs font-bold text-red-400 transition"
-          >
-            Desvincular Netflix
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ProfileSettingsClient() {
   const { preferences, updatePreference, loadingPreferences, authenticated, hydrated, user } = useAuth();
   const { t } = useTranslation();
@@ -1001,7 +765,6 @@ function ProfileSettingsClient() {
 
   const tabs = [
     { id: "personalization", label: t("settings_personal", "Preferencias"), icon: SlidersHorizontal },
-    { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
 
@@ -1124,18 +887,18 @@ function ProfileSettingsClient() {
 
       {!isNetflixConnected && (
         <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-          <span className="block text-xs font-black uppercase tracking-widest text-red-400/80">
+          <span className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
             Activación guiada
           </span>
           <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-            Pulsa Conectar en la pestaña Conexiones. Si la extensión oficial no está instalada, te llevaremos a instalarla y podrás continuar el vínculo al volver.
+            Conecta tus plataformas de streaming desde la pestaña Conexiones. Si la extensión oficial no está instalada, te llevaremos a instalarla y podrás continuar el vínculo al volver.
           </p>
           <button
             type="button"
             onClick={() => setActiveTab("connections")}
-            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
           >
-            Ir a conectar Netflix
+            Ir a conectar plataformas
           </button>
         </div>
       )}
@@ -1218,59 +981,6 @@ function ProfileSettingsClient() {
                 </motion.div>
               )}
 
-              {activeTab === "imports" && (
-                <motion.div
-                  key="imports"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.25 }}
-                  className="grid gap-6 grid-cols-1"
-                >
-                  <ImportPanel
-                    title={t("settings_import_trakt", "Importar desde Trakt")}
-                    description={t("settings_import_trakt_desc", "Trae tu historial de visionado y tus puntuaciones a The Show Verse.")}
-                    color="emerald"
-                    connectHref={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
-                    connectLabel={t("settings_connect", "Conectar Trakt")}
-                    startUrl="/api/trakt/import/start"
-                    statusUrl="/api/trakt/import/status"
-                    startBody={{ mode: "history_ratings" }}
-                    buttonLabel={t("settings_import_now", "Importar ahora")}
-                    stepsConfig={[
-                      { key: "history", label: t("nav_history", "Historial") },
-                      { key: "ratings", label: "Ratings" },
-                    ]}
-                    logoSrc="/logo-Trakt.png"
-                  />
-                  <ImportPanel
-                    title={t("settings_import_tmdb", "Importar desde TMDb")}
-                    description={t("settings_import_tmdb_desc", "Trae tus favoritos, pendientes y puntuaciones antiguas a The Show Verse.")}
-                    color="sky"
-                    connectHref={`/api/tmdb/auth/start?next=${encodeURIComponent("/profile/settings")}`}
-                    connectLabel={t("settings_connect", "Conectar TMDb")}
-                    startUrl="/api/tmdb/import/start"
-                    statusUrl="/api/tmdb/import/status"
-                    buttonLabel={t("settings_import_now", "Importar TMDb")}
-                    stepsConfig={[
-                      { key: "favorites", label: t("nav_favorites", "Favoritos") },
-                      { key: "watchlist", label: t("nav_watchlist", "Pendientes") },
-                      { key: "ratings", label: "Ratings" },
-                    ]}
-                    logoSrc="/logo-TMDb.png"
-                  />
-                  <NetflixAutoSyncPanel
-                    connections={connections}
-                    fetchConnections={fetchConnections}
-                    onImported={() => {
-                      window.sessionStorage?.removeItem("showverse:profile:stats:v7");
-                      window.sessionStorage?.removeItem("showverse:profile:data:v7");
-                    }}
-                    onGoToConnections={() => setActiveTab("connections")}
-                  />
-                </motion.div>
-              )}
-
               {activeTab === "connections" && (
                 <motion.div
                   key="connections"
@@ -1280,6 +990,58 @@ function ProfileSettingsClient() {
                   transition={{ duration: 0.25 }}
                   className="space-y-6"
                 >
+                  {/* Streaming sync Connection (principal) */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-5`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                      <div className="flex items-start gap-4">
+                        <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 group-hover:scale-105 transition-all duration-300">
+                          <Layers className="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-extrabold text-white tracking-wide">Plataformas de streaming</h3>
+                            {isNetflixConnected ? (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Sincronizado
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                                Automático
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                            {isNetflixConnected
+                              ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas de streaming.`
+                              : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves en tus plataformas de streaming, sin subir archivos."}
+                          </p>
+                        </div>
+                      </div>
+                      {isNetflixConnected ? (
+                        <button
+                          type="button"
+                          onClick={handleDisconnectNetflix}
+                          className="min-h-10 px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        >
+                          Desconectar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleConnectNetflix}
+                          className="min-h-10 px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        >
+                          Conectar
+                        </button>
+                      )}
+                    </div>
+
+                    <PlatformBadges
+                      activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
+                    />
+                  </div>
+
                   {/* Plex Connection */}
                   <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
                     <div className="flex items-start gap-4">
@@ -1357,58 +1119,6 @@ function ProfileSettingsClient() {
                     </Link>
                   </div>
 
-                  {/* Streaming sync Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-5`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
-                        <Layers className="h-6 w-6" aria-hidden="true" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Sincronización de streaming</h3>
-                          {isNetflixConnected ? (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                              Sincronizado
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                              Automático
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          {isNetflixConnected
-                            ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas.`
-                            : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves, sin subir archivos."}
-                        </p>
-                      </div>
-                    </div>
-                    {isNetflixConnected ? (
-                      <button
-                        type="button"
-                        onClick={handleDisconnectNetflix}
-                        className="min-h-10 px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                      >
-                        Desconectar
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleConnectNetflix}
-                        className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                      >
-                        Conectar
-                      </button>
-                    )}
-                    </div>
-
-                    <PlatformBadges
-                      activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
-                    />
-                  </div>
-
                   {/* Letterboxd Connection */}
                   <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
                     <div className="flex items-start gap-4">
@@ -1462,6 +1172,49 @@ function ProfileSettingsClient() {
                       Conectar
                     </button>
                   </div>
+
+                  {/* Importar historial y puntuaciones desde otros servicios */}
+                  <div className="pt-2">
+                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
+                      Importar datos
+                    </span>
+                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                      Trae tu historial, puntuaciones y listas de otros servicios a The Show Verse.
+                    </p>
+                  </div>
+
+                  <ImportPanel
+                    title={t("settings_import_trakt", "Importar desde Trakt")}
+                    description={t("settings_import_trakt_desc", "Trae tu historial de visionado y tus puntuaciones a The Show Verse.")}
+                    color="emerald"
+                    connectHref={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
+                    connectLabel={t("settings_connect", "Conectar Trakt")}
+                    startUrl="/api/trakt/import/start"
+                    statusUrl="/api/trakt/import/status"
+                    startBody={{ mode: "history_ratings" }}
+                    buttonLabel={t("settings_import_now", "Importar ahora")}
+                    stepsConfig={[
+                      { key: "history", label: t("nav_history", "Historial") },
+                      { key: "ratings", label: "Ratings" },
+                    ]}
+                    logoSrc="/logo-Trakt.png"
+                  />
+                  <ImportPanel
+                    title={t("settings_import_tmdb", "Importar desde TMDb")}
+                    description={t("settings_import_tmdb_desc", "Trae tus favoritos, pendientes y puntuaciones antiguas a The Show Verse.")}
+                    color="sky"
+                    connectHref={`/api/tmdb/auth/start?next=${encodeURIComponent("/profile/settings")}`}
+                    connectLabel={t("settings_connect", "Conectar TMDb")}
+                    startUrl="/api/tmdb/import/start"
+                    statusUrl="/api/tmdb/import/status"
+                    buttonLabel={t("settings_import_now", "Importar TMDb")}
+                    stepsConfig={[
+                      { key: "favorites", label: t("nav_favorites", "Favoritos") },
+                      { key: "watchlist", label: t("nav_watchlist", "Pendientes") },
+                      { key: "ratings", label: "Ratings" },
+                    ]}
+                    logoSrc="/logo-TMDb.png"
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
