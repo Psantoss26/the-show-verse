@@ -36,6 +36,42 @@ const NETFLIX_EXTENSION_INSTALL_URL =
     ? `https://chromewebstore.google.com/detail/${NETFLIX_EXTENSION_ID}`
     : "");
 
+// Plataformas de streaming que la extensión sincroniza en tiempo real. El `id`
+// coincide con el que envía la extensión (metadata.lastPlatform).
+const STREAMING_PLATFORMS = [
+  { id: "netflix", name: "Netflix", icon: "/netflix.png" },
+  { id: "prime", name: "Prime Video", icon: "/amazonprimevideo.png" },
+  { id: "max", name: "Max", icon: "/hbomax.png" },
+  { id: "disney", name: "Disney+", icon: "/disney.png" },
+  { id: "plex", name: "Plex", icon: "/plex.png" },
+];
+
+function PlatformBadges({ activeId = null, className = "" }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      {STREAMING_PLATFORMS.map((platform) => {
+        const active = activeId === platform.id;
+        return (
+          <div
+            key={platform.id}
+            title={active ? `${platform.name} · último visionado` : platform.name}
+            className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
+              active
+                ? "border-emerald-400/40 bg-emerald-500/10"
+                : "border-white/10 bg-white/[0.03]"
+            }`}
+          >
+            <img src={platform.icon} alt={platform.name} className="h-4 w-4 object-contain" />
+            <span className={`text-[11px] font-bold ${active ? "text-emerald-200" : "text-zinc-300"}`}>
+              {platform.name}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function sendNetflixExtensionMessage(message) {
   return new Promise((resolve) => {
     if (
@@ -61,44 +97,35 @@ function sendNetflixExtensionMessage(message) {
   });
 }
 
-// La extensión instalada marca su presencia en cada página de la app mediante el
-// content script (atributo en <html> + evento). Esto permite detectar si está
-// instalada sin depender del ID público.
-const EXT_PRESENCE_ATTR = "data-tsv-netflix-ext";
-
-function isNetflixExtensionPresent() {
-  return (
-    typeof document !== "undefined" &&
-    document.documentElement.hasAttribute(EXT_PRESENCE_ATTR)
-  );
-}
-
-function waitForExtensionPresence(timeout = 800) {
+// Detección de presencia de la extensión por petición/respuesta vía el content
+// script (no muta el DOM, así no rompe la hidratación de React).
+function pingExtensionBridge(timeout = 700) {
   return new Promise((resolve) => {
-    if (isNetflixExtensionPresent()) {
-      resolve(true);
+    if (typeof document === "undefined") {
+      resolve(false);
       return;
     }
     let done = false;
     const finish = (value) => {
       if (done) return;
       done = true;
-      document.removeEventListener("tsv-netflix-ext-ready", onReady);
+      document.removeEventListener("response-tsv-ext-ping", onResponse);
       resolve(value);
     };
-    const onReady = () => finish(true);
-    document.addEventListener("tsv-netflix-ext-ready", onReady);
-    window.setTimeout(() => finish(isNetflixExtensionPresent()), timeout);
+    const onResponse = () => finish(true);
+    document.addEventListener("response-tsv-ext-ping", onResponse);
+    document.dispatchEvent(new CustomEvent("request-tsv-ext-ping"));
+    window.setTimeout(() => finish(false), timeout);
   });
 }
 
 // Comprueba si la extensión está instalada. La mensajería externa (por ID)
 // funciona incluso en pestañas ya abiertas justo tras instalarla desde la Store;
-// el atributo del content script es la señal secundaria.
+// el puente del content script es la señal secundaria.
 async function detectNetflixExtension() {
   const ping = await sendNetflixExtensionMessage({ action: "ping" });
   if (ping?.installed || ping?.success) return true;
-  return waitForExtensionPresence(800);
+  return pingExtensionBridge(700);
 }
 
 function SettingsBackground() {
@@ -538,21 +565,26 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
       <div>
         <div className="mb-4 flex items-start gap-4">
           <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
-            <img src="/netflix.png" alt="Netflix" className="h-6 w-6 object-contain" />
+            <Layers className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
             <h3 className="text-base font-extrabold text-white tracking-wide">
-              Sincronización de Netflix
+              Sincronización de streaming
             </h3>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Obtén de forma automática y en tiempo real toda tu actividad de visionado de Netflix sin necesidad de subir archivos manuales.
+              Obtén de forma automática y en tiempo real todo lo que ves en tus plataformas, sin subir archivos manuales.
             </p>
           </div>
         </div>
 
+        <PlatformBadges
+          activeId={isConnected ? netflixConn?.metadata?.lastPlatform || null : null}
+          className="mb-4"
+        />
+
         <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
           <span className="font-bold block text-red-400 text-sm mb-1">Sincronización real en navegador</span>
-          The Show Verse usa una extensión oficial y revocable para detectar lo que reproduces en Netflix desde tu propio navegador. La app no guarda contraseñas ni cookies de Netflix.
+          The Show Verse usa una extensión oficial y revocable para detectar lo que reproduces desde tu propio navegador. La app no guarda contraseñas ni cookies de las plataformas.
         </div>
 
         {isConnected ? (
@@ -564,7 +596,7 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
               </span>
               <div>
                 <span className="font-bold block text-white text-sm">Sincronización Automática Activa</span>
-                Historial vinculado a <strong className="text-emerald-200">{netflixConn.email}</strong> (Perfil: {netflixConn.metadata?.profileName || "Principal"}). La app actualizará tu visionado de forma automática en cuanto reproduzcas contenido en Netflix.
+                Historial vinculado a <strong className="text-emerald-200">{netflixConn.email}</strong>. La app actualizará tu visionado de forma automática en cuanto reproduzcas contenido en cualquiera de tus plataformas.
               </div>
             </div>
 
@@ -743,7 +775,7 @@ function ProfileSettingsClient() {
         if (response) finish(response);
       });
 
-      window.setTimeout(() => finish(null), 2500);
+      window.setTimeout(() => finish(null), 6000);
     });
   }, []);
 
@@ -759,7 +791,11 @@ function ProfileSettingsClient() {
   }, []);
 
   // Realiza la conexión propiamente dicha asumiendo que la extensión ya está
-  // instalada: detecta la sesión de Netflix, genera el token y lo vincula.
+  // instalada: genera el token de sincronización del navegador y lo vincula.
+  // La detección de Netflix es OPCIONAL: si hay sesión activa, la usamos para
+  // mostrar la cuenta y habilitar el backfill de historial de Netflix; si no, la
+  // conexión funciona igualmente para el resto de plataformas (Prime, Max,
+  // Disney+, Plex) en tiempo real.
   const proceedNetflixConnect = useCallback(async () => {
     setAwaitingInstall(false);
     setConnectLoading(true);
@@ -776,19 +812,26 @@ function ProfileSettingsClient() {
         }),
       ]);
 
-      // La extensión no respondió: probablemente aún no está instalada/activa.
+      let hasNetflix = Boolean(detailsResult && detailsResult.success && detailsResult.email);
+
+      // Si la extensión no respondió en absoluto, confirmamos su presencia con un
+      // ping. Si tampoco está → todavía no está instalada; si está, seguimos sin
+      // sesión de Netflix.
       if (!detailsResult) {
-        timers.forEach(clearTimeout);
-        setConnectLoading(false);
-        setAwaitingInstall(true);
-        return;
-      }
-      if (!detailsResult.success) {
-        throw new Error(detailsResult.error || "No se detectó una sesión activa en Netflix.");
+        const present = await detectNetflixExtension();
+        if (!present) {
+          timers.forEach(clearTimeout);
+          setConnectLoading(false);
+          setAwaitingInstall(true);
+          return;
+        }
+        hasNetflix = false;
       }
 
-      const selectedEmail = detailsResult.email;
-      const selectedProfile = detailsResult.profileName || "Principal";
+      const selectedEmail = hasNetflix
+        ? detailsResult.email
+        : user?.email || `tsv-${user?.id || "user"}@users.theshowverse.local`;
+      const selectedProfile = hasNetflix ? detailsResult.profileName || "Principal" : "Streaming";
 
       setConnectedEmail(selectedEmail);
 
@@ -838,7 +881,7 @@ function ProfileSettingsClient() {
       setConnectError(err?.message || "No se pudo conectar la cuenta. Inténtalo de nuevo.");
       setConnectLoading(false);
     }
-  }, [requestNetflixExtensionDetails, bindNetflixExtension, fetchConnections]);
+  }, [requestNetflixExtensionDetails, bindNetflixExtension, fetchConnections, user]);
 
   const handleConnectNetflix = useCallback(async () => {
     setShowNetflixModal(true);
@@ -1314,15 +1357,16 @@ function ProfileSettingsClient() {
                     </Link>
                   </div>
 
-                  {/* Netflix Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
+                  {/* Streaming sync Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-5`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                     <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/netflix.png" alt="Netflix" className="h-6 w-6 object-contain" />
+                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
+                        <Layers className="h-6 w-6" aria-hidden="true" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Netflix</h3>
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Sincronización de streaming</h3>
                           {isNetflixConnected ? (
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1336,8 +1380,8 @@ function ProfileSettingsClient() {
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                           {isNetflixConnected
-                            ? `Vinculado a ${netflixAccountInfo.email} (Perfil: ${netflixAccountInfo.metadata?.profileName || "Principal"}). Historial en tiempo real activo.`
-                            : "Vincula Netflix con instalación guiada de la extensión oficial para registrar automáticamente tu historial en tiempo real sin subir archivos."}
+                            ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas.`
+                            : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves, sin subir archivos."}
                         </p>
                       </div>
                     </div>
@@ -1358,6 +1402,11 @@ function ProfileSettingsClient() {
                         Conectar
                       </button>
                     )}
+                    </div>
+
+                    <PlatformBadges
+                      activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
+                    />
                   </div>
 
                   {/* Letterboxd Connection */}
@@ -1497,7 +1546,7 @@ function ProfileSettingsClient() {
                         {connectStep > 0 ? "✓" : "●"}
                       </div>
                       <span className={connectStep === 0 ? "text-white font-bold" : "text-zinc-400"}>
-                        Comprobando extensión oficial y cuenta de Netflix activa...
+                        Comprobando la extensión de The Show Verse...
                       </span>
                     </div>
 
@@ -1508,7 +1557,7 @@ function ProfileSettingsClient() {
                         {connectStep > 1 ? "✓" : "●"}
                       </div>
                       <span className={connectStep === 1 ? "text-white font-bold" : connectStep < 1 ? "text-zinc-600" : "text-zinc-400"}>
-                        ¡Sesión detectada para {connectedEmail || "Netflix"}! Autorizando acceso...
+                        Cuenta vinculada: {connectedEmail || "tu cuenta"}. Autorizando sincronización...
                       </span>
                     </div>
 

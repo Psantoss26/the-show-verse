@@ -43,7 +43,8 @@
         "https://*.disneyplus.com/*",
         "https://app.plex.tv/*"
       ],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "all_frames": true
     },
     {
       "matches": [
