@@ -253,13 +253,16 @@ function hasProfileData(json) {
   );
 }
 
-async function buildProfileFromExistingBackendRoutes(request) {
+async function buildProfileFromExistingBackendRoutes(request, { compact = false } = {}) {
+  const historyLimit = compact ? 200 : 1500;
+  const ratingsLimit = compact ? 80 : 200;
+  const watchlistLimit = compact ? 40 : 100;
   const [me, statsRoot, history, ratings, watchlist] = await Promise.all([
     backendFetchJson(request, "/v1/auth/me"),
     backendFetchJson(request, "/v1/stats"),
-    backendFetchJson(request, "/v1/history?limit=1500"),
-    backendFetchJson(request, "/v1/ratings?limit=200"),
-    backendFetchJson(request, "/v1/watchlist?limit=100"),
+    backendFetchJson(request, `/v1/history?limit=${historyLimit}`),
+    backendFetchJson(request, `/v1/ratings?limit=${ratingsLimit}`),
+    backendFetchJson(request, `/v1/watchlist?limit=${watchlistLimit}`),
   ]);
 
   if ([me, statsRoot, history, ratings, watchlist].some((result) => result.status === 401)) {
@@ -297,6 +300,7 @@ async function buildProfileFromExistingBackendRoutes(request) {
     json: {
       authenticated: true,
       source: "showverse",
+      compact,
       user: userPayload(me.json.user),
       stats: {
         ...emptyStats,
@@ -341,13 +345,17 @@ async function buildProfileFromExistingBackendRoutes(request) {
 }
 
 export async function GET(request) {
-  let backend = await backendFetchJson(request, "/v1/stats/profile");
+  const compact = request.nextUrl?.searchParams?.get("compact") === "1";
+  let backend = await backendFetchJson(
+    request,
+    `/v1/stats/profile${compact ? "?compact=1" : ""}`,
+  );
 
   if (backend.ok && !hasProfileData(backend.json)) {
-    const composed = await buildProfileFromExistingBackendRoutes(request);
+    const composed = await buildProfileFromExistingBackendRoutes(request, { compact });
     if (composed.ok && hasProfileData(composed.json)) backend = composed;
   } else if (!backend.ok && backend.status !== 401 && !backend.skipped) {
-    const composed = await buildProfileFromExistingBackendRoutes(request);
+    const composed = await buildProfileFromExistingBackendRoutes(request, { compact });
     if (composed.ok) backend = composed;
   }
 

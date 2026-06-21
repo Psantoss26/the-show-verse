@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import DetailsSectionMenu from "@/components/DetailsSectionMenu";
 import {
   Children,
   useRef,
@@ -50,6 +51,7 @@ const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v7";
 const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v2";
 const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
+const PROFILE_FULL_REFRESH_DELAY_MS = 80;
 
 function scheduleProfileDeferredOverview(callback) {
   if (typeof window === "undefined") return null;
@@ -98,6 +100,10 @@ function clearProfileSessionCache() {
     window.sessionStorage.removeItem(PROFILE_DATA_CACHE_KEY);
     window.sessionStorage.removeItem(PROFILE_USER_CACHE_KEY);
   } catch {}
+}
+
+function isCompactProfilePayload(payload) {
+  return Boolean(payload?.compact);
 }
 
 function createEmptyProfileStatsData() {
@@ -988,70 +994,14 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
   ];
 
   return (
-    <div className={className}>
-      <div
-        className="relative isolate w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 p-2 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-[50px] sm:rounded-3xl lg:w-fit"
-        role="tablist"
-        aria-label="Secciones del perfil"
-      >
-        <div className="grid w-full grid-cols-3 items-center gap-1.5 lg:flex lg:w-fit lg:gap-2">
-          {tabs.map((tab) => {
-            const active = viewMode === tab.id;
-            return (
-              <motion.button
-                key={tab.id}
-                type="button"
-                onClick={() => setViewMode(tab.id)}
-                role="tab"
-                aria-selected={active}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`group relative inline-flex h-11 min-w-0 items-center justify-center overflow-hidden rounded-xl px-2 text-sm font-semibold uppercase tracking-wider transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 sm:px-4 lg:min-w-[155px] ${
-                  active
-                    ? "text-white"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                }`}
-              >
-                <AnimatePresence>
-                  {active && (
-                    <motion.span
-                      layoutId="profileSectionActiveBg"
-                      className="absolute inset-0 rounded-xl bg-black/20 bg-gradient-to-br from-indigo-500/40 via-white/10 to-indigo-500/10 shadow-[0_10px_30px_-10px_rgba(129,140,248,0.55)] backdrop-blur-lg"
-                      initial={{ opacity: 0, scale: 0.96 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.96 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 700,
-                        damping: 28,
-                      }}
-                    />
-                  )}
-                </AnimatePresence>
-                {active && (
-                  <motion.span
-                    layoutId="profileSectionActiveLine"
-                    className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r from-indigo-500 via-violet-400 to-cyan-400 shadow-[0_0_8px_rgba(129,140,248,0.65)]"
-                  />
-                )}
-                <span className="relative z-10 flex min-w-0 items-center gap-2">
-                  <tab.icon
-                    className={`h-5 w-5 shrink-0 transition-all duration-300 ${
-                      active
-                        ? "text-indigo-300 drop-shadow-[0_0_6px_rgba(129,140,248,0.75)]"
-                        : "text-zinc-400 group-hover:text-zinc-200"
-                    }`}
-                  />
-                  <span className="min-w-0 truncate text-xs sm:text-sm">
-                    {tab.label}
-                  </span>
-                </span>
-              </motion.button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <DetailsSectionMenu
+      items={tabs}
+      activeId={viewMode}
+      onChange={setViewMode}
+      className={["w-full lg:w-[520px]", className].join(" ")}
+      maxWidthClass="max-w-none"
+      colorScheme="indigo"
+    />
   );
 }
 
@@ -1360,26 +1310,85 @@ export default function StatsClient({ connectNext = "/profile" }) {
       setLoading(false);
     };
 
+    const applyProfileJson = (json) => {
+      const profile = {
+        user: json.user || showVerseProfileUser,
+        recentHistory: Array.isArray(json.recentHistory)
+          ? json.recentHistory
+          : [],
+        recentRatings: Array.isArray(json.recentRatings)
+          ? json.recentRatings
+          : [],
+        watchlist: Array.isArray(json.watchlist) ? json.watchlist : [],
+      };
+
+      const statsPayload = {
+        ...createEmptyProfileStatsData(),
+        ...json,
+        source: "showverse",
+        stats: {
+          ...createEmptyProfileStatsData().stats,
+          ...(json.stats || {}),
+        },
+        history: Array.isArray(json.history) ? json.history : [],
+        watchedMovies: Array.isArray(json.watchedMovies)
+          ? json.watchedMovies
+          : [],
+        watchedShows: Array.isArray(json.watchedShows)
+          ? json.watchedShows
+          : [],
+        topActors: Array.isArray(json.topActors) ? json.topActors : [],
+        topDirectors: Array.isArray(json.topDirectors) ? json.topDirectors : [],
+      };
+
+      setProfileData(profile);
+      setData(statsPayload);
+      writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, profile);
+      writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, statsPayload);
+      if (profile.user) {
+        writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
+          user: profile.user,
+        });
+      }
+
+      return statsPayload;
+    };
+
+    const fetchProfileJson = async (compact) => {
+      const res = await fetch(`/api/profile${compact ? "?compact=1" : ""}`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (ignore) return null;
+      if (res.status === 401) return { unauthorized: true };
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          error: json?.error || "No se pudieron cargar las estadísticas.",
+          status: res.status,
+        };
+      }
+      return { json };
+    };
+
     const fetchData = async () => {
       setError("");
       if (!cachedStats) setLoading(true);
 
       try {
-        const res = await fetch("/api/profile", {
-          cache: "no-store",
-          credentials: "include",
-        });
+        const shouldUseCompactFirst =
+          !cachedStats || isCompactProfilePayload(cachedStats);
+        const initialResult = await fetchProfileJson(shouldUseCompactFirst);
         if (ignore) return;
-        if (res.status === 401) {
+        if (initialResult?.unauthorized) {
           applyShowVerseFallback();
           return;
         }
-        if (!res.ok) {
-          const json = await res.json().catch(() => ({}));
+        if (initialResult?.error) {
           if (authenticated) {
             console.warn(
               "No se pudo cargar el perfil desde el backend propio:",
-              json?.error || res.status,
+              initialResult.error || initialResult.status,
             );
             applyShowVerseFallback();
           } else if (!cachedStats) {
@@ -1388,47 +1397,27 @@ export default function StatsClient({ connectNext = "/profile" }) {
           return;
         }
 
-        const json = await res.json();
+        const initialStats = initialResult?.json
+          ? applyProfileJson(initialResult.json)
+          : null;
         if (ignore) return;
+        setLoading(false);
 
-        const profile = {
-          user: json.user || showVerseProfileUser,
-          recentHistory: Array.isArray(json.recentHistory)
-            ? json.recentHistory
-            : [],
-          recentRatings: Array.isArray(json.recentRatings)
-            ? json.recentRatings
-            : [],
-          watchlist: Array.isArray(json.watchlist) ? json.watchlist : [],
-        };
-
-        const statsPayload = {
-          ...createEmptyProfileStatsData(),
-          ...json,
-          source: "showverse",
-          stats: {
-            ...createEmptyProfileStatsData().stats,
-            ...(json.stats || {}),
-          },
-          history: Array.isArray(json.history) ? json.history : [],
-          watchedMovies: Array.isArray(json.watchedMovies)
-            ? json.watchedMovies
-            : [],
-          watchedShows: Array.isArray(json.watchedShows)
-            ? json.watchedShows
-            : [],
-          topActors: [],
-          topDirectors: [],
-        };
-
-        setProfileData(profile);
-        setData(statsPayload);
-        writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, profile);
-        writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, statsPayload);
-        if (profile.user) {
-          writeProfileSessionCache(PROFILE_USER_CACHE_KEY, {
-            user: profile.user,
-          });
+        if (isCompactProfilePayload(initialStats)) {
+          window.setTimeout(async () => {
+            if (ignore) return;
+            try {
+              const fullResult = await fetchProfileJson(false);
+              if (ignore || fullResult?.unauthorized) return;
+              if (fullResult?.json) {
+                applyProfileJson(fullResult.json);
+              }
+            } catch (e) {
+              console.error(e);
+            } finally {
+              if (!ignore) setLoading(false);
+            }
+          }, PROFILE_FULL_REFRESH_DELAY_MS);
         }
       } catch (e) {
         console.error(e);
@@ -1639,7 +1628,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     );
   }
 
-  if (!pageReady && !error) {
+  if (!headerReady && !error) {
     return (
       <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
         <ProfilePageBackground />

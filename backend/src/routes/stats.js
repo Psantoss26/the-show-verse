@@ -465,6 +465,8 @@ export default async function statsRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.get('/profile', async (req, reply) => {
     const userId = req.user.id;
+    const compact = req.query?.compact === '1' || req.query?.compact === 'true';
+    const historyLimit = compact ? 180 : 1500;
 
     const [
       showStats,
@@ -509,7 +511,7 @@ export default async function statsRoutes(fastify) {
         .from(watchHistory)
         .where(eq(watchHistory.userId, userId))
         .orderBy(desc(watchHistory.watchedAt))
-        .limit(1500),
+        .limit(historyLimit),
     ]);
 
     const metadataByKey = await getProfileMetadataMap([
@@ -555,6 +557,7 @@ export default async function statsRoutes(fastify) {
 
     return reply.send({
       source: 'showverse',
+      compact,
       user: {
         username: req.user.username,
         name: req.user.displayName || req.user.username,
