@@ -1,43 +1,41 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
-const RESTORE_DELAYS_MS = [0, 80, 180, 360, 720, 1200, 1800, 2600];
+const HISTORY_NAVIGATION_WINDOW_MS = 1200;
 
 function getCurrentRouteKey() {
   return `${window.location.pathname}${window.location.search}` || "/";
 }
 
-function getStorageKey(routeKey) {
-  return `${STORAGE_PREFIX}${routeKey}`;
+function getStorageKey(pathname) {
+  return `${STORAGE_PREFIX}${pathname || "/"}`;
 }
 
-function readScrollPosition(routeKey) {
-  if (!routeKey) return null;
-
+function readScrollPosition(pathname) {
   try {
-    const raw = window.sessionStorage.getItem(getStorageKey(routeKey));
+    const raw = window.sessionStorage.getItem(getStorageKey(pathname));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
     const x = Number(parsed?.x);
     const y = Number(parsed?.y);
-
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
-    return { x, y };
+    return { x: Math.max(0, x), y: Math.max(0, y) };
   } catch {
     return null;
   }
 }
 
-function saveScrollPosition(routeKey) {
-  if (!routeKey) return;
+function saveScrollPosition(pathname) {
+  if (!pathname) return;
 
   try {
     window.sessionStorage.setItem(
-      getStorageKey(routeKey),
+      getStorageKey(pathname),
       JSON.stringify({
         x: window.scrollX,
         y: window.scrollY,
@@ -45,7 +43,7 @@ function saveScrollPosition(routeKey) {
       }),
     );
   } catch {
-    // Storage can be unavailable in private browsing or constrained webviews.
+    // Session storage may be unavailable in private browsing.
   }
 }
 
@@ -53,116 +51,49 @@ function scrollToPageStart() {
   window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
 
-function scrollToSavedPosition(position) {
+function scrollToPosition(position) {
   if (!position) {
     scrollToPageStart();
     return;
   }
 
   window.scrollTo({
-    top: Math.max(0, position.y),
-    left: Math.max(0, position.x),
+    top: position.y,
+    left: position.x,
     behavior: "auto",
   });
 }
 
 export default function ScrollRestoration() {
-  const currentRouteKeyRef = useRef("");
-  const scrollSaveRafRef = useRef(0);
-  const scrollSaveLockRef = useRef(null);
-  const urlChangeRafRef = useRef(0);
-  const restoreTimersRef = useRef([]);
+  const pathname = usePathname() || "/";
+  const currentRouteKeyRef = useRef(null);
+  const navigationModeRef = useRef("push");
   const historyNavigationUntilRef = useRef(0);
+  const scrollFrameRef = useRef(0);
+  const saveFrameRef = useRef(0);
+
+  useEffect(() => {
+    if (!("scrollRestoration" in window.history)) return undefined;
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
 
   useEffect(() => {
     currentRouteKeyRef.current = getCurrentRouteKey();
+  }, [pathname]);
 
-    const previousScrollRestoration = "scrollRestoration" in window.history
-      ? window.history.scrollRestoration
-      : null;
-    if (previousScrollRestoration != null) {
-      window.history.scrollRestoration = "manual";
-    }
+  useEffect(() => {
+    const scheduleSave = () => {
+      if (saveFrameRef.current) return;
 
-    const clearRestoreTimers = () => {
-      restoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      restoreTimersRef.current = [];
-    };
-
-    const lockCurrentRouteAgainstAutomaticTopSave = () => {
-      scrollSaveLockRef.current = {
-        routeKey: currentRouteKeyRef.current,
-        expiresAt: window.performance.now() + 1500,
-      };
-    };
-
-    const shouldSkipCurrentPositionSave = () => {
-      const lock = scrollSaveLockRef.current;
-      if (!lock) return false;
-
-      if (window.performance.now() > lock.expiresAt) {
-        scrollSaveLockRef.current = null;
-        return false;
-      }
-
-      return (
-        lock.routeKey === currentRouteKeyRef.current &&
-        (lock.skipAll ||
-          (window.scrollX === 0 &&
-            window.scrollY === 0))
-      );
-    };
-
-    const saveCurrentPosition = ({ lockAfterSave = false } = {}) => {
-      saveScrollPosition(currentRouteKeyRef.current);
-      if (lockAfterSave) lockCurrentRouteAgainstAutomaticTopSave();
-    };
-
-    const runNavigationScroll = (mode) => {
-      const nextRouteKey = getCurrentRouteKey();
-      if (nextRouteKey === currentRouteKeyRef.current) return;
-
-      clearRestoreTimers();
-
-      currentRouteKeyRef.current = nextRouteKey;
-
-      if (mode === "history") {
-        const savedPosition = readScrollPosition(nextRouteKey);
-        scrollSaveLockRef.current = {
-          routeKey: nextRouteKey,
-          expiresAt: window.performance.now() + 3200,
-          skipAll: true,
-        };
-
-        scrollToSavedPosition(savedPosition);
-        restoreTimersRef.current = RESTORE_DELAYS_MS.map((delay) =>
-          window.setTimeout(() => scrollToSavedPosition(savedPosition), delay),
-        );
-        return;
-      }
-
-      scrollSaveLockRef.current = null;
-      scrollToPageStart();
-    };
-
-    const scheduleNavigationScroll = (mode) => {
-      if (urlChangeRafRef.current) {
-        window.cancelAnimationFrame(urlChangeRafRef.current);
-      }
-
-      urlChangeRafRef.current = window.requestAnimationFrame(() => {
-        urlChangeRafRef.current = 0;
-        runNavigationScroll(mode);
-      });
-    };
-
-    const scheduleCurrentPositionSave = () => {
-      if (scrollSaveRafRef.current) return;
-
-      scrollSaveRafRef.current = window.requestAnimationFrame(() => {
-        scrollSaveRafRef.current = 0;
-        if (shouldSkipCurrentPositionSave()) return;
-        saveCurrentPosition();
+      saveFrameRef.current = window.requestAnimationFrame(() => {
+        saveFrameRef.current = 0;
+        saveScrollPosition(currentRouteKeyRef.current);
       });
     };
 
@@ -170,78 +101,86 @@ export default function ScrollRestoration() {
     const originalReplaceState = window.history.replaceState;
 
     window.history.pushState = function pushState(...args) {
-      saveCurrentPosition({ lockAfterSave: true });
-      const result = originalPushState.apply(this, args);
-      scheduleNavigationScroll("push");
-      return result;
+      saveScrollPosition(currentRouteKeyRef.current);
+      navigationModeRef.current = "push";
+      return originalPushState.apply(this, args);
     };
 
     window.history.replaceState = function replaceState(...args) {
-      const previousRouteKey = getCurrentRouteKey();
-      const result = originalReplaceState.apply(this, args);
-      if (getCurrentRouteKey() !== previousRouteKey) {
-        const mode =
-          window.performance.now() <= historyNavigationUntilRef.current
-            ? "history"
-            : "replace";
-        scheduleNavigationScroll(mode);
+      saveScrollPosition(currentRouteKeyRef.current);
+      if (window.performance.now() <= historyNavigationUntilRef.current) {
+        navigationModeRef.current = "history";
+      } else {
+        navigationModeRef.current = "push";
       }
-      return result;
+      return originalReplaceState.apply(this, args);
     };
 
     const handlePopState = () => {
-      saveCurrentPosition({ lockAfterSave: true });
-      historyNavigationUntilRef.current = window.performance.now() + 1500;
-      scheduleNavigationScroll("history");
+      saveScrollPosition(currentRouteKeyRef.current);
+      navigationModeRef.current = "history";
+      historyNavigationUntilRef.current =
+        window.performance.now() + HISTORY_NAVIGATION_WINDOW_MS;
     };
 
-    const handleDocumentClick = () => {
-      saveCurrentPosition({ lockAfterSave: true });
+    const handlePageHide = () => {
+      saveScrollPosition(currentRouteKeyRef.current);
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") saveCurrentPosition();
-    };
-
-    const initialTopFrame = window.requestAnimationFrame(scrollToPageStart);
-
-    document.addEventListener("click", handleDocumentClick, true);
-    window.addEventListener("scroll", scheduleCurrentPositionSave, {
-      passive: true,
-    });
+    window.addEventListener("scroll", scheduleSave, { passive: true });
     window.addEventListener("popstate", handlePopState);
-    window.addEventListener("pagehide", saveCurrentPosition);
-    window.addEventListener("beforeunload", saveCurrentPosition);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handlePageHide);
 
     return () => {
-      window.cancelAnimationFrame(initialTopFrame);
-      if (scrollSaveRafRef.current) {
-        window.cancelAnimationFrame(scrollSaveRafRef.current);
-        scrollSaveRafRef.current = 0;
-      }
-      if (urlChangeRafRef.current) {
-        window.cancelAnimationFrame(urlChangeRafRef.current);
-        urlChangeRafRef.current = 0;
+      if (saveFrameRef.current) {
+        window.cancelAnimationFrame(saveFrameRef.current);
+        saveFrameRef.current = 0;
       }
 
-      clearRestoreTimers();
-      saveCurrentPosition();
-
+      saveScrollPosition(currentRouteKeyRef.current);
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;
-      if (previousScrollRestoration != null) {
-        window.history.scrollRestoration = previousScrollRestoration;
-      }
-
-      document.removeEventListener("click", handleDocumentClick, true);
-      window.removeEventListener("scroll", scheduleCurrentPositionSave);
+      window.removeEventListener("scroll", scheduleSave);
       window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("pagehide", saveCurrentPosition);
-      window.removeEventListener("beforeunload", saveCurrentPosition);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handlePageHide);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    const routeKey = getCurrentRouteKey();
+    if (currentRouteKeyRef.current === routeKey) return undefined;
+
+    currentRouteKeyRef.current = routeKey;
+    const mode = navigationModeRef.current;
+    navigationModeRef.current = "push";
+
+    if (window.location.hash) return undefined;
+
+    if (scrollFrameRef.current) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
+
+    const savedPosition =
+      mode === "history" ? readScrollPosition(routeKey) : null;
+
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      if (mode === "history") {
+        scrollToPosition(savedPosition);
+      } else {
+        scrollToPageStart();
+      }
+    });
+
+    return () => {
+      if (scrollFrameRef.current) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = 0;
+      }
+    };
+  }, [pathname]);
 
   return null;
 }
