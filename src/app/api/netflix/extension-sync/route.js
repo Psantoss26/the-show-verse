@@ -1,0 +1,132 @@
+import { NextResponse } from "next/server";
+import { backendFetchJson } from "@/lib/backend/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+export async function POST(request) {
+  try {
+    const { mainTitle, subTitle, videoId } = await request.json().catch(() => ({}));
+
+    if (!mainTitle) {
+      return NextResponse.json({ error: "mainTitle is required" }, { status: 400 });
+    }
+
+    console.log(`[Extension Sync] Netflix watch detected: "${mainTitle}" - "${subTitle}" (Video ID: ${videoId})`);
+
+    // 1. Parse TV Details if subTitle exists
+    let isTv = false;
+    let season = null;
+    let episode = null;
+    let cleanEpisodeTitle = "";
+
+    if (subTitle) {
+      // Match patterns like T4: E1, Temporada 4: Episodio 1, S4:E1, Season 4: Episode 1
+      const sMatch = subTitle.match(/(?:T|S|Temporada|Season)\s*(\d+)/i);
+      const eMatch = subTitle.match(/(?:E|Episodio|Episode|Capítulo|Chapter)\s*(\d+)/i);
+
+      if (eMatch) {
+        isTv = true;
+        season = sMatch ? parseInt(sMatch[1], 10) : 1; // Default to season 1 if not specified
+        episode = parseInt(eMatch[1], 10);
+        cleanEpisodeTitle = subTitle
+          .replace(/^(?:T|S|Temporada|Season)?\s*\d*\s*:\s*(?:E|Episodio|Episode|Capítulo|Chapter)\s*\d+\s*:?\s*/i, "")
+          .trim();
+      }
+    }
+
+    let tmdbId = null;
+    let mediaType = isTv ? "tv" : "movie";
+    let resolvedTitle = "";
+    let posterPath = "";
+
+    // 2. Search TMDb
+    if (isTv) {
+      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(mainTitle)}&type=tv`);
+      console.log("[Extension Sync] TV Search result:", { ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
+      if (searchRes.ok && searchRes.json?.results?.length > 0) {
+        const show = searchRes.json.results[0];
+        tmdbId = show.id;
+        resolvedTitle = show.name;
+        posterPath = show.poster_path;
+
+        // Fetch episode name if possible
+        if (TMDB_API_KEY) {
+          try {
+            const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
+            const epRes = await fetch(epUrl);
+            if (epRes.ok) {
+              const epData = await epRes.json();
+              if (epData.name) {
+                resolvedTitle = `${show.name}: ${epData.name}`;
+              }
+            }
+          } catch (e) {
+            console.error("[Extension Sync] Failed to fetch episode name:", e);
+          }
+        }
+      }
+    } else {
+      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(mainTitle)}&type=movie`);
+      console.log("[Extension Sync] Movie Search result:", { ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
+      if (searchRes.ok && searchRes.json?.results?.length > 0) {
+        const movie = searchRes.json.results[0];
+        tmdbId = movie.id;
+        resolvedTitle = movie.title;
+        posterPath = movie.poster_path;
+      }
+    }
+
+    if (!tmdbId) {
+      console.error("[Extension Sync] Could not resolve TMDb entity for:", mainTitle);
+      return NextResponse.json({ error: `Could not resolve TMDb entity for: ${mainTitle}` }, { status: 404 });
+    }
+
+    // 3. Insert into history
+    const body = {
+      tmdbId,
+      mediaType,
+      watchedAt: new Date().toISOString(),
+    };
+
+    if (resolvedTitle) body.title = resolvedTitle;
+    if (posterPath) body.posterPath = posterPath;
+    if (isTv && season != null) body.season = season;
+    if (isTv && episode != null) body.episode = episode;
+
+    console.log("[Extension Sync] Submitting history body to backend:", JSON.stringify(body));
+
+    const historyRes = await backendFetchJson(request, "/v1/history", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    if (!historyRes.ok) {
+      console.error("[Extension Sync] Backend history insert failed:", {
+        status: historyRes.status,
+        error: historyRes.error,
+        json: historyRes.json
+      });
+      return NextResponse.json({ 
+        error: historyRes.error || "Failed to add history entry",
+        issues: historyRes.json?.issues 
+      }, { status: historyRes.status || 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      synced: {
+        tmdbId,
+        mediaType,
+        season,
+        episode,
+        title: resolvedTitle,
+        posterPath,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });
+  }
+}

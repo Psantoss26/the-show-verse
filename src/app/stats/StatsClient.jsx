@@ -1238,6 +1238,16 @@ export default function StatsClient({ connectNext = "/profile" }) {
     setRefreshTick((tick) => tick + 1);
   }, []);
 
+  useEffect(() => {
+    const handleNetflixSyncUpdate = () => {
+      handleSyncProfile();
+    };
+    window.addEventListener("netflix-sync-update", handleNetflixSyncUpdate);
+    return () => {
+      window.removeEventListener("netflix-sync-update", handleNetflixSyncUpdate);
+    };
+  }, [handleSyncProfile]);
+
   const handleDisconnect = useCallback(async () => {
     try {
       clearProfileSessionCache();
