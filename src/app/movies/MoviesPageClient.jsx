@@ -23,13 +23,6 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useTranslation } from "@/lib/i18n";
-import {
-  getGenreName,
-  getTmdbIncludeImageLanguage,
-  pickBestImageByLocale,
-} from "@/lib/localization";
-import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
 
 import {
   getMediaAccountStates,
@@ -139,6 +132,28 @@ const dashboardPreviewBackdropFadeStyle = {
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
   maskImage:
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+};
+
+const MOVIE_GENRES = {
+  28: "Acción",
+  12: "Aventura",
+  16: "Animación",
+  35: "Comedia",
+  80: "Crimen",
+  99: "Documental",
+  18: "Drama",
+  10751: "Familia",
+  14: "Fantasía",
+  36: "Historia",
+  27: "Terror",
+  10402: "Música",
+  9648: "Misterio",
+  10749: "Romance",
+  878: "Ciencia ficción",
+  10770: "TV Movie",
+  53: "Thriller",
+  10752: "Bélica",
+  37: "Western",
 };
 
 async function resolveTmdbSrc(filePath, sizes) {
@@ -284,14 +299,13 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   return top3en[0];
 }
 
-async function getMovieImages(movieId, locale = "es-ES") {
-  const cacheKey = `${locale}:${movieId}`;
-  if (movieImagesCache.has(cacheKey)) return movieImagesCache.get(cacheKey);
+async function getMovieImages(movieId) {
+  if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId);
 
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey) {
     const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(cacheKey, fallback);
+    movieImagesCache.set(movieId, fallback);
     return fallback;
   }
 
@@ -299,7 +313,7 @@ async function getMovieImages(movieId, locale = "es-ES") {
     const url =
       `https://api.themoviedb.org/3/movie/${movieId}/images` +
       `?api_key=${apiKey}` +
-      `&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
+      `&include_image_language=en,en-US,null`;
 
     const r = await fetch(url, { cache: "force-cache" });
     const j = await r.json();
@@ -307,52 +321,50 @@ async function getMovieImages(movieId, locale = "es-ES") {
     const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
 
     const data = { posters, backdrops };
-    movieImagesCache.set(cacheKey, data);
+    movieImagesCache.set(movieId, data);
     return data;
   } catch {
     const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(cacheKey, fallback);
+    movieImagesCache.set(movieId, fallback);
     return fallback;
   }
 }
 
-async function fetchBestPoster(movieId, locale = "es-ES") {
-  const { posters } = await getMovieImages(movieId, locale);
+async function fetchBestPoster(movieId) {
+  const { posters } = await getMovieImages(movieId);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestImageByLocale(posters, { locale, kind: "poster" });
+  const best = pickBestPosterEN(posters);
   return best?.file_path || null;
 }
 
-async function fetchBestBackdrop(movieId, locale = "es-ES") {
-  const { backdrops } = await getMovieImages(movieId, locale);
+async function fetchBestBackdrop(movieId) {
+  const { backdrops } = await getMovieImages(movieId);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
-  const best = pickBestImageByLocale(backdrops, {
-    locale,
-    kind: "backdrop",
+  const best = pickBestBackdropByLangResVotes(backdrops, {
+    preferLangs: ["en", "en-US"],
     minWidth: 1200,
   });
 
   return best?.file_path || null;
 }
 
-async function preparePreviewBackdrop(movie, locale = "es-ES") {
+async function preparePreviewBackdrop(movie) {
   if (!movie?.id) return null;
 
-  const cacheKey = `${locale}:${movie.id}`;
-  let backdropPath = movieBackdropCache.get(cacheKey);
+  let backdropPath = movieBackdropCache.get(movie.id);
 
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestBackdrop(movie.id, locale)) ||
+        (await fetchBestBackdrop(movie.id)) ||
         getPreviewBackdropFallback(movie);
     } catch {
       backdropPath = getPreviewBackdropFallback(movie);
     }
 
-    movieBackdropCache.set(cacheKey, backdropPath);
+    movieBackdropCache.set(movie.id, backdropPath);
   }
 
   if (backdropPath) {
@@ -441,7 +453,7 @@ async function getBestTrailerCached(movieId) {
  * ==================================================================== */
 
 // ✅ DISEÑO NUEVO: rounded-lg
-function PosterImage({ movie, cache, locale = "es-ES" }) {
+function PosterImage({ movie, cache }) {
   const [posterPath, setPosterPath] = useState(() => {
     if (!movie) return null;
     const { poster: userPoster } = getArtworkPreference(movie.id);
@@ -487,7 +499,7 @@ function PosterImage({ movie, cache, locale = "es-ES" }) {
       }
 
       // 3) Buscamos la alternativa en inglés (fetchBestPoster)
-      const preferred = await fetchBestPoster(movie.id, locale);
+      const preferred = await fetchBestPoster(movie.id);
       const basePoster = movie.poster_path || movie.backdrop_path || null;
       const chosen = preferred || basePoster || null;
 
@@ -502,7 +514,7 @@ function PosterImage({ movie, cache, locale = "es-ES" }) {
     return () => {
       abort = true;
     };
-  }, [movie, cache, locale]);
+  }, [movie, cache]);
 
   if (!ready || !posterPath) {
     return (
@@ -664,10 +676,9 @@ function Top10MobileBackdropCard({
 }
 
 // ✅ DISEÑO NUEVO: rounded-lg
-function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
+function InlinePreviewCard({ movie, heightClass }) {
   const { session, account } = useAuth();
   const router = useRouter();
-  const backdropCacheKey = movie?.id ? `${locale}:${movie.id}` : null;
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -678,7 +689,7 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
     if (!movie) return null;
     const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
     if (userBackdrop) return userBackdrop;
-    const cached = movieBackdropCache.get(backdropCacheKey);
+    const cached = movieBackdropCache.get(movie.id);
     if (cached !== undefined) return cached;
     return null;
   });
@@ -686,7 +697,7 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
     if (!movie) return false;
     const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
     if (userBackdrop) return true;
-    const cached = movieBackdropCache.get(backdropCacheKey);
+    const cached = movieBackdropCache.get(movie.id);
     if (cached !== undefined) return !!cached;
     return false;
   });
@@ -750,21 +761,21 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
       const userPreferredBackdrop = userBackdrop || null;
 
       if (userPreferredBackdrop) {
-        movieBackdropCache.set(backdropCacheKey, userPreferredBackdrop);
+        movieBackdropCache.set(movie.id, userPreferredBackdrop);
         revealBackdrop(userPreferredBackdrop);
       } else {
-        const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
+        const cachedBackdrop = movieBackdropCache.get(movie.id);
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           const fallback = getPreviewBackdropFallback(movie);
           try {
-            const preferred = await fetchBestBackdrop(movie.id, locale);
+            const preferred = await fetchBestBackdrop(movie.id);
             const chosen = preferred || fallback;
-            movieBackdropCache.set(backdropCacheKey, chosen);
+            movieBackdropCache.set(movie.id, chosen);
             revealBackdrop(chosen);
           } catch {
-            movieBackdropCache.set(backdropCacheKey, fallback);
+            movieBackdropCache.set(movie.id, fallback);
             revealBackdrop(fallback);
           }
         }
@@ -822,7 +833,7 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
     return () => {
       abort = true;
     };
-  }, [movie, locale, backdropCacheKey]);
+  }, [movie]);
 
   const href = `/details/movie/${movie.id}`;
 
@@ -937,9 +948,7 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const names = ids
-      .map((id) => getGenreName("movie", id, locale))
-      .filter(Boolean);
+    const names = ids.map((id) => MOVIE_GENRES[id]).filter(Boolean);
     return names.slice(0, 3).join(" • ");
   })();
 
@@ -1143,8 +1152,7 @@ function InlinePreviewCard({ movie, heightClass, locale = "es-ES" }) {
 }
 
 /* ---------- Sección reusable (cada fila) ---------- */
-function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
-  const { t, lang } = useTranslation();
+function Row({ title, items, isMobile, posterCacheRef }) {
   const reduceMotion = useReducedMotion();
   const safeItems = useMemo(() => {
     if (!Array.isArray(items)) return EMPTY_ARRAY;
@@ -1156,24 +1164,58 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
       return true;
     });
   }, [items]);
-  const localizedItems = useLocalizedMediaItems(safeItems, lang, { limit: 80 });
-  const hasItems = localizedItems.length > 0;
+  const hasItems = safeItems.length > 0;
 
-  const isGenreRow = String(rowKey || "").startsWith("genre-");
-  const labelText =
-    rowKey === "top-es"
-      ? "TOP 10"
-      : rowKey === "blockbusters"
-        ? "IMPRESCINDIBLES"
-        : rowKey === "vengeance"
-          ? "SUPERHEROES"
-          : rowKey === "popular"
-            ? "TENDENCIAS"
-            : String(rowKey || "").startsWith("decade-")
-              ? lang === "en-US" ? "DECADE" : "DECADA"
-              : isGenreRow
-                ? t("media_genre").toUpperCase()
-                : null;
+  // ✅ Detectar si es una fila de género específico
+  const isGenreRow =
+    ![
+      "Populares",
+      "Taquillazos imprescindibles",
+      "Superéxito",
+      "Historias de venganza",
+      "Top 10 hoy en España",
+      "Tendencias ahora mismo",
+      "Lo mejor de 2020",
+      "Clásicos de los 90",
+      "Favoritas de los 2000",
+      "Hits de 2010",
+      "Recientes de 2020",
+    ].includes(title) &&
+    !title.includes("década") &&
+    !title.includes("Clásicos") &&
+    !title.includes("Favoritas") &&
+    !title.includes("Hits") &&
+    !title.includes("Recientes");
+
+  // ✅ Determinar etiqueta específica según el título
+  let labelText = null;
+  if (title === "Top 10 hoy en España") {
+    labelText = "TOP 10";
+  } else if (title === "Taquillazos imprescindibles") {
+    labelText = "IMPRESCINDIBLES";
+  } else if (title === "Historias de venganza") {
+    labelText = "SUPERHEROES";
+  } else if (title === "Tendencias ahora mismo") {
+    labelText = "TENDENCIAS";
+  } else if (title === "Lo mejor de 2020") {
+    labelText = "AÑOS 2020";
+  } else if (title === "Clásicos de los 90") {
+    labelText = "AÑOS 90";
+  } else if (title === "Favoritas de los 2000") {
+    labelText = "AÑOS 2000";
+  } else if (title === "Hits de 2010") {
+    labelText = "AÑOS 2010";
+  } else if (title === "Recientes de 2020") {
+    labelText = "AÑOS 2020";
+  } else if (title === "Lo mejor de esta década") {
+    labelText = "AÑOS 2020";
+  } else if (title && title.toLowerCase().includes("2010")) {
+    labelText = "AÑOS 2010";
+  } else if (title && title.toLowerCase().includes("2020")) {
+    labelText = "AÑOS 2020";
+  } else if (isGenreRow) {
+    labelText = "GÉNERO";
+  }
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -1190,21 +1232,21 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
     if (!isHoveredRow || !hasItems || isMobile) return;
 
     const preloadBackdrops = async () => {
-      const toPreload = localizedItems
+      const toPreload = safeItems
         .slice(0, 5)
         .filter((movie) => !preloadedBackdrops.has(movie.id));
 
       for (const movie of toPreload) {
-        await preparePreviewBackdrop(movie, lang);
+        await preparePreviewBackdrop(movie);
         setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
       }
     };
 
     const timer = window.setTimeout(preloadBackdrops, 300);
     return () => window.clearTimeout(timer);
-  }, [isHoveredRow, hasItems, localizedItems, isMobile, preloadedBackdrops, lang]);
+  }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
 
-  const isTop10 = rowKey === "top-es";
+  const isTop10 = title === "Top 10 hoy en España";
   const hasActivePreview = !!hoveredId;
 
   const heightClassDesktop =
@@ -1226,7 +1268,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
             </span>
           </div>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            {title}<span className="text-emerald-500">.</span>
+            Top 10 hoy en España<span className="text-emerald-500">.</span>
           </h3>
         </div>
         <Swiper
@@ -1243,7 +1285,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
           modules={[Navigation]}
           className="group relative"
         >
-          {localizedItems.map((m, i) => (
+          {safeItems.map((m, i) => (
             <SwiperSlide key={m.id} className="select-none">
               <Top10MobileBackdropCard movie={m} rank={i + 1} />
             </SwiperSlide>
@@ -1364,7 +1406,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
           className="group relative"
           breakpoints={breakpointsRow}
         >
-          {localizedItems.map((m, i) => {
+          {safeItems.map((m, i) => {
             const itemKey = `movie:${m.id}`;
             const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
 
@@ -1383,7 +1425,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
             let transformClass = "";
             if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
               const activeIndex = hoveredIndex;
-              const totalItems = localizedItems.length;
+              const totalItems = safeItems.length;
 
               if (activeIndex >= totalItems - 3 && i <= activeIndex) {
                 if (activeIndex === totalItems - 1) {
@@ -1407,7 +1449,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
-                    preparePreviewBackdrop(m, lang).finally(() => {
+                    preparePreviewBackdrop(m).finally(() => {
                       if (hoverIntentRef.current === hoverToken) {
                         setHoveredId(itemKey);
                       }
@@ -1444,7 +1486,6 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
                       <InlinePreviewCard
                         movie={m}
                         heightClass={heightClassDesktop}
-                        locale={lang}
                       />
                     </motion.div>
                   ) : (
@@ -1479,11 +1520,7 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
                           href={`/details/movie/${m.id}`}
                           className="block w-full h-full"
                         >
-                          <PosterImage
-                            movie={m}
-                            cache={posterCacheRef}
-                            locale={lang}
-                          />
+                          <PosterImage movie={m} cache={posterCacheRef} />
                         </Link>
                       )}
                     </motion.div>
@@ -1559,7 +1596,6 @@ function Row({ rowKey, title, items, isMobile, posterCacheRef }) {
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
 export default function MoviesPageClient({ initialData, deferredDataPromise }) {
-  const { t } = useTranslation();
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
@@ -1573,10 +1609,6 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
         .catch(console.error);
     }
   }, [deferredDataPromise]);
-
-  useEffect(() => {
-    document.title = `${t("movies_title")} • TSV`;
-  }, [t]);
 
   const dashboardData = useMemo(
     () => ({
@@ -1596,37 +1628,37 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
 
     addRow(
       "top-es",
-      t("row_top_spain"),
+      "Top 10 hoy en España",
       dashboardData["Top 10 hoy en España"],
     );
-    addRow("popular", t("row_trending_now"), dashboardData.popular);
-    addRow("top-imdb", t("row_movies_top_imdb"), dashboardData.top_imdb);
+    addRow("popular", "Tendencias ahora mismo", dashboardData.popular);
+    addRow("top-imdb", "Lo más aclamado en IMDb", dashboardData.top_imdb);
     addRow(
       "most-voted",
-      t("row_most_voted_movies"),
+      "Las más votadas de todos los tiempos",
       dashboardData["Más votadas"],
     );
     addRow(
       "blockbusters",
-      t("row_blockbusters_movies"),
+      "Taquillazos imprescindibles",
       dashboardData["Superéxito"],
     );
-    addRow("mind", t("row_mind_movies"), dashboardData.mind);
-    addRow("action", t("row_action_movies"), dashboardData.action);
-    addRow("scifi", t("row_scifi_movies"), dashboardData.scifi);
-    addRow("thrillers", t("row_thriller_movies"), dashboardData.thrillers);
-    addRow("romance", t("row_romance_movies"), dashboardData.romance);
-    addRow("vengeance", t("row_vengeance_movies"), dashboardData.vengeance);
-    addRow("decade-1990", t("row_decade_1990"), dashboardData["Década de 1990"]);
+    addRow("mind", "Guiones que te vuelan la cabeza", dashboardData.mind);
+    addRow("action", "Acción taquillera", dashboardData.action);
+    addRow("scifi", "Ciencia ficción espectacular", dashboardData.scifi);
+    addRow("thrillers", "Thrillers que no te sueltan", dashboardData.thrillers);
+    addRow("romance", "Romance que enamora", dashboardData.romance);
+    addRow("vengeance", "Historias de venganza", dashboardData.vengeance);
+    addRow("decade-1990", "Clásicos de los 90", dashboardData["Década de 1990"]);
     addRow(
       "decade-2000",
-      t("row_decade_2000"),
+      "Favoritas de los 2000",
       dashboardData["Década de 2000"],
     );
-    addRow("decade-2010", t("row_decade_2010"), dashboardData["Década de 2010"]);
+    addRow("decade-2010", "Hits de los 2010", dashboardData["Década de 2010"]);
     addRow(
       "decade-2020",
-      t("row_decade_2020"),
+      "Lo mejor de esta década",
       dashboardData["Década de 2020"],
     );
 
@@ -1635,7 +1667,7 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
     );
 
     return rows;
-  }, [dashboardData, t]);
+  }, [dashboardData]);
 
   useEffect(() => {
     if (visibleRowCount >= rowConfigs.length) return undefined;
@@ -1683,7 +1715,6 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
         {visibleRows.map(({ key, title, items }) => (
           <Row
             key={key}
-            rowKey={key}
             title={title}
             items={items}
             isMobile={isMobile}

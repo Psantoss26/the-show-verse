@@ -1,5 +1,4 @@
 // /src/app/series/page.jsx
-import { cookies } from "next/headers";
 import SeriesPageClient from "./SeriesPageClient";
 
 import {
@@ -10,21 +9,12 @@ import {
   discoverTV,
   fetchTrendingTVDay,
 } from "@/lib/api/tmdb";
-import { normalizeLocale } from "@/lib/localization";
 
 export const revalidate = 1800; // 30 min
 
-export async function generateMetadata() {
-  const locale = await getUserLocale();
-  return {
-    title: locale === "en-US" ? "TV Shows" : "Series",
-  };
-}
-
-async function getUserLocale() {
-  const cookieStore = await cookies();
-  return normalizeLocale(cookieStore.get("showverse_locale")?.value);
-}
+export const metadata = {
+  title: "Series",
+};
 
 /* ========= Utilidad para obtener la URL base en servidor ========= */
 function getBaseUrl() {
@@ -114,7 +104,9 @@ function curateList(
 }
 
 /* ======== Carga de datos CRÍTICOS en el SERVIDOR para series ======== */
-async function getCriticalDashboardData(lang) {
+async function getCriticalDashboardData() {
+  const lang = "es-ES";
+
   try {
     const [popular, topES] = await Promise.all([
       fetchPopularMedia({ type: "tv", language: lang }),
@@ -144,7 +136,9 @@ async function getCriticalDashboardData(lang) {
 }
 
 /* ======== Carga de datos DIFERIDOS en el SERVIDOR para series ======== */
-async function getDeferredDashboardData(lang) {
+async function getDeferredDashboardData() {
+  const lang = "es-ES";
+
   try {
     const [
       topImdbRaw,
@@ -331,13 +325,11 @@ async function getDeferredDashboardData(lang) {
 
 /* =================== Componente de servidor =================== */
 export default async function SeriesPage() {
-  const lang = await getUserLocale();
-  const initialData = await getCriticalDashboardData(lang);
-  const deferredDataPromise = getDeferredDashboardData(lang);
+  const initialData = await getCriticalDashboardData();
+  const deferredDataPromise = getDeferredDashboardData();
 
   return (
     <SeriesPageClient
-      language={lang}
       initialData={initialData}
       deferredDataPromise={deferredDataPromise}
     />

@@ -40,11 +40,6 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
-import {
-  getTmdbIncludeImageLanguage,
-  pickBestImageByLocale,
-} from "@/lib/localization";
-import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 80;
@@ -287,11 +282,10 @@ function getEpisodeRange(group) {
 
 function getMainTitle(entry) {
   return (
-    entry?.title ||
-    entry?.name ||
     entry?.title_es ||
     entry?.show?.title ||
     entry?.movie?.title ||
+    entry?.title ||
     "Sin título"
   );
 }
@@ -430,31 +424,27 @@ function pickBestBackdropByLangResVotes(list) {
   return top3en[0];
 }
 
-async function fetchBestBackdropEN(type, id, locale = "es-ES") {
+async function fetchBestBackdropEN(type, id) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    const best = pickBestImageByLocale(j?.backdrops, {
-      locale,
-      kind: "backdrop",
-      minWidth: 1200,
-    });
+    const best = pickBestBackdropByLangResVotes(j?.backdrops);
     return best?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestBackdropCached(type, id, locale = "es-ES") {
-  const key = `${locale}:${type}:${id}`;
+async function getBestBackdropCached(type, id) {
+  const key = `${type}:${id}`;
   if (backdropCache.has(key)) return backdropCache.get(key);
   if (backdropInflight.has(key)) return backdropInflight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id, locale);
+    const chosen = await fetchBestBackdropEN(type, id);
     backdropCache.set(key, chosen || null);
     backdropInflight.delete(key);
     return chosen || null;
@@ -494,29 +484,26 @@ function pickBestPosterEN(posters) {
   );
 }
 
-async function fetchBestPosterEN(type, id, locale = "es-ES") {
+async function fetchBestPosterEN(type, id) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US,null`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    return pickBestImageByLocale(j?.posters, {
-      locale,
-      kind: "poster",
-    })?.file_path || null;
+    return pickBestPosterEN(j?.posters)?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id, locale = "es-ES") {
-  const key = `${locale}:${type}:${id}`;
+async function getBestPosterCached(type, id) {
+  const key = `${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id, locale);
+    const chosen = await fetchBestPosterEN(type, id);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -526,16 +513,16 @@ async function getBestPosterCached(type, id, locale = "es-ES") {
   return p;
 }
 
-async function fetchTmdbPoster({ type, tmdbId, locale = "es-ES" }) {
+async function fetchTmdbPoster({ type, tmdbId }) {
   const t = type === "show" ? "tv" : "movie";
-  const key = `${locale}:${t}:${tmdbId}`;
+  const key = `${t}:${tmdbId}`;
   if (tmdbCache.has(key)) return tmdbCache.get(key);
   if (tmdbInflight.has(key)) return tmdbInflight.get(key);
 
   const p = (async () => {
     if (!TMDB_API_KEY || !tmdbId) return null;
     try {
-      const url = `https://api.themoviedb.org/3/${t}/${encodeURIComponent(tmdbId)}?api_key=${TMDB_API_KEY}&language=${locale}`;
+      const url = `https://api.themoviedb.org/3/${t}/${encodeURIComponent(tmdbId)}?api_key=${TMDB_API_KEY}&language=es-ES`;
       const res = await fetch(url);
       const json = await res.json();
       if (!res.ok) return null;
@@ -1276,7 +1263,6 @@ function CalendarPanel({
 // History Item Component
 // ----------------------------
 function Poster({ entry, className = "" }) {
-  const { lang } = useTranslation();
   const [posterPath, setPosterPath] = useState(null);
   const [ready, setReady] = useState(false);
   const { ref, hasBeenInView } = useInView({
@@ -1293,7 +1279,7 @@ function Poster({ entry, className = "" }) {
 
     const load = async () => {
       const tmdbType = type === "show" ? "tv" : "movie";
-      const key = `${lang}:${tmdbType}:${id}`;
+      const key = `${tmdbType}:${id}`;
       const hasCache = posterChoiceCache.has(key);
       const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
       const initialPath = memoryBest || entry?.poster_path || null;
@@ -1304,12 +1290,12 @@ function Poster({ entry, className = "" }) {
       }
 
       if (!hasCache) {
-        const best = await getBestPosterCached(tmdbType, id, lang);
+        const best = await getBestPosterCached(tmdbType, id);
         if (best && best !== initialPath && !abort) {
           setPosterPath(best);
           setReady(true);
         } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type, tmdbId: id, locale: lang });
+          const r = await fetchTmdbPoster({ type, tmdbId: id });
           if (r?.poster_path && !abort) {
             setPosterPath(r.poster_path);
             setReady(true);
@@ -1322,7 +1308,7 @@ function Poster({ entry, className = "" }) {
     return () => {
       abort = true;
     };
-  }, [entry, hasBeenInView, type, id, lang]);
+  }, [entry, hasBeenInView, type, id]);
 
   const src = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
@@ -1351,7 +1337,6 @@ function Poster({ entry, className = "" }) {
 
 // SmartPoster for Compact view - transitions from poster to backdrop on hover
 function SmartPoster({ entry, title, mode = "poster" }) {
-  const { lang } = useTranslation();
   const type = getItemType(entry);
   const id = getTmdbId(entry);
   const [src, setSrc] = useState(null);
@@ -1364,7 +1349,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
 
     const load = async () => {
       const tmdbType = type === "show" ? "tv" : "movie";
-      const key = `${lang}:${tmdbType}:${id}`;
+      const key = `${tmdbType}:${id}`;
 
       // BACKDROP MODE
       if (mode === "backdrop") {
@@ -1381,7 +1366,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
         }
 
         if (!hasCache) {
-          const bestBackdrop = await getBestBackdropCached(tmdbType, id, lang);
+          const bestBackdrop = await getBestBackdropCached(tmdbType, id);
           if (bestBackdrop && bestBackdrop !== initialPath && !abort) {
             const url = `https://image.tmdb.org/t/p/w780${bestBackdrop}`;
             await preloadImage(url);
@@ -1390,7 +1375,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
               setReady(true);
             }
           } else if (!bestBackdrop && !initialPath && !abort) {
-            const r = await fetchTmdbPoster({ type, tmdbId: id, locale: lang });
+            const r = await fetchTmdbPoster({ type, tmdbId: id });
             const finalPath = r?.backdrop_path || r?.poster_path || null;
             if (finalPath) {
               const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
@@ -1419,7 +1404,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
       }
 
       if (!hasCache) {
-        const best = await getBestPosterCached(tmdbType, id, lang);
+        const best = await getBestPosterCached(tmdbType, id);
         if (best && best !== initialPath && !abort) {
           const url = `https://image.tmdb.org/t/p/w342${best}`;
           await preloadImage(url);
@@ -1428,7 +1413,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
             setReady(true);
           }
         } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type, tmdbId: id, locale: lang });
+          const r = await fetchTmdbPoster({ type, tmdbId: id });
           const finalPath = r?.poster_path || null;
           if (finalPath) {
             const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
@@ -1446,7 +1431,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, entry, lang]);
+  }, [mode, type, id, entry]);
 
   return (
     <div className="absolute inset-0 w-full h-full">
@@ -1483,7 +1468,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
   editMode = false,
   isMobile = false,
 }) {
-  const { lang } = useTranslation();
   const type = getItemType(entry);
 
   const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
@@ -1548,7 +1532,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       if (!t || !id) return;
 
       const tmdbType = t === "show" ? "tv" : "movie";
-      const key = `${lang}:${tmdbType}:${id}`;
+      const key = `${tmdbType}:${id}`;
       const hasCache = backdropCache.has(key);
       const memoryBest = hasCache ? backdropCache.get(key) : null;
       const initialPath = memoryBest || entry?.backdrop_path || entry?.poster_path || null;
@@ -1562,7 +1546,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       }
 
       if (!hasCache) {
-        const best = await getBestBackdropCached(tmdbType, id, lang);
+        const best = await getBestBackdropCached(tmdbType, id);
         if (best && best !== initialPath && !abort) {
           const url = `https://image.tmdb.org/t/p/w780${best}`;
           await preloadImage(url);
@@ -1571,7 +1555,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
             setBackdropReady(true);
           }
         } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type: t, tmdbId: id, locale: lang });
+          const r = await fetchTmdbPoster({ type: t, tmdbId: id });
           const finalPath = r?.backdrop_path || r?.poster_path || null;
           if (finalPath) {
             const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
@@ -1588,7 +1572,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return () => {
       abort = true;
     };
-  }, [entry, hasBeenInView, lang]);
+  }, [entry, hasBeenInView]);
 
   const Content = (
     <div
@@ -2461,7 +2445,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 // ----------------------------
 export default function HistoryClient() {
   const { session, account, hydrated: authHydrated, preferences, updatePreference, authenticated } = useAuth();
-  const { t, lang } = useTranslation();
+  const { t } = useTranslation();
   const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
@@ -2550,10 +2534,6 @@ export default function HistoryClient() {
 
     setHydrated(true);
   }, [account?.id]);
-
-  useEffect(() => {
-    document.title = `${t("hist_title")} • TSV`;
-  }, [t]);
 
   // Persistir estados de UI en localStorage
   useEffect(() => {
@@ -2738,11 +2718,9 @@ export default function HistoryClient() {
     }
   }, [account?.id]);
 
-  const localizedRaw = useLocalizedMediaItems(raw, lang, { limit: 180 });
-
   const filtered = useMemo(() => {
     const needle = (q || "").trim().toLowerCase();
-    return (localizedRaw || []).filter((e) => {
+    return (raw || []).filter((e) => {
       const t = getItemType(e);
       if (typeFilter === "movies" && t !== "movie") return false;
       if (typeFilter === "shows" && t !== "show") return false;
@@ -2755,7 +2733,7 @@ export default function HistoryClient() {
       }
       return true;
     });
-  }, [localizedRaw, q, typeFilter, selectedDay]);
+  }, [raw, q, typeFilter, selectedDay]);
 
   const sorted = useMemo(() => {
     const items = [...filtered];
