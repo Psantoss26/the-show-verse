@@ -8,7 +8,14 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_AP
 
 export async function POST(request) {
   try {
-    const { mainTitle, subTitle, videoId } = await request.json().catch(() => ({}));
+    const {
+      mainTitle,
+      subTitle,
+      videoId,
+      platform = "netflix",
+      season: seasonIn,
+      episode: episodeIn,
+    } = await request.json().catch(() => ({}));
     const authHeader = request.headers.get("authorization") || "";
     const syncToken = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
@@ -18,17 +25,22 @@ export async function POST(request) {
       return NextResponse.json({ error: "mainTitle is required" }, { status: 400 });
     }
 
-    console.log(`[Extension Sync] Netflix watch detected: "${mainTitle}" - "${subTitle}" (Video ID: ${videoId})`);
+    console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${videoId})`);
 
-    // 1. Parse TV Details if subTitle exists
+    // 1. Determine TV details. La extensión puede enviar season/episode ya
+    // parseados; si no, los inferimos del subtítulo en varios formatos.
     let isTv = false;
     let season = null;
     let episode = null;
 
-    if (subTitle) {
-      // Match patterns like T4: E1, Temporada 4: Episodio 1, S4:E1, Season 4: Episode 1
-      const sMatch = subTitle.match(/(?:T|S|Temporada|Season)\s*(\d+)/i);
-      const eMatch = subTitle.match(/(?:E|Episodio|Episode|Capítulo|Chapter)\s*(\d+)/i);
+    if (Number.isInteger(episodeIn) && episodeIn > 0) {
+      isTv = true;
+      episode = episodeIn;
+      season = Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : 1;
+    } else if (subTitle) {
+      // Patrones: "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 Episode 1", "Ep. 1".
+      const sMatch = subTitle.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
+      const eMatch = subTitle.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
 
       if (eMatch) {
         isTv = true;
@@ -118,6 +130,7 @@ export async function POST(request) {
         cache: "no-store",
         body: JSON.stringify({
           ...body,
+          platform,
           netflixVideoId: videoId || undefined,
           netflixTitle: mainTitle,
         }),

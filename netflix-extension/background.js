@@ -468,6 +468,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
+
+  // 3b. Sincronización de reproducción multiplataforma (Prime, Max, Disney+, Plex, Netflix).
+  if (message.action === "syncWatch") {
+    const { platform, platformName, contentId, mainTitle, subTitle, season, episode } = message;
+    addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
+
+    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken"], (result) => {
+      const origin = result.showVerseOrigin || "http://localhost:3000";
+      const syncToken = result.netflixSyncToken || "";
+      if (!syncToken) {
+        const errMsg = "Abre The Show Verse y pulsa Conectar para activar la sincronización.";
+        addLog(errMsg, "error");
+        sendResponse({ success: false, error: errMsg });
+        return;
+      }
+
+      fetch(`${origin}/api/netflix/extension-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${syncToken}`
+        },
+        body: JSON.stringify({
+          platform: platform || "netflix",
+          videoId: contentId || undefined,
+          mainTitle,
+          subTitle,
+          season: season || undefined,
+          episode: episode || undefined
+        }),
+        credentials: "omit"
+      })
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          addLog(`Sincronizado (${platformName || platform}): "${mainTitle}"`, "success");
+          sendResponse({ success: true, synced: json.synced });
+        } else {
+          const errorMsg = json.error || `HTTP ${res.status}`;
+          addLog(`Fallo al sincronizar: ${errorMsg}`, "error");
+          sendResponse({ success: false, error: errorMsg });
+        }
+      })
+      .catch((err) => {
+        addLog(`Error de conexión: ${err.message}`, "error");
+        sendResponse({ success: false, error: err.message });
+      });
+    });
+    return true;
+  }
 });
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {

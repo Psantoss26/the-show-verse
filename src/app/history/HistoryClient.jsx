@@ -509,6 +509,21 @@ async function getBestPosterCached(type, id) {
   return p;
 }
 
+async function resolveFinalPosterPath({ type, id, entry }) {
+  const tmdbType = type === "show" ? "tv" : "movie";
+  const key = `${tmdbType}:${id}`;
+
+  if (posterChoiceCache.has(key)) {
+    return posterChoiceCache.get(key) || entry?.poster_path || entry?.backdrop_path || null;
+  }
+
+  const best = await getBestPosterCached(tmdbType, id);
+  if (best) return best;
+
+  const tmdb = await fetchTmdbPoster({ type, tmdbId: id });
+  return tmdb?.poster_path || entry?.poster_path || entry?.backdrop_path || null;
+}
+
 async function fetchTmdbPoster({ type, tmdbId }) {
   const t = type === "show" ? "tv" : "movie";
   const key = `${t}:${tmdbId}`;
@@ -1260,7 +1275,6 @@ function CalendarPanel({
 // ----------------------------
 function Poster({ entry, className = "" }) {
   const [posterPath, setPosterPath] = useState(null);
-  const [ready, setReady] = useState(false);
   const { ref, hasBeenInView } = useInView({
     threshold: 0.01,
     rootMargin: "350px",
@@ -1272,31 +1286,12 @@ function Poster({ entry, className = "" }) {
   useEffect(() => {
     let abort = false;
     if (!hasBeenInView || !type || !id) return;
+    setPosterPath(null);
 
     const load = async () => {
-      const tmdbType = type === "show" ? "tv" : "movie";
-      const key = `${tmdbType}:${id}`;
-      const hasCache = posterChoiceCache.has(key);
-      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
-      const initialPath = memoryBest || entry?.poster_path || null;
-
-      if (initialPath) {
-        setPosterPath(initialPath);
-        setReady(true);
-      }
-
-      if (!hasCache) {
-        const best = await getBestPosterCached(tmdbType, id);
-        if (best && best !== initialPath && !abort) {
-          setPosterPath(best);
-          setReady(true);
-        } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type, tmdbId: id });
-          if (r?.poster_path && !abort) {
-            setPosterPath(r.poster_path);
-            setReady(true);
-          }
-        }
+      const finalPath = await resolveFinalPosterPath({ type, id, entry });
+      if (finalPath && !abort) {
+        setPosterPath(finalPath);
       }
     };
 
@@ -1387,38 +1382,13 @@ function SmartPoster({ entry, title, mode = "poster" }) {
       }
 
       // POSTER MODE
-      const hasCache = posterChoiceCache.has(key);
-      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
-      const initialPath = memoryBest || entry?.poster_path || entry?.backdrop_path || null;
-
-      if (initialPath) {
-        const url = `https://image.tmdb.org/t/p/w342${initialPath}`;
+      const finalPath = await resolveFinalPosterPath({ type, id, entry });
+      if (finalPath) {
+        const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
+        await preloadImage(url);
         if (!abort) {
           setSrc(url);
           setReady(true);
-        }
-      }
-
-      if (!hasCache) {
-        const best = await getBestPosterCached(tmdbType, id);
-        if (best && best !== initialPath && !abort) {
-          const url = `https://image.tmdb.org/t/p/w342${best}`;
-          await preloadImage(url);
-          if (!abort) {
-            setSrc(url);
-            setReady(true);
-          }
-        } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type, tmdbId: id });
-          const finalPath = r?.poster_path || null;
-          if (finalPath) {
-            const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
-            await preloadImage(url);
-            if (!abort) {
-              setSrc(url);
-              setReady(true);
-            }
-          }
         }
       }
     };
