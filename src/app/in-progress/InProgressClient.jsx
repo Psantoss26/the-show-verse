@@ -171,9 +171,9 @@ function getProgressColor(pct) {
 // ----------------------------
 // SHARED CACHE / IMAGES
 // ----------------------------
-const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v3";
+const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v6";
 const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
-const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v2";
+const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v4";
 const COMPLETED_CACHE_TTL = 1000 * 60 * 10;
 const IN_PROGRESS_VIEW_MODES = new Set(["cards", "compact", "poster"]);
 

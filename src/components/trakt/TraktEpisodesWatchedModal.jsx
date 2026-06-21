@@ -78,6 +78,30 @@ const seasonLabelText = (sn, name) => {
   return sn === 0 ? "Especiales" : `Temporada ${sn}`;
 };
 
+const getAvailableEpisodeTotal = (season) => {
+  const total = Number(season?.episode_count || 0);
+  return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+};
+
+const getWatchedEpisodeSetForSeason = (watchedBySeason, seasonNumber, total) => {
+  const episodes = watchedBySeason?.[seasonNumber] || [];
+  if (!Array.isArray(episodes) || total <= 0) return new Set();
+
+  return new Set(
+    episodes
+      .map((episode) => Number(episode))
+      .filter((episode) => (
+        Number.isInteger(episode) && episode >= 1 && episode <= total
+      )),
+  );
+};
+
+const getWatchedEpisodeCountForSeason = (
+  watchedBySeason,
+  seasonNumber,
+  total,
+) => getWatchedEpisodeSetForSeason(watchedBySeason, seasonNumber, total).size;
+
 const MAX_EPISODES_RENDER = 120;
 const MOVIE_BUSY_KEY = "MOVIE";
 const SHOW_BUSY_KEY = "SHOW";
@@ -332,13 +356,17 @@ export default function TraktEpisodesWatchedModal({
   // Progreso (por vista actual)
   const totals = useMemo(() => {
     const totalEpisodes = usableSeasons.reduce(
-      (acc, s) => acc + Math.max(0, s.episode_count || 0),
+      (acc, s) => acc + getAvailableEpisodeTotal(s),
       0,
     );
     const watchedEpisodes = usableSeasons.reduce((acc, s) => {
       const sn = s.season_number;
-      const arr = watchedBySeasonActive?.[sn];
-      return acc + (Array.isArray(arr) ? arr.length : 0);
+      const total = getAvailableEpisodeTotal(s);
+      return acc + getWatchedEpisodeCountForSeason(
+        watchedBySeasonActive,
+        sn,
+        total,
+      );
     }, 0);
     return { totalEpisodes, watchedEpisodes };
   }, [usableSeasons, watchedBySeasonActive]);
@@ -1447,8 +1475,12 @@ export default function TraktEpisodesWatchedModal({
                 <div className="p-3 space-y-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
-                    const watched = (watchedBySeasonActive?.[sn] || []).length;
-                    const total = s.episode_count || 0;
+                    const total = getAvailableEpisodeTotal(s);
+                    const watched = getWatchedEpisodeCountForSeason(
+                      watchedBySeasonActive,
+                      sn,
+                      total,
+                    );
                     const active = sn === activeSeason;
 
                     return (
@@ -1658,10 +1690,13 @@ export default function TraktEpisodesWatchedModal({
             <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-20 sm:pb-4">
               {seasonsFilteredForTable.map((s) => {
                 const sn = s.season_number;
-                const total = s.episode_count || 0;
-                const watchedArr = watchedBySeasonActive?.[sn] || [];
-                const watchedSetLocal = new Set(watchedArr);
-                const watchedCount = watchedArr.length;
+                const total = getAvailableEpisodeTotal(s);
+                const watchedSetLocal = getWatchedEpisodeSetForSeason(
+                  watchedBySeasonActive,
+                  sn,
+                  total,
+                );
+                const watchedCount = watchedSetLocal.size;
 
                 if (onlyUnwatched && watchedCount >= total) return null;
 
