@@ -70,7 +70,7 @@ function mapBackendMediaItem(item) {
 // GET: List all favorites (movies + TV shows)
 export async function GET(req) {
   try {
-    const backend = await backendFetchJson(req, '/v1/favorites?limit=1000')
+    const backend = await backendFetchJson(req, '/v1/favorites?limit=500')
     if (backend.ok) {
       const favorites = (Array.isArray(backend.json?.results) ? backend.json.results : []).map(mapBackendMediaItem)
       const res = NextResponse.json({ favorites, source: 'backend' })
