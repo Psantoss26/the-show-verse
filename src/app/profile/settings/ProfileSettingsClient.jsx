@@ -21,6 +21,7 @@ import {
   Database,
   Link2,
   Chrome,
+  Unlink,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -47,21 +48,21 @@ const STREAMING_PLATFORMS = [
 
 function PlatformBadges({ activeId = null, className = "" }) {
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-5 gap-y-3 ${className}`}>
       {STREAMING_PLATFORMS.map((platform) => {
         const active = activeId === platform.id;
         return (
           <div
             key={platform.id}
             title={active ? `${platform.name} · último visionado` : platform.name}
-            className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 transition ${
-              active
-                ? "border-emerald-400/40 bg-emerald-500/10"
-                : "border-white/10 bg-white/[0.03]"
-            }`}
+            className="flex items-center gap-2"
           >
-            <img src={platform.icon} alt={platform.name} className="h-4 w-4 object-contain" />
-            <span className={`text-[11px] font-bold ${active ? "text-emerald-200" : "text-zinc-300"}`}>
+            <img
+              src={platform.icon}
+              alt={platform.name}
+              className={`h-7 w-7 object-contain ${active ? "" : "opacity-90"}`}
+            />
+            <span className={`hidden sm:inline text-xs sm:text-sm font-bold ${active ? "text-emerald-300" : "text-zinc-300"}`}>
               {platform.name}
             </span>
           </div>
@@ -341,16 +342,16 @@ function ImportPanel({
       <div>
         <div className="mb-4 flex items-start gap-4">
           <div
-            className={`rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center ${
+            className={`shrink-0 h-12 w-12 flex items-center justify-center ${
               accent === "sky"
-                ? "bg-sky-500/10 text-sky-400 ring-sky-500/20"
-                : "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20"
+                ? "text-sky-400"
+                : "text-emerald-400"
             } group-hover:scale-105 group-hover:bg-opacity-20 transition-all duration-300`}
           >
             {logoSrc ? (
-              <img src={logoSrc} alt={title} className="h-6 w-6 object-contain" />
+              <img src={logoSrc} alt={title} className="h-8 w-8 object-contain" />
             ) : (
-              <DownloadCloud className="h-6 w-6" aria-hidden="true" />
+              <DownloadCloud className="h-8 w-8" aria-hidden="true" />
             )}
           </div>
           <div>
@@ -765,6 +766,7 @@ function ProfileSettingsClient() {
 
   const tabs = [
     { id: "personalization", label: t("settings_personal", "Preferencias"), icon: SlidersHorizontal },
+    { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
 
@@ -885,24 +887,6 @@ function ProfileSettingsClient() {
                     </div>
       )}
 
-      {!isNetflixConnected && (
-        <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-          <span className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
-            Activación guiada
-          </span>
-          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-            Conecta tus plataformas de streaming desde la pestaña Conexiones. Si la extensión oficial no está instalada, te llevaremos a instalarla y podrás continuar el vínculo al volver.
-          </p>
-          <button
-            type="button"
-            onClick={() => setActiveTab("connections")}
-            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-          >
-            Ir a conectar plataformas
-          </button>
-        </div>
-      )}
-
                   <div className="flex flex-col gap-4">
                     <SegmentedField
                       label={t("settings_def_view", "Vista por defecto")}
@@ -981,208 +965,15 @@ function ProfileSettingsClient() {
                 </motion.div>
               )}
 
-              {activeTab === "connections" && (
+              {activeTab === "imports" && (
                 <motion.div
-                  key="connections"
+                  key="imports"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.25 }}
-                  className="space-y-6"
+                  className="grid gap-6 grid-cols-1"
                 >
-                  {/* Streaming sync Connection (principal) */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-5`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 group-hover:scale-105 transition-all duration-300">
-                          <Layers className="h-6 w-6" aria-hidden="true" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-base font-extrabold text-white tracking-wide">Plataformas de streaming</h3>
-                            {isNetflixConnected ? (
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Sincronizado
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                                Automático
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                            {isNetflixConnected
-                              ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas de streaming.`
-                              : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves en tus plataformas de streaming, sin subir archivos."}
-                          </p>
-                        </div>
-                      </div>
-                      {isNetflixConnected ? (
-                        <button
-                          type="button"
-                          onClick={handleDisconnectNetflix}
-                          className="min-h-10 px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                        >
-                          Desconectar
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleConnectNetflix}
-                          className="min-h-10 px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                        >
-                          Conectar
-                        </button>
-                      )}
-                    </div>
-
-                    <PlatformBadges
-                      activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
-                    />
-                  </div>
-
-                  {/* Plex Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-amber-500/10 ring-amber-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/logo-Plex.png" alt="Plex" className="h-6 w-6 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Plex</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Conecta tu servidor Plex local o remoto para indexar tu biblioteca y reproducir contenidos directamente en la aplicación.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled
-                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
-                    >
-                      Conectar
-                    </button>
-                  </div>
-
-                  {/* Spotify Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-emerald-500/10 ring-emerald-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/spotify.png" alt="Spotify" className="h-6 w-6 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Spotify</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Vincula tu cuenta de Spotify para acceder a las bandas sonoras originales de tus películas y series directamente desde sus fichas.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled
-                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
-                    >
-                      Conectar
-                    </button>
-                  </div>
-
-                  {/* Trakt Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-red-500/10 ring-red-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/logo-Trakt.png" alt="Trakt" className="h-6 w-6 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Trakt.tv</h3>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Vincula tu cuenta de Trakt para registrar automáticamente tu historial de visionado, listas y calificaciones en tiempo real.
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
-                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                    >
-                      Conectar
-                    </Link>
-                  </div>
-
-                  {/* Letterboxd Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-orange-500/10 ring-orange-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/logo-Letterboxd.png" alt="Letterboxd" className="h-6 w-6 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Importa tu diario cinéfilo y películas valoradas desde Letterboxd mediante archivo CSV o integración directa.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled
-                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
-                    >
-                      Conectar
-                    </button>
-                  </div>
-
-                  {/* Filmaffinity Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-2xl shrink-0 ring-1 h-12 w-12 flex items-center justify-center bg-blue-500/10 ring-blue-500/20 group-hover:scale-105 transition-all duration-300">
-                        <img src="/logoFilmaffinity.png" alt="Filmaffinity" className="h-6 w-6 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Filmaffinity</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Sincroniza tus calificaciones e historial de visionado desde Filmaffinity importando tus listas directamente.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled
-                      className="min-h-10 px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto"
-                    >
-                      Conectar
-                    </button>
-                  </div>
-
-                  {/* Importar historial y puntuaciones desde otros servicios */}
-                  <div className="pt-2">
-                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
-                      Importar datos
-                    </span>
-                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                      Trae tu historial, puntuaciones y listas de otros servicios a The Show Verse.
-                    </p>
-                  </div>
-
                   <ImportPanel
                     title={t("settings_import_trakt", "Importar desde Trakt")}
                     description={t("settings_import_trakt_desc", "Trae tu historial de visionado y tus puntuaciones a The Show Verse.")}
@@ -1215,6 +1006,222 @@ function ProfileSettingsClient() {
                     ]}
                     logoSrc="/logo-TMDb.png"
                   />
+                </motion.div>
+              )}
+
+              {activeTab === "connections" && (
+                <motion.div
+                  key="connections"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  {/* Streaming sync Connection (principal) */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-5`}>
+                    <div className="flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5">
+                      <div className="flex items-start gap-4 min-w-0">
+                        <div className="shrink-0 h-12 w-12 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-all duration-300">
+                          <Layers className="h-8 w-8" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-base font-extrabold text-white tracking-wide">Plataformas de streaming</h3>
+                            {isNetflixConnected ? (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Sincronizado
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                                Automático
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 hidden sm:block text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                            {isNetflixConnected
+                              ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas de streaming.`
+                              : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves en tus plataformas de streaming, sin subir archivos."}
+                          </p>
+                        </div>
+                      </div>
+                      {isNetflixConnected ? (
+                        <button
+                          type="button"
+                          onClick={handleDisconnectNetflix}
+                          aria-label="Desconectar"
+                          title="Desconectar"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        >
+                          <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                          <span className="hidden sm:inline">Desconectar</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleConnectNetflix}
+                          aria-label="Conectar"
+                          title="Conectar"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        >
+                          <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                          <span className="hidden sm:inline">Conectar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <PlatformBadges
+                      activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
+                      className="pl-16"
+                    />
+                  </div>
+
+                  {/* Plex Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Plex.png" alt="Plex" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Plex</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Conecta tu servidor Plex local o remoto para indexar tu biblioteca y reproducir contenidos directamente en la aplicación.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      aria-label="Conectar"
+                      title="Conectar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                    >
+                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Conectar</span>
+                    </button>
+                  </div>
+
+                  {/* Spotify Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                        <img src="/spotify.png" alt="Spotify" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Spotify</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Vincula tu cuenta de Spotify para acceder a las bandas sonoras originales de tus películas y series directamente desde sus fichas.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      aria-label="Conectar"
+                      title="Conectar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                    >
+                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Conectar</span>
+                    </button>
+                  </div>
+
+                  {/* Trakt Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Trakt.png" alt="Trakt" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Trakt.tv</h3>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Vincula tu cuenta de Trakt para registrar automáticamente tu historial de visionado, listas y calificaciones en tiempo real.
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
+                      aria-label="Conectar"
+                      title="Conectar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                    >
+                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Conectar</span>
+                    </Link>
+                  </div>
+
+                  {/* Letterboxd Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                        <img src="/logo-Letterboxd.png" alt="Letterboxd" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Importa tu diario cinéfilo y películas valoradas desde Letterboxd mediante archivo CSV o integración directa.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      aria-label="Conectar"
+                      title="Conectar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                    >
+                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Conectar</span>
+                    </button>
+                  </div>
+
+                  {/* Filmaffinity Connection */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                        <img src="/logoFilmaffinity.png" alt="Filmaffinity" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">Filmaffinity</h3>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                            Próximamente
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                          Sincroniza tus calificaciones e historial de visionado desde Filmaffinity importando tus listas directamente.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      aria-label="Conectar"
+                      title="Conectar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                    >
+                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Conectar</span>
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
