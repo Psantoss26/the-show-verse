@@ -2,14 +2,14 @@
 
 console.log("[The Show Verse Extension] Web bridge active.");
 
-// Marca la presencia de la extensión en la página para que la app pueda detectar
-// si está instalada (sin depender del ID público de la Store).
-try {
-  document.documentElement.setAttribute("data-tsv-netflix-ext", "1");
-  document.dispatchEvent(new CustomEvent("tsv-netflix-ext-ready"));
-} catch {
-  // noop
-}
+// Detección de presencia por petición/respuesta. NO mutamos el DOM (atributos en
+// <html>/<body>) para no romper la hidratación de React: respondemos solo cuando
+// la app lo pide.
+document.addEventListener("request-tsv-ext-ping", () => {
+  document.dispatchEvent(
+    new CustomEvent("response-tsv-ext-ping", { detail: { installed: true } }),
+  );
+});
 
 // 1. Automatically register the origin if it matches The Show Verse branding
 const bodyText = document.body ? document.body.innerText : "";

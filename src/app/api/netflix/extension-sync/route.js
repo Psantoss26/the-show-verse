@@ -6,6 +6,21 @@ export const dynamic = "force-dynamic";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
+// Prefijo de plataforma que algunas pestañas anteponen al título.
+const PLATFORM_PREFIX_RE =
+  /^\s*(prime video|amazon prime video|amazon|netflix|max|hbo max|hbo|disney\s*\+|disney plus|star\s*\+|plex)\s*[:\-|–·]\s*/i;
+
+// Normaliza el título para buscar en TMDb: quita el prefijo de la plataforma y
+// los descriptores de temporada/episodio del final ("- Temporada 1", ": S2 E4").
+function cleanSearchTitle(raw) {
+  let t = String(raw || "").trim();
+  t = t.replace(PLATFORM_PREFIX_RE, "");
+  t = t.replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "");
+  t = t.replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "");
+  t = t.replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x]\s*E?\s*\d+.*$/i, "");
+  return t.trim();
+}
+
 export async function POST(request) {
   try {
     const {
@@ -27,26 +42,51 @@ export async function POST(request) {
 
     console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${videoId})`);
 
-    // 1. Determine TV details. La extensión puede enviar season/episode ya
-    // parseados; si no, los inferimos del subtítulo en varios formatos.
+    // 1. Detectar temporada/episodio. La extensión puede enviarlos ya parseados;
+    // si no, los inferimos del título completo (main + subtítulo) en varios
+    // formatos: "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 Episode 1".
+    const combined = `${mainTitle} ${subTitle || ""}`;
     let isTv = false;
     let season = null;
     let episode = null;
+    let seriesWithoutEpisode = false;
 
     if (Number.isInteger(episodeIn) && episodeIn > 0) {
       isTv = true;
       episode = episodeIn;
       season = Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : 1;
-    } else if (subTitle) {
-      // Patrones: "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 Episode 1", "Ep. 1".
-      const sMatch = subTitle.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
-      const eMatch = subTitle.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
+    } else {
+      const sMatch = combined.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
+      const eMatch = combined.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
 
       if (eMatch) {
         isTv = true;
-        season = sMatch ? parseInt(sMatch[1], 10) : 1; // Default to season 1 if not specified
+        season = sMatch ? parseInt(sMatch[1], 10) : 1; // por defecto temporada 1
         episode = parseInt(eMatch[1], 10);
+      } else if (sMatch) {
+        // Serie con temporada pero sin episodio identificable.
+        seriesWithoutEpisode = true;
+        season = parseInt(sMatch[1], 10);
       }
+    }
+
+    // 2. Limpiar el título para la búsqueda en TMDb.
+    const query = cleanSearchTitle(mainTitle);
+    if (!query) {
+      return NextResponse.json({ error: "Empty title after cleanup" }, { status: 422 });
+    }
+
+    // Sin episodio identificable no podemos fijar una entrada de historial de
+    // episodio fiable: omitimos en vez de registrar datos incorrectos.
+    if (seriesWithoutEpisode) {
+      console.log(`[Extension Sync] Serie sin episodio identificable, omitida: "${query}" (T${season})`);
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "series_without_episode",
+        title: query,
+        season,
+      });
     }
 
     let tmdbId = null;
@@ -54,10 +94,10 @@ export async function POST(request) {
     let resolvedTitle = "";
     let posterPath = "";
 
-    // 2. Search TMDb
+    // 3. Search TMDb
     if (isTv) {
-      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(mainTitle)}&type=tv`);
-      console.log("[Extension Sync] TV Search result:", { ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
+      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=tv`);
+      console.log("[Extension Sync] TV Search result:", { query, ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
       if (searchRes.ok && searchRes.json?.results?.length > 0) {
         const show = searchRes.json.results[0];
         tmdbId = show.id;
@@ -81,8 +121,8 @@ export async function POST(request) {
         }
       }
     } else {
-      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(mainTitle)}&type=movie`);
-      console.log("[Extension Sync] Movie Search result:", { ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
+      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=movie`);
+      console.log("[Extension Sync] Movie Search result:", { query, ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
       if (searchRes.ok && searchRes.json?.results?.length > 0) {
         const movie = searchRes.json.results[0];
         tmdbId = movie.id;
@@ -92,8 +132,8 @@ export async function POST(request) {
     }
 
     if (!tmdbId) {
-      console.error("[Extension Sync] Could not resolve TMDb entity for:", mainTitle);
-      return NextResponse.json({ error: `Could not resolve TMDb entity for: ${mainTitle}` }, { status: 404 });
+      console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
+      return NextResponse.json({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
     }
 
     // 3. Insert into history
@@ -120,7 +160,9 @@ export async function POST(request) {
         return NextResponse.json({ error: "Backend base URL is not configured" }, { status: 503 });
       }
 
-      const res = await fetch(`${baseUrl}/v1/auth/netflix/sync`, {
+      const syncUrl = `${baseUrl}/v1/auth/netflix/sync`;
+      console.log(`[Extension Sync] POST -> ${syncUrl}`);
+      const res = await fetch(syncUrl, {
         method: "POST",
         headers: {
           Accept: "application/json",
