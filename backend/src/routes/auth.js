@@ -2,6 +2,7 @@
 // Endpoints de autenticación: register, login, refresh, logout, me
 
 import bcrypt from 'bcrypt';
+import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { users, refreshTokens, userPreferences, connectedAccounts, watchHistory } from '../db/schema.js';
@@ -35,6 +36,40 @@ const tmdbSessionSchema = z.object({
 
 const googleAuthSchema = z.object({
   idToken: z.string().min(20),
+});
+
+const netflixConnectSchema = z.object({
+  email: z.string().email(),
+  profileName: z.string().min(1).max(120).optional(),
+});
+
+const netflixSyncSchema = z.object({
+  tmdbId: z.number().int().positive(),
+  mediaType: z.enum(['movie', 'tv']),
+  season: z.number().int().positive().optional(),
+  episode: z.number().int().positive().optional(),
+  watchedAt: z.string().datetime().optional(),
+  runtimeMins: z.number().int().positive().optional(),
+  title: z.string().max(300).optional(),
+  posterPath: z.string().max(300).nullable().optional(),
+  netflixVideoId: z.string().max(80).optional(),
+  netflixTitle: z.string().max(300).optional(),
+});
+
+const netflixSyncBatchSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        tmdbId: z.number().int().positive(),
+        mediaType: z.enum(['movie', 'tv']),
+        season: z.number().int().positive().optional(),
+        episode: z.number().int().positive().optional(),
+        watchedAt: z.string().datetime().optional(),
+        title: z.string().max(300).optional(),
+        posterPath: z.string().max(300).nullable().optional(),
+      }),
+    )
+    .max(1000),
 });
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -717,107 +752,253 @@ export default async function authRoutes(fastify) {
   });
 
   // ──────────────────────────────────────────────
-  // POST /netflix/connect — Conectar cuenta de Netflix (Simulado)
+  // POST /netflix/connect — Conectar cuenta de Netflix detectada por la extension
   // ──────────────────────────────────────────────
   fastify.post('/netflix/connect', { preHandler: fastify.requireAuth }, async (req, reply) => {
-    const { email, profileName } = req.body || {};
-    if (!email) {
-      return reply.status(400).send({ error: 'Email is required' });
+    const parsed = netflixConnectSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    // Datos iniciales de historial para simular importación automática
-    const netflixSeedHistory = [
-      {
-        tmdbId: 66732, // Stranger Things
-        mediaType: 'tv',
-        season: 4,
-        episode: 1,
-        title: 'Stranger Things: Capítulo uno: El Club del Fuego del Infierno',
-        posterPath: '/49WJfeN0mhmmQ9R6w4DjaRrk7uP.jpg',
-        watchedOffsetDays: 5,
-      },
-      {
-        tmdbId: 119051, // Wednesday / Miércoles
-        mediaType: 'tv',
-        season: 1,
-        episode: 1,
-        title: 'Miércoles: Y todos mis males',
-        posterPath: '/9pf1T92r66mdmV9ehw584n5767P.jpg',
-        watchedOffsetDays: 4,
-      },
-      {
-        tmdbId: 661378, // Glass Onion
-        mediaType: 'movie',
-        title: 'Puñales por la espalda: El misterio de Glass Onion',
-        posterPath: '/vD1AgjI627mclJv5mZuI40K9uX2.jpg',
-        watchedOffsetDays: 3,
-      },
-      {
-        tmdbId: 512195, // Red Notice / Alerta roja
-        mediaType: 'movie',
-        title: 'Alerta roja',
-        posterPath: '/wd72U4jU3mdR7K582t7Y34YIf4w.jpg',
-        watchedOffsetDays: 2,
-      },
-      {
-        tmdbId: 1416, // Black Mirror
-        mediaType: 'tv',
-        season: 6,
-        episode: 1,
-        title: 'Black Mirror: Joan es horrible',
-        posterPath: '/79N5b1S8M3aH84F2w2E8H3a9A2.jpg',
-        watchedOffsetDays: 1,
-      }
-    ];
+    const { email, profileName } = parsed.data;
+    const syncToken = `tsv_netflix_${nanoid(48)}`;
+    const now = new Date();
 
-    // Vincular cuenta en base de datos
     await db
       .insert(connectedAccounts)
       .values({
         userId: req.user.id,
         provider: 'netflix',
         providerUid: email,
+        accessToken: hashToken(syncToken),
         metadata: {
           email,
           profileName: profileName || 'Principal',
-          connectedAt: new Date().toISOString(),
-          lastPolledAt: new Date().toISOString(),
+          connectedAt: now.toISOString(),
+          lastSyncedAt: null,
+          syncMode: 'browser-extension',
         },
       })
       .onConflictDoUpdate({
         target: [connectedAccounts.provider, connectedAccounts.providerUid],
         set: {
           userId: req.user.id,
+          accessToken: hashToken(syncToken),
           metadata: {
             email,
             profileName: profileName || 'Principal',
-            connectedAt: new Date().toISOString(),
-            lastPolledAt: new Date().toISOString(),
+            connectedAt: now.toISOString(),
+            lastSyncedAt: null,
+            syncMode: 'browser-extension',
           },
         },
       });
 
-    // Insertar historial semilla
-    const historyRows = netflixSeedHistory.map((item) => {
-      const watchedAt = new Date();
-      watchedAt.setDate(watchedAt.getDate() - item.watchedOffsetDays);
-      return {
-        userId: req.user.id,
-        tmdbId: item.tmdbId,
-        mediaType: item.mediaType,
-        season: item.season || null,
-        episode: item.episode || null,
-        watchedAt,
-        title: item.title,
-        posterPath: item.posterPath,
-      };
+    return reply.send({
+      connected: true,
+      email,
+      profileName: profileName || 'Principal',
+      syncToken,
     });
+  });
 
-    if (historyRows.length > 0) {
-      await db.insert(watchHistory).values(historyRows).onConflictDoNothing();
+  // ──────────────────────────────────────────────
+  // POST /netflix/sync — Recibe visionados desde la extension con token revocable
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/sync', async (req, reply) => {
+    const auth = req.headers.authorization || '';
+    const syncToken = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
+    if (!syncToken) {
+      return reply.status(401).send({ error: 'Netflix sync token is required' });
     }
 
-    return reply.send({ connected: true, email, profileName });
+    const parsed = netflixSyncSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    const [account] = await db
+      .select()
+      .from(connectedAccounts)
+      .where(and(
+        eq(connectedAccounts.provider, 'netflix'),
+        eq(connectedAccounts.accessToken, hashToken(syncToken))
+      ))
+      .limit(1);
+
+    if (!account) {
+      return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
+    }
+
+    const { tmdbId, mediaType, season, episode, watchedAt, runtimeMins, title, posterPath } = parsed.data;
+    if (mediaType === 'tv' && (!season || !episode)) {
+      return reply.status(400).send({ error: 'season and episode are required for tv history entries' });
+    }
+
+    const recentCutoff = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const duplicateConditions = [
+      eq(watchHistory.userId, account.userId),
+      eq(watchHistory.tmdbId, tmdbId),
+      eq(watchHistory.mediaType, mediaType),
+      gt(watchHistory.watchedAt, recentCutoff),
+    ];
+    if (mediaType === 'tv') {
+      duplicateConditions.push(eq(watchHistory.season, season));
+      duplicateConditions.push(eq(watchHistory.episode, episode));
+    }
+
+    const [recentDuplicate] = await db
+      .select({ id: watchHistory.id })
+      .from(watchHistory)
+      .where(and(...duplicateConditions))
+      .limit(1);
+
+    let item = null;
+    if (!recentDuplicate) {
+      [item] = await db
+        .insert(watchHistory)
+        .values({
+          userId: account.userId,
+          tmdbId,
+          mediaType,
+          season: mediaType === 'tv' ? season : null,
+          episode: mediaType === 'tv' ? episode : null,
+          watchedAt: watchedAt ? new Date(watchedAt) : new Date(),
+          runtimeMins: runtimeMins || null,
+          title: title || null,
+          posterPath: posterPath || null,
+        })
+        .returning();
+    }
+
+    await db
+      .update(connectedAccounts)
+      .set({
+        metadata: {
+          ...(account.metadata || {}),
+          lastSyncedAt: new Date().toISOString(),
+          lastNetflixVideoId: parsed.data.netflixVideoId || null,
+        },
+      })
+      .where(eq(connectedAccounts.id, account.id));
+
+    return reply.status(recentDuplicate ? 200 : 201).send({
+      success: true,
+      duplicate: Boolean(recentDuplicate),
+      item,
+    });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /netflix/sync/batch — Backfill/sondeo de la actividad de visionado
+  // de Netflix obtenida por la extensión. Autenticado con el token revocable.
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/sync/batch', async (req, reply) => {
+    const auth = req.headers.authorization || '';
+    const syncToken = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
+    if (!syncToken) {
+      return reply.status(401).send({ error: 'Netflix sync token is required' });
+    }
+
+    const parsed = netflixSyncBatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    const [account] = await db
+      .select()
+      .from(connectedAccounts)
+      .where(and(
+        eq(connectedAccounts.provider, 'netflix'),
+        eq(connectedAccounts.accessToken, hashToken(syncToken)),
+      ))
+      .limit(1);
+
+    if (!account) {
+      return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
+    }
+
+    const userId = account.userId;
+
+    // Normaliza y descarta tv sin temporada/episodio.
+    const candidates = [];
+    for (const item of parsed.data.items) {
+      if (item.mediaType === 'tv' && (!item.season || !item.episode)) continue;
+      const watchedAt = item.watchedAt ? new Date(item.watchedAt) : new Date();
+      if (Number.isNaN(watchedAt.getTime())) continue;
+      candidates.push({
+        userId,
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+        season: item.mediaType === 'tv' ? item.season : null,
+        episode: item.mediaType === 'tv' ? item.episode : null,
+        watchedAt,
+        title: item.title || null,
+        posterPath: item.posterPath || null,
+      });
+    }
+
+    // Deduplica contra el historial existente por (tmdbId, mediaType, season,
+    // episode, día). El backfill conserva la fecha real de visionado.
+    const dayKey = (value) => {
+      const d = value instanceof Date ? value : new Date(value);
+      return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    };
+    const entryKey = (item) =>
+      [item.tmdbId, item.mediaType, item.season ?? '', item.episode ?? '', dayKey(item.watchedAt)].join(':');
+
+    const existing = await db
+      .select({
+        tmdbId: watchHistory.tmdbId,
+        mediaType: watchHistory.mediaType,
+        season: watchHistory.season,
+        episode: watchHistory.episode,
+        watchedAt: watchHistory.watchedAt,
+      })
+      .from(watchHistory)
+      .where(eq(watchHistory.userId, userId));
+    const existingKeys = new Set(existing.map(entryKey));
+
+    const toInsert = [];
+    const batchSeen = new Set();
+    let duplicates = 0;
+    for (const item of candidates) {
+      const key = entryKey(item);
+      if (existingKeys.has(key) || batchSeen.has(key)) {
+        duplicates += 1;
+        continue;
+      }
+      batchSeen.add(key);
+      toInsert.push(item);
+    }
+
+    let imported = 0;
+    for (let i = 0; i < toInsert.length; i += 500) {
+      const chunk = toInsert.slice(i, i + 500);
+      const inserted = await db
+        .insert(watchHistory)
+        .values(chunk)
+        .onConflictDoNothing()
+        .returning({ id: watchHistory.id });
+      imported += inserted.length;
+    }
+
+    await db
+      .update(connectedAccounts)
+      .set({
+        metadata: {
+          ...(account.metadata || {}),
+          lastSyncedAt: new Date().toISOString(),
+        },
+      })
+      .where(eq(connectedAccounts.id, account.id));
+
+    return reply.send({
+      success: true,
+      total: parsed.data.items.length,
+      imported,
+      duplicates,
+    });
   });
 
   // ──────────────────────────────────────────────

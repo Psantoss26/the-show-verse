@@ -415,11 +415,13 @@ export async function traktSetEpisodeWatched({
   episode,
   watched,
   watchedAt,
+  title,
 }) {
   const watchedAtYmd = normalizeWatchedAtForApi(watchedAt);
 
   const payload = { tmdbId, season, episode, watched };
   if (watchedAtYmd) payload.watchedAt = watchedAtYmd;
+  if (title) payload.title = title;
 
   const res = await offlineMutationFetch("/api/trakt/episode/watched", {
     method: "POST",
@@ -739,11 +741,13 @@ export async function traktAddEpisodePlay({
   season,
   episode,
   watchedAt,
+  title,
 }) {
   const watchedAtIso = normalizeWatchedAtForHistoryApi(watchedAt);
 
   const payload = { tmdbId, season, episode };
   if (watchedAtIso) payload.watchedAt = watchedAtIso;
+  if (title) payload.title = title;
 
   const res = await fetch("/api/trakt/episode/play", {
     method: "POST",
@@ -787,4 +791,3 @@ export async function traktDeleteComment({ commentId }) {
   if (!res.ok) throw new Error(json?.error || "Error al eliminar comentario");
   return json;
 }
-

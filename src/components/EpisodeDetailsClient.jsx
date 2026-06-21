@@ -1156,6 +1156,7 @@ export default function EpisodeDetailsClient({
           season: Number(seasonNumber),
           episode: Number(episodeNumber),
           watchedAt,
+          title: showName,
         });
         // Recargar historial después de añadir
         setEpisodePlaysLoaded(false);
@@ -1176,7 +1177,7 @@ export default function EpisodeDetailsClient({
         setWatchedBusy(false);
       }
     },
-    [showId, seasonNumber, episodeNumber],
+    [showId, seasonNumber, episodeNumber, showName],
   );
 
   const handleEpisodeUpdatePlay = useCallback(
@@ -1190,6 +1191,7 @@ export default function EpisodeDetailsClient({
           season: Number(seasonNumber),
           episode: Number(episodeNumber),
           watchedAt,
+          title: showName,
         });
         setEpisodePlaysLoaded(false);
         const json = await traktGetEpisodePlays({
@@ -1209,7 +1211,7 @@ export default function EpisodeDetailsClient({
         setWatchedBusy(false);
       }
     },
-    [showId, seasonNumber, episodeNumber],
+    [showId, seasonNumber, episodeNumber, showName],
   );
 
   const handleEpisodeRemovePlay = useCallback(
@@ -1262,6 +1264,7 @@ export default function EpisodeDetailsClient({
         season: Number(seasonNumber),
         episode: Number(episodeNumber),
         watched: newWatched,
+        title: showName,
       });
 
       traktRequestIdRef.current += 1;
@@ -1296,6 +1299,7 @@ export default function EpisodeDetailsClient({
     showId,
     seasonNumber,
     episodeNumber,
+    showName,
     applyShowWatchedPayload,
   ]);
 

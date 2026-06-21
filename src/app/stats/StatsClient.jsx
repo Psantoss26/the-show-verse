@@ -45,11 +45,11 @@ import "swiper/swiper-bundle.css";
 
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
+import { COLORS } from "./chartConstants";
 
 const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v7";
 const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v7";
 const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v2";
-const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
 const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
 const PROFILE_FULL_REFRESH_DELAY_MS = 80;
 
@@ -72,14 +72,23 @@ function cancelProfileDeferredOverview(handle) {
   window.clearTimeout(handle);
 }
 
+// Persisted in localStorage (survives across sessions) and served
+// stale-while-revalidate: cached profile data paints instantly on the first
+// visit of a new session, while the mount effect always refreshes in the
+// background. A hard age cap drops data that is too old to be useful.
+const PROFILE_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
 function readProfileSessionCache(key) {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
-    if (Date.now() - Number(parsed.t || 0) > PROFILE_CACHE_TTL_MS) return null;
+    if (Date.now() - Number(parsed.t || 0) > PROFILE_CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
     return parsed.data || null;
   } catch {
     return null;
@@ -89,16 +98,16 @@ function readProfileSessionCache(key) {
 function writeProfileSessionCache(key, data) {
   if (typeof window === "undefined" || !data) return;
   try {
-    window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }));
+    window.localStorage.setItem(key, JSON.stringify({ t: Date.now(), data }));
   } catch {}
 }
 
 function clearProfileSessionCache() {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.removeItem(PROFILE_STATS_CACHE_KEY);
-    window.sessionStorage.removeItem(PROFILE_DATA_CACHE_KEY);
-    window.sessionStorage.removeItem(PROFILE_USER_CACHE_KEY);
+    window.localStorage.removeItem(PROFILE_STATS_CACHE_KEY);
+    window.localStorage.removeItem(PROFILE_DATA_CACHE_KEY);
+    window.localStorage.removeItem(PROFILE_USER_CACHE_KEY);
   } catch {}
 }
 
@@ -166,55 +175,41 @@ const useIsMobileLayout = (breakpointPx = 768) => {
   return isMobile;
 };
 
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Legend,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+// Charts are code-split out of the initial Profile bundle (recharts is heavy and
+// the charts render deferred / below the fold anyway).
+const ChartLoading = ({ className = "h-[300px]" }) => (
+  <div className={`${className} min-w-0 w-full animate-pulse rounded-2xl bg-white/5`} />
+);
+const MonthlyActivityChart = dynamic(
+  () => import("./profileCharts").then((m) => m.MonthlyActivityChart),
+  { ssr: false, loading: () => <ChartLoading /> },
+);
+const TimeDistributionChart = dynamic(
+  () => import("./profileCharts").then((m) => m.TimeDistributionChart),
+  { ssr: false, loading: () => <ChartLoading className="h-[250px]" /> },
+);
+const HourOfDayChart = dynamic(
+  () => import("./profileCharts").then((m) => m.HourOfDayChart),
+  { ssr: false, loading: () => <ChartLoading /> },
+);
+const DayOfWeekChart = dynamic(
+  () => import("./profileCharts").then((m) => m.DayOfWeekChart),
+  { ssr: false, loading: () => <ChartLoading /> },
+);
+const GenreRadarChart = dynamic(
+  () => import("./profileCharts").then((m) => m.GenreRadarChart),
+  { ssr: false, loading: () => <ChartLoading /> },
+);
+const RatingsBarChart = dynamic(
+  () => import("./profileCharts").then((m) => m.RatingsBarChart),
+  { ssr: false, loading: () => <ChartLoading /> },
+);
 
 // -----------------------------------------------------------------------------
 // COLORS & CONSTANTS
 // -----------------------------------------------------------------------------
-const COLORS = {
-  emerald: "#10b981",
-  blue: "#3b82f6",
-  purple: "#a855f7",
-  yellow: "#eab308",
-  pink: "#ec4899",
-  red: "#ef4444",
-  cyan: "#06b6d4",
-  orange: "#f97316",
-  slate: "#64748b",
-  indigo: "#6366f1",
-  teal: "#14b8a6",
-  rose: "#f43f5e",
-  lime: "#84cc16",
-  background: "#18181b", // zinc-900
-};
-
-const CHART_THEME = {
-  background: "transparent",
-  text: "#a1a1aa", // zinc-400
-  grid: "#27272a", // zinc-800
-  tooltipBg: "#18181b",
-  tooltipBorder: "#27272a",
-};
-
 function privateMediaUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -786,68 +781,6 @@ function ProfileCardScroller({ children }) {
 
 function ProfileCardScrollerItem({ children }) {
   return children;
-}
-
-function CustomTooltip({ active, payload, label, formatter }) {
-  if (active && payload && payload.length) {
-    const title = label || (payload[0] && payload[0].name);
-    return (
-      <div className="bg-zinc-950/90 border border-white/10 rounded-xl p-3 shadow-xl backdrop-blur-md z-50">
-        <p className="font-bold text-white mb-2 text-sm">{title}</p>
-        <div className="space-y-1">
-          {payload.map((p, idx) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between gap-4 text-xs"
-            >
-              <span
-                className="flex items-center gap-2"
-                style={{ color: p.color }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: p.color }}
-                />
-                {p.name}
-              </span>
-              <span className="font-mono font-bold text-zinc-300">
-                {formatter ? formatter(p.value) : p.value.toLocaleString()}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-}
-
-function ChartFrame({ className = "h-[300px]", children }) {
-  const ref = useRef(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return undefined;
-
-    const update = () => {
-      const rect = node.getBoundingClientRect();
-      setReady(rect.width > 0 && rect.height > 0);
-    };
-
-    update();
-
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={ref} className={`${className} min-w-0 w-full`}>
-      {ready ? children : null}
-    </div>
-  );
 }
 
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
@@ -1516,30 +1449,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
     };
   }, [data]);
 
-  const formatMinutes = (mins) => {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${m}m`;
-  };
-
-  const formatGenreTick = (value) => {
-    if (!value) return "";
-    const mappings = {
-      "Ciencia ficción": "C. Ficción",
-      "Science Fiction": "Sci-Fi",
-      "Ciencia ficción y Fantasía": "C. Ficc/Fant",
-      "Science Fiction & Fantasy": "Sci-Fi/Fant",
-      "Sci-Fi & Fantasy": "Sci-Fi/Fant",
-      "Acción y aventura": "Acción/Aven.",
-      "Action & Adventure": "Action/Adv.",
-      "Película de TV": "Peli TV",
-      "TV Movie": "TV Movie",
-      "Documental": "Docu",
-      "Documentary": "Docu",
-    };
-    return mappings[value] || value;
-  };
-
   const profileUser = showVerseProfileUser || profileData?.user || null;
   const recentHistory = profileData?.recentHistory || [];
   const recentRatings = profileData?.recentRatings || [];
@@ -1916,76 +1825,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         color="indigo"
                       />
 
-                      <ChartFrame>
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                          <AreaChart
-                            data={stats.monthlyData}
-                            margin={{
-                              top: 10,
-                              right: 5,
-                              left: -28,
-                              bottom: 0,
-                            }}
-                          >
-                            <defs>
-                              <linearGradient
-                                id="colorTotal"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="5%"
-                                  stopColor={COLORS.indigo}
-                                  stopOpacity={0.3}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor={COLORS.indigo}
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke={CHART_THEME.grid}
-                            />
-                            <XAxis
-                              dataKey="label"
-                              stroke={CHART_THEME.text}
-                              tick={{ fill: CHART_THEME.text, fontSize: 12 }}
-                              tickLine={false}
-                              axisLine={false}
-                              dy={10}
-                            />
-                            <YAxis
-                              stroke={CHART_THEME.text}
-                              tick={{ fill: CHART_THEME.text, fontSize: 12 }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <Tooltip
-                              content={<CustomTooltip />}
-                              cursor={{
-                                stroke: "rgba(255,255,255,0.1)",
-                                strokeWidth: 2,
-                              }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="total"
-                              name="Total"
-                              stroke={COLORS.indigo}
-                              strokeWidth={3}
-                              fillOpacity={1}
-                              fill="url(#colorTotal)"
-                              animationDuration={1500}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </ChartFrame>
+                      <MonthlyActivityChart data={stats.monthlyData} />
                     </motion.div>
 
                     {/* Time Distribution */}
@@ -2001,47 +1841,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                         subtitle="Películas vs Series"
                         color="indigo"
                       />
-                      <ChartFrame className="relative h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                          <PieChart>
-                            <Pie
-                              data={stats.timeDistribution}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              {stats.timeDistribution.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={entry.color}
-                                  stroke="rgba(0,0,0,0)"
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              content={
-                                <CustomTooltip formatter={formatMinutes} />
-                              }
-                              wrapperStyle={{ zIndex: 1000 }}
-                            />
-                            <Legend
-                              verticalAlign="bottom"
-                              height={36}
-                              iconType="circle"
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        {/* Center Text */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                          <span className="text-3xl font-black text-white">
-                            {stats.formattedTotalTime.split(" ")[0]}
-                          </span>
-                          <span className="text-sm font-bold text-zinc-500 uppercase tracking-widest">
-                            {stats.formattedTotalTime.split(" ")[1]}
-                          </span>
-                        </div>
-                      </ChartFrame>
+                      <TimeDistributionChart
+                        data={stats.timeDistribution}
+                        formattedTotalTime={stats.formattedTotalTime}
+                      />
                     </motion.div>
                   </div>
                 )}
@@ -2199,36 +2002,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="¿Cuándo ves más contenido?"
                       color="pink"
                     />
-                    <ChartFrame>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart
-                          data={stats.hourOfDayData}
-                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke={CHART_THEME.grid}
-                          />
-                          <XAxis
-                            dataKey="name"
-                            stroke={CHART_THEME.text}
-                            tick={{ fontSize: 10 }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                          />
-                          <Bar
-                            dataKey="value"
-                            fill={COLORS.pink}
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      </ChartFrame>
+                    <HourOfDayChart data={stats.hourOfDayData} />
                   </div>
 
                   {/* Day of Week */}
@@ -2239,36 +2013,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus días más activos"
                       color="cyan"
                     />
-                    <ChartFrame>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart
-                          data={stats.dayOfWeekData}
-                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke={CHART_THEME.grid}
-                          />
-                          <XAxis
-                            dataKey="name"
-                            stroke={CHART_THEME.text}
-                            tick={{ fontSize: 10 }}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                          />
-                          <Bar
-                            dataKey="value"
-                            fill={COLORS.cyan}
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      </ChartFrame>
+                    <DayOfWeekChart data={stats.dayOfWeekData} />
                   </div>
                 </div>
 
@@ -2284,41 +2029,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Tus categorías más frecuentes"
                       color="lime"
                     />
-                     <ChartFrame>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <RadarChart
-                          cx="50%"
-                          cy="50%"
-                          outerRadius="80%"
-                          data={stats.genreData}
-                        >
-                          <PolarGrid stroke={CHART_THEME.grid} />
-                          <PolarAngleAxis
-                            dataKey="name"
-                            tickFormatter={formatGenreTick}
-                            tick={{
-                              fill: CHART_THEME.text,
-                              fontSize: isMobile ? 11 : 14,
-                              fontWeight: 500,
-                            }}
-                          />
-                          <PolarRadiusAxis
-                            angle={30}
-                            domain={[0, "auto"]}
-                            tick={false}
-                            axisLine={false}
-                          />
-                          <Radar
-                            name="Géneros"
-                            dataKey="value"
-                            stroke={COLORS.lime}
-                            fill={COLORS.lime}
-                            fillOpacity={0.4}
-                          />
-                          <Tooltip content={<CustomTooltip />} />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                      </ChartFrame>
+                     <GenreRadarChart data={stats.genreData} isMobile={isMobile} />
                   </motion.div>
 
                   {/* Ratings - Bar */}
@@ -2331,53 +2042,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       subtitle="Distribución de ratings (1-10)"
                       color="teal"
                     />
-                    <ChartFrame>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart
-                          data={stats.ratingData}
-                          barSize={20}
-                          margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke={CHART_THEME.grid}
-                          />
-                          <XAxis
-                            dataKey="name"
-                            stroke={CHART_THEME.text}
-                            tick={{ fill: CHART_THEME.text, fontSize: 12 }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                          />
-                          <Bar
-                            dataKey="value"
-                            name="Votos"
-                            radius={[4, 4, 0, 0]}
-                          >
-                            {stats.ratingData.map((entry, index) => {
-                              const rating = Number(entry.name);
-                              return (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={
-                                    rating >= 7.5
-                                      ? COLORS.teal
-                                      : rating >= 5
-                                        ? COLORS.yellow
-                                        : COLORS.rose
-                                  }
-                                />
-                              );
-                            })}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                      </ChartFrame>
+                    <RatingsBarChart data={stats.ratingData} />
                   </motion.div>
                 </div>
               </motion.div>

@@ -311,6 +311,11 @@ export default async function historyRoutes(fastify) {
             title: title || null,
             posterPath: posterPath || null,
           });
+      } else if (title) {
+        await db
+          .update(watchHistory)
+          .set({ title })
+          .where(eq(watchHistory.id, existing.id));
       }
     } else {
       // Quitar del historial (todos los plays de este episodio)

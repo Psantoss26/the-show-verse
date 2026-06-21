@@ -343,15 +343,23 @@ const getPosterPreference = (type, id) => {
   return window.localStorage.getItem(key) || null;
 };
 
-function readSessionCache(key, ttlMs) {
+// Persisted in localStorage (not sessionStorage) so a returning user gets an
+// instant paint on the first visit of a NEW session. Data is served
+// stale-while-revalidate: we render whatever is cached (up to a hard age cap)
+// and always refresh in the background. `ttlMs` is kept for callers but the
+// hard cap is what gates whether stale data is still shown.
+const CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
+function readSessionCache(key, ttlMs = CACHE_HARD_MAX_AGE) {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const ts = Number(parsed?.ts || 0);
-    if (!ts || Date.now() - ts > ttlMs) {
-      window.sessionStorage.removeItem(key);
+    const maxAge = Math.max(ttlMs, CACHE_HARD_MAX_AGE);
+    if (!ts || Date.now() - ts > maxAge) {
+      window.localStorage.removeItem(key);
       return null;
     }
     return parsed?.data ?? null;
@@ -363,7 +371,7 @@ function readSessionCache(key, ttlMs) {
 function writeSessionCache(key, data) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       key,
       JSON.stringify({ ts: Date.now(), data }),
     );
@@ -373,7 +381,7 @@ function writeSessionCache(key, data) {
 function clearSessionCache(key) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.removeItem(key);
+    window.localStorage.removeItem(key);
   } catch {}
 }
 
@@ -1305,7 +1313,15 @@ export default function InProgressClient({
             IN_PROGRESS_CACHE_KEY,
             IN_PROGRESS_CACHE_TTL,
           );
-          void loadData({ fallbackCache: cached });
+          const hasCache = !!(cached?.items || cached?.stats);
+          if (hasCache) {
+            // Paint cached data immediately, refresh silently in the background.
+            setItems(Array.isArray(cached.items) ? cached.items : []);
+            setStats(cached.stats || null);
+            setDataLoaded(true);
+            setLoading(false);
+          }
+          void loadData({ background: hasCache, fallbackCache: cached });
           return;
         }
 
@@ -1334,7 +1350,15 @@ export default function InProgressClient({
 
         setAuth({ loading: false, connected: true });
 
-        void loadData({ fallbackCache: cached });
+        const hasCache = !!(cached?.items || cached?.stats);
+        if (hasCache) {
+          // Paint cached data immediately, refresh silently in the background.
+          setItems(Array.isArray(cached.items) ? cached.items : []);
+          setStats(cached.stats || null);
+          setDataLoaded(true);
+          setLoading(false);
+        }
+        void loadData({ background: hasCache, fallbackCache: cached });
       } catch (error) {
         if (cancelled) return;
         console.error("Error checking Trakt auth:", error);

@@ -28,6 +28,37 @@ import { useTranslation } from "@/lib/i18n";
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
 const GLASS_PANEL = `${GLASS_SURFACE} transition-all duration-300 hover:border-white/15`;
+const NETFLIX_EXTENSION_ID = process.env.NEXT_PUBLIC_NETFLIX_EXTENSION_ID || "";
+const NETFLIX_EXTENSION_INSTALL_URL =
+  process.env.NEXT_PUBLIC_NETFLIX_EXTENSION_URL ||
+  (NETFLIX_EXTENSION_ID
+    ? `https://chromewebstore.google.com/detail/${NETFLIX_EXTENSION_ID}`
+    : "");
+
+function sendNetflixExtensionMessage(message) {
+  return new Promise((resolve) => {
+    if (
+      !NETFLIX_EXTENSION_ID ||
+      typeof window === "undefined" ||
+      !window.chrome?.runtime?.sendMessage
+    ) {
+      resolve(null);
+      return;
+    }
+
+    try {
+      window.chrome.runtime.sendMessage(NETFLIX_EXTENSION_ID, message, (response) => {
+        if (window.chrome?.runtime?.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(response || null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
 
 function SettingsBackground() {
   return (
@@ -131,7 +162,14 @@ function ImportPanel({
   const [notice, setNotice] = useState("");
   const pollingRef = useRef(null);
   const startedHereRef = useRef(false);
+  const onImportedRef = useRef(onImported);
+  const tRef = useRef(t);
   const accent = color === "sky" ? "sky" : "emerald";
+
+  useEffect(() => {
+    onImportedRef.current = onImported;
+    tRef.current = t;
+  }, [onImported, t]);
 
   const clearPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -140,8 +178,12 @@ function ImportPanel({
     }
   }, []);
 
-  const loadStatus = useCallback(async () => {
-    const res = await fetch(statusUrl, { cache: "no-store" });
+  const loadStatus = useCallback(async (options = {}) => {
+    const res = await fetch(statusUrl, {
+      cache: "no-store",
+      priority: "low",
+      signal: options.signal,
+    });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.error || "No se pudo consultar el progreso.");
     setStatus(json);
@@ -155,8 +197,8 @@ function ImportPanel({
         setLoading(false);
         if (startedHereRef.current) {
           startedHereRef.current = false;
-          setNotice(t("settings_imported", "Importación completada. Tus datos ya están en The Show Verse."));
-          onImported?.();
+          setNotice(tRef.current("settings_imported", "Importación completada. Tus datos ya están en The Show Verse."));
+          onImportedRef.current?.();
         }
       } else if (nextStatus?.status === "error") {
         clearPolling();
@@ -165,7 +207,7 @@ function ImportPanel({
         startedHereRef.current = false;
       }
     },
-    [clearPolling, onImported, t],
+    [clearPolling],
   );
 
   const startPolling = useCallback(() => {
@@ -182,7 +224,8 @@ function ImportPanel({
 
   useEffect(() => {
     let ignore = false;
-    loadStatus()
+    const controller = new AbortController();
+    loadStatus({ signal: controller.signal })
       .then((nextStatus) => {
         if (ignore) return;
         const isRunning = nextStatus?.status === "running";
@@ -193,6 +236,7 @@ function ImportPanel({
       .catch(() => {});
     return () => {
       ignore = true;
+      controller.abort();
       clearPolling();
     };
   }, [clearPolling, loadStatus, startPolling, stopIfFinal]);
@@ -345,6 +389,58 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
   const netflixConn = connections.find((c) => c.provider === "netflix");
   const isConnected = !!netflixConn?.connected;
 
+  const requestActivitySync = useCallback(() => {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (value) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("response-netflix-sync", handleResponse);
+        resolve(value);
+      };
+      const handleResponse = (event) => finish(event.detail || null);
+
+      document.addEventListener("response-netflix-sync", handleResponse);
+      document.dispatchEvent(new CustomEvent("request-netflix-sync", { detail: { full: true } }));
+
+      sendNetflixExtensionMessage({ action: "syncNetflixActivity", full: true }).then((response) => {
+        if (response) finish(response);
+      });
+
+      // La lectura del historial completo puede tardar; damos margen amplio.
+      window.setTimeout(() => finish(null), 60000);
+    });
+  }, []);
+
+  const handleSyncNow = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await requestActivitySync();
+      if (!response) {
+        throw new Error(
+          "No se pudo contactar con la extensión. Asegúrate de tener la sesión de Netflix abierta y la extensión instalada.",
+        );
+      }
+      if (!response.success) {
+        throw new Error(response.error || "No se pudo leer la actividad de Netflix.");
+      }
+      const imported = Number(response.imported || 0);
+      setSuccess(
+        imported > 0
+          ? `¡Sincronizado! Se añadieron ${imported} visionado(s) desde Netflix.`
+          : "Tu historial ya estaba al día con Netflix.",
+      );
+      if (imported > 0) onImported?.();
+    } catch (err) {
+      setError(err?.message || "No se pudo sincronizar con Netflix.");
+    } finally {
+      setLoading(false);
+    }
+  }, [onImported, requestActivitySync]);
+
   const handleSimulate = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -376,6 +472,8 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
         method: "POST",
       });
       if (!res.ok) throw new Error("Error al desvincular Netflix.");
+      document.dispatchEvent(new CustomEvent("request-netflix-unbind"));
+      void sendNetflixExtensionMessage({ action: "clearSyncConfig" });
       
       // Notificar cambio de conexión
       window.dispatchEvent(
@@ -412,8 +510,8 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
         </div>
 
         <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-4 text-xs leading-relaxed text-zinc-400">
-          <span className="font-bold block text-red-400 text-sm mb-1">🔌 Sincronización Real en Navegador</span>
-          Para registrar tus reproducciones reales de Netflix automáticamente al verlas en tu navegador, carga la extensión ubicada en la carpeta <code className="text-red-300 bg-red-950/20 px-1.5 py-0.5 rounded">netflix-extension/</code> de este proyecto como extensión descomprimida en <code className="text-red-400 bg-black/40 px-1.5 py-0.5 rounded">chrome://extensions</code>.
+          <span className="font-bold block text-red-400 text-sm mb-1">Sincronización real en navegador</span>
+          The Show Verse usa una extensión oficial y revocable para detectar lo que reproduces en Netflix desde tu propio navegador. La app no guarda contraseñas ni cookies de Netflix.
         </div>
 
         {isConnected ? (
@@ -431,30 +529,39 @@ function NetflixAutoSyncPanel({ connections, fetchConnections, onImported, onGoT
 
             <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
               <span className="block text-xs font-black uppercase tracking-widest text-red-400/80">
-                Simulador de Actividad (Demostración)
+                Sincronización del historial
               </span>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Pulsa el botón de abajo para simular que estás reproduciendo una película o episodio en Netflix. Verás aparecer inmediatamente la notificación Toast del sistema y las estadísticas de tu perfil se actualizarán en tiempo real.
+                Tu historial se importa automáticamente al conectar y se actualiza en segundo plano. Usa este botón si quieres forzar una sincronización inmediata con tu actividad real de Netflix.
               </p>
-              
+
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={handleSimulate}
+                  onClick={handleSyncNow}
                   disabled={loading}
                   className="flex min-h-11 w-full items-center justify-center rounded-xl bg-red-600 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Simulando reproducción...
+                      Leyendo tu actividad de Netflix...
                     </>
                   ) : (
                     <>
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      Simular visionado en Netflix
+                      Sincronizar historial de Netflix ahora
                     </>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSimulate}
+                  disabled={loading}
+                  className="flex min-h-9 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-[11px] font-bold text-zinc-400 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Diagnóstico: simular visionado
                 </button>
 
                 {success && (
@@ -521,12 +628,7 @@ function ProfileSettingsClient() {
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [connectedEmail, setConnectedEmail] = useState("");
-  const [connectedProfile, setConnectedProfile] = useState("");
-
-  const resolvedEmail = user?.email
-    ? user.email.replace(/@.*/, '.netflix@gmail.com')
-    : "usuario.netflix@gmail.com";
-
+  const [extensionInstallNeeded, setExtensionInstallNeeded] = useState(false);
 
   const fetchConnections = useCallback(async () => {
     if (!authenticated) return;
@@ -550,65 +652,111 @@ function ProfileSettingsClient() {
     }
   }, [hydrated, authenticated, fetchConnections]);
 
+  const requestNetflixExtensionDetails = useCallback(() => {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (value) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("response-netflix-details", handleResponse);
+        resolve(value);
+      };
+      const handleResponse = (event) => {
+        finish(event.detail || null);
+      };
+
+      document.addEventListener("response-netflix-details", handleResponse);
+      document.dispatchEvent(new CustomEvent("request-netflix-details"));
+
+      sendNetflixExtensionMessage({ action: "getNetflixDetails" }).then((response) => {
+        if (response) finish(response);
+      });
+
+      // La detección lee dos páginas de Netflix (cuenta + perfil); damos margen.
+      window.setTimeout(() => finish(null), 8000);
+    });
+  }, []);
+
+  const bindNetflixExtension = useCallback((payload) => {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (value) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("response-netflix-bind", handleResponse);
+        resolve(value);
+      };
+      const handleResponse = (event) => {
+        finish(event.detail || null);
+      };
+
+      document.addEventListener("response-netflix-bind", handleResponse);
+      document.dispatchEvent(new CustomEvent("request-netflix-bind", { detail: payload }));
+
+      sendNetflixExtensionMessage({
+        action: "storeSyncConfig",
+        origin: window.location.origin,
+        ...payload,
+      }).then((response) => {
+        if (response) finish(response);
+      });
+
+      window.setTimeout(() => finish(null), 2500);
+    });
+  }, []);
+
+  const openNetflixExtensionInstall = useCallback(() => {
+    if (!NETFLIX_EXTENSION_INSTALL_URL) {
+      setConnectError(
+        "La URL pública de la extensión no está configurada. Define NEXT_PUBLIC_NETFLIX_EXTENSION_URL o NEXT_PUBLIC_NETFLIX_EXTENSION_ID.",
+      );
+      return;
+    }
+
+    window.open(NETFLIX_EXTENSION_INSTALL_URL, "_blank", "noopener,noreferrer");
+  }, []);
+
   const handleConnectNetflix = async () => {
     setShowNetflixModal(true);
     setConnectLoading(true);
     setConnectError("");
     setConnectStep(0);
     setConnectedEmail("");
-    setConnectedProfile("");
+    setExtensionInstallNeeded(false);
 
-    const resolvedProfile = user?.displayName || user?.username || "Principal";
     const timers = [];
 
-    let selectedEmail = resolvedEmail;
-    let selectedProfile = resolvedProfile;
-
     try {
-      // Step 0: Detectando... (wait 1.5s)
-      // Attempt to query the Chrome Extension for active Netflix session details
-      const extensionPromise = new Promise((resolve) => {
-        const handleResponse = (e) => {
-          document.removeEventListener("response-netflix-details", handleResponse);
-          resolve({ success: true, data: e.detail });
-        };
-        document.addEventListener("response-netflix-details", handleResponse);
-        document.dispatchEvent(new CustomEvent("request-netflix-details"));
-        
-        // Timeout after 1.2 seconds if the extension isn't loaded or active
-        setTimeout(() => {
-          document.removeEventListener("response-netflix-details", handleResponse);
-          resolve({ success: false, error: "timeout" });
-        }, 1200);
-      });
-
       const [detailsResult] = await Promise.all([
-        extensionPromise,
+        requestNetflixExtensionDetails(),
         new Promise((resolve) => {
-          timers.push(setTimeout(resolve, 1500));
+          timers.push(window.setTimeout(resolve, 900));
         })
       ]);
 
-      if (detailsResult.success && detailsResult.data) {
-        if (detailsResult.data.success) {
-          selectedEmail = detailsResult.data.email;
-          selectedProfile = detailsResult.data.profileName || resolvedProfile;
-        } else {
-          // If extension runs but fails to find session, prompt error
-          throw new Error(detailsResult.data.error || "No se detectó sesión activa en Netflix.");
-        }
+      if (!detailsResult) {
+        setExtensionInstallNeeded(true);
+        throw new Error(
+          NETFLIX_EXTENSION_INSTALL_URL
+            ? "Necesitas instalar la extensión oficial de The Show Verse para activar la sincronización automática de Netflix. La abriremos en una pestaña nueva y podrás reintentar al volver."
+            : "No se detectó la extensión de The Show Verse y no hay una URL pública configurada para instalarla.",
+        );
       }
+      if (!detailsResult.success) {
+        throw new Error(detailsResult.error || "No se detectó una sesión activa en Netflix.");
+      }
+      setExtensionInstallNeeded(false);
+
+      const selectedEmail = detailsResult.email;
+      const selectedProfile = detailsResult.profileName || "Principal";
 
       setConnectedEmail(selectedEmail);
-      setConnectedProfile(selectedProfile);
 
-      // Step 1: Sesión detectada para email (wait 1.5s)
       setConnectStep(1);
       await new Promise((resolve) => {
-        timers.push(setTimeout(resolve, 1500));
+        timers.push(window.setTimeout(resolve, 700));
       });
 
-      // Step 2: Sincronizando historial...
       setConnectStep(2);
 
       const res = await fetch("/api/netflix/connect", {
@@ -622,14 +770,22 @@ function ProfileSettingsClient() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "No se pudo establecer la conexión.");
+      if (!json.syncToken) throw new Error("El servidor no devolvió el token de sincronización.");
 
-      // Step 3: Completado y config... (wait 1.5s)
+      const bindResult = await bindNetflixExtension({
+        syncToken: json.syncToken,
+        email: selectedEmail,
+        profileName: selectedProfile,
+      });
+      if (!bindResult?.success) {
+        throw new Error(bindResult?.error || "No se pudo guardar la vinculación en la extensión.");
+      }
+
       setConnectStep(3);
       await new Promise((resolve) => {
-        timers.push(setTimeout(resolve, 1500));
+        timers.push(window.setTimeout(resolve, 900));
       });
 
-      // Disparar evento global de cambio de conexión
       window.dispatchEvent(
         new CustomEvent("netflix-connection-changed", { detail: { connected: true } })
       );
@@ -651,6 +807,8 @@ function ProfileSettingsClient() {
     try {
       const res = await fetch("/api/netflix/disconnect", { method: "POST" });
       if (res.ok) {
+        document.dispatchEvent(new CustomEvent("request-netflix-unbind"));
+        void sendNetflixExtensionMessage({ action: "clearSyncConfig" });
         window.dispatchEvent(
           new CustomEvent("netflix-connection-changed", { detail: { connected: false } })
         );
@@ -835,7 +993,25 @@ function ProfileSettingsClient() {
                     <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-xs sm:text-sm text-red-200" role="alert">
                       {error}
                     </div>
-                  )}
+      )}
+
+      {!isNetflixConnected && (
+        <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+          <span className="block text-xs font-black uppercase tracking-widest text-red-400/80">
+            Activación guiada
+          </span>
+          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+            Pulsa Conectar en la pestaña Conexiones. Si la extensión oficial no está instalada, te llevaremos a instalarla y podrás continuar el vínculo al volver.
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab("connections")}
+            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+          >
+            Ir a conectar Netflix
+          </button>
+        </div>
+      )}
 
                   <div className="flex flex-col gap-4">
                     <SegmentedField
@@ -1077,7 +1253,7 @@ function ProfileSettingsClient() {
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                           {isNetflixConnected
                             ? `Vinculado a ${netflixAccountInfo.email} (Perfil: ${netflixAccountInfo.metadata?.profileName || "Principal"}). Historial en tiempo real activo.`
-                            : "Vincula tu cuenta de Netflix para registrar automáticamente tu historial de visionado en tiempo real sin subir archivos."}
+                            : "Vincula Netflix con instalación guiada de la extensión oficial para registrar automáticamente tu historial en tiempo real sin subir archivos."}
                         </p>
                       </div>
                     </div>
@@ -1201,7 +1377,7 @@ function ProfileSettingsClient() {
                         {connectStep > 0 ? "✓" : "●"}
                       </div>
                       <span className={connectStep === 0 ? "text-white font-bold" : "text-zinc-400"}>
-                        Detectando cuenta de Netflix activa en el navegador...
+                        Comprobando extensión oficial y cuenta de Netflix activa...
                       </span>
                     </div>
 
@@ -1212,7 +1388,7 @@ function ProfileSettingsClient() {
                         {connectStep > 1 ? "✓" : "●"}
                       </div>
                       <span className={connectStep === 1 ? "text-white font-bold" : connectStep < 1 ? "text-zinc-600" : "text-zinc-400"}>
-                        ¡Sesión detectada para {connectedEmail || resolvedEmail}! Autorizando acceso...
+                        ¡Sesión detectada para {connectedEmail || "Netflix"}! Autorizando acceso...
                       </span>
                     </div>
 
@@ -1223,7 +1399,7 @@ function ProfileSettingsClient() {
                         {connectStep > 2 ? "✓" : "●"}
                       </div>
                       <span className={connectStep === 2 ? "text-white font-bold" : connectStep < 2 ? "text-zinc-600" : "text-zinc-400"}>
-                        Sincronizando historial inicial de visionados...
+                        Activando sincronización automática en la extensión...
                       </span>
                     </div>
 
@@ -1252,7 +1428,7 @@ function ProfileSettingsClient() {
                       <p className="text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-3 rounded-xl leading-relaxed">
                         {connectError}
                       </p>
-                      <div className="flex gap-3 pt-2">
+                      <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                         <button
                           type="button"
                           onClick={() => setShowNetflixModal(false)}
@@ -1260,6 +1436,15 @@ function ProfileSettingsClient() {
                         >
                           Cancelar
                         </button>
+                        {extensionInstallNeeded && NETFLIX_EXTENSION_INSTALL_URL && (
+                          <button
+                            type="button"
+                            onClick={openNetflixExtensionInstall}
+                            className="inline-flex flex-1 min-h-11 items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 text-xs sm:text-sm font-bold text-red-100 transition hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+                          >
+                            Instalar extensión
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={handleConnectNetflix}

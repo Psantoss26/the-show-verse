@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { backendFetchJson } from "@/lib/backend/server";
+import { backendFetchJson, getBackendBaseUrl } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +9,10 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_AP
 export async function POST(request) {
   try {
     const { mainTitle, subTitle, videoId } = await request.json().catch(() => ({}));
+    const authHeader = request.headers.get("authorization") || "";
+    const syncToken = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
 
     if (!mainTitle) {
       return NextResponse.json({ error: "mainTitle is required" }, { status: 400 });
@@ -20,7 +24,6 @@ export async function POST(request) {
     let isTv = false;
     let season = null;
     let episode = null;
-    let cleanEpisodeTitle = "";
 
     if (subTitle) {
       // Match patterns like T4: E1, Temporada 4: Episodio 1, S4:E1, Season 4: Episode 1
@@ -31,9 +34,6 @@ export async function POST(request) {
         isTv = true;
         season = sMatch ? parseInt(sMatch[1], 10) : 1; // Default to season 1 if not specified
         episode = parseInt(eMatch[1], 10);
-        cleanEpisodeTitle = subTitle
-          .replace(/^(?:T|S|Temporada|Season)?\s*\d*\s*:\s*(?:E|Episodio|Episode|Capítulo|Chapter)\s*\d+\s*:?\s*/i, "")
-          .trim();
       }
     }
 
@@ -96,12 +96,45 @@ export async function POST(request) {
     if (isTv && season != null) body.season = season;
     if (isTv && episode != null) body.episode = episode;
 
-    console.log("[Extension Sync] Submitting history body to backend:", JSON.stringify(body));
+    console.log("[Extension Sync] Submitting Netflix sync body to backend:", JSON.stringify({
+      ...body,
+      netflixVideoId: videoId || null,
+    }));
 
-    const historyRes = await backendFetchJson(request, "/v1/history", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    let historyRes;
+    if (syncToken) {
+      const baseUrl = getBackendBaseUrl();
+      if (!baseUrl) {
+        return NextResponse.json({ error: "Backend base URL is not configured" }, { status: 503 });
+      }
+
+      const res = await fetch(`${baseUrl}/v1/auth/netflix/sync`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${syncToken}`,
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          ...body,
+          netflixVideoId: videoId || undefined,
+          netflixTitle: mainTitle,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      historyRes = {
+        ok: res.ok,
+        status: res.status,
+        json,
+        error: json?.error || json?.message || `Backend HTTP ${res.status}`,
+      };
+    } else {
+      historyRes = await backendFetchJson(request, "/v1/history", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    }
 
     if (!historyRes.ok) {
       console.error("[Extension Sync] Backend history insert failed:", {
@@ -124,6 +157,7 @@ export async function POST(request) {
         episode,
         title: resolvedTitle,
         posterPath,
+        duplicate: Boolean(historyRes.json?.duplicate),
       },
     });
   } catch (error) {

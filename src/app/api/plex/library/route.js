@@ -444,15 +444,30 @@ export async function GET(request) {
     let showsCount = 0;
 
     for (const section of sections) {
+      // `/all` (section items) and `/allLeaves` (episodes, shows only) are
+      // independent Plex calls; fetch them concurrently to cut section latency.
+      const allItemsPromise = fetchAllPlexMetadata({
+        baseUrl: activePlexUrl,
+        path: `/library/sections/${encodeURIComponent(section.key)}/all`,
+        token: plexToken,
+        timeoutMs: 12000,
+      });
+      const leavesPromise =
+        section.type === "show"
+          ? fetchAllPlexMetadata({
+              baseUrl: activePlexUrl,
+              path: `/library/sections/${encodeURIComponent(section.key)}/allLeaves`,
+              token: plexToken,
+              timeoutMs: 20000,
+            }).catch(() => null)
+          : Promise.resolve(null);
+
       let rawItems = [];
       try {
-        rawItems = await fetchAllPlexMetadata({
-          baseUrl: activePlexUrl,
-          path: `/library/sections/${encodeURIComponent(section.key)}/all`,
-          token: plexToken,
-          timeoutMs: 12000,
-        });
+        rawItems = await allItemsPromise;
       } catch {
+        // Ensure the parallel leaves request settles before bailing out.
+        await leavesPromise;
         sectionSummaries.push({
           key: section.key,
           title: section.title,
@@ -465,14 +480,8 @@ export async function GET(request) {
 
       let showResolutionMap = new Map();
       if (section.type === "show") {
-        try {
-          const episodes = await fetchAllPlexMetadata({
-            baseUrl: activePlexUrl,
-            path: `/library/sections/${encodeURIComponent(section.key)}/allLeaves`,
-            token: plexToken,
-            timeoutMs: 20000,
-          });
-
+        const episodes = await leavesPromise;
+        if (episodes) {
           showResolutionMap = new Map();
           for (const episode of episodes) {
             const showKey = String(
@@ -491,8 +500,6 @@ export async function GET(request) {
             }
             showResolutionMap.set(showKey, current);
           }
-        } catch {
-          // keep empty map
         }
       }
 

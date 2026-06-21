@@ -69,6 +69,26 @@ function readInitialWatchlistViewMode() {
   return WATCHLIST_VIEW_MODES.has(saved) ? saved : "grid";
 }
 
+const WATCHLIST_INITIAL_RENDER_LIMIT = 24;
+const WATCHLIST_RENDER_CHUNK_SIZE = 36;
+
+function scheduleWatchlistRenderChunk(callback) {
+  if (typeof window === "undefined") return null;
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout: 220 });
+  }
+  return window.setTimeout(callback, 48);
+}
+
+function cancelWatchlistRenderChunk(handle) {
+  if (typeof window === "undefined" || handle == null) return;
+  if ("cancelIdleCallback" in window) {
+    window.cancelIdleCallback(handle);
+    return;
+  }
+  window.clearTimeout(handle);
+}
+
 // TMDb Genre mappings
 const MOVIE_GENRES = {
   28: "Acción",
@@ -142,16 +162,27 @@ const TARGET_PROVIDER_ORDER = new Map([
   ["plex", 7],
 ]);
 
+// Persisted in localStorage (survives across sessions) and served
+// stale-while-revalidate: cached watchlist paints instantly on the first visit
+// of a new session, then a background refresh updates it. A hard age cap drops
+// data that is too old to be useful.
+const WATCHLIST_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
 function readWatchlistCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(WATCHLIST_CACHE_KEY);
+    const raw = window.localStorage.getItem(WATCHLIST_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
+    const age = Date.now() - Number(parsed.t || 0);
+    if (age > WATCHLIST_CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(WATCHLIST_CACHE_KEY);
+      return null;
+    }
     return {
       items: parsed.items,
-      fresh: Date.now() - Number(parsed.t || 0) < WATCHLIST_CACHE_TTL_MS,
+      fresh: age < WATCHLIST_CACHE_TTL_MS,
     };
   } catch {
     return null;
@@ -161,7 +192,7 @@ function readWatchlistCache() {
 function writeWatchlistCache(items) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       WATCHLIST_CACHE_KEY,
       JSON.stringify({
         t: Date.now(),
@@ -730,7 +761,7 @@ function getCanonicalProviders(providers = [], plexAvailable = false) {
 function readPlexLibraryIndexCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(PLEX_LIBRARY_INDEX_CACHE_KEY);
+    const raw = window.localStorage.getItem(PLEX_LIBRARY_INDEX_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (
@@ -749,7 +780,7 @@ function readPlexLibraryIndexCache() {
 function writePlexLibraryIndexCache(index) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       PLEX_LIBRARY_INDEX_CACHE_KEY,
       JSON.stringify({ t: Date.now(), keys: Array.from(index || []) }),
     );
@@ -1901,20 +1932,35 @@ const WatchlistCard = memo(function WatchlistCard({
 export default function WatchlistClient() {
   const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(() => !readWatchlistCache()?.items);
+  // Read each persistent cache only once on mount. These JSON.parse and build
+  // Maps from localStorage; calling them several times (watchlist x2,
+  // providers x2) blocked the first render and added a perceptible delay to the
+  // route transition into this page.
+  const [initialCache] = useState(() => ({
+    watchlist: readWatchlistCache(),
+    providers: readProvidersCache(),
+  }));
+  const [loading, setLoading] = useState(() => !initialCache.watchlist?.items);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => readWatchlistCache()?.items || []);
+  const [items, setItems] = useState(() => initialCache.watchlist?.items || []);
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
-  const [providersByItem, setProvidersByItem] = useState(() =>
-    readProvidersCache(),
+  const [providersByItem, setProvidersByItem] = useState(
+    () => initialCache.providers,
   );
-  const [layoutProvidersByItem] = useState(() => readProvidersCache());
+  const [layoutProvidersByItem] = useState(() => initialCache.providers);
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
+
+  // Render the cards in chunks: only the first batch mounts on the initial
+  // render, so navigating into the page commits cheaply (instant redirect) while
+  // those first cards animate in immediately — same fluid entrance as the other
+  // pages. The remaining cards fill in during idle time. Starts small on every
+  // mount, so the entrance feels consistent every visit.
+  const [renderLimit, setRenderLimit] = useState(WATCHLIST_INITIAL_RENDER_LIMIT);
 
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialWatchlistViewMode);
@@ -2547,6 +2593,33 @@ export default function WatchlistClient() {
     layoutProvidersByItem,
     loadingProviders,
   ]);
+
+  const renderedSorted = useMemo(
+    () => sorted.slice(0, renderLimit),
+    [sorted, renderLimit],
+  );
+
+  // Only start expanding the render window AFTER the entrance animation of the
+  // first batch has finished, so growing the list never interrupts (and janks)
+  // that animation or the navbar selector transition. Until then the page just
+  // shows the first cards animating in, exactly like History / In-Progress.
+  const [canExpandRender, setCanExpandRender] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setCanExpandRender(true), 450);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Grow the render window up to the full list during idle time, so the rest of
+  // the cards appear shortly after the (cheap, fast) first paint.
+  useEffect(() => {
+    if (!canExpandRender || renderLimit >= sorted.length) return;
+    const handle = scheduleWatchlistRenderChunk(() => {
+      setRenderLimit((prev) =>
+        Math.min(prev + WATCHLIST_RENDER_CHUNK_SIZE, sorted.length),
+      );
+    });
+    return () => cancelWatchlistRenderChunk(handle);
+  }, [canExpandRender, renderLimit, sorted.length]);
 
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
@@ -3411,6 +3484,7 @@ export default function WatchlistClient() {
                           >
                             {subgroup.items.map((item, idx) => {
                               const currentGlobalIdx = globalCardIndex++;
+                              if (currentGlobalIdx >= renderLimit) return null;
                               return (
                                 <WatchlistCard
                                   key={getMediaKey(item)}
@@ -3438,6 +3512,7 @@ export default function WatchlistClient() {
                     >
                       {group.items.map((item, idx) => {
                         const currentGlobalIdx = globalCardIndex++;
+                        if (currentGlobalIdx >= renderLimit) return null;
                         return (
                           <WatchlistCard
                             key={getMediaKey(item)}
@@ -3463,7 +3538,7 @@ export default function WatchlistClient() {
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
           >
-            {sorted.map((item, idx) => (
+            {renderedSorted.map((item, idx) => (
               <WatchlistCard
                 key={getMediaKey(item)}
                 item={item}

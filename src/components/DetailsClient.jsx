@@ -5730,6 +5730,7 @@ export default function DetailsClient({
         episode: episodeNumber,
         watched: next,
         watchedAt: null,
+        title,
       });
       invalidateTraktGetCache({
         tmdbId: id,
@@ -5840,6 +5841,7 @@ export default function DetailsClient({
             season: seasonNumber,
             episode: episodeNumber,
             watchedAt: watchedAtIso,
+            title,
           });
           invalidateTraktGetCache({
             tmdbId: id,
@@ -5908,6 +5910,7 @@ export default function DetailsClient({
       rewatchWatchedBySeason,
       rewatchHistoryByEpisode,
       id,
+      title,
       loadTraktShowPlays,
       resolveRewatchWindow,
       cacheRewatchViewState,
@@ -6078,6 +6081,7 @@ export default function DetailsClient({
         season,
         episode,
         watchedAt: watchedAtIso || new Date().toISOString(),
+        title,
       });
       invalidateTraktGetCache({
         tmdbId: id,

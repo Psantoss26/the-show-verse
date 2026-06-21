@@ -968,6 +968,7 @@ export default function SeasonDetailsClient({
           episode: en,
           watched: next,
           watchedAt: null,
+          title: showName,
         });
         invalidateTraktGetCache({
           tmdbId: Number(showId),
@@ -989,7 +990,7 @@ export default function SeasonDetailsClient({
         setEpisodeBusyKey("");
       }
     },
-    [trakt?.connected, trakt.traktId, episodeBusyKey, showId],
+    [trakt?.connected, trakt.traktId, episodeBusyKey, showId, showName],
   );
 
   const prefetchEpisodeDetails = useCallback(
