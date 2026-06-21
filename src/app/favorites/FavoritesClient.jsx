@@ -17,13 +17,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 import {
-  getGenreName,
-  getNoGenreLabel,
-  getTmdbIncludeImageLanguage,
-  pickBestImageByLocale,
-} from "@/lib/localization";
-import { useLocalizedMediaItems } from "@/lib/useLocalizedMediaItems";
-import {
   fetchRatedForUser,
   getWatchProviders,
 } from "@/lib/api/tmdb";
@@ -128,6 +121,48 @@ function limitFavoriteGroupsForRender(groups, limit) {
 }
 
 // ================== UTILS & CACHE ==================
+// TMDb Genre mappings
+const MOVIE_GENRES = {
+  28: "Acción",
+  12: "Aventura",
+  16: "Animación",
+  35: "Comedia",
+  80: "Crimen",
+  99: "Documental",
+  18: "Drama",
+  10751: "Familiar",
+  14: "Fantasía",
+  36: "Historia",
+  27: "Terror",
+  10402: "Música",
+  9648: "Misterio",
+  10749: "Romance",
+  878: "Ciencia ficción",
+  10770: "Película de TV",
+  53: "Suspense",
+  10752: "Bélica",
+  37: "Western",
+};
+
+const TV_GENRES = {
+  10759: "Acción y aventura",
+  16: "Animación",
+  35: "Comedia",
+  80: "Crimen",
+  99: "Documental",
+  18: "Drama",
+  10751: "Familiar",
+  10762: "Infantil",
+  9648: "Misterio",
+  10763: "Noticias",
+  10764: "Reality",
+  10765: "Ciencia ficción y fantasía",
+  10766: "Telenovela",
+  10767: "Talk show",
+  10768: "Bélica y política",
+  37: "Western",
+};
+
 const posterChoiceCache = new Map();
 const posterInFlight = new Map();
 
@@ -155,7 +190,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FAVORITES_CACHE_KEY = "showverse:favorites:items:v3";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v3";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v2";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let imageChoiceCacheMemory = null;
 let imageChoicePersistHandle = null;
@@ -702,17 +737,16 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   return top3en[0];
 }
 
-async function fetchBestBackdropEN(type, id, locale = "es-ES") {
+async function fetchBestBackdropEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    const best = pickBestImageByLocale(j?.backdrops, {
-      locale,
-      kind: "backdrop",
+    const best = pickBestBackdropByLangResVotes(j?.backdrops, {
+      preferLangs: ["en", "en-US"],
       minWidth: 1200,
     });
     return best?.file_path || null;
@@ -721,13 +755,13 @@ async function fetchBestBackdropEN(type, id, locale = "es-ES") {
   }
 }
 
-async function getBestBackdropCached(type, id, locale = "es-ES") {
-  const key = `${locale}:${type}:${id}`;
+async function getBestBackdropCached(type, id) {
+  const key = `${type}:${id}`;
   if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key);
   if (backdropInFlight.has(key)) return backdropInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id, locale);
+    const chosen = await fetchBestBackdropEN(type, id);
     backdropChoiceCache.set(key, chosen || null);
     backdropInFlight.delete(key);
     return chosen || null;
@@ -737,30 +771,27 @@ async function getBestBackdropCached(type, id, locale = "es-ES") {
   return p;
 }
 
-async function fetchBestPosterEN(type, id, locale = "es-ES") {
+async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=${getTmdbIncludeImageLanguage(locale)}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    return pickBestImageByLocale(j?.posters, {
-      locale,
-      kind: "poster",
-    })?.file_path || null;
+    return pickBestPosterEN(j?.posters)?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id, locale = "es-ES") {
-  const key = `${locale}:${type}:${id}`;
+async function getBestPosterCached(type, id) {
+  const key = `${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id, locale);
+    const chosen = await fetchBestPosterEN(type, id);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -838,17 +869,22 @@ function writeImageChoice(kind, key, path) {
   } catch {}
 }
 
-function getCachedSmartPosterUrl(item, mode = "poster", locale = "es-ES") {
+function getCachedSmartPosterUrl(item, mode = "poster") {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
-  const key = `${locale}:${type}:${id}`;
+  const key = `${type}:${id}`;
 
   if (mode === "backdrop") {
     const cachedBackdrop = backdropChoiceCache.has(key)
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path = cachedBackdrop || storedBackdrop || null;
+    const path =
+      cachedBackdrop ||
+      storedBackdrop ||
+      item.backdrop_path ||
+      item.poster_path ||
+      null;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -856,15 +892,15 @@ function getCachedSmartPosterUrl(item, mode = "poster", locale = "es-ES") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || null;
+  const path = cachedPoster || storedPoster || item.poster_path || item.backdrop_path || null;
   return path ? buildImg(path, "w500") : null;
 }
 
-function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
+function SmartPoster({ item, title, mode = "poster" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
-  const imageKey = `${locale}:${type}:${id}`;
-  const initialSrc = getCachedSmartPosterUrl(item, mode, locale);
+  const imageKey = `${type}:${id}`;
+  const initialSrc = getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);
   const [ready, setReady] = useState(Boolean(initialSrc));
@@ -872,7 +908,7 @@ function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
   useEffect(() => {
     let abort = false;
 
-    const cachedUrl = getCachedSmartPosterUrl(item, mode, locale);
+    const cachedUrl = getCachedSmartPosterUrl(item, mode);
     if (cachedUrl) {
       setSrc(cachedUrl);
       setReady(true);
@@ -886,7 +922,7 @@ function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
 
     const load = async () => {
       if (mode === "backdrop") {
-        const bestBackdrop = await getBestBackdropCached(type, id, locale);
+        const bestBackdrop = await getBestBackdropCached(type, id);
         const finalPath =
           bestBackdrop || item.backdrop_path || item.poster_path || null;
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
@@ -899,7 +935,7 @@ function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
         return;
       }
 
-      const best = await getBestPosterCached(type, id, locale);
+      const best = item.poster_path ? null : await getBestPosterCached(type, id);
       const finalPath = best || item.poster_path || item.backdrop_path || null;
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
@@ -922,7 +958,6 @@ function SmartPoster({ item, title, mode = "poster", locale = "es-ES" }) {
     item.poster_path,
     item.backdrop_path,
     item,
-    locale,
   ]);
 
   return (
@@ -1109,19 +1144,19 @@ function buildFavoriteGroupMetas(
     ratingStep = 0.5,
     ratingOffset = 0,
     forceUserRatingRange = false,
-    locale = "es-ES",
   },
 ) {
   if (groupBy === "none") return [];
 
   if (groupBy === "genre") {
     const type = item.media_type || (item.title ? "movie" : "tv");
+    const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
     const genreIds = item.genre_ids || [];
     if (genreIds.length === 0)
-      return [{ key: "no_genre", label: getNoGenreLabel(locale) }];
+      return [{ key: "no_genre", label: "Sin género" }];
     return genreIds.map((genreId) => ({
       key: String(genreId),
-      label: getGenreName(type, genreId, locale),
+      label: genreMap[genreId] || `Género ${genreId}`,
     }));
   }
 
@@ -1793,7 +1828,6 @@ const FavoriteCard = memo(function FavoriteCard({
   imageMode = "poster",
   imdbScore: initialImdbScore,
   traktScore: initialTraktScore,
-  locale = "es-ES",
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1802,8 +1836,8 @@ const FavoriteCard = memo(function FavoriteCard({
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
   const userRating = item.user_rating || null;
   const genreIds = item.genre_ids || [];
-  const firstGenre =
-    genreIds.length > 0 ? getGenreName(type, genreIds[0], locale) : null;
+  const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
+  const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
 
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
   const [traktScore, setTraktScore] = useState(initialTraktScore);
@@ -1926,7 +1960,6 @@ const FavoriteCard = memo(function FavoriteCard({
                 item={item}
                 title={title}
                 mode={effectiveImageMode}
-                locale={locale}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1989,7 +2022,6 @@ const FavoriteCard = memo(function FavoriteCard({
               item={item}
               title={title}
               mode={effectiveImageMode}
-              locale={locale}
             />
             <div
               className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -2103,7 +2135,6 @@ const FavoriteCard = memo(function FavoriteCard({
             item={item}
             title={title}
             mode={effectiveImageMode}
-            locale={locale}
           />
           <div
             className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
@@ -2196,17 +2227,14 @@ const FavoriteCard = memo(function FavoriteCard({
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
-  const { session, account, hydrated, logout, preferences, loadingPreferences, updatePreference, authenticated } = useAuth();
-  const { t, lang } = useTranslation();
+  const { session, account, hydrated, logout, preferences, updatePreference, authenticated } = useAuth();
+  const { t } = useTranslation();
   const initialFavoritesCacheRef = useRef(null);
   if (initialFavoritesCacheRef.current === null) {
     initialFavoritesCacheRef.current = readFavoritesCache(account?.id) || false;
   }
   const initialFavoritesCache = initialFavoritesCacheRef.current || null;
   const [loading, setLoading] = useState(() => !initialFavoritesCache?.items);
-  const [initialLoadResolved, setInitialLoadResolved] = useState(
-    () => !!initialFavoritesCache?.items,
-  );
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() => initialFavoritesCache?.items || []);
   const [ratedItems, setRatedItems] = useState(
@@ -2223,7 +2251,6 @@ export default function FavoritesClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
-  const [uiReady, setUiReady] = useState(false);
 
   useEffect(() => {
     if (!account?.id || items.length > 0) return;
@@ -2231,13 +2258,8 @@ export default function FavoritesClient() {
     if (!cached?.items?.length) return;
     setItems(cached.items);
     setRatedItems(cached.ratedItems || []);
-    setInitialLoadResolved(true);
     setLoading(false);
   }, [account?.id, items.length]);
-
-  useEffect(() => {
-    document.title = `${t("fav_title")} • TSV`;
-  }, [t]);
 
   // Watch history for sorting
   const [watchDates, setWatchDates] = useState(new Map());
@@ -2247,7 +2269,6 @@ export default function FavoritesClient() {
   const [viewMode, setViewModeState] = useState("grid");
 
   useEffect(() => {
-    if (!hydrated || loadingPreferences) return;
     if (preferences?.defaultView) {
       setViewModeState(preferences.defaultView);
     } else {
@@ -2256,8 +2277,7 @@ export default function FavoritesClient() {
         setViewModeState(saved);
       }
     }
-    setUiReady(true);
-  }, [hydrated, loadingPreferences, preferences?.defaultView]);
+  }, [preferences?.defaultView]);
 
   const setViewMode = useCallback((mode) => {
     setViewModeState(mode);
@@ -2428,7 +2448,6 @@ export default function FavoritesClient() {
 
     const loadFavorites = async () => {
       if (!session || !account?.id) {
-        setInitialLoadResolved(true);
         setLoading(false);
         return;
       }
@@ -2452,7 +2471,6 @@ export default function FavoritesClient() {
           ) {
             setItems([]);
             setRatedItems([]);
-            setInitialLoadResolved(true);
             return;
           }
           console.error(
@@ -2461,7 +2479,6 @@ export default function FavoritesClient() {
             favResponse.statusText,
           );
           setItems([]);
-          setInitialLoadResolved(true);
           return;
         }
 
@@ -2470,7 +2487,6 @@ export default function FavoritesClient() {
         if (!text) {
           console.error("Empty response from API");
           setItems([]);
-          setInitialLoadResolved(true);
           return;
         }
 
@@ -2493,7 +2509,6 @@ export default function FavoritesClient() {
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
           setItems(favoritesWithMeta);
-          setInitialLoadResolved(true);
           writeFavoritesCache(favoritesWithMeta, [], account?.id);
 
           const isShowverse = session === "showverse" || account?.provider === "showverse";
@@ -2552,11 +2567,9 @@ export default function FavoritesClient() {
         console.error("Error loading favorites:", error);
         if (!cancelled) {
           setItems([]);
-          setInitialLoadResolved(true);
         }
       } finally {
         if (!cancelled) {
-          setInitialLoadResolved(true);
           setLoading(false);
         }
       }
@@ -2787,11 +2800,9 @@ export default function FavoritesClient() {
   }, [sortBy, items]);
 
   // Filter and sort
-  const localizedItems = useLocalizedMediaItems(items, lang, { limit: 160 });
-
   const filtered = useMemo(() => {
     const needle = normText(q);
-    return localizedItems.filter((item) => {
+    return items.filter((item) => {
       const type = item.media_type || (item.title ? "movie" : "tv");
       if (typeFilter === "movies" && type !== "movie") return false;
       if (typeFilter === "shows" && type !== "tv") return false;
@@ -2801,7 +2812,7 @@ export default function FavoritesClient() {
       }
       return true;
     });
-  }, [localizedItems, q, typeFilter]);
+  }, [items, q, typeFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -3054,7 +3065,6 @@ export default function FavoritesClient() {
       imdbScores: layoutImdbScores,
       traktScores: layoutTraktScores,
       providersByItem: layoutProvidersByItem,
-      locale: lang,
     };
 
     for (const item of sorted) {
@@ -3128,7 +3138,6 @@ export default function FavoritesClient() {
     layoutTraktScores,
     layoutProvidersByItem,
     loadingProviders,
-    lang,
   ]);
 
   const renderedSorted = sorted.slice(0, renderLimit);
@@ -3250,7 +3259,7 @@ export default function FavoritesClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
-  if (!hydrated || !uiReady) {
+  if (!hydrated) {
     return <div className="min-h-screen bg-black" />;
   }
 
@@ -3393,7 +3402,7 @@ export default function FavoritesClient() {
               </p>
             </div>
 
-            {!loading && initialLoadResolved && (
+            {!loading && (
               <motion.div
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
@@ -3976,7 +3985,7 @@ export default function FavoritesClient() {
           {/* Scores load silently in background - no loading indicator */}
 
           {/* Content */}
-          {loading || !initialLoadResolved ? null : sorted.length === 0 ? (
+          {loading ? null : sorted.length === 0 ? (
             <motion.div
               className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -4049,7 +4058,6 @@ export default function FavoritesClient() {
                                     totalItems={sorted.length}
                                     viewMode={viewMode}
                                     imageMode={imageMode}
-                                    locale={lang}
                                     imdbScore={imdbScores.get(getScoreItemKey(item))}
                                     traktScore={traktScores.get(
                                       getScoreItemKey(item),
@@ -4076,7 +4084,6 @@ export default function FavoritesClient() {
                               totalItems={sorted.length}
                               viewMode={viewMode}
                               imageMode={imageMode}
-                              locale={lang}
                               imdbScore={imdbScores.get(getScoreItemKey(item))}
                               traktScore={traktScores.get(getScoreItemKey(item))}
                             />
@@ -4101,7 +4108,6 @@ export default function FavoritesClient() {
                   totalItems={sorted.length}
                   viewMode={viewMode}
                   imageMode={imageMode}
-                  locale={lang}
                   imdbScore={imdbScores.get(getScoreItemKey(item))}
                   traktScore={traktScores.get(getScoreItemKey(item))}
                 />
