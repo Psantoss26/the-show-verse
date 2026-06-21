@@ -231,72 +231,73 @@ function getArtworkPreference(movieId) {
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
-function pickBestPosterEN(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const englishPosters = posters.filter((p) => norm(p?.iso_639_1) === "en");
-  if (!englishPosters.length) return null;
-
-  const maxVotes = englishPosters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = englishPosters.filter(
-    (p) => (p.vote_count || 0) === maxVotes,
-  );
-  if (!withMaxVotes.length) return null;
-
-  return (
-    [...withMaxVotes].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
-}
-
 function pickBestBackdropByLangResVotes(list, opts = {}) {
   const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
   if (!Array.isArray(list) || list.length === 0) return null;
 
+  // normaliza a 'en'
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => {
-    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
-    return preferSet.has(norm(img?.iso_639_1));
-  };
+  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
+  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
-  const englishPool = list.filter(isPreferredLang);
-  if (!englishPool.length) return null;
-
+  // Mantener orden + minWidth (si no hay, cae al original)
   const pool0 =
-    minWidth > 0
-      ? englishPool.filter((b) => (b?.width || 0) >= minWidth)
-      : englishPool;
-  const pool = pool0.length ? pool0 : englishPool;
+    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
+  const pool = pool0.length ? pool0 : list;
 
+  // Primero 3 con idioma preferido; si no hay, 3 sin idioma.
   const top3en = [];
+  const top3NoLanguage = [];
   for (const b of pool) {
-    top3en.push(b);
+    if (isPreferredLang(b)) top3en.push(b);
+    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
     if (top3en.length === 3) break;
   }
+  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
+  if (!candidates.length) return null;
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
 
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
+  // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720.
+  const b1080 = candidates.find((b) => isRes(b, 1920, 1080));
   if (b1080) return b1080;
 
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
+  const b1440 = candidates.find((b) => isRes(b, 2560, 1440));
   if (b1440) return b1440;
 
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
+  const b4k = candidates.find((b) => isRes(b, 3840, 2160));
   if (b4k) return b4k;
 
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
+  const b720 = candidates.find((b) => isRes(b, 1280, 720));
   if (b720) return b720;
 
-  return top3en[0];
+  return candidates[0];
+}
+
+function pickBestPosterByLangThenResolution(list, opts = {}) {
+  const { preferLangs = ["en", "en-US"], minWidth = 500 } = opts;
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const area = (img) => (img?.width || 0) * (img?.height || 0);
+  const lang = (img) => img?.iso_639_1 || null;
+
+  const sizeFiltered =
+    minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list;
+  const pool0 = sizeFiltered.length ? sizeFiltered : list;
+
+  const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)));
+  const pool1 = hasPreferred
+    ? pool0.filter((p) => preferLangs.includes(lang(p)))
+    : pool0;
+
+  let maxArea = 0;
+  for (const p of pool1) maxArea = Math.max(maxArea, area(p));
+
+  for (const p of pool1) {
+    if (area(p) === maxArea) return p;
+  }
+  return null;
 }
 
 async function getMovieImages(movieId) {
@@ -334,7 +335,11 @@ async function fetchBestPoster(movieId) {
   const { posters } = await getMovieImages(movieId);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestPosterEN(posters);
+  const best = pickBestPosterByLangThenResolution(posters, {
+    preferLangs: ["en", "en-US"],
+    minWidth: 500,
+  });
+
   return best?.file_path || null;
 }
 
@@ -344,6 +349,7 @@ async function fetchBestBackdrop(movieId) {
 
   const best = pickBestBackdropByLangResVotes(backdrops, {
     preferLangs: ["en", "en-US"],
+    resolutionWindow: 0.98,
     minWidth: 1200,
   });
 
@@ -454,28 +460,19 @@ async function getBestTrailerCached(movieId) {
 
 // ✅ DISEÑO NUEVO: rounded-lg
 function PosterImage({ movie, cache }) {
-  const [posterPath, setPosterPath] = useState(() => {
-    if (!movie) return null;
-    const { poster: userPoster } = getArtworkPreference(movie.id);
-    if (userPoster) return userPoster;
-    const cached = cache.current.get(movie.id);
-    if (cached) return cached;
-    return null;
-  });
-  const [ready, setReady] = useState(() => {
-    if (!movie) return false;
-    const { poster: userPoster } = getArtworkPreference(movie.id);
-    if (userPoster) return true;
-    const cached = cache.current.get(movie.id);
-    if (cached) return true;
-    return false;
-  });
+  const initialPosterPath = movie?.poster_path || movie?.backdrop_path || null;
+  const [posterPath, setPosterPath] = useState(initialPosterPath);
+  const [ready, setReady] = useState(!!initialPosterPath);
 
   useEffect(() => {
     let abort = false;
 
     const load = async () => {
       if (!movie) return;
+
+      const basePoster = movie.poster_path || movie.backdrop_path || null;
+      setPosterPath(basePoster);
+      setReady(!!basePoster);
 
       // 1) Preferencia usuario
       const { poster: userPoster } = getArtworkPreference(movie.id);
@@ -498,10 +495,16 @@ function PosterImage({ movie, cache }) {
         return;
       }
 
-      // 3) Buscamos la alternativa en inglés (fetchBestPoster)
+      // 3) Usar primero el poster ya disponible para no bloquear el primer render
+      if (basePoster) {
+        cache.current.set(movie.id, basePoster);
+        return;
+      }
+
+      // 4) Solo buscar una alternativa si realmente falta artwork base
+      setReady(false);
       const preferred = await fetchBestPoster(movie.id);
-      const basePoster = movie.poster_path || movie.backdrop_path || null;
-      const chosen = preferred || basePoster || null;
+      const chosen = preferred || null;
 
       if (!abort) {
         cache.current.set(movie.id, chosen);
@@ -555,6 +558,7 @@ function PosterImage({ movie, cache }) {
   );
 }
 
+// ✅ Top 10: backdrop completo, con número opcional para móvil.
 function Top10MobileBackdropCard({
   movie,
   rank,
@@ -562,22 +566,8 @@ function Top10MobileBackdropCard({
   frameClassName = "rounded-3xl aspect-[16/9]",
   imageClassName = "object-contain",
 }) {
-  const [backdropPath, setBackdropPath] = useState(() => {
-    if (!movie) return null;
-    const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-    if (userBackdrop) return userBackdrop;
-    const cached = movieBackdropCache.get(movie.id);
-    if (cached !== undefined) return cached;
-    return null;
-  });
-  const [ready, setReady] = useState(() => {
-    if (!movie) return false;
-    const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-    if (userBackdrop) return true;
-    const cached = movieBackdropCache.get(movie.id);
-    if (cached !== undefined) return !!cached;
-    return false;
-  });
+  const [backdropPath, setBackdropPath] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let abort = false;
@@ -604,14 +594,13 @@ function Top10MobileBackdropCard({
         return;
       }
 
-      const fallback = getPreviewBackdropFallback(movie);
-
       try {
         const preferred = await fetchBestBackdrop(movie.id);
-        const chosen = preferred || fallback;
+        const chosen = preferred || getPreviewBackdropFallback(movie);
         movieBackdropCache.set(movie.id, chosen);
         revealBackdrop(chosen);
       } catch {
+        const fallback = getPreviewBackdropFallback(movie);
         movieBackdropCache.set(movie.id, fallback);
         revealBackdrop(fallback);
       }
@@ -685,22 +674,8 @@ function InlinePreviewCard({ movie, heightClass }) {
     awards: null,
     imdbRating: null,
   });
-  const [backdropPath, setBackdropPath] = useState(() => {
-    if (!movie) return null;
-    const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-    if (userBackdrop) return userBackdrop;
-    const cached = movieBackdropCache.get(movie.id);
-    if (cached !== undefined) return cached;
-    return null;
-  });
-  const [backdropReady, setBackdropReady] = useState(() => {
-    if (!movie) return false;
-    const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-    if (userBackdrop) return true;
-    const cached = movieBackdropCache.get(movie.id);
-    if (cached !== undefined) return !!cached;
-    return false;
-  });
+  const [backdropPath, setBackdropPath] = useState(null);
+  const [backdropReady, setBackdropReady] = useState(false);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -768,13 +743,14 @@ function InlinePreviewCard({ movie, heightClass }) {
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
-          const fallback = getPreviewBackdropFallback(movie);
           try {
             const preferred = await fetchBestBackdrop(movie.id);
-            const chosen = preferred || fallback;
+            const chosen = preferred || getPreviewBackdropFallback(movie);
             movieBackdropCache.set(movie.id, chosen);
+
             revealBackdrop(chosen);
           } catch {
+            const fallback = getPreviewBackdropFallback(movie);
             movieBackdropCache.set(movie.id, fallback);
             revealBackdrop(fallback);
           }
