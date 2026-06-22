@@ -21,6 +21,28 @@ export const SPOTIFY_ACCESS_COOKIE = "spotify_access_token";
 export const SPOTIFY_REFRESH_COOKIE = "spotify_refresh_token";
 export const SPOTIFY_EXPIRES_COOKIE = "spotify_expires_at";
 
+// Deriva el origin REAL de la petición a partir del header Host. En dev,
+// req.nextUrl.origin puede normalizar el host (p. ej. devolver localhost aunque
+// entres por 127.0.0.1), lo que rompe el host de las cookies. El header Host es
+// el host real donde se guardan/leen las cookies.
+export function getRequestOrigin(req) {
+  try {
+    const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "")
+      .split(",")[0]
+      .trim();
+    if (host) {
+      const proto =
+        (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim() ||
+        (req.nextUrl?.protocol ? req.nextUrl.protocol.replace(":", "") : "") ||
+        "http";
+      return `${proto}://${host}`;
+    }
+  } catch {
+    // ignore
+  }
+  return req?.nextUrl?.origin || new URL(req.url).origin;
+}
+
 export function getSpotifyClientCreds() {
   const id = process.env.SPOTIFY_CLIENT_ID;
   const secret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -28,9 +50,12 @@ export function getSpotifyClientCreds() {
   return { id, secret };
 }
 
+// Redirect URI EXACTO registrado en Spotify (debe coincidir con el dashboard).
+// Spotify solo permite 127.0.0.1 para loopback (no localhost), así que en local
+// será http://127.0.0.1:3000/api/spotify/callback vía SPOTIFY_REDIRECT_URI.
 export function resolveSpotifyRedirectUri(origin) {
-  const configured = String(process.env.SPOTIFY_REDIRECT_URI || "").trim();
-  if (/^https?:\/\//i.test(configured)) return configured.replace(/\/+$/, "");
+  const configured = String(process.env.SPOTIFY_REDIRECT_URI || "").trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(configured)) return configured;
   return `${String(origin || "").replace(/\/+$/, "")}/api/spotify/callback`;
 }
 

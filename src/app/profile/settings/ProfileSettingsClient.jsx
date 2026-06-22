@@ -520,6 +520,12 @@ function ProfileSettingsClient() {
   }, [hydrated, authenticated, fetchConnections]);
 
   useEffect(() => {
+    const onFocus = () => fetchSpotifyStatus();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchSpotifyStatus]);
+
+  useEffect(() => {
     if (!hydrated) return;
     fetchSpotifyStatus();
     // Tras volver del OAuth de Spotify: abre la pestaña Conexiones para que se
