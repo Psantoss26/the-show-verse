@@ -129,23 +129,20 @@ function formatDateHeader(date, mode = "day") {
   }).format(d);
 }
 
-function formatWatchedLine(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { date: "", time: "", dayMonth: "" };
-  const dd = new Intl.DateTimeFormat("es-ES", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-  const hh = new Intl.DateTimeFormat("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-  const dayMonth = new Intl.DateTimeFormat("es-ES", {
-    day: "numeric",
-    month: "short",
-  }).format(d);
-  return { date: dd, time: hh, dayMonth };
+function formatWatchedBadgeDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = new Intl.DateTimeFormat("es-ES", { month: "short" })
+    .format(d)
+    .replace(".", "")
+    .slice(0, 3)
+    .toUpperCase();
+  const day = new Intl.DateTimeFormat("es-ES", { day: "numeric" }).format(d);
+  return {
+    month,
+    day,
+    label: `${day} ${month.toLowerCase()}`,
+  };
 }
 
 function getItemType(entry) {
@@ -286,22 +283,6 @@ function getMainTitle(entry) {
   );
 }
 
-function getYear(entry) {
-  return entry?.year || entry?.movie?.year || entry?.show?.year || null;
-}
-
-function getGenreLabel(entry) {
-  const genres = Array.isArray(entry?.genres) ? entry.genres : [];
-  const firstGenre = genres.find(Boolean);
-  if (!firstGenre) return null;
-  if (typeof firstGenre === "string") return firstGenre;
-  return firstGenre?.name || null;
-}
-
-function getYearGenreLabel(entry) {
-  return [getYear(entry), getGenreLabel(entry)].filter(Boolean).join(" • ");
-}
-
 function getHistoryId(entry) {
   return entry?.id || entry?.history_id || null;
 }
@@ -331,6 +312,96 @@ function getDetailsHref(entry) {
 
   // Serie normal -> details/tv/:id
   return `/details/${mediaType}/${tmdbId}`;
+}
+
+const HISTORY_INDICATOR_COLORS = {
+  emerald: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+  purple: "bg-purple-500/15 border-purple-500/30 text-purple-300",
+  red: "bg-red-500/15 border-red-500/30 text-red-300",
+  sky: "bg-sky-500/15 border-sky-500/30 text-sky-300",
+};
+
+function getHistoryIndicatorClass({
+  side = "left",
+  compact = false,
+  color = "emerald",
+  visibility = "hover",
+  interactive = false,
+}) {
+  const sideClass =
+    side === "right"
+      ? "right-0 rounded-bl-2xl border-l origin-top-right"
+      : "left-0 rounded-br-2xl border-r origin-top-left";
+  const paddingClass = compact ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5";
+  const visibilityClass =
+    visibility === "always"
+      ? "flex opacity-100 scale-100"
+      : visibility === "mobile-edit"
+        ? "flex opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100"
+        : "hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100";
+
+  return [
+    "items-center justify-center absolute top-0 z-20 border-b backdrop-blur-md shadow-sm",
+    paddingClass,
+    sideClass,
+    "transition-all duration-300 ease-out transform-gpu",
+    visibilityClass,
+    HISTORY_INDICATOR_COLORS[color] || HISTORY_INDICATOR_COLORS.emerald,
+    interactive ? "pointer-events-auto" : "pointer-events-none",
+  ].join(" ");
+}
+
+function HistoryCornerIndicator({
+  editMode,
+  confirmDel,
+  onDelete,
+  dateParts,
+  compact = false,
+}) {
+  if (confirmDel) return null;
+
+  if (editMode) {
+    return (
+      <button
+        onClick={onDelete}
+        className={`${getHistoryIndicatorClass({
+          side: "right",
+          compact,
+          color: "red",
+          visibility: "mobile-edit",
+          interactive: true,
+        })} hover:bg-red-500/30 hover:text-red-200`}
+        title="Borrar"
+        aria-label="Borrar"
+      >
+        <Trash2
+          className={
+            compact ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-4 h-4 sm:w-[18px] sm:h-[18px]"
+          }
+        />
+      </button>
+    );
+  }
+
+  if (!dateParts) return null;
+
+  return (
+    <div
+      className={`${getHistoryIndicatorClass({
+        side: "right",
+        compact,
+        color: "emerald",
+      })} flex-col gap-0`}
+      aria-label={`Visto el ${dateParts.label}`}
+    >
+      <span className="text-[8px] sm:text-[9px] font-black uppercase leading-none tracking-[0.08em] [text-box:trim-both_cap_alphabetic]">
+        {dateParts.month}
+      </span>
+      <span className="mt-0.5 text-sm sm:text-base font-black leading-none tracking-tight [text-box:trim-both_cap_alphabetic]">
+        {dateParts.day}
+      </span>
+    </div>
+  );
 }
 
 function normalizeHistoryResponse(json) {
@@ -1422,7 +1493,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
   index = 0,
   totalItems = 0,
   editMode = false,
-  isMobile = false,
 }) {
   const type = getItemType(entry);
 
@@ -1441,16 +1511,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
   // AQUÍ está la clave: el título incluye T1 E1
   const title = inlineEp ? `${baseTitle} ${inlineEp}` : baseTitle;
 
-  const year = getYear(entry);
-  const yearGenre = getYearGenreLabel(entry);
-  const watchedDate = useMemo(() => {
-    const d = new Date(entry?.watched_at);
-    if (Number.isNaN(d.getTime())) return "";
-    return new Intl.DateTimeFormat("es-ES", {
-      day: "numeric",
-      month: "long",
-    }).format(d);
-  }, [entry?.watched_at]);
+  const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1555,15 +1616,10 @@ const HistoryItemCard = memo(function HistoryItemCard({
             className={`absolute inset-x-0 top-0 h-16 sm:h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
           />
           <div
-            className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-              isGroup
-                ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-                : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                    type === "movie"
-                      ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                      : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                  }`
-            }`}
+            className={getHistoryIndicatorClass({
+              color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
+              visibility: isGroup ? "always" : "hover",
+            })}
           >
             {isGroup ? (
               <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
@@ -1586,33 +1642,22 @@ const HistoryItemCard = memo(function HistoryItemCard({
           </h4>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
-          {/* Para series: si hay título de episodio, lo mostramos; si no, el año */}
-          <span className="truncate max-w-[260px]">
-            {isGroup
-              ? `${groupCount} episodios agrupados`
-              : type === "show" && epMeta?.title
-                ? epMeta.title
-                : yearGenre || year}
-          </span>
-        </div>
+        {(isGroup || (type === "show" && epMeta?.title)) && (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
+            <span className="truncate max-w-[260px]">
+              {isGroup ? `${groupCount} episodios agrupados` : epMeta.title}
+            </span>
+          </div>
+        )}
 
-        <div className="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5 font-medium">
-          <RotateCcw className="w-3 h-3" /> {watchedDate}
-        </div>
       </div>
 
-      {/* Botón borrar: visible en móvil solo si editMode, en desktop al hover */}
-      {!confirmDel && (!isMobile || editMode) && (
-        <button
-          onClick={handleDeleteClick}
-          className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl rounded-tr-xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
-          title="Borrar"
-          aria-label="Borrar"
-        >
-          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-        </button>
-      )}
+      <HistoryCornerIndicator
+        editMode={editMode}
+        confirmDel={confirmDel}
+        onDelete={handleDeleteClick}
+        dateParts={watchedDate}
+      />
 
       {/* Confirmación de borrado */}
       <AnimatePresence>
@@ -1661,7 +1706,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return (
       <motion.div
         ref={ref}
-        className="relative bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
+        className="relative overflow-hidden bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1693,7 +1738,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     >
       <Link
         href={href}
-        className="block relative bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
+        className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
@@ -1720,8 +1765,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const epBadge = type === "show" && epMeta ? formatEpisodeBadge(epMeta) : null;
   const isGroup = entry?._group && entry._group.length > 1;
   const groupCount = isGroup ? entry._group.length : 0;
-  const { dayMonth } = formatWatchedLine(entry?.watched_at);
-  const yearGenre = getYearGenreLabel(entry);
+  const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1746,7 +1790,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <motion.div
-      className={`relative aspect-[2/3] compact-card group rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
+      className={`relative aspect-[2/3] compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
       whileHover={{
         scale: 1.15,
         zIndex: 50,
@@ -1769,15 +1813,11 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
         />
         <div
-          className={`items-center justify-center absolute top-0 left-0 z-20 p-1.5 sm:p-2 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-            isGroup
-              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                  type === "movie"
-                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                }`
-          }`}
+          className={getHistoryIndicatorClass({
+            compact: true,
+            color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
+            visibility: isGroup ? "always" : "hover",
+          })}
         >
           {isGroup ? (
             <div className="flex items-center gap-1 font-bold text-[10px] sm:text-xs">
@@ -1800,21 +1840,9 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
           {/* Bottom gradient con título e info */}
           <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-            <div className="flex items-center gap-2 mb-1 -ml-0.5">
-              <span className="text-[8px] text-zinc-300/90 font-medium">
-                {dayMonth}
-              </span>
-            </div>
-
             <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
               {title}
             </h5>
-
-            {yearGenre && (
-              <div className="text-[9px] text-zinc-300/85 font-medium mt-0.5 line-clamp-1">
-                {yearGenre}
-              </div>
-            )}
 
             {isGroup ? (
               <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
@@ -1830,18 +1858,6 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
             )}
           </div>
         </div>
-
-        {/* Delete button - appears on hover o en editMode mobile */}
-        {!confirmDel && (!isMobile || editMode) && (
-          <button
-            onClick={handleDeleteClick}
-            className="absolute top-0 right-0 z-20 flex items-center justify-center p-1.5 sm:p-2 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
-            title="Borrar"
-            aria-label="Borrar"
-          >
-            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-        )}
 
         {/* Delete confirmation overlay */}
         <AnimatePresence>
@@ -1881,6 +1897,13 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           )}
         </AnimatePresence>
       </div>
+      <HistoryCornerIndicator
+        editMode={editMode}
+        confirmDel={confirmDel}
+        onDelete={handleDeleteClick}
+        dateParts={watchedDate}
+        compact
+      />
     </motion.div>
   );
 
@@ -1946,8 +1969,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   const groupCount = isGroup ? entry._group.length : 0;
   const groupRange = isGroup ? getEpisodeRange(entry._group) : null;
 
-  const { dayMonth } = formatWatchedLine(entry?.watched_at);
-  const yearGenre = getYearGenreLabel(entry);
+  const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1972,21 +1994,9 @@ const HistoryGridCard = memo(function HistoryGridCard({
 
   const InfoContent = (
     <>
-      <div className="flex items-center gap-2 mb-1 -ml-0.5">
-        <span className="text-[10px] text-zinc-300/80 font-medium">
-          {dayMonth}
-        </span>
-      </div>
-
       <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
         {title}
       </h5>
-
-      {yearGenre && (
-        <div className="mt-0.5 text-[10px] text-zinc-300/85 font-medium line-clamp-1">
-          {yearGenre}
-        </div>
-      )}
 
       <div className="mt-0.5 text-[10px] text-zinc-200/80">
         {isGroup ? (
@@ -2018,7 +2028,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <div
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
-        "relative aspect-[2/3] group rounded-xl bg-zinc-900 shadow-md",
+        "relative aspect-[2/3] group overflow-hidden rounded-xl bg-zinc-900 shadow-md",
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
@@ -2033,15 +2043,10 @@ const HistoryGridCard = memo(function HistoryGridCard({
           className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
         />
         <div
-          className={`items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left ${
-            isGroup
-              ? "flex opacity-100 scale-100 bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-              : `hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                  type === "movie"
-                    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                    : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-                }`
-          }`}
+          className={getHistoryIndicatorClass({
+            color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
+            visibility: isGroup ? "always" : "hover",
+          })}
         >
           {isGroup ? (
             <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
@@ -2079,21 +2084,9 @@ const HistoryGridCard = memo(function HistoryGridCard({
           ].join(" ")}
         >
           <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-            <div className="flex items-center gap-2 mb-1 -ml-0.5">
-              <span className="text-[10px] text-zinc-300 font-medium">
-                {dayMonth}
-              </span>
-            </div>
-
             <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
               {title}
             </h5>
-
-            {yearGenre && (
-              <div className="mt-0.5 text-[10px] text-zinc-300/85 font-medium line-clamp-1">
-                {yearGenre}
-              </div>
-            )}
 
             {isGroup ? (
               <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">
@@ -2128,18 +2121,6 @@ const HistoryGridCard = memo(function HistoryGridCard({
             )}
           </div>
         </div>
-
-        {/* Botón borrar: visible en móvil solo si editMode está activo, en desktop solo al hover */}
-        {!confirmDel && (!isMobile || editMode) && (
-          <button
-            onClick={handleDeleteClick}
-            className="absolute top-0 right-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
-            title="Borrar"
-            aria-label="Borrar"
-          >
-            <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          </button>
-        )}
 
         {/* Confirmación de borrado */}
         <AnimatePresence>
@@ -2179,6 +2160,12 @@ const HistoryGridCard = memo(function HistoryGridCard({
           )}
         </AnimatePresence>
       </div>
+      <HistoryCornerIndicator
+        editMode={editMode}
+        confirmDel={confirmDel}
+        onDelete={handleDeleteClick}
+        dateParts={watchedDate}
+      />
     </div>
   );
 
@@ -3242,6 +3229,9 @@ export default function HistoryClient() {
 
                             <button
                               onClick={() => setEditMode(!editMode)}
+                              title={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                              aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                              aria-pressed={editMode}
                               className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                                 editMode
                                   ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
@@ -3456,6 +3446,24 @@ export default function HistoryClient() {
                       <LayoutGrid className="w-4 h-4" />
                     </button>
                   </div>
+
+                  <button
+                    onClick={() => setEditMode(!editMode)}
+                    title={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                    aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                    aria-pressed={editMode}
+                    className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                      editMode
+                        ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                        : "text-zinc-200 hover:bg-black/30"
+                    }`}
+                  >
+                    {editMode ? (
+                      <X className="w-4 h-4" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </motion.div>
             )}

@@ -15,6 +15,7 @@ import {
   GENERIC_WORDS,
 } from "@/lib/api/soundtrack-utils";
 import { searchFallback } from "@/lib/api/soundtrack-fallback";
+import { getUserSpotifyAccessToken } from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,9 +139,18 @@ async function fetchJson(url, { label = "req", headers = {}, method = "GET", bod
   }
 }
 
-async function getToken() {
+async function getToken(req) {
   const creds = credentials();
   if (!creds) return { token: "", mode: "missing_credentials" };
+
+  // 1) Token del usuario conectado (OAuth por usuario). Si el usuario vinculó su
+  // cuenta de Spotify, usamos su token; si no, caemos al token global de la app.
+  try {
+    const userToken = await getUserSpotifyAccessToken(req);
+    if (userToken) return { token: userToken, mode: "user" };
+  } catch (e) {
+    console.warn("[Spotify] user token failed:", e?.message);
+  }
 
   const cached = g.__svSpToken;
   if (cached.token && cached.expiresAt > Date.now() + 30_000) {
@@ -279,6 +289,108 @@ function setRateBlock(retryAfter) {
   g.__svSpRateBlock.retryAfter = retryAfter;
   console.warn(
     `[Spotify] Rate limited — blocked for ${seconds}s (until ${new Date(g.__svSpRateBlock.until).toISOString()})`,
+  );
+}
+
+function logSoundtrackPlatform({
+  title,
+  mediaType,
+  year,
+  country,
+  source,
+  tracks,
+  configured,
+  auth,
+  spotifyActive,
+  spotifyRateLimited,
+  spotifyRetryAfter,
+  spotifySearchError,
+  fromCache,
+  fallbackSource,
+  fallbackActive,
+}) {
+  const spotifyAvailable =
+    configured &&
+    Boolean(auth?.token) &&
+    spotifyActive &&
+    !spotifyRateLimited &&
+    !spotifySearchError;
+  const spotifyUnavailableReason = getSpotifyUnavailableReason({
+    configured,
+    auth,
+    spotifyActive,
+    spotifyRateLimited,
+    spotifyRetryAfter,
+    spotifySearchError,
+  });
+  const spotifyTrackCount = tracks.filter((track) => track.source === "Spotify").length;
+
+  console.info(`[Soundtrack] platform ${JSON.stringify({
+    title,
+    type: mediaType,
+    year: year || null,
+    country,
+    source,
+    tracks: tracks.length,
+    spotify: {
+      available: spotifyAvailable,
+      configured,
+      active: spotifyActive,
+      authMode: auth?.mode || "unknown",
+      rateLimited: spotifyRateLimited,
+      retryAfter: spotifyRetryAfter || null,
+      unavailableReason: spotifyUnavailableReason,
+      error: spotifySearchError || null,
+      tracks: spotifyTrackCount,
+      fromCache,
+    },
+    fallback: {
+      active: fallbackActive,
+      source: fallbackSource || null,
+    },
+  })}`);
+}
+
+function getSpotifyUnavailableReason({
+  configured,
+  auth,
+  spotifyActive,
+  spotifyRateLimited,
+  spotifyRetryAfter,
+  spotifySearchError,
+}) {
+  if (!configured) return "missing_credentials";
+  if (!auth?.token) return auth?.mode || "auth_failed";
+  if (spotifyRateLimited) return `rate_limited${spotifyRetryAfter ? `:${spotifyRetryAfter}s` : ""}`;
+  if (spotifySearchError) return `search_error:${spotifySearchError}`;
+  if (!spotifyActive) return "inactive";
+  return null;
+}
+
+function normalizeSoundtrackSource(source) {
+  const key = String(source || "").trim().toLowerCase();
+  if (key === "spotify") return "spotify";
+  if (key === "itunes" || key === "apple" || key === "apple music") return "itunes";
+  if (key === "deezer") return "deezer";
+  return key || null;
+}
+
+function resolveSoundtrackSource(tracks, fallbackSource, spotifySkippedReason) {
+  const counts = new Map();
+  for (const track of tracks) {
+    const source = normalizeSoundtrackSource(track.source);
+    if (!source) continue;
+    counts.set(source, (counts.get(source) || 0) + 1);
+  }
+
+  if (counts.has("spotify")) return "spotify";
+  if (counts.size > 0) {
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  return (
+    normalizeSoundtrackSource(fallbackSource) ||
+    (spotifySkippedReason === "no_original_title_album_match" ? "itunes" : "spotify")
   );
 }
 
@@ -1895,7 +2007,7 @@ export async function GET(req) {
   let auth = { token: "", mode: "missing_credentials" };
   if (configured) {
     try {
-      auth = await getToken();
+      auth = await getToken(req);
     } catch (e) {
       console.error("[Spotify] getToken error:", e?.message);
       auth = { token: "", mode: "auth_failed" };
@@ -1913,6 +2025,7 @@ export async function GET(req) {
   let spotifyAlbums = [];
   let spotifyQuery = "";
   let spotifySkippedReason = "";
+  let spotifySearchError = "";
   let market = country;
 
   // ---- Try Spotify ----
@@ -1936,6 +2049,7 @@ export async function GET(req) {
       const spotifyTracks = Array.isArray(result.tracks) ? result.tracks : [];
       tracks = spotifyTracks;
     } catch (err) {
+      spotifySearchError = err?.message || "unknown_error";
       console.error("[Spotify] search error:", err?.message);
     }
   }
@@ -1992,13 +2106,46 @@ export async function GET(req) {
   tracks = topRelevantTracks(tracks).map(toPublic);
 
   // ---- Build response payload ----
+  const resolvedSource = resolveSoundtrackSource(
+    tracks,
+    fallbackSource,
+    spotifySkippedReason,
+  );
+  const spotifyAvailable =
+    configured &&
+    Boolean(auth?.token) &&
+    spotifyActive &&
+    !spotifyRateLimited &&
+    !spotifySearchError;
+  const spotifyUnavailableReason = getSpotifyUnavailableReason({
+    configured,
+    auth,
+    spotifyActive,
+    spotifyRateLimited,
+    spotifyRetryAfter,
+    spotifySearchError,
+  });
+
+  logSoundtrackPlatform({
+    title,
+    mediaType,
+    year,
+    country,
+    source: resolvedSource,
+    tracks,
+    configured,
+    auth,
+    spotifyActive,
+    spotifyRateLimited,
+    spotifyRetryAfter,
+    spotifySearchError,
+    fromCache,
+    fallbackSource,
+    fallbackActive,
+  });
+
   const payload = {
-    source: tracks.some((t) => t.source === "Spotify")
-      ? "spotify"
-      : (fallbackSource?.toLowerCase() ??
-        (spotifySkippedReason === "no_original_title_album_match"
-          ? "itunes"
-          : "spotify")),
+    source: resolvedSource,
     query: spotifyQuery || "",
     market,
     spotifyConfigured: configured,
@@ -2006,6 +2153,8 @@ export async function GET(req) {
     spotifyRateLimited,
     spotifyRetryAfter,
     spotifyAuthMode: auth.mode,
+    spotifyAvailable,
+    spotifyUnavailableReason,
     spotifySkippedReason,
     fromCache,
     fallbackSource,

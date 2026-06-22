@@ -460,6 +460,34 @@ function ProfileSettingsClient() {
   const [connections, setConnections] = useState([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
 
+  // Estado de la conexión OAuth de Spotify (tokens por usuario en cookies).
+  const [spotify, setSpotify] = useState({ loading: true, connected: false, profile: null });
+
+  const fetchSpotifyStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/spotify/auth/status", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      setSpotify({
+        loading: false,
+        connected: Boolean(json?.connected),
+        profile: json?.profile || null,
+      });
+    } catch {
+      setSpotify({ loading: false, connected: false, profile: null });
+    }
+  }, []);
+
+  const handleDisconnectSpotify = useCallback(async () => {
+    if (!confirm("¿Seguro que deseas desconectar tu cuenta de Spotify?")) return;
+    try {
+      await fetch("/api/spotify/auth/disconnect", { method: "POST" });
+    } catch {
+      // noop
+    } finally {
+      setSpotify({ loading: false, connected: false, profile: null });
+    }
+  }, []);
+
   // Netflix connection modal states
   const [showNetflixModal, setShowNetflixModal] = useState(false);
   const [connectStep, setConnectStep] = useState(0);
@@ -490,6 +518,26 @@ function ProfileSettingsClient() {
       fetchConnections();
     }
   }, [hydrated, authenticated, fetchConnections]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    fetchSpotifyStatus();
+    // Tras volver del OAuth de Spotify: abre la pestaña Conexiones para que se
+    // vea el estado actualizado y limpia el parámetro de la URL.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("spotify")) {
+        setActiveTab("connections");
+        params.delete("spotify");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+        );
+      }
+    }
+  }, [hydrated, fetchSpotifyStatus]);
 
   const requestNetflixExtensionDetails = useCallback(() => {
     return new Promise((resolve) => {
@@ -1116,25 +1164,42 @@ function ProfileSettingsClient() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Spotify</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
+                          {spotify.connected && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Conectado
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Vincula tu cuenta de Spotify para acceder a las bandas sonoras originales de tus películas y series directamente desde sus fichas.
+                          {spotify.connected
+                            ? `Vinculado${spotify.profile?.displayName ? ` como ${spotify.profile.displayName}` : ""}. Las bandas sonoras usan tu propia cuenta de Spotify.`
+                            : "Vincula tu cuenta de Spotify para acceder a las bandas sonoras originales de tus películas y series directamente desde sus fichas, usando tu propia cuenta."}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled
-                      aria-label="Conectar"
-                      title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
-                    >
-                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                      <span className="hidden sm:inline">Conectar</span>
-                    </button>
+                    {spotify.connected ? (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectSpotify}
+                        aria-label="Desconectar"
+                        title="Desconectar"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                        <span className="hidden sm:inline">Desconectar</span>
+                      </button>
+                    ) : (
+                      <a
+                        href="/api/spotify/login?next=/profile/settings"
+                        aria-label="Conectar"
+                        title="Conectar"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                        <span className="hidden sm:inline">Conectar</span>
+                      </a>
+                    )}
                   </div>
 
                   {/* Trakt Connection */}
