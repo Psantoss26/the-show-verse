@@ -1344,38 +1344,28 @@ function SmartPoster({ entry, title, mode = "poster" }) {
 
       // BACKDROP MODE
       if (mode === "backdrop") {
-        const hasCache = backdropCache.has(key);
-        const memoryBest = hasCache ? backdropCache.get(key) : null;
-        const initialPath = memoryBest || entry?.backdrop_path || entry?.poster_path || null;
-
-        if (initialPath) {
-          const url = `https://image.tmdb.org/t/p/w780${initialPath}`;
-          if (!abort) {
-            setSrc(url);
-            setReady(true);
+        // Resolvemos SIEMPRE el backdrop final antes de mostrar nada (sin flash
+        // de una imagen que luego se sobreescribe) y con fallback para no dejar
+        // la tarjeta vacía.
+        let finalPath;
+        if (backdropCache.has(key)) {
+          finalPath = backdropCache.get(key) || entry?.backdrop_path || entry?.poster_path || null;
+        } else {
+          const bestBackdrop = await getBestBackdropCached(tmdbType, id);
+          if (bestBackdrop) {
+            finalPath = bestBackdrop;
+          } else {
+            const r = await fetchTmdbPoster({ type, tmdbId: id });
+            finalPath = r?.backdrop_path || r?.poster_path || entry?.backdrop_path || entry?.poster_path || null;
           }
         }
 
-        if (!hasCache) {
-          const bestBackdrop = await getBestBackdropCached(tmdbType, id);
-          if (bestBackdrop && bestBackdrop !== initialPath && !abort) {
-            const url = `https://image.tmdb.org/t/p/w780${bestBackdrop}`;
-            await preloadImage(url);
-            if (!abort) {
-              setSrc(url);
-              setReady(true);
-            }
-          } else if (!bestBackdrop && !initialPath && !abort) {
-            const r = await fetchTmdbPoster({ type, tmdbId: id });
-            const finalPath = r?.backdrop_path || r?.poster_path || null;
-            if (finalPath) {
-              const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
-              await preloadImage(url);
-              if (!abort) {
-                setSrc(url);
-                setReady(true);
-              }
-            }
+        if (finalPath && !abort) {
+          const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
+          await preloadImage(url);
+          if (!abort) {
+            setSrc(url);
+            setReady(true);
           }
         }
         return;
@@ -1499,38 +1489,29 @@ const HistoryItemCard = memo(function HistoryItemCard({
 
       const tmdbType = t === "show" ? "tv" : "movie";
       const key = `${tmdbType}:${id}`;
-      const hasCache = backdropCache.has(key);
-      const memoryBest = hasCache ? backdropCache.get(key) : null;
-      const initialPath = memoryBest || entry?.backdrop_path || entry?.poster_path || null;
 
-      if (initialPath) {
-        const url = `https://image.tmdb.org/t/p/w780${initialPath}`;
-        if (!abort) {
-          setPosterSrc(url);
-          setBackdropReady(true);
+      // Resolvemos SIEMPRE el backdrop final antes de mostrar nada (sin flash de
+      // una imagen que luego se sobreescribe) y con fallback para no dejar la
+      // tarjeta vacía.
+      let finalPath;
+      if (backdropCache.has(key)) {
+        finalPath = backdropCache.get(key) || entry?.backdrop_path || entry?.poster_path || null;
+      } else {
+        const best = await getBestBackdropCached(tmdbType, id);
+        if (best) {
+          finalPath = best;
+        } else {
+          const r = await fetchTmdbPoster({ type: t, tmdbId: id });
+          finalPath = r?.backdrop_path || r?.poster_path || entry?.backdrop_path || entry?.poster_path || null;
         }
       }
 
-      if (!hasCache) {
-        const best = await getBestBackdropCached(tmdbType, id);
-        if (best && best !== initialPath && !abort) {
-          const url = `https://image.tmdb.org/t/p/w780${best}`;
-          await preloadImage(url);
-          if (!abort) {
-            setPosterSrc(url);
-            setBackdropReady(true);
-          }
-        } else if (!best && !initialPath && !abort) {
-          const r = await fetchTmdbPoster({ type: t, tmdbId: id });
-          const finalPath = r?.backdrop_path || r?.poster_path || null;
-          if (finalPath) {
-            const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
-            await preloadImage(url);
-            if (!abort) {
-              setPosterSrc(url);
-              setBackdropReady(true);
-            }
-          }
+      if (finalPath && !abort) {
+        const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
+        await preloadImage(url);
+        if (!abort) {
+          setPosterSrc(url);
+          setBackdropReady(true);
         }
       }
     };
@@ -2410,7 +2391,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 // MAIN PAGE
 // ----------------------------
 export default function HistoryClient() {
-  const { session, account, hydrated: authHydrated, preferences, updatePreference, authenticated } = useAuth();
+  const { session, account, hydrated: authHydrated, preferences } = useAuth();
   const { t } = useTranslation();
   const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
@@ -2429,27 +2410,28 @@ export default function HistoryClient() {
 
   // UI States
   const [viewMode, setViewModeState] = useState("compact");
+  // Marca si el usuario (o el localStorage propio) ya fijó una vista del Historial,
+  // para que la preferencia global NUNCA la sobrescriba al recargar.
+  const viewModeUserSetRef = useRef(false);
 
+  // La preferencia global solo SIEMBRA la vista la primera vez (cuando aún no hay
+  // una vista propia del Historial guardada). El valor real ya se restauró desde
+  // localStorage en el efecto de hidratación, así que esto no provoca cambios al
+  // recargar.
   useEffect(() => {
-    if (preferences?.defaultView) {
-      setViewModeState(preferences.defaultView);
-    } else {
-      const saved = window.localStorage.getItem("showverse:history:viewMode");
-      if (saved === "list" || saved === "grid" || saved === "compact") {
-        setViewModeState(saved);
-      }
-    }
-  }, [preferences?.defaultView]);
+    if (!hydrated || viewModeUserSetRef.current) return;
+    const saved = window.localStorage.getItem("showverse:history:viewMode");
+    if (saved === "list" || saved === "grid" || saved === "compact") return;
+    if (preferences?.defaultView) setViewModeState(preferences.defaultView);
+  }, [hydrated, preferences?.defaultView]);
 
   const setViewMode = useCallback((mode) => {
+    viewModeUserSetRef.current = true;
     setViewModeState(mode);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("showverse:history:viewMode", mode);
     }
-    if (authenticated) {
-      updatePreference({ defaultView: mode });
-    }
-  }, [authenticated, updatePreference]);
+  }, []);
 
   const [groupBy, setGroupBy] = useState("day");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -2483,6 +2465,12 @@ export default function HistoryClient() {
       setHistoryLoaded(true);
       setHasMoreHistory(cached.hasMore);
       hasMoreHistoryRef.current = cached.hasMore;
+    }
+
+    const savedView = window.localStorage.getItem("showverse:history:viewMode");
+    if (savedView === "list" || savedView === "grid" || savedView === "compact") {
+      setViewModeState(savedView);
+      viewModeUserSetRef.current = true;
     }
 
     const savedGroupBy = window.localStorage.getItem(

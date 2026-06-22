@@ -403,28 +403,27 @@ function SmartPoster({ item, title }) {
 
     const load = async () => {
       const key = `${type}:${id}`;
-      const hasCache = posterChoiceCache.has(key);
-      const memoryBest = hasCache ? posterChoiceCache.get(key) : null;
       const pref = getPosterPreference(type, id);
-      const initialPath = memoryBest || pref || null;
 
-      if (initialPath) {
-        const url = buildImg(initialPath, "w500");
-        if (!abort) {
-          setSrc(url);
-          setReady(true);
+      // Resolvemos SIEMPRE la versión final antes de mostrar nada (sin flash de
+      // una imagen que luego se sobreescribe) y con fallback al póster del propio
+      // item para que la tarjeta nunca quede vacía.
+      let finalPath = pref || null;
+      if (!finalPath) {
+        if (posterChoiceCache.has(key)) {
+          finalPath = posterChoiceCache.get(key) || item.poster_path || item.backdrop_path || null;
+        } else {
+          const best = await getBestPosterCached(type, id);
+          finalPath = best || item.poster_path || item.backdrop_path || null;
         }
       }
 
-      if (!hasCache && !pref) {
-        const best = await getBestPosterCached(type, id);
-        const finalPath = best || item.poster_path || item.backdrop_path || null;
-        if (finalPath && !abort) {
-          const url = buildImg(finalPath, "w500");
-          if (!initialPath) await preloadImage(url);
-          if (!abort) setSrc(url);
-          if (!abort) setReady(true);
-        }
+      if (!finalPath || abort) return;
+      const url = buildImg(finalPath, "w500");
+      await preloadImage(url);
+      if (!abort) {
+        setSrc(url);
+        setReady(true);
       }
     };
 
@@ -476,27 +475,23 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
 
     const load = async () => {
       const key = `${type}:${id}`;
-      const hasCache = backdropChoiceCache.has(key);
-      const memoryBest = hasCache ? backdropChoiceCache.get(key) : null;
-      const initialPath = memoryBest || null;
 
-      if (initialPath) {
-        const url = buildImg(initialPath, "w1280");
-        if (!abort) {
-          setSrc(url);
-          setReady(true);
-        }
+      // Resolvemos SIEMPRE el backdrop final antes de mostrar nada, con fallback
+      // al backdrop/póster del propio item para que nunca quede vacía.
+      let finalPath;
+      if (backdropChoiceCache.has(key)) {
+        finalPath = backdropChoiceCache.get(key) || item.backdrop_path || item.poster_path || null;
+      } else {
+        const best = await getBestBackdropCached(type, id);
+        finalPath = best || item.backdrop_path || item.poster_path || null;
       }
 
-      if (!hasCache) {
-        const best = await getBestBackdropCached(type, id);
-        const finalPath = best || item.backdrop_path || item.poster_path || null;
-        if (finalPath && !abort) {
-          const url = buildImg(finalPath, "w1280");
-          if (!initialPath) await preloadImage(url);
-          if (!abort) setSrc(url);
-          if (!abort) setReady(true);
-        }
+      if (!finalPath || abort) return;
+      const url = buildImg(finalPath, "w1280");
+      await preloadImage(url);
+      if (!abort) {
+        setSrc(url);
+        setReady(true);
       }
     };
 

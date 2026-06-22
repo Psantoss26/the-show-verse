@@ -62,7 +62,7 @@ function PlatformBadges({ activeId = null, className = "" }) {
               alt={platform.name}
               className={`h-7 w-7 object-contain ${active ? "" : "opacity-90"}`}
             />
-            <span className={`hidden sm:inline text-xs sm:text-sm font-bold ${active ? "text-emerald-300" : "text-zinc-300"}`}>
+            <span className="hidden sm:inline text-xs sm:text-sm font-bold text-zinc-300">
               {platform.name}
             </span>
           </div>

@@ -73,8 +73,8 @@ export default function NetflixSyncListener() {
           setToasts((prev) => [...prev, { ...item, toastId: id }]);
 
           // Despachar evento global para que las páginas recarguen los datos
-          window.sessionStorage?.removeItem("showverse:profile:stats:v7");
-          window.sessionStorage?.removeItem("showverse:profile:data:v7");
+          window.localStorage?.removeItem("showverse:profile:stats:v8");
+          window.localStorage?.removeItem("showverse:profile:data:v8");
           window.dispatchEvent(new CustomEvent("netflix-sync-update", { detail: item }));
 
           // Auto-eliminar toast tras 7 segundos

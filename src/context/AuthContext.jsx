@@ -147,10 +147,10 @@ export const AuthProvider = ({ children }) => {
     const json = await res.json().catch(() => ({}));
     const nextUser = json?.authenticated ? json.user || null : null;
     applyUser(nextUser);
-    setHydrated(true);
     if (nextUser) {
-      loadPreferences();
+      await loadPreferences();
     }
+    setHydrated(true);
     return nextUser;
   }, [applyUser, loadPreferences]);
 
@@ -179,17 +179,21 @@ export const AuthProvider = ({ children }) => {
         if (cancelled) return;
         const loggedUser = applyUser(json?.authenticated ? json.user || null : null);
         if (loggedUser) {
-          fetch("/api/user/preferences", { cache: "no-store" })
-            .then((r) => r.json())
-            .then((prefJson) => {
-              if (cancelled) return;
-              if (prefJson?.preferences) {
-                const merged = mergePreferences(prefJson.preferences);
-                setPreferences(merged);
-                syncPreferenceCookies(merged);
-              }
-            })
-            .catch(() => {});
+          setLoadingPreferences(true);
+          try {
+            const prefRes = await fetch("/api/user/preferences", { cache: "no-store" });
+            const prefJson = await prefRes.json().catch(() => ({}));
+            if (cancelled) return;
+            if (prefJson?.preferences) {
+              const merged = mergePreferences(prefJson.preferences);
+              setPreferences(merged);
+              syncPreferenceCookies(merged);
+            }
+          } catch (err) {
+            console.warn("No se pudieron cargar las preferencias", err);
+          } finally {
+            if (!cancelled) setLoadingPreferences(false);
+          }
         }
       } catch (e) {
         console.warn("No se pudo hidratar la sesión propia", e);
@@ -216,11 +220,11 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(credentials || {}),
       });
       const json = await readJsonResponse(res);
-      setHydrated(true);
       const loggedUser = applyUser(json.user || null);
       if (loggedUser) {
-        loadPreferences();
+        await loadPreferences();
       }
+      setHydrated(true);
       return loggedUser;
     },
     [applyUser, loadPreferences],
@@ -237,11 +241,11 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(payload || {}),
       });
       const json = await readJsonResponse(res);
-      setHydrated(true);
       const loggedUser = applyUser(json.user || null);
       if (loggedUser) {
-        loadPreferences();
+        await loadPreferences();
       }
+      setHydrated(true);
       return loggedUser;
     },
     [applyUser, loadPreferences],
