@@ -1,6 +1,7 @@
 // src/app/api/plex/route.js
 import { NextResponse } from "next/server";
 import { getPlexAccessToken, getActivePlexServer } from "@/lib/plex/auth";
+import { getUserPlexToken } from "@/lib/plex/userAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,11 +43,13 @@ export async function GET(request) {
       );
     }
 
-    const plexToken = await getPlexAccessToken();
+    // Prioriza el token del usuario conectado (flujo PIN por usuario); si no,
+    // cae al token global de la app (PLEX_TOKEN), si está configurado.
+    const plexToken = getUserPlexToken(request) || (await getPlexAccessToken());
 
     if (!plexToken) {
       console.warn(
-        "Plex no configurado. Define PLEX_TOKEN (fallback) o PLEX_JWT_PRIVATE_KEY para refresh automatico.",
+        "Plex no conectado. Conéctalo por usuario (PIN) o define PLEX_TOKEN como fallback.",
       );
       return NextResponse.json({
         available: false,
