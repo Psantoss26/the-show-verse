@@ -47,8 +47,8 @@ import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "./chartConstants";
 
-const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v7";
-const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v7";
+const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v8";
+const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v8";
 const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v2";
 const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
 const PROFILE_FULL_REFRESH_DELAY_MS = 80;
@@ -246,47 +246,6 @@ function privateMediaUrl(value) {
   }
 
   return null;
-}
-
-function fallbackPosterDataUrl(title, type, sectionColor = "indigo") {
-  const palette = {
-    emerald: ["#052e2b", "#10b981"],
-    yellow: ["#332400", "#eab308"],
-    indigo: ["#111827", "#6366f1"],
-    blue: ["#061b33", "#3b82f6"],
-    purple: ["#1f1235", "#a855f7"],
-    rose: ["#33111c", "#f43f5e"],
-  };
-  const [bg, accent] = palette[sectionColor] || palette.indigo;
-  const label = type === "movie" ? "PELICULA" : type === "person" ? "PERSONA" : "SERIE";
-  const words = String(title || "Sin titulo").split(/\s+/).filter(Boolean);
-  const lines = [];
-  let current = "";
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > 18 && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-    if (lines.length === 2) break;
-  }
-  if (current && lines.length < 3) lines.push(current);
-  const safeLines = (lines.length ? lines : ["Sin titulo"]).slice(0, 3);
-  const escapeSvgText = (value) =>
-    String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  const text = safeLines
-    .map((line, index) => {
-      const y = 226 + index * 34;
-      return `<text x="32" y="${y}" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800">${escapeSvgText(line)}</text>`;
-    })
-    .join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="342" height="513" viewBox="0 0 342 513"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity=".55"/><stop offset=".42" stop-color="${bg}"/><stop offset="1" stop-color="#030712"/></linearGradient></defs><rect width="342" height="513" fill="url(#g)"/><rect x="24" y="24" width="294" height="465" rx="22" fill="none" stroke="${accent}" stroke-opacity=".35"/><text x="32" y="78" fill="${accent}" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900" letter-spacing="3">${label}</text>${text}<circle cx="286" cy="430" r="28" fill="${accent}" fill-opacity=".22"/><path d="M274 414 L302 430 L274 446 Z" fill="${accent}" fill-opacity=".9"/></svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
 const fmtDate = (iso) => {
@@ -1010,16 +969,13 @@ function ProfileUnifiedCard({
     item?.poster_path ||
     item?.posterPath ||
     item?.profilePosterPath ||
-    media?.backdrop_path ||
-    item?.backdrop_path ||
     null;
-  const fallbackSrc = fallbackPosterDataUrl(title, itemType, sectionColor);
   const resolvedSrc = privateMediaUrl(path);
-  const src = err ? fallbackSrc : resolvedSrc || fallbackSrc;
+  const src = err ? null : resolvedSrc;
 
   useEffect(() => {
     setErr(false);
-  }, [resolvedSrc, fallbackSrc]);
+  }, [resolvedSrc]);
 
   return (
     <Link

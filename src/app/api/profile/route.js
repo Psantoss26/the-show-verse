@@ -4,6 +4,7 @@ import {
   getCookieSecure,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
+import { fetchTmdbMetadata } from "../_utils/tmdbMetadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,7 +79,7 @@ function normalizeRatingRow(row) {
     tmdbId: row.tmdbId,
     title: row.title || "Sin titulo",
     name: row.title || "Sin titulo",
-    poster_path: row.posterPath || null,
+    poster_path: row.posterPath || row.profilePosterPath || null,
     rating: row.rating,
     rated_at: row.ratedAt || row.updatedAt || null,
     detailsHref: detailsHref(row),
@@ -104,7 +105,7 @@ function normalizeWatchlistRow(row) {
     tmdbId: row.tmdbId,
     title: row.title || "Sin titulo",
     name: row.title || "Sin titulo",
-    poster_path: row.posterPath || null,
+    poster_path: row.posterPath || row.profilePosterPath || null,
     listed_at: row.addedAt || null,
     detailsHref: detailsHref(row),
   };
@@ -192,6 +193,184 @@ function attachKnownPosters(rows, posterByKey) {
       profilePosterPath: row.posterPath || posterByKey.get(key) || null,
     };
   });
+}
+
+function profileTmdbType(mediaType) {
+  if (mediaType === "movie") return "movie";
+  if (mediaType === "tv" || mediaType === "show" || mediaType === "episode") return "tv";
+  return null;
+}
+
+function posterKey(mediaType, tmdbId) {
+  const type = profileTmdbType(mediaType);
+  if (!type || !tmdbId) return null;
+  return `${type}:${tmdbId}`;
+}
+
+function firstPosterPath(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return null;
+}
+
+function plainProfileEntry(item) {
+  if (!item || typeof item !== "object") return null;
+  const type = profileTmdbType(item.type || item.mediaType);
+  const tmdbId = item.tmdbId || item.ids?.tmdb;
+  if (!type || !tmdbId) return null;
+  return {
+    item,
+    type,
+    tmdbId,
+    key: posterKey(type, tmdbId),
+    posterPath: firstPosterPath(
+      item.poster_path,
+      item.posterPath,
+      item.profilePosterPath,
+    ),
+  };
+}
+
+function nestedProfileEntry(item, nestedKey, type) {
+  const media = item?.[nestedKey];
+  if (!media || typeof media !== "object") return null;
+  const tmdbId = media.ids?.tmdb || media.tmdbId || media.id;
+  if (!tmdbId) return null;
+  return {
+    item,
+    nestedKey,
+    type,
+    tmdbId,
+    key: posterKey(type, tmdbId),
+    posterPath: firstPosterPath(
+      media.poster_path,
+      media.posterPath,
+      item.poster_path,
+      item.posterPath,
+    ),
+  };
+}
+
+function collectProfilePosterEntries(payload) {
+  const entries = [];
+  for (const name of ["recentHistory", "recentRatings", "watchlist"]) {
+    for (const item of Array.isArray(payload?.[name]) ? payload[name] : []) {
+      const entry = plainProfileEntry(item);
+      if (entry?.key) entries.push(entry);
+    }
+  }
+  for (const item of Array.isArray(payload?.watchedMovies) ? payload.watchedMovies : []) {
+    const entry = nestedProfileEntry(item, "movie", "movie");
+    if (entry?.key) entries.push(entry);
+  }
+  for (const item of Array.isArray(payload?.watchedShows) ? payload.watchedShows : []) {
+    const entry = nestedProfileEntry(item, "show", "tv");
+    if (entry?.key) entries.push(entry);
+  }
+  return entries;
+}
+
+async function buildProfilePosterMap(entries) {
+  const posterByKey = new Map();
+  for (const entry of entries) {
+    if (entry.posterPath && !posterByKey.has(entry.key)) {
+      posterByKey.set(entry.key, entry.posterPath);
+    }
+  }
+
+  const missing = [...new Map(entries.map((entry) => [entry.key, entry])).values()].filter(
+    (entry) => !posterByKey.has(entry.key),
+  );
+  if (missing.length === 0) return posterByKey;
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(8, missing.length) }, async () => {
+    while (cursor < missing.length) {
+      const index = cursor;
+      cursor += 1;
+      const entry = missing[index];
+      const metadata = await fetchTmdbMetadata(entry.tmdbId, entry.type).catch(() => null);
+      const posterPath = firstPosterPath(metadata?.poster_path, metadata?.backdrop_path);
+      if (posterPath) posterByKey.set(entry.key, posterPath);
+    }
+  });
+
+  await Promise.all(workers);
+  return posterByKey;
+}
+
+function withPlainPoster(item, posterPath) {
+  if (!posterPath) return item;
+  const existing = firstPosterPath(item.poster_path, item.posterPath, item.profilePosterPath);
+  if (existing) return item;
+  return {
+    ...item,
+    poster_path: posterPath,
+  };
+}
+
+function withNestedPoster(item, nestedKey, posterPath) {
+  if (!posterPath || !item?.[nestedKey]) return item;
+  const media = item[nestedKey];
+  const existing = firstPosterPath(media.poster_path, media.posterPath, item.poster_path);
+  if (existing) return item;
+  return {
+    ...item,
+    [nestedKey]: {
+      ...media,
+      poster_path: posterPath,
+    },
+  };
+}
+
+async function enrichProfilePayloadPosters(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const entries = collectProfilePosterEntries(payload);
+  if (entries.length === 0) return payload;
+
+  const posterByKey = await buildProfilePosterMap(entries);
+  if (posterByKey.size === 0) return payload;
+
+  return {
+    ...payload,
+    history: Array.isArray(payload.history)
+      ? payload.history.map((item) => {
+          const entry = plainProfileEntry(item);
+          return withPlainPoster(item, entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.history,
+    recentHistory: Array.isArray(payload.recentHistory)
+      ? payload.recentHistory.map((item) => {
+          const entry = plainProfileEntry(item);
+          return withPlainPoster(item, entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.recentHistory,
+    recentRatings: Array.isArray(payload.recentRatings)
+      ? payload.recentRatings.map((item) => {
+          const entry = plainProfileEntry(item);
+          return withPlainPoster(item, entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.recentRatings,
+    watchlist: Array.isArray(payload.watchlist)
+      ? payload.watchlist.map((item) => {
+          const entry = plainProfileEntry(item);
+          return withPlainPoster(item, entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.watchlist,
+    watchedMovies: Array.isArray(payload.watchedMovies)
+      ? payload.watchedMovies.map((item) => {
+          const entry = nestedProfileEntry(item, "movie", "movie");
+          return withNestedPoster(item, "movie", entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.watchedMovies,
+    watchedShows: Array.isArray(payload.watchedShows)
+      ? payload.watchedShows.map((item) => {
+          const entry = nestedProfileEntry(item, "show", "tv");
+          return withNestedPoster(item, "show", entry ? posterByKey.get(entry.key) : null);
+        })
+      : payload.watchedShows,
+  };
 }
 
 function normalizeTopMovie(row) {
@@ -374,11 +553,12 @@ export async function GET(request) {
     );
   }
 
-  const response = NextResponse.json({
+  const payload = await enrichProfilePayloadPosters({
     authenticated: true,
     ...(backend.json || {}),
     source: "showverse",
   });
+  const response = NextResponse.json(payload);
 
   setBackendAuthCookies(response, backend.cookieSource || backend, {
     secure: getCookieSecure(request),

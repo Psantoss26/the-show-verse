@@ -239,9 +239,42 @@ try {
   process.exit(1);
 }
 
+// ────────────────────────────────────────────
+// Keepalive de BD/Redis
+// Evita el arranque en frío "primera vez del día": los proveedores serverless
+// (Neon Postgres, Upstash Redis) suspenden la conexión tras unos minutos de
+// inactividad y la primera consulta tarda varios segundos en despertarlos.
+// Mientras el proceso esté vivo, un ping ligero periódico los mantiene calientes.
+// Ajustable con DB_KEEPALIVE_MS (0 para desactivar).
+// ────────────────────────────────────────────
+const KEEPALIVE_INTERVAL_MS =
+  process.env.DB_KEEPALIVE_MS != null ? Number(process.env.DB_KEEPALIVE_MS) : 4 * 60 * 1000;
+
+let keepAliveTimer = null;
+if (Number.isFinite(KEEPALIVE_INTERVAL_MS) && KEEPALIVE_INTERVAL_MS > 0) {
+  keepAliveTimer = setInterval(async () => {
+    try {
+      await db.execute(sql`select 1`);
+    } catch (err) {
+      fastify.log.warn({ err: err?.message }, 'DB keepalive ping failed');
+    }
+    if (process.env.REDIS_URL) {
+      try {
+        await getRedis().ping();
+      } catch (err) {
+        fastify.log.warn({ err: err?.message }, 'Redis keepalive ping failed');
+      }
+    }
+  }, KEEPALIVE_INTERVAL_MS);
+  // No mantener vivo el proceso solo por este temporizador.
+  keepAliveTimer.unref?.();
+  console.log(`💓 Keepalive de BD/Redis activo cada ${Math.round(KEEPALIVE_INTERVAL_MS / 1000)}s`);
+}
+
 // Graceful shutdown
 async function shutdown(signal) {
   console.log(`${signal} received. Shutting down gracefully...`);
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
   await fastify.close();
   await closeRedis();
   await closeDb();
