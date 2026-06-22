@@ -261,8 +261,34 @@
 
   let lastKey = null;
   let lastDebug = 0;
+  let pollTimer = null;
+
+  // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
+  // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
+  // pasa a ser undefined: acceder a él lanza y rompía cada tick.
+  function extensionAlive() {
+    try {
+      return Boolean(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function stop() {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
 
   function tick() {
+    if (!extensionAlive()) {
+      // Extensión recargada/actualizada: detenemos este script huérfano. La
+      // pestaña recuperará la sincronización al recargarse.
+      stop();
+      return;
+    }
+
     const video = getMainVideo();
     if (!video || video.currentTime < MIN_WATCH_SECONDS) return;
 
@@ -291,29 +317,36 @@
     // reintentar en bucle títulos que no resuelvan (el servidor deduplica igual).
     lastKey = key;
 
-    chrome.runtime.sendMessage(
-      {
-        action: "syncWatch",
-        platform: adapter.id,
-        platformName: adapter.name,
-        contentId: data.contentId || null,
-        mainTitle: data.mainTitle,
-        subTitle: data.subTitle || "",
-        season: data.season || null,
-        episode: data.episode || null,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          // El service worker no respondió (transitorio): permitimos reintentar.
-          lastKey = null;
-          return;
-        }
-        if (response && response.success) {
-          console.log(`[The Show Verse] Sincronizado (${adapter.name}): "${data.mainTitle}"`);
-        }
-      },
-    );
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: "syncWatch",
+          platform: adapter.id,
+          platformName: adapter.name,
+          contentId: data.contentId || null,
+          mainTitle: data.mainTitle,
+          subTitle: data.subTitle || "",
+          season: data.season || null,
+          episode: data.episode || null,
+        },
+        (response) => {
+          if (!extensionAlive()) return;
+          if (chrome.runtime.lastError) {
+            // El service worker no respondió (transitorio): permitimos reintentar.
+            lastKey = null;
+            return;
+          }
+          if (response && response.success) {
+            console.log(`[The Show Verse] Sincronizado (${adapter.name}): "${data.mainTitle}"`);
+          }
+        },
+      );
+    } catch (e) {
+      // Contexto invalidado justo al enviar: permitimos reintento y paramos.
+      lastKey = null;
+      stop();
+    }
   }
 
-  setInterval(tick, POLL_MS);
+  pollTimer = setInterval(tick, POLL_MS);
 })();
