@@ -10,6 +10,7 @@ export default function DetailsSectionMenu({
   className = "",
   maxWidthClass = "max-w-[1400px]",
   colorScheme = "yellow",
+  showLabelsOnMobile = false,
 }) {
   const safeItems = useMemo(
     () => (Array.isArray(items) ? items.filter(Boolean) : []),
@@ -247,8 +248,8 @@ export default function DetailsSectionMenu({
                                 }}
                                 transition={{ duration: 0.3 }}
                                 className={[
-                                  "hidden sm:inline",
-                                  "text-sm font-semibold tracking-wider uppercase transition-all duration-300",
+                                  showLabelsOnMobile ? "inline" : "hidden sm:inline",
+                                  "text-[11px] sm:text-sm font-semibold tracking-wide sm:tracking-wider uppercase transition-all duration-300",
                                   active
                                     ? "text-white font-bold"
                                     : "text-zinc-400 group-hover:text-zinc-200",
