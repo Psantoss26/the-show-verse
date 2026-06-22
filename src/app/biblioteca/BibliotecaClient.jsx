@@ -49,6 +49,9 @@ const EXPANDED_FETCH_LIMIT = 10000;
 const MAX_LOCALIZED_ARTWORK_IDS_PER_TYPE = 120;
 const INITIAL_RENDER_COUNT = 180;
 const RENDER_CHUNK_SIZE = 120;
+// Nº de tarjetas iniciales (aprox. lo visible al entrar) cuya portada se carga
+// de inmediato (eager + prioridad alta) para que aparezca lo antes posible.
+const EAGER_IMAGE_COUNT = 24;
 const ARTWORK_PREFETCH_AHEAD = 80;
 
 const RESOLUTION_STYLES = {
@@ -75,23 +78,6 @@ const RESOLUTION_ORDER = [
   "SD",
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.04 },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.3, ease: "easeOut" },
-  },
-};
-
 function getCacheKey(limit) {
   return `${CACHE_KEY_PREFIX}:limit:${Number(limit) || DEFAULT_FETCH_LIMIT}`;
 }
@@ -102,6 +88,45 @@ function getCacheKey(limit) {
 // cliente es el mismo: loading=true).
 const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// Caché de los pósters/backdrops localizados de TMDb (mapa tmdbId → path). Se
+// persiste para que, al recargar o volver a entrar, las portadas FINALES estén
+// disponibles de inmediato y no se vean "tarjetas vacías" mientras se re-resuelven.
+const ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v1";
+const ARTWORK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (las portadas cambian poco)
+
+function readArtworkCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ARTWORK_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - Number(parsed?.t || 0) > ARTWORK_CACHE_TTL_MS) {
+      window.localStorage.removeItem(ARTWORK_CACHE_KEY);
+      return null;
+    }
+    const norm = (m) => ({
+      movie: m?.movie && typeof m.movie === "object" ? m.movie : {},
+      tv: m?.tv && typeof m.tv === "object" ? m.tv : {},
+    });
+    if (!parsed?.poster && !parsed?.backdrop) return null;
+    return { poster: norm(parsed.poster), backdrop: norm(parsed.backdrop) };
+  } catch {
+    return null;
+  }
+}
+
+function writeArtworkCache(poster, backdrop) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      ARTWORK_CACHE_KEY,
+      JSON.stringify({ t: Date.now(), poster, backdrop }),
+    );
+  } catch {
+    // cuota excedida: ignoramos
+  }
+}
 
 // Lee la caché de la biblioteca de forma SÍNCRONA (cualquier antigüedad) para
 // poder pintar el contenido —como las demás páginas de usuario— en lugar de
@@ -790,11 +815,12 @@ function LibraryMediaCard({
   const imageSrc = imageCandidates[imageIndex] || null;
   const addedAtLabel = formatEpoch(item?.addedAt);
 
+  // Misma animación de entrada que Favoritos: anima solo las primeras 24
+  // tarjetas (lo visible al entrar), independientemente del tamaño de la
+  // biblioteca, con un retardo escalonado por índice.
   const animDelay =
-    totalItems > 30
-      ? Math.min(index * 0.01, 0.15)
-      : Math.min(index * 0.02, 0.3);
-  const shouldAnimate = animated && index < 30;
+    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  const shouldAnimate = index < 24;
   const enableHoverLift =
     animated &&
     totalItems <= 120 &&
@@ -824,7 +850,10 @@ function LibraryMediaCard({
           key={imageSrc}
           src={imageSrc}
           alt={title}
-          loading="lazy"
+          // Las primeras tarjetas (visibles al entrar) cargan de inmediato para
+          // mostrar la portada cuanto antes; el resto, lazy.
+          loading={index < EAGER_IMAGE_COUNT ? "eager" : "lazy"}
+          fetchPriority={index < EAGER_IMAGE_COUNT ? "high" : "auto"}
           decoding="async"
           onError={() => {
             setImageIndex((prev) =>
@@ -842,8 +871,15 @@ function LibraryMediaCard({
   if (viewMode === "list") {
     return (
       <motion.div
-        variants={shouldAnimate ? cardVariants : undefined}
-        initial={shouldAnimate ? undefined : false}
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.25,
+          delay: shouldAnimate ? animDelay : 0,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        layout
       >
         <article
           className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
@@ -888,8 +924,15 @@ function LibraryMediaCard({
   if (viewMode === "compact") {
     return (
       <motion.div
-        variants={shouldAnimate ? cardVariants : undefined}
-        initial={shouldAnimate ? undefined : false}
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{
+          duration: 0.25,
+          delay: shouldAnimate ? animDelay : 0,
+          ease: [0.25, 0.1, 0.25, 1],
+        }}
+        layout
       >
         <div className="block">
           <motion.article
@@ -965,8 +1008,15 @@ function LibraryMediaCard({
 
   return (
     <motion.div
-      variants={shouldAnimate ? cardVariants : undefined}
-      initial={shouldAnimate ? undefined : false}
+      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      transition={{
+        duration: 0.25,
+        delay: shouldAnimate ? animDelay : 0,
+        ease: [0.25, 0.1, 0.25, 1],
+      }}
+      layout
     >
       <div className="block">
         <article
@@ -1119,14 +1169,27 @@ export default function BibliotecaClient() {
   const [isExpandingDataset, setIsExpandingDataset] = useState(false);
   const [hasExpandedDataset, setHasExpandedDataset] = useState(false);
   const [expansionAttempted, setExpansionAttempted] = useState(false);
-  const [localizedPosterMap, setLocalizedPosterMap] = useState({
-    movie: {},
-    tv: {},
-  });
-  const [localizedBackdropMap, setLocalizedBackdropMap] = useState({
-    movie: {},
-    tv: {},
-  });
+  // Hidratación SÍNCRONA de los pósters localizados desde caché: en recarga/acceso
+  // las portadas finales ya están disponibles, así no se ven "tarjetas vacías".
+  // (No afecta a la hidratación SSR: las tarjetas solo se renderizan tras `mounted`.)
+  const [localizedPosterMap, setLocalizedPosterMap] = useState(
+    () => readArtworkCache()?.poster || { movie: {}, tv: {} },
+  );
+  const [localizedBackdropMap, setLocalizedBackdropMap] = useState(
+    () => readArtworkCache()?.backdrop || { movie: {}, tv: {} },
+  );
+
+  // Persistimos los pósters/backdrops resueltos para reutilizarlos al recargar.
+  // No escribimos mapas vacíos (no machacar la caché antes de resolver nada).
+  useEffect(() => {
+    const hasContent =
+      Object.keys(localizedPosterMap.movie).length > 0 ||
+      Object.keys(localizedPosterMap.tv).length > 0 ||
+      Object.keys(localizedBackdropMap.movie).length > 0 ||
+      Object.keys(localizedBackdropMap.tv).length > 0;
+    if (!hasContent) return;
+    writeArtworkCache(localizedPosterMap, localizedBackdropMap);
+  }, [localizedPosterMap, localizedBackdropMap]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
@@ -1623,9 +1686,8 @@ export default function BibliotecaClient() {
   const loadedItemsCount = Array.isArray(data?.items) ? data.items.length : 0;
   const visibleRenderedCount = Math.min(visibleCount, filteredItems.length);
   const shouldAnimateCards = filteredItems.length <= 180;
-  const contentMotionProps = shouldAnimateCards
-    ? { variants: containerVariants, initial: "hidden", animate: "visible" }
-    : { initial: false };
+  // El contenedor no anima: cada tarjeta se anima por sí misma (como Favoritos).
+  const contentMotionProps = { initial: false };
 
   function getItemsGridClass(withTopMargin = false) {
     if (viewMode === "list") {
