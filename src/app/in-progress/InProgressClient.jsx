@@ -770,6 +770,7 @@ const InProgressCard = memo(function InProgressCard({
       >
         <Link
           href={href}
+          prefetch
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -853,7 +854,7 @@ const InProgressCard = memo(function InProgressCard({
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
-        <Link href={href} className="block">
+        <Link href={href} prefetch className="block">
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-emerald-900/20 transition-all">
             <SmartPoster item={item} title={title} />
 
@@ -940,7 +941,7 @@ const InProgressCard = memo(function InProgressCard({
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
     >
-      <Link href={href} className="block group">
+      <Link href={href} prefetch className="block group">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
           onMouseEnter={(e) => {

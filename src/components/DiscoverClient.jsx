@@ -582,9 +582,6 @@ function DiscoverCard({ item }) {
   const href = `/details/${item.media_type}/${item.id}`;
   const handlePrefetch = () => {
     router.prefetch(href);
-    if (typeof window !== "undefined") {
-      fetch(href, { priority: "low" }).catch(() => {});
-    }
   };
 
   const typeColorClass = isMovie
@@ -594,6 +591,7 @@ function DiscoverCard({ item }) {
   return (
     <Link
       href={href}
+      prefetch
       className="group relative flex flex-col w-full h-full"
       onMouseEnter={handlePrefetch}
       onFocus={handlePrefetch}

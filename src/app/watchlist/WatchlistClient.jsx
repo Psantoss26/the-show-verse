@@ -1670,6 +1670,7 @@ const WatchlistCard = memo(function WatchlistCard({
       >
         <Link
           href={href}
+          prefetch
           className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -1718,7 +1719,7 @@ const WatchlistCard = memo(function WatchlistCard({
         }}
         layout
       >
-        <Link href={href} className="block">
+        <Link href={href} prefetch className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300`}
             whileHover={{
@@ -1833,7 +1834,7 @@ const WatchlistCard = memo(function WatchlistCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
-      <Link href={href} className="block">
+      <Link href={href} prefetch className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
           onMouseEnter={handleHover}

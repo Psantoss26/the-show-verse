@@ -1025,12 +1025,41 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
 
+  const cardRef = useRef(null);
+  const prefetchedRef = useRef(false);
+
   const prefetchHref = () => {
+    if (prefetchedRef.current) return;
+    prefetchedRef.current = true;
     router.prefetch(href);
     if (typeof window !== "undefined") {
+      // Calienta la caché de ruta completa (ISR) para que el push sea inmediato.
       fetch(href, { priority: "low" }).catch(() => {});
     }
   };
+
+  // Prefetch al entrar en viewport (como hace <Link>), clave en móvil donde no
+  // hay hover: al pulsar, el destino ya está precargado y la navegación es
+  // instantánea sin estados de carga.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            prefetchHref();
+            observer.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [href]);
 
   const navigateToDetails = () => {
     router.push(href);
@@ -1157,6 +1186,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      ref={cardRef}
       className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
@@ -1528,12 +1558,41 @@ function InlinePreviewCardAnticipated({
       : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
 
+  const cardRef = useRef(null);
+  const prefetchedRef = useRef(false);
+
   const prefetchHref = () => {
+    if (prefetchedRef.current) return;
+    prefetchedRef.current = true;
     router.prefetch(href);
     if (typeof window !== "undefined") {
+      // Calienta la caché de ruta completa (ISR) para que el push sea inmediato.
       fetch(href, { priority: "low" }).catch(() => {});
     }
   };
+
+  // Prefetch al entrar en viewport (como hace <Link>), clave en móvil donde no
+  // hay hover: al pulsar, el destino ya está precargado y la navegación es
+  // instantánea sin estados de carga.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            prefetchHref();
+            observer.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [href]);
 
   const navigateToDetails = () => {
     router.push(href);
@@ -1654,6 +1713,7 @@ function InlinePreviewCardAnticipated({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      ref={cardRef}
       className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
@@ -2359,6 +2419,7 @@ function Row({
                         >
                           <Link
                             href={`/details/${m.media_type === "tv" || (m.name && !m.title) || m.first_air_date ? "tv" : "movie"}/${m.id}`}
+                            prefetch
                           >
                             <PosterImage
                               movie={m}
@@ -3054,7 +3115,7 @@ function TopRatedHero({
                 if (!heroBackdrop) {
                   return (
                     <SwiperSlide key={movie.id} className={slideClass}>
-                      <Link href={`/details/${mediaType}/${movie.id}`}>
+                      <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
                         <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
                       </Link>
                     </SwiperSlide>
@@ -3063,7 +3124,7 @@ function TopRatedHero({
 
                 return (
                   <SwiperSlide key={movie.id} className={slideClass}>
-                    <Link href={`/details/${mediaType}/${movie.id}`}>
+                    <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
                       <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
                         <NextImage
                           src={buildImg(heroBackdrop, "w780")}
