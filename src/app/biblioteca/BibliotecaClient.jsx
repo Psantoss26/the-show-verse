@@ -6,6 +6,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -93,6 +94,28 @@ const cardVariants = {
 
 function getCacheKey(limit) {
   return `${CACHE_KEY_PREFIX}:limit:${Number(limit) || DEFAULT_FETCH_LIMIT}`;
+}
+
+// useLayoutEffect en cliente, useEffect en servidor (evita el warning de SSR).
+// Lo usamos para pintar el contenido cacheado ANTES del primer pintado del
+// navegador, sin provocar mismatch de hidratación (el estado inicial server y
+// cliente es el mismo: loading=true).
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// Lee la caché de la biblioteca de forma SÍNCRONA (cualquier antigüedad) para
+// poder pintar el contenido —como las demás páginas de usuario— en lugar de
+// mostrar el esqueleto. Después se revalida en segundo plano.
+function readInitialLibraryCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(getCacheKey(DEFAULT_FETCH_LIMIT));
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    return cached?.payload || null;
+  } catch {
+    return null;
+  }
 }
 
 function buildTmdbImage(path, size = "w1280") {
@@ -1002,33 +1025,88 @@ function LibraryMediaCard({
 // ================== MAIN COMPONENT ==================
 
 export default function BibliotecaClient() {
-  const { preferences, updatePreference, authenticated } = useAuth();
+  const { preferences, updatePreference, authenticated, hydrated } = useAuth();
   const { t } = useTranslation();
 
+  // Estado inicial IDÉNTICO en servidor y cliente (loading=true) para no romper
+  // la hidratación. El contenido cacheado se aplica en un layout effect (abajo),
+  // antes del primer pintado, así no se ve el esqueleto en visitas repetidas.
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState(null);
+  // `mounted` es false en el servidor y en el primer render del cliente (idénticos
+  // → hidratación limpia). Hasta que monta, el área de contenido NO pinta nada:
+  // así, al recargar, NO se ve el esqueleto del HTML del servidor. El layout
+  // effect aplica la caché antes del pintado, de modo que el contenido aparece de
+  // inmediato (y el esqueleto solo se muestra si de verdad no hay caché).
+  const [mounted, setMounted] = useState(false);
+
+  // Ref espejo de `data` para que fetchLibrary (callback estable) sepa si ya hay
+  // contenido y revalide en 2º plano (refreshing) en vez de mostrar el esqueleto.
+  const dataRef = useRef(null);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  // Pintado instantáneo desde caché tras montar, SIN esperar a la hidratación de
+  // auth. Al ser layout effect se aplica antes del pintado: en visitas repetidas
+  // no se ve el esqueleto.
+  useIsoLayoutEffect(() => {
+    const cached = readInitialLibraryCache();
+    if (cached) {
+      dataRef.current = cached;
+      setData(cached);
+      setLoading(false);
+    }
+    setMounted(true);
+  }, []);
 
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [resFilter, setResFilter] = useState("all");
   const [sortBy, setSortBy] = useState("added-desc");
   const [groupBy, setGroupBy] = useState("none");
+  // Modo de vista e imagen: valor por defecto ESTABLE (igual en servidor y
+  // cliente) para no romper la hidratación —los toggles y las columnas de la
+  // rejilla dependen de estos valores—. El valor guardado se aplica en un layout
+  // effect ANTES del primer pintado, así no hay ni parpadeo ni mismatch.
   const [viewMode, setViewModeState] = useState("grid");
+  const [imageMode, setImageMode] = useState("poster");
+  // Marca si el usuario ya fijó una vista propia: en ese caso la preferencia
+  // global NO debe sobrescribirla de forma asíncrona.
+  const viewModeUserSetRef = useRef(false);
+
+  useIsoLayoutEffect(() => {
+    const savedView = window.localStorage.getItem(
+      "showverse:biblioteca:viewMode",
+    );
+    if (savedView === "list" || savedView === "grid" || savedView === "compact") {
+      viewModeUserSetRef.current = true;
+      setViewModeState(savedView);
+    }
+    const savedImage = window.localStorage.getItem(
+      "showverse:biblioteca:imageMode",
+    );
+    if (savedImage === "poster" || savedImage === "backdrop") {
+      setImageMode(savedImage);
+    }
+  }, []);
 
   useEffect(() => {
-    if (preferences?.defaultView) {
+    // La preferencia global solo aplica cuando el usuario aún no tiene una vista
+    // propia para Biblioteca (evita el parpadeo al recargar).
+    if (viewModeUserSetRef.current) return;
+    if (
+      preferences?.defaultView &&
+      ["list", "grid", "compact"].includes(preferences.defaultView)
+    ) {
       setViewModeState(preferences.defaultView);
-    } else {
-      const saved = window.localStorage.getItem("showverse:biblioteca:viewMode");
-      if (saved === "list" || saved === "grid" || saved === "compact") {
-        setViewModeState(saved);
-      }
     }
   }, [preferences?.defaultView]);
 
   const setViewMode = useCallback((mode) => {
+    viewModeUserSetRef.current = true;
     setViewModeState(mode);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("showverse:biblioteca:viewMode", mode);
@@ -1037,13 +1115,6 @@ export default function BibliotecaClient() {
       updatePreference({ defaultView: mode });
     }
   }, [authenticated, updatePreference]);
-
-  const [imageMode, setImageMode] = useState(() => {
-    if (typeof window === "undefined") return "poster";
-    return (
-      window.localStorage.getItem("showverse:biblioteca:imageMode") || "poster"
-    );
-  });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [isExpandingDataset, setIsExpandingDataset] = useState(false);
   const [hasExpandedDataset, setHasExpandedDataset] = useState(false);
@@ -1085,6 +1156,8 @@ export default function BibliotecaClient() {
       background = false,
       markExpanded = false,
     } = {}) => {
+      const MAX_INITIAL_RETRIES = 3;
+      const INITIAL_RETRY_DELAY_MS = 700;
       const hasWindow = typeof window !== "undefined";
       const now = Date.now();
       const safeLimit =
@@ -1125,61 +1198,90 @@ export default function BibliotecaClient() {
         }
       }
 
-      if (force || background) setRefreshing(true);
+      // Si ya hay contenido en pantalla (caché), revalidamos en 2º plano sin
+      // mostrar el esqueleto; solo mostramos esqueleto cuando no hay nada que ver.
+      if (force || background || dataRef.current) setRefreshing(true);
       else setLoading(true);
       if (background) setIsExpandingDataset(true);
 
-      try {
-        // Usar force-cache para aprovechar caché del navegador, excepto en refresh manual
-        const response = await fetch(`/api/plex/library?limit=${safeLimit}`, {
-          cache: force ? "no-store" : "force-cache",
-        });
-        const json = await response.json().catch(() => null);
+      // En el primer acceso el backend puede estar frío o la conexión Plex aún no
+      // estar lista. Reintentamos en silencio manteniendo el esqueleto en vez de
+      // mostrar el error y luego cargar (el "flash" que veía el usuario).
+      const isInitialLoad = !force && !background;
+      const maxAttempts = isInitialLoad ? MAX_INITIAL_RETRIES + 1 : 1;
+      let lastErr = null;
 
-        if (!response.ok || !json?.available) {
-          throw new Error(
-            json?.message ||
-              json?.error ||
-              "No se pudo cargar la biblioteca Plex.",
-          );
-        }
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          // Primer intento aprovecha caché del navegador; refresh manual o
+          // reintentos fuerzan datos frescos (la caché podría tener un
+          // available:false transitorio).
+          const response = await fetch(`/api/plex/library?limit=${safeLimit}`, {
+            cache: force || attempt > 0 ? "no-store" : "force-cache",
+          });
+          const json = await response.json().catch(() => null);
 
-        setData(json);
-        setError("");
-        if (
-          markExpanded ||
-          safeLimit > DEFAULT_FETCH_LIMIT ||
-          !json?.summary?.truncated
-        ) {
-          setHasExpandedDataset(true);
-        }
+          if (!response.ok || !json?.available) {
+            throw new Error(
+              json?.message ||
+                json?.error ||
+                "No se pudo cargar la biblioteca Plex.",
+            );
+          }
 
-        if (hasWindow) {
-          const payload = JSON.stringify({ timestamp: now, payload: json });
-          window.localStorage.setItem(cacheKey, payload);
-          if (safeLimit > DEFAULT_FETCH_LIMIT) {
-            window.localStorage.setItem(
-              getCacheKey(DEFAULT_FETCH_LIMIT),
-              payload,
+          setData(json);
+          setError("");
+          if (
+            markExpanded ||
+            safeLimit > DEFAULT_FETCH_LIMIT ||
+            !json?.summary?.truncated
+          ) {
+            setHasExpandedDataset(true);
+          }
+
+          if (hasWindow) {
+            const payload = JSON.stringify({ timestamp: now, payload: json });
+            window.localStorage.setItem(cacheKey, payload);
+            if (safeLimit > DEFAULT_FETCH_LIMIT) {
+              window.localStorage.setItem(
+                getCacheKey(DEFAULT_FETCH_LIMIT),
+                payload,
+              );
+            }
+          }
+
+          lastErr = null;
+          break; // éxito
+        } catch (err) {
+          lastErr = err;
+          if (attempt < maxAttempts - 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, INITIAL_RETRY_DELAY_MS * (attempt + 1)),
             );
           }
         }
-      } catch (err) {
-        if (!background) {
-          setError(err instanceof Error ? err.message : "Error desconocido.");
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        if (background) setIsExpandingDataset(false);
       }
+
+      // Si ya teníamos contenido en pantalla, no rompemos la vista con la
+      // pantalla de error por un fallo de revalidación: mantenemos lo mostrado.
+      if (lastErr && !background && !dataRef.current) {
+        setError(
+          lastErr instanceof Error ? lastErr.message : "Error desconocido.",
+        );
+      }
+      setLoading(false);
+      setRefreshing(false);
+      if (background) setIsExpandingDataset(false);
     },
     [],
   );
 
   useEffect(() => {
+    // Esperamos a la hidratación de auth para no lanzar el fetch antes de que la
+    // sesión/conexión esté lista (causa del available:false en el primer acceso).
+    if (!hydrated) return;
     fetchLibrary({ limit: DEFAULT_FETCH_LIMIT });
-  }, [fetchLibrary]);
+  }, [fetchLibrary, hydrated]);
 
   useEffect(() => {
     if (!data?.summary?.truncated) return;
@@ -1809,6 +1911,35 @@ export default function BibliotecaClient() {
   function renderContent() {
     const visibleLimit = Math.min(visibleCount, filteredItems.length);
 
+    // Servidor y primer render del cliente: no pintamos contenido (ni esqueleto).
+    // El layout effect aplica la caché antes del pintado, así al recargar NO se ve
+    // el esqueleto del HTML del servidor. Reservamos algo de alto para evitar
+    // saltos de layout mientras el contenido aparece.
+    if (!mounted) {
+      return <div key="content-placeholder" className="min-h-[60vh]" />;
+    }
+
+    // Montado pero todavía sin contenido y cargando (p. ej. primer acceso sin
+    // caché): esqueletos *inline* dentro del shell, no a pantalla completa.
+    if (loading && filteredItems.length === 0) {
+      return (
+        <div key="loading-skeleton" className={getItemsGridClass(true)}>
+          {Array.from({ length: 24 }).map((_, i) => (
+            <div
+              key={i}
+              className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-neutral-800/50 via-neutral-900/50 to-neutral-800/50 animate-pulse" />
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
+                style={{ backgroundSize: "200% 100%" }}
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     if (filteredItems.length === 0) {
       return (
         <motion.div
@@ -1930,42 +2061,9 @@ export default function BibliotecaClient() {
     );
   }
 
-  // ===== LOADING STATE =====
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-amber-500/30">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-amber-700/20 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-orange-800/25 blur-[120px] sm:blur-[150px]" />
-        </div>
-        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <div className="mb-10">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-amber-500/50" />
-              <div className="h-3 w-24 bg-zinc-800 rounded-full animate-pulse" />
-            </div>
-            <div className="h-12 w-64 bg-zinc-800 rounded-xl animate-pulse mb-2" />
-            <div className="h-4 w-80 bg-zinc-800/50 rounded-full animate-pulse hidden md:block" />
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6 gap-3">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <div
-                key={i}
-                className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-neutral-800/50 via-neutral-900/50 to-neutral-800/50 animate-pulse" />
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
-                  style={{ backgroundSize: "200% 100%" }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Nota: ya NO hay un estado de carga a pantalla completa. Igual que Favoritos y
+  // Pendientes, el shell (fondo, header animado, filtros) se renderiza siempre y
+  // la rejilla muestra esqueletos *inline* mientras carga (ver renderContent).
 
   // ===== ERROR STATE =====
   if (error) {
@@ -2054,6 +2152,7 @@ export default function BibliotecaClient() {
               </p>
             </div>
 
+            {!loading && (
             <motion.div
               className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
               initial={{ opacity: 0, y: 20 }}
@@ -2094,6 +2193,7 @@ export default function BibliotecaClient() {
                 </div>
               </div>
             </motion.div>
+            )}
           </div>
         </motion.header>
 
