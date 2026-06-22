@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import { getPlexConnection, clearPlexConnectionCache } from "@/lib/plex/client";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -489,20 +490,37 @@ function ProfileSettingsClient() {
   }, []);
 
   // Estado de la conexión de Plex (token por usuario en cookie, flujo PIN).
-  const [plex, setPlex] = useState({ loading: true, connected: false, account: null, server: null });
+  // `link` indica si el servidor (local/relay) es accesible DESDE EL NAVEGADOR.
+  const [plex, setPlex] = useState({
+    loading: true,
+    connected: false,
+    account: null,
+    server: null,
+    link: undefined,
+  });
 
   const fetchPlexStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/plex/auth/status", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
+      const connected = Boolean(json?.connected);
       setPlex({
         loading: false,
-        connected: Boolean(json?.connected),
+        connected,
         account: json?.account || null,
         server: json?.server || null,
+        link: connected ? undefined : null,
       });
+      if (connected) {
+        // Probar acceso real al servidor desde el navegador (local → relay).
+        const conn = await getPlexConnection({ force: true }).catch(() => null);
+        setPlex((prev) => ({
+          ...prev,
+          link: conn ? { kind: conn.kind, name: conn.serverName } : null,
+        }));
+      }
     } catch {
-      setPlex({ loading: false, connected: false, account: null, server: null });
+      setPlex({ loading: false, connected: false, account: null, server: null, link: null });
     }
   }, []);
 
@@ -513,7 +531,8 @@ function ProfileSettingsClient() {
     } catch {
       // noop
     } finally {
-      setPlex({ loading: false, connected: false, account: null, server: null });
+      clearPlexConnectionCache();
+      setPlex({ loading: false, connected: false, account: null, server: null, link: null });
     }
   }, []);
 
@@ -1186,6 +1205,23 @@ function ProfileSettingsClient() {
                             ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? ` · Servidor: ${plex.server.name}` : " · No se detectó ningún servidor"}.`
                             : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
                         </p>
+                        {plex.connected && plex.server && (
+                          <p className="mt-1.5 text-[11px] font-bold">
+                            {plex.link === undefined ? (
+                              <span className="text-zinc-500">Comprobando acceso al servidor…</span>
+                            ) : plex.link?.kind === "local" ? (
+                              <span className="text-emerald-400">● Servidor local accesible desde este dispositivo</span>
+                            ) : plex.link?.kind === "relay" ? (
+                              <span className="text-amber-400">● Accesible vía relay de Plex (no estás en la red local)</span>
+                            ) : plex.link?.kind === "remote" ? (
+                              <span className="text-emerald-400">● Servidor accesible (conexión remota)</span>
+                            ) : (
+                              <span className="text-zinc-500">
+                                ○ No accesible desde este dispositivo. Conéctate a la misma red que tu servidor para acceso local.
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {plex.connected ? (
