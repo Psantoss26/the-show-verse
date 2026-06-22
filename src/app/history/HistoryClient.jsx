@@ -316,6 +316,7 @@ function getDetailsHref(entry) {
 
 const HISTORY_INDICATOR_COLORS = {
   emerald: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+  light: "bg-zinc-100/15 border-white/25 text-zinc-100",
   purple: "bg-purple-500/15 border-purple-500/30 text-purple-300",
   red: "bg-red-500/15 border-red-500/30 text-red-300",
   sky: "bg-sky-500/15 border-sky-500/30 text-sky-300",
@@ -390,7 +391,7 @@ function HistoryCornerIndicator({
       className={`${getHistoryIndicatorClass({
         side: "right",
         compact,
-        color: "emerald",
+        color: "light",
       })} flex-col gap-0`}
       aria-label={`Visto el ${dateParts.label}`}
     >

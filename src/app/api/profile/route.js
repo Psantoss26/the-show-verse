@@ -9,6 +9,9 @@ import { fetchTmdbMetadata } from "../_utils/tmdbMetadata";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Tope de tiempo para el enriquecimiento de pósters con TMDb (solo respuesta full).
+const POSTER_ENRICH_BUDGET_MS = 2500;
+
 const emptyStats = {
   movies: { watched: 0, plays: 0, minutes: 0, comments: 0, collected: 0 },
   shows: { watched: 0, collected: 0, comments: 0 },
@@ -285,8 +288,9 @@ async function buildProfilePosterMap(entries) {
   if (missing.length === 0) return posterByKey;
 
   let cursor = 0;
+  let stop = false;
   const workers = Array.from({ length: Math.min(8, missing.length) }, async () => {
-    while (cursor < missing.length) {
+    while (cursor < missing.length && !stop) {
       const index = cursor;
       cursor += 1;
       const entry = missing[index];
@@ -296,7 +300,11 @@ async function buildProfilePosterMap(entries) {
     }
   });
 
-  await Promise.all(workers);
+  // Tope de tiempo: si TMDb está frío/lento, devolvemos lo resuelto hasta ahora
+  // (el resto se completa en cargas posteriores gracias a la caché de 24h).
+  const budget = new Promise((resolve) => setTimeout(resolve, POSTER_ENRICH_BUDGET_MS));
+  await Promise.race([Promise.all(workers), budget]);
+  stop = true;
   return posterByKey;
 }
 
@@ -553,11 +561,16 @@ export async function GET(request) {
     );
   }
 
-  const payload = await enrichProfilePayloadPosters({
+  const basePayload = {
     authenticated: true,
     ...(backend.json || {}),
     source: "showverse",
-  });
+  };
+
+  // El primer pintado (compact) NO espera al enriquecimiento de pósters con TMDb:
+  // devuelve al instante con los posterPath ya cacheados en BD (como el resto de
+  // páginas). El full posterior, en segundo plano, completa los que falten.
+  const payload = compact ? basePayload : await enrichProfilePayloadPosters(basePayload);
   const response = NextResponse.json(payload);
 
   setBackendAuthCookies(response, backend.cookieSource || backend, {
