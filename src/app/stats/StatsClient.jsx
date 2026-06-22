@@ -909,6 +909,7 @@ function ProfileSectionTabs({ viewMode, setViewMode, className = "" }) {
       className={["w-full lg:w-[520px]", className].join(" ")}
       maxWidthClass="max-w-none"
       colorScheme="indigo"
+      showLabelsOnMobile
     />
   );
 }
