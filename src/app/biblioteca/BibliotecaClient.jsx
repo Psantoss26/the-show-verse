@@ -846,9 +846,9 @@ function LibraryMediaCard({
                 )}
                 {primaryRes && (
                   <>
-                    {(year || duration) && <span>•</span>}
+                    {(year || duration) && <span className="hidden lg:inline">•</span>}
                     <span
-                      className={`font-bold ${getResolutionTextColor(primaryRes)}`}
+                      className={`hidden font-bold lg:inline ${getResolutionTextColor(primaryRes)}`}
                     >
                       {formatResolutionLabel(primaryRes)}
                     </span>
@@ -909,11 +909,11 @@ function LibraryMediaCard({
             </div>
             {primaryRes && (
               <div
-                className={`absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
+                className={`hidden lg:flex items-center justify-center absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
                   primaryRes,
                 )}`}
               >
-                <span className="flex items-center justify-center h-4 px-0.5 sm:h-[18px] text-[10px] sm:text-[11px] font-black tracking-widest drop-shadow-sm leading-none">
+                <span className="flex w-4 h-4 sm:w-[18px] sm:h-[18px] items-center justify-center text-xs sm:text-sm font-black tracking-tight drop-shadow-sm leading-none [text-box:trim-both_cap_alphabetic]">
                   {formatResolutionLabel(primaryRes)}
                 </span>
               </div>
@@ -967,11 +967,11 @@ function LibraryMediaCard({
           </div>
           {primaryRes && (
             <div
-              className={`absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
+              className={`hidden lg:flex items-center justify-center absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
                 primaryRes,
               )}`}
             >
-              <span className="flex items-center justify-center h-4 px-0.5 sm:h-[18px] text-[10px] sm:text-[11px] font-black tracking-widest drop-shadow-sm leading-none">
+              <span className="flex w-4 h-4 sm:w-[18px] sm:h-[18px] items-center justify-center text-xs sm:text-sm font-black tracking-tight drop-shadow-sm leading-none [text-box:trim-both_cap_alphabetic]">
                 {formatResolutionLabel(primaryRes)}
               </span>
             </div>
