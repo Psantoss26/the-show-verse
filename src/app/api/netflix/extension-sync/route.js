@@ -128,6 +128,20 @@ export async function POST(request) {
         tmdbId = movie.id;
         resolvedTitle = movie.title;
         posterPath = movie.poster_path;
+      } else {
+        // No es película: puede ser una serie detectada solo por título (sin
+        // temporada/episodio visibles, p. ej. en Plex). Si TMDb la conoce como
+        // serie, la omitimos limpiamente en vez de devolver un 404 de resolución.
+        const tvRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=tv`);
+        if (tvRes.ok && tvRes.json?.results?.length > 0) {
+          console.log(`[Extension Sync] Serie reconocida sin episodio identificable, omitida: "${query}"`);
+          return NextResponse.json({
+            success: true,
+            skipped: true,
+            reason: "series_without_episode",
+            title: query,
+          });
+        }
       }
     }
 

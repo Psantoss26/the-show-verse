@@ -25,7 +25,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
-import { getPlexConnection, clearPlexConnectionCache } from "@/lib/plex/client";
+import {
+  getPlexConnection,
+  clearPlexConnectionCache,
+  connectPlexInteractive,
+} from "@/lib/plex/client";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -523,6 +527,23 @@ function ProfileSettingsClient() {
       setPlex({ loading: false, connected: false, account: null, server: null, link: null });
     }
   }, []);
+
+  const [plexConnecting, setPlexConnecting] = useState(false);
+
+  const handleConnectPlex = useCallback(async () => {
+    setPlexConnecting(true);
+    try {
+      const result = await connectPlexInteractive();
+      if (result?.ok) {
+        await fetchPlexStatus();
+        setActiveTab("connections");
+      } else if (result?.error && result.error !== "cancelled" && result.error !== "popup_blocked") {
+        alert("No se pudo conectar con Plex. Inténtalo de nuevo.");
+      }
+    } finally {
+      setPlexConnecting(false);
+    }
+  }, [fetchPlexStatus]);
 
   const handleDisconnectPlex = useCallback(async () => {
     if (!confirm("¿Seguro que deseas desconectar tu servidor de Plex?")) return;
@@ -1236,15 +1257,23 @@ function ProfileSettingsClient() {
                         <span className="hidden sm:inline">Desconectar</span>
                       </button>
                     ) : (
-                      <a
-                        href="/api/plex/auth/start?next=/profile/settings"
+                      <button
+                        type="button"
+                        onClick={handleConnectPlex}
+                        disabled={plexConnecting}
                         aria-label="Conectar"
                         title="Conectar"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                        <span className="hidden sm:inline">Conectar</span>
-                      </a>
+                        {plexConnecting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <>
+                            <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                            <span className="hidden sm:inline">Conectar</span>
+                          </>
+                        )}
+                      </button>
                     )}
                   </div>
 
