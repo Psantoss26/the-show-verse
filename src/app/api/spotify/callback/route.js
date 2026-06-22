@@ -3,6 +3,7 @@ import {
   exchangeSpotifyCode,
   resolveSpotifyRedirectUri,
   setSpotifyCookies,
+  getRequestOrigin,
 } from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
@@ -24,10 +25,32 @@ function sanitizeNext(p) {
 
 export async function GET(req) {
   const url = new URL(req.url);
-  const origin = req.nextUrl?.origin || url.origin;
+  // Origin REAL (header Host): host donde se ejecuta este callback.
+  const origin = getRequestOrigin(req);
   const code = url.searchParams.get("code");
   const oauthError = url.searchParams.get("error");
-  const decoded = decodeState(url.searchParams.get("state"));
+  const stateParam = url.searchParams.get("state");
+  const decoded = decodeState(stateParam);
+  const appHost =
+    decoded?.h && /^https?:\/\//i.test(decoded.h)
+      ? String(decoded.h).replace(/\/+$/, "")
+      : null;
+
+  // ── Puente de host ──
+  // Spotify solo permite 127.0.0.1 como redirect_uri (no localhost), así que este
+  // callback puede entregarse en 127.0.0.1 aunque la app (y tu sesión) viva en
+  // localhost. Si el host actual no es el de la app, reenviamos al host de la app
+  // para hacer ahí el intercambio y guardar las cookies junto a la sesión.
+  if (appHost && appHost !== origin) {
+    const forward = new URL("/api/spotify/callback", appHost);
+    if (code) forward.searchParams.set("code", code);
+    if (stateParam) forward.searchParams.set("state", stateParam);
+    if (oauthError) forward.searchParams.set("error", oauthError);
+    return NextResponse.redirect(forward);
+  }
+
+  // A partir de aquí estamos en el host de la app (donde están la sesión y el
+  // nonce del OAuth).
   const nextPath = sanitizeNext(decoded?.p);
   const storedNonce = req.cookies.get("spotify_oauth_state")?.value || null;
   const secure = origin.startsWith("https://");
@@ -36,7 +59,6 @@ export async function GET(req) {
     const dest = new URL(nextPath, origin);
     dest.searchParams.set("spotify", status);
     const res = NextResponse.redirect(dest);
-    // Limpia cookies temporales del flujo.
     const clear = { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 };
     res.cookies.set("spotify_oauth_state", "", clear);
     res.cookies.set("spotify_oauth_redirect_uri", "", clear);
@@ -46,9 +68,9 @@ export async function GET(req) {
   if (oauthError || !code) return back("error");
   if (decoded?.n && storedNonce && decoded.n !== storedNonce) return back("error");
 
-  const redirectUri =
-    req.cookies.get("spotify_oauth_redirect_uri")?.value ||
-    resolveSpotifyRedirectUri(origin);
+  // redirect_uri del intercambio = el MISMO enviado a /authorize (el registrado,
+  // p. ej. 127.0.0.1). resolveSpotifyRedirectUri devuelve SPOTIFY_REDIRECT_URI.
+  const redirectUri = resolveSpotifyRedirectUri(origin);
 
   try {
     const tokens = await exchangeSpotifyCode({ code, redirectUri });

@@ -3,6 +3,7 @@ import {
   getSpotifyClientCreds,
   resolveSpotifyRedirectUri,
   buildSpotifyAuthorizeUrl,
+  getRequestOrigin,
 } from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
@@ -22,14 +23,18 @@ export async function GET(req) {
     );
   }
 
-  const origin = req.nextUrl?.origin || new URL(req.url).origin;
+  const origin = getRequestOrigin(req);
+  // redirect_uri = el registrado en Spotify (p. ej. 127.0.0.1). Guardamos en el
+  // state el host real de la app (donde está tu sesión) para que el callback,
+  // que Spotify entrega en 127.0.0.1, reenvíe a tu host y deje ahí las cookies.
   const redirectUri = resolveSpotifyRedirectUri(origin);
   const nextPath = sanitizeNext(req.nextUrl?.searchParams?.get("next"));
 
   const nonce = crypto.randomUUID();
-  const state = Buffer.from(JSON.stringify({ n: nonce, p: nextPath }), "utf8").toString(
-    "base64url",
-  );
+  const state = Buffer.from(
+    JSON.stringify({ n: nonce, p: nextPath, h: origin }),
+    "utf8",
+  ).toString("base64url");
 
   const authorizeUrl = buildSpotifyAuthorizeUrl({
     clientId: creds.id,
