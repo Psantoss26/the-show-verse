@@ -29,6 +29,7 @@ import {
   getPlexConnection,
   clearPlexConnectionCache,
   connectPlexInteractive,
+  syncPlexHistory,
 } from "@/lib/plex/client";
 
 const GLASS_SURFACE =
@@ -544,6 +545,26 @@ function ProfileSettingsClient() {
       setPlexConnecting(false);
     }
   }, [fetchPlexStatus]);
+
+  const [plexSync, setPlexSync] = useState({ running: false, result: null });
+
+  const handleSyncPlex = useCallback(async () => {
+    setPlexSync({ running: true, result: null });
+    try {
+      const result = await syncPlexHistory();
+      if (!result?.ok) {
+        setPlexSync({ running: false, result: { error: true, message: "No se pudo leer el historial de Plex desde tu navegador. Asegúrate de estar en la misma red que el servidor." } });
+        return;
+      }
+      const { added = 0, duplicates = 0, skipped = 0, empty } = result;
+      const message = empty
+        ? "No se encontró historial reciente en tu servidor de Plex."
+        : `Sincronizado: ${added} nuevo${added === 1 ? "" : "s"}, ${duplicates} ya estaba${duplicates === 1 ? "" : "n"}${skipped ? `, ${skipped} sin coincidencia` : ""}.`;
+      setPlexSync({ running: false, result: { error: false, message } });
+    } catch {
+      setPlexSync({ running: false, result: { error: true, message: "Error al sincronizar el historial de Plex." } });
+    }
+  }, []);
 
   const handleDisconnectPlex = useCallback(async () => {
     if (!confirm("¿Seguro que deseas desconectar tu servidor de Plex?")) return;
@@ -1243,19 +1264,41 @@ function ProfileSettingsClient() {
                             )}
                           </p>
                         )}
+                        {plexSync.result && (
+                          <p className={`mt-2 text-xs sm:text-sm leading-relaxed ${plexSync.result.error ? "text-red-400" : "text-emerald-400"}`}>
+                            {plexSync.result.message}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {plex.connected ? (
-                      <button
-                        type="button"
-                        onClick={handleDisconnectPlex}
-                        aria-label="Desconectar"
-                        title="Desconectar"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
-                      >
-                        <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                        <span className="hidden sm:inline">Desconectar</span>
-                      </button>
+                      <div className="flex flex-col gap-2 self-start sm:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleSyncPlex}
+                          disabled={plexSync.running}
+                          aria-label="Sincronizar historial"
+                          title="Sincronizar historial de Plex"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {plexSync.running ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                          )}
+                          <span className="hidden sm:inline">{plexSync.running ? "Sincronizando…" : "Sincronizar"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDisconnectPlex}
+                          aria-label="Desconectar"
+                          title="Desconectar"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center"
+                        >
+                          <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                          <span className="hidden sm:inline">Desconectar</span>
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"

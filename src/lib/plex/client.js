@@ -270,6 +270,65 @@ export async function connectPlexInteractive() {
   }
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Sincronización de historial DESDE EL NAVEGADOR.
+// El servidor local no es accesible desde Vercel, pero el navegador (misma red)
+// sí puede leer el historial real de Plex, que incluye temporada/episodio exactos
+// — algo que el scraping del reproductor no consigue de forma fiable.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lee el historial de reproducción del servidor del usuario y lo normaliza.
+ * @returns {Promise<Array<{type,title,show,season,episode,year,viewedAt}>>}
+ */
+export async function fetchPlexHistory({ size = 200 } = {}) {
+  // X-Plex-Container-* como query params para no provocar preflight CORS.
+  const path =
+    `/status/sessions/history/all?sort=viewedAt:desc` +
+    `&X-Plex-Container-Start=0&X-Plex-Container-Size=${encodeURIComponent(size)}`;
+  const data = await plexFetch(path, { timeoutMs: 12000 });
+  const items = data?.MediaContainer?.Metadata;
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map((m) => {
+      const type = m.type === "episode" ? "episode" : m.type === "movie" ? "movie" : null;
+      if (!type) return null;
+      const season = Number.isFinite(Number(m.parentIndex)) ? Number(m.parentIndex) : null;
+      const episode = Number.isFinite(Number(m.index)) ? Number(m.index) : null;
+      const year = Number.isFinite(Number(m.year)) ? Number(m.year) : null;
+      const viewedAt = Number.isFinite(Number(m.viewedAt)) ? Number(m.viewedAt) : null;
+      return {
+        type,
+        title: m.title || "",
+        show: m.grandparentTitle || "",
+        season: type === "episode" ? season : null,
+        episode: type === "episode" ? episode : null,
+        year,
+        viewedAt,
+      };
+    })
+    .filter((x) => x && (x.title || x.show));
+}
+
+/**
+ * Lee el historial de Plex y lo envía al backend para añadirlo al historial de
+ * la app. Devuelve el resumen { processed, added, duplicates, skipped, failed }.
+ */
+export async function syncPlexHistory({ size = 200 } = {}) {
+  const items = await fetchPlexHistory({ size });
+  if (!items.length) return { ok: true, processed: 0, added: 0, duplicates: 0, skipped: 0, failed: 0, empty: true };
+
+  const res = await fetch("/api/plex/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.success) return { ok: false, error: json?.error || `HTTP ${res.status}` };
+  return { ok: true, ...json };
+}
+
 /**
  * Busca un título en el servidor del usuario (para "disponible en tu Plex").
  */
