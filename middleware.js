@@ -5,7 +5,15 @@ const BOT_UA =
     /WhatsApp|facebookexternalhit|Facebot|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|Pinterest|Googlebot|bingbot/i
 const ACCESS_COOKIE = 'showverse_device_access'
 const ACCESS_ROUTE = '/api/private-access'
-const PUBLIC_API_ROUTES = new Set(['/api/health'])
+// Rutas de la extensión: van autenticadas por su propio token (Bearer syncToken),
+// no por la cookie del dispositivo. La extensión las llama sin cookies
+// (credentials: "omit"), así que deben quedar exentas del gate de acceso privado;
+// de lo contrario el middleware devuelve 404 antes de llegar a la ruta.
+const PUBLIC_API_ROUTES = new Set([
+    '/api/health',
+    '/api/netflix/extension-sync',
+    '/api/netflix/extension-import',
+])
 const PUBLIC_FILE_RE = /\.(?:avif|gif|ico|jpg|jpeg|js|json|map|png|svg|txt|webmanifest|webp|woff|woff2)$/i
 
 async function sha256(value) {

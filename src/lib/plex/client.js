@@ -153,6 +153,123 @@ export async function plexFetch(path, { timeoutMs = 8000 } = {}) {
   }
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Conexión interactiva (flujo PIN DESDE EL NAVEGADOR).
+// Hacer el PIN desde el navegador hace que plex.tv vea la IP/ubicación REAL del
+// usuario (no la del servidor de Vercel), evitando la alerta con IP de EE. UU.
+// ───────────────────────────────────────────────────────────────────────────
+const PLEX_AUTH_APP = "https://app.plex.tv/auth";
+
+async function plexTvFetch(url, init) {
+  return fetch(url, { ...init, headers: { Accept: "application/json", ...(init?.headers || {}) }, cache: "no-store" });
+}
+
+async function fetchPlexConfig() {
+  const res = await fetch("/api/plex/auth/config", { cache: "no-store" });
+  const json = await res.json().catch(() => null);
+  return json?.clientIdentifier ? json : null;
+}
+
+async function createPin(clientId, product) {
+  // X-Plex-* como query params para evitar preflight CORS (Accept está safelisted).
+  const url =
+    `https://plex.tv/api/v2/pins?strong=true` +
+    `&X-Plex-Product=${encodeURIComponent(product)}` +
+    `&X-Plex-Client-Identifier=${encodeURIComponent(clientId)}`;
+  const res = await plexTvFetch(url, { method: "POST" });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.id || !json?.code) throw new Error("No se pudo crear el PIN de Plex");
+  return { id: json.id, code: json.code };
+}
+
+async function pollPin(id, code, clientId) {
+  const url =
+    `https://plex.tv/api/v2/pins/${encodeURIComponent(id)}` +
+    `?code=${encodeURIComponent(code)}` +
+    `&X-Plex-Client-Identifier=${encodeURIComponent(clientId)}`;
+  const res = await plexTvFetch(url);
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => null);
+  return json?.authToken || null;
+}
+
+function buildAuthUrl(clientId, product, code, forwardUrl) {
+  const params = new URLSearchParams({
+    clientID: clientId,
+    code,
+    forwardUrl,
+    "context[device][product]": product,
+    "context[device][platform]": "Web",
+    "context[device][device]": "The Show Verse",
+  });
+  return `${PLEX_AUTH_APP}#?${params.toString()}`;
+}
+
+/**
+ * Conecta Plex con el flujo PIN ejecutado en el navegador (popup).
+ * Devuelve { ok, error?, account? }.
+ */
+export async function connectPlexInteractive() {
+  if (typeof window === "undefined") return { ok: false, error: "no_window" };
+
+  // Abrir el popup YA (dentro del gesto de click) para evitar bloqueadores.
+  const popup = window.open("about:blank", "plex-auth", "width=620,height=780,noopener=no");
+  if (!popup) {
+    // Popup bloqueado → respaldo: flujo por servidor (redirección completa).
+    window.location.href = "/api/plex/auth/start?next=/profile/settings";
+    return { ok: false, error: "popup_blocked" };
+  }
+
+  try {
+    const config = await fetchPlexConfig();
+    if (!config) {
+      popup.close();
+      return { ok: false, error: "config" };
+    }
+
+    const { id, code } = await createPin(config.clientIdentifier, config.product);
+    const forwardUrl = `${window.location.origin}/api/plex/auth/close`;
+    const authUrl = buildAuthUrl(config.clientIdentifier, config.product, code, forwardUrl);
+    popup.location.href = authUrl;
+
+    // Sondear el PIN hasta ~3 min (o hasta obtener token).
+    const deadline = Date.now() + 3 * 60 * 1000;
+    let token = null;
+    let closedTicks = 0;
+    while (Date.now() < deadline && !token) {
+      await new Promise((r) => setTimeout(r, 2000));
+      token = await pollPin(id, code, config.clientIdentifier).catch(() => null);
+      if (!token && popup.closed) {
+        // El usuario cerró el popup: damos un margen corto por si autorizó justo antes.
+        closedTicks += 1;
+        if (closedTicks >= 2) break;
+      }
+    }
+
+    if (!token) {
+      try { popup.close(); } catch { /* ignore */ }
+      return { ok: false, error: popup.closed ? "cancelled" : "timeout" };
+    }
+
+    // Guardar el token en cookie httpOnly vía el servidor (lo valida contra plex.tv).
+    const res = await fetch("/api/plex/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    try { popup.close(); } catch { /* ignore */ }
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: json?.error || "session" };
+
+    clearPlexConnectionCache();
+    return { ok: true, account: json?.account || null };
+  } catch (e) {
+    try { popup.close(); } catch { /* ignore */ }
+    return { ok: false, error: e?.message || "error" };
+  }
+}
+
 /**
  * Busca un título en el servidor del usuario (para "disponible en tu Plex").
  */
