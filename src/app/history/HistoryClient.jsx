@@ -1088,7 +1088,7 @@ function CalendarWithPosters({
                   return (
                     <Link
                       key={`item-${getHistoryId(entry) || idx}`}
-                      href={href || "#"}
+                      href={href || "#"} prefetch
                       className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
                     >
                       <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
@@ -1195,7 +1195,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                 return (
                   <Link
                     key={`sub-${getHistoryId(sub) || subIdx}`}
-                    href={subHref || "#"}
+                    href={subHref || "#"} prefetch
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
                     <div className="w-[44px] h-[66px] shrink-0 rounded-md overflow-hidden bg-zinc-900 border border-white/10 shadow-sm">
@@ -1739,6 +1739,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     >
       <Link
         href={href}
+        prefetch
         className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
@@ -1941,7 +1942,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       }}
       layout
     >
-      <Link href={href} className="block">
+      <Link href={href} prefetch className="block">
         {CardInner}
       </Link>
     </motion.div>
@@ -2192,7 +2193,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
-      <Link href={href} className="block">
+      <Link href={href} prefetch className="block">
         {CardInner}
       </Link>
     </motion.div>
@@ -2224,7 +2225,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
   return (
     <div className="relative group/subitem rounded-xl overflow-hidden transition-all hover:bg-white/5 border border-transparent hover:border-white/10">
       <Link
-        href={href || "#"}
+        href={href || "#"} prefetch
         className={`flex items-center gap-3 p-2.5 sm:p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
         <div className="relative w-24 sm:w-28 aspect-video rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
@@ -2338,7 +2339,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
             </div>
             <div className="min-w-0">
               <Link
-                href={href || "#"}
+                href={href || "#"} prefetch
                 className="text-base sm:text-lg font-bold text-white hover:text-emerald-300 transition-colors line-clamp-1 drop-shadow-sm"
               >
                 {title}

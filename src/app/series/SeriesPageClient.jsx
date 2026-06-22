@@ -595,7 +595,7 @@ function Top10MobileBackdropCardTV({
   const src = backdropPath ? buildImg(backdropPath, "w1280") : null;
 
   return (
-    <Link href={href} className="block w-full h-full">
+    <Link href={href} prefetch className="block w-full h-full">
       <div
         className={`relative w-full overflow-hidden bg-neutral-900 ${frameClassName}`}
       >
@@ -1447,6 +1447,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                       ) : (
                         <Link
                           href={`/details/tv/${s.id}`}
+                          prefetch
                           className="block w-full h-full"
                         >
                           <PosterImage show={s} cache={posterCacheRef} />
