@@ -644,7 +644,7 @@ function ProfileCardScroller({ children }) {
         overflowY: "visible",
       }}
     >
-      <div className="relative z-0 px-3 hover:z-[200] sm:px-0">
+      <div className="group/row relative z-0 px-3 hover:z-[200] sm:px-0">
         <div
           className="relative z-0"
           style={{
@@ -692,47 +692,37 @@ function ProfileCardScroller({ children }) {
           </Swiper>
         </div>
 
-        <AnimatePresence>
-          {showPrev && !isMobile && (
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              type="button"
-              onClick={handlePrevClick}
-              className="absolute inset-y-0 -left-8 z-[500] hidden w-7 items-center justify-center text-white/80 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
-              aria-label="Anterior"
+        {showPrev && !isMobile && (
+          <button
+            type="button"
+            onClick={handlePrevClick}
+            className="absolute inset-y-0 -left-8 z-[500] hidden w-7 items-center justify-center text-white/80 opacity-0 transition-[color,opacity] duration-200 hover:text-white focus-visible:opacity-100 group-hover/row:opacity-100 pointer-events-auto sm:flex xl:-left-10"
+            aria-label="Anterior"
+          >
+            <motion.span
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: -4 }}
             >
-              <motion.span
-                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
-                whileHover={{ x: -4 }}
-              >
-                ‹
-              </motion.span>
-            </motion.button>
-          )}
-        </AnimatePresence>
+              ‹
+            </motion.span>
+          </button>
+        )}
 
-        <AnimatePresence>
-          {showNext && !isMobile && (
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              type="button"
-              onClick={handleNextClick}
-              className="absolute inset-y-0 -right-8 z-[500] hidden w-7 items-center justify-center text-white/80 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
-              aria-label="Siguiente"
+        {showNext && !isMobile && (
+          <button
+            type="button"
+            onClick={handleNextClick}
+            className="absolute inset-y-0 -right-8 z-[500] hidden w-7 items-center justify-center text-white/80 opacity-0 transition-[color,opacity] duration-200 hover:text-white focus-visible:opacity-100 group-hover/row:opacity-100 pointer-events-auto sm:flex xl:-right-10"
+            aria-label="Siguiente"
+          >
+            <motion.span
+              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+              whileHover={{ x: 4 }}
             >
-              <motion.span
-                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
-                whileHover={{ x: 4 }}
-              >
-                ›
-              </motion.span>
-            </motion.button>
-          )}
-        </AnimatePresence>
+              ›
+            </motion.span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -985,7 +975,7 @@ function ProfileUnifiedCard({
       onDragStart={(e) => e.preventDefault()}
     >
       <motion.div
-        className={`${PROFILE_GLASS_PANEL} group z-0 aspect-[2/3] w-full rounded-2xl shadow-lg transform-gpu will-change-transform`}
+        className={`${PROFILE_GLASS_PANEL} group z-0 aspect-[2/3] w-full rounded-lg shadow-lg transform-gpu will-change-transform`}
         whileHover={{
           y: -6,
           zIndex: 300,
