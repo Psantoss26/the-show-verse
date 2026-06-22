@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "The Show Verse - Streaming Sync",
-  "version": "1.4",
+  "version": "1.5",
   "description": "Sincroniza automáticamente lo que ves en Netflix, Prime Video, Max, Disney+ y Plex con tu cuenta de The Show Verse en tiempo real.",
   "permissions": [
     "cookies",

@@ -119,7 +119,6 @@
   function resolveTitle({ titleSel = [], subSel = [], tabSuffixes = [] }) {
     let mainTitle = firstText(titleSel);
     let subTitle = firstText(subSel);
-    if (!subTitle) subTitle = findSeasonEpisodeBadge();
     if (!mainTitle) {
       const ms = mediaSessionMeta();
       if (ms) {
@@ -128,6 +127,16 @@
         mainTitle = ms.artist || ms.album || ms.title;
         if ((ms.artist || ms.album) && !subTitle) subTitle = ms.title;
       }
+    }
+    // Si el subtítulo todavía no contiene temporada + episodio, buscamos un
+    // distintivo ("T1 E2", "S1 · E2") en el DOM. En reproductores como Plex el
+    // subtítulo trae solo el nombre del episodio (vía Media Session) y los
+    // números aparecen aparte cuando los controles están visibles; al fusionarlo
+    // conseguimos fijar el episodio en lugar de quedarnos solo con la serie.
+    const subHasSE = subTitle && SE_SEASON_RE.test(subTitle) && SE_EPISODE_RE.test(subTitle);
+    if (!subHasSE) {
+      const badge = findSeasonEpisodeBadge();
+      if (badge) subTitle = subTitle ? `${subTitle} · ${badge}` : badge;
     }
     if (!mainTitle) mainTitle = titleFromTab(tabSuffixes);
     return { mainTitle, subTitle };
