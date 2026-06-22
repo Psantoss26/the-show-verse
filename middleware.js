@@ -68,7 +68,7 @@ function isPrivateAccessEnabled(req) {
 
 function isPublicAsset(pathname) {
     return (
-        pathname.startsWith('/_next/') ||
+        pathname.startsWith('/_next/static/') ||
         pathname.startsWith('/images/') ||
         pathname.startsWith('/assets/') ||
         PUBLIC_API_ROUTES.has(pathname) ||
@@ -131,5 +131,5 @@ export async function middleware(req) {
 }
 
 export const config = {
-    matcher: ['/((?!_next/static|_next/image).*)']
+    matcher: ['/((?!_next/static).*)']
 }

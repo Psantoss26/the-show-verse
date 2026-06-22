@@ -1,52 +1,54 @@
 import { NextResponse } from "next/server";
+import {
+  getSpotifyClientCreds,
+  resolveSpotifyRedirectUri,
+  buildSpotifyAuthorizeUrl,
+} from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getBaseUrl(req) {
-  const configured = process.env.SPOTIFY_REDIRECT_URI;
-  if (configured) {
-    try {
-      const url = new URL(configured);
-      return `${url.protocol}//${url.host}`;
-    } catch {
-      // Fall through to request origin.
-    }
-  }
-  return new URL(req.url).origin;
+function sanitizeNext(p) {
+  if (!p || typeof p !== "string" || !p.startsWith("/")) return "/profile/settings";
+  return p;
 }
 
 export async function GET(req) {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const redirectUri =
-    process.env.SPOTIFY_REDIRECT_URI ||
-    `${getBaseUrl(req)}/api/spotify/callback`;
-
-  if (!clientId) {
+  const creds = getSpotifyClientCreds();
+  if (!creds) {
     return NextResponse.json(
-      { error: "Missing SPOTIFY_CLIENT_ID" },
+      { error: "Missing SPOTIFY_CLIENT_ID/SPOTIFY_CLIENT_SECRET" },
       { status: 500 },
     );
   }
 
-  const state = crypto.randomUUID();
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: clientId,
-    redirect_uri: redirectUri,
+  const origin = req.nextUrl?.origin || new URL(req.url).origin;
+  const redirectUri = resolveSpotifyRedirectUri(origin);
+  const nextPath = sanitizeNext(req.nextUrl?.searchParams?.get("next"));
+
+  const nonce = crypto.randomUUID();
+  const state = Buffer.from(JSON.stringify({ n: nonce, p: nextPath }), "utf8").toString(
+    "base64url",
+  );
+
+  const authorizeUrl = buildSpotifyAuthorizeUrl({
+    clientId: creds.id,
+    redirectUri,
     state,
-    scope: "playlist-read-private playlist-read-collaborative",
   });
 
-  const response = NextResponse.redirect(
-    `https://accounts.spotify.com/authorize?${params.toString()}`,
-  );
-  response.cookies.set("spotify_oauth_state", state, {
+  const secure = redirectUri.startsWith("https://") || origin.startsWith("https://");
+  const cookieOptions = {
     httpOnly: true,
     sameSite: "lax",
-    secure: redirectUri.startsWith("https://"),
-    maxAge: 60 * 10,
+    secure,
     path: "/",
-  });
-  return response;
+    maxAge: 60 * 10,
+  };
+
+  const res = NextResponse.redirect(authorizeUrl);
+  res.cookies.set("spotify_oauth_state", nonce, cookieOptions);
+  // Guardamos el redirect_uri exacto usado para reutilizarlo en el callback.
+  res.cookies.set("spotify_oauth_redirect_uri", redirectUri, cookieOptions);
+  return res;
 }

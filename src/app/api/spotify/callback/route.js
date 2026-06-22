@@ -1,75 +1,62 @@
 import { NextResponse } from "next/server";
+import {
+  exchangeSpotifyCode,
+  resolveSpotifyRedirectUri,
+  setSpotifyCookies,
+} from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
+function decodeState(s) {
+  try {
+    const o = JSON.parse(Buffer.from(String(s), "base64url").toString("utf8"));
+    return o && typeof o === "object" ? o : null;
+  } catch {
+    return null;
+  }
+}
 
-function html(body) {
-  return new NextResponse(
-    `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Spotify conectado</title><style>body{font-family:system-ui,sans-serif;max-width:760px;margin:48px auto;padding:0 20px;line-height:1.5;background:#111;color:#f5f5f5}code,textarea{font-family:ui-monospace,monospace}textarea{width:100%;min-height:120px;background:#050505;color:#dcfce7;border:1px solid #333;border-radius:8px;padding:12px}a{color:#86efac}</style></head><body>${body}</body></html>`,
-    { headers: { "content-type": "text/html; charset=utf-8" } },
-  );
+function sanitizeNext(p) {
+  if (!p || typeof p !== "string" || !p.startsWith("/")) return "/profile/settings";
+  return p;
 }
 
 export async function GET(req) {
   const url = new URL(req.url);
+  const origin = req.nextUrl?.origin || url.origin;
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
-  const error = url.searchParams.get("error");
-  const storedState = req.cookies.get("spotify_oauth_state")?.value;
+  const oauthError = url.searchParams.get("error");
+  const decoded = decodeState(url.searchParams.get("state"));
+  const nextPath = sanitizeNext(decoded?.p);
+  const storedNonce = req.cookies.get("spotify_oauth_state")?.value || null;
+  const secure = origin.startsWith("https://");
 
-  if (error) {
-    return html(`<h1>Spotify no autorizó la conexión</h1><p>${error}</p>`);
-  }
+  const back = (status) => {
+    const dest = new URL(nextPath, origin);
+    dest.searchParams.set("spotify", status);
+    const res = NextResponse.redirect(dest);
+    // Limpia cookies temporales del flujo.
+    const clear = { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 0 };
+    res.cookies.set("spotify_oauth_state", "", clear);
+    res.cookies.set("spotify_oauth_redirect_uri", "", clear);
+    return res;
+  };
 
-  if (!code) {
-    return html(
-      "<h1>Callback de Spotify disponible</h1><p>Abre <a href=\"/api/spotify/login\">/api/spotify/login</a> para generar el refresh token.</p>",
-    );
-  }
+  if (oauthError || !code) return back("error");
+  if (decoded?.n && storedNonce && decoded.n !== storedNonce) return back("error");
 
-  if (storedState && state !== storedState) {
-    return html("<h1>Estado OAuth inválido</h1><p>Vuelve a iniciar la conexión.</p>");
-  }
-
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   const redirectUri =
-    process.env.SPOTIFY_REDIRECT_URI ||
-    `${url.protocol}//${url.host}/api/spotify/callback`;
+    req.cookies.get("spotify_oauth_redirect_uri")?.value ||
+    resolveSpotifyRedirectUri(origin);
 
-  if (!clientId || !clientSecret) {
-    return html("<h1>Faltan credenciales</h1><p>Configura SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET.</p>");
+  try {
+    const tokens = await exchangeSpotifyCode({ code, redirectUri });
+    const res = back("connected");
+    setSpotifyCookies(res, tokens, { secure });
+    return res;
+  } catch (e) {
+    console.error("[Spotify] token exchange failed:", e?.message);
+    return back("error");
   }
-
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-  });
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-
-  const tokenResponse = await fetch(SPOTIFY_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Basic ${basic}`,
-      "content-type": "application/x-www-form-urlencoded",
-    },
-    body,
-    cache: "no-store",
-  });
-
-  const payload = await tokenResponse.json().catch(() => null);
-  if (!tokenResponse.ok || !payload?.refresh_token) {
-    return html(
-      `<h1>No se pudo obtener refresh token</h1><pre>${JSON.stringify(payload, null, 2)}</pre>`,
-    );
-  }
-
-  const response = html(
-    `<h1>Spotify conectado</h1><p>Añade esta variable a tu <code>.env</code> local y reinicia Next:</p><textarea readonly>SPOTIFY_REFRESH_TOKEN=${payload.refresh_token}</textarea><p>Despues prueba <code>/api/soundtrack?title=The%20Bear&type=tv&year=2022&country=ES</code>.</p>`,
-  );
-  response.cookies.delete("spotify_oauth_state");
-  return response;
 }
