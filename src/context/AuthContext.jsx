@@ -50,6 +50,45 @@ function cleanLegacyStorage() {
   }
 }
 
+// Caché del usuario (stale-while-revalidate), igual que las páginas de usuario
+// (History/Stats): permite pintar el icono de perfil del navbar al instante sin
+// esperar a /api/auth/me, y revalidar en segundo plano.
+const AUTH_USER_CACHE_KEY = "showverse:auth:user:v1";
+const AUTH_USER_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+
+function readAuthUserCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_USER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !parsed.user) return null;
+    if (Date.now() - Number(parsed.t || 0) > AUTH_USER_CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      return null;
+    }
+    return parsed.user;
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthUserCache(user) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!user) {
+      window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      return;
+    }
+    window.localStorage.setItem(
+      AUTH_USER_CACHE_KEY,
+      JSON.stringify({ t: Date.now(), user }),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 function toCompatAccount(user) {
   if (!user) return null;
   return {
@@ -84,6 +123,7 @@ export const AuthProvider = ({ children }) => {
   const applyUser = useCallback((nextUser) => {
     const normalized = nextUser || null;
     setUser(normalized);
+    writeAuthUserCache(normalized);
     return normalized;
   }, []);
 
@@ -169,6 +209,15 @@ export const AuthProvider = ({ children }) => {
 
     async function hydrateAuth() {
       cleanLegacyStorage();
+
+      // 1) Pintado optimista desde caché: el navbar muestra el perfil al instante
+      // sin esperar a la red (igual que History/Stats). Se revalida abajo.
+      const cachedUser = readAuthUserCache();
+      if (cachedUser) {
+        setUser(cachedUser);
+        setHydrated(true);
+      }
+
       try {
         const res = await fetch("/api/auth/me", {
           method: "GET",
@@ -178,27 +227,15 @@ export const AuthProvider = ({ children }) => {
         const json = await res.json().catch(() => ({}));
         if (cancelled) return;
         const loggedUser = applyUser(json?.authenticated ? json.user || null : null);
+        // 2) Desbloqueamos el navbar/Profile tras UNA sola llamada; las
+        // preferencias se cargan en segundo plano (no en la ruta crítica).
+        setHydrated(true);
         if (loggedUser) {
-          setLoadingPreferences(true);
-          try {
-            const prefRes = await fetch("/api/user/preferences", { cache: "no-store" });
-            const prefJson = await prefRes.json().catch(() => ({}));
-            if (cancelled) return;
-            if (prefJson?.preferences) {
-              const merged = mergePreferences(prefJson.preferences);
-              setPreferences(merged);
-              syncPreferenceCookies(merged);
-            }
-          } catch (err) {
-            console.warn("No se pudieron cargar las preferencias", err);
-          } finally {
-            if (!cancelled) setLoadingPreferences(false);
-          }
+          loadPreferences();
         }
       } catch (e) {
         console.warn("No se pudo hidratar la sesión propia", e);
-        if (!cancelled) applyUser(null);
-      } finally {
+        if (!cancelled && !cachedUser) applyUser(null);
         if (!cancelled) setHydrated(true);
       }
     }
@@ -207,7 +244,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [applyUser, syncPreferenceCookies]);
+  }, [applyUser, loadPreferences]);
 
   const login = useCallback(
     async (credentials) => {
