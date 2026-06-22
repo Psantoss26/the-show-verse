@@ -12,7 +12,7 @@ import {
   useCallback,
   startTransition,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   BarChart3,
   Calendar as CalendarIcon,
@@ -257,13 +257,39 @@ const fmtDate = (iso) => {
   });
 };
 
-const fmtDateShort = (iso) => {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-  });
-};
+function formatProfileBadgeDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = new Intl.DateTimeFormat("es-ES", { month: "short" })
+    .format(d)
+    .replace(".", "")
+    .slice(0, 3)
+    .toUpperCase();
+  const day = new Intl.DateTimeFormat("es-ES", { day: "numeric" }).format(d);
+
+  return {
+    month,
+    day,
+    label: `${day} ${month.toLowerCase()}`,
+  };
+}
+
+function ProfileDateIndicator({ dateParts }) {
+  if (!dateParts) return null;
+
+  return (
+    <div
+      className="absolute top-0 right-0 z-20 flex flex-col items-center justify-center gap-0 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b border-white/25 bg-zinc-100/15 text-zinc-100 backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 pointer-events-none"
+    >
+      <span className="text-[8px] sm:text-[9px] font-black uppercase leading-none tracking-[0.08em] [text-box:trim-both_cap_alphabetic]">
+        {dateParts.month}
+      </span>
+      <span className="mt-0.5 text-sm sm:text-base font-black leading-none tracking-tight [text-box:trim-both_cap_alphabetic]">
+        {dateParts.day}
+      </span>
+    </div>
+  );
+}
 
 const COLOR_STYLES = {
   emerald: {
@@ -743,8 +769,8 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
   const actionButtons = (className = "") => (
     <div className={`flex items-center gap-2 ${className}`}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.25 }}
       >
         <LiquidButton
@@ -760,8 +786,8 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.3 }}
       >
         <LiquidButton
@@ -778,8 +804,8 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.4 }}
       >
         <LiquidButton
@@ -936,6 +962,10 @@ function ProfileUnifiedCard({
   const itemType = type || item.type;
   const isMedia =
     itemType === "movie" || itemType === "show" || itemType === "tv";
+  const dateParts =
+    dateField && item?.[dateField]
+      ? formatProfileBadgeDate(item[dateField])
+      : null;
 
   const shadowColorStyles = {
     emerald: "16, 185, 129",
@@ -1028,6 +1058,8 @@ function ProfileUnifiedCard({
           </div>
         )}
 
+        <ProfileDateIndicator dateParts={dateParts} />
+
         {/* Bottom gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -1054,11 +1086,6 @@ function ProfileUnifiedCard({
                 )
               )}
 
-              {dateField && item[dateField] && (
-                <p className="mt-0.5 text-[10px] leading-tight text-zinc-400 font-medium">
-                  {fmtDateShort(item[dateField])}
-                </p>
-              )}
             </div>
 
             {/* Play Count (vistas) for ranked top movie/shows */}
@@ -1502,6 +1529,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
@@ -1662,8 +1690,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {deferredOverviewReady && profileRowsReady && recentHistory.length > 0 && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.18 }}
                     className="relative order-2"
                   >
@@ -1693,8 +1721,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {deferredOverviewReady && profileRowsReady && recentRatings.length > 0 && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.22 }}
                     className="relative order-2"
                   >
@@ -1724,8 +1752,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                 {deferredOverviewReady && profileRowsReady && watchlist.length > 0 && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.26 }}
                     className="relative order-2"
                   >
@@ -1758,8 +1786,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
                   <div className="order-1 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Activity Chart - Spans 2 cols */}
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                       className={`${PROFILE_GLASS_PANEL} min-w-0 lg:col-span-2 rounded-3xl p-4 sm:p-6`}
                     >
@@ -1776,8 +1804,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                     {/* Time Distribution */}
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
                       className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6 flex flex-col items-center justify-center`}
                     >
@@ -1997,9 +2025,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
             {stats && viewMode === "yearly" && (
               <motion.div
                 key="yearly"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.05 }}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
                 transition={{ duration: 0.4 }}
                 className="flex flex-col items-center justify-center py-20 text-center"
               >
@@ -2080,5 +2108,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

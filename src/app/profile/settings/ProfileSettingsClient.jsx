@@ -488,6 +488,35 @@ function ProfileSettingsClient() {
     }
   }, []);
 
+  // Estado de la conexión de Plex (token por usuario en cookie, flujo PIN).
+  const [plex, setPlex] = useState({ loading: true, connected: false, account: null, server: null });
+
+  const fetchPlexStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/plex/auth/status", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      setPlex({
+        loading: false,
+        connected: Boolean(json?.connected),
+        account: json?.account || null,
+        server: json?.server || null,
+      });
+    } catch {
+      setPlex({ loading: false, connected: false, account: null, server: null });
+    }
+  }, []);
+
+  const handleDisconnectPlex = useCallback(async () => {
+    if (!confirm("¿Seguro que deseas desconectar tu servidor de Plex?")) return;
+    try {
+      await fetch("/api/plex/auth/disconnect", { method: "POST" });
+    } catch {
+      // noop
+    } finally {
+      setPlex({ loading: false, connected: false, account: null, server: null });
+    }
+  }, []);
+
   // Netflix connection modal states
   const [showNetflixModal, setShowNetflixModal] = useState(false);
   const [connectStep, setConnectStep] = useState(0);
@@ -520,21 +549,26 @@ function ProfileSettingsClient() {
   }, [hydrated, authenticated, fetchConnections]);
 
   useEffect(() => {
-    const onFocus = () => fetchSpotifyStatus();
+    const onFocus = () => {
+      fetchSpotifyStatus();
+      fetchPlexStatus();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [fetchSpotifyStatus]);
+  }, [fetchSpotifyStatus, fetchPlexStatus]);
 
   useEffect(() => {
     if (!hydrated) return;
     fetchSpotifyStatus();
-    // Tras volver del OAuth de Spotify: abre la pestaña Conexiones para que se
-    // vea el estado actualizado y limpia el parámetro de la URL.
+    fetchPlexStatus();
+    // Tras volver del OAuth de Spotify/Plex: abre la pestaña Conexiones para que
+    // se vea el estado actualizado y limpia el parámetro de la URL.
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.has("spotify")) {
+      if (params.has("spotify") || params.has("plex")) {
         setActiveTab("connections");
         params.delete("spotify");
+        params.delete("plex");
         const qs = params.toString();
         window.history.replaceState(
           {},
@@ -543,7 +577,7 @@ function ProfileSettingsClient() {
         );
       }
     }
-  }, [hydrated, fetchSpotifyStatus]);
+  }, [hydrated, fetchSpotifyStatus, fetchPlexStatus]);
 
   const requestNetflixExtensionDetails = useCallback(() => {
     return new Promise((resolve) => {
@@ -1140,25 +1174,42 @@ function ProfileSettingsClient() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Plex</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                            Próximamente
-                          </span>
+                          {plex.connected && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Conectado
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Conecta tu servidor Plex local o remoto para indexar tu biblioteca y reproducir contenidos directamente en la aplicación.
+                          {plex.connected
+                            ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? ` · Servidor: ${plex.server.name}` : " · No se detectó ningún servidor"}.`
+                            : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled
-                      aria-label="Conectar"
-                      title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
-                    >
-                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                      <span className="hidden sm:inline">Conectar</span>
-                    </button>
+                    {plex.connected ? (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectPlex}
+                        aria-label="Desconectar"
+                        title="Desconectar"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                        <span className="hidden sm:inline">Desconectar</span>
+                      </button>
+                    ) : (
+                      <a
+                        href="/api/plex/auth/start?next=/profile/settings"
+                        aria-label="Conectar"
+                        title="Conectar"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      >
+                        <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                        <span className="hidden sm:inline">Conectar</span>
+                      </a>
+                    )}
                   </div>
 
                   {/* Spotify Connection */}
