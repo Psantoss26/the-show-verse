@@ -1,8 +1,33 @@
+import { unstable_cache } from "next/cache";
 import { fetchTrakt, normalizeType } from "@/lib/trakt/fetchWithCache";
 
 const RESOLVE_CACHE_TTL_MS = 60 * 60 * 1000;
 const pendingResolutions = new Map();
 const resolvedCache = new Map();
+
+// Caché CROSS-INSTANCIA y persistente (Data Cache de Next) para el mapeo
+// TMDb→Trakt, que es inmutable. La caché en memoria (resolvedCache) se pierde en
+// cada cold start / instancia nueva de Vercel, lo que hacía lento el PRIMER
+// acceso de los botones de acción (vía /api/trakt/item/status). Con esto, el
+// primer resolve se comparte entre instancias y sobrevive a los cold starts.
+const _resolveEntityCached = unstable_cache(
+  async (normalizedType, normalizedTmdbId) => {
+    const resolved = await resolveTraktEntityUncached(
+      normalizedType,
+      normalizedTmdbId,
+    );
+    if (!resolved?.traktId) return null;
+    // Devolvemos solo lo necesario y serializable.
+    return {
+      traktId: resolved.traktId,
+      ids: resolved.ids || null,
+      slug: resolved.slug || null,
+      item: resolved.item || null,
+    };
+  },
+  ["trakt-item-resolve"],
+  { revalidate: 60 * 60 * 24 }, // 24h: el mapeo TMDb→Trakt es estable
+);
 
 function getResolveCacheKey(type, tmdbId) {
   return `${String(type)}:${String(tmdbId)}`;
@@ -140,7 +165,7 @@ export async function resolveTraktEntityFromTmdb({ type, tmdbId } = {}) {
     return pendingResolutions.get(cacheKey);
   }
 
-  const resolutionPromise = resolveTraktEntityUncached(
+  const resolutionPromise = _resolveEntityCached(
     normalizedType,
     normalizedTmdbId,
   )
