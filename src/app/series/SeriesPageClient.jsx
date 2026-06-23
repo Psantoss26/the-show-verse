@@ -2,7 +2,6 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import FeaturedHero from "@/components/FeaturedHero";
 import { useRef, useEffect, useMemo, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -1530,13 +1529,8 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
-  const [hydrated, setHydrated] = useState(false);
   const [deferredData, setDeferredData] = useState(null);
   const [visibleRowCount, setVisibleRowCount] = useState(INITIAL_VISIBLE_ROWS);
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   useEffect(() => {
     if (deferredDataPromise) {
@@ -1567,8 +1561,7 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
       "Top 10 hoy en España",
       dashboardData["Top 10 hoy en España"],
     );
-    addRow("trending", "Tendencias ahora mismo", dashboardData.trending);
-    addRow("popular", "Populares ahora mismo", dashboardData.popular);
+    addRow("popular", "Tendencias ahora mismo", dashboardData.popular);
     addRow("top-imdb", "Series imprescindibles", dashboardData.top_imdb);
     addRow(
       "most-voted",
@@ -1642,16 +1635,14 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
 
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30">
-      <div className="relative z-10">
-        <FeaturedHero
-          items={dashboardData.featured || EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-        />
+    <div className="relative min-h-screen overflow-hidden bg-black px-4 py-6 text-white selection:bg-amber-500/30 sm:px-6">
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-amber-500/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-yellow-600/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-amber-700/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
-      <div className="relative z-10 space-y-12 px-4 pt-8 pb-6 sm:px-6 sm:pt-12">
+      <div className="relative z-10 space-y-12 pt-2">
         {visibleRows.map(({ key, title, items }) => (
           <Row
             key={key}

@@ -10,10 +10,7 @@ import {
   fetchMovieSections,
   fetchMindBendingMovies,
   discoverMovies,
-  fetchTrendingMovies,
-  fetchTrendingMoviesDay,
 } from "@/lib/api/tmdb";
-import { buildDashboardFeatured } from "@/lib/dashboard/featuredSelection";
 
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
@@ -117,10 +114,9 @@ async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const [popular, topES, trending] = await Promise.all([
+    const [popular, topES] = await Promise.all([
       fetchPopularMedia({ type: "movie", language: lang }),
-      fetchTrendingMoviesDay(),
-      fetchTrendingMovies(),
+      discoverMovies({ region: "ES", sort_by: "popularity.desc", page: 1 }),
     ]);
 
     const curatedPopular = curateList(popular, {
@@ -130,31 +126,15 @@ async function getCriticalDashboardData() {
       maxSize: 80,
     });
 
-    const curatedTrending = curateList(trending, {
-      minVotes: 500,
-      minRating: 5.8,
-      minSize: 20,
-      maxSize: 60,
-    });
-
-    const curatedTopES = (topES || []).slice(0, 10);
+    const curatedTopES = sortByVotes(topES).slice(0, 10);
 
     return {
-      featured: buildDashboardFeatured({
-        topToday: curatedTopES,
-        trending: curatedTrending,
-        popular: curatedPopular,
-        mediaType: "movie",
-      }),
-      trending: curatedTrending,
       popular: curatedPopular,
       "Top 10 hoy en España": curatedTopES,
     };
   } catch (err) {
     console.error("Error cargando datos críticos de películas (SSR):", err);
     return {
-      featured: [],
-      trending: [],
       popular: [],
       "Top 10 hoy en España": [],
     };
