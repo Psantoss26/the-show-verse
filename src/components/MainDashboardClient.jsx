@@ -3270,12 +3270,6 @@ export default function MainDashboardClient({ initialData }) {
       animate="visible"
       variants={fadeInUp}
     >
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-amber-500/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-yellow-600/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-amber-700/25 blur-[120px] sm:blur-[150px]" />
-      </div>
-
       <div className="relative z-10">
         {/* Hero destacado a pantalla completa (bajo la navbar transparente) */}
         <FeaturedHero
