@@ -122,6 +122,8 @@ const ACTIVITY_POLL_PERIOD_MIN = 30;
 const ACTIVITY_BACKFILL_MAX_PAGES = 20;
 const ACTIVITY_INCREMENTAL_MAX_PAGES = 2;
 const ACTIVITY_IMPORT_CHUNK = 200;
+const SYNC_PAUSED_KEY = "streamingSyncPaused";
+const SYNC_PAUSED_MESSAGE = "Sincronización pausada desde la extensión.";
 
 function getStored(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
@@ -129,6 +131,11 @@ function getStored(keys) {
 
 function setStored(values) {
   return new Promise((resolve) => chrome.storage.local.set(values, resolve));
+}
+
+async function isSyncPaused() {
+  const result = await getStored([SYNC_PAUSED_KEY]);
+  return Boolean(result[SYNC_PAUSED_KEY]);
 }
 
 // Obtiene el BUILD_IDENTIFIER necesario para la API shakti de Netflix.
@@ -221,6 +228,10 @@ async function fetchViewingActivity({ maxPages, sinceEpoch = 0 }) {
 
 // Lee la actividad y la envía a la app para resolverla e insertarla en el historial.
 async function syncViewingActivity({ full = false } = {}) {
+  if (await isSyncPaused()) {
+    return { success: false, paused: true, error: SYNC_PAUSED_MESSAGE };
+  }
+
   const { showVerseOrigin, netflixSyncToken, netflixActivityHighWater } = await getStored([
     "showVerseOrigin",
     "netflixSyncToken",
@@ -305,8 +316,8 @@ chrome.runtime.onStartup.addListener(ensureActivityAlarm);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== ALARM_ACTIVITY_POLL) return;
-  chrome.storage.local.get(["netflixSyncToken"], (result) => {
-    if (result.netflixSyncToken) {
+  chrome.storage.local.get(["netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
+    if (result.netflixSyncToken && !result[SYNC_PAUSED_KEY]) {
       syncViewingActivity({ full: false }).catch((e) =>
         console.error("[The Show Verse SW] Activity poll failed:", e),
       );
@@ -338,7 +349,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       netflixAccountEmail: email || "",
       netflixProfileName: profileName || "Principal",
       netflixConnectedAt: new Date().toISOString(),
-      netflixActivityHighWater: 0
+      netflixActivityHighWater: 0,
+      [SYNC_PAUSED_KEY]: false
     }, () => {
       addLog("Sincronización automática vinculada.", "success");
       ensureActivityAlarm();
@@ -358,7 +370,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       "netflixProfileName",
       "netflixConnectedAt",
       "netflixActivityHighWater",
-      "netflixActivityLastSyncAt"
+      "netflixActivityLastSyncAt",
+      SYNC_PAUSED_KEY
     ], () => {
       addLog("Sincronización automática desvinculada.", "info");
       chrome.alarms.clear(ALARM_ACTIVITY_POLL);
@@ -374,17 +387,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // respuesta asíncrona
   }
 
+  if (message.action === "setSyncPaused") {
+    const paused = Boolean(message.paused);
+    chrome.storage.local.set({ [SYNC_PAUSED_KEY]: paused }, () => {
+      addLog(
+        paused ? "Sincronización pausada por el usuario." : "Sincronización reanudada.",
+        paused ? "info" : "success",
+      );
+      if (paused) {
+        chrome.alarms.clear(ALARM_ACTIVITY_POLL);
+      } else {
+        ensureActivityAlarm();
+      }
+      sendResponse({ success: true, paused });
+    });
+    return true;
+  }
+
   if (message.action === "getSyncStatus") {
     chrome.storage.local.get([
       "showVerseOrigin",
       "netflixSyncToken",
       "netflixAccountEmail",
       "netflixProfileName",
-      "netflixConnectedAt"
+      "netflixConnectedAt",
+      SYNC_PAUSED_KEY
     ], (result) => {
       sendResponse({
         success: true,
         connected: Boolean(result.netflixSyncToken),
+        paused: Boolean(result[SYNC_PAUSED_KEY]),
         origin: result.showVerseOrigin || "",
         email: result.netflixAccountEmail || "",
         profileName: result.netflixProfileName || "",
@@ -429,9 +461,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const { videoId, mainTitle, subTitle } = message;
     addLog(`Reproducción detectada: "${mainTitle}"`, "info");
 
-    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken"], (result) => {
+    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
       const origin = result.showVerseOrigin || "http://localhost:3000";
       const syncToken = result.netflixSyncToken || "";
+      if (result[SYNC_PAUSED_KEY]) {
+        sendResponse({ success: false, paused: true, error: SYNC_PAUSED_MESSAGE });
+        return;
+      }
       if (!syncToken) {
         const errMsg = "Abre The Show Verse y pulsa Conectar Netflix para activar la sincronización.";
         addLog(errMsg, "error");
@@ -474,9 +510,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const { platform, platformName, contentId, mainTitle, subTitle, season, episode } = message;
     addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
 
-    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken"], (result) => {
+    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
       const origin = result.showVerseOrigin || "http://localhost:3000";
       const syncToken = result.netflixSyncToken || "";
+      if (result[SYNC_PAUSED_KEY]) {
+        sendResponse({ success: false, paused: true, error: SYNC_PAUSED_MESSAGE });
+        return;
+      }
       if (!syncToken) {
         const errMsg = "Abre The Show Verse y pulsa Conectar para activar la sincronización.";
         addLog(errMsg, "error");
@@ -560,7 +600,8 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       netflixAccountEmail: email || "",
       netflixProfileName: profileName || "Principal",
       netflixConnectedAt: new Date().toISOString(),
-      netflixActivityHighWater: 0
+      netflixActivityHighWater: 0,
+      [SYNC_PAUSED_KEY]: false
     }, () => {
       addLog("Sincronización automática vinculada.", "success");
       ensureActivityAlarm();
@@ -586,7 +627,8 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       "netflixProfileName",
       "netflixConnectedAt",
       "netflixActivityHighWater",
-      "netflixActivityLastSyncAt"
+      "netflixActivityLastSyncAt",
+      SYNC_PAUSED_KEY
     ], () => {
       addLog("Sincronización automática desvinculada.", "info");
       chrome.alarms.clear(ALARM_ACTIVITY_POLL);

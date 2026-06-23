@@ -62,6 +62,63 @@ function curateList(
   return sorted.slice(0, size);
 }
 
+/* ======== Selección de contenido DESTACADO para el hero ======== */
+// Mezcla curada a partir de las fuentes ya cargadas en SSR (top valoradas,
+// tendencias y galardonadas). Se puntúa cada título y se devuelven los mejores,
+// intercalando películas y series para dar variedad tipo Netflix/Prime.
+function buildFeatured(
+  { topRatedMovies = [], topRatedTV = [], trending = [], awarded = [] } = {},
+  { size = 8 } = {},
+) {
+  const trendingIds = new Set(
+    (Array.isArray(trending) ? trending : []).map((m) => m?.id).filter(Boolean),
+  );
+  const awardedIds = new Set(
+    (Array.isArray(awarded) ? awarded : []).map((m) => m?.id).filter(Boolean),
+  );
+
+  const pool = new Map();
+  const addAll = (list, mediaType) => {
+    for (const raw of Array.isArray(list) ? list : []) {
+      if (!raw?.id) continue;
+      if (!raw.backdrop_path) continue; // exige imagen horizontal de calidad
+      if (pool.has(raw.id)) continue;
+      const type = mediaType || (raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie");
+      pool.set(raw.id, { ...raw, media_type: type });
+    }
+  };
+
+  addAll(topRatedMovies, "movie");
+  addAll(topRatedTV, "tv");
+  addAll(trending, null);
+  addAll(awarded, "movie");
+
+  const scoreOf = (m) => {
+    const rating =
+      typeof m?.vote_average === "number" ? m.vote_average / 10 : 0; // 0..1
+    const votes = Math.min(1, Math.log10((m?.vote_count || 0) + 1) / 5); // ~0..1
+    const trendingBoost = trendingIds.has(m.id) ? 0.35 : 0;
+    const awardedBoost = awardedIds.has(m.id) ? 0.2 : 0;
+    return rating * 1.4 + votes * 0.8 + trendingBoost + awardedBoost;
+  };
+
+  const ranked = [...pool.values()].sort((a, b) => scoreOf(b) - scoreOf(a));
+
+  // Intercala películas y series para que no salgan todas del mismo tipo.
+  const movies = ranked.filter((m) => m.media_type === "movie");
+  const shows = ranked.filter((m) => m.media_type === "tv");
+  const result = [];
+  let i = 0;
+  let j = 0;
+  while (result.length < size && (i < movies.length || j < shows.length)) {
+    if (i < movies.length) result.push(movies[i++]);
+    if (result.length >= size) break;
+    if (j < shows.length) result.push(shows[j++]);
+  }
+
+  return result.slice(0, size);
+}
+
 /* ======== Carga de datos en el SERVIDOR ======== */
 async function getDashboardData() {
   try {
@@ -103,15 +160,26 @@ async function getDashboardData() {
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
       .slice(0, 20);
 
+    const awardedSSR = curateList(awarded, {
+      minVotes: 1200,
+      minRating: 6.8,
+      minSize: 20,
+      maxSize: 60,
+    });
+
     return {
       topRatedMovies: topRatedMoviesSSR,
       topRatedTV: topRatedTVSSR,
-      awarded: curateList(awarded, {
-        minVotes: 1200,
-        minRating: 6.8,
-        minSize: 20,
-        maxSize: 60,
-      }),
+      featured: buildFeatured(
+        {
+          topRatedMovies: topRatedMoviesSSR,
+          topRatedTV: topRatedTVSSR,
+          trending,
+          awarded: awardedSSR,
+        },
+        { size: 8 },
+      ),
+      awarded: awardedSSR,
       dramaTV: curateList(dramaTV, {
         minVotes: 1000,
         minRating: 6.5,

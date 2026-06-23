@@ -98,6 +98,21 @@
     .btn:hover {
       background: #b20710;
     }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f4f4f5;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+    .btn-paused {
+      background: #10b981;
+      color: #04130d;
+    }
+    .btn-paused:hover {
+      background: #34d399;
+    }
     .logs-container {
       margin-top: 12px;
       background: rgba(0, 0, 0, 0.2);
@@ -168,6 +183,9 @@
       Cuenta vinculada: <span id="user-email" class="user-email">...</span>
     </div>
     <a href="#" id="action-btn" class="btn" style="display: none;">Configuración</a>
+    <button type="button" id="pause-btn" class="btn btn-secondary" style="display: none;">
+      Pausar sincronización
+    </button>
   </div>
 
   <div class="logs-container">

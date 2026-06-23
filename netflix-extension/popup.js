@@ -6,7 +6,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const userInfo = document.getElementById("user-info");
   const userEmail = document.getElementById("user-email");
   const actionBtn = document.getElementById("action-btn");
+  const pauseBtn = document.getElementById("pause-btn");
   const logsList = document.getElementById("logs-list");
+  let syncPaused = false;
+
+  function renderPauseButton(paused) {
+    syncPaused = Boolean(paused);
+    pauseBtn.style.display = "block";
+    pauseBtn.textContent = syncPaused ? "Reanudar sincronización" : "Pausar sincronización";
+    pauseBtn.classList.toggle("btn-paused", syncPaused);
+  }
 
   // 1. Fetch dynamic host origin and check session
   chrome.storage.local.get([
@@ -14,7 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "logs",
     "netflixSyncToken",
     "netflixAccountEmail",
-    "netflixProfileName"
+    "netflixProfileName",
+    "streamingSyncPaused"
   ], (result) => {
     const origin = result.showVerseOrigin || "http://localhost:3000";
     console.log("[The Show Verse Popup] Querying auth status from:", origin);
@@ -40,8 +50,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (result.netflixSyncToken) {
-      statusDot.className = "dot dot-green";
-      statusText.textContent = "Sincronización activa";
+      renderPauseButton(result.streamingSyncPaused);
+      statusDot.className = result.streamingSyncPaused ? "dot dot-orange" : "dot dot-green";
+      statusText.textContent = result.streamingSyncPaused
+        ? "Sincronización pausada"
+        : "Sincronización activa";
 
       userInfo.style.display = "block";
       userEmail.textContent = `${result.netflixAccountEmail || "Netflix"} · ${result.netflixProfileName || "Principal"}`;
@@ -99,5 +112,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (actionBtn.href) {
       chrome.tabs.create({ url: actionBtn.href });
     }
+  });
+
+  pauseBtn.addEventListener("click", () => {
+    const nextPaused = !syncPaused;
+    pauseBtn.disabled = true;
+
+    chrome.runtime.sendMessage(
+      { action: "setSyncPaused", paused: nextPaused },
+      (response) => {
+        pauseBtn.disabled = false;
+        if (!response?.success) return;
+
+        renderPauseButton(response.paused);
+        statusDot.className = response.paused ? "dot dot-orange" : "dot dot-green";
+        statusText.textContent = response.paused
+          ? "Sincronización pausada"
+          : "Sincronización activa";
+      },
+    );
   });
 });

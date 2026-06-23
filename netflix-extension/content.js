@@ -262,6 +262,7 @@
   let lastKey = null;
   let lastDebug = 0;
   let pollTimer = null;
+  let syncPaused = false;
 
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
@@ -281,10 +282,21 @@
     }
   }
 
+  function start() {
+    if (pollTimer == null && !syncPaused) {
+      pollTimer = setInterval(tick, POLL_MS);
+    }
+  }
+
   function tick() {
     if (!extensionAlive()) {
       // Extensión recargada/actualizada: detenemos este script huérfano. La
       // pestaña recuperará la sincronización al recargarse.
+      stop();
+      return;
+    }
+
+    if (syncPaused) {
       stop();
       return;
     }
@@ -348,5 +360,26 @@
     }
   }
 
-  pollTimer = setInterval(tick, POLL_MS);
+  function applyPausedState(paused) {
+    syncPaused = Boolean(paused);
+    if (syncPaused) {
+      stop();
+    } else {
+      lastKey = null;
+      start();
+    }
+  }
+
+  try {
+    chrome.storage.local.get(["streamingSyncPaused"], (result) => {
+      applyPausedState(result.streamingSyncPaused);
+    });
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes.streamingSyncPaused) return;
+      applyPausedState(changes.streamingSyncPaused.newValue);
+    });
+  } catch (e) {
+    start();
+  }
 })();
