@@ -36,7 +36,6 @@ import {
   getMediaTypeForItem,
   getPreviewBackdropFallback,
   fetchBestBackdropNoLang,
-  fetchBestPosterNoLang,
   fetchBestLogo,
   getBestTrailerCached,
   getArtworkPreference,
@@ -49,9 +48,6 @@ import {
 // "original" = máxima resolución de TMDb; NextImage la reescala según el
 // viewport, así que la imagen del hero se ve nítida en pantallas grandes/retina.
 const HERO_BACKDROP_SIZE = "original";
-const HERO_POSTER_SIZE = "original";
-// Tras este tiempo en un slide activo, se reproduce su trailer automáticamente.
-const TRAILER_AUTOPLAY_DELAY = 4000;
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 
@@ -61,10 +57,8 @@ const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 function FeaturedSlide({
   movie,
   backdropPath,
-  posterPath,
   logoPath,
   isActive,
-  isMobile,
   onTrailerPlay,
   onTrailerClose,
 }) {
@@ -86,9 +80,6 @@ function FeaturedSlide({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
-  // Si el usuario cierra el trailer manualmente, no se vuelve a auto-reproducir
-  // en este slide.
-  const userClosedTrailerRef = useRef(false);
 
   // Al dejar de ser el slide activo, cerramos el trailer.
   useEffect(() => {
@@ -98,33 +89,7 @@ function FeaturedSlide({
   useEffect(() => {
     setShowTrailer(false);
     setTrailer(null);
-    userClosedTrailerRef.current = false;
   }, [movie?.id]);
-
-  // Auto-reproduce el trailer del título activo tras un breve timeout (estilo
-  // Netflix/Prime). Al iniciarse, pausa el carrusel para que se vea completo.
-  useEffect(() => {
-    if (!isActive || showTrailer || userClosedTrailerRef.current) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        setTrailerLoading(true);
-        const t = await getBestTrailerCached(movie.id, mediaType);
-        // Solo se muestra si seguimos activos y el usuario no lo cerró entretanto.
-        if (!t?.key || userClosedTrailerRef.current) return;
-        setTrailer(t);
-        setShowTrailer(true);
-        onTrailerPlay?.();
-      } catch {
-        // sin trailer disponible → se mantiene el backdrop
-      } finally {
-        setTrailerLoading(false);
-      }
-    }, TRAILER_AUTOPLAY_DELAY);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, movie?.id]);
 
   // Estado de cuenta (favorito/pendiente/visto). El backend devuelve los tres
   // estados en una sola llamada (igual que DetailsClient), con source "backend".
@@ -227,7 +192,6 @@ function FeaturedSlide({
     e.stopPropagation();
     if (showTrailer) {
       setShowTrailer(false);
-      userClosedTrailerRef.current = true; // no auto-reproducir de nuevo aquí
       onTrailerClose?.(); // reanuda el carrusel
       return;
     }
@@ -328,14 +292,7 @@ function FeaturedSlide({
       .join(" · ");
   }, [movie]);
 
-  // En móvil usamos el cartel/poster textless (encaja mejor en vertical); en
-  // escritorio, el backdrop completo sin recorte.
-  const useMobilePoster = isMobile && !!posterPath;
-  const bgSrc = useMobilePoster
-    ? buildImg(posterPath, HERO_POSTER_SIZE)
-    : backdropPath
-      ? buildImg(backdropPath, HERO_BACKDROP_SIZE)
-      : null;
+  const bgSrc = backdropPath ? buildImg(backdropPath, HERO_BACKDROP_SIZE) : null;
   const logoSrc = logoPath ? buildImg(logoPath, "original") : null;
   const title = movie.title || movie.name || "";
   const overview =
@@ -359,8 +316,8 @@ function FeaturedSlide({
       className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-black"
       onClick={navigateToDetails}
     >
-      {/* Fondo: backdrop/cartel a sangre completa (estilo Prime). La imagen
-          cubre toda la superficie sin dejar espacios en los extremos. */}
+      {/* Fondo: backdrop completo. Mantiene su formato; si el hero llega a su
+          alto máximo, el sobrante queda negro en el lado de la información. */}
       <div className="absolute inset-0">
         {!showTrailer && bgSrc && (
           <NextImage
@@ -370,7 +327,7 @@ function FeaturedSlide({
             fill
             priority={isActive}
             sizes="100vw"
-            className="object-cover object-center"
+            className="object-contain object-right"
           />
         )}
 
@@ -381,48 +338,49 @@ function FeaturedSlide({
             )}
             {trailerSrc && (
               <div className="absolute inset-0 overflow-hidden">
-                <iframe
-                  key={trailer.key}
-                  ref={trailerIframeRef}
-                  className="pointer-events-none absolute left-1/2 top-1/2 h-[160%] w-[120%] -translate-x-1/2 -translate-y-1/2 sm:h-[135%] sm:w-[105%]"
-                  src={trailerSrc}
-                  title={`Trailer - ${title}`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen={false}
-                  onLoad={() => {
-                    try {
-                      const win = trailerIframeRef.current?.contentWindow;
-                      if (!win) return;
-                      const target = "https://www.youtube-nocookie.com";
-                      const cmd = (func, args = []) =>
-                        win.postMessage(
-                          JSON.stringify({ event: "command", func, args }),
-                          target,
-                        );
-                      setTimeout(() => {
-                        cmd("unMute");
-                        cmd("setVolume", [25]);
-                        // Fuerza la máxima resolución disponible del reproductor.
-                        cmd("setPlaybackQualityRange", ["hd2160", "hd1080"]);
-                        cmd("setPlaybackQuality", ["hd1080"]);
-                      }, 150);
-                    } catch { }
-                  }}
-                />
+                <div className="absolute inset-y-0 right-0 aspect-video h-full max-w-full">
+                  <iframe
+                    key={trailer.key}
+                    ref={trailerIframeRef}
+                    className="pointer-events-none absolute inset-0 h-full w-full"
+                    src={trailerSrc}
+                    title={`Trailer - ${title}`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen={false}
+                    onLoad={() => {
+                      try {
+                        const win = trailerIframeRef.current?.contentWindow;
+                        if (!win) return;
+                        const target = "https://www.youtube-nocookie.com";
+                        const cmd = (func, args = []) =>
+                          win.postMessage(
+                            JSON.stringify({ event: "command", func, args }),
+                            target,
+                          );
+                        setTimeout(() => {
+                          cmd("unMute");
+                          cmd("setVolume", [25]);
+                          // Fuerza la máxima resolución disponible del reproductor.
+                          cmd("setPlaybackQualityRange", ["hd2160", "hd1080"]);
+                          cmd("setPlaybackQuality", ["hd1080"]);
+                        }, 150);
+                      } catch { }
+                    }}
+                  />
+                </div>
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* Degradados estilo Prime: izquierda fuerte (legibilidad del texto),
-          base hacia el fondo y un velo superior para fundir con la cabecera.
-          Aseguran que la imagen llegue a los extremos sin cortes visibles. */}
+      {/* Degradados estilo Prime: la izquierda puede convertirse en fondo negro
+          cuando el hero ya llegó al alto máximo y el backdrop mantiene formato. */}
       <div
         className="pointer-events-none absolute inset-0 hidden sm:block"
         style={{
           background:
-            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.85) 22%, rgba(0,0,0,0.35) 48%, transparent 72%)",
+            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
         }}
       />
       <div
@@ -587,7 +545,7 @@ function FeaturedSlide({
 export default function FeaturedHero({ items = [], isMobile, hydrated }) {
   const swiperRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
+  const [assets, setAssets] = useState({}); // id -> { backdrop, logo }
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
@@ -609,7 +567,7 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     } catch { }
   }, [hydrated]);
 
-  // Carga progresiva de backdrops/carteles textless + logos del título (cliente).
+  // Carga progresiva de backdrops textless + logos del título (cliente).
   // getMovieImages cachea la respuesta completa por título, así que pedir
   // backdrop, cartel y logo no implica peticiones de red adicionales.
   useEffect(() => {
@@ -633,29 +591,15 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
             backdrop = getPreviewBackdropFallback(movie);
           }
 
-          let poster = null;
-          try {
-            poster =
-              (await fetchBestPosterNoLang(id, mediaType)) ||
-              movie.poster_path ||
-              null;
-          } catch {
-            poster = movie.poster_path || null;
-          }
-
           let logo = null;
           try {
             // Logo del título preferentemente en inglés (luego textless).
             logo = await fetchBestLogo(id, mediaType, ["en", null]);
           } catch { }
 
-          // Precarga solo la imagen que se mostrará en la vista actual.
-          const toPreload = isMobile
-            ? poster && buildImg(poster, HERO_POSTER_SIZE)
-            : backdrop && buildImg(backdrop, HERO_BACKDROP_SIZE);
-          if (toPreload) await preloadImage(toPreload);
+          if (backdrop) await preloadImage(buildImg(backdrop, HERO_BACKDROP_SIZE));
 
-          return [id, { backdrop, poster, logo }];
+          return [id, { backdrop, logo }];
         }),
       );
 
@@ -669,13 +613,13 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     return () => {
       canceled = true;
     };
-  }, [list, isMobile]);
+  }, [list]);
 
   if (!list.length) return null;
 
   return (
     <section
-      className="relative h-[72vh] min-h-[460px] w-full sm:h-[88vh]"
+      className="relative aspect-video max-h-[72dvh] w-full bg-black sm:max-h-[88dvh]"
       aria-label="Contenido destacado"
       style={{
         "--swiper-pagination-color": "#f59e0b",
@@ -706,16 +650,13 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
           const a = assets[movie.id] || {};
           const seededBackdrop =
             a.backdrop || getPreviewBackdropFallback(movie) || null;
-          const seededPoster = a.poster || movie.poster_path || null;
           return (
             <SwiperSlide key={movie.id} className="!h-full">
               <FeaturedSlide
                 movie={movie}
                 backdropPath={seededBackdrop}
-                posterPath={seededPoster}
                 logoPath={a.logo || null}
                 isActive={index === activeIndex}
-                isMobile={isMobile}
                 onTrailerPlay={pauseAutoplay}
                 onTrailerClose={resumeAutoplay}
               />
