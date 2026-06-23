@@ -101,9 +101,9 @@ export default function AddToListModal(props) {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[3rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out">
+      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out">
         {/* Header */}
-        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 border-b border-white/10 shrink-0">
+        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 bg-white/[0.025] shrink-0">
           <div>
             <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
               Añadir a una lista

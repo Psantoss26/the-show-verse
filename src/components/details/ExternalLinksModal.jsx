@@ -35,8 +35,7 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                         transition={{ duration: 0.18, ease: 'easeOut' }}
                         className="
               absolute bottom-0 left-0 right-0
-              rounded-t-3xl border-t border-white/10
-              bg-[#101010]/95 backdrop-blur
+              rounded-t-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl
               px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]
             "
                     >

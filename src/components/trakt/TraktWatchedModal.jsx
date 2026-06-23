@@ -145,13 +145,13 @@ function CalendarPickerModal({
       />
 
       <div
-        className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
+        className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         {/* Header Calendario */}
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between px-5 py-4 bg-white/[0.025]">
           <div>
             <div className="text-sm font-black uppercase tracking-wide text-white drop-shadow-sm">
               {title}
@@ -370,13 +370,13 @@ export default function TraktWatchedModal({
 
       {/* Modal Container */}
       <div
-        className="relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
+        className="relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
         role="dialog"
         aria-modal="true"
         aria-label="Historial de visionados"
       >
         {/* Header Premium */}
-        <div className="flex items-start justify-between border-b border-white/10 px-6 py-5 sm:px-7">
+        <div className="flex items-start justify-between px-6 py-5 sm:px-7 bg-white/[0.025]">
           <div>
             <h3 className="text-xl font-black text-white drop-shadow-md">
               Historial de Visionado

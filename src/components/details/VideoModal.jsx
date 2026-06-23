@@ -177,12 +177,12 @@ export default function VideoModal({
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className="relative w-full max-w-5xl flex flex-col overflow-hidden rounded-[3rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
+        className="relative w-full max-w-5xl flex flex-col overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
         role="dialog"
         aria-modal="true"
       >
         {/* HEADER: Glass Header */}
-        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 border-b border-white/10">
+        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 bg-white/[0.025]">
           <div className="flex flex-col gap-0.5 min-w-0 pr-4">
             <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
               {video.name || "Tráiler Oficial"}
@@ -230,7 +230,7 @@ export default function VideoModal({
         </div>
 
         {/* FOOTER: Información y acciones */}
-        <div className="flex flex-wrap items-center justify-between gap-4 p-6 sm:px-8 border-t border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-6 sm:px-8 bg-white/[0.025]">
           <div className="text-xs font-semibold text-white/50">
             {video.published_at && (
               <span>
