@@ -27,11 +27,19 @@ function redirectToLogin(request, next, reason) {
   return response;
 }
 
-function normalizeBackendGoogleError(error) {
+function normalizeBackendGoogleError(error, status = 0) {
   const message = String(error || "").toLowerCase();
+  if (status === 404 || message.includes("backend http 404")) {
+    return "backend_route_not_found";
+  }
+  if (message.includes("cors origin not allowed")) return "backend_cors_origin";
   if (message.includes("google_client_id")) return "backend_google_config";
   if (message.includes("audience")) return "google_audience_mismatch";
+  if (message.includes("invalid value") || message.includes("invalid google token")) {
+    return "google_token_rejected";
+  }
   if (message.includes("email is not verified")) return "google_email_not_verified";
+  if (status >= 500) return "backend_server_error";
   if (message.includes("backend api is not configured")) return "backend_missing_config";
   return "backend_auth_failed";
 }
@@ -95,12 +103,23 @@ export async function GET(request) {
       method: "POST",
       body: JSON.stringify({ idToken: googleTokens.json.id_token }),
     });
-  } catch {
+  } catch (error) {
+    console.error("[google-auth] backend request failed", {
+      message: error?.message || String(error),
+    });
     return redirectToLogin(request, next, "backend_unavailable");
   }
 
   if (!backend.ok || !backend.json?.accessToken || !backend.json?.refreshToken) {
-    return redirectToLogin(request, next, normalizeBackendGoogleError(backend.error));
+    console.error("[google-auth] backend rejected Google login", {
+      status: backend.status,
+      error: backend.error,
+    });
+    return redirectToLogin(
+      request,
+      next,
+      normalizeBackendGoogleError(backend.error, backend.status),
+    );
   }
 
   const response = NextResponse.redirect(new URL(next, request.url));
