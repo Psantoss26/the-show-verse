@@ -9,6 +9,7 @@ import {
   fetchPopularMovies,
   fetchPopularTV,
   discoverMovies,
+  discoverTV,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
 
@@ -66,12 +67,12 @@ function curateList(
 
 /* ======== Selección de contenido DESTACADO para el hero ======== */
 const FEATURED_SOURCE_WEIGHTS = {
-  topRatedMovies: 0.38,
-  topRatedTV: 0.38,
   trendingMovies: 0.55,
   trendingTV: 0.55,
   popularMovies: 0.28,
   popularTV: 0.28,
+  recognizedMovies: 0.44,
+  recognizedTV: 0.44,
   awarded: 0.34,
 };
 
@@ -120,18 +121,17 @@ function normalizeFeaturedItem(raw, mediaType) {
   };
 }
 
-// Mezcla curada a partir de fuentes SSR: calidad contrastada, popularidad
-// reciente, popularidad amplia y premios. El resultado favorece títulos con
-// buena imagen horizontal y alterna películas/series sin depender de una sola
-// señal.
+// Mezcla curada a partir de fuentes SSR: interés actual, reconocimiento amplio
+// y premios. No usa las listas top rated para que el hero no sea redundante con
+// la sección de mejor valoradas.
 function buildFeatured(
   {
-    topRatedMovies = [],
-    topRatedTV = [],
     trendingMovies = [],
     trendingTV = [],
     popularMovies = [],
     popularTV = [],
+    recognizedMovies = [],
+    recognizedTV = [],
     awarded = [],
   } = {},
   { size = 8 } = {},
@@ -165,12 +165,12 @@ function buildFeatured(
     }
   };
 
-  addAll(topRatedMovies, "movie", "topRatedMovies");
-  addAll(topRatedTV, "tv", "topRatedTV");
   addAll(trendingMovies, "movie", "trendingMovies");
   addAll(trendingTV, "tv", "trendingTV");
   addAll(popularMovies, "movie", "popularMovies");
   addAll(popularTV, "tv", "popularTV");
+  addAll(recognizedMovies, "movie", "recognizedMovies");
+  addAll(recognizedTV, "tv", "recognizedTV");
   addAll(awarded, "movie", "awarded");
 
   const scoreOf = (m) => {
@@ -205,7 +205,9 @@ function buildFeatured(
       const votes = Number(item?.vote_count || 0);
       const rating = Number(item?.vote_average || 0);
       const hasDemandSource = Object.keys(item.__featuredSources || {}).some((source) =>
-        source.startsWith("trending") || source.startsWith("popular"),
+        source.startsWith("trending") ||
+        source.startsWith("popular") ||
+        source.startsWith("recognized"),
       );
       return rating >= 6.6 && (votes >= 700 || hasDemandSource);
     })
@@ -251,6 +253,8 @@ async function getDashboardData() {
       trendingTV,
       popularMovies,
       popularTV,
+      recognizedMovies,
+      recognizedTV,
     ] = await Promise.all([
       fetchTopRatedMovies(5000),
       fetchTopRatedTV(5000),
@@ -270,6 +274,18 @@ async function getDashboardData() {
       fetchTrendingTV(),
       fetchPopularMovies(),
       fetchPopularTV(),
+      discoverMovies({
+        "vote_average.gte": 6.7,
+        "vote_count.gte": 2500,
+        sort_by: "vote_count.desc",
+        page: 1,
+      }),
+      discoverTV({
+        "vote_average.gte": 6.7,
+        "vote_count.gte": 1200,
+        sort_by: "vote_count.desc",
+        page: 1,
+      }),
     ]);
 
     // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
@@ -296,12 +312,12 @@ async function getDashboardData() {
       topRatedTV: topRatedTVSSR,
       featured: buildFeatured(
         {
-          topRatedMovies: topRatedMoviesSSR,
-          topRatedTV: topRatedTVSSR,
           trendingMovies,
           trendingTV,
           popularMovies,
           popularTV,
+          recognizedMovies,
+          recognizedTV,
           awarded: awardedSSR,
         },
         { size: 8 },

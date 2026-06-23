@@ -36,6 +36,7 @@ import {
   getMediaTypeForItem,
   getPreviewBackdropFallback,
   fetchBestBackdropNoLang,
+  fetchBestPosterNoLang,
   fetchBestLogo,
   getBestTrailerCached,
   getArtworkPreference,
@@ -48,6 +49,7 @@ import {
 // "original" = máxima resolución de TMDb; NextImage la reescala según el
 // viewport, así que la imagen del hero se ve nítida en pantallas grandes/retina.
 const HERO_BACKDROP_SIZE = "original";
+const HERO_POSTER_SIZE = "original";
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_FALLBACK = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800];
@@ -60,8 +62,10 @@ const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 function FeaturedSlide({
   movie,
   backdropPath,
+  posterPath,
   logoPath,
   isActive,
+  isMobile,
   onTrailerPlay,
   onTrailerClose,
 }) {
@@ -295,7 +299,13 @@ function FeaturedSlide({
       .join(" · ");
   }, [movie]);
 
-  const bgSrc = backdropPath ? buildImg(backdropPath, HERO_BACKDROP_SIZE) : null;
+  const bgSrc = isMobile
+    ? posterPath
+      ? buildImg(posterPath, HERO_POSTER_SIZE)
+      : null
+    : backdropPath
+      ? buildImg(backdropPath, HERO_BACKDROP_SIZE)
+      : null;
   const logoSrc = logoPath ? buildImg(logoPath, "original") : null;
   const title = movie.title || movie.name || "";
   const overview =
@@ -319,8 +329,7 @@ function FeaturedSlide({
       className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-black"
       onClick={navigateToDetails}
     >
-      {/* Fondo: backdrop completo. Mantiene su formato; si el hero llega a su
-          alto máximo, el sobrante queda negro en el lado de la información. */}
+      {/* Fondo: poster textless en móvil; backdrop completo en escritorio. */}
       <div className="absolute inset-0">
         {!showTrailer && bgSrc && (
           <NextImage
@@ -330,7 +339,7 @@ function FeaturedSlide({
             fill
             priority={isActive}
             sizes="100vw"
-            className="object-contain object-right"
+            className={isMobile ? "object-contain object-center" : "object-contain object-right"}
           />
         )}
 
@@ -388,14 +397,16 @@ function FeaturedSlide({
       {/* Degradados estilo Prime: la izquierda puede convertirse en fondo negro
           cuando el hero ya llegó al alto máximo y el backdrop mantiene formato. */}
       <div
-        className="pointer-events-none absolute inset-0 hidden sm:block"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
+            isMobile
+              ? "linear-gradient(to top, #000 0%, rgba(0,0,0,0.82) 12%, rgba(0,0,0,0.42) 30%, rgba(0,0,0,0.1) 48%, transparent 64%)"
+              : "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
         }}
       />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5"
+        className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-3/5 sm:block"
         style={{
           background:
             "linear-gradient(to top, #000 0%, rgba(0,0,0,0.55) 35%, transparent 100%)",
@@ -406,27 +417,27 @@ function FeaturedSlide({
       {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
           lateral izquierdo y un margen inferior cómodo. */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-8 pb-20 sm:px-16 sm:pb-24 lg:px-32 lg:pb-28">
-          <div className="max-w-xl">
+        <div className="w-full px-5 pb-12 sm:px-16 sm:pb-24 lg:px-32 lg:pb-28">
+          <div className="max-w-[22rem] sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
-              <div className="relative mb-5 h-28 w-[78%] max-w-md sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl">
+              <div className="relative mb-3 h-20 w-[72%] max-w-[15rem] sm:mb-5 sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl">
                 <NextImage
                   src={logoSrc}
                   alt={title}
                   fill
-                  sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 78vw"
+                  sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 72vw"
                   className="object-contain object-left drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
                 />
               </div>
             ) : (
-              <h2 className="mb-5 text-4xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:text-6xl">
+              <h2 className="mb-3 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:mb-5 sm:text-6xl">
                 {title}
               </h2>
             )}
 
             {/* Metadatos + puntuaciones */}
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-neutral-200">
+            <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:gap-x-3 sm:gap-y-2 sm:text-sm">
               {yearOf(movie) && (
                 <span className="font-semibold">{yearOf(movie)}</span>
               )}
@@ -462,28 +473,28 @@ function FeaturedSlide({
             </div>
 
             {genres && (
-              <div className="mb-3 text-sm font-medium text-amber-300/90">
+              <div className="mb-2 text-xs font-medium text-amber-300/90 sm:mb-3 sm:text-sm">
                 {genres}
               </div>
             )}
 
             {overview && (
-              <p className="mb-5 line-clamp-2 max-w-xl text-sm leading-relaxed text-neutral-200/90 sm:line-clamp-3 sm:text-base">
+              <p className="mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base">
                 {overview}
               </p>
             )}
 
             {/* Botones de acción */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigateToDetails();
                 }}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black shadow-lg transition hover:bg-white/90 sm:px-6 sm:text-base"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-black shadow-lg transition hover:bg-white/90 sm:px-6 sm:py-2.5 sm:text-base"
               >
-                <Info className="h-5 w-5" />
+                <Info className="h-4 w-4 sm:h-5 sm:w-5" />
                 Más información
               </button>
 
@@ -494,7 +505,7 @@ function FeaturedSlide({
                 activeColor="yellow"
                 groupId="featured-hero-actions"
                 title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="!h-11 !w-11 !bg-white !text-black [&_svg]:!h-5 [&_svg]:!w-5"
+                className="!h-10 !w-10 !bg-white !text-black sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 {showTrailer ? (
                   <X className="text-black" />
@@ -510,7 +521,7 @@ function FeaturedSlide({
                 activeColor="red"
                 groupId="featured-hero-actions"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
+                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 <Heart className={favorite ? "fill-current" : ""} />
               </LiquidButton>
@@ -522,7 +533,7 @@ function FeaturedSlide({
                 activeColor="blue"
                 groupId="featured-hero-actions"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
+                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </LiquidButton>
@@ -534,7 +545,7 @@ function FeaturedSlide({
                 activeColor="green"
                 groupId="featured-hero-actions"
                 title={watched ? "Marcar como no visto" : "Marcar como visto"}
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
+                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 {watched ? <Eye /> : <EyeOff />}
               </LiquidButton>
@@ -556,7 +567,7 @@ function FeaturedSlide({
 export default function FeaturedHero({ items = [], isMobile, hydrated }) {
   const swiperRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [assets, setAssets] = useState({}); // id -> { backdrop, logo }
+  const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
@@ -578,7 +589,7 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     } catch { }
   }, [hydrated]);
 
-  // Carga progresiva de backdrops textless + logos del título (cliente).
+  // Carga progresiva de backdrops/posters textless + logos del título (cliente).
   // getMovieImages cachea la respuesta completa por título, así que pedir
   // backdrop, cartel y logo no implica peticiones de red adicionales.
   useEffect(() => {
@@ -602,15 +613,25 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
             backdrop = getPreviewBackdropFallback(movie);
           }
 
+          let poster = null;
+          try {
+            poster = await fetchBestPosterNoLang(id, mediaType);
+          } catch {
+            poster = null;
+          }
+
           let logo = null;
           try {
             // Logo del título preferentemente en inglés (luego textless).
             logo = await fetchBestLogo(id, mediaType, ["en", null]);
           } catch { }
 
-          if (backdrop) await preloadImage(buildImg(backdrop, HERO_BACKDROP_SIZE));
+          const imageToPreload = isMobile
+            ? poster && buildImg(poster, HERO_POSTER_SIZE)
+            : backdrop && buildImg(backdrop, HERO_BACKDROP_SIZE);
+          if (imageToPreload) await preloadImage(imageToPreload);
 
-          return [id, { backdrop, logo }];
+          return [id, { backdrop, poster, logo }];
         }),
       );
 
@@ -624,13 +645,13 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     return () => {
       canceled = true;
     };
-  }, [list]);
+  }, [list, isMobile]);
 
   if (!list.length) return null;
 
   return (
     <section
-      className="relative aspect-video max-h-[72dvh] w-full bg-black sm:max-h-[88dvh]"
+      className="relative aspect-[2/3] w-full bg-black sm:aspect-video sm:max-h-[88dvh]"
       aria-label="Contenido destacado"
       style={{
         "--swiper-pagination-color": "#f59e0b",
@@ -661,13 +682,16 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
           const a = assets[movie.id] || {};
           const seededBackdrop =
             a.backdrop || getPreviewBackdropFallback(movie) || null;
+          const seededPoster = a.poster || null;
           return (
             <SwiperSlide key={movie.id} className="!h-full">
               <FeaturedSlide
                 movie={movie}
                 backdropPath={seededBackdrop}
+                posterPath={seededPoster}
                 logoPath={a.logo || null}
                 isActive={index === activeIndex}
+                isMobile={isMobile}
                 onTrailerPlay={pauseAutoplay}
                 onTrailerClose={resumeAutoplay}
               />
