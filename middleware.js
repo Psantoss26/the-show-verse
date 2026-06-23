@@ -10,6 +10,12 @@ const ACCESS_ROUTE = '/api/private-access'
 // (credentials: "omit"), así que deben quedar exentas del gate de acceso privado;
 // de lo contrario el middleware devuelve 404 antes de llegar a la ruta.
 const PUBLIC_API_ROUTES = new Set([
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/me',
+    '/api/auth/register',
+    '/api/auth/google/start',
+    '/api/auth/google/callback',
     '/api/health',
     '/api/netflix/extension-sync',
     '/api/netflix/extension-import',
