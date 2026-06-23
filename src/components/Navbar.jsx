@@ -375,6 +375,11 @@ export default function Navbar() {
     setPendingHref(null);
   }, [pathname]);
 
+  // En Inicio y al estar arriba del todo, la navbar va sobre el FeaturedHero sin
+  // fondo glass (solo un velo oscuro mínimo para legibilidad). El fondo
+  // difuminado aparece al hacer scroll.
+  const heroNavMode = pathname === "/" && !isScrolled;
+
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
     activePath === href || (href !== "/" && activePath?.startsWith(href));
@@ -537,7 +542,16 @@ export default function Navbar() {
   return (
     <>
       {/* ===================== TOP BAR ===================== */}
-      <nav className="sticky top-0 z-40 w-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
+      {/* En Inicio (arriba del todo) la navbar es transparente sobre el hero, con
+          un velo oscuro mínimo para que los botones se vean; al hacer scroll
+          aparece el fondo glass difuminado. */}
+      <nav
+        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
+          heroNavMode
+            ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
+            : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+        }`}
+      >
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
