@@ -235,6 +235,33 @@ export async function fetchBestBackdrop(itemId, mediaType = "movie") {
   return best?.file_path || null;
 }
 
+// Selecciona el mejor backdrop SIN idioma (textless, iso_639_1 nulo), ideal para
+// superponer un logotipo encima. Si no hay textless, cae al de mayor resolución.
+export function pickBestBackdropNoLang(list, { minWidth = 1280 } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const noLang = list.filter((b) => !norm(b?.iso_639_1));
+  const pool = noLang.length ? noLang : list;
+
+  const sized = pool.filter((b) => (b?.width || 0) >= minWidth);
+  const candidates = sized.length ? sized : pool;
+
+  return (
+    [...candidates].sort(
+      (a, b) =>
+        (b?.width || 0) - (a?.width || 0) ||
+        (b?.vote_average || 0) - (a?.vote_average || 0),
+    )[0] || null
+  );
+}
+
+export async function fetchBestBackdropNoLang(itemId, mediaType = "movie") {
+  const { backdrops } = await getMovieImages(itemId, mediaType);
+  const best = pickBestBackdropNoLang(backdrops);
+  return best?.file_path || null;
+}
+
 export async function preparePreviewBackdrop(item, backdropOverride) {
   if (!item?.id) return null;
 
@@ -275,9 +302,8 @@ export async function fetchBestPoster(itemId, mediaType = "movie") {
 }
 
 /* =================== LOGOS (arte del título) =================== */
-function pickBestLogoByLang(logos) {
+function pickBestLogoByLang(logos, order = ["es", "en", null]) {
   if (!Array.isArray(logos) || logos.length === 0) return null;
-  const order = ["es", "en", null];
   const score = (l) => {
     const langIdx = order.indexOf(l?.iso_639_1 ?? null);
     const langScore = langIdx === -1 ? 0 : (order.length - langIdx) * 1000;
@@ -287,9 +313,13 @@ function pickBestLogoByLang(logos) {
   return [...logos].sort((a, b) => score(b) - score(a))[0] || null;
 }
 
-export async function fetchBestLogo(itemId, mediaType = "movie") {
+export async function fetchBestLogo(
+  itemId,
+  mediaType = "movie",
+  preferLangs = ["es", "en", null],
+) {
   const { logos } = await getMovieImages(itemId, mediaType);
-  const best = pickBestLogoByLang(logos);
+  const best = pickBestLogoByLang(logos, preferLangs);
   return best?.file_path || null;
 }
 

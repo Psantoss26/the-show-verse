@@ -13,15 +13,14 @@ import {
   Heart,
   BookmarkPlus,
   Eye,
+  EyeOff,
   Info,
-  Check,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import {
-  getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
   getMovieDetails,
@@ -35,14 +34,12 @@ import {
   buildImg,
   GENRES,
   getMediaTypeForItem,
-  getBackdropCacheKey,
   getPreviewBackdropFallback,
-  fetchBestBackdrop,
+  fetchBestBackdropNoLang,
   fetchBestLogo,
   getBestTrailerCached,
   getArtworkPreference,
   preloadImage,
-  movieBackdropCache,
   yearOf,
   ratingOf,
   formatRuntime,
@@ -51,6 +48,15 @@ import {
 const HERO_BACKDROP_SIZE = "w1280";
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
+
+// Difuminado de bordes (superior e inferior) del hero: la imagen se desvanece
+// gradualmente hacia el fondo en lugar de terminar en un corte recto.
+const HERO_EDGE_FADE =
+  "linear-gradient(to bottom, transparent 0%, #000 9%, #000 84%, transparent 100%)";
+const HERO_EDGE_FADE_STYLE = {
+  WebkitMaskImage: HERO_EDGE_FADE,
+  maskImage: HERO_EDGE_FADE,
+};
 
 /* ====================================================================
  * Slide individual del hero a pantalla completa
@@ -85,11 +91,12 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
     setTrailer(null);
   }, [movie?.id]);
 
-  // Estado de cuenta (favorito/pendiente/visto)
+  // Estado de cuenta (favorito/pendiente/visto). El backend devuelve los tres
+  // estados en una sola llamada (igual que DetailsClient), con source "backend".
   useEffect(() => {
     let cancel = false;
     const load = async () => {
-      if (!movie || !session || !account?.id) {
+      if (!movie || !account?.id) {
         setFavorite(false);
         setWatchlist(false);
         setWatched(false);
@@ -97,17 +104,14 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
       }
       try {
         setLoadingStates(true);
-        const [st, traktSt] = await Promise.all([
-          getMediaAccountStates(mediaType, movie.id, session).catch(() => ({})),
-          traktGetItemStatus({
-            type: traktTypeOf(mediaType),
-            tmdbId: movie.id,
-          }).catch(() => null),
-        ]);
-        if (!cancel) {
-          setFavorite(!!st?.favorite);
-          setWatchlist(!!st?.watchlist);
-          setWatched(!!traktSt?.watched);
+        const status = await traktGetItemStatus({
+          type: traktTypeOf(mediaType),
+          tmdbId: movie.id,
+        }).catch(() => null);
+        if (!cancel && status) {
+          setFavorite(!!status.favorite);
+          setWatchlist(!!status.watchlist || !!status.inWatchlist);
+          setWatched(!!status.watched);
         }
       } catch {
         // silencio
@@ -119,7 +123,7 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
     return () => {
       cancel = true;
     };
-  }, [movie, session, account, mediaType]);
+  }, [movie, account, mediaType]);
 
   // Extras: duración/temporadas + nota IMDb
   useEffect(() => {
@@ -307,21 +311,36 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
 
   return (
     <div
-      className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-neutral-950"
+      className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-black"
       onClick={navigateToDetails}
     >
-      {/* Fondo: backdrop o trailer */}
-      <div className="absolute inset-0">
+      {/* Fondo: backdrop o trailer. La máscara vertical difumina los bordes
+          superior e inferior para que la imagen se funda con el fondo en vez de
+          cortarse en seco. */}
+      <div className="absolute inset-0" style={HERO_EDGE_FADE_STYLE}>
         {!showTrailer && bgSrc && (
-          <NextImage
-            key={bgSrc}
-            src={bgSrc}
-            alt={title}
-            fill
-            priority={isActive}
-            sizes="100vw"
-            className="object-cover"
-          />
+          <>
+            {/* Relleno difuminado para cubrir los bordes sin recortar la imagen */}
+            <NextImage
+              key={`${bgSrc}-blur`}
+              src={bgSrc}
+              alt=""
+              aria-hidden="true"
+              fill
+              sizes="100vw"
+              className="scale-110 object-cover opacity-50 blur-2xl"
+            />
+            {/* Backdrop completo, sin recorte */}
+            <NextImage
+              key={bgSrc}
+              src={bgSrc}
+              alt={title}
+              fill
+              priority={isActive}
+              sizes="100vw"
+              className="object-contain"
+            />
+          </>
         )}
 
         {showTrailer && (
@@ -368,8 +387,8 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
 
       {/* Contenido */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="mx-auto w-full max-w-7xl px-5 pb-10 sm:px-10 sm:pb-14 lg:pb-16">
-          <div className="max-w-2xl">
+        <div className="w-full px-5 pb-10 sm:px-10 sm:pb-14 lg:px-16 lg:pb-16">
+          <div className="max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
               <div className="relative mb-4 h-20 w-[60%] max-w-sm sm:h-28 sm:w-[70%]">
@@ -498,7 +517,7 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
                 title={watched ? "Marcar como no visto" : "Marcar como visto"}
                 className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
               >
-                {watched ? <Check className="fill-current" /> : <Eye />}
+                {watched ? <Eye /> : <EyeOff />}
               </LiquidButton>
             </div>
 
@@ -535,24 +554,22 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
         list.map(async (movie) => {
           const id = movie.id;
           const mediaType = getMediaTypeForItem(movie);
-          const cacheKey = getBackdropCacheKey(movie, mediaType);
 
           let backdrop = null;
           try {
             const { backdrop: userBackdrop } = getArtworkPreference(id);
             backdrop =
               userBackdrop ||
-              movieBackdropCache.get(cacheKey) ||
-              (await fetchBestBackdrop(id, mediaType)) ||
+              (await fetchBestBackdropNoLang(id, mediaType)) ||
               getPreviewBackdropFallback(movie);
           } catch {
             backdrop = getPreviewBackdropFallback(movie);
           }
-          if (backdrop) movieBackdropCache.set(cacheKey, backdrop);
 
           let logo = null;
           try {
-            logo = await fetchBestLogo(id, mediaType);
+            // Logo del título preferentemente en inglés (luego textless).
+            logo = await fetchBestLogo(id, mediaType, ["en", null]);
           } catch {}
 
           if (backdrop) {
@@ -622,24 +639,24 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
         })}
       </Swiper>
 
-      {/* Flechas (solo desktop) */}
+      {/* Flechas (solo desktop) — estilo glass coherente con la app */}
       {!isMobile && list.length > 1 && (
         <>
           <button
             type="button"
             aria-label="Anterior"
             onClick={() => swiperRef.current?.slidePrev()}
-            className="absolute left-2 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-md transition hover:bg-black/70 sm:block"
+            className="group/arrow absolute left-4 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur-[50px] transition-all duration-300 hover:scale-110 hover:from-white/20 hover:shadow-[0_0_25px_rgba(255,255,255,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
-            <ChevronLeft className="h-7 w-7" />
+            <ChevronLeft className="h-6 w-6 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
           </button>
           <button
             type="button"
             aria-label="Siguiente"
             onClick={() => swiperRef.current?.slideNext()}
-            className="absolute right-2 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-md transition hover:bg-black/70 sm:block"
+            className="group/arrow absolute right-4 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur-[50px] transition-all duration-300 hover:scale-110 hover:from-white/20 hover:shadow-[0_0_25px_rgba(255,255,255,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
-            <ChevronRight className="h-7 w-7" />
+            <ChevronRight className="h-6 w-6 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
           </button>
         </>
       )}

@@ -537,15 +537,7 @@ export default function Navbar() {
   return (
     <>
       {/* ===================== TOP BAR ===================== */}
-      {/* En Inicio, la barra es transparente sobre el hero a pantalla completa y
-          vuelve a su fondo glass al hacer scroll (estilo Netflix/Prime). */}
-      <nav
-        className={`sticky top-0 z-40 w-full transition-[background-color,box-shadow,backdrop-filter] duration-300 ${
-          pathname === "/" && !isScrolled
-            ? "bg-transparent shadow-none"
-            : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
-        }`}
-      >
+      <nav className="sticky top-0 z-40 w-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
