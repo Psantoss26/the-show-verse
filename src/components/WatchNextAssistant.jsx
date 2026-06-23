@@ -483,7 +483,7 @@ export default function WatchNextAssistant({ isMobile = false }) {
               ease: [0.22, 1, 0.36, 1],
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="relative isolate mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] transform-gpu sm:rounded-[2rem] sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]"
+            className="relative isolate mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transform-gpu sm:rounded-[2rem] sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]"
           >
             <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
             {/* Header */}

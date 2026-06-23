@@ -183,12 +183,12 @@ export default function StarRating({
             />
 
             <div
-              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300 ease-out"
+              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
               role="dialog"
               aria-modal="true"
               aria-label="Puntuación del usuario"
             >
-              <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+              <div className="flex items-center justify-between bg-white/[0.025] px-6 py-5">
                 <span className="text-xs font-bold uppercase tracking-widest text-white/55">
                   Tu reseña
                 </span>

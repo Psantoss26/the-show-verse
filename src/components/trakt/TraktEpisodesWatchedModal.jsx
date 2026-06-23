@@ -773,7 +773,7 @@ export default function TraktEpisodesWatchedModal({
   if (!open) return null;
 
   const PanelClass =
-    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 bg-black/25 bg-gradient-to-br from-white/10 via-white/5 to-black/45 backdrop-blur-[50px] sm:rounded-[2rem] sm:border sm:border-white/20 sm:shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]";
+    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 bg-black/45 bg-gradient-to-br from-white/10 via-white/5 to-black/55 backdrop-blur-3xl sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]";
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -797,7 +797,7 @@ export default function TraktEpisodesWatchedModal({
           aria-modal="true"
           aria-label="Marcar película"
         >
-          <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+          <div className="flex items-start justify-between gap-4 bg-white/[0.035] p-5 backdrop-blur-xl">
             <div>
               <h3 className="text-xl font-black text-white">Marcar película</h3>
               <p className="mt-0.5 line-clamp-1 text-sm text-white/55">
@@ -920,7 +920,7 @@ export default function TraktEpisodesWatchedModal({
         aria-label="Episodios vistos"
       >
         {/* Header */}
-        <div className="z-30 flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[0.04] px-5 py-4 backdrop-blur-xl">
+        <div className="z-30 flex shrink-0 items-center justify-between bg-white/[0.035] px-5 py-4 backdrop-blur-xl">
           <div className="min-w-0 pr-4">
             <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
               Episodios vistos
@@ -970,7 +970,7 @@ export default function TraktEpisodesWatchedModal({
         </div>
 
         {/* Toolbar */}
-        <div className="z-20 shrink-0 space-y-2 border-b border-white/10 bg-white/[0.035] px-4 py-3 backdrop-blur-xl">
+        <div className="z-20 shrink-0 space-y-2 bg-white/[0.025] px-4 py-3 backdrop-blur-xl">
           {/* Móvil: búsqueda + toggle filtros */}
           <div className="flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -1471,7 +1471,7 @@ export default function TraktEpisodesWatchedModal({
           ) : viewMode === "list" ? (
             <>
               {/* Sidebar Temporadas (Desktop) */}
-              <div className="hidden w-64 flex-col overflow-y-auto border-r border-white/10 bg-white/[0.035] backdrop-blur-xl sv-scroll md:flex">
+              <div className="hidden w-64 flex-col overflow-y-auto bg-white/[0.02] backdrop-blur-xl sv-scroll md:flex">
                 <div className="p-3 space-y-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
@@ -1532,7 +1532,7 @@ export default function TraktEpisodesWatchedModal({
               </div>
 
               {/* Mobile Season Selector */}
-              <div className="w-full shrink-0 overflow-x-auto border-b border-white/10 bg-white/[0.035] backdrop-blur-xl no-scrollbar md:hidden">
+              <div className="w-full shrink-0 overflow-x-auto bg-white/[0.02] backdrop-blur-xl no-scrollbar md:hidden">
                 <div className="flex gap-2 p-3 min-w-max">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
@@ -1801,7 +1801,7 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl"
+                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
                 role="dialog"
                 aria-modal="true"
                 aria-label={
@@ -1810,7 +1810,7 @@ export default function TraktEpisodesWatchedModal({
                     : "Añadir visionado"
                 }
               >
-                <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
+                <div className="flex items-start justify-between gap-4 bg-white/[0.025] p-5">
                   <div>
                     <h3 className="text-lg font-black text-white">
                       {addPlayMode === "rewatch"
@@ -2007,12 +2007,12 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl"
+                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Historial de visionados"
               >
-                <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
+                <div className="p-5 bg-white/[0.025] flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-black text-white">
                       Historial de visionados

@@ -122,7 +122,7 @@ export default function TraktConnectModal({ open, onClose, onSuccess }) {
       onClick={handleClose}
     >
       <div
-        className="relative w-full max-w-md bg-neutral-900 rounded-2xl border border-white/10 shadow-2xl p-6"
+        className="relative w-full max-w-md bg-black/45 bg-gradient-to-br from-white/10 to-white/5 rounded-[2rem] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botón cerrar */}
