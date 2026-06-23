@@ -157,6 +157,11 @@ export async function fetchTrendingMovies() {
   return data?.results || [];
 }
 
+export async function fetchTrendingMoviesDay() {
+  const data = await tmdb("/trending/movie/day", { page: 1 });
+  return data?.results || [];
+}
+
 export async function fetchPopularMovies() {
   const data = await tmdb("/movie/popular", { page: 1 });
   return data?.results || [];
