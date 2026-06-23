@@ -3278,7 +3278,7 @@ export default function MainDashboardClient({ initialData }) {
           hydrated={hydrated}
         />
 
-        <div className="px-4 pt-10 pb-6 sm:px-6 sm:pt-14 sm:pb-8">
+        <div className="px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8">
           <TopRatedHero
             movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
             tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
