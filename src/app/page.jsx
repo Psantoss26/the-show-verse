@@ -5,7 +5,9 @@ import {
   fetchTopRatedMovies,
   fetchTopRatedTV,
   fetchTrendingMovies,
+  fetchTrendingTV,
   fetchPopularMovies,
+  fetchPopularTV,
   discoverMovies,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
@@ -63,60 +65,178 @@ function curateList(
 }
 
 /* ======== Selección de contenido DESTACADO para el hero ======== */
-// Mezcla curada a partir de las fuentes ya cargadas en SSR (top valoradas,
-// tendencias y galardonadas). Se puntúa cada título y se devuelven los mejores,
-// intercalando películas y series para dar variedad tipo Netflix/Prime.
+const FEATURED_SOURCE_WEIGHTS = {
+  topRatedMovies: 0.38,
+  topRatedTV: 0.38,
+  trendingMovies: 0.55,
+  trendingTV: 0.55,
+  popularMovies: 0.28,
+  popularTV: 0.28,
+  awarded: 0.34,
+};
+
+const normalize01 = (value, max) => {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(1, n / max);
+};
+
+const logScore = (value, maxLog = 5) =>
+  Math.min(1, Math.log10(Number(value || 0) + 1) / maxLog);
+
+function getReleaseDate(item) {
+  const raw = item?.release_date || item?.first_air_date || "";
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function yearsSinceRelease(item) {
+  const time = getReleaseDate(item);
+  if (!time) return 20;
+  return Math.max(0, (Date.now() - time) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function getMediaKey(item, fallbackType = "movie") {
+  if (!item?.id) return null;
+  const type =
+    item.media_type === "tv" ||
+      fallbackType === "tv" ||
+      (item.name && !item.title) ||
+      item.first_air_date
+      ? "tv"
+      : "movie";
+  return `${type}:${item.id}`;
+}
+
+function inferMediaType(item, fallbackType = "movie") {
+  return getMediaKey(item, fallbackType)?.split(":")[0] || fallbackType;
+}
+
+function normalizeFeaturedItem(raw, mediaType) {
+  const type = inferMediaType(raw, mediaType);
+  return {
+    ...raw,
+    media_type: type,
+  };
+}
+
+// Mezcla curada a partir de fuentes SSR: calidad contrastada, popularidad
+// reciente, popularidad amplia y premios. El resultado favorece títulos con
+// buena imagen horizontal y alterna películas/series sin depender de una sola
+// señal.
 function buildFeatured(
-  { topRatedMovies = [], topRatedTV = [], trending = [], awarded = [] } = {},
+  {
+    topRatedMovies = [],
+    topRatedTV = [],
+    trendingMovies = [],
+    trendingTV = [],
+    popularMovies = [],
+    popularTV = [],
+    awarded = [],
+  } = {},
   { size = 8 } = {},
 ) {
-  const trendingIds = new Set(
-    (Array.isArray(trending) ? trending : []).map((m) => m?.id).filter(Boolean),
-  );
-  const awardedIds = new Set(
-    (Array.isArray(awarded) ? awarded : []).map((m) => m?.id).filter(Boolean),
-  );
-
   const pool = new Map();
-  const addAll = (list, mediaType) => {
-    for (const raw of Array.isArray(list) ? list : []) {
+  const addAll = (list, mediaType, source) => {
+    for (const [index, raw] of (Array.isArray(list) ? list : []).entries()) {
       if (!raw?.id) continue;
       if (!raw.backdrop_path) continue; // exige imagen horizontal de calidad
-      if (pool.has(raw.id)) continue;
-      const type = mediaType || (raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie");
-      pool.set(raw.id, { ...raw, media_type: type });
+
+      const item = normalizeFeaturedItem(raw, mediaType);
+      const key = getMediaKey(item, mediaType);
+      if (!key) continue;
+
+      const current = pool.get(key);
+      const sources = {
+        ...(current?.__featuredSources || {}),
+        [source]: {
+          rank: index + 1,
+          weight: FEATURED_SOURCE_WEIGHTS[source] || 0,
+        },
+      };
+
+      pool.set(key, {
+        ...(current || {}),
+        ...item,
+        media_type: item.media_type,
+        __featuredKey: key,
+        __featuredSources: sources,
+      });
     }
   };
 
-  addAll(topRatedMovies, "movie");
-  addAll(topRatedTV, "tv");
-  addAll(trending, null);
-  addAll(awarded, "movie");
+  addAll(topRatedMovies, "movie", "topRatedMovies");
+  addAll(topRatedTV, "tv", "topRatedTV");
+  addAll(trendingMovies, "movie", "trendingMovies");
+  addAll(trendingTV, "tv", "trendingTV");
+  addAll(popularMovies, "movie", "popularMovies");
+  addAll(popularTV, "tv", "popularTV");
+  addAll(awarded, "movie", "awarded");
 
   const scoreOf = (m) => {
-    const rating =
-      typeof m?.vote_average === "number" ? m.vote_average / 10 : 0; // 0..1
-    const votes = Math.min(1, Math.log10((m?.vote_count || 0) + 1) / 5); // ~0..1
-    const trendingBoost = trendingIds.has(m.id) ? 0.35 : 0;
-    const awardedBoost = awardedIds.has(m.id) ? 0.2 : 0;
-    return rating * 1.4 + votes * 0.8 + trendingBoost + awardedBoost;
+    const voteAverage = Number(m?.vote_average || 0);
+    const voteCount = Number(m?.vote_count || 0);
+    const popularity = Number(m?.popularity || 0);
+    const bayesianRating =
+      voteCount > 0 ? (voteCount / (voteCount + 1200)) * voteAverage + (1200 / (voteCount + 1200)) * 7 : 0;
+    const quality = normalize01(bayesianRating, 10);
+    const confidence = logScore(voteCount, 5);
+    const demand = logScore(popularity, 3);
+    const freshEnough = Math.max(0, 1 - yearsSinceRelease(m) / 12);
+    const sourceScore = Object.values(m.__featuredSources || {}).reduce(
+      (sum, source) => {
+        const rankBonus = Math.max(0, 1 - (Number(source.rank || 1) - 1) / 20);
+        return sum + Number(source.weight || 0) * (0.72 + rankBonus * 0.28);
+      },
+      0,
+    );
+
+    return (
+      quality * 1.25 +
+      confidence * 0.72 +
+      demand * 0.42 +
+      freshEnough * 0.18 +
+      sourceScore
+    );
   };
 
-  const ranked = [...pool.values()].sort((a, b) => scoreOf(b) - scoreOf(a));
+  const ranked = [...pool.values()]
+    .filter((item) => {
+      const votes = Number(item?.vote_count || 0);
+      const rating = Number(item?.vote_average || 0);
+      const hasDemandSource = Object.keys(item.__featuredSources || {}).some((source) =>
+        source.startsWith("trending") || source.startsWith("popular"),
+      );
+      return rating >= 6.6 && (votes >= 700 || hasDemandSource);
+    })
+    .sort((a, b) => scoreOf(b) - scoreOf(a));
 
-  // Intercala películas y series para que no salgan todas del mismo tipo.
-  const movies = ranked.filter((m) => m.media_type === "movie");
-  const shows = ranked.filter((m) => m.media_type === "tv");
   const result = [];
-  let i = 0;
-  let j = 0;
-  while (result.length < size && (i < movies.length || j < shows.length)) {
-    if (i < movies.length) result.push(movies[i++]);
+  const typeCounts = { movie: 0, tv: 0 };
+  const genreCounts = new Map();
+  const maxPerType = Math.ceil(size * 0.65);
+
+  for (const item of ranked) {
     if (result.length >= size) break;
-    if (j < shows.length) result.push(shows[j++]);
+    if (typeCounts[item.media_type] >= maxPerType) continue;
+
+    const primaryGenre = Array.isArray(item.genre_ids) ? item.genre_ids[0] : null;
+    if (primaryGenre && (genreCounts.get(primaryGenre) || 0) >= 3) continue;
+
+    result.push(item);
+    typeCounts[item.media_type] += 1;
+    if (primaryGenre) genreCounts.set(primaryGenre, (genreCounts.get(primaryGenre) || 0) + 1);
   }
 
-  return result.slice(0, size);
+  if (result.length < size) {
+    for (const item of ranked) {
+      if (result.length >= size) break;
+      if (result.some((selected) => selected.__featuredKey === item.__featuredKey)) continue;
+      result.push(item);
+    }
+  }
+
+  return result.slice(0, size).map(({ __featuredKey, __featuredSources, ...item }) => item);
 }
 
 /* ======== Carga de datos en el SERVIDOR ======== */
@@ -127,8 +247,10 @@ async function getDashboardData() {
       topRatedTV,
       awarded,
       dramaTV,
-      trending,
-      popular,
+      trendingMovies,
+      trendingTV,
+      popularMovies,
+      popularTV,
     ] = await Promise.all([
       fetchTopRatedMovies(5000),
       fetchTopRatedTV(5000),
@@ -145,7 +267,9 @@ async function getDashboardData() {
         language: "es-ES",
       }),
       fetchTrendingMovies(),
+      fetchTrendingTV(),
       fetchPopularMovies(),
+      fetchPopularTV(),
     ]);
 
     // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
@@ -174,7 +298,10 @@ async function getDashboardData() {
         {
           topRatedMovies: topRatedMoviesSSR,
           topRatedTV: topRatedTVSSR,
-          trending,
+          trendingMovies,
+          trendingTV,
+          popularMovies,
+          popularTV,
           awarded: awardedSSR,
         },
         { size: 8 },
@@ -186,8 +313,8 @@ async function getDashboardData() {
         minSize: 25,
         maxSize: 70,
       }),
-      trending,
-      popular,
+      trending: [...trendingMovies, ...trendingTV],
+      popular: [...popularMovies, ...popularTV],
 
       // Trakt se carga en el cliente para que Inicio no bloquee la navegación
       // validando cookies/tokens ni esperando endpoints externos.

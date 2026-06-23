@@ -48,6 +48,9 @@ import {
 // "original" = máxima resolución de TMDb; NextImage la reescala según el
 // viewport, así que la imagen del hero se ve nítida en pantallas grandes/retina.
 const HERO_BACKDROP_SIZE = "original";
+const YOUTUBE_QUALITY_HINT = "highres";
+const YOUTUBE_QUALITY_FALLBACK = "hd1080";
+const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 
@@ -304,7 +307,7 @@ function FeaturedSlide({
     ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
     `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
     `&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1` +
-    `&vq=hd1080&hd=1` + // pista de máxima calidad
+    `&vq=${YOUTUBE_QUALITY_HINT}&hd=1` + // pista de máxima calidad
     `&origin=${typeof window !== "undefined"
       ? encodeURIComponent(window.location.origin)
       : ""
@@ -345,6 +348,8 @@ function FeaturedSlide({
                     className="pointer-events-none absolute inset-0 h-full w-full"
                     src={trailerSrc}
                     title={`Trailer - ${title}`}
+                    width="1920"
+                    height="1080"
                     allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen={false}
                     onLoad={() => {
@@ -357,13 +362,19 @@ function FeaturedSlide({
                             JSON.stringify({ event: "command", func, args }),
                             target,
                           );
-                        setTimeout(() => {
+                        const requestBestQuality = () => {
                           cmd("unMute");
                           cmd("setVolume", [25]);
                           // Fuerza la máxima resolución disponible del reproductor.
-                          cmd("setPlaybackQualityRange", ["hd2160", "hd1080"]);
-                          cmd("setPlaybackQuality", ["hd1080"]);
-                        }, 150);
+                          cmd("setPlaybackQualityRange", [
+                            YOUTUBE_QUALITY_HINT,
+                            YOUTUBE_QUALITY_FALLBACK,
+                          ]);
+                          cmd("setPlaybackQuality", [YOUTUBE_QUALITY_HINT]);
+                        };
+                        YOUTUBE_QUALITY_RETRY_DELAYS.forEach((delay) => {
+                          setTimeout(requestBestQuality, delay);
+                        });
                       } catch { }
                     }}
                   />
@@ -665,24 +676,24 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
         })}
       </Swiper>
 
-      {/* Flechas (solo desktop) — estilo glass coherente con la app */}
+      {/* Flechas (solo desktop) */}
       {!isMobile && list.length > 1 && (
         <>
           <button
             type="button"
             aria-label="Anterior"
             onClick={() => swiperRef.current?.slidePrev()}
-            className="group/arrow absolute left-4 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur-[50px] transition-all duration-300 hover:scale-110 hover:from-white/20 hover:shadow-[0_0_25px_rgba(255,255,255,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+            className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
-            <ChevronLeft className="h-6 w-6 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
+            <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
           </button>
           <button
             type="button"
             aria-label="Siguiente"
             onClick={() => swiperRef.current?.slideNext()}
-            className="group/arrow absolute right-4 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur-[50px] transition-all duration-300 hover:scale-110 hover:from-white/20 hover:shadow-[0_0_25px_rgba(255,255,255,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+            className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
-            <ChevronRight className="h-6 w-6 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
+            <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
           </button>
         </>
       )}
