@@ -301,6 +301,33 @@ export async function fetchBestPoster(itemId, mediaType = "movie") {
   return best?.file_path || null;
 }
 
+// Selecciona el mejor cartel SIN idioma (textless). Si no hay textless, cae al
+// de mayor resolución disponible.
+export function pickBestPosterNoLang(list, { minWidth = 500 } = {}) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const noLang = list.filter((p) => !norm(p?.iso_639_1));
+  const pool = noLang.length ? noLang : list;
+
+  const sized = pool.filter((p) => (p?.width || 0) >= minWidth);
+  const candidates = sized.length ? sized : pool;
+
+  return (
+    [...candidates].sort(
+      (a, b) =>
+        (b?.width || 0) - (a?.width || 0) ||
+        (b?.vote_average || 0) - (a?.vote_average || 0),
+    )[0] || null
+  );
+}
+
+export async function fetchBestPosterNoLang(itemId, mediaType = "movie") {
+  const { posters } = await getMovieImages(itemId, mediaType);
+  const best = pickBestPosterNoLang(posters);
+  return best?.file_path || null;
+}
+
 /* =================== LOGOS (arte del título) =================== */
 function pickBestLogoByLang(logos, order = ["es", "en", null]) {
   if (!Array.isArray(logos) || logos.length === 0) return null;

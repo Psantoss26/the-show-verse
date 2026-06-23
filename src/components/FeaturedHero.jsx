@@ -1,7 +1,7 @@
 // /src/components/FeaturedHero.jsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, Pagination, EffectFade } from "swiper/modules";
 import "swiper/swiper-bundle.css";
@@ -36,6 +36,7 @@ import {
   getMediaTypeForItem,
   getPreviewBackdropFallback,
   fetchBestBackdropNoLang,
+  fetchBestPosterNoLang,
   fetchBestLogo,
   getBestTrailerCached,
   getArtworkPreference,
@@ -45,23 +46,28 @@ import {
   formatRuntime,
 } from "@/lib/dashboard/media";
 
-const HERO_BACKDROP_SIZE = "w1280";
+// "original" = máxima resolución de TMDb; NextImage la reescala según el
+// viewport, así que la imagen del hero se ve nítida en pantallas grandes/retina.
+const HERO_BACKDROP_SIZE = "original";
+const HERO_POSTER_SIZE = "original";
+// Tras este tiempo en un slide activo, se reproduce su trailer automáticamente.
+const TRAILER_AUTOPLAY_DELAY = 4000;
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
-
-// Difuminado de bordes (superior e inferior) del hero: la imagen se desvanece
-// gradualmente hacia el fondo en lugar de terminar en un corte recto.
-const HERO_EDGE_FADE =
-  "linear-gradient(to bottom, transparent 0%, #000 9%, #000 84%, transparent 100%)";
-const HERO_EDGE_FADE_STYLE = {
-  WebkitMaskImage: HERO_EDGE_FADE,
-  maskImage: HERO_EDGE_FADE,
-};
 
 /* ====================================================================
  * Slide individual del hero a pantalla completa
  * ==================================================================== */
-function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
+function FeaturedSlide({
+  movie,
+  backdropPath,
+  posterPath,
+  logoPath,
+  isActive,
+  isMobile,
+  onTrailerPlay,
+  onTrailerClose,
+}) {
   const { session, account } = useAuth();
   const router = useRouter();
 
@@ -80,6 +86,9 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  // Si el usuario cierra el trailer manualmente, no se vuelve a auto-reproducir
+  // en este slide.
+  const userClosedTrailerRef = useRef(false);
 
   // Al dejar de ser el slide activo, cerramos el trailer.
   useEffect(() => {
@@ -89,7 +98,33 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
   useEffect(() => {
     setShowTrailer(false);
     setTrailer(null);
+    userClosedTrailerRef.current = false;
   }, [movie?.id]);
+
+  // Auto-reproduce el trailer del título activo tras un breve timeout (estilo
+  // Netflix/Prime). Al iniciarse, pausa el carrusel para que se vea completo.
+  useEffect(() => {
+    if (!isActive || showTrailer || userClosedTrailerRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setTrailerLoading(true);
+        const t = await getBestTrailerCached(movie.id, mediaType);
+        // Solo se muestra si seguimos activos y el usuario no lo cerró entretanto.
+        if (!t?.key || userClosedTrailerRef.current) return;
+        setTrailer(t);
+        setShowTrailer(true);
+        onTrailerPlay?.();
+      } catch {
+        // sin trailer disponible → se mantiene el backdrop
+      } finally {
+        setTrailerLoading(false);
+      }
+    }, TRAILER_AUTOPLAY_DELAY);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, movie?.id]);
 
   // Estado de cuenta (favorito/pendiente/visto). El backend devuelve los tres
   // estados en una sola llamada (igual que DetailsClient), con source "backend".
@@ -162,7 +197,7 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
             const ds = await fetchImdbRatingByImdb(imdbId);
             if (typeof ds?.rating === "number") imdbRating = ds.rating;
           }
-        } catch {}
+        } catch { }
 
         if (!abort) setExtras({ runtime, imdbRating });
       } catch {
@@ -192,6 +227,8 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
     e.stopPropagation();
     if (showTrailer) {
       setShowTrailer(false);
+      userClosedTrailerRef.current = true; // no auto-reproducir de nuevo aquí
+      onTrailerClose?.(); // reanuda el carrusel
       return;
     }
     try {
@@ -204,6 +241,7 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
       }
       setTrailer(t);
       setShowTrailer(true);
+      onTrailerPlay?.();
     } catch {
       setError("No se pudo cargar el trailer.");
     } finally {
@@ -290,8 +328,15 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
       .join(" · ");
   }, [movie]);
 
-  const bgSrc = backdropPath ? buildImg(backdropPath, HERO_BACKDROP_SIZE) : null;
-  const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
+  // En móvil usamos el cartel/poster textless (encaja mejor en vertical); en
+  // escritorio, el backdrop completo sin recorte.
+  const useMobilePoster = isMobile && !!posterPath;
+  const bgSrc = useMobilePoster
+    ? buildImg(posterPath, HERO_POSTER_SIZE)
+    : backdropPath
+      ? buildImg(backdropPath, HERO_BACKDROP_SIZE)
+      : null;
+  const logoSrc = logoPath ? buildImg(logoPath, "original") : null;
   const title = movie.title || movie.name || "";
   const overview =
     typeof movie.overview === "string" && movie.overview.trim()
@@ -300,13 +345,13 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
 
   const trailerSrc = trailer?.key
     ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
-      `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
-      `&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1` +
-      `&origin=${
-        typeof window !== "undefined"
-          ? encodeURIComponent(window.location.origin)
-          : ""
-      }`
+    `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+    `&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1` +
+    `&vq=hd1080&hd=1` + // pista de máxima calidad
+    `&origin=${typeof window !== "undefined"
+      ? encodeURIComponent(window.location.origin)
+      : ""
+    }`
     : null;
 
   return (
@@ -314,33 +359,19 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
       className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-black"
       onClick={navigateToDetails}
     >
-      {/* Fondo: backdrop o trailer. La máscara vertical difumina los bordes
-          superior e inferior para que la imagen se funda con el fondo en vez de
-          cortarse en seco. */}
-      <div className="absolute inset-0" style={HERO_EDGE_FADE_STYLE}>
+      {/* Fondo: backdrop/cartel a sangre completa (estilo Prime). La imagen
+          cubre toda la superficie sin dejar espacios en los extremos. */}
+      <div className="absolute inset-0">
         {!showTrailer && bgSrc && (
-          <>
-            {/* Relleno difuminado para cubrir los bordes sin recortar la imagen */}
-            <NextImage
-              key={`${bgSrc}-blur`}
-              src={bgSrc}
-              alt=""
-              aria-hidden="true"
-              fill
-              sizes="100vw"
-              className="scale-110 object-cover opacity-50 blur-2xl"
-            />
-            {/* Backdrop completo, sin recorte */}
-            <NextImage
-              key={bgSrc}
-              src={bgSrc}
-              alt={title}
-              fill
-              priority={isActive}
-              sizes="100vw"
-              className="object-contain"
-            />
-          </>
+          <NextImage
+            key={bgSrc}
+            src={bgSrc}
+            alt={title}
+            fill
+            priority={isActive}
+            sizes="100vw"
+            className="object-cover object-center"
+          />
         )}
 
         {showTrailer && (
@@ -371,8 +402,11 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
                       setTimeout(() => {
                         cmd("unMute");
                         cmd("setVolume", [25]);
+                        // Fuerza la máxima resolución disponible del reproductor.
+                        cmd("setPlaybackQualityRange", ["hd2160", "hd1080"]);
+                        cmd("setPlaybackQuality", ["hd1080"]);
                       }, 150);
-                    } catch {}
+                    } catch { }
                   }}
                 />
               </div>
@@ -381,27 +415,43 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
         )}
       </div>
 
-      {/* Degradados para legibilidad */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/45 via-40% to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/85 via-black/20 to-transparent" />
+      {/* Degradados estilo Prime: izquierda fuerte (legibilidad del texto),
+          base hacia el fondo y un velo superior para fundir con la cabecera.
+          Aseguran que la imagen llegue a los extremos sin cortes visibles. */}
+      <div
+        className="pointer-events-none absolute inset-0 hidden sm:block"
+        style={{
+          background:
+            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.85) 22%, rgba(0,0,0,0.35) 48%, transparent 72%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5"
+        style={{
+          background:
+            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.55) 35%, transparent 100%)",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent sm:h-28" />
 
-      {/* Contenido */}
+      {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
+          lateral izquierdo y un margen inferior cómodo. */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-5 pb-10 sm:px-10 sm:pb-14 lg:px-16 lg:pb-16">
+        <div className="w-full px-8 pb-20 sm:px-16 sm:pb-24 lg:px-32 lg:pb-28">
           <div className="max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
-              <div className="relative mb-4 h-20 w-[60%] max-w-sm sm:h-28 sm:w-[70%]">
+              <div className="relative mb-5 h-28 w-[78%] max-w-md sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl">
                 <NextImage
                   src={logoSrc}
                   alt={title}
                   fill
-                  sizes="(min-width:640px) 420px, 60vw"
+                  sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 78vw"
                   className="object-contain object-left drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
                 />
               </div>
             ) : (
-              <h2 className="mb-4 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:text-5xl">
+              <h2 className="mb-5 text-4xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:text-6xl">
                 {title}
               </h2>
             )}
@@ -537,14 +587,31 @@ function FeaturedSlide({ movie, backdropPath, logoPath, isActive }) {
 export default function FeaturedHero({ items = [], isMobile, hydrated }) {
   const swiperRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [assets, setAssets] = useState({}); // id -> { backdrop, logo }
+  const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
     [items],
   );
 
-  // Carga progresiva de backdrops EN + logos del título (cliente)
+  // Pausa el carrusel cuando empieza un trailer (para que se vea completo) y lo
+  // reanuda si el usuario cierra el trailer.
+  const pauseAutoplay = useCallback(() => {
+    try {
+      swiperRef.current?.autoplay?.stop();
+    } catch { }
+  }, []);
+
+  const resumeAutoplay = useCallback(() => {
+    if (!hydrated) return;
+    try {
+      swiperRef.current?.autoplay?.start();
+    } catch { }
+  }, [hydrated]);
+
+  // Carga progresiva de backdrops/carteles textless + logos del título (cliente).
+  // getMovieImages cachea la respuesta completa por título, así que pedir
+  // backdrop, cartel y logo no implica peticiones de red adicionales.
   useEffect(() => {
     if (!list.length) return;
     let canceled = false;
@@ -566,16 +633,29 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
             backdrop = getPreviewBackdropFallback(movie);
           }
 
+          let poster = null;
+          try {
+            poster =
+              (await fetchBestPosterNoLang(id, mediaType)) ||
+              movie.poster_path ||
+              null;
+          } catch {
+            poster = movie.poster_path || null;
+          }
+
           let logo = null;
           try {
             // Logo del título preferentemente en inglés (luego textless).
             logo = await fetchBestLogo(id, mediaType, ["en", null]);
-          } catch {}
+          } catch { }
 
-          if (backdrop) {
-            await preloadImage(buildImg(backdrop, HERO_BACKDROP_SIZE));
-          }
-          return [id, { backdrop, logo }];
+          // Precarga solo la imagen que se mostrará en la vista actual.
+          const toPreload = isMobile
+            ? poster && buildImg(poster, HERO_POSTER_SIZE)
+            : backdrop && buildImg(backdrop, HERO_BACKDROP_SIZE);
+          if (toPreload) await preloadImage(toPreload);
+
+          return [id, { backdrop, poster, logo }];
         }),
       );
 
@@ -589,7 +669,7 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     return () => {
       canceled = true;
     };
-  }, [list]);
+  }, [list, isMobile]);
 
   if (!list.length) return null;
 
@@ -626,13 +706,18 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
           const a = assets[movie.id] || {};
           const seededBackdrop =
             a.backdrop || getPreviewBackdropFallback(movie) || null;
+          const seededPoster = a.poster || movie.poster_path || null;
           return (
             <SwiperSlide key={movie.id} className="!h-full">
               <FeaturedSlide
                 movie={movie}
                 backdropPath={seededBackdrop}
+                posterPath={seededPoster}
                 logoPath={a.logo || null}
                 isActive={index === activeIndex}
+                isMobile={isMobile}
+                onTrailerPlay={pauseAutoplay}
+                onTrailerClose={resumeAutoplay}
               />
             </SwiperSlide>
           );
