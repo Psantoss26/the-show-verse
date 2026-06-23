@@ -3325,6 +3325,11 @@ export default function DetailsClient({
   const watchedBySeasonRef = useRef(initialWatchedBySeason);
   const watchedBySeasonLoadedRef = useRef(hasInitialShowWatched);
   const watchedBySeasonRequestIdRef = useRef(0);
+  // Ref a la última versión de loadTraktShowWatched (para invocarla en un efecto
+  // sin meterla en deps y evitar re-ejecuciones). Y flag de "carga inicial ya
+  // disparada" para no duplicar el fetch con el efecto de reconexión.
+  const loadTraktShowWatchedRef = useRef(null);
+  const showWatchedInitiatedRef = useRef(false);
   const showPlaysRequestIdRef = useRef(0);
   const rewatchViewCacheRef = useRef(new Map());
 
@@ -3697,13 +3702,17 @@ export default function DetailsClient({
     hasAnyWatchedEpisodeInMap,
   ]);
 
-  // Carga los episodios vistos de una serie desde la API de Trakt
-  const loadTraktShowWatched = useCallback(async () => {
+  // Carga los episodios vistos de una serie desde la API de Trakt.
+  // allowDisconnected: lanza la petición sin esperar al flag de cliente
+  // `trakt.connected` (el servidor decide la conexión por la cookie). Sirve para
+  // disparar esta carga EN PARALELO con item/status en el primer acceso, en vez
+  // de esperar a que item/status confirme la conexión (cascada).
+  const loadTraktShowWatched = useCallback(async ({ allowDisconnected = false } = {}) => {
     if (type !== "tv") return;
     const requestId = watchedBySeasonRequestIdRef.current + 1;
     watchedBySeasonRequestIdRef.current = requestId;
 
-    if (!trakt?.connected) {
+    if (!trakt?.connected && !allowDisconnected) {
       setWatchedBySeason({});
       setWatchedBySeasonLoaded(false);
       return { ok: false, connected: false };
@@ -3768,6 +3777,20 @@ export default function DetailsClient({
       };
     }
   }, [type, id, trakt?.connected, applyWatchedBySeasonState]);
+
+  useEffect(() => {
+    loadTraktShowWatchedRef.current = loadTraktShowWatched;
+  }, [loadTraktShowWatched]);
+
+  // Carga inicial de episodios vistos EN PARALELO con item/status (no espera a
+  // que se confirme trakt.connected). Así el botón se revela tras el más lento de
+  // los dos fetches, no la suma → menos retardo en el primer acceso. Se invoca
+  // por ref para no depender de la identidad de la función (evita re-ejecuciones).
+  useEffect(() => {
+    if (endpointType !== "tv") return;
+    showWatchedInitiatedRef.current = true;
+    void loadTraktShowWatchedRef.current?.({ allowDisconnected: true });
+  }, [id, endpointType]);
 
   // Cierra el modal de episodios al instante y reconcilia el % visto en segundo plano.
   const closeTraktEpisodesModal = useCallback(() => {
@@ -4101,11 +4124,36 @@ export default function DetailsClient({
 
     let ignore = false;
 
+    const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${tCommentsTab}`;
+
     const load = async () => {
-      setTComments((p) => ({ ...p, loading: true, error: "" }));
+      const isLikes30 = tCommentsTab === "likes30";
+      const isFirstPage = isLikes30 || tComments.page === 1;
+
+      // SWR: pintamos la caché al instante (sin spinner) y revalidamos en 2º
+      // plano, así al volver a entrar los comentarios aparecen ya cargados.
+      let hadCache = false;
+      if (isFirstPage && typeof window !== "undefined") {
+        try {
+          const raw = window.localStorage.getItem(commentsCacheKey);
+          const cached = raw ? JSON.parse(raw) : null;
+          if (cached && Array.isArray(cached.items)) {
+            hadCache = true;
+            setTComments((p) => ({
+              ...p,
+              loading: false,
+              error: "",
+              items: cached.items,
+              hasMore: !!cached.hasMore,
+              total: Number(cached.total || 0),
+            }));
+          }
+        } catch {}
+      }
+
+      setTComments((p) => ({ ...p, loading: !hadCache, error: "" }));
 
       try {
-        const isLikes30 = tCommentsTab === "likes30";
         const sort = tCommentsTab === "recent" ? "newest" : "likes";
 
         // Para likes30: pedimos mas y filtramos por fecha (ultimos 30 dias)
@@ -4152,12 +4200,28 @@ export default function DetailsClient({
           hasMore: !isLikes30 ? hasMore : false,
           total,
         }));
+
+        // Persistimos solo la primera página (lo que se ve al entrar).
+        if (isFirstPage && typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              commentsCacheKey,
+              JSON.stringify({
+                items,
+                hasMore: !isLikes30 ? hasMore : false,
+                total,
+                t: Date.now(),
+              }),
+            );
+          } catch {}
+        }
       } catch (e) {
         if (!ignore)
           setTComments((p) => ({
             ...p,
             loading: false,
-            error: e?.message || "Error",
+            // Si ya mostramos caché, no rompemos la vista con el error.
+            error: hadCache ? "" : e?.message || "Error",
           }));
       }
     };
@@ -4288,8 +4352,30 @@ export default function DetailsClient({
     let ignore = false;
     let timeoutId = null;
 
+    const listsCacheKey = `showverse:trakt:lists:${traktType}:${id}:${tListsTab}`;
+    // SWR: pintamos la caché al instante (sin spinner); el fetch revalida en 2º
+    // plano, así al volver a entrar las listas aparecen ya cargadas.
+    let hadCache = false;
+    if (tLists.page === 1 && typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(listsCacheKey);
+        const cached = raw ? JSON.parse(raw) : null;
+        if (cached && Array.isArray(cached.items)) {
+          hadCache = true;
+          setTLists((p) => ({
+            ...p,
+            loading: false,
+            error: "",
+            items: cached.items,
+            hasMore: !!cached.hasMore,
+            total: Number(cached.total || 0),
+          }));
+        }
+      } catch {}
+    }
+
     const load = async () => {
-      setTLists((p) => ({ ...p, loading: true, error: "" }));
+      setTLists((p) => ({ ...p, loading: !hadCache, error: "" }));
       const retryDelays = [0, 1400];
 
       for (let attempt = 0; attempt < retryDelays.length; attempt++) {
@@ -4340,6 +4426,15 @@ export default function DetailsClient({
             hasMore,
             total,
           }));
+          // Persistimos solo la primera página (lo que se ve al entrar).
+          if (tLists.page === 1 && typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(
+                listsCacheKey,
+                JSON.stringify({ items, hasMore, total, t: Date.now() }),
+              );
+            } catch {}
+          }
           return;
         } catch (e) {
           if (ignore) return;
@@ -4356,7 +4451,7 @@ export default function DetailsClient({
           setTLists((p) => ({
             ...p,
             loading: false,
-            error: isTransient ? "" : e?.message || "Error",
+            error: hadCache ? "" : isTransient ? "" : e?.message || "Error",
           }));
           return;
         }
@@ -4371,10 +4466,12 @@ export default function DetailsClient({
       }
     };
 
-    // ⏱️ Delay adicional para dejar que scoreboard y stats se asienten primero
+    // ⏱️ Pequeño delay para dejar que scoreboard y stats se asienten primero.
+    // Reducido: la caché SWR ya pinta las listas al instante; este delay solo
+    // afecta a la revalidación/primer acceso sin caché.
     timeoutId = setTimeout(() => {
       load();
-    }, 900);
+    }, 400);
 
     return () => {
       ignore = true;
@@ -4481,7 +4578,13 @@ export default function DetailsClient({
             traktId: normalizedJson.traktId ?? null,
             traktUrl: normalizedJson.traktUrl || prev.traktUrl || null,
             watched: preserveTvWatched
-              ? prev.watched
+              ? // Derivamos de los episodios YA cargados (ref), no de prev.watched:
+                // con la carga en paralelo, item/status puede resolver antes de que
+                // el efecto de sync actualice prev.watched, lo que revelaría el
+                // botón como "no visto" un instante. Esto lo evita.
+                Object.values(watchedBySeasonRef.current || {}).some(
+                  (eps) => Array.isArray(eps) && eps.length > 0,
+                )
               : !!normalizedJson.watched,
             plays: Number(normalizedJson.plays || 0),
             lastWatchedAt: normalizedJson.lastWatchedAt || null,
@@ -4538,7 +4641,12 @@ export default function DetailsClient({
         return nextState;
       }
     },
-    [traktType, id, endpointType, watchedBySeasonLoaded],
+    // NOTA: usamos watchedBySeasonLoadedRef.current (no el state) a propósito.
+    // Incluir watchedBySeasonLoaded aquí cambiaba la identidad de la función al
+    // cargar los episodios, lo que re-ejecutaba el efecto de carga inicial y
+    // disparaba un segundo reload no-background → `loading` volvía a true →
+    // parpadeo en el primer acceso. Por eso NO va en las dependencias.
+    [traktType, id, endpointType],
   );
 
   const loadTraktMovieWatched = useCallback(
@@ -5058,11 +5166,20 @@ export default function DetailsClient({
     );
 
     setWatchedBySeason(nextWatchedBySeason);
-    setWatchedBySeasonLoaded(
-      hydratedShowWatched && !hasInitialShowWatched
-        ? false
-        : nextWatchedBySeasonLoaded,
-    );
+    // Mantenemos loaded=true al hidratar desde caché (antes se forzaba a false).
+    // Forzarlo a false desactivaba `preserveTvWatched`, así que el
+    // reloadTraktStatus({ force:true }) inicial sobrescribía `trakt.watched` con
+    // el valor "crudo" del item/status (false en series) y, justo después, la
+    // carga de episodios lo volvía a marcar → el parpadeo
+    // "marcado → desmarcado → marcado". Con loaded=true el % se muestra al
+    // instante y el estado visto se PRESERVA durante la recarga; la
+    // revalidación de episodios sigue corriendo en 2º plano (efecto aparte).
+    setWatchedBySeasonLoaded(nextWatchedBySeasonLoaded);
+    // Sincronizamos los refs YA (no esperamos al efecto de sync) para que el
+    // reloadTraktStatus inicial vea watchedBySeasonLoadedRef=true y preserve el
+    // estado visto aunque su respuesta llegue muy rápido.
+    watchedBySeasonRef.current = nextWatchedBySeason;
+    watchedBySeasonLoadedRef.current = nextWatchedBySeasonLoaded;
     setHasCachedTraktStatus(hydratedStatus);
     setHasCachedShowWatched(hydratedShowWatched);
   }, [
@@ -5334,10 +5451,13 @@ export default function DetailsClient({
     endpointType,
   ]);
 
-  // Trigger para cargar episodios vistos cuando cambian las dependencias
+  // Trigger para cargar episodios vistos al conectar. La carga INICIAL ya la hace
+  // el efecto en paralelo (allowDisconnected); aquí evitamos duplicar el fetch
+  // cuando se confirma la conexión en el primer acceso.
   useEffect(() => {
     if (endpointType !== "tv") return;
     if (!trakt.connected) return;
+    if (showWatchedInitiatedRef.current) return;
     loadTraktShowWatched();
   }, [
     endpointType,
