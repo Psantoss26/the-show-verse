@@ -488,7 +488,14 @@ export default function Navbar() {
     };
 
     const t = tones[tone] || tones.amber;
-    return `${base} ${active ? t.active : t.hover} ${active ? "" : "text-neutral-400"}`;
+    // En la fase inicial del hero (navbar transparente) los iconos pueden
+    // perderse sobre backdrops claros: los aclaramos y les damos una sombra
+    // oscura para garantizar contraste sobre cualquier fondo.
+    const inactiveColor = heroNavMode ? "text-neutral-100" : "text-neutral-400";
+    const heroShadow = heroNavMode
+      ? " drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
+      : "";
+    return `${base} ${active ? t.active : t.hover} ${active ? "" : inactiveColor}${heroShadow}`;
   };
 
   const navLinkClassMobileBottom = (href, tone = "blue") => {
@@ -761,7 +768,15 @@ export default function Navbar() {
                 {t("nav_login", "Iniciar sesión")}
               </a>
             ) : (
-              <UserAvatar account={account} />
+              <div
+                className={
+                  heroNavMode
+                    ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]"
+                    : undefined
+                }
+              >
+                <UserAvatar account={account} />
+              </div>
             )}
           </div>
 
