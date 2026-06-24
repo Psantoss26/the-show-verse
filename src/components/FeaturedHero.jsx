@@ -43,13 +43,13 @@ import {
 
 // El hero convive con previews interactivas en la misma vista. Usamos tamaños
 // acotados para no competir con los backdrops de hover del dashboard.
-const HERO_BACKDROP_SIZE = "w1280";
+const HERO_BACKDROP_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 5000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
-const YOUTUBE_QUALITY_FALLBACK = "hd1080";
-const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800];
+const YOUTUBE_QUALITY_MIN = "hd1080";
+const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 
@@ -523,6 +523,7 @@ function FeaturedSlide({
             fill
             loading="lazy"
             fetchPriority="low"
+            quality={100}
             sizes="100vw"
             className={isMobile ? "object-contain object-center" : "object-contain object-right"}
           />
@@ -542,8 +543,8 @@ function FeaturedSlide({
                     className="pointer-events-none absolute inset-0 h-full w-full"
                     src={trailerSrc}
                     title={`Trailer - ${title}`}
-                    width="1920"
-                    height="1080"
+                    width="3840"
+                    height="2160"
                     allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen={false}
                     onLoad={() => {
@@ -559,10 +560,11 @@ function FeaturedSlide({
                         const requestBestQuality = () => {
                           cmd("unMute");
                           cmd("setVolume", [25]);
-                          // Fuerza la máxima resolución disponible del reproductor.
+                          // Pide la máxima resolución disponible; YouTube ajusta
+                          // al mejor nivel real que tenga cada trailer.
                           cmd("setPlaybackQualityRange", [
+                            YOUTUBE_QUALITY_MIN,
                             YOUTUBE_QUALITY_HINT,
-                            YOUTUBE_QUALITY_FALLBACK,
                           ]);
                           cmd("setPlaybackQuality", [YOUTUBE_QUALITY_HINT]);
                         };
