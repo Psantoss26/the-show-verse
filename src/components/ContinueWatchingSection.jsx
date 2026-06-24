@@ -286,7 +286,7 @@ function ContinueWatchingBaseCard({ show }) {
  * Tarjeta hover: backdrop ampliado (16:9) + panel de info
  * con botones Continuar / Favoritos / Pendientes
  * ==================================================================== */
-function ContinueWatchingPreviewCard({ show, index, totalCount }) {
+function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex }) {
   const { session, account } = useAuth();
   const router = useRouter();
   const { backdropPath, ready } = useShowBackdrop(show);
@@ -416,24 +416,37 @@ function ContinueWatchingPreviewCard({ show, index, totalCount }) {
   })();
 
   // Determinar la alineación horizontal de la tarjeta absoluta
+  const activeIdx = typeof activeIndex === "number" ? activeIndex : 0;
+  const isLeftBoundary = index === activeIdx || index === 0;
+  const isRightBoundary = index === activeIdx + 5 || index === totalCount - 1;
+
   let alignmentClass = "left-1/2 -translate-x-1/2";
-  if (index === 0) {
+  let transformOrigin = "center center";
+
+  if (isLeftBoundary) {
     alignmentClass = "left-0";
-  } else if (index === totalCount - 1) {
+    transformOrigin = "left center";
+  } else if (isRightBoundary) {
     alignmentClass = "right-0";
+    transformOrigin = "right center";
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
-      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[280px] sm:w-[320px] md:w-[380px] xl:w-[420px] rounded-xl text-white cursor-pointer bg-[#141414] shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 z-50 flex flex-col overflow-hidden`}
+      initial={{ opacity: 0, scale: 0.88, y: 0 }}
+      animate={{ opacity: 1, scale: 1.12, y: -10 }}
+      exit={{ opacity: 0, scale: 0.88, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
+      transition={{
+        type: "spring",
+        stiffness: 180,
+        damping: 20,
+        mass: 0.8
+      }}
+      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[280px] sm:w-[320px] md:w-[380px] xl:w-[420px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
       onClick={() => router.push(href)}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
-      style={{ willChange: "transform, opacity" }}
+      style={{ willChange: "transform, opacity", transformOrigin }}
     >
       {/* Backdrop de 16:9 */}
       <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
@@ -449,19 +462,26 @@ function ContinueWatchingPreviewCard({ show, index, totalCount }) {
         )}
 
         {bgSrc && (
-          <NextImage
-            key={bgSrc}
-            src={bgSrc}
-            alt={show?.title || ""}
-            fill
-            sizes="(min-width:1280px) 420px, (min-width:768px) 380px, 320px"
-            className={`scale-[1.015] object-cover transition-opacity duration-200 ${
-              ready ? "opacity-100" : "opacity-0"
-            }`}
-            style={cwBackdropFadeStyle}
-            loading="eager"
-            fetchPriority="high"
-          />
+          <motion.div
+            initial={{ scale: 1 }}
+            animate={{ scale: 1.08 }}
+            transition={{ duration: 4, ease: "easeOut" }}
+            className="absolute inset-0 w-full h-full"
+          >
+            <NextImage
+              key={bgSrc}
+              src={bgSrc}
+              alt={show?.title || ""}
+              fill
+              sizes="(min-width:1280px) 420px, (min-width:768px) 380px, 320px"
+              className={`scale-[1.015] object-cover transition-opacity duration-200 ${
+                ready ? "opacity-100" : "opacity-0"
+              }`}
+              style={cwBackdropFadeStyle}
+              loading="eager"
+              fetchPriority="high"
+            />
+          </motion.div>
         )}
 
         {/* Barra de progreso verde superpuesta al pie del backdrop */}
@@ -477,7 +497,12 @@ function ContinueWatchingPreviewCard({ show, index, totalCount }) {
       </div>
 
       {/* Panel de info (debajo del backdrop) */}
-      <div className="w-full bg-[#141414] px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
+        className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-200 sm:text-xs">
@@ -542,7 +567,7 @@ function ContinueWatchingPreviewCard({ show, index, totalCount }) {
             </LiquidButton>
           </div>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -598,6 +623,46 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [animatingOutId, setAnimatingOutId] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const hoverTimeoutRef = useRef(null);
+
+  // Limpiar temporizador al desmontar
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnterItem = (itemKey, index) => {
+    if (isMobile) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredId(itemKey);
+      setHoveredIndex(index);
+    }, 250); // 250ms de retraso para evitar activaciones accidentales y agilizar la apertura
+  };
+
+  const handleMouseLeaveItem = (itemKey) => {
+    if (isMobile) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredId((prev) => {
+      if (prev === itemKey) {
+        setAnimatingOutId(itemKey);
+        return null;
+      }
+      return prev;
+    });
+    setHoveredIndex(null);
+  };
+
 
   useEffect(() => {
     // Auth ya resuelto y sin sesión: vacío definitivo, limpiamos caché.
@@ -669,6 +734,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     const hasOverflow = !swiper.isLocked;
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
+    setActiveIndex(swiper.activeIndex);
   };
 
   const handleSwiper = (swiper) => {
@@ -756,9 +822,17 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         className="relative"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
-          hoverIntentRef.current += 1;
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           setIsHoveredRow(false);
-          setHoveredId(null);
+          setHoveredId((prev) => {
+            if (prev) {
+              setAnimatingOutId(prev);
+            }
+            return null;
+          });
           setHoveredIndex(null);
         }}
       >
@@ -794,6 +868,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
             {shows.map((show, i) => {
               const itemKey = `tv:${show.id}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
+              const isAnimatingOut = animatingOutId === itemKey;
 
               const base =
                 "relative flex-shrink-0 transition-all duration-300 ease-in-out";
@@ -803,7 +878,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                 ? `${BASE_WIDTH} ${ROW_HEIGHT}`
                 : "w-full aspect-video";
               const sizeClasses = `${dimensionClasses} ${
-                isActive ? "z-[90]" : "z-10"
+                isActive || isAnimatingOut ? "z-[90]" : "z-10"
               }`;
 
               return (
@@ -813,21 +888,18 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                 >
                   <div
                     className={`${base} ${sizeClasses} ${
-                      isActive ? "overflow-visible" : "overflow-hidden"
+                      isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
                     }`}
-                    onMouseEnter={() => {
-                      if (!isMobile) {
-                        setHoveredIndex(i);
-                        setHoveredId(itemKey);
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      hoverIntentRef.current += 1;
-                      setHoveredId((prev) => (prev === itemKey ? null : prev));
-                      setHoveredIndex(null);
-                    }}
+                    onMouseEnter={() => handleMouseEnterItem(itemKey, i)}
+                    onMouseLeave={() => handleMouseLeaveItem(itemKey)}
                   >
-                    <AnimatePresence initial={false} mode="popLayout">
+                    <AnimatePresence
+                      initial={false}
+                      mode="popLayout"
+                      onExitComplete={() => {
+                        setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
+                      }}
+                    >
                       {isActive ? (
                         <div
                           key="preview"
@@ -837,6 +909,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                             show={show}
                             index={i}
                             totalCount={shows.length}
+                            activeIndex={activeIndex}
                           />
                         </div>
                       ) : (
