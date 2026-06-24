@@ -525,7 +525,11 @@ function FeaturedSlide({
             fetchPriority="low"
             quality={100}
             sizes="100vw"
-            className={isMobile ? "object-contain object-center" : "object-contain object-right"}
+            className={
+              isMobile
+                ? "origin-top scale-[1.08] object-cover object-top"
+                : "object-contain object-right"
+            }
           />
         )}
 
@@ -588,7 +592,7 @@ function FeaturedSlide({
         style={{
           background:
             isMobile
-              ? "linear-gradient(to top, #000 0%, rgba(0,0,0,0.82) 12%, rgba(0,0,0,0.42) 30%, rgba(0,0,0,0.1) 48%, transparent 64%)"
+              ? "linear-gradient(to top, #000 0%, rgba(0,0,0,0.68) 8%, rgba(0,0,0,0.34) 22%, rgba(0,0,0,0.08) 38%, transparent 54%)"
               : "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
         }}
       />
