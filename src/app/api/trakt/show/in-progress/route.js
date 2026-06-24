@@ -122,6 +122,41 @@ function calculateProgressPct(completed, total, fallbackPct) {
   return Number.isFinite(pct) ? Math.min(100, Math.max(0, Math.round(pct))) : 0;
 }
 
+function normalizeEpisodeRef(value) {
+  const season = Number(value?.season ?? value?.season_number);
+  const number = Number(value?.number ?? value?.episode ?? value?.episode_number);
+  if (!Number.isFinite(season) || !Number.isFinite(number)) return null;
+  if (season <= 0 || number <= 0) return null;
+  return {
+    season,
+    number,
+    title: value?.title || value?.name || null,
+  };
+}
+
+function episodeRefFromLinearPosition(tmdb, position) {
+  const target = Number(position);
+  if (!Number.isFinite(target) || target <= 0) return null;
+
+  let offset = target;
+  const seasons = (Array.isArray(tmdb?.seasons) ? tmdb.seasons : [])
+    .map((season) => ({
+      season: Number(season?.season_number),
+      count: positiveNumber(season?.episode_count),
+    }))
+    .filter((season) => season.season > 0 && season.count > 0)
+    .sort((a, b) => a.season - b.season);
+
+  for (const season of seasons) {
+    if (offset <= season.count) {
+      return { season: season.season, number: offset, title: null };
+    }
+    offset -= season.count;
+  }
+
+  return null;
+}
+
 function mergeBackendProgressCandidates(...lists) {
   const byTmdbId = new Map();
 
@@ -146,6 +181,16 @@ async function normalizeBackendInProgressItem(item) {
   const episodeTotal =
     getRegularEpisodeCount(tmdb) || currentTotal || currentAired;
   const pct = calculateProgressPct(completed, episodeTotal, item?.pct);
+  const lastEpisode =
+    normalizeEpisodeRef(item?.lastEpisode) ||
+    normalizeEpisodeRef(item?.last_episode) ||
+    episodeRefFromLinearPosition(tmdb, completed);
+  const nextEpisode =
+    normalizeEpisodeRef(item?.nextEpisode) ||
+    normalizeEpisodeRef(item?.next_episode) ||
+    (episodeTotal <= 0 || completed < episodeTotal
+      ? episodeRefFromLinearPosition(tmdb, completed + 1)
+      : null);
 
   return {
     ...item,
@@ -153,6 +198,8 @@ async function normalizeBackendInProgressItem(item) {
     aired: episodeTotal || currentAired,
     completed,
     pct,
+    nextEpisode,
+    lastEpisode,
     hasKnownAired: episodeTotal > 0,
     title_es: item?.title_es || tmdb?.name || null,
     poster_path: item?.poster_path || tmdb?.poster_path || null,

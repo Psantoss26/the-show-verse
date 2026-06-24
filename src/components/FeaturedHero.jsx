@@ -12,6 +12,8 @@ import {
   Eye,
   EyeOff,
   Info,
+  Volume2,
+  VolumeX,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -45,13 +47,57 @@ import {
 // acotados para no competir con los backdrops de hover del dashboard.
 const HERO_BACKDROP_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
-const HERO_AUTO_ADVANCE_MS = 5000;
+const HERO_AUTO_ADVANCE_MS = 7000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
+
+/* =================== PREFERENCIA GLOBAL DE SOUNDTRACK ===================
+ * El soundtrack del Hero suena por defecto. Si el usuario lo silencia con el
+ * botón de volumen, la elección se guarda y aplica a TODOS los FeaturedHero.
+ */
+const SOUNDTRACK_MUTED_KEY = "showverse:hero:soundtrack-muted";
+const SOUNDTRACK_MUTED_EVENT = "showverse:hero-soundtrack-muted";
+
+function readSoundtrackMuted() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SOUNDTRACK_MUTED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSoundtrackMuted(muted) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SOUNDTRACK_MUTED_KEY, muted ? "1" : "0");
+  } catch {}
+  // Sincroniza al instante todas las instancias montadas (el evento `storage`
+  // no se dispara en la misma pestaña, así que usamos uno propio).
+  window.dispatchEvent(new CustomEvent(SOUNDTRACK_MUTED_EVENT, { detail: muted }));
+}
+
+// Hook compartido: lee la preferencia, escucha cambios y expone un toggle.
+function useSoundtrackMuted() {
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    setMuted(readSoundtrackMuted());
+    const onChange = (e) => setMuted(!!e.detail);
+    window.addEventListener(SOUNDTRACK_MUTED_EVENT, onChange);
+    return () => window.removeEventListener(SOUNDTRACK_MUTED_EVENT, onChange);
+  }, []);
+
+  const toggle = useCallback(() => {
+    writeSoundtrackMuted(!readSoundtrackMuted());
+  }, []);
+
+  return [muted, toggle];
+}
 
 const HERO_ACTION_COLORS = {
   blue: {
@@ -124,7 +170,7 @@ function HeroActionButton({
       disabled={disabled || loading}
       data-hero-action-button="true"
       onClick={handleClick}
-      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full border border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow,border-color] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
+      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full border border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow,border-color] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 cursor-default disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
       style={{
         containerType: "inline-size",
         backgroundColor:
@@ -270,6 +316,13 @@ function FeaturedSlide({
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
 
+  // Soundtrack: suena por defecto al mostrar el título; el botón de volumen
+  // silencia/activa la preferencia global para todos los FeaturedHero.
+  const [soundtrackMuted, toggleSoundtrackMuted] = useSoundtrackMuted();
+  const [soundtrackTrack, setSoundtrackTrack] = useState(null);
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
+  const audioRef = useRef(null);
+
   // Al dejar de ser el slide activo, cerramos el trailer.
   useEffect(() => {
     if (isActive) return;
@@ -282,6 +335,96 @@ function FeaturedSlide({
     setTrailer(null);
     onTrailerVisibilityChange?.(false);
   }, [movie?.id, onTrailerVisibilityChange]);
+
+  // Carga la mejor pista del soundtrack (preview) del título activo.
+  useEffect(() => {
+    let abort = false;
+    if (!isActive || !movie?.id) return;
+    setSoundtrackTrack(null);
+    setSoundtrackPlaying(false);
+
+    const load = async () => {
+      try {
+        const baseTitle = movie.title || movie.name || "";
+        const params = new URLSearchParams({
+          title: baseTitle,
+          type: mediaType === "tv" ? "tv" : "movie",
+          country: "ES",
+        });
+        const original = movie.original_title || movie.original_name;
+        if (original && original !== baseTitle) {
+          params.set("originalTitle", original);
+        }
+        const year = yearOf(movie);
+        if (year) params.set("year", String(year));
+        params.set("tmdbId", String(movie.id));
+
+        const res = await fetch(`/api/soundtrack?${params.toString()}`, {
+          priority: "low",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const tracks = Array.isArray(data?.tracks) ? data.tracks : [];
+        const first = tracks.find((t) => t?.previewUrl);
+        if (!abort && first?.previewUrl) {
+          setSoundtrackTrack({
+            previewUrl: first.previewUrl,
+            trackName: first.trackName || first.name || "",
+            artistName: first.artistName || "",
+          });
+        }
+      } catch {
+        // silencio
+      }
+    };
+
+    load();
+    return () => {
+      abort = true;
+    };
+  }, [isActive, movie, mediaType]);
+
+  // Reproduce el soundtrack cuando el título está activo, no está silenciado y
+  // no se está viendo el trailer (que tiene su propio audio). Si el navegador
+  // bloquea el autoplay con sonido, arranca tras la primera interacción.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const shouldPlay =
+      isActive && !showTrailer && !soundtrackMuted && !!soundtrackTrack;
+
+    if (!shouldPlay) {
+      audio.pause();
+      return;
+    }
+
+    audio.volume = 0.3;
+    let unlock = null;
+
+    const play = () =>
+      audio.play().catch(() => {
+        if (unlock) return;
+        unlock = () => {
+          audio.play().catch(() => {});
+          window.removeEventListener("pointerdown", unlock);
+          window.removeEventListener("keydown", unlock);
+          unlock = null;
+        };
+        window.addEventListener("pointerdown", unlock);
+        window.addEventListener("keydown", unlock);
+      });
+
+    play();
+
+    return () => {
+      if (unlock) {
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+        unlock = null;
+      }
+    };
+  }, [isActive, showTrailer, soundtrackMuted, soundtrackTrack]);
 
   // Estado de cuenta (favorito/pendiente/visto). El backend devuelve los tres
   // estados en una sola llamada (igual que DetailsClient), con source "backend".
@@ -748,6 +891,9 @@ function FeaturedSlide({
               </p>
             )}
 
+            {/* Contenedor relativo: el indicador de soundtrack se posiciona
+                de forma absoluta debajo para no desplazar la información. */}
+            <div className="relative">
             {/* Botones de acción */}
             <div
               className="hero-reveal flex flex-nowrap items-center gap-2 sm:gap-3"
@@ -759,7 +905,7 @@ function FeaturedSlide({
                   e.stopPropagation();
                   navigateToDetails();
                 }}
-                className="featured-info-button inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3.5 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
+                className="featured-info-button inline-flex h-9 cursor-default items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3.5 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
               >
                 <Info className="h-4 w-4" />
                 <span className="[text-box:trim-both_cap_alphabetic]">
@@ -781,6 +927,40 @@ function FeaturedSlide({
                   <Play className="ml-0.5 fill-current text-black" />
                 )}
               </HeroActionButton>
+
+              {/* Soundtrack: suena por defecto; el botón silencia/activa la
+                  preferencia global (se guarda para todos los FeaturedHero). */}
+              <HeroActionButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSoundtrackMuted();
+                }}
+                active
+                activeColor="yellow"
+                solid
+                title={
+                  soundtrackMuted ? "Activar soundtrack" : "Silenciar soundtrack"
+                }
+              >
+                {soundtrackMuted ? (
+                  <VolumeX className="text-black" />
+                ) : (
+                  <Volume2 className="text-black" />
+                )}
+              </HeroActionButton>
+
+              {soundtrackTrack?.previewUrl && (
+                <audio
+                  ref={audioRef}
+                  src={soundtrackTrack.previewUrl}
+                  loop
+                  preload="none"
+                  aria-hidden="true"
+                  className="hidden"
+                  onPlay={() => setSoundtrackPlaying(true)}
+                  onPause={() => setSoundtrackPlaying(false)}
+                />
+              )}
 
               <HeroActionButton
                 onClick={handleToggleFavorite}
@@ -813,6 +993,44 @@ function FeaturedSlide({
               >
                 {watched ? <Eye /> : <EyeOff />}
               </HeroActionButton>
+            </div>
+
+            {/* Indicador "ahora sonando" (liquid glass sin borde marcado),
+                absoluto para no desplazar la información. Solo visible mientras
+                el soundtrack se reproduce de verdad. */}
+            {soundtrackPlaying && soundtrackTrack && (
+              <div className="hero-nowplaying absolute left-0 top-full mt-3 inline-flex max-w-[min(80vw,22rem)] items-center gap-2.5 rounded-full bg-black/15 bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-black/30 px-3 py-1.5 backdrop-blur-[50px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.18),0_12px_34px_-14px_rgba(0,0,0,0.6)]">
+                <span
+                  className="flex h-3.5 items-end gap-[2px]"
+                  aria-hidden="true"
+                >
+                  <span className="hero-eq-bar w-[2px] rounded-full bg-amber-300" />
+                  <span
+                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                    style={{ animationDelay: "180ms" }}
+                  />
+                  <span
+                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                    style={{ animationDelay: "360ms" }}
+                  />
+                  <span
+                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                    style={{ animationDelay: "90ms" }}
+                  />
+                </span>
+                <span className="min-w-0 truncate text-[11px] leading-none text-white/90 sm:text-xs">
+                  <span className="font-semibold">
+                    {soundtrackTrack.trackName || "Soundtrack"}
+                  </span>
+                  {soundtrackTrack.artistName && (
+                    <span className="text-white/55">
+                      {" · "}
+                      {soundtrackTrack.artistName}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
             </div>
 
             {error && (
@@ -853,6 +1071,46 @@ function FeaturedSlide({
           animation-delay: var(--hero-delay, 0ms);
           transform-origin: left center;
           will-change: opacity, transform, filter;
+        }
+
+        .hero-nowplaying {
+          animation: heroNowPlayingIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .hero-eq-bar {
+          height: 35%;
+          animation: heroEqualizer 900ms ease-in-out infinite;
+          will-change: height;
+        }
+
+        @keyframes heroNowPlayingIn {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 6px, 0);
+            filter: blur(4px);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+            filter: blur(0);
+          }
+        }
+
+        @keyframes heroEqualizer {
+          0%,
+          100% {
+            height: 28%;
+          }
+          50% {
+            height: 100%;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hero-eq-bar {
+            animation: none;
+            height: 70%;
+          }
         }
 
         @keyframes heroBackdropReveal {

@@ -4,7 +4,7 @@
 import { useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import { Play, Heart, BookmarkPlus } from "lucide-react";
@@ -29,6 +29,81 @@ import {
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
+
+// Caché local para que la sección NO desaparezca al recargar: se pinta al
+// instante lo último conocido mientras se refresca en segundo plano.
+const CONTINUE_WATCHING_CACHE_KEY = "showverse:dashboard:continue-watching:v1";
+const CONTINUE_WATCHING_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 h
+// Tras recargar, el token/cookies del backend pueden no estar listos y el
+// endpoint devuelve vacío momentáneamente: reintentamos antes de ocultar.
+const CONTINUE_WATCHING_RETRY_DELAYS = [800, 1600, 3000, 5000];
+
+function readContinueWatchingCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CONTINUE_WATCHING_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const savedAt = Number(parsed?.savedAt || 0);
+    if (
+      !savedAt ||
+      Date.now() - savedAt > CONTINUE_WATCHING_CACHE_TTL_MS ||
+      !Array.isArray(parsed?.shows) ||
+      parsed.shows.length === 0
+    ) {
+      return null;
+    }
+    return parsed.shows;
+  } catch {
+    return null;
+  }
+}
+
+function writeContinueWatchingCache(shows) {
+  if (typeof window === "undefined") return;
+  try {
+    if (Array.isArray(shows) && shows.length > 0) {
+      window.localStorage.setItem(
+        CONTINUE_WATCHING_CACHE_KEY,
+        JSON.stringify({ savedAt: Date.now(), shows }),
+      );
+    } else {
+      window.localStorage.removeItem(CONTINUE_WATCHING_CACHE_KEY);
+    }
+  } catch {
+    // ignorar (modo privado / cuota)
+  }
+}
+
+function mapInProgressItems(items) {
+  return (Array.isArray(items) ? items : EMPTY_ARRAY)
+    .filter((it) => it?.tmdbId)
+    .slice(0, MAX_ITEMS)
+    .map((it) => {
+      const season = Number(it?.nextEpisode?.season);
+      const number = Number(it?.nextEpisode?.number);
+      const hasNextEpisode =
+        Number.isFinite(season) &&
+        season > 0 &&
+        Number.isFinite(number) &&
+        number > 0;
+
+      return {
+        id: it.tmdbId,
+        title: it.title,
+        backdrop_path: it.backdrop_path || null,
+        poster_path: it.poster_path || null,
+        overview: it.overview || null,
+        genres: Array.isArray(it.genres) ? it.genres : EMPTY_ARRAY,
+        pct: it.pct,
+        completed: it.completed,
+        aired: it.aired,
+        nextEpisode: hasNextEpisode ? it.nextEpisode : null,
+        lastEpisode: it.lastEpisode,
+        lastWatchedAt: it.lastWatchedAt,
+      };
+    });
+}
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -497,11 +572,18 @@ function ContinueWatchingSkeleton() {
  * Sección "Continuar viendo"
  * ==================================================================== */
 function ContinueWatchingSection({ isMobile, hydrated }) {
-  const { session } = useAuth();
+  const { authenticated, hydrated: authReady } = useAuth();
   const router = useRouter();
 
-  // null = cargando, [] = vacío / sin sesión
+  // null = cargando, [] = vacío confirmado (sin sesión / sin series en curso)
   const [shows, setShows] = useState(null);
+
+  // Pinta al instante lo último cacheado para que NO desaparezca al recargar
+  // (se refrescará en segundo plano cuando el backend confirme).
+  useEffect(() => {
+    const cached = readContinueWatchingCache();
+    if (cached) setShows(cached);
+  }, []);
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -511,55 +593,71 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const isInView = useInView(rowRef, { once: true, margin: "-100px" });
 
   useEffect(() => {
-    if (!session) {
+    // Auth ya resuelto y sin sesión: vacío definitivo, limpiamos caché.
+    if (authReady && !authenticated) {
       setShows(EMPTY_ARRAY);
+      writeContinueWatchingCache(null);
       return;
     }
+    // Auth todavía resolviéndose: mantenemos lo cacheado y esperamos.
+    if (!authenticated) return;
 
     let abort = false;
-    setShows(null);
+    let attempt = 0;
+    let timer = null;
 
     const load = async () => {
       try {
         const res = await traktGetInProgress();
-        const items = Array.isArray(res?.items) ? res.items : EMPTY_ARRAY;
-        const mapped = items
-          .filter(
-            (it) =>
-              it?.tmdbId &&
-              it?.nextEpisode &&
-              Number.isFinite(it.nextEpisode.season) &&
-              Number.isFinite(it.nextEpisode.number),
-          )
-          .slice(0, MAX_ITEMS)
-          .map((it) => ({
-            id: it.tmdbId,
-            title: it.title,
-            backdrop_path: it.backdrop_path || null,
-            poster_path: it.poster_path || null,
-            overview: it.overview || null,
-            genres: Array.isArray(it.genres) ? it.genres : EMPTY_ARRAY,
-            pct: it.pct,
-            completed: it.completed,
-            aired: it.aired,
-            nextEpisode: it.nextEpisode,
-            lastEpisode: it.lastEpisode,
-            lastWatchedAt: it.lastWatchedAt,
-          }));
-        if (!abort) setShows(mapped);
+        const mapped = mapInProgressItems(res?.items);
+        if (abort) return;
+
+        if (mapped.length > 0) {
+          setShows(mapped);
+          writeContinueWatchingCache(mapped);
+          return;
+        }
+
+        // Vacío: puede ser transitorio tras recargar (backend aún sin token).
+        // Reintentamos antes de ocultar la sección.
+        if (attempt < CONTINUE_WATCHING_RETRY_DELAYS.length) {
+          timer = window.setTimeout(
+            load,
+            CONTINUE_WATCHING_RETRY_DELAYS[attempt],
+          );
+          attempt += 1;
+          return;
+        }
+
+        // Tras los reintentos sigue vacío => realmente no hay nada en curso.
+        setShows(EMPTY_ARRAY);
+        writeContinueWatchingCache(null);
       } catch {
-        if (!abort) setShows(EMPTY_ARRAY);
+        if (abort) return;
+        if (attempt < CONTINUE_WATCHING_RETRY_DELAYS.length) {
+          timer = window.setTimeout(
+            load,
+            CONTINUE_WATCHING_RETRY_DELAYS[attempt],
+          );
+          attempt += 1;
+          return;
+        }
+        // Error persistente: conservamos lo que ya hubiera (caché); si no hay
+        // nada, ocultamos.
+        setShows((prev) =>
+          Array.isArray(prev) && prev.length ? prev : EMPTY_ARRAY,
+        );
       }
     };
 
     load();
     return () => {
       abort = true;
+      if (timer) window.clearTimeout(timer);
     };
-  }, [session]);
+  }, [authenticated, authReady]);
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -583,11 +681,14 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     }
   };
 
-  // Sin sesión o sin series en progreso: la sección no se renderiza.
-  if (!session) return null;
+  // No se renderiza si: auth resuelto y sin sesión, o vacío confirmado.
+  if (authReady && !authenticated) return null;
   if (Array.isArray(shows) && shows.length === 0) return null;
 
   const loading = shows === null;
+  // Aún sin datos y sin sesión confirmada: no mostramos skeleton (evita flash
+  // en usuarios sin sesión); esperamos a que llegue la caché o se autentique.
+  if (loading && !authenticated) return null;
   const hasActivePreview = !!hoveredId;
   const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
@@ -634,7 +735,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     <motion.div
       ref={rowRef}
       initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
+      animate="visible"
       variants={fadeInUp}
       className="relative group"
     >
