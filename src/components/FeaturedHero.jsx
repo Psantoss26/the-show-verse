@@ -267,6 +267,7 @@ function FeaturedSlide({
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
+  const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
 
   // Al dejar de ser el slide activo, cerramos el trailer.
@@ -516,21 +517,45 @@ function FeaturedSlide({
       {/* Fondo: poster textless en móvil; backdrop completo en escritorio. */}
       <div className="absolute inset-0">
         {!showTrailer && shouldLoadMedia && bgSrc && (
-          <NextImage
+          <div
             key={bgSrc}
-            src={bgSrc}
-            alt={title}
-            fill
-            loading="lazy"
-            fetchPriority="low"
-            quality={100}
-            sizes="100vw"
-            className={
+            className={`hero-backdrop-reveal absolute inset-0 ${
               isMobile
-                ? "object-contain object-top"
-                : "object-contain object-right"
-            }
-          />
+                ? "hero-backdrop-reveal-mobile"
+                : "hero-backdrop-reveal-desktop"
+            } ${loadedBackdropSrc === bgSrc ? "hero-backdrop-ready" : "hero-backdrop-loading"}`}
+          >
+            <NextImage
+              src={bgSrc}
+              alt={title}
+              fill
+              loading="lazy"
+              fetchPriority="low"
+              quality={100}
+              sizes="100vw"
+              onLoad={() => setLoadedBackdropSrc(bgSrc)}
+              className={
+                isMobile
+                  ? "object-contain object-top"
+                  : "object-contain object-right"
+              }
+              style={
+                isMobile
+                  ? {
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, black 88%, transparent 100%)",
+                      maskImage:
+                        "linear-gradient(to bottom, black 88%, transparent 100%)",
+                    }
+                  : {
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, black 76%, rgba(0,0,0,0.88) 84%, transparent 100%)",
+                      maskImage:
+                        "linear-gradient(to bottom, black 76%, rgba(0,0,0,0.88) 84%, transparent 100%)",
+                    }
+              }
+            />
+          </div>
         )}
 
         {showTrailer && (
@@ -597,10 +622,10 @@ function FeaturedSlide({
         }}
       />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-3/5 sm:block"
+        className="pointer-events-none absolute inset-x-0 -bottom-px hidden h-[68%] sm:block"
         style={{
           background:
-            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.55) 35%, transparent 100%)",
+            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.92) 12%, rgba(0,0,0,0.64) 42%, rgba(0,0,0,0.22) 70%, transparent 100%)",
         }}
       />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent sm:h-28" />
@@ -608,7 +633,7 @@ function FeaturedSlide({
       {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
           lateral izquierdo y un margen inferior cómodo. */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-7 pb-10 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
+        <div className="w-full px-7 pb-7 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
           <div className="max-w-[22rem] sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
@@ -770,12 +795,64 @@ function FeaturedSlide({
       </div>
 
       <style jsx>{`
+        .hero-backdrop-reveal {
+          opacity: 0;
+          transform: translate3d(0, 0, 0);
+          filter: blur(0);
+          will-change: opacity, transform, filter;
+        }
+
+        .hero-backdrop-loading {
+          opacity: 0;
+        }
+
+        .hero-backdrop-ready {
+          animation: heroBackdropReveal 920ms cubic-bezier(0.16, 1, 0.3, 1)
+            both;
+        }
+
+        .hero-backdrop-reveal-mobile.hero-backdrop-ready {
+          animation-name: heroPosterRevealMobile;
+        }
+
         .hero-reveal {
           animation: heroContentReveal 680ms cubic-bezier(0.22, 1, 0.36, 1)
             both;
           animation-delay: var(--hero-delay, 0ms);
           transform-origin: left center;
           will-change: opacity, transform, filter;
+        }
+
+        @keyframes heroBackdropReveal {
+          from {
+            opacity: 0;
+            transform: translate3d(18px, 0, 0) scale(1.025);
+            filter: blur(10px) saturate(0.9);
+          }
+          55% {
+            opacity: 1;
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0) saturate(1);
+          }
+        }
+
+        @keyframes heroPosterRevealMobile {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 10px, 0);
+            filter: blur(8px) saturate(0.92);
+          }
+          60% {
+            opacity: 1;
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+            filter: blur(0) saturate(1);
+          }
         }
 
         .hero-logo-reveal,
@@ -810,6 +887,9 @@ function FeaturedSlide({
         }
 
         @media (prefers-reduced-motion: reduce) {
+          .hero-backdrop-reveal,
+          .hero-backdrop-loading,
+          .hero-backdrop-ready,
           .hero-reveal,
           .hero-logo-reveal,
           .hero-title-reveal {

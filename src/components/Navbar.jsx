@@ -375,10 +375,13 @@ export default function Navbar() {
     setPendingHref(null);
   }, [pathname]);
 
-  // En Inicio y al estar arriba del todo, la navbar va sobre el FeaturedHero sin
-  // fondo glass (solo un velo oscuro mínimo para legibilidad). El fondo
-  // difuminado aparece al hacer scroll.
-  const heroNavMode = pathname === "/" && !isScrolled;
+  const featuredHeroRoutes = ["/", "/movies", "/series"];
+  const isFeaturedHeroRoute = featuredHeroRoutes.includes(pathname || "/");
+
+  // En las páginas con FeaturedHero y al estar arriba del todo, la navbar va
+  // sobre el hero sin fondo glass (solo un velo oscuro mínimo para legibilidad).
+  // El fondo difuminado aparece al hacer scroll.
+  const heroNavMode = isFeaturedHeroRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
@@ -542,9 +545,9 @@ export default function Navbar() {
   return (
     <>
       {/* ===================== TOP BAR ===================== */}
-      {/* En Inicio (arriba del todo) la navbar es transparente sobre el hero, con
-          un velo oscuro mínimo para que los botones se vean; al hacer scroll
-          aparece el fondo glass difuminado. */}
+      {/* En páginas con FeaturedHero (arriba del todo) la navbar es transparente
+          sobre el hero, con un velo oscuro mínimo para que los botones se vean;
+          al hacer scroll aparece el fondo glass difuminado. */}
       <nav
         className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode

@@ -7,8 +7,17 @@ import {
   fetchTVSections,
   fetchRomanceSeriesWithGoodReviews,
   discoverTV,
+  discoverMovies,
+  fetchTrendingMovies,
+  fetchTrendingTV,
+  fetchPopularMovies,
+  fetchPopularTV,
   fetchTrendingTVDay,
 } from "@/lib/api/tmdb";
+import {
+  buildFeatured,
+  getFeaturedExclusionKeys,
+} from "@/lib/dashboard/featured";
 
 export const revalidate = 1800; // 30 min
 
@@ -108,9 +117,41 @@ async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const [popular, topES] = await Promise.all([
+    const [
+      popular,
+      topES,
+      trendingMovies,
+      trendingTV,
+      popularMovies,
+      popularTV,
+      recognizedMovies,
+      recognizedTV,
+      awarded,
+    ] = await Promise.all([
       fetchPopularMedia({ type: "tv", language: lang }),
       fetchTrendingTVDay(),
+      fetchTrendingMovies(),
+      fetchTrendingTV(),
+      fetchPopularMovies(),
+      fetchPopularTV(),
+      discoverMovies({
+        "vote_average.gte": 6.7,
+        "vote_count.gte": 2500,
+        sort_by: "vote_count.desc",
+        page: 1,
+      }),
+      discoverTV({
+        "vote_average.gte": 6.7,
+        "vote_count.gte": 1200,
+        sort_by: "vote_count.desc",
+        page: 1,
+      }),
+      discoverMovies({
+        "vote_average.gte": 7.5,
+        "vote_count.gte": 2000,
+        sort_by: "vote_average.desc",
+        page: 1,
+      }),
     ]);
 
     const curatedPopular = curateList(popular, {
@@ -121,14 +162,48 @@ async function getCriticalDashboardData() {
     });
 
     const curatedTopES = (topES || []).slice(0, 10);
+    const curatedAwarded = curateList(awarded, {
+      minVotes: 1200,
+      minRating: 6.8,
+      minSize: 20,
+      maxSize: 60,
+    });
+    const mainFeatured = buildFeatured(
+      {
+        trendingMovies,
+        trendingTV,
+        popularMovies,
+        popularTV,
+        recognizedMovies,
+        recognizedTV,
+        awarded: curatedAwarded,
+      },
+      { size: 8 },
+    );
+    const { mediaKeys, titleKeys } = getFeaturedExclusionKeys(mainFeatured);
+    const featured = buildFeatured(
+      {
+        trendingTV,
+        popularTV,
+        recognizedTV,
+      },
+      {
+        size: 8,
+        mediaTypes: ["tv"],
+        excludeMediaKeys: mediaKeys,
+        excludeTitleKeys: titleKeys,
+      },
+    );
 
     return {
+      featured,
       popular: curatedPopular,
       "Top 10 hoy en España": curatedTopES,
     };
   } catch (err) {
     console.error("Error cargando datos críticos de series (SSR):", err);
     return {
+      featured: [],
       popular: [],
       "Top 10 hoy en España": [],
     };
