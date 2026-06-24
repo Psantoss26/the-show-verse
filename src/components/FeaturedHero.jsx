@@ -164,7 +164,6 @@ function HeroActionButton({
   return (
     <button
       type="button"
-      title={title}
       aria-label={title}
       aria-pressed={active}
       disabled={disabled || loading}
@@ -236,12 +235,6 @@ function HeroActionButton({
           children
         )}
       </span>
-
-      {title && (
-        <span className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all delay-[1200ms] duration-200 ease-out group-hover/hero-action:scale-100 group-hover/hero-action:opacity-100">
-          {title}
-        </span>
-      )}
 
       <style jsx>{`
         @keyframes heroLiquidShine {
@@ -813,7 +806,7 @@ function FeaturedSlide({
             {/* Logo del título o nombre */}
             {logoSrc ? (
               <div
-                className="hero-reveal hero-logo-reveal relative mb-3 h-20 w-[72%] max-w-[15rem] sm:mb-5 sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl"
+                className="hero-reveal hero-logo-reveal relative mb-3 h-24 w-[72%] max-w-[17rem] sm:mb-5 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
                 style={{ "--hero-delay": "80ms" }}
               >
                 <NextImage
@@ -907,10 +900,10 @@ function FeaturedSlide({
                   e.stopPropagation();
                   navigateToDetails();
                 }}
-                className="featured-info-button inline-flex h-9 cursor-default items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3.5 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
+                className="featured-info-button inline-flex h-9 w-9 cursor-default items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white px-0 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm"
               >
-                <Info className="h-4 w-4" />
-                <span className="[text-box:trim-both_cap_alphabetic]">
+                <Info className="h-5 w-5 sm:h-4 sm:w-4" />
+                <span className="hidden [text-box:trim-both_cap_alphabetic] sm:inline">
                   Más información
                 </span>
               </button>
@@ -1424,7 +1417,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
       </section>
 
       {isMobile && indicators && (
-        <div className="flex h-9 items-center justify-center bg-black sm:hidden">
+        <div className="flex items-center justify-center bg-black pb-3 pt-7 sm:hidden">
           {indicators}
         </div>
       )}
