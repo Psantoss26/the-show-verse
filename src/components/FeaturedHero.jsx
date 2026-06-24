@@ -529,8 +529,8 @@ function FeaturedSlide({
               src={bgSrc}
               alt={title}
               fill
-              loading="lazy"
-              fetchPriority="low"
+              loading={isActive ? "eager" : "lazy"}
+              fetchPriority={isActive ? "high" : "low"}
               quality={100}
               sizes="100vw"
               onLoad={() => setLoadedBackdropSrc(bgSrc)}
