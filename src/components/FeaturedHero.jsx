@@ -539,21 +539,6 @@ function FeaturedSlide({
                   ? "object-contain object-top"
                   : "object-contain object-right"
               }
-              style={
-                isMobile
-                  ? {
-                      WebkitMaskImage:
-                        "linear-gradient(to bottom, black 88%, transparent 100%)",
-                      maskImage:
-                        "linear-gradient(to bottom, black 88%, transparent 100%)",
-                    }
-                  : {
-                      WebkitMaskImage:
-                        "linear-gradient(to bottom, black 76%, rgba(0,0,0,0.88) 84%, transparent 100%)",
-                      maskImage:
-                        "linear-gradient(to bottom, black 76%, rgba(0,0,0,0.88) 84%, transparent 100%)",
-                    }
-              }
             />
           </div>
         )}
@@ -610,25 +595,30 @@ function FeaturedSlide({
         )}
       </div>
 
-      {/* Degradados estilo Prime: ocultos en móvil, activos en escritorio */}
+      {/* Difuminado lateral izquierdo (solo escritorio): cubre siempre el hueco
+          del backdrop y la zona de logo/información/botones, fundiéndose hacia
+          el centro-derecha. */}
       <div
-        className="pointer-events-none absolute inset-0 sm:block hidden"
+        className="pointer-events-none absolute inset-0 hidden sm:block"
         style={{
           background:
-            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
+            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.92) 22%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.2) 58%, transparent 74%)",
         }}
       />
+
+      {/* Difuminado inferior (solo escritorio): negro sólido en el borde para
+          ocultar el corte de la imagen contra el fin de FeaturedHero, fundiendo
+          suavemente hacia arriba y cubriendo los puntos indicadores. */}
       <div
-        className="pointer-events-none absolute inset-x-0 -bottom-px hidden h-[68%] sm:block"
+        className="pointer-events-none absolute inset-x-0 -bottom-px hidden h-[22%] sm:block"
         style={{
           background:
-            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.92) 12%, rgba(0,0,0,0.64) 42%, rgba(0,0,0,0.22) 70%, transparent 100%)",
+            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.85) 14%, rgba(0,0,0,0.4) 46%, transparent 100%)",
         }}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent sm:h-28" />
 
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
         <div className="max-w-full sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
