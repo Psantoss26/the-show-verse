@@ -306,7 +306,6 @@ function FeaturedSlide({
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
   const [watched, setWatched] = useState(false);
-  const [loadingStates, setLoadingStates] = useState(false);
   const [updating, setUpdating] = useState("");
   const [error, setError] = useState("");
 
@@ -437,8 +436,12 @@ function FeaturedSlide({
         setWatched(false);
         return;
       }
+      // Al cambiar de título reseteamos a estado neutro (sin spinner de carga) y
+      // solo pintamos la versión final de los botones cuando llega la respuesta.
+      setFavorite(false);
+      setWatchlist(false);
+      setWatched(false);
       try {
-        setLoadingStates(true);
         const status = await traktGetItemStatus({
           type: traktTypeOf(mediaType),
           tmdbId: movie.id,
@@ -450,8 +453,6 @@ function FeaturedSlide({
         }
       } catch {
         // silencio
-      } finally {
-        if (!cancel) setLoadingStates(false);
       }
     };
     load();
@@ -964,7 +965,7 @@ function FeaturedSlide({
 
               <HeroActionButton
                 onClick={handleToggleFavorite}
-                loading={loadingStates || updating === "favorite"}
+                loading={updating === "favorite"}
                 active={favorite}
                 activeColor="red"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
@@ -974,7 +975,7 @@ function FeaturedSlide({
 
               <HeroActionButton
                 onClick={handleToggleWatchlist}
-                loading={loadingStates || updating === "watchlist"}
+                loading={updating === "watchlist"}
                 active={watchlist}
                 activeColor="blue"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
