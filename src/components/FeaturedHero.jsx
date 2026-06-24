@@ -511,7 +511,7 @@ function FeaturedSlide({
 
   return (
     <div
-      className="relative flex flex-col w-full bg-black cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
+      className="relative w-full h-full bg-black cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
       onClick={navigateToDetails}
     >
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
@@ -628,7 +628,7 @@ function FeaturedSlide({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent sm:h-28" />
 
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
-      <div className="relative z-10 w-full bg-black px-7 pb-8 pt-4 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
         <div className="max-w-full sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
@@ -1069,7 +1069,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
   return (
     <>
       <section
-        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-auto sm:aspect-video sm:max-h-[88dvh]"
+        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100dvh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[88dvh]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
