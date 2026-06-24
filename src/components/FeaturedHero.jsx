@@ -24,7 +24,7 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
-import { traktGetItemStatus, traktSetWatched } from "@/lib/api/traktClient";
+import { traktGetItemStatus } from "@/lib/api/traktClient";
 
 import {
   buildImg,
@@ -453,26 +453,6 @@ function FeaturedSlide({
     }
   };
 
-  const handleToggleWatched = async (e) => {
-    e.stopPropagation();
-    if (requireLogin() || updating) return;
-    const next = !watched;
-    setUpdating("watched");
-    setWatched(next);
-    try {
-      await traktSetWatched({
-        type: traktTypeOf(mediaType),
-        tmdbId: movie.id,
-        watched: next,
-      });
-    } catch {
-      setWatched((v) => !v);
-      setError("No se pudo actualizar el visionado.");
-    } finally {
-      setUpdating("");
-    }
-  };
-
   const genres = useMemo(() => {
     const ids =
       movie.genre_ids ||
@@ -598,19 +578,29 @@ function FeaturedSlide({
       {/* Difuminado lateral izquierdo (solo escritorio): oscurece la zona de
           logo/información/botones, fundiéndose hacia el centro-derecha. */}
       <div
-        className="pointer-events-none absolute inset-0 hidden sm:block"
+        className="pointer-events-none absolute inset-0 hidden sm:block transition-opacity duration-500"
         style={{
-          background:
-            "linear-gradient(to right," +
-            " #000 0%," +
-            " rgba(0,0,0,0.93) 16%," +
-            " rgba(0,0,0,0.74) 30%," +
-            " rgba(0,0,0,0.52) 42%," +
-            " rgba(0,0,0,0.32) 52%," +
-            " rgba(0,0,0,0.17) 62%," +
-            " rgba(0,0,0,0.07) 70%," +
-            " rgba(0,0,0,0.02) 78%," +
-            " transparent 86%)",
+          background: showTrailer
+            ? // Al reproducir el trailer el difuminado lateral se recoge para
+              // mostrar más parte del vídeo (termina antes, ~62%).
+              "linear-gradient(to right," +
+              " #000 0%," +
+              " rgba(0,0,0,0.9) 12%," +
+              " rgba(0,0,0,0.62) 24%," +
+              " rgba(0,0,0,0.36) 34%," +
+              " rgba(0,0,0,0.18) 44%," +
+              " rgba(0,0,0,0.06) 54%," +
+              " transparent 62%)"
+            : "linear-gradient(to right," +
+              " #000 0%," +
+              " rgba(0,0,0,0.93) 16%," +
+              " rgba(0,0,0,0.74) 30%," +
+              " rgba(0,0,0,0.52) 42%," +
+              " rgba(0,0,0,0.32) 52%," +
+              " rgba(0,0,0,0.17) 62%," +
+              " rgba(0,0,0,0.07) 70%," +
+              " rgba(0,0,0,0.02) 78%," +
+              " transparent 86%)",
         }}
       />
 
@@ -793,12 +783,14 @@ function FeaturedSlide({
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </HeroActionButton>
 
+              {/* Indicador de visionado: solo informativo. No se puede accionar
+                  desde aquí para evitar borrar el historial de visionado con un
+                  único clic. */}
               <HeroActionButton
-                onClick={handleToggleWatched}
-                loading={loadingStates || updating === "watched"}
                 active={watched}
                 activeColor="green"
-                title={watched ? "Marcar como no visto" : "Marcar como visto"}
+                title={watched ? "Visto" : "No visto"}
+                className="pointer-events-none"
               >
                 {watched ? <Eye /> : <EyeOff />}
               </HeroActionButton>
