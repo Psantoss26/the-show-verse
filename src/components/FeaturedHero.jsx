@@ -604,7 +604,7 @@ function FeaturedSlide({
       {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
           lateral izquierdo y un margen inferior cómodo. */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-5 pb-12 sm:px-16 sm:pb-24 lg:px-32 lg:pb-28">
+        <div className="w-full px-7 pb-16 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
           <div className="max-w-[22rem] sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
