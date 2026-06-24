@@ -592,7 +592,7 @@ function FeaturedSlide({
         style={{
           background:
             isMobile
-              ? "linear-gradient(to top, #000 0%, rgba(0,0,0,0.68) 8%, rgba(0,0,0,0.34) 22%, rgba(0,0,0,0.08) 38%, transparent 54%)"
+              ? "linear-gradient(to top, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.48) 7%, rgba(0,0,0,0.22) 18%, rgba(0,0,0,0.06) 32%, transparent 46%)"
               : "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
         }}
       />
