@@ -45,21 +45,76 @@ import {
 // acotados para no competir con los backdrops de hover del dashboard.
 const HERO_BACKDROP_SIZE = "w1280";
 const HERO_POSTER_SIZE = "w780";
+const HERO_AUTO_ADVANCE_MS = 5000;
+const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_FALLBACK = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 
+const HERO_ACTION_COLORS = {
+  blue: {
+    rgb: "59, 130, 246",
+    secondary: "147, 197, 253",
+    glow: "rgba(59, 130, 246, 0.5)",
+  },
+  red: {
+    rgb: "239, 68, 68",
+    secondary: "252, 165, 165",
+    glow: "rgba(239, 68, 68, 0.5)",
+  },
+  yellow: {
+    rgb: "234, 179, 8",
+    secondary: "253, 224, 71",
+    glow: "rgba(234, 179, 8, 0.5)",
+  },
+  green: {
+    rgb: "34, 197, 94",
+    secondary: "134, 239, 172",
+    glow: "rgba(34, 197, 94, 0.5)",
+  },
+};
+
 function HeroActionButton({
   children,
   active = false,
+  activeColor = "blue",
   disabled = false,
   loading = false,
+  solid = false,
   title,
   onClick,
   className = "",
 }) {
+  const colors = HERO_ACTION_COLORS[activeColor] || HERO_ACTION_COLORS.blue;
+  const [ripples, setRipples] = useState([]);
+
+  const handleClick = (event) => {
+    if (disabled || loading) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+
+    setRipples((prev) => [
+      ...prev,
+      {
+        id,
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      },
+    ]);
+
+    window.setTimeout(() => {
+      setRipples((prev) => prev.filter((ripple) => ripple.id !== id));
+    }, 620);
+
+    onClick?.(event);
+  };
+
   return (
     <button
       type="button"
@@ -67,14 +122,117 @@ function HeroActionButton({
       aria-label={title}
       aria-pressed={active}
       disabled={disabled || loading}
-      onClick={onClick}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/12 text-white shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-white/22 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-wait disabled:opacity-70 sm:h-11 sm:w-11 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5 ${active ? "bg-white text-black hover:bg-white/90" : ""} ${className}`}
+      data-hero-action-button="true"
+      onClick={handleClick}
+      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
+      style={{
+        containerType: "inline-size",
+        backgroundColor:
+          solid && !disabled
+            ? "#fff"
+            : active && !disabled
+              ? `rgba(${colors.rgb}, 0.3)`
+              : undefined,
+        backgroundImage: solid && !disabled ? "none" : undefined,
+        color:
+          solid && !disabled
+            ? "#000"
+            : active && !disabled
+              ? `rgb(${colors.secondary})`
+              : undefined,
+        boxShadow:
+          solid && !disabled
+            ? "0 10px 30px -10px rgba(255,255,255,0.55)"
+            : active && !disabled
+              ? `0 0 20px ${colors.glow}`
+              : "0 10px 30px -10px rgba(0,0,0,0.5)",
+      }}
     >
-      {loading ? (
-        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent" />
-      ) : (
-        children
+      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+        <span
+          className="absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover/hero-action:opacity-100"
+          style={{
+            background: `linear-gradient(135deg, rgba(${colors.secondary}, 0.22), transparent 42%, rgba(${colors.rgb}, 0.14), transparent 78%)`,
+            animation:
+              active && !loading
+                ? "heroLiquidShine 3s ease-in-out infinite"
+                : undefined,
+          }}
+        />
+        <span
+          className="absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover/hero-action:opacity-60"
+          style={{
+            border: `2px solid rgb(${colors.rgb})`,
+            animation:
+              active && !loading
+                ? "heroLiquidPulse 2s ease-in-out infinite"
+                : undefined,
+          }}
+        />
+        {ripples.map((ripple) => (
+          <span
+            key={ripple.id}
+            className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              left: ripple.x,
+              top: ripple.y,
+              background: `rgba(${colors.secondary}, 0.65)`,
+              animation: "heroActionRipple 620ms ease-out forwards",
+            }}
+          />
+        ))}
+      </span>
+
+      <span className="relative z-10 flex h-full w-full items-center justify-center">
+        {loading ? (
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        ) : (
+          children
+        )}
+      </span>
+
+      {title && (
+        <span className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all delay-[1200ms] duration-200 ease-out group-hover/hero-action:scale-100 group-hover/hero-action:opacity-100">
+          {title}
+        </span>
       )}
+
+      <style jsx>{`
+        @keyframes heroLiquidShine {
+          0%,
+          100% {
+            transform: translateX(-100%) translateY(-100%) rotate(0deg);
+            opacity: 0;
+          }
+          50% {
+            transform: translateX(100%) translateY(100%) rotate(180deg);
+            opacity: 1;
+          }
+        }
+
+        @keyframes heroLiquidPulse {
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 0.3;
+          }
+          50% {
+            transform: scale(1.15);
+            opacity: 0.7;
+          }
+        }
+
+        @keyframes heroActionRipple {
+          from {
+            opacity: 0.75;
+            scale: 0;
+          }
+          to {
+            opacity: 0;
+            scale: 16;
+          }
+        }
+      `}</style>
     </button>
   );
 }
@@ -90,6 +248,7 @@ function FeaturedSlide({
   isActive,
   isMobile,
   shouldLoadMedia,
+  onTrailerVisibilityChange,
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
@@ -112,13 +271,16 @@ function FeaturedSlide({
 
   // Al dejar de ser el slide activo, cerramos el trailer.
   useEffect(() => {
-    if (!isActive) setShowTrailer(false);
-  }, [isActive]);
+    if (isActive) return;
+    setShowTrailer(false);
+    onTrailerVisibilityChange?.(false);
+  }, [isActive, onTrailerVisibilityChange]);
 
   useEffect(() => {
     setShowTrailer(false);
     setTrailer(null);
-  }, [movie?.id]);
+    onTrailerVisibilityChange?.(false);
+  }, [movie?.id, onTrailerVisibilityChange]);
 
   // Estado de cuenta (favorito/pendiente/visto). El backend devuelve los tres
   // estados en una sola llamada (igual que DetailsClient), con source "backend".
@@ -221,6 +383,7 @@ function FeaturedSlide({
     e.stopPropagation();
     if (showTrailer) {
       setShowTrailer(false);
+      onTrailerVisibilityChange?.(false);
       return;
     }
     try {
@@ -233,6 +396,7 @@ function FeaturedSlide({
       }
       setTrailer(t);
       setShowTrailer(true);
+      onTrailerVisibilityChange?.(true);
     } catch {
       setError("No se pudo cargar el trailer.");
     } finally {
@@ -442,7 +606,10 @@ function FeaturedSlide({
           <div className="max-w-[22rem] sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
-              <div className="relative mb-3 h-20 w-[72%] max-w-[15rem] sm:mb-5 sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl">
+              <div
+                className="hero-reveal hero-logo-reveal relative mb-3 h-20 w-[72%] max-w-[15rem] sm:mb-5 sm:h-40 sm:max-w-lg lg:h-48 lg:max-w-xl"
+                style={{ "--hero-delay": "80ms" }}
+              >
                 <NextImage
                   src={logoSrc}
                   alt={title}
@@ -452,13 +619,19 @@ function FeaturedSlide({
                 />
               </div>
             ) : (
-              <h2 className="mb-3 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:mb-5 sm:text-6xl">
+              <h2
+                className="hero-reveal hero-title-reveal mb-3 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:mb-5 sm:text-6xl"
+                style={{ "--hero-delay": "80ms" }}
+              >
                 {title}
               </h2>
             )}
 
             {/* Metadatos + puntuaciones */}
-            <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:gap-x-3 sm:gap-y-2 sm:text-sm">
+            <div
+              className="hero-reveal mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:gap-x-3 sm:gap-y-2 sm:text-sm"
+              style={{ "--hero-delay": "170ms" }}
+            >
               {yearOf(movie) && (
                 <span className="font-semibold">{yearOf(movie)}</span>
               )}
@@ -496,37 +669,49 @@ function FeaturedSlide({
             </div>
 
             {genres && (
-              <div className="mb-2 text-xs font-medium text-amber-300/90 sm:mb-3 sm:text-sm">
+              <div
+                className="hero-reveal mb-2 text-xs font-medium text-amber-300/90 sm:mb-3 sm:text-sm"
+                style={{ "--hero-delay": "230ms" }}
+              >
                 {genres}
               </div>
             )}
 
             {overview && (
-              <p className="mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base">
+              <p
+                className="hero-reveal mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
+                style={{ "--hero-delay": "290ms" }}
+              >
                 {overview}
               </p>
             )}
 
             {/* Botones de acción */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <div
+              className="hero-reveal flex flex-nowrap items-center gap-2 sm:gap-3"
+              style={{ "--hero-delay": "360ms" }}
+            >
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigateToDetails();
                 }}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-black shadow-lg transition hover:bg-white/90 sm:px-6 sm:py-2.5 sm:text-base"
+                className="featured-info-button inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3.5 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
               >
-                <Info className="h-4 w-4 sm:h-5 sm:w-5" />
-                Más información
+                <Info className="h-4 w-4" />
+                <span className="[text-box:trim-both_cap_alphabetic]">
+                  Más información
+                </span>
               </button>
 
               <HeroActionButton
                 onClick={handleToggleTrailer}
                 loading={trailerLoading}
                 active
+                activeColor="yellow"
+                solid
                 title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="bg-white text-black hover:bg-white/90"
               >
                 {showTrailer ? (
                   <X className="text-black" />
@@ -539,6 +724,7 @@ function FeaturedSlide({
                 onClick={handleToggleFavorite}
                 loading={loadingStates || updating === "favorite"}
                 active={favorite}
+                activeColor="red"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
               >
                 <Heart className={favorite ? "fill-current" : ""} />
@@ -548,6 +734,7 @@ function FeaturedSlide({
                 onClick={handleToggleWatchlist}
                 loading={loadingStates || updating === "watchlist"}
                 active={watchlist}
+                activeColor="blue"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
@@ -557,6 +744,7 @@ function FeaturedSlide({
                 onClick={handleToggleWatched}
                 loading={loadingStates || updating === "watched"}
                 active={watched}
+                activeColor="green"
                 title={watched ? "Marcar como no visto" : "Marcar como visto"}
               >
                 {watched ? <Eye /> : <EyeOff />}
@@ -564,11 +752,68 @@ function FeaturedSlide({
             </div>
 
             {error && (
-              <p className="mt-2 text-xs text-red-400">{error}</p>
+              <p
+                className="hero-reveal mt-2 text-xs text-red-400"
+                style={{ "--hero-delay": "420ms" }}
+              >
+                {error}
+              </p>
             )}
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .hero-reveal {
+          animation: heroContentReveal 680ms cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+          animation-delay: var(--hero-delay, 0ms);
+          transform-origin: left center;
+          will-change: opacity, transform, filter;
+        }
+
+        .hero-logo-reveal,
+        .hero-title-reveal {
+          animation-name: heroTitleReveal;
+        }
+
+        @keyframes heroContentReveal {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 18px, 0);
+            filter: blur(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+            filter: blur(0);
+          }
+        }
+
+        @keyframes heroTitleReveal {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 24px, 0) scale(0.96);
+            filter: blur(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hero-reveal,
+          .hero-logo-reveal,
+          .hero-title-reveal {
+            animation: none;
+            opacity: 1;
+            transform: none;
+            filter: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -579,8 +824,12 @@ function FeaturedSlide({
 export default function FeaturedHero({ items = [], isMobile }) {
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
+  const pointerStartRef = useRef(null);
+  const suppressClickRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [trailerOpen, setTrailerOpen] = useState(false);
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
@@ -642,6 +891,25 @@ export default function FeaturedHero({ items = [], isMobile }) {
     resolveAssetsFor(list[activeIndex]);
   }, [list, activeIndex, resolveAssetsFor]);
 
+  const goToPrevious = useCallback(() => {
+    setActiveIndex((current) =>
+      current <= 0 ? list.length - 1 : current - 1,
+    );
+  }, [list.length]);
+
+  const goToNext = useCallback(() => {
+    setActiveIndex((current) =>
+      current >= list.length - 1 ? 0 : current + 1,
+    );
+  }, [list.length]);
+
+  useEffect(() => {
+    if (list.length <= 1 || isInteracting || trailerOpen) return;
+
+    const timer = window.setTimeout(goToNext, HERO_AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, goToNext, isInteracting, list.length, trailerOpen]);
+
   if (!list.length) return null;
 
   const activeMovie = list[activeIndex] || list[0];
@@ -650,22 +918,62 @@ export default function FeaturedHero({ items = [], isMobile }) {
     activeAssets.backdrop || getPreviewBackdropFallback(activeMovie) || null;
   const activePoster = activeAssets.poster || null;
 
-  const goToPrevious = () => {
-    setActiveIndex((current) =>
-      current <= 0 ? list.length - 1 : current - 1,
-    );
+  const handlePointerDown = (event) => {
+    if (event.button !== 0 && event.pointerType === "mouse") return;
+    pointerStartRef.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    suppressClickRef.current = false;
+    setIsInteracting(true);
   };
 
-  const goToNext = () => {
-    setActiveIndex((current) =>
-      current >= list.length - 1 ? 0 : current + 1,
-    );
+  const handlePointerMove = (event) => {
+    const start = pointerStartRef.current;
+    if (!start || start.id !== event.pointerId) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (
+      Math.abs(dx) > HERO_SWIPE_THRESHOLD_PX &&
+      Math.abs(dx) > Math.abs(dy) * 1.35
+    ) {
+      suppressClickRef.current = true;
+      pointerStartRef.current = null;
+      if (dx < 0) {
+        goToNext();
+      } else {
+        goToPrevious();
+      }
+    }
+  };
+
+  const handlePointerEnd = (event) => {
+    const start = pointerStartRef.current;
+    if (start?.id === event.pointerId) pointerStartRef.current = null;
+    window.setTimeout(() => {
+      setIsInteracting(false);
+    }, 120);
+  };
+
+  const handleClickCapture = (event) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   return (
     <section
-      className="relative isolate aspect-[2/3] w-full overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
+      className="relative isolate aspect-[2/3] w-full touch-pan-y overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
       aria-label="Contenido destacado"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerLeave={handlePointerEnd}
+      onClickCapture={handleClickCapture}
     >
       <FeaturedSlide
         key={activeMovie.id}
@@ -676,6 +984,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
         isActive
         isMobile={isMobile}
         shouldLoadMedia
+        onTrailerVisibilityChange={setTrailerOpen}
       />
 
       {/* Flechas (solo desktop) */}
@@ -684,7 +993,10 @@ export default function FeaturedHero({ items = [], isMobile }) {
           <button
             type="button"
             aria-label="Anterior"
-            onClick={goToPrevious}
+            onClick={(event) => {
+              event.stopPropagation();
+              goToPrevious();
+            }}
             className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
             <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
@@ -692,7 +1004,10 @@ export default function FeaturedHero({ items = [], isMobile }) {
           <button
             type="button"
             aria-label="Siguiente"
-            onClick={goToNext}
+            onClick={(event) => {
+              event.stopPropagation();
+              goToNext();
+            }}
             className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
             <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
@@ -711,7 +1026,10 @@ export default function FeaturedHero({ items = [], isMobile }) {
               type="button"
               aria-label={`Ver destacado ${index + 1}`}
               aria-current={index === activeIndex ? "true" : undefined}
-              onClick={() => setActiveIndex(index)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setActiveIndex(index);
+              }}
               className={`h-2 rounded-full transition-colors ${
                 index === activeIndex
                   ? "w-6 bg-amber-500"
