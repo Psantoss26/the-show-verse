@@ -1671,7 +1671,7 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
           animate="visible"
           className={
             hasFeaturedHero
-              ? "space-y-12 px-4 pt-5 pb-6 sm:px-6 sm:pt-14"
+              ? "space-y-12 px-4 pt-4 pb-6 sm:px-6 sm:pt-12"
               : "space-y-12 pt-2"
           }
         >
