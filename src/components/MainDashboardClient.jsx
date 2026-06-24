@@ -1390,31 +1390,43 @@ function InlinePreviewCardAnticipated({
       })
     : yearOf(movie) || "—";
 
-  // Determinar la alineación horizontal de la tarjeta absoluta
-  let alignmentClass = "left-1/2 -translate-x-1/2";
+  // Determinar la alineación horizontal de la tarjeta absoluta.
+  // IMPORTANTE: el posicionamiento se hace con valores de framer-motion (x/y),
+  // NO con clases -translate de Tailwind, porque framer sobrescribe el
+  // `transform` al animar la escala y rompería el centrado.
+  let alignmentClass = "left-1/2";
+  let alignX = "-50%"; // centrado: desplaza media anchura propia
   let transformOrigin = "center center";
 
   if (alignment === "left") {
     alignmentClass = "left-0";
+    alignX = "0%";
     transformOrigin = "left center";
   } else if (alignment === "right") {
     alignmentClass = "right-0";
+    alignX = "0%";
     transformOrigin = "right center";
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.88, y: 0 }}
-      animate={{ opacity: 1, scale: 1.12, y: -10 }}
-      exit={{ opacity: 0, scale: 0.88, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
+      initial={{ opacity: 0, scale: 0.92, x: alignX, y: "-50%" }}
+      animate={{ opacity: 1, scale: 1.18, x: alignX, y: "-50%" }}
+      exit={{
+        opacity: 0,
+        scale: 0.92,
+        x: alignX,
+        y: "-50%",
+        transition: { duration: 0.14, ease: "easeInOut" },
+      }}
       transition={{
         type: "spring",
-        stiffness: 180,
-        damping: 20,
-        mass: 0.8
+        stiffness: 200,
+        damping: 22,
+        mass: 0.7,
       }}
       ref={cardRef}
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
+      className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
@@ -1843,9 +1855,18 @@ function Row({
     if (rowRef.current && e.currentTarget) {
       const slideRect = e.currentTarget.getBoundingClientRect();
       const rowRect = rowRef.current.getBoundingClientRect();
-      const isLeft = (slideRect.left - rowRect.left) < 120;
-      const isRight = (rowRect.right - slideRect.right) < 120;
-      setHoveredAlignment(isLeft ? "left" : isRight ? "right" : "center");
+      // El popover es ~2.3x el ancho del póster; centrado sobresale ~0.65x el
+      // ancho de la tarjeta a cada lado. Detectamos si, centrado, se saldría de
+      // los límites de la fila para alinearlo hacia dentro (funciona con
+      // cualquier número de tarjetas por fila, no solo 6).
+      const overflowHalf = slideRect.width * 1.2;
+      const slideCenter = slideRect.left + slideRect.width / 2;
+      const margin = 8;
+      const wouldClipLeft = slideCenter - overflowHalf < rowRect.left + margin;
+      const wouldClipRight = slideCenter + overflowHalf > rowRect.right - margin;
+      setHoveredAlignment(
+        wouldClipLeft ? "left" : wouldClipRight ? "right" : "center",
+      );
     }
 
     if (previewKind === "anticipated") {
@@ -1989,7 +2010,10 @@ function Row({
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
       variants={fadeInUp}
-      className="relative group sv-deferred-row"
+      // En "Más esperadas" la vista previa se superpone fuera de la fila, así
+      // que NO usamos `sv-deferred-row` (content-visibility recortaría el
+      // overflow del popover por arriba/abajo). El resto de filas sí lo usan.
+      className={`relative group ${previewKind === "anticipated" ? "" : "sv-deferred-row"}`}
     >
       {!hideTitle && (
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
@@ -2053,7 +2077,7 @@ function Row({
                 : false
             }
             modules={[Navigation, FreeMode]}
-            className={`group relative ${previewKind === "anticipated" ? "!py-14 sm:!py-16 md:!py-20 !-my-14 sm:!-my-16 md:!-my-20" : ""}`}
+            className={`group relative ${previewKind === "anticipated" ? "!py-20 sm:!py-24 md:!py-28 !-my-20 sm:!-my-24 md:!-my-28" : ""}`}
             wrapperClass={previewKind === "anticipated" ? "flex items-center" : ""}
             breakpoints={breakpointsRow}
           >
