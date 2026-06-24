@@ -803,8 +803,8 @@ function FeaturedSlide({
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
       <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
         <div className="flex max-w-full flex-col items-center text-center sm:block sm:max-w-xl sm:text-left">
-            {/* Logo del título o nombre */}
-            {logoSrc ? (
+            {/* Solo el logo del título; no se muestra el título en texto. */}
+            {logoSrc && (
               <div
                 className="hero-reveal hero-logo-reveal relative mb-3 h-24 w-[72%] max-w-[17rem] sm:mb-5 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
                 style={{ "--hero-delay": "80ms" }}
@@ -817,13 +817,6 @@ function FeaturedSlide({
                   className="object-contain object-center drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] sm:object-left"
                 />
               </div>
-            ) : (
-              <h2
-                className="hero-reveal hero-title-reveal mb-3 text-3xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] sm:mb-5 sm:text-6xl"
-                style={{ "--hero-delay": "80ms" }}
-              >
-                {title}
-              </h2>
             )}
 
             {/* Metadatos + puntuaciones */}
