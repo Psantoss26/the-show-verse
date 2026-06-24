@@ -595,14 +595,29 @@ function FeaturedSlide({
         )}
       </div>
 
-      {/* Difuminado lateral izquierdo (solo escritorio): cubre siempre el hueco
-          del backdrop y la zona de logo/información/botones, fundiéndose hacia
-          el centro-derecha. */}
+      {/* Difuminado lateral izquierdo (solo escritorio): oscurece la zona de
+          logo/información/botones, fundiéndose hacia el centro-derecha. */}
       <div
         className="pointer-events-none absolute inset-0 hidden sm:block"
         style={{
           background:
             "linear-gradient(to right, #000 0%, rgba(0,0,0,0.92) 22%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.2) 58%, transparent 74%)",
+        }}
+      />
+
+      {/* Tapa-hueco lateral izquierdo (solo escritorio): el backdrop es
+          object-contain object-right, así que al ensanchar la ventana queda un
+          hueco a la izquierda cuyo tamaño = 100% - anchoImagen, donde
+          anchoImagen = 88dvh * 16/9 (alto limitado por max-h-[88dvh]). Este
+          panel negro cubre SIEMPRE ese hueco (+2rem de margen) y se funde 14rem
+          dentro de la imagen, escalando con el ancho de la ventana para que el
+          borde izquierdo del backdrop no sea visible nunca. */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 hidden sm:block"
+        style={{
+          width: "calc(100% - 88dvh * 16 / 9 + 16rem)",
+          background:
+            "linear-gradient(to right, #000 0%, #000 calc(100% - 14rem), rgba(0,0,0,0.6) calc(100% - 7rem), transparent 100%)",
         }}
       />
 

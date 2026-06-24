@@ -13,7 +13,7 @@ function getInitials(account) {
     .join("");
 }
 
-export default function UserAvatar({ account }) {
+export default function UserAvatar({ account, className = "" }) {
   const avatarUrl = account?.avatarUrl || account?.avatar_path || null;
   const label = account?.displayName || account?.name || account?.username || "Mi perfil";
 
@@ -22,7 +22,7 @@ export default function UserAvatar({ account }) {
       href="/profile"
       aria-label={label}
       title={label}
-      className="flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200"
+      className={`flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200 ${className}`}
     >
       <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-black text-white">
         {avatarUrl ? (

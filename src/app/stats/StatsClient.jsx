@@ -51,7 +51,11 @@ const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v8";
 const PROFILE_DATA_CACHE_KEY = "showverse:profile:data:v8";
 const PROFILE_USER_CACHE_KEY = "showverse:profile:user:v2";
 const PROFILE_DEFERRED_OVERVIEW_TIMEOUT_MS = 220;
-const PROFILE_FULL_REFRESH_DELAY_MS = 80;
+const PROFILE_FAST_QUERY = "?posters=0";
+const PROFILE_MEMORY_CACHE_MAX_AGE = 1000 * 60 * 10; // 10 minutos
+
+let profileStatsMemoryCache = null;
+let profileDataMemoryCache = null;
 
 function scheduleProfileDeferredOverview(callback) {
   if (typeof window === "undefined") return null;
@@ -72,10 +76,9 @@ function cancelProfileDeferredOverview(handle) {
   window.clearTimeout(handle);
 }
 
-// Persisted in localStorage (survives across sessions) and served
-// stale-while-revalidate: cached profile data paints instantly on the first
-// visit of a new session, while the mount effect always refreshes in the
-// background. A hard age cap drops data that is too old to be useful.
+// Persisted in localStorage (survives across sessions). Cached stats are only
+// used as an error fallback so Profile never paints stale or compact numbers
+// before the final profile payload is ready.
 const PROFILE_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
 
 function readProfileSessionCache(key) {
@@ -103,6 +106,8 @@ function writeProfileSessionCache(key, data) {
 }
 
 function clearProfileSessionCache() {
+  profileStatsMemoryCache = null;
+  profileDataMemoryCache = null;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(PROFILE_STATS_CACHE_KEY);
@@ -111,8 +116,12 @@ function clearProfileSessionCache() {
   } catch {}
 }
 
-function isCompactProfilePayload(payload) {
-  return Boolean(payload?.compact);
+function readProfileMemoryCache(cache) {
+  if (!cache?.data) return null;
+  if (Date.now() - Number(cache.t || 0) > PROFILE_MEMORY_CACHE_MAX_AGE) {
+    return null;
+  }
+  return cache.data;
 }
 
 function createEmptyProfileStatsData() {
@@ -1197,16 +1206,19 @@ export default function StatsClient({ connectNext = "/profile" }) {
     }
 
     const cachedStats = readProfileSessionCache(PROFILE_STATS_CACHE_KEY);
-    const cachedProfile = readProfileSessionCache(PROFILE_DATA_CACHE_KEY);
     const cachedUser = readProfileSessionCache(PROFILE_USER_CACHE_KEY);
+    const memoryStats = readProfileMemoryCache(profileStatsMemoryCache);
+    const memoryProfile = readProfileMemoryCache(profileDataMemoryCache);
 
-    if (cachedStats) {
-      setData(cachedStats);
+    if (memoryStats) {
+      setData(memoryStats);
       setLoading(false);
     }
-    if (cachedProfile) {
-      setProfileData(cachedProfile);
-    } else if (cachedUser?.user) {
+    if (memoryProfile) {
+      setProfileData(memoryProfile);
+    }
+
+    if (!showVerseProfileUser && cachedUser?.user) {
       setProfileData(cachedUser);
     }
     if (showVerseProfileUser) {
@@ -1216,7 +1228,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
       }));
     }
 
-    const applyShowVerseFallback = () => {
+    const applyShowVerseFallback = ({ allowCachedStats = false } = {}) => {
       clearProfileSessionCache();
       if (showVerseProfileUser) {
         setProfileData((prev) => ({
@@ -1224,7 +1236,11 @@ export default function StatsClient({ connectNext = "/profile" }) {
           user: showVerseProfileUser,
         }));
       }
-      if (!cachedStats) setData(createEmptyProfileStatsData());
+      setData(
+        allowCachedStats && cachedStats
+          ? cachedStats
+          : createEmptyProfileStatsData(),
+      );
       setLoading(false);
     };
 
@@ -1261,6 +1277,8 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
       setProfileData(profile);
       setData(statsPayload);
+      profileDataMemoryCache = { t: Date.now(), data: profile };
+      profileStatsMemoryCache = { t: Date.now(), data: statsPayload };
       writeProfileSessionCache(PROFILE_DATA_CACHE_KEY, profile);
       writeProfileSessionCache(PROFILE_STATS_CACHE_KEY, statsPayload);
       if (profile.user) {
@@ -1272,10 +1290,20 @@ export default function StatsClient({ connectNext = "/profile" }) {
       return statsPayload;
     };
 
-    const fetchProfileJson = async (compact) => {
-      const res = await fetch(`/api/profile${compact ? "?compact=1" : ""}`, {
+    const fetchProfileJson = async ({
+      compact = false,
+      skipPosterEnrichment = false,
+      priority,
+    } = {}) => {
+      const query = compact
+        ? "?compact=1"
+        : skipPosterEnrichment
+          ? PROFILE_FAST_QUERY
+          : "";
+      const res = await fetch(`/api/profile${query}`, {
         cache: "no-store",
         credentials: "include",
+        ...(priority ? { priority } : {}),
       });
       if (ignore) return null;
       if (res.status === 401) return { unauthorized: true };
@@ -1291,12 +1319,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
     const fetchData = async () => {
       setError("");
-      if (!cachedStats) setLoading(true);
+      setLoading(!memoryStats);
 
       try {
-        const shouldUseCompactFirst =
-          !cachedStats || isCompactProfilePayload(cachedStats);
-        const initialResult = await fetchProfileJson(shouldUseCompactFirst);
+        const initialResult = await fetchProfileJson({
+          skipPosterEnrichment: true,
+        });
         if (ignore) return;
         if (initialResult?.unauthorized) {
           applyShowVerseFallback();
@@ -1308,39 +1336,41 @@ export default function StatsClient({ connectNext = "/profile" }) {
               "No se pudo cargar el perfil desde el backend propio:",
               initialResult.error || initialResult.status,
             );
-            applyShowVerseFallback();
-          } else if (!cachedStats) {
+            applyShowVerseFallback({ allowCachedStats: true });
+          } else {
             setError("No se pudieron cargar las estadísticas.");
           }
           return;
         }
 
-        const initialStats = initialResult?.json
-          ? applyProfileJson(initialResult.json)
-          : null;
+        if (initialResult?.json) {
+          applyProfileJson(initialResult.json);
+        }
         if (ignore) return;
         setLoading(false);
 
-        if (isCompactProfilePayload(initialStats)) {
-          window.setTimeout(async () => {
-            if (ignore) return;
-            try {
-              const fullResult = await fetchProfileJson(false);
-              if (ignore || fullResult?.unauthorized) return;
-              if (fullResult?.json) {
+        window.setTimeout(async () => {
+          if (ignore) return;
+          try {
+            const fullResult = await fetchProfileJson({ priority: "low" });
+            if (ignore || fullResult?.unauthorized || fullResult?.error) return;
+            if (fullResult?.json) {
+              startTransition(() => {
                 applyProfileJson(fullResult.json);
-              }
-            } catch (e) {
-              console.error(e);
-            } finally {
-              if (!ignore) setLoading(false);
+              });
             }
-          }, PROFILE_FULL_REFRESH_DELAY_MS);
-        }
+          } catch (e) {
+            console.error(e);
+          }
+        }, 0);
       } catch (e) {
         console.error(e);
-        if (!ignore && !cachedStats) {
-          setError("No se pudieron cargar las estadísticas.");
+        if (!ignore) {
+          if (cachedStats) {
+            applyShowVerseFallback({ allowCachedStats: true });
+          } else {
+            setError("No se pudieron cargar las estadísticas.");
+          }
         }
       } finally {
         if (!ignore) setLoading(false);
