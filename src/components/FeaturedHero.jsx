@@ -124,7 +124,7 @@ function HeroActionButton({
       disabled={disabled || loading}
       data-hero-action-button="true"
       onClick={handleClick}
-      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
+      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full border border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow,border-color] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
       style={{
         containerType: "inline-size",
         backgroundColor:
@@ -142,10 +142,10 @@ function HeroActionButton({
               : undefined,
         boxShadow:
           solid && !disabled
-            ? "0 10px 30px -10px rgba(255,255,255,0.55)"
+            ? "inset 0 1.5px 2px rgba(255,255,255,0.15), 0 10px 30px -10px rgba(255,255,255,0.55)"
             : active && !disabled
-              ? `0 0 20px ${colors.glow}`
-              : "0 10px 30px -10px rgba(0,0,0,0.5)",
+              ? `inset 0 1.5px 2px rgba(255,255,255,0.15), 0 0 20px ${colors.glow}`
+              : "inset 0 1.5px 2px rgba(255,255,255,0.15), 0 10px 30px -10px rgba(0,0,0,0.5)",
       }}
     >
       <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">

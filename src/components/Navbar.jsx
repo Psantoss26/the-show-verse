@@ -828,7 +828,7 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/30 bg-gradient-to-b from-white/10 to-transparent backdrop-blur-[30px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.2),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/12 flex items-center px-4 overflow-visible">
+      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-4 overflow-visible">
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
         <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
 
