@@ -36,6 +36,7 @@ import { fetchArtworkOverrides } from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
 import FeaturedHero from "@/components/FeaturedHero";
+import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 
 import {
   yearOf,
@@ -3293,6 +3294,9 @@ export default function MainDashboardClient({ initialData }) {
             initial="hidden"
             animate="visible"
           >
+          {/* Continuar viendo (backend/BBDD propios: historial + próximo episodio) */}
+          <ContinueWatchingSection isMobile={isMobile} hydrated={hydrated} />
+
           {/* Trakt: Más esperadas con selector Películas/Series */}
           <AnticipatedSection
             movieItems={
