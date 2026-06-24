@@ -2,9 +2,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Autoplay, Pagination, EffectFade } from "swiper/modules";
-import "swiper/swiper-bundle.css";
 import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -28,7 +25,6 @@ import {
 } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { traktGetItemStatus, traktSetWatched } from "@/lib/api/traktClient";
-import LiquidButton from "@/components/LiquidButton";
 
 import {
   buildImg,
@@ -40,21 +36,48 @@ import {
   fetchBestLogo,
   getBestTrailerCached,
   getArtworkPreference,
-  preloadImage,
   yearOf,
   ratingOf,
   formatRuntime,
 } from "@/lib/dashboard/media";
 
-// "original" = máxima resolución de TMDb; NextImage la reescala según el
-// viewport, así que la imagen del hero se ve nítida en pantallas grandes/retina.
-const HERO_BACKDROP_SIZE = "original";
-const HERO_POSTER_SIZE = "original";
+// El hero convive con previews interactivas en la misma vista. Usamos tamaños
+// acotados para no competir con los backdrops de hover del dashboard.
+const HERO_BACKDROP_SIZE = "w1280";
+const HERO_POSTER_SIZE = "w780";
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_FALLBACK = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
+
+function HeroActionButton({
+  children,
+  active = false,
+  disabled = false,
+  loading = false,
+  title,
+  onClick,
+  className = "",
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      disabled={disabled || loading}
+      onClick={onClick}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/12 text-white shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-white/22 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-wait disabled:opacity-70 sm:h-11 sm:w-11 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5 ${active ? "bg-white text-black hover:bg-white/90" : ""} ${className}`}
+    >
+      {loading ? (
+        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        children
+      )}
+    </button>
+  );
+}
 
 /* ====================================================================
  * Slide individual del hero a pantalla completa
@@ -66,8 +89,7 @@ function FeaturedSlide({
   logoPath,
   isActive,
   isMobile,
-  onTrailerPlay,
-  onTrailerClose,
+  shouldLoadMedia,
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
@@ -103,7 +125,7 @@ function FeaturedSlide({
   useEffect(() => {
     let cancel = false;
     const load = async () => {
-      if (!movie || !account?.id) {
+      if (!isActive || !movie || !account?.id) {
         setFavorite(false);
         setWatchlist(false);
         setWatched(false);
@@ -130,12 +152,12 @@ function FeaturedSlide({
     return () => {
       cancel = true;
     };
-  }, [movie, account, mediaType]);
+  }, [isActive, movie, account, mediaType]);
 
   // Extras: duración/temporadas + nota IMDb
   useEffect(() => {
     let abort = false;
-    if (!movie) return;
+    if (!isActive || !movie) return;
 
     const load = async () => {
       try {
@@ -181,7 +203,7 @@ function FeaturedSlide({
     return () => {
       abort = true;
     };
-  }, [movie, mediaType]);
+  }, [isActive, movie, mediaType]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -199,7 +221,6 @@ function FeaturedSlide({
     e.stopPropagation();
     if (showTrailer) {
       setShowTrailer(false);
-      onTrailerClose?.(); // reanuda el carrusel
       return;
     }
     try {
@@ -212,7 +233,6 @@ function FeaturedSlide({
       }
       setTrailer(t);
       setShowTrailer(true);
-      onTrailerPlay?.();
     } catch {
       setError("No se pudo cargar el trailer.");
     } finally {
@@ -331,13 +351,14 @@ function FeaturedSlide({
     >
       {/* Fondo: poster textless en móvil; backdrop completo en escritorio. */}
       <div className="absolute inset-0">
-        {!showTrailer && bgSrc && (
+        {!showTrailer && shouldLoadMedia && bgSrc && (
           <NextImage
             key={bgSrc}
             src={bgSrc}
             alt={title}
             fill
-            priority={isActive}
+            loading="lazy"
+            fetchPriority="low"
             sizes="100vw"
             className={isMobile ? "object-contain object-center" : "object-contain object-right"}
           />
@@ -451,6 +472,7 @@ function FeaturedSlide({
                   width={36}
                   height={12}
                   loading="lazy"
+                  style={{ width: "auto" }}
                 />
                 <span className="font-semibold">{ratingOf(movie)}</span>
               </span>
@@ -464,6 +486,7 @@ function FeaturedSlide({
                     width={34}
                     height={16}
                     loading="lazy"
+                    style={{ width: "auto" }}
                   />
                   <span className="font-semibold">
                     {extras.imdbRating.toFixed(1)}
@@ -498,57 +521,46 @@ function FeaturedSlide({
                 Más información
               </button>
 
-              <LiquidButton
+              <HeroActionButton
                 onClick={handleToggleTrailer}
                 loading={trailerLoading}
                 active
-                activeColor="yellow"
-                groupId="featured-hero-actions"
                 title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="!h-10 !w-10 !bg-white !text-black sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
+                className="bg-white text-black hover:bg-white/90"
               >
                 {showTrailer ? (
                   <X className="text-black" />
                 ) : (
                   <Play className="ml-0.5 fill-current text-black" />
                 )}
-              </LiquidButton>
+              </HeroActionButton>
 
-              <LiquidButton
+              <HeroActionButton
                 onClick={handleToggleFavorite}
                 loading={loadingStates || updating === "favorite"}
                 active={favorite}
-                activeColor="red"
-                groupId="featured-hero-actions"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 <Heart className={favorite ? "fill-current" : ""} />
-              </LiquidButton>
+              </HeroActionButton>
 
-              <LiquidButton
+              <HeroActionButton
                 onClick={handleToggleWatchlist}
                 loading={loadingStates || updating === "watchlist"}
                 active={watchlist}
-                activeColor="blue"
-                groupId="featured-hero-actions"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </LiquidButton>
+              </HeroActionButton>
 
-              <LiquidButton
+              <HeroActionButton
                 onClick={handleToggleWatched}
                 loading={loadingStates || updating === "watched"}
                 active={watched}
-                activeColor="green"
-                groupId="featured-hero-actions"
                 title={watched ? "Marcar como no visto" : "Marcar como visto"}
-                className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-4 [&_svg]:!w-4 sm:[&_svg]:!h-5 sm:[&_svg]:!w-5"
               >
                 {watched ? <Eye /> : <EyeOff />}
-              </LiquidButton>
+              </HeroActionButton>
             </div>
 
             {error && (
@@ -564,8 +576,9 @@ function FeaturedSlide({
 /* ====================================================================
  * Hero destacado a pantalla completa (carrusel)
  * ==================================================================== */
-export default function FeaturedHero({ items = [], isMobile, hydrated }) {
-  const swiperRef = useRef(null);
+export default function FeaturedHero({ items = [], isMobile }) {
+  const assetsRef = useRef({});
+  const resolvingAssetsRef = useRef(new Set());
   const [activeIndex, setActiveIndex] = useState(0);
   const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
 
@@ -574,131 +587,96 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
     [items],
   );
 
-  // Pausa el carrusel cuando empieza un trailer (para que se vea completo) y lo
-  // reanuda si el usuario cierra el trailer.
-  const pauseAutoplay = useCallback(() => {
-    try {
-      swiperRef.current?.autoplay?.stop();
-    } catch { }
-  }, []);
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
 
-  const resumeAutoplay = useCallback(() => {
-    if (!hydrated) return;
-    try {
-      swiperRef.current?.autoplay?.start();
-    } catch { }
-  }, [hydrated]);
+  useEffect(() => {
+    if (activeIndex >= list.length) setActiveIndex(0);
+  }, [activeIndex, list.length]);
 
-  // Carga progresiva de backdrops/posters textless + logos del título (cliente).
-  // getMovieImages cachea la respuesta completa por título, así que pedir
-  // backdrop, cartel y logo no implica peticiones de red adicionales.
+  const resolveAssetsFor = useCallback(
+    async (movie) => {
+      if (!movie?.id) return;
+      const id = movie.id;
+      if (assetsRef.current[id] || resolvingAssetsRef.current.has(id)) return;
+
+      resolvingAssetsRef.current.add(id);
+      const mediaType = getMediaTypeForItem(movie);
+      let backdrop = null;
+      let poster = null;
+      let logo = null;
+
+      try {
+        const { backdrop: userBackdrop } = getArtworkPreference(id);
+        backdrop =
+          userBackdrop ||
+          (await fetchBestBackdropNoLang(id, mediaType)) ||
+          getPreviewBackdropFallback(movie);
+      } catch {
+        backdrop = getPreviewBackdropFallback(movie);
+      }
+
+      try {
+        poster = await fetchBestPosterNoLang(id, mediaType);
+      } catch {
+        poster = null;
+      }
+
+      try {
+        logo = await fetchBestLogo(id, mediaType, ["en", null]);
+      } catch { }
+
+      setAssets((prev) =>
+        prev[id] ? prev : { ...prev, [id]: { backdrop, poster, logo } },
+      );
+      resolvingAssetsRef.current.delete(id);
+    },
+    [],
+  );
+
+  // Carga solo los assets del slide activo. No hay precarga de slides futuros:
+  // las previews del dashboard conservan prioridad absoluta.
   useEffect(() => {
     if (!list.length) return;
-    let canceled = false;
-
-    const load = async () => {
-      const entries = await Promise.all(
-        list.map(async (movie) => {
-          const id = movie.id;
-          const mediaType = getMediaTypeForItem(movie);
-
-          let backdrop = null;
-          try {
-            const { backdrop: userBackdrop } = getArtworkPreference(id);
-            backdrop =
-              userBackdrop ||
-              (await fetchBestBackdropNoLang(id, mediaType)) ||
-              getPreviewBackdropFallback(movie);
-          } catch {
-            backdrop = getPreviewBackdropFallback(movie);
-          }
-
-          let poster = null;
-          try {
-            poster = await fetchBestPosterNoLang(id, mediaType);
-          } catch {
-            poster = null;
-          }
-
-          let logo = null;
-          try {
-            // Logo del título preferentemente en inglés (luego textless).
-            logo = await fetchBestLogo(id, mediaType, ["en", null]);
-          } catch { }
-
-          const imageToPreload = isMobile
-            ? poster && buildImg(poster, HERO_POSTER_SIZE)
-            : backdrop && buildImg(backdrop, HERO_BACKDROP_SIZE);
-          if (imageToPreload) await preloadImage(imageToPreload);
-
-          return [id, { backdrop, poster, logo }];
-        }),
-      );
-
-      if (canceled) return;
-      const map = {};
-      for (const [id, value] of entries) map[id] = value;
-      setAssets(map);
-    };
-
-    load();
-    return () => {
-      canceled = true;
-    };
-  }, [list, isMobile]);
+    resolveAssetsFor(list[activeIndex]);
+  }, [list, activeIndex, resolveAssetsFor]);
 
   if (!list.length) return null;
 
+  const activeMovie = list[activeIndex] || list[0];
+  const activeAssets = assets[activeMovie.id] || {};
+  const activeBackdrop =
+    activeAssets.backdrop || getPreviewBackdropFallback(activeMovie) || null;
+  const activePoster = activeAssets.poster || null;
+
+  const goToPrevious = () => {
+    setActiveIndex((current) =>
+      current <= 0 ? list.length - 1 : current - 1,
+    );
+  };
+
+  const goToNext = () => {
+    setActiveIndex((current) =>
+      current >= list.length - 1 ? 0 : current + 1,
+    );
+  };
+
   return (
     <section
-      className="relative aspect-[2/3] w-full bg-black sm:aspect-video sm:max-h-[88dvh]"
+      className="relative isolate aspect-[2/3] w-full overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
       aria-label="Contenido destacado"
-      style={{
-        "--swiper-pagination-color": "#f59e0b",
-        "--swiper-pagination-bullet-inactive-color": "#ffffff",
-        "--swiper-pagination-bullet-inactive-opacity": "0.4",
-        "--swiper-pagination-bullet-size": "8px",
-      }}
     >
-      <Swiper
-        modules={[Navigation, Autoplay, Pagination, EffectFade]}
-        effect="fade"
-        fadeEffect={{ crossFade: true }}
-        slidesPerView={1}
-        loop={list.length > 1}
-        autoplay={
-          hydrated
-            ? { delay: 7000, disableOnInteraction: false, pauseOnMouseEnter: true }
-            : false
-        }
-        pagination={{ clickable: true }}
-        onSwiper={(s) => {
-          swiperRef.current = s;
-        }}
-        onSlideChange={(s) => setActiveIndex(s.realIndex)}
-        className="h-full w-full"
-      >
-        {list.map((movie, index) => {
-          const a = assets[movie.id] || {};
-          const seededBackdrop =
-            a.backdrop || getPreviewBackdropFallback(movie) || null;
-          const seededPoster = a.poster || null;
-          return (
-            <SwiperSlide key={movie.id} className="!h-full">
-              <FeaturedSlide
-                movie={movie}
-                backdropPath={seededBackdrop}
-                posterPath={seededPoster}
-                logoPath={a.logo || null}
-                isActive={index === activeIndex}
-                isMobile={isMobile}
-                onTrailerPlay={pauseAutoplay}
-                onTrailerClose={resumeAutoplay}
-              />
-            </SwiperSlide>
-          );
-        })}
-      </Swiper>
+      <FeaturedSlide
+        key={activeMovie.id}
+        movie={activeMovie}
+        backdropPath={activeBackdrop}
+        posterPath={activePoster}
+        logoPath={activeAssets.logo || null}
+        isActive
+        isMobile={isMobile}
+        shouldLoadMedia
+      />
 
       {/* Flechas (solo desktop) */}
       {!isMobile && list.length > 1 && (
@@ -706,7 +684,7 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
           <button
             type="button"
             aria-label="Anterior"
-            onClick={() => swiperRef.current?.slidePrev()}
+            onClick={goToPrevious}
             className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
             <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
@@ -714,12 +692,34 @@ export default function FeaturedHero({ items = [], isMobile, hydrated }) {
           <button
             type="button"
             aria-label="Siguiente"
-            onClick={() => swiperRef.current?.slideNext()}
+            onClick={goToNext}
             className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
           >
             <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
           </button>
         </>
+      )}
+
+      {list.length > 1 && (
+        <div
+          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
+          aria-label="Diapositivas destacadas"
+        >
+          {list.map((movie, index) => (
+            <button
+              key={movie.id}
+              type="button"
+              aria-label={`Ver destacado ${index + 1}`}
+              aria-current={index === activeIndex ? "true" : undefined}
+              onClick={() => setActiveIndex(index)}
+              className={`h-2 rounded-full transition-colors ${
+                index === activeIndex
+                  ? "w-6 bg-amber-500"
+                  : "w-2 bg-white/45 hover:bg-white/70"
+              }`}
+            />
+          ))}
+        </div>
       )}
     </section>
   );

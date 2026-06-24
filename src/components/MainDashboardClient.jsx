@@ -3271,12 +3271,12 @@ export default function MainDashboardClient({ initialData }) {
       variants={fadeInUp}
     >
       <div className="relative z-10">
-        {/* Hero destacado a pantalla completa (bajo la navbar transparente) */}
-        <FeaturedHero
-          items={dashboardData.featured || EMPTY_ARRAY}
-          isMobile={isMobile}
-          hydrated={hydrated}
-        />
+        <div className="relative isolate" style={{ contain: "layout paint" }}>
+          <FeaturedHero
+            items={dashboardData.featured || EMPTY_ARRAY}
+            isMobile={isMobile}
+          />
+        </div>
 
         <div className="px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8">
           <TopRatedHero
