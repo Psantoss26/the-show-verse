@@ -20,6 +20,8 @@ import {
 } from "@/lib/dashboard/featured";
 
 export const revalidate = 1800; // 30 min
+// Margen para que la carga + streaming de datos diferidos termine en Vercel.
+export const maxDuration = 30;
 
 export const metadata = {
   title: "Series",
@@ -41,31 +43,38 @@ async function fetchTopRatedImdbTvServer() {
 
   const url = `${baseUrl}/api/imdb/top-rated?type=tv&pages=3&limit=80&minVotes=5000`;
 
-  let res;
+  // Timeout para que este self-fetch (scraping de IMDb, lento) nunca cuelgue la
+  // carga del resto de secciones diferidas en producción.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
   try {
-    res = await fetch(url, {
+    const res = await fetch(url, {
       next: { revalidate },
+      signal: controller.signal,
     });
+
+    if (!res.ok) {
+      console.error("Error al llamar a /api/imdb/top-rated (tv):", res.status);
+      return [];
+    }
+
+    const json = await res.json().catch(() => null);
+    if (!json) return [];
+
+    if (Array.isArray(json)) return json;
+    if (Array.isArray(json.results)) return json.results;
+    if (Array.isArray(json.items)) return json.items;
+    return [];
   } catch (networkErr) {
     console.error(
       "Error de red al llamar a /api/imdb/top-rated (tv):",
       networkErr?.message,
     );
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  if (!res.ok) {
-    console.error("Error al llamar a /api/imdb/top-rated (tv):", res.status);
-    return [];
-  }
-
-  const json = await res.json();
-
-  if (Array.isArray(json)) return json;
-  if (Array.isArray(json.results)) return json.results;
-  if (Array.isArray(json.items)) return json.items;
-
-  return [];
 }
 
 /* ======== Curado de listas tipo Netflix/Prime ======== */
@@ -224,44 +233,48 @@ async function getDeferredDashboardData() {
       animation,
       kDrama,
       baseSections,
+      // Cada llamada se protege con .catch para que un fallo aislado (p. ej. en
+      // producción) no rechace todo el Promise.all y deje sin secciones la
+      // página. Las que devuelven array caen a [], baseSections a {}.
     ] = await Promise.all([
-      fetchTopRatedImdbTvServer(),
+      fetchTopRatedImdbTvServer().catch(() => []),
       fetchMediaByGenre({
         type: "tv",
         genreId: 18,
         minVotes: 800,
         language: lang,
-      }), // Drama
+      }).catch(() => []), // Drama
       fetchMediaByGenre({
         type: "tv",
         genreId: 10765,
         minVotes: 800,
         language: lang,
-      }), // Sci-Fi & Fantasy
+      }).catch(() => []), // Sci-Fi & Fantasy
       fetchMediaByGenre({
         type: "tv",
         genreId: 80,
         minVotes: 800,
         language: lang,
-      }), // Crimen
+      }).catch(() => []), // Crimen
       fetchRomanceSeriesWithGoodReviews({
         language: lang,
         pages: 1,
-      }), // Romance
+      }).catch(() => []), // Romance
       fetchMediaByGenre({
         type: "tv",
         genreId: 16,
         minVotes: 400,
         language: lang,
-      }), // Animación
+      }).catch(() => []), // Animación
       discoverTV({
         with_original_language: "ko",
         sort_by: "popularity.desc",
         "vote_count.gte": 300,
-      }), // K-Drama
-      fetchTVSections
+      }).catch(() => []), // K-Drama
+      (fetchTVSections
         ? fetchTVSections({ language: lang })
-        : Promise.resolve({}),
+        : Promise.resolve({})
+      ).catch(() => ({})),
     ]);
 
     const curatedTopIMDb = curateList(topImdbRaw, {

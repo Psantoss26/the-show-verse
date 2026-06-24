@@ -23,6 +23,8 @@ import {
 
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
+// Margen para que la carga + streaming de datos diferidos termine en Vercel.
+export const maxDuration = 30;
 
 export const metadata = {
   title: "Películas",
@@ -45,33 +47,39 @@ async function fetchTopRatedImdbServer() {
 
   const url = `${baseUrl}/api/imdb/top-rated?type=movie&pages=3&limit=80&minVotes=15000`;
 
-  let res;
+  // Timeout para que este self-fetch (scraping de IMDb, lento) nunca cuelgue la
+  // carga del resto de secciones diferidas en producción.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
   try {
-    res = await fetch(url, {
-      // Opcional, para que Next cachee también esta llamada
+    const res = await fetch(url, {
       next: { revalidate },
+      signal: controller.signal,
     });
+
+    if (!res.ok) {
+      console.error("Error al llamar a /api/imdb/top-rated:", res.status);
+      return [];
+    }
+
+    // Protegemos el parseo: en producción la respuesta podría no ser JSON.
+    const json = await res.json().catch(() => null);
+    if (!json) return [];
+
+    if (Array.isArray(json)) return json;
+    if (Array.isArray(json.results)) return json.results;
+    if (Array.isArray(json.items)) return json.items;
+    return [];
   } catch (networkErr) {
     console.error(
       "Error de red al llamar a /api/imdb/top-rated:",
       networkErr?.message,
     );
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  if (!res.ok) {
-    console.error("Error al llamar a /api/imdb/top-rated:", res.status);
-    return [];
-  }
-
-  const json = await res.json();
-
-  // Cubrimos varias formas posibles de respuesta:
-  if (Array.isArray(json)) return json;
-  if (Array.isArray(json.results)) return json.results;
-  if (Array.isArray(json.items)) return json.items;
-
-  return [];
 }
 
 /* ======== Curado de listas tipo Netflix/Prime (solo servidor) ======== */
@@ -234,45 +242,49 @@ async function getDeferredDashboardData() {
       blockbustersP2,
       blockbustersP3,
       baseSections,
+      // Cada llamada se protege con .catch para que un fallo aislado (p. ej. en
+      // producción) no rechace todo el Promise.all y deje sin secciones la
+      // página. Las que devuelven array caen a [], baseSections a {}.
     ] = await Promise.all([
-      fetchTopRatedImdbServer(),
+      fetchTopRatedImdbServer().catch(() => []),
       fetchMediaByGenre({
         type: "movie",
         genreId: 28,
         minVotes: 1000,
         language: lang,
-      }),
+      }).catch(() => []),
       fetchMediaByGenre({
         type: "movie",
         genreId: 878,
         minVotes: 1000,
         language: lang,
-      }),
+      }).catch(() => []),
       fetchMediaByGenre({
         type: "movie",
         genreId: 53,
         minVotes: 1000,
         language: lang,
-      }),
+      }).catch(() => []),
       fetchMediaByGenre({
         type: "movie",
         genreId: 10749,
         minVotes: 1000,
         language: lang,
-      }),
+      }).catch(() => []),
       fetchMediaByKeyword({
         type: "movie",
         keywordId: 9715,
         minVotes: 500,
         language: lang,
-      }),
-      fetchMindBendingMovies(),
-      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 1 }),
-      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 2 }),
-      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 3 }),
-      fetchMovieSections
+      }).catch(() => []),
+      fetchMindBendingMovies().catch(() => []),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 1 }).catch(() => []),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 2 }).catch(() => []),
+      discoverMovies({ "vote_count.gte": 4000, sort_by: "popularity.desc", page: 3 }).catch(() => []),
+      (fetchMovieSections
         ? fetchMovieSections({ language: lang })
-        : Promise.resolve({}),
+        : Promise.resolve({})
+      ).catch(() => ({})),
     ]);
 
     const curatedTopIMDb = curateList(topImdbRaw, {

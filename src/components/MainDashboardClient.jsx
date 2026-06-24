@@ -1076,6 +1076,10 @@ function InlinePreviewCardAnticipated({
   movie,
   heightClass,
   backdropOverride,
+  index,
+  totalCount,
+  activeIndex,
+  alignment,
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
@@ -1386,49 +1390,74 @@ function InlinePreviewCardAnticipated({
       })
     : yearOf(movie) || "—";
 
+  // Determinar la alineación horizontal de la tarjeta absoluta
+  let alignmentClass = "left-1/2 -translate-x-1/2";
+  let transformOrigin = "center center";
+
+  if (alignment === "left") {
+    alignmentClass = "left-0";
+    transformOrigin = "left center";
+  } else if (alignment === "right") {
+    alignmentClass = "right-0";
+    transformOrigin = "right center";
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, scale: 0.88, y: 0 }}
+      animate={{ opacity: 1, scale: 1.12, y: -10 }}
+      exit={{ opacity: 0, scale: 0.88, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
+      transition={{
+        type: "spring",
+        stiffness: 180,
+        damping: 20,
+        mass: 0.8
+      }}
       ref={cardRef}
-      className={dashboardPreviewCardClass(heightClass)}
+      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
-      onTouchStart={prefetchHref}
+      style={{ willChange: "transform, opacity", transformOrigin }}
     >
-      <div className={dashboardPreviewMediaClass}>
+      {/* Backdrop de 16:9 */}
+      <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
         {!showTrailer && !backdropReady && (
           <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
         )}
 
         {!showTrailer && bgSrc && (
-          <NextImage
-            key={bgSrc}
-            src={bgSrc}
-            alt={movie.title || movie.name}
-            fill
-            sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-            className={`scale-[1.015] object-cover transition-opacity duration-200 ${
-              backdropReady ? "opacity-100" : "opacity-0"
-            }`}
-            style={dashboardPreviewBackdropFadeStyle}
-            loading="eager"
-            fetchPriority="high"
-            onLoad={() => setBackdropReady(true)}
-            onError={() => {
-              const fallback = getPreviewBackdropFallback(movie);
-              if (fallback && fallback !== backdropPath) {
-                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
-                setBackdropPath(fallback);
-                setBackdropReady(true);
-                return;
-              }
-              setBackdropReady(false);
-            }}
-          />
+          <motion.div
+            initial={{ scale: 1 }}
+            animate={{ scale: 1.08 }}
+            transition={{ duration: 4, ease: "easeOut" }}
+            className="absolute inset-0 w-full h-full"
+          >
+            <NextImage
+              key={bgSrc}
+              src={bgSrc}
+              alt={movie.title || movie.name}
+              fill
+              sizes="(min-width:1280px) 450px, (min-width:768px) 410px, 350px"
+              className={`scale-[1.015] object-cover transition-opacity duration-200 ${
+                backdropReady ? "opacity-100" : "opacity-0"
+              }`}
+              style={dashboardPreviewBackdropFadeStyle}
+              loading="eager"
+              fetchPriority="high"
+              onLoad={() => setBackdropReady(true)}
+              onError={() => {
+                const fallback = getPreviewBackdropFallback(movie);
+                if (fallback && fallback !== backdropPath) {
+                  movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                  setBackdropPath(fallback);
+                  setBackdropReady(true);
+                  return;
+                }
+                setBackdropReady(false);
+              }}
+            />
+          </motion.div>
         )}
 
         {showTrailer && (
@@ -1460,37 +1489,40 @@ function InlinePreviewCardAnticipated({
         />
       </div>
 
-      <div className={dashboardPreviewInfoClass}>
-        <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
+      {/* Panel de info (debajo del backdrop) */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
+        className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
+      >
+        <div className="h-full flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             {/* META NUEVA SOLO PARA MÁS ESPERADAS */}
             <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-neutral-200">
-              <span className="font-medium">{releaseText}</span>
-              {extras?.runtime ? (
-                <span>• {formatRuntime(extras.runtime)}</span>
-              ) : null}
-              {extras?.country ? <span>• {extras.country}</span> : null}
+              <span className="font-semibold text-white">{releaseText}</span>
+              {extras?.runtime && (
+                <span className="text-neutral-300">• {formatRuntime(extras.runtime)}</span>
+              )}
+              {extras?.country && (
+                <span className="text-neutral-300">• {extras.country}</span>
+              )}
             </div>
 
             {genres && (
-              <div className="mt-1 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
+              <div className="mt-0.5 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
                 {genres}
               </div>
             )}
 
             {error && (
-              <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
+              <p className="mt-0.5 text-[11px] text-red-400 line-clamp-1">
                 {error}
               </p>
             )}
           </div>
 
-          <motion.div
-            className="flex items-center gap-2 sm:gap-3 flex-shrink-0"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
             <LiquidButton
               onClick={handleToggleTrailer}
               loading={trailerLoading}
@@ -1498,7 +1530,7 @@ function InlinePreviewCardAnticipated({
               activeColor="yellow"
               groupId="dashboard-preview-actions"
               title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="!h-9 !w-9 !bg-white !text-black sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
+              className="!h-9 !w-9 !bg-white !text-black [&_svg]:!h-5 [&_svg]:!w-5"
             >
               {showTrailer ? (
                 <X className="text-black" />
@@ -1514,7 +1546,7 @@ function InlinePreviewCardAnticipated({
               activeColor="red"
               groupId="dashboard-preview-actions"
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
+              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
             >
               <Heart className={favorite ? "fill-current" : ""} />
             </LiquidButton>
@@ -1526,13 +1558,13 @@ function InlinePreviewCardAnticipated({
               activeColor="blue"
               groupId="dashboard-preview-actions"
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
+              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
             >
               <BookmarkPlus className={watchlist ? "fill-current" : ""} />
             </LiquidButton>
-          </motion.div>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -1788,6 +1820,72 @@ function Row({
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [anticipatedAnimatingOutId, setAnticipatedAnimatingOutId] = useState(null);
+  const [hoveredAlignment, setHoveredAlignment] = useState("center");
+  const hoverTimeoutRef = useRef(null);
+
+  // Limpiar temporizador al desmontar
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnterItem = (e, itemKey, index, m, backdropOverride) => {
+    if (isMobile) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    if (rowRef.current && e.currentTarget) {
+      const slideRect = e.currentTarget.getBoundingClientRect();
+      const rowRect = rowRef.current.getBoundingClientRect();
+      const isLeft = (slideRect.left - rowRect.left) < 120;
+      const isRight = (rowRect.right - slideRect.right) < 120;
+      setHoveredAlignment(isLeft ? "left" : isRight ? "right" : "center");
+    }
+
+    if (previewKind === "anticipated") {
+      // Iniciar precarga de imagen de fondo de inmediato
+      preparePreviewBackdrop(m, backdropOverride);
+
+      hoverTimeoutRef.current = setTimeout(() => {
+        setHoveredId(itemKey);
+        setHoveredIndex(index);
+      }, 250);
+    } else {
+      const hoverToken = hoverIntentRef.current + 1;
+      hoverIntentRef.current = hoverToken;
+      setHoveredIndex(index);
+      preparePreviewBackdrop(m, backdropOverride).finally(() => {
+        if (hoverIntentRef.current === hoverToken) {
+          setHoveredId(itemKey);
+        }
+      });
+    }
+  };
+
+  const handleMouseLeaveItem = (itemKey) => {
+    if (isMobile) return;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredId((prev) => {
+      if (prev === itemKey) {
+        if (previewKind === "anticipated") {
+          setAnticipatedAnimatingOutId(itemKey);
+        }
+        return null;
+      }
+      return prev;
+    });
+    setHoveredIndex(null);
+    setHoveredAlignment("center");
+  };
   const isInView = eager
     ? true
     : useInView(rowRef, { once: true, margin: "-100px" });
@@ -1840,6 +1938,7 @@ function Row({
     const hasOverflow = !swiper.isLocked;
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
+    setActiveIndex(swiper.activeIndex);
   };
 
   const handleSwiper = (swiper) => {
@@ -1913,9 +2012,19 @@ function Row({
         className="relative"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
-          hoverIntentRef.current += 1;
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
           setIsHoveredRow(false);
-          setHoveredId(null);
+          setHoveredId((prev) => {
+            if (prev) {
+              if (previewKind === "anticipated") {
+                setAnticipatedAnimatingOutId(prev);
+              }
+            }
+            return null;
+          });
           setHoveredIndex(null);
         }}
       >
@@ -1944,7 +2053,8 @@ function Row({
                 : false
             }
             modules={[Navigation, FreeMode]}
-            className="group relative"
+            className={`group relative ${previewKind === "anticipated" ? "!py-14 sm:!py-16 md:!py-20 !-my-14 sm:!-my-16 md:!-my-20" : ""}`}
+            wrapperClass={previewKind === "anticipated" ? "flex items-center" : ""}
             breakpoints={breakpointsRow}
           >
             {normalizedItems.map((m, i) => {
@@ -1956,6 +2066,7 @@ function Row({
                   : "movie";
               const itemKey = `${itemType}:${m.id}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
+              const isAnimatingOut = anticipatedAnimatingOutId === itemKey;
               const isLast = i === normalizedItems.length - 1;
               const isSecondToLast = i === normalizedItems.length - 2;
               const isThirdToLast = i === normalizedItems.length - 3;
@@ -1966,13 +2077,19 @@ function Row({
 
               const sizeClasses = isMobile
                 ? "w-full"
-                : isActive
+                : (isActive && previewKind !== "anticipated")
                   ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
                   : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
 
+              const zOverflowClasses = (previewKind === "anticipated" && (isActive || isAnimatingOut))
+                ? "z-[90] overflow-visible"
+                : isActive
+                  ? "overflow-visible"
+                  : "overflow-hidden";
+
               // Determinar si el item activo está cerca del borde y calcular transformación
               let transformClass = "";
-              if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
+              if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0 && previewKind !== "anticipated") {
                 const activeIndex = hoveredIndex;
                 const totalItems = normalizedItems.length;
 
@@ -2022,73 +2139,70 @@ function Row({
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={isMobile ? "select-none" : "!w-auto select-none"}
+                  className={isMobile ? "select-none" : `!w-auto select-none ${previewKind === "anticipated" ? "!overflow-visible" : ""}`}
                 >
                   <div
-                    className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
-                    onMouseEnter={() => {
-                      if (!isMobile) {
-                        const hoverToken = hoverIntentRef.current + 1;
-                        hoverIntentRef.current = hoverToken;
-                        setHoveredIndex(i);
-                        preparePreviewBackdrop(m, backdropOverride).finally(
-                          () => {
-                            if (hoverIntentRef.current === hoverToken) {
-                              setHoveredId(itemKey);
-                            }
-                          },
-                        );
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      hoverIntentRef.current += 1;
-                      setHoveredId((prev) => (prev === itemKey ? null : prev));
-                      setHoveredIndex(null);
-                    }}
+                    className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${zOverflowClasses}`}
+                    onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
+                    onMouseLeave={() => handleMouseLeaveItem(itemKey)}
                   >
-                    <AnimatePresence initial={false} mode="popLayout">
+                    <AnimatePresence
+                      initial={false}
+                      mode="popLayout"
+                      onExitComplete={() => {
+                        setAnticipatedAnimatingOutId((prev) => (prev === itemKey ? null : prev));
+                      }}
+                    >
                       {isActive ? (
-                        <motion.div
-                          key="preview"
-                          initial={{ opacity: 0, scale: 0.98 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{
-                            opacity: 0,
-                            scale: 0.95,
-                            transition: { duration: 0.12 },
-                          }}
-                          transition={{
-                            duration: 0.25,
-                            ease: [0.4, 0, 0.2, 1],
-                          }}
-                          className="w-full h-full hidden sm:block"
-                          style={{ willChange: "transform, opacity" }}
-                        >
-                          {/* 4C: preview por tipo */}
-                          {previewKind === "anticipated" ? (
-                            <InlinePreviewCardAnticipated
-                              movie={m}
-                              heightClass={heightClassDesktop}
-                              backdropOverride={backdropOverride}
-                            />
-                          ) : (
+                        previewKind === "anticipated" ? (
+                          <InlinePreviewCardAnticipated
+                            key="preview-anticipated"
+                            movie={m}
+                            heightClass={heightClassDesktop}
+                            backdropOverride={backdropOverride}
+                            index={i}
+                            totalCount={normalizedItems.length}
+                            activeIndex={activeIndex}
+                            alignment={hoveredAlignment}
+                          />
+                        ) : (
+                          <motion.div
+                            key="preview-normal"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{
+                              opacity: 0,
+                              scale: 0.95,
+                              transition: { duration: 0.12 },
+                            }}
+                            transition={{
+                              duration: 0.25,
+                              ease: [0.4, 0, 0.2, 1],
+                            }}
+                            className="hidden sm:block w-full h-full"
+                            style={{ willChange: "transform, opacity" }}
+                          >
                             <InlinePreviewCard
                               movie={m}
                               heightClass={heightClassDesktop}
                               backdropOverride={backdropOverride}
                             />
-                          )}
-                        </motion.div>
+                          </motion.div>
+                        )
                       ) : (
                         <motion.div
                           key="poster"
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          exit={{
-                            opacity: 0,
-                            scale: 0.98,
-                            transition: { duration: 0.12 },
-                          }}
+                          exit={
+                            previewKind === "anticipated"
+                              ? { opacity: 0, transition: { duration: 0 } }
+                              : {
+                                  opacity: 0,
+                                  scale: 0.98,
+                                  transition: { duration: 0.12 },
+                                }
+                          }
                           transition={{
                             duration: 0.18,
                             ease: [0.4, 0, 0.2, 1],
