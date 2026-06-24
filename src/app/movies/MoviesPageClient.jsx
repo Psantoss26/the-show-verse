@@ -48,36 +48,14 @@ const fadeInUp = {
   },
 };
 
-const pageEntrance = {
-  hidden: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.72, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const heroEntrance = {
-  hidden: { opacity: 0, y: 12, scale: 0.992 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.82, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const rowsEntrance = {
-  hidden: { opacity: 0, y: 24 },
+const staggerContainer = {
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.66,
-      delay: 0.18,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.08,
-      delayChildren: 0.06,
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
     },
   },
 };
@@ -1609,7 +1587,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
  * ==================================================================== */
 export default function MoviesPageClient({ initialData, deferredDataPromise }) {
   const isMobile = useIsMobileLayout(768);
-  const reduceMotion = useReducedMotion();
 
   const posterCacheRef = useRef(new Map());
   const [deferredData, setDeferredData] = useState(null);
@@ -1718,31 +1695,26 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
   }
 
 
-  const motionInitial = reduceMotion ? false : "hidden";
-  const motionAnimate = "visible";
-
   return (
     <motion.div
-      initial={motionInitial}
-      animate={motionAnimate}
-      variants={pageEntrance}
       className={`relative min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30 ${
         hasFeaturedHero ? "-mt-16" : "px-4 py-6 sm:px-6"
       }`}
+      initial="hidden"
+      animate="visible"
+      variants={fadeInUp}
     >
       <div className="relative z-10">
         {hasFeaturedHero && (
-          <motion.div
-            className="relative isolate"
-            style={{ contain: "layout paint" }}
-            variants={heroEntrance}
-          >
+          <div className="relative isolate" style={{ contain: "layout paint" }}>
             <FeaturedHero items={featuredItems} isMobile={isMobile} />
-          </motion.div>
+          </div>
         )}
 
         <motion.div
-          variants={rowsEntrance}
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
           className={
             hasFeaturedHero
               ? "space-y-12 px-4 pt-5 pb-6 sm:px-6 sm:pt-14"
