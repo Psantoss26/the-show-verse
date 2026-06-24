@@ -198,7 +198,7 @@ function ContinueWatchingBaseCard({ show }) {
         )}
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
           <div
-            className="h-full rounded-full bg-amber-500"
+            className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -208,10 +208,10 @@ function ContinueWatchingBaseCard({ show }) {
 }
 
 /* ====================================================================
- * Tarjeta hover: backdrop ampliado (72%) + panel de info (28%)
+ * Tarjeta hover: backdrop ampliado (16:9) + panel de info
  * con botones Continuar / Favoritos / Pendientes
  * ==================================================================== */
-function ContinueWatchingPreviewCard({ show }) {
+function ContinueWatchingPreviewCard({ show, index, totalCount }) {
   const { session, account } = useAuth();
   const router = useRouter();
   const { backdropPath, ready } = useShowBackdrop(show);
@@ -340,20 +340,28 @@ function ContinueWatchingPreviewCard({ show }) {
     return parts.join(" · ");
   })();
 
+  // Determinar la alineación horizontal de la tarjeta absoluta
+  let alignmentClass = "left-1/2 -translate-x-1/2";
+  if (index === 0) {
+    alignmentClass = "left-0";
+  } else if (index === totalCount - 1) {
+    alignmentClass = "right-0";
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      className={cwPreviewCardClass}
+      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[280px] sm:w-[320px] md:w-[380px] xl:w-[420px] rounded-xl text-white cursor-pointer bg-[#141414] shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 z-50 flex flex-col overflow-hidden`}
       onClick={() => router.push(href)}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       style={{ willChange: "transform, opacity" }}
     >
-      {/* Backdrop ampliado */}
-      <div className="relative h-full w-full overflow-hidden bg-transparent">
+      {/* Backdrop de 16:9 */}
+      <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
         {!ready && (
           <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
             <motion.div
@@ -371,7 +379,7 @@ function ContinueWatchingPreviewCard({ show }) {
             src={bgSrc}
             alt={show?.title || ""}
             fill
-            sizes="(min-width:1280px) 520px, (min-width:768px) 470px, 400px"
+            sizes="(min-width:1280px) 420px, (min-width:768px) 380px, 320px"
             className={`scale-[1.015] object-cover transition-opacity duration-200 ${
               ready ? "opacity-100" : "opacity-0"
             }`}
@@ -381,12 +389,12 @@ function ContinueWatchingPreviewCard({ show }) {
           />
         )}
 
-        {/* Barra de progreso superpuesta al pie del backdrop */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent via-black/35 to-black/70" />
+        {/* Barra de progreso verde superpuesta al pie del backdrop */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-black/85" />
         <div className="absolute inset-x-3 bottom-2">
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
             <div
-              className="h-full rounded-full bg-amber-500"
+              className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -394,8 +402,8 @@ function ContinueWatchingPreviewCard({ show }) {
       </div>
 
       {/* Panel de info (debajo del backdrop) */}
-      <div className="relative h-full w-full overflow-hidden bg-black/10 bg-gradient-to-br from-white/5 via-transparent to-black/20 backdrop-blur-[50px]">
-        <div className="flex h-full items-center justify-between gap-3 px-3 py-1.5 sm:px-4">
+      <div className="w-full bg-[#141414] px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-200 sm:text-xs">
               {ep && (
@@ -667,7 +675,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                 : false
             }
             modules={[Navigation, FreeMode]}
-            className="group relative"
+            className="group relative !py-14 sm:!py-16 md:!py-20 !-my-14 sm:!-my-16 md:!-my-20"
+            wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >
             {shows.map((show, i) => {
@@ -676,34 +685,12 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
               const base =
                 "relative flex-shrink-0 transition-all duration-300 ease-in-out";
-              const sizeClasses = isActive
-                ? `${ACTIVE_WIDTH} z-20`
-                : `${BASE_WIDTH} z-10`;
-
-              // Desplazamiento de los últimos items para que la tarjeta
-              // ampliada no se recorte contra el borde derecho.
-              let transformClass = "";
-              if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
-                const activeIndex = hoveredIndex;
-                const total = shows.length;
-                if (activeIndex >= total - 3 && i <= activeIndex) {
-                  if (activeIndex === total - 1) {
-                    transformClass =
-                      "sm:-translate-x-[140px] md:-translate-x-[170px] xl:-translate-x-[182px]";
-                  } else if (activeIndex === total - 2) {
-                    transformClass =
-                      "sm:-translate-x-[94px] md:-translate-x-[114px] xl:-translate-x-[122px]";
-                  } else if (activeIndex === total - 3) {
-                    transformClass =
-                      "sm:-translate-x-[47px] md:-translate-x-[57px] xl:-translate-x-[61px]";
-                  }
-                }
-              }
+              const sizeClasses = `${BASE_WIDTH} ${isActive ? "z-[90]" : "z-10"}`;
 
               return (
                 <SwiperSlide key={itemKey} className="!w-auto select-none">
                   <div
-                    className={`${base} ${sizeClasses} ${ROW_HEIGHT} ${transformClass} ${
+                    className={`${base} ${sizeClasses} ${ROW_HEIGHT} ${
                       isActive ? "overflow-visible" : "overflow-hidden"
                     }`}
                     onMouseEnter={() => {
@@ -720,13 +707,16 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                   >
                     <AnimatePresence initial={false} mode="popLayout">
                       {isActive ? (
-                        <motion.div
+                        <div
                           key="preview"
-                          className="hidden h-full w-full sm:block"
-                          style={{ willChange: "transform, opacity" }}
+                          className="hidden sm:block"
                         >
-                          <ContinueWatchingPreviewCard show={show} />
-                        </motion.div>
+                          <ContinueWatchingPreviewCard
+                            show={show}
+                            index={i}
+                            totalCount={shows.length}
+                          />
+                        </div>
                       ) : (
                         <motion.div
                           key="base"
