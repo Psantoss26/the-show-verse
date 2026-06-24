@@ -548,13 +548,18 @@ function ContinueWatchingPreviewCard({ show, index, totalCount }) {
 }
 
 /* =================== SKELETON =================== */
-function ContinueWatchingSkeleton() {
+function ContinueWatchingSkeleton({ isMobile }) {
+  const count = isMobile ? 5 : 6;
   return (
     <div className="flex gap-4 overflow-hidden">
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className={`relative ${BASE_WIDTH} ${ROW_HEIGHT} flex-shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`}
+          className={`relative overflow-hidden rounded-lg bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 ${
+            isMobile
+              ? `flex-shrink-0 ${BASE_WIDTH} ${ROW_HEIGHT}`
+              : "aspect-video min-w-0 flex-1"
+          }`}
         >
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
@@ -717,17 +722,23 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         className="relative"
       >
         {Header}
-        <ContinueWatchingSkeleton />
+        <ContinueWatchingSkeleton isMobile={isMobile} />
       </motion.div>
     );
   }
 
-  const breakpoints = {
-    0: { slidesPerView: "auto", spaceBetween: 12 },
-    640: { slidesPerView: "auto", spaceBetween: 14 },
-    1024: { slidesPerView: "auto", spaceBetween: 16 },
-    1280: { slidesPerView: "auto", spaceBetween: 18 },
-  };
+  // En escritorio mostramos exactamente 6 títulos por fila (Swiper calcula el
+  // ancho); en móvil se mantiene el ancho fijo con scroll horizontal.
+  const breakpoints = isMobile
+    ? {
+        0: { slidesPerView: "auto", spaceBetween: 12 },
+        640: { slidesPerView: "auto", spaceBetween: 14 },
+      }
+    : {
+        768: { slidesPerView: 6, spaceBetween: 14 },
+        1024: { slidesPerView: 6, spaceBetween: 16 },
+        1280: { slidesPerView: 6, spaceBetween: 18 },
+      };
 
   const swiperKey = `continue-watching-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
 
@@ -754,8 +765,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
           <Swiper
             key={swiperKey}
-            slidesPerView="auto"
-            spaceBetween={12}
+            slidesPerView={isMobile ? "auto" : 6}
+            spaceBetween={isMobile ? 12 : 16}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -786,12 +797,22 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
               const base =
                 "relative flex-shrink-0 transition-all duration-300 ease-in-out";
-              const sizeClasses = `${BASE_WIDTH} ${isActive ? "z-[90]" : "z-10"}`;
+              // Escritorio: el ancho lo fija Swiper (6 por fila) y el alto sale
+              // del aspect-video. Móvil: ancho/alto fijos con scroll.
+              const dimensionClasses = isMobile
+                ? `${BASE_WIDTH} ${ROW_HEIGHT}`
+                : "w-full aspect-video";
+              const sizeClasses = `${dimensionClasses} ${
+                isActive ? "z-[90]" : "z-10"
+              }`;
 
               return (
-                <SwiperSlide key={itemKey} className="!w-auto select-none">
+                <SwiperSlide
+                  key={itemKey}
+                  className={isMobile ? "!w-auto select-none" : "select-none"}
+                >
                   <div
-                    className={`${base} ${sizeClasses} ${ROW_HEIGHT} ${
+                    className={`${base} ${sizeClasses} ${
                       isActive ? "overflow-visible" : "overflow-hidden"
                     }`}
                     onMouseEnter={() => {

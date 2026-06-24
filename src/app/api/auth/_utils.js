@@ -102,12 +102,25 @@ export function authUserResponse(request, user, tokens = null) {
   return response;
 }
 
-export function unauthenticatedResponse(request, status = 200) {
+export function unauthenticatedResponse(
+  request,
+  status = 200,
+  { clearCookies = false } = {},
+) {
   const response = NextResponse.json(
     { authenticated: false, user: null },
     { status },
   );
-  clearBackendAuthCookies(response, { secure: getCookieSecure(request) });
+  // IMPORTANTE: por defecto NO borramos las cookies de auth. Al cargar el
+  // dashboard se disparan muchas peticiones a la vez y todas intentan refrescar
+  // el mismo refresh token; si el backend lo rota (de un solo uso), unas ganan
+  // y otras reciben 401. Si /api/auth/me pierde esa carrera y borrara el token,
+  // invalidaría una sesión válida de 30 días → logout permanente al volver.
+  // El refresh token solo se limpia en el logout explícito (o se sobrescribe al
+  // volver a iniciar sesión).
+  if (clearCookies) {
+    clearBackendAuthCookies(response, { secure: getCookieSecure(request) });
+  }
   return response;
 }
 

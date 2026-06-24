@@ -218,15 +218,34 @@ export const AuthProvider = ({ children }) => {
         setHydrated(true);
       }
 
-      try {
+      const fetchMe = async () => {
         const res = await fetch("/api/auth/me", {
           method: "GET",
           cache: "no-store",
           credentials: "include",
         });
         const json = await res.json().catch(() => ({}));
+        return json?.authenticated ? json.user || null : null;
+      };
+
+      try {
+        let nextUser = await fetchMe();
+
+        // Si teníamos sesión cacheada pero /api/auth/me dice que no, puede ser
+        // una carrera de refresco concurrente: al cargar el dashboard varias
+        // peticiones intentan rotar el mismo refresh token a la vez. Reintentamos
+        // unas veces (manteniendo el usuario optimista) antes de cerrar sesión.
+        if (!nextUser && cachedUser) {
+          const delays = [500, 1200, 2500];
+          for (let i = 0; i < delays.length && !nextUser; i += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, delays[i]));
+            if (cancelled) return;
+            nextUser = await fetchMe();
+          }
+        }
+
         if (cancelled) return;
-        const loggedUser = applyUser(json?.authenticated ? json.user || null : null);
+        const loggedUser = applyUser(nextUser);
         // 2) Desbloqueamos el navbar/Profile tras UNA sola llamada; las
         // preferencias se cargan en segundo plano (no en la ruta crítica).
         setHydrated(true);
