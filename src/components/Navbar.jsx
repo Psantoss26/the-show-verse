@@ -797,7 +797,7 @@ export default function Navbar() {
           {/* Centro */}
           <div className="absolute left-1/2 top-1/2 flex w-full max-w-[620px] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 px-4">
             <SearchBar />
-            <WatchNextAssistant />
+            <WatchNextAssistant heroNavMode={heroNavMode} />
           </div>
         </div>
 
@@ -812,7 +812,7 @@ export default function Navbar() {
             >
               <MenuIcon className="w-6 h-6" />
             </button>
-            <WatchNextAssistant isMobile />
+            <WatchNextAssistant isMobile heroNavMode={heroNavMode} />
           </div>
 
           {/* Centro: logo */}

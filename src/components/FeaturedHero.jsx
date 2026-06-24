@@ -1069,7 +1069,11 @@ function FeaturedSlide({
         }
 
         .hero-nowplaying {
-          animation: heroNowPlayingIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: heroNowPlayingIn 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          /* Entra después de la sección de información (los botones están a
+             360ms) para no aparecer antes que el resto en la animación de
+             entrada. */
+          animation-delay: 440ms;
         }
 
         .hero-eq-bar {
@@ -1081,12 +1085,10 @@ function FeaturedSlide({
         @keyframes heroNowPlayingIn {
           from {
             opacity: 0;
-            transform: translate3d(0, 6px, 0);
             filter: blur(4px);
           }
           to {
             opacity: 1;
-            transform: translate3d(0, 0, 0);
             filter: blur(0);
           }
         }
