@@ -42,7 +42,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const HISTORY_PAGE_SIZE = 80;
+const HISTORY_PAGE_SIZE = 160;
 const HISTORY_CACHE_KEY = "showverse:history:items:v4";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
