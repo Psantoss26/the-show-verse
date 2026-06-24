@@ -519,6 +519,25 @@ function FeaturedSlide({
                   ? "object-contain object-top"
                   : "object-contain object-right"
               }
+              // Fundido mínimo en el borde inferior de la propia imagen para que
+              // su corte nunca sea una línea dura, ni siquiera durante los
+              // estados transitorios de carga del layout. Queda bajo el
+              // difuminado inferior, así que no resta imagen visible.
+              style={
+                isMobile
+                  ? {
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, black 90%, transparent 100%)",
+                      maskImage:
+                        "linear-gradient(to bottom, black 90%, transparent 100%)",
+                    }
+                  : {
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, black 92%, transparent 100%)",
+                      maskImage:
+                        "linear-gradient(to bottom, black 92%, transparent 100%)",
+                    }
+              }
             />
           </div>
         )}
