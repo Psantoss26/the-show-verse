@@ -527,7 +527,7 @@ function FeaturedSlide({
             sizes="100vw"
             className={
               isMobile
-                ? "origin-top scale-[1.08] object-cover object-top"
+                ? "object-contain object-top"
                 : "object-contain object-right"
             }
           />
@@ -608,7 +608,7 @@ function FeaturedSlide({
       {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
           lateral izquierdo y un margen inferior cómodo. */}
       <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-7 pb-16 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
+        <div className="w-full px-7 pb-10 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
           <div className="max-w-[22rem] sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
@@ -970,81 +970,92 @@ export default function FeaturedHero({ items = [], isMobile }) {
     event.stopPropagation();
   };
 
+  const indicators = list.length > 1 && (
+    <div className="flex items-center justify-center gap-2" aria-label="Diapositivas destacadas">
+      {list.map((movie, index) => (
+        <button
+          key={movie.id}
+          type="button"
+          aria-label={`Ver destacado ${index + 1}`}
+          aria-current={index === activeIndex ? "true" : undefined}
+          onClick={(event) => {
+            event.stopPropagation();
+            setActiveIndex(index);
+          }}
+          className={`h-2 rounded-full transition-colors ${
+            index === activeIndex
+              ? "w-6 bg-amber-500"
+              : "w-2 bg-white/45 hover:bg-white/70"
+          }`}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <section
-      className="relative isolate aspect-[2/3] w-full touch-pan-y overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
-      aria-label="Contenido destacado"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onPointerLeave={handlePointerEnd}
-      onClickCapture={handleClickCapture}
-    >
-      <FeaturedSlide
-        key={activeMovie.id}
-        movie={activeMovie}
-        backdropPath={activeBackdrop}
-        posterPath={activePoster}
-        logoPath={activeAssets.logo || null}
-        isActive
-        isMobile={isMobile}
-        shouldLoadMedia
-        onTrailerVisibilityChange={setTrailerOpen}
-      />
+    <>
+      <section
+        className="relative isolate aspect-[2/3] w-full touch-pan-y overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
+        aria-label="Contenido destacado"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onPointerLeave={handlePointerEnd}
+        onClickCapture={handleClickCapture}
+      >
+        <FeaturedSlide
+          key={activeMovie.id}
+          movie={activeMovie}
+          backdropPath={activeBackdrop}
+          posterPath={activePoster}
+          logoPath={activeAssets.logo || null}
+          isActive
+          isMobile={isMobile}
+          shouldLoadMedia
+          onTrailerVisibilityChange={setTrailerOpen}
+        />
 
-      {/* Flechas (solo desktop) */}
-      {!isMobile && list.length > 1 && (
-        <>
-          <button
-            type="button"
-            aria-label="Anterior"
-            onClick={(event) => {
-              event.stopPropagation();
-              goToPrevious();
-            }}
-            className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
-          >
-            <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Siguiente"
-            onClick={(event) => {
-              event.stopPropagation();
-              goToNext();
-            }}
-            className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
-          >
-            <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
-          </button>
-        </>
-      )}
-
-      {list.length > 1 && (
-        <div
-          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
-          aria-label="Diapositivas destacadas"
-        >
-          {list.map((movie, index) => (
+        {/* Flechas (solo desktop) */}
+        {!isMobile && list.length > 1 && (
+          <>
             <button
-              key={movie.id}
               type="button"
-              aria-label={`Ver destacado ${index + 1}`}
-              aria-current={index === activeIndex ? "true" : undefined}
+              aria-label="Anterior"
               onClick={(event) => {
                 event.stopPropagation();
-                setActiveIndex(index);
+                goToPrevious();
               }}
-              className={`h-2 rounded-full transition-colors ${
-                index === activeIndex
-                  ? "w-6 bg-amber-500"
-                  : "w-2 bg-white/45 hover:bg-white/70"
-              }`}
-            />
-          ))}
+              className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+            >
+              <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Siguiente"
+              onClick={(event) => {
+                event.stopPropagation();
+                goToNext();
+              }}
+              className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+            >
+              <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
+            </button>
+          </>
+        )}
+
+        {!isMobile && indicators && (
+          <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
+            {indicators}
+          </div>
+        )}
+      </section>
+
+      {isMobile && indicators && (
+        <div className="flex h-9 items-center justify-center bg-black sm:hidden">
+          {indicators}
         </div>
       )}
-    </section>
+    </>
   );
 }
