@@ -550,11 +550,11 @@ function FeaturedSlide({
             )}
             {trailerSrc && (
               <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-y-0 right-0 aspect-video h-full max-w-full">
+                <div className="absolute inset-y-0 right-0 aspect-video h-full max-w-full overflow-hidden">
                   <iframe
                     key={trailer.key}
                     ref={trailerIframeRef}
-                    className="pointer-events-none absolute inset-0 h-full w-full"
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-[116%] w-[116%] -translate-x-1/2 -translate-y-1/2"
                     src={trailerSrc}
                     title={`Trailer - ${title}`}
                     width="3840"
@@ -601,7 +601,16 @@ function FeaturedSlide({
         className="pointer-events-none absolute inset-0 hidden sm:block"
         style={{
           background:
-            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.92) 22%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.2) 58%, transparent 74%)",
+            "linear-gradient(to right," +
+            " #000 0%," +
+            " rgba(0,0,0,0.93) 16%," +
+            " rgba(0,0,0,0.74) 30%," +
+            " rgba(0,0,0,0.52) 42%," +
+            " rgba(0,0,0,0.32) 52%," +
+            " rgba(0,0,0,0.17) 62%," +
+            " rgba(0,0,0,0.07) 70%," +
+            " rgba(0,0,0,0.02) 78%," +
+            " transparent 86%)",
         }}
       />
 
@@ -615,9 +624,22 @@ function FeaturedSlide({
       <div
         className="pointer-events-none absolute inset-y-0 left-0 hidden sm:block"
         style={{
-          width: "calc(100% - 88dvh * 16 / 9 + 16rem)",
+          width: "calc(100% - 88dvh * 16 / 9 + 42rem)",
           background:
-            "linear-gradient(to right, #000 0%, #000 calc(100% - 14rem), rgba(0,0,0,0.6) calc(100% - 7rem), transparent 100%)",
+            "linear-gradient(to right," +
+            " #000 0%," +
+            " #000 calc(100% - 40rem)," +
+            " rgba(0,0,0,0.88) calc(100% - 34rem)," +
+            " rgba(0,0,0,0.72) calc(100% - 28rem)," +
+            " rgba(0,0,0,0.56) calc(100% - 23rem)," +
+            " rgba(0,0,0,0.42) calc(100% - 18rem)," +
+            " rgba(0,0,0,0.29) calc(100% - 14rem)," +
+            " rgba(0,0,0,0.19) calc(100% - 10rem)," +
+            " rgba(0,0,0,0.11) calc(100% - 7rem)," +
+            " rgba(0,0,0,0.055) calc(100% - 4.5rem)," +
+            " rgba(0,0,0,0.022) calc(100% - 2.5rem)," +
+            " rgba(0,0,0,0.006) calc(100% - 1rem)," +
+            " transparent 100%)",
         }}
       />
 
