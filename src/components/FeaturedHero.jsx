@@ -809,7 +809,7 @@ function FeaturedSlide({
 
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
       <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
-        <div className="max-w-full sm:max-w-xl">
+        <div className="flex max-w-full flex-col items-center text-center sm:block sm:max-w-xl sm:text-left">
             {/* Logo del título o nombre */}
             {logoSrc ? (
               <div
@@ -821,7 +821,7 @@ function FeaturedSlide({
                   alt={title}
                   fill
                   sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 72vw"
-                  className="object-contain object-left drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]"
+                  className="object-contain object-center drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] sm:object-left"
                 />
               </div>
             ) : (
@@ -835,7 +835,7 @@ function FeaturedSlide({
 
             {/* Metadatos + puntuaciones */}
             <div
-              className="hero-reveal mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:gap-x-3 sm:gap-y-2 sm:text-sm"
+              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:justify-start sm:gap-x-3 sm:gap-y-2 sm:text-sm"
               style={{ "--hero-delay": "170ms" }}
             >
               {yearOf(movie) && (
@@ -893,11 +893,12 @@ function FeaturedSlide({
             )}
 
             {/* Contenedor relativo: el indicador de soundtrack se posiciona
-                de forma absoluta debajo para no desplazar la información. */}
-            <div className="relative">
+                de forma absoluta debajo para no desplazar la información. Ancho
+                completo en móvil para centrar correctamente botones e indicador. */}
+            <div className="relative w-full sm:w-auto">
             {/* Botones de acción */}
             <div
-              className="hero-reveal flex flex-nowrap items-center gap-2 sm:gap-3"
+              className="hero-reveal flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-start sm:gap-3"
               style={{ "--hero-delay": "360ms" }}
             >
               <button
@@ -1000,7 +1001,7 @@ function FeaturedSlide({
                 absoluto para no desplazar la información. Solo visible mientras
                 el soundtrack se reproduce de verdad. */}
             {soundtrackPlaying && soundtrackTrack && (
-              <div className="hero-nowplaying absolute left-0 top-full mt-3 inline-flex max-w-[min(80vw,22rem)] items-center gap-2.5 rounded-full bg-black/15 bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-black/30 px-3 py-1.5 backdrop-blur-[50px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.18),0_12px_34px_-14px_rgba(0,0,0,0.6)]">
+              <div className="hero-nowplaying absolute left-1/2 top-full mt-3 inline-flex max-w-[min(80vw,22rem)] -translate-x-1/2 items-center gap-2.5 rounded-full bg-black/15 bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-black/30 px-3 py-1.5 backdrop-blur-[50px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.18),0_12px_34px_-14px_rgba(0,0,0,0.6)] sm:left-0 sm:translate-x-0">
                 <span
                   className="flex h-3.5 items-end gap-[2px]"
                   aria-hidden="true"
