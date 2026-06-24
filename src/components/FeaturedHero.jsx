@@ -511,11 +511,11 @@ function FeaturedSlide({
 
   return (
     <div
-      className="relative h-full w-full cursor-pointer select-none overflow-hidden bg-black"
+      className="relative flex flex-col w-full bg-black cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
       onClick={navigateToDetails}
     >
-      {/* Fondo: poster textless en móvil; backdrop completo en escritorio. */}
-      <div className="absolute inset-0">
+      {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
+      <div className="relative w-full aspect-[2/3] sm:absolute sm:inset-0 sm:aspect-auto sm:h-full">
         {!showTrailer && shouldLoadMedia && bgSrc && (
           <div
             key={bgSrc}
@@ -610,15 +610,12 @@ function FeaturedSlide({
         )}
       </div>
 
-      {/* Degradados estilo Prime: la izquierda puede convertirse en fondo negro
-          cuando el hero ya llegó al alto máximo y el backdrop mantiene formato. */}
+      {/* Degradados estilo Prime: ocultos en móvil, activos en escritorio */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 sm:block hidden"
         style={{
           background:
-            isMobile
-              ? "linear-gradient(to top, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.48) 7%, rgba(0,0,0,0.22) 18%, rgba(0,0,0,0.06) 32%, transparent 46%)"
-              : "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
+            "linear-gradient(to right, #000 0%, rgba(0,0,0,0.96) 24%, rgba(0,0,0,0.55) 46%, rgba(0,0,0,0.12) 68%, transparent 84%)",
         }}
       />
       <div
@@ -630,11 +627,9 @@ function FeaturedSlide({
       />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent sm:h-28" />
 
-      {/* Contenido: anclado en la zona inferior (no centrado) con amplio margen
-          lateral izquierdo y un margen inferior cómodo. */}
-      <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="w-full px-7 pb-7 sm:px-20 sm:pb-28 lg:px-40 lg:pb-32">
-          <div className="max-w-[22rem] sm:max-w-xl">
+      {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
+      <div className="relative z-10 w-full bg-black px-7 pb-8 pt-4 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-transparent sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
+        <div className="max-w-full sm:max-w-xl">
             {/* Logo del título o nombre */}
             {logoSrc ? (
               <div
@@ -791,7 +786,6 @@ function FeaturedSlide({
               </p>
             )}
           </div>
-        </div>
       </div>
 
       <style jsx>{`
@@ -1075,7 +1069,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
   return (
     <>
       <section
-        className="relative isolate aspect-[2/3] w-full touch-pan-y overflow-hidden bg-black sm:aspect-video sm:max-h-[88dvh]"
+        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-auto sm:aspect-video sm:max-h-[88dvh]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
