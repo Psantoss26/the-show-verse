@@ -533,6 +533,8 @@ async function buildProfileFromExistingBackendRoutes(request, { compact = false 
 
 export async function GET(request) {
   const compact = request.nextUrl?.searchParams?.get("compact") === "1";
+  const skipPosterEnrichment =
+    request.nextUrl?.searchParams?.get("posters") === "0";
   let backend = await backendFetchJson(
     request,
     `/v1/stats/profile${compact ? "?compact=1" : ""}`,
@@ -567,10 +569,13 @@ export async function GET(request) {
     source: "showverse",
   };
 
-  // El primer pintado (compact) NO espera al enriquecimiento de pósters con TMDb:
-  // devuelve al instante con los posterPath ya cacheados en BD (como el resto de
-  // páginas). El full posterior, en segundo plano, completa los que falten.
-  const payload = compact ? basePayload : await enrichProfilePayloadPosters(basePayload);
+  // Las estadísticas finales no necesitan esperar al enriquecimiento de pósters.
+  // `posters=0` mantiene el payload completo de stats/listas desde backend, pero
+  // evita bloquear el primer pintado con llamadas extra a TMDb.
+  const payload =
+    compact || skipPosterEnrichment
+      ? basePayload
+      : await enrichProfilePayloadPosters(basePayload);
   const response = NextResponse.json(payload);
 
   setBackendAuthCookies(response, backend.cookieSource || backend, {
