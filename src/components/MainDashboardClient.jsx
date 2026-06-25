@@ -2721,6 +2721,7 @@ function TopRatedHero({
   const isInView = useInView(heroRef, { once: true, margin: "0px" });
 
   const [heroBackdrops, setHeroBackdrops] = useState(null);
+  const [heroExtraBackdrops, setHeroExtraBackdrops] = useState(null);
 
   // Cargar backdrops para AMBAS listas para evitar flash al cambiar de tab
   const allItems = useMemo(() => {
@@ -2743,19 +2744,7 @@ function TopRatedHero({
         const entries = await Promise.all(
           allItems.map(async (movie) => {
             const id = movie?.id;
-            if (!id) return [null, null];
-
-            const override = backdropOverrides?.[id] || null;
-            if (override) {
-              await preloadImage(buildImg(override, "w780"));
-              return [id, override];
-            }
-
-            const { backdrop: userBackdrop } = getArtworkPreference(id);
-            if (userBackdrop) {
-              await preloadImage(buildImg(userBackdrop, "w780"));
-              return [id, userBackdrop];
-            }
+            if (!id) return [null, null, null];
 
             // Siempre buscar el mejor backdrop EN (nunca usar backdrop_path directamente)
             const mediaType =
@@ -2764,23 +2753,35 @@ function TopRatedHero({
               movie.first_air_date
                 ? "tv"
                 : "movie";
-            let chosen = await fetchBestBackdrop(id, mediaType);
+
+            const override = backdropOverrides?.[id] || null;
+            const { backdrop: userBackdrop } = getArtworkPreference(id);
+            let chosen = override || userBackdrop || null;
+            if (!chosen) chosen = await fetchBestBackdrop(id, mediaType);
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
+
+            let extra = await fetchBestBackdrop(id, mediaType, { offset: 1 });
+            if (extra === chosen) extra = null;
+
             if (chosen) await preloadImage(buildImg(chosen, "w780"));
-            return [id, chosen];
+            if (extra) await preloadImage(buildImg(extra, "w780"));
+            return [id, chosen, extra];
           }),
         );
 
         if (canceled) return;
 
         const map = {};
-        for (const [id, path] of entries) {
+        const extraMap = {};
+        for (const [id, path, extraPath] of entries) {
           if (!id) continue;
           map[id] = path;
+          if (extraPath) extraMap[id] = extraPath;
         }
 
         setHeroBackdrops(map);
+        setHeroExtraBackdrops(extraMap);
       } catch (err) {
         if (canceled) return;
         console.error("Error cargando backdrops del hero", err);
@@ -2790,6 +2791,7 @@ function TopRatedHero({
           map[movie.id] = movie.backdrop_path || movie.poster_path || null;
         }
         setHeroBackdrops(map);
+        setHeroExtraBackdrops({});
       }
     };
 
@@ -2920,6 +2922,10 @@ function TopRatedHero({
                   heroBackdrops !== null
                     ? (heroBackdrops[movie.id] ?? null)
                     : null; // null mientras carga → muestra placeholder neutral
+                const heroExtraBackdrop =
+                  heroExtraBackdrops !== null
+                    ? (heroExtraBackdrops[movie.id] ?? null)
+                    : null;
                 const slideClass = isMobile
                   ? "!w-full select-none"
                   : "select-none";
@@ -2965,7 +2971,11 @@ function TopRatedHero({
                           fill
                           className={`rounded-xl ${
                             isMobile ? "object-contain" : "object-cover"
-                          } transition-transform duration-700 ease-out group-hover/hero:scale-105`}
+                          } transition-[opacity,transform] duration-700 ease-out group-hover/hero:scale-105 ${
+                            heroExtraBackdrop
+                              ? "group-hover/hero:opacity-0"
+                              : ""
+                          } motion-reduce:transition-none`}
                           {...(index === 0
                             ? { priority: true, fetchPriority: "high" }
                             : {
@@ -2973,6 +2983,21 @@ function TopRatedHero({
                                   index < (isMobile ? 1 : 3) ? "eager" : "lazy",
                               })}
                         />
+                        {heroExtraBackdrop && (
+                          <NextImage
+                            src={buildImg(heroExtraBackdrop, "w1280")}
+                            sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
+                            alt=""
+                            aria-hidden="true"
+                            fill
+                            className={`rounded-xl ${
+                              isMobile ? "object-contain" : "object-cover"
+                            } opacity-0 transition-[opacity,transform] duration-700 ease-out group-hover/hero:scale-105 group-hover/hero:opacity-100 motion-reduce:transition-none`}
+                            loading={
+                              index < (isMobile ? 1 : 3) ? "eager" : "lazy"
+                            }
+                          />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
                       </motion.div>
                     </Link>
