@@ -37,6 +37,7 @@ import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
 import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
+import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import {
   yearOf,
@@ -3131,6 +3132,11 @@ export default function MainDashboardClient({ initialData }) {
     [initialData, lazySections],
   );
 
+  // Filas de la engine de dashboards (recomendaciones personalizadas + genérico
+  // rotativo, ya deduplicado por el backend; sin Trakt). Sustituyen a las filas
+  // genéricas repetitivas anteriores.
+  const { rows: engineRows } = useEngineRows("home");
+
   const allMovieIds = useMemo(() => {
     const keys = [
       "topRatedMovies",
@@ -3217,217 +3223,9 @@ export default function MainDashboardClient({ initialData }) {
     };
   }, [allMovieIds]);
 
-  // ⚡ Carga anticipada: «Más esperadas» visible sin scroll — carga inmediata al montar
-  useEffect(() => {
-    let cancelled = false;
 
-    if (hasRenderableInitialAnticipatedData) {
-      return () => {
-        cancelled = true;
-      };
-    }
+  // (Eliminado) Cargadores de Trakt: las filas ahora vienen de la engine.
 
-    const loadAnticipatedBucket = async ({ key, url }) => {
-      const cached = readDashboardSectionCache(key);
-      if (cached && !cancelled) {
-        setLazySections((prev) => ({
-          ...prev,
-          [key]: cached,
-        }));
-      }
-
-      try {
-        const items = await fetchDashboardJson(url, {
-          priority: "high",
-          cache: "default",
-          timeoutMs: 6500,
-        }).catch(() => cached || []);
-        if (cancelled) return;
-        const fetchedItems = Array.isArray(items) ? items : [];
-        const safeItems =
-          fetchedItems.length === 0 && cached?.length ? cached : fetchedItems;
-        writeDashboardSectionCache(key, safeItems);
-        setLazySections((prev) => ({
-          ...prev,
-          [key]: safeItems,
-        }));
-      } catch (err) {
-        console.error(`❌ Error cargando ${key}:`, err);
-        if (!cancelled && !cached) {
-          setLazySections((prev) => ({
-            ...prev,
-            [key]: [],
-          }));
-        }
-      }
-    };
-
-    loadAnticipatedBucket({
-      key: "traktMoviesAnticipated",
-      url: "/api/trakt/dashboard/movies-anticipated?limit=18",
-    });
-    loadAnticipatedBucket({
-      key: "traktShowsAnticipated",
-      url: "/api/trakt/dashboard/shows-anticipated?limit=18",
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasRenderableInitialAnticipatedData]);
-
-  // ⚡ Carga independiente: Recomendados no espera al resto de secciones Trakt.
-  useEffect(() => {
-    let cancelled = false;
-    let usedCachedRecommended = false;
-
-    const loadRecommended = async () => {
-      try {
-        const cached = readRecommendedDashboardCache();
-        if (cached && !cancelled) {
-          usedCachedRecommended = true;
-          setLazySections((prev) => ({
-            ...prev,
-            traktRecommended: cached.items,
-            traktRecommendedMovies: cached.movies,
-            traktRecommendedShows: cached.shows,
-          }));
-        }
-
-        const recommended = await fetch(
-          "/api/trakt/dashboard/recommended?limit=18",
-          {
-            cache: "default",
-            priority: "high",
-          },
-        ).then((r) => {
-          if (!r.ok) throw new Error(`Recommended HTTP ${r.status}`);
-          return r.json();
-        });
-        const normalized = normalizeRecommendedPayload(recommended);
-
-        if (cancelled) return;
-        if (!normalized.movies.length && !normalized.shows.length && cached) {
-          return;
-        }
-        writeRecommendedDashboardCache(recommended);
-        setLazySections((prev) => ({
-          ...prev,
-          traktRecommended: normalized.items,
-          traktRecommendedMovies: normalized.movies,
-          traktRecommendedShows: normalized.shows,
-        }));
-      } catch (err) {
-        console.error("❌ Error cargando recomendados:", err);
-        if (!cancelled && !usedCachedRecommended) {
-          setLazySections((prev) => ({
-            ...prev,
-            traktRecommended: [],
-            traktRecommendedMovies: [],
-            traktRecommendedShows: [],
-          }));
-        }
-      }
-    };
-
-    loadRecommended();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // ⚡ Carga diferida: resto de secciones Trakt (below-the-fold)
-  useEffect(() => {
-    let cancelled = false;
-    const sectionRequests = [
-      {
-        key: "traktTrending",
-        url: "/api/trakt/dashboard/trending?limit=18",
-      },
-      {
-        key: "traktPopular",
-        url: "/api/trakt/dashboard/popular?limit=18",
-      },
-      {
-        key: "traktPlayedWeekly",
-        url: "/api/trakt/dashboard/played?period=weekly&limit=18",
-      },
-      {
-        key: "traktPlayedMonthly",
-        url: "/api/trakt/dashboard/played?period=monthly&limit=18",
-      },
-      {
-        key: "traktWatchedWeekly",
-        url: "/api/trakt/dashboard/watched?period=weekly&limit=18",
-      },
-      {
-        key: "traktWatchedMonthly",
-        url: "/api/trakt/dashboard/watched?period=monthly&limit=18",
-      },
-      {
-        key: "traktCollectedWeekly",
-        url: "/api/trakt/dashboard/collected?period=weekly&limit=18",
-      },
-      {
-        key: "traktCollectedMonthly",
-        url: "/api/trakt/dashboard/collected?period=monthly&limit=18",
-      },
-    ];
-
-    const loadSection = async ({ key, url }) => {
-      if (cancelled) return;
-      const cached = readDashboardSectionCache(key);
-      if (cached && !cancelled) {
-        setLazySections((prev) => ({
-          ...prev,
-          [key]: cached,
-        }));
-      }
-
-      try {
-        const items = await fetchDashboardJson(url, {
-          priority: "low",
-          cache: "default",
-          timeoutMs: 9000,
-        }).catch(() => cached || []);
-        if (cancelled) return;
-        const fetchedItems = Array.isArray(items) ? items : [];
-        const safeItems =
-          fetchedItems.length === 0 && cached?.length ? cached : fetchedItems;
-        writeDashboardSectionCache(key, safeItems);
-        setLazySections((prev) => ({
-          ...prev,
-          [key]: safeItems,
-        }));
-      } catch (err) {
-        console.error(`❌ Error cargando ${key}:`, err);
-        if (!cancelled && !cached) {
-          setLazySections((prev) => ({
-            ...prev,
-            [key]: [],
-          }));
-        }
-      }
-    };
-
-    const cancelIdle = runWhenBrowserIdle(loadLazySections, {
-      timeout: 3000,
-      delay: 1000,
-    });
-    function loadLazySections() {
-      sectionRequests.forEach((request, index) => {
-        window.setTimeout(() => {
-          loadSection(request);
-        }, index * 120);
-      });
-    }
-
-    return () => {
-      cancelled = true;
-      cancelIdle();
-    };
-  }, []); // Solo ejecutar una vez al montar
 
   if (!dashboardData || Object.keys(dashboardData).length === 0) {
     return <div className="h-screen bg-black" />;
@@ -3466,137 +3264,20 @@ export default function MainDashboardClient({ initialData }) {
           {/* Continuar viendo (backend/BBDD propios: historial + próximo episodio) */}
           <ContinueWatchingSection isMobile={isMobile} hydrated={hydrated} />
 
-          {/* Trakt: Más esperadas con selector Películas/Series */}
-          <AnticipatedSection
-            movieItems={
-              dashboardData.traktMoviesAnticipated === null
-                ? null
-                : (dashboardData.traktMoviesAnticipated ?? EMPTY_ARRAY)
-            }
-            tvItems={
-              dashboardData.traktShowsAnticipated === null
-                ? null
-                : (dashboardData.traktShowsAnticipated ?? EMPTY_ARRAY)
-            }
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Trakt: Recomendados con selector Películas/Series */}
-          <RecommendedSection
-            movieItems={
-              dashboardData.traktRecommendedMovies === null
-                ? null
-                : (dashboardData.traktRecommendedMovies ?? EMPTY_ARRAY)
-            }
-            tvItems={
-              dashboardData.traktRecommendedShows === null
-                ? null
-                : (dashboardData.traktRecommendedShows ?? EMPTY_ARRAY)
-            }
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Tendencias unificadas (Trakt/TMDb) */}
-          <RowWithSourceFilter
-            title="Tendencias"
-            traktData={dashboardData.traktTrending || EMPTY_ARRAY}
-            tmdbData={dashboardData.trending || EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Populares unificados (Trakt/TMDb) */}
-          <RowWithSourceFilter
-            title="Populares"
-            traktData={dashboardData.traktPopular || EMPTY_ARRAY}
-            tmdbData={dashboardData.popular || EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-            eager={true}
-          />
-
-          <Row
-            title="Premiadas y nominadas"
-            labelText="GALARDONADAS"
-            items={dashboardData.awarded}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          <Row
-            title="Dramas que enganchan"
-            items={dashboardData.dramaTV}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Trakt: Más reproducidas (con selector de período) */}
-          <RowWithTimeFilter
-            title="Más reproducidas"
-            weeklyData={dashboardData.traktPlayedWeekly || EMPTY_ARRAY}
-            monthlyData={dashboardData.traktPlayedMonthly || EMPTY_ARRAY}
-            yearlyData={EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Trakt: Más vistas (con selector de período) */}
-          <RowWithTimeFilter
-            title="Más vistas"
-            weeklyData={dashboardData.traktWatchedWeekly || EMPTY_ARRAY}
-            monthlyData={dashboardData.traktWatchedMonthly || EMPTY_ARRAY}
-            yearlyData={EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
-
-          {/* Trakt: Más coleccionadas (con selector de período) */}
-          <RowWithTimeFilter
-            title="Más coleccionadas"
-            weeklyData={dashboardData.traktCollectedWeekly || EMPTY_ARRAY}
-            monthlyData={dashboardData.traktCollectedMonthly || EMPTY_ARRAY}
-            yearlyData={EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            posterCacheRef={posterCacheRef}
-            posterOverrides={posterOverrides}
-            backdropOverrides={backdropOverrides}
-            overridesReady={overridesReady}
-          />
+          {/* Filas de la engine: recomendaciones personalizadas + contenido
+              genérico rotativo, deduplicado por el backend (sin Trakt). Se omite
+              "Mejor valoradas" porque ya se muestra arriba en TopRatedHero. */}
+          {engineRows
+            .filter((row) => row.key !== "top_rated")
+            .map((row) => (
+              <TraktMixedRow
+                key={row.key}
+                title={row.title}
+                items={row.items}
+                isMobile={isMobile}
+                hydrated={hydrated}
+              />
+            ))}
           </motion.div>
         </div>
       </div>
