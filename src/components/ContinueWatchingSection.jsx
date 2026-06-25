@@ -453,11 +453,18 @@ function ContinueWatchingPreviewCard({
   // intentos ni parpadeos. Solo si no estuviera en caché se carga después.
   const initialTrailerVideos = readCachedPreviewTrailerVideos(show?.id) || EMPTY_ARRAY;
   const [trailer, setTrailer] = useState(initialTrailerVideos[0] || null);
+  // El iframe se mantiene OCULTO (con el backdrop fijo debajo) hasta que el
+  // vídeo realmente empieza a reproducirse. Así los intentos fallidos (trailers
+  // no embebibles que obligan a probar el siguiente) ocurren de forma invisible:
+  // no se ve ningún parpadeo, solo el backdrop estable, y el trailer aparece
+  // cuando uno funciona.
+  const [trailerVisible, setTrailerVisible] = useState(false);
 
   const href = nextEpisodeHref(show);
   const prefetchedRef = useRef(false);
   const trailerIframeRef = useRef(null);
   const trailerPlayerRef = useRef(null);
+  const trailerRevealTimerRef = useRef(null);
   const trailerVideosRef = useRef(initialTrailerVideos);
   const skippedTrailerKeysRef = useRef(new Set());
 
@@ -519,12 +526,34 @@ function ContinueWatchingPreviewCard({
   }, [show?.id, trailer]);
 
   useEffect(() => {
-    if (!trailer?.key || trailer.site !== "YouTube") return;
+    if (!trailer?.key) return;
+
+    // Cada vez que cambia el vídeo (incluido un reintento tras fallo) ocultamos
+    // el iframe: solo se revelará cuando ESE vídeo empiece a reproducirse, de
+    // modo que los reintentos no producen ningún parpadeo (queda el backdrop).
+    setTrailerVisible(false);
+
+    const clearReveal = () => {
+      if (trailerRevealTimerRef.current) {
+        window.clearTimeout(trailerRevealTimerRef.current);
+        trailerRevealTimerRef.current = null;
+      }
+    };
+    clearReveal();
+
+    // Respaldo: si no llegara el evento de reproducción, revelamos pasado un
+    // tiempo prudencial (el vídeo ya debería estar reproduciéndose).
+    trailerRevealTimerRef.current = window.setTimeout(() => {
+      setTrailerVisible(true);
+      trailerRevealTimerRef.current = null;
+    }, 1600);
+
+    if (trailer.site !== "YouTube") {
+      return () => clearReveal();
+    }
 
     let cancelled = false;
 
-    // El YT.Player se usa solo para (1) asegurar la reproducción como respaldo y
-    // (2) saltar al siguiente vídeo si el actual falla. NO controla el revelado.
     loadYouTubeIframeApi().then((YT) => {
       if (cancelled || !YT?.Player || !trailerIframeRef.current) return;
 
@@ -539,8 +568,20 @@ function ContinueWatchingPreviewCard({
               // La URL ya incluye autoplay, mute y start=5.
             }
           },
+          onStateChange: (event) => {
+            if (cancelled) return;
+            // PLAYING (1): ya hay fotograma → revelar al instante.
+            if (Number(event?.data) === 1) {
+              clearReveal();
+              setTrailerVisible(true);
+            }
+          },
           onError: () => {
             if (cancelled) return;
+            // Salta al siguiente vídeo SIN revelar el actual (sigue oculto), así
+            // el intento fallido no se ve. El efecto se relanza con el nuevo
+            // vídeo y vuelve a esperar a su reproducción.
+            clearReveal();
             setTrailer((currentTrailer) => {
               const currentKey = getVideoIdentity(currentTrailer);
               if (currentKey) skippedTrailerKeysRef.current.add(currentKey);
@@ -557,6 +598,7 @@ function ContinueWatchingPreviewCard({
 
     return () => {
       cancelled = true;
+      clearReveal();
       try {
         trailerPlayerRef.current?.destroy?.();
       } catch {
@@ -753,11 +795,11 @@ function ContinueWatchingPreviewCard({
 
         {trailerSrc && (
           <motion.div
-            // El iframe se muestra de inmediato (un único fundido de entrada al
-            // montar, sin esperar a detectar reproducción): nada de retardos ni
-            // parpadeos. El backdrop queda debajo como fondo durante la carga.
+            // Oculto hasta que el vídeo se reproduce de verdad: durante la carga
+            // y los reintentos queda el backdrop estable (sin parpadeos) y el
+            // trailer aparece con un fundido suave cuando empieza a reproducirse.
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: trailerVisible ? 1 : 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             className="pointer-events-none absolute inset-0 overflow-hidden"
           >
