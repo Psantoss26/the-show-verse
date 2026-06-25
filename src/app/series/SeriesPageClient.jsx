@@ -32,6 +32,7 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
+import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -1598,57 +1599,19 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
     [initialData, deferredData],
   );
 
-  const rowConfigs = useMemo(() => {
-    const rows = [];
-    const addRow = (key, title, items) => {
-      if (Array.isArray(items) && items.length > 0) {
-        rows.push({ key, title, items });
-      }
-    };
-
-    addRow(
-      "top-es",
-      "Top 10 hoy en España",
-      dashboardData["Top 10 hoy en España"],
-    );
-    addRow("popular", "Tendencias ahora mismo", dashboardData.popular);
-    addRow("top-imdb", "Series imprescindibles", dashboardData.top_imdb);
-    addRow(
-      "most-voted",
-      "Las más valoradas de la historia",
-      dashboardData["Más votadas"],
-    );
-    addRow("awarded", "Ganadoras de grandes premios", dashboardData["Premiadas"]);
-    addRow("blockbusters", "Fenómenos de audiencia", dashboardData["Superéxito"]);
-    addRow("drama", "Drama que te deja sin palabras", dashboardData.drama);
-    addRow(
-      "scifi-fantasy",
-      "Ciencia ficción y fantasía",
-      dashboardData.scifi_fantasy,
-    );
-    addRow("crime", "Crimen y suspense", dashboardData.crime);
-    addRow("k-drama", "K-Drama que engancha", dashboardData.kDrama);
-    addRow("romance", "Romance que atrapa", dashboardData.romance);
-    addRow("animation", "Animación para maratonear", dashboardData.animation);
-    addRow("decade-1990", "Clásicos de los 90", dashboardData["Década de 1990"]);
-    addRow(
-      "decade-2000",
-      "Favoritas de los 2000",
-      dashboardData["Década de 2000"],
-    );
-    addRow("decade-2010", "Hits de los 2010", dashboardData["Década de 2010"]);
-    addRow(
-      "decade-2020",
-      "Lo mejor de esta década",
-      dashboardData["Década de 2020"],
-    );
-
-    Object.entries(dashboardData["Por género"] || {}).forEach(
-      ([genreName, list]) => addRow(`genre-${genreName}`, genreName, list),
-    );
-
-    return rows;
-  }, [dashboardData]);
+  // Filas de la engine de dashboards (genérico rotativo + recomendaciones,
+  // deduplicado por el backend; sin Trakt). Sustituyen a las filas TMDb
+  // genéricas que repetían títulos.
+  const { rows: engineRows } = useEngineRows("series");
+  const rowConfigs = useMemo(
+    () =>
+      engineRows.map((row) => ({
+        key: row.key,
+        title: row.title,
+        items: row.items,
+      })),
+    [engineRows],
+  );
 
   useEffect(() => {
     if (visibleRowCount >= rowConfigs.length) return undefined;
