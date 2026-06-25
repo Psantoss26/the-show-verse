@@ -27,7 +27,7 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
-import { traktGetItemStatus } from "@/lib/api/traktClient";
+import { getBackendItemStatus } from "@/lib/api/itemStatus";
 
 import {
   buildImg,
@@ -54,8 +54,6 @@ const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
-
-const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
 
 function uniquePaths(paths) {
   return [...new Set(paths.filter(Boolean))];
@@ -463,13 +461,14 @@ function FeaturedSlide({
       setWatchlist(false);
       setWatched(false);
       try {
-        const status = await traktGetItemStatus({
-          type: traktTypeOf(mediaType),
+        // Estado leído del backend/BBDD propio (nunca Trakt).
+        const status = await getBackendItemStatus({
+          type: mediaType,
           tmdbId: movie.id,
         }).catch(() => null);
         if (!cancel && status) {
           setFavorite(!!status.favorite);
-          setWatchlist(!!status.watchlist || !!status.inWatchlist);
+          setWatchlist(!!status.watchlist);
           setWatched(!!status.watched);
         }
       } catch {
@@ -861,10 +860,10 @@ function FeaturedSlide({
                   src="/logo-TMDb.png"
                   alt="TMDb"
                   className="h-3 w-auto"
-                  width={36}
-                  height={12}
+                  width={2560}
+                  height={1846}
+                  sizes="32px"
                   loading="lazy"
-                  style={{ width: "auto" }}
                 />
                 <span className="font-semibold">{ratingOf(movie)}</span>
               </span>
@@ -875,10 +874,10 @@ function FeaturedSlide({
                     src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"
-                    width={34}
-                    height={16}
+                    width={575}
+                    height={290}
+                    sizes="40px"
                     loading="lazy"
-                    style={{ width: "auto" }}
                   />
                   <span className="font-semibold">
                     {extras.imdbRating.toFixed(1)}

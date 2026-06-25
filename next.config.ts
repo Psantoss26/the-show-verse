@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Todas las imágenes usan la calidad por defecto (75), suficiente para el
-    // Hero tras reoptimizar y mucho más ligera en la primera carga.
-    qualities: [75],
+    // El resto de imágenes usan 75 (por defecto). Mantenemos 100 declarada para
+    // no romper chunks cacheados que aún la pidan; el Hero ya usa 75.
+    qualities: [75, 100],
     remotePatterns: [
       {
         protocol: "https",

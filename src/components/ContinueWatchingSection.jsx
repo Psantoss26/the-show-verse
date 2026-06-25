@@ -13,10 +13,10 @@ import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
 import {
   getVideos,
-  getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
 } from "@/lib/api/tmdb";
+import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import {
   uniqBy,
   isPlayableVideo,
@@ -144,6 +144,9 @@ const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
 const CONTINUE_WATCHING_IMAGE_QUALITY = 92;
 const CONTINUE_WATCHING_TRAILER_LANGUAGES = ["es-ES", "en-US"];
 
+let youtubeIframeApiPromise = null;
+const previewTrailerVideosCache = new Map();
+
 const cwPreviewCardClass =
   "relative isolate grid h-full w-full grid-rows-[72%_28%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu " +
   "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] " +
@@ -171,16 +174,45 @@ function getVideoIdentity(video) {
 
 async function fetchPreviewTrailerVideos(tvId) {
   if (!tvId) return EMPTY_ARRAY;
-  const responses = await Promise.all(
+  const cacheKey = `tv:${tvId}`;
+  const cached = previewTrailerVideosCache.get(cacheKey);
+  if (cached) return cached;
+
+  const request = Promise.all(
     CONTINUE_WATCHING_TRAILER_LANGUAGES.map((language) =>
       getVideos("tv", tvId, language).catch(() => ({ results: EMPTY_ARRAY })),
     ),
-  );
-  return normalizePreviewVideos(
-    responses.flatMap((data) =>
-      Array.isArray(data?.results) ? data.results : EMPTY_ARRAY,
+  ).then((responses) =>
+    normalizePreviewVideos(
+      responses.flatMap((data) =>
+        Array.isArray(data?.results) ? data.results : EMPTY_ARRAY,
+      ),
     ),
-  );
+  ).then((videos) => {
+    previewTrailerVideosCache.set(cacheKey, videos);
+    return videos;
+  });
+
+  previewTrailerVideosCache.set(cacheKey, request);
+  return request;
+}
+
+function prewarmPreviewTrailer(tvId) {
+  if (!tvId || typeof window === "undefined") return;
+  resolvePreviewTrailerVideos(tvId).catch(() => {});
+  loadYouTubeIframeApi().catch(() => {});
+}
+
+function readCachedPreviewTrailerVideos(tvId) {
+  if (!tvId) return null;
+  const cached = previewTrailerVideosCache.get(`tv:${tvId}`);
+  return Array.isArray(cached) ? cached : null;
+}
+
+async function resolvePreviewTrailerVideos(tvId) {
+  const videos = await fetchPreviewTrailerVideos(tvId);
+  previewTrailerVideosCache.set(`tv:${tvId}`, videos);
+  return videos;
 }
 
 function pickNextPreviewTrailer(videos, currentVideo, skippedKeys) {
@@ -210,7 +242,7 @@ function buildPreviewTrailerSrc(video) {
         ? encodeURIComponent(window.location.origin)
         : "";
     return (
-      `https://www.youtube-nocookie.com/embed/${video.key}` +
+      `https://www.youtube.com/embed/${video.key}` +
       `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
       `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
       `&start=5&enablejsapi=1&widget_referrer=${origin}&origin=${origin}`
@@ -223,6 +255,33 @@ function buildPreviewTrailerSrc(video) {
   }
 
   return embedUrl;
+}
+
+function loadYouTubeIframeApi() {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+
+  youtubeIframeApiPromise = new Promise((resolve) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolve(window.YT);
+    };
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]',
+    );
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    document.head.appendChild(script);
+  });
+
+  return youtubeIframeApiPromise;
 }
 
 /* =================== HELPERS =================== */
@@ -387,16 +446,19 @@ function ContinueWatchingPreviewCard({
   const [watchlist, setWatchlist] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [trailer, setTrailer] = useState(null);
-  const [trailerLoading, setTrailerLoading] = useState(false);
-  const [trailerReady, setTrailerReady] = useState(false);
-  const [trailerVisible, setTrailerVisible] = useState(false);
+
+  // Resolvemos el trailer de forma SÍNCRONA desde la caché ya precalentada (la
+  // fila precalienta los trailers visibles), de modo que el iframe esté presente
+  // desde el primer render: el trailer se muestra al instante, sin esperas,
+  // intentos ni parpadeos. Solo si no estuviera en caché se carga después.
+  const initialTrailerVideos = readCachedPreviewTrailerVideos(show?.id) || EMPTY_ARRAY;
+  const [trailer, setTrailer] = useState(initialTrailerVideos[0] || null);
 
   const href = nextEpisodeHref(show);
   const prefetchedRef = useRef(false);
   const trailerIframeRef = useRef(null);
-  const trailerRevealTimerRef = useRef(null);
-  const trailerVideosRef = useRef(EMPTY_ARRAY);
+  const trailerPlayerRef = useRef(null);
+  const trailerVideosRef = useRef(initialTrailerVideos);
   const skippedTrailerKeysRef = useRef(new Set());
 
   const prefetchHref = () => {
@@ -418,7 +480,7 @@ function ContinueWatchingPreviewCard({
       }
       try {
         setLoadingStates(true);
-        const st = await getMediaAccountStates("tv", show.id, session);
+        const st = await getBackendItemStatus({ type: "tv", tmdbId: show.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
@@ -435,102 +497,72 @@ function ContinueWatchingPreviewCard({
     };
   }, [show, session, account]);
 
+  // Solo si el trailer NO estaba en caché lo resolvemos una vez (poco habitual:
+  // la fila precalienta los visibles en idle). No reseteamos el trailer ya
+  // mostrado para evitar parpadeos/remontajes del iframe.
   useEffect(() => {
+    if (trailer || !show?.id) return;
     let cancel = false;
-    setTrailer(null);
-    setTrailerReady(false);
-    setTrailerVisible(false);
-    trailerVideosRef.current = EMPTY_ARRAY;
-    skippedTrailerKeysRef.current = new Set();
-    if (trailerRevealTimerRef.current) {
-      window.clearTimeout(trailerRevealTimerRef.current);
-      trailerRevealTimerRef.current = null;
-    }
-
-    const load = async () => {
-      if (!show?.id) return;
+    (async () => {
       try {
-        setTrailerLoading(true);
-        const videos = await fetchPreviewTrailerVideos(show.id);
-        if (!cancel) {
-          trailerVideosRef.current = videos;
-          setTrailer(videos[0] || null);
-        }
+        const videos = await resolvePreviewTrailerVideos(show.id);
+        if (cancel) return;
+        trailerVideosRef.current = videos;
+        setTrailer(videos[0] || null);
       } catch {
-        if (!cancel) setTrailer(null);
-      } finally {
-        if (!cancel) setTrailerLoading(false);
+        // Sin trailer: queda el backdrop como fondo.
       }
-    };
-
-    load();
+    })();
     return () => {
       cancel = true;
-      if (trailerRevealTimerRef.current) {
-        window.clearTimeout(trailerRevealTimerRef.current);
-        trailerRevealTimerRef.current = null;
-      }
     };
-  }, [show?.id]);
+  }, [show?.id, trailer]);
 
   useEffect(() => {
     if (!trailer?.key || trailer.site !== "YouTube") return;
 
-    const handleMessage = (event) => {
-      if (
-        event.origin !== "https://www.youtube-nocookie.com" &&
-        event.origin !== "https://www.youtube.com"
-      ) {
-        return;
-      }
+    let cancelled = false;
 
-      let data = event.data;
-      if (typeof data === "string") {
-        try {
-          data = JSON.parse(data);
-        } catch {
-          return;
-        }
-      }
+    // El YT.Player se usa solo para (1) asegurar la reproducción como respaldo y
+    // (2) saltar al siguiente vídeo si el actual falla. NO controla el revelado.
+    loadYouTubeIframeApi().then((YT) => {
+      if (cancelled || !YT?.Player || !trailerIframeRef.current) return;
 
-      if (data?.event === "onError") {
-        setTrailer((currentTrailer) => {
-          const currentKey = getVideoIdentity(currentTrailer);
-          if (currentKey) skippedTrailerKeysRef.current.add(currentKey);
-          return pickNextPreviewTrailer(
-            trailerVideosRef.current,
-            currentTrailer,
-            skippedTrailerKeysRef.current,
-          );
-        });
-        setTrailerReady(false);
-        setTrailerVisible(false);
-        return;
-      }
+      trailerPlayerRef.current = new YT.Player(trailerIframeRef.current, {
+        events: {
+          onReady: (event) => {
+            if (cancelled) return;
+            try {
+              event.target.mute?.();
+              event.target.playVideo?.();
+            } catch {
+              // La URL ya incluye autoplay, mute y start=5.
+            }
+          },
+          onError: () => {
+            if (cancelled) return;
+            setTrailer((currentTrailer) => {
+              const currentKey = getVideoIdentity(currentTrailer);
+              if (currentKey) skippedTrailerKeysRef.current.add(currentKey);
+              return pickNextPreviewTrailer(
+                trailerVideosRef.current,
+                currentTrailer,
+                skippedTrailerKeysRef.current,
+              );
+            });
+          },
+        },
+      });
+    });
 
-      const state = Number(data?.info);
-      const isPlayingOrBuffering =
-        data?.event === "onStateChange" && (state === 1 || state === 3);
-      if (!isPlayingOrBuffering) return;
-
-      setTrailerReady(true);
-      if (trailerRevealTimerRef.current) {
-        window.clearTimeout(trailerRevealTimerRef.current);
-      }
-      // YouTube suele mostrar un icono central de pausa/play durante el arranque.
-      // Revelamos el iframe un instante después de empezar para no mostrarlo.
-      trailerRevealTimerRef.current = window.setTimeout(() => {
-        setTrailerVisible(true);
-        trailerRevealTimerRef.current = null;
-      }, 700);
-    };
-
-    window.addEventListener("message", handleMessage);
     return () => {
-      window.removeEventListener("message", handleMessage);
-      if (trailerRevealTimerRef.current) {
-        window.clearTimeout(trailerRevealTimerRef.current);
-        trailerRevealTimerRef.current = null;
+      cancelled = true;
+      try {
+        trailerPlayerRef.current?.destroy?.();
+      } catch {
+        // El iframe puede haber sido desmontado por React.
+      } finally {
+        trailerPlayerRef.current = null;
       }
     };
   }, [trailer?.key, trailer?.site]);
@@ -719,15 +751,14 @@ function ContinueWatchingPreviewCard({
           </motion.div>
         )}
 
-        {trailerLoading && !trailerReady && (
-          <div className="pointer-events-none absolute inset-0 bg-black/10" />
-        )}
-
         {trailerSrc && (
           <motion.div
+            // El iframe se muestra de inmediato (un único fundido de entrada al
+            // montar, sin esperar a detectar reproducción): nada de retardos ni
+            // parpadeos. El backdrop queda debajo como fondo durante la carga.
             initial={{ opacity: 0 }}
-            animate={{ opacity: trailerVisible ? 1 : 0 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className="pointer-events-none absolute inset-0 overflow-hidden"
           >
             <iframe
@@ -743,30 +774,24 @@ function ContinueWatchingPreviewCard({
               allowFullScreen={false}
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={() => {
+                // El iframe ya es visible (no se gatea por reproducción). Esto
+                // es solo un respaldo de autoplay: la URL ya trae
+                // autoplay=1&mute=1, pero reforzamos por postMessage por si el
+                // navegador lo retrasara.
                 try {
-                  if (trailer.site !== "YouTube") {
-                    window.setTimeout(() => {
-                      setTrailerReady(true);
-                      setTrailerVisible(true);
-                    }, 350);
-                    return;
-                  }
-
+                  if (trailer.site !== "YouTube") return;
                   const win = trailerIframeRef.current?.contentWindow;
                   if (!win) return;
-                  const target = "https://www.youtube-nocookie.com";
-                  const cmd = (func, args = []) =>
-                    win.postMessage(
-                      JSON.stringify({ event: "command", func, args }),
-                      target,
-                    );
-                  window.setTimeout(() => {
-                    cmd("mute");
-                    cmd("seekTo", [5, true]);
-                    cmd("playVideo");
-                  }, 180);
+                  win.postMessage(
+                    JSON.stringify({
+                      event: "command",
+                      func: "playVideo",
+                      args: [],
+                    }),
+                    "https://www.youtube.com",
+                  );
                 } catch {
-                  // El fallback visual sigue siendo el backdrop.
+                  // ignorar
                 }
               }}
             />
@@ -949,6 +974,27 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     hoveredIdRef.current = hoveredId;
   }, [hoveredId]);
 
+  useEffect(() => {
+    if (isMobile || !hydrated || !Array.isArray(shows) || shows.length === 0)
+      return;
+
+    const warmVisibleTrailers = () => {
+      shows.slice(0, Math.min(6, shows.length)).forEach((show) => {
+        prewarmPreviewTrailer(show?.id);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(warmVisibleTrailers, {
+        timeout: 1500,
+      });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+
+    const timer = window.setTimeout(warmVisibleTrailers, 500);
+    return () => window.clearTimeout(timer);
+  }, [shows, isMobile, hydrated]);
+
   const clearHoverOpenTimer = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -979,13 +1025,21 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     setHoveredIndex(null);
   };
 
-  const handleMouseEnterItem = (itemKey, index) => {
+  const prewarmVisibleTrailers = () => {
+    if (isMobile || !Array.isArray(shows) || shows.length === 0) return;
+    shows
+      .slice(activeIndex, Math.min(shows.length, activeIndex + perView))
+      .forEach((show) => prewarmPreviewTrailer(show?.id));
+  };
+
+  const handleMouseEnterItem = (itemKey, index, tvId) => {
     if (isMobile) return;
+    prewarmPreviewTrailer(tvId);
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     hoverTimeoutRef.current = setTimeout(() => {
       openPreview(itemKey, index);
-    }, 250); // 250ms de retraso para evitar activaciones accidentales y agilizar la apertura
+    }, 120);
   };
 
   const handleMouseLeaveItem = (itemKey) => {
@@ -1159,7 +1213,10 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
       <div
         className="relative"
-        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseEnter={() => {
+          setIsHoveredRow(true);
+          prewarmVisibleTrailers();
+        }}
         onMouseLeave={() => {
           clearHoverOpenTimer();
           setIsHoveredRow(false);
@@ -1233,7 +1290,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                     className={`${base} ${sizeClasses} ${
                       isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
                     }`}
-                    onMouseEnter={() => handleMouseEnterItem(itemKey, i)}
+                    onMouseEnter={() => handleMouseEnterItem(itemKey, i, show.id)}
                     onMouseLeave={() => {
                       if (!isActive) handleMouseLeaveItem(itemKey);
                     }}
