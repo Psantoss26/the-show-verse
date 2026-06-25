@@ -113,7 +113,7 @@ addPool('region_top', 'movie', TTL_24H, async () =>
 );
 addPool('region_top', 'tv', TTL_24H, async () =>
   dedupeCards(await discoverPages('tv', {
-    watch_region: 'ES',
+    region: 'ES',
     sort_by: 'popularity.desc',
   }, 2))
 );
