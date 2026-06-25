@@ -8,10 +8,17 @@ import { rotateWindow } from './rotation.js';
  * @param {Array}   options.rowSpecs     - Array of { key, title, reason, mediaType, items: card[], rotate: boolean }
  * @param {number}  options.rotationSeed - Seed used for seeded rotation
  * @param {number}  [options.perRow=20]  - Max items per row
+ * @param {number}  [options.minItems=1] - Drop rows that end up with fewer than this many items
  * @param {Set}     [options.excludeIds] - Set of "${mediaType}:${tmdbId}" keys to pre-exclude
  * @returns {Array} Non-empty rows: { key, title, reason, mediaType, items: card[] }
  */
-export function assembleRows({ rowSpecs, rotationSeed, perRow = 20, excludeIds = new Set() }) {
+export function assembleRows({
+  rowSpecs,
+  rotationSeed,
+  perRow = 20,
+  minItems = 1,
+  excludeIds = new Set(),
+}) {
   const used = new Set(excludeIds);
   const output = [];
 
@@ -23,16 +30,20 @@ export function assembleRows({ rowSpecs, rotationSeed, perRow = 20, excludeIds =
       : items;
 
     const taken = [];
+    const takenKeys = [];
     for (const card of candidates) {
       if (taken.length >= perRow) break;
       const cardKey = `${card.mediaType}:${card.tmdbId}`;
       if (used.has(cardKey)) continue;
-      used.add(cardKey);
+      takenKeys.push(cardKey);
       taken.push(card);
     }
 
-    if (taken.length === 0) continue;
+    // Si la fila no alcanza el mínimo, la descartamos y NO marcamos sus títulos
+    // como usados (así quedan disponibles para filas posteriores).
+    if (taken.length < minItems) continue;
 
+    for (const cardKey of takenKeys) used.add(cardKey);
     output.push({ key, title, reason, mediaType, items: taken });
   }
 

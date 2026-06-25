@@ -88,7 +88,10 @@ export default async function dashboardRoutes(fastify) {
           }
         } else if (kind === 'decadeRotating') {
           const decades = ['1980', '1990', '2000', '2010', '2020'];
-          const picked = pickRotating(decades, seed + 7, def.source.count);
+          // Mostramos las décadas elegidas en orden cronológico (1980 → 2020).
+          const picked = pickRotating(decades, seed + 7, def.source.count).sort(
+            (a, b) => Number(a) - Number(b),
+          );
           for (const d of picked) {
             try {
               let items;
@@ -146,6 +149,7 @@ export default async function dashboardRoutes(fastify) {
       rowSpecs: [...personalSpecs, ...genericSpecs],
       rotationSeed: seed,
       perRow: 20,
+      minItems: 15, // toda fila debe tener al menos 15 elementos
       excludeIds,
     });
 

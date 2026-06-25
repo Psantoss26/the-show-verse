@@ -1,6 +1,4 @@
 // backend/src/dashboard/surfaces.js
-// eslint-disable-next-line no-unused-vars
-import { MOVIE_GENRES, TV_GENRES } from './tmdb.js';
 
 /**
  * Surface row definitions for the dashboard.
@@ -60,7 +58,7 @@ export const SURFACES = {
         key: 'decade_rotating',
         title: 'Imprescindibles de cada década',
         mediaType: 'mixed',
-        source: { kind: 'decadeRotating', count: 2 },
+        source: { kind: 'decadeRotating', count: 5 },
       },
     ],
   },
@@ -126,7 +124,7 @@ export const SURFACES = {
         key: 'decade_rotating',
         title: 'Por décadas',
         mediaType: 'movie',
-        source: { kind: 'decadeRotating', count: 2 },
+        source: { kind: 'decadeRotating', count: 5 },
       },
     ],
   },
@@ -192,7 +190,7 @@ export const SURFACES = {
         key: 'decade_rotating',
         title: 'Por décadas',
         mediaType: 'tv',
-        source: { kind: 'decadeRotating', count: 2 },
+        source: { kind: 'decadeRotating', count: 5 },
       },
     ],
   },
@@ -244,9 +242,9 @@ export function personalizedRowDefs(recsByType, surface) {
     becauseGroups.get(seedTmdbId).items.push(item);
   }
 
-  // Sort by group size desc, take top 2 with >= 4 items
+  // Sort by group size desc, take top 2 with >= 15 items (mínimo por fila)
   const topBecauseGroups = [...becauseGroups.entries()]
-    .filter(([, g]) => g.items.length >= 4)
+    .filter(([, g]) => g.items.length >= 15)
     .sort(([, a], [, b]) => b.items.length - a.items.length)
     .slice(0, 2);
 
@@ -266,7 +264,7 @@ export function personalizedRowDefs(recsByType, surface) {
     item.reasons?.some((r) => r.type === 'based_on_genres'),
   );
 
-  if (genreFillItems.length >= 4) {
+  if (genreFillItems.length >= 15) {
     rows.push({
       key: 'genre_fill',
       title: 'Más para ti',

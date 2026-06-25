@@ -3265,17 +3265,22 @@ export default function MainDashboardClient({ initialData }) {
           <ContinueWatchingSection isMobile={isMobile} hydrated={hydrated} />
 
           {/* Filas de la engine: recomendaciones personalizadas + contenido
-              genérico rotativo, deduplicado por el backend (sin Trakt). Se omite
-              "Mejor valoradas" porque ya se muestra arriba en TopRatedHero. */}
+              genérico rotativo, deduplicado por el backend (sin Trakt). Se usa el
+              componente Row (con vista previa al hover y flechas de desplazamiento).
+              Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero. */}
           {engineRows
             .filter((row) => row.key !== "top_rated")
             .map((row) => (
-              <TraktMixedRow
+              <Row
                 key={row.key}
                 title={row.title}
                 items={row.items}
                 isMobile={isMobile}
                 hydrated={hydrated}
+                posterCacheRef={posterCacheRef}
+                posterOverrides={posterOverrides}
+                backdropOverrides={backdropOverrides}
+                overridesReady={overridesReady}
               />
             ))}
           </motion.div>
