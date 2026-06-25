@@ -1,0 +1,1633 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - link "Películas" [ref=e10] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e11] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e12] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e13] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - link "Listas" [ref=e16] [cursor=pointer]:
+            - /url: /lists
+            - img [ref=e18]
+          - link "Calendario" [ref=e20] [cursor=pointer]:
+            - /url: /calendar
+            - img [ref=e22]
+          - link "En Progreso" [ref=e24] [cursor=pointer]:
+            - /url: /in-progress
+            - img [ref=e26]
+          - link "Historial" [ref=e28] [cursor=pointer]:
+            - /url: /history
+            - img [ref=e30]
+          - link "Favoritas" [ref=e33] [cursor=pointer]:
+            - /url: /favorites
+            - img [ref=e35]
+          - link "Pendientes" [ref=e37] [cursor=pointer]:
+            - /url: /watchlist
+            - img [ref=e39]
+        - link "Iniciar sesión" [ref=e41] [cursor=pointer]:
+          - /url: /login?next=%2Fdetails%2Ftv%2F37854%2Fseason%2F13
+      - generic [ref=e42]:
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e49]
+        - button "Abrir recomendador de qué ver" [ref=e50]:
+          - img [ref=e51]
+  - generic [ref=e60]:
+    - generic [ref=e61]:
+      - button "Volver" [ref=e62]:
+        - img [ref=e63]
+      - link "One Piece" [ref=e65] [cursor=pointer]:
+        - /url: /details/tv/37854
+        - img [ref=e66]
+        - text: One Piece
+    - generic [ref=e69]:
+      - img "Impel Down y Marineford" [ref=e74]
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - img [ref=e78]
+            - generic [ref=e82]: Serie
+          - heading "Impel Down y Marineford" [level=1] [ref=e83]
+          - generic [ref=e84]:
+            - generic [ref=e85]: One Piece
+            - generic [ref=e86]: ●
+            - generic [ref=e87]: 101 episodios
+        - generic [ref=e89]:
+          - link "Ver en TMDb" [ref=e91] [cursor=pointer]:
+            - /url: https://www.themoviedb.org/tv/37854/season/13
+            - img "Provider" [ref=e93]
+            - generic [ref=e94]:
+              - generic [ref=e96]: "8.0"
+              - generic [ref=e98]: "651"
+            - generic: Ver en TMDb
+          - generic [ref=e101]:
+            - button "Inicia sesión para usar Vistos" [ref=e103]:
+              - img [ref=e105]
+            - button "Puntuar" [ref=e110]:
+              - img [ref=e112]
+        - generic [ref=e114]:
+          - generic [ref=e115]:
+            - button "Detalles" [ref=e116]: Detalles
+            - button "Sinopsis" [ref=e118]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - img [ref=e124]
+              - generic [ref=e127]:
+                - generic [ref=e128]: Serie
+                - generic [ref=e129]: One Piece
+            - generic [ref=e130]:
+              - img [ref=e132]
+              - generic [ref=e134]:
+                - generic [ref=e135]: Estreno
+                - generic [ref=e136]: —
+            - generic [ref=e137]:
+              - img [ref=e139]
+              - generic [ref=e143]:
+                - generic [ref=e144]: Temporada
+                - generic [ref=e145]: "13"
+            - generic [ref=e146]:
+              - img [ref=e148]
+              - generic [ref=e150]:
+                - generic [ref=e151]: Episodios
+                - generic [ref=e152]: "101"
+    - generic [ref=e153]:
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - img [ref=e158]
+          - heading "Episodios" [level=2] [ref=e162]
+        - generic [ref=e166]:
+          - button "Vista lista" [pressed] [ref=e167]:
+            - img [ref=e168]
+          - button "Vista grid" [ref=e169]:
+            - img [ref=e170]
+      - generic [ref=e175]:
+        - link "¡Una infiltración mortal! ¡La prisión submarina Impel Down! Episodio 422 ¡Una infiltración mortal! ¡La prisión submarina Impel Down! 18 oct 2009 24 min Garp le dice a Ace que Luffy sabe ahora acerca de su padre y que él había esperado que Ace y Luffy se convertirían en infantes de marina. Ace dice que es imposible, porque tanto él como Luffy son descendientes de criminales, y que como él niega a su padre, tomó el apellido de su madre y considera solamente a Barbablanca como su padre. Los Piratas de Buggy navegan hacia Impel Down, con la esperanza de liberar a Buggy. Alvida se niega y sugiere que Impel Down es impenetrable, y el resto de la tripulación se da por vencida después ella dice que va a tomar el barco. Hancock llega a Impel Down con Luffy, donde se reúne con Hannybal, el ambicioso vice-jefe de la prisión, y debe ser sometida a un chequeo al desnudo antes de entrar." [ref=e176] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/422
+          - generic [ref=e178]:
+            - img "¡Una infiltración mortal! ¡La prisión submarina Impel Down!" [ref=e180]
+            - generic [ref=e181]:
+              - generic [ref=e182]: Episodio 422
+              - heading "¡Una infiltración mortal! ¡La prisión submarina Impel Down!" [level=3] [ref=e184]
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - img [ref=e187]
+                  - text: 18 oct 2009
+                - generic [ref=e189]:
+                  - img [ref=e190]
+                  - text: 24 min
+              - paragraph [ref=e193]: Garp le dice a Ace que Luffy sabe ahora acerca de su padre y que él había esperado que Ace y Luffy se convertirían en infantes de marina. Ace dice que es imposible, porque tanto él como Luffy son descendientes de criminales, y que como él niega a su padre, tomó el apellido de su madre y considera solamente a Barbablanca como su padre. Los Piratas de Buggy navegan hacia Impel Down, con la esperanza de liberar a Buggy. Alvida se niega y sugiere que Impel Down es impenetrable, y el resto de la tripulación se da por vencida después ella dice que va a tomar el barco. Hancock llega a Impel Down con Luffy, donde se reúne con Hannybal, el ambicioso vice-jefe de la prisión, y debe ser sometida a un chequeo al desnudo antes de entrar.
+        - link "¡¿Una reunión en el infierno?! ¡El hombre que comió la Bara Bara No Mi! Episodio 423 ¡¿Una reunión en el infierno?! ¡El hombre que comió la Bara Bara No Mi! 25 oct 2009 24 min Hancock petrifica a Domino y al caracol de la cámara para permitir a Luffy salir a escondidas. Ella sube al ascensor para presentarse con Magellan, el jefe de la prisión en el nivel 4. Luffy se cuela en el nivel 1, mientras que Buggy esta por salir de su celda, por haber ocultado su habilidad de dividirse, Buggy alerta a algunos guardias y activa algunas trampas en su fuga, pero Luffy se las arregla para evadirlas y oye el rumor de que Ace esta en el nivel 5. Buggy corre, perseguido por los poderosos Blugori, y después de algunas disputas entre él y Luffy, deciden unirse para luchar contra los enemigos." [ref=e194] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/423
+          - generic [ref=e196]:
+            - img "¡¿Una reunión en el infierno?! ¡El hombre que comió la Bara Bara No Mi!" [ref=e198]
+            - generic [ref=e199]:
+              - generic [ref=e200]: Episodio 423
+              - heading "¡¿Una reunión en el infierno?! ¡El hombre que comió la Bara Bara No Mi!" [level=3] [ref=e202]
+              - generic [ref=e203]:
+                - generic [ref=e204]:
+                  - img [ref=e205]
+                  - text: 25 oct 2009
+                - generic [ref=e207]:
+                  - img [ref=e208]
+                  - text: 24 min
+              - paragraph [ref=e211]: Hancock petrifica a Domino y al caracol de la cámara para permitir a Luffy salir a escondidas. Ella sube al ascensor para presentarse con Magellan, el jefe de la prisión en el nivel 4. Luffy se cuela en el nivel 1, mientras que Buggy esta por salir de su celda, por haber ocultado su habilidad de dividirse, Buggy alerta a algunos guardias y activa algunas trampas en su fuga, pero Luffy se las arregla para evadirlas y oye el rumor de que Ace esta en el nivel 5. Buggy corre, perseguido por los poderosos Blugori, y después de algunas disputas entre él y Luffy, deciden unirse para luchar contra los enemigos.
+        - link "¡Atravesar el infierno carmesí! ¡El plan de inducción al caos de Buggy! Episodio 424 ¡Atravesar el infierno carmesí! ¡El plan de inducción al caos de Buggy! 01 nov 2009 24 min Luffy derrota fácilmente al Blugori mientras Buggy es incapaz de derrotar a uno. Buggy revela su pasada asociación con Ace y las circunstancias detrás de su captura, y se compromete a trabajar con Luffy a cambio del brazalete que recibió en Thriller Bark, que es una pista de un tesoro. Buggy y Luffy llegan al primer nivel de Impel Down, conocido como el Infierno Carmesí, donde los prisioneros son obligados a correr a través de un bosque. Luffy y Buggy caen al segundo nivel, el nivel de las bestias salvajes del infierno, donde se encuentra Mr. 3." [ref=e212] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/424
+          - generic [ref=e214]:
+            - img "¡Atravesar el infierno carmesí! ¡El plan de inducción al caos de Buggy!" [ref=e216]
+            - generic [ref=e217]:
+              - generic [ref=e218]: Episodio 424
+              - heading "¡Atravesar el infierno carmesí! ¡El plan de inducción al caos de Buggy!" [level=3] [ref=e220]
+              - generic [ref=e221]:
+                - generic [ref=e222]:
+                  - img [ref=e223]
+                  - text: 01 nov 2009
+                - generic [ref=e225]:
+                  - img [ref=e226]
+                  - text: 24 min
+              - paragraph [ref=e229]: Luffy derrota fácilmente al Blugori mientras Buggy es incapaz de derrotar a uno. Buggy revela su pasada asociación con Ace y las circunstancias detrás de su captura, y se compromete a trabajar con Luffy a cambio del brazalete que recibió en Thriller Bark, que es una pista de un tesoro. Buggy y Luffy llegan al primer nivel de Impel Down, conocido como el Infierno Carmesí, donde los prisioneros son obligados a correr a través de un bosque. Luffy y Buggy caen al segundo nivel, el nivel de las bestias salvajes del infierno, donde se encuentra Mr. 3.
+        - link [ref=e230] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/425
+          - generic [ref=e232]:
+            - img "El hombre más fuerte en la prisión! Magellan el hombre Veneno aparece!" [ref=e234]
+            - generic [ref=e235]:
+              - generic [ref=e236]: Episodio 425
+              - heading "El hombre más fuerte en la prisión! Magellan el hombre Veneno aparece!" [level=3] [ref=e238]
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - img [ref=e241]
+                  - text: 08 nov 2009
+                - generic [ref=e243]:
+                  - img [ref=e244]
+                  - text: 24 min
+              - paragraph [ref=e247]: Luffy y Buggy se encuentran en el piso de las bestias salvajes del infierno y combaten a los monstruos. Luffy derrota al basilisco de gran alcance con un solo puñetazo usando el geard third, destruyendo un puesto de guardia en el proceso y alertando a la prisión. Hancock se reúne con Magellan, el jefe de la prisión que comió La Doku Doku no mi. Buggy logra liberar a algunos presos, con la esperanza de iniciar un motín y escapar en la confusión, pero el retorno de los prisioneros a sus celdas, aterrorizados por el "jefe" del nivel. Luffy y Buggy se encuentran con Mr. 3, que se ofrece a ayudarles a llegar hasta el tercer nivel. En la Sede de la Marina, Sengoku se sorprende de saber que Kuma no acabo con Luffy, y que Luffy esta infiltrado en Impel Down, pero confía en que será capturado. Sengoku recuerda al hombre que escapó de Impel Down, León de Oro Shiki.
+        - link [ref=e248] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/426
+          - generic [ref=e250]:
+            - img "Especial relacionado con la película- Empieza a moverse. La ambición de Shiki" [ref=e252]
+            - generic [ref=e253]:
+              - generic [ref=e254]: Episodio 426
+              - heading "Especial relacionado con la película- Empieza a moverse. La ambición de Shiki" [level=3] [ref=e256]
+              - generic [ref=e257]:
+                - generic [ref=e258]:
+                  - img [ref=e259]
+                  - text: 15 nov 2009
+                - generic [ref=e261]:
+                  - img [ref=e262]
+                  - text: 24 min
+              - paragraph [ref=e265]: En un flashback, se revela que hace 20 años, un pirata llamado Shiki se cortó las piernas y se escapó de Impel Down. Shiki contacto a los Piratas Amigo, una tripulación de piratas liderados por un hombre llamado Largo, que ofrecen pertenecer a su tripulación si cumplen con una solicitud determinada. Mientras tanto, Luffy, Usopp, Chopper y Brook tratar de atrapar un gran pez, pero termina siendo devorado por un gran escarabajo llamado "Jefe". Luffy comienza la lucha contra el escarabajo con la intención de hacerlo parte de su tripulación, pero vuela hacia una isla con él, Zoro, Sanji y Usopp en el remolque. Yoko, una chica que llevaba un abrigo de la Marina aparece, atacando a Luffy sobre cómo trató a “Jefe”, y algunas personas salen y revelan que han estado viviendo bajo muchas amenazas, porque los marines no los protegen. El padre de Yoko fue un infante de marina que murió defendiéndolos hace cinco años, y que “Jefe” se reunió por primera vez en la isla hace tres años después de su muerte. Se muestran a los cuatro Sombreros de Paja en un pueblo, que se parece mucho al East Blue hasta el punto de tener réplicas de varios edificios importantes. La misión de Largo y sus piratas es secuestrar al escarabajo que salió de su escondite.
+        - link "Especial relacionado con la película. Amenazan al pequeño East Blue Episodio 427 Especial relacionado con la película. Amenazan al pequeño East Blue 22 nov 2009 24 min Los Sombrero de Paja se reúnen con personas en lugares que les recuerdan de dónde vinieron, y Yoko se irrita cuando lo vinculan tan fácilmente. Los Piratas Amigo deciden ir a tierra, pero debido a Largo, está tomando una siesta, Colt los lleva. Nami se reúne con el club \"Orenami\", que la conduce a través de un laberinto y le muestra una estatua desnuda de ella, que la ofende. Ella ve a Yoko, y considera que Yoko le recuerda a sí misma cuando ella conoció a Luffy. Mientras que los sombreros de paja en una fiesta pelean contra los piratas Amigo, destruyendo gran parte del pueblo, y la demanda del escarabajo. Luffy derrota fácilmente a Colt y a sus hombres con la ayuda de Zoro y Sanji." [ref=e266] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/427
+          - generic [ref=e268]:
+            - img "Especial relacionado con la película. Amenazan al pequeño East Blue" [ref=e270]
+            - generic [ref=e271]:
+              - generic [ref=e272]: Episodio 427
+              - heading "Especial relacionado con la película. Amenazan al pequeño East Blue" [level=3] [ref=e274]
+              - generic [ref=e275]:
+                - generic [ref=e276]:
+                  - img [ref=e277]
+                  - text: 22 nov 2009
+                - generic [ref=e279]:
+                  - img [ref=e280]
+                  - text: 24 min
+              - paragraph [ref=e283]: Los Sombrero de Paja se reúnen con personas en lugares que les recuerdan de dónde vinieron, y Yoko se irrita cuando lo vinculan tan fácilmente. Los Piratas Amigo deciden ir a tierra, pero debido a Largo, está tomando una siesta, Colt los lleva. Nami se reúne con el club "Orenami", que la conduce a través de un laberinto y le muestra una estatua desnuda de ella, que la ofende. Ella ve a Yoko, y considera que Yoko le recuerda a sí misma cuando ella conoció a Luffy. Mientras que los sombreros de paja en una fiesta pelean contra los piratas Amigo, destruyendo gran parte del pueblo, y la demanda del escarabajo. Luffy derrota fácilmente a Colt y a sus hombres con la ayuda de Zoro y Sanji.
+        - link "Especial de la película. El ataque de los piratas amigos Episodio 428 Especial de la película. El ataque de los piratas amigos 29 nov 2009 24 min Zoro y Sanji intentan atacar a Largo, que utiliza su Ami-Ami para crear redes a partir de materiales que se come y los captura. Largo y Colt amenazan con exterminar la ciudad si no obtienen el escarabajo, y “Jefe” sale a luchar contra ellos, pero es derrotado rápidamente. “Jefe” decide sacrificarse para salvar al pueblo, pese a las objeciones de Yoko, pero las lágrimas de Luffy abren la red y golpea a “jefe”, diciendo que él quiere pelear con él de nuevo. “Jefe” es capaz de volar el tiempo suficiente para quemar la red en donde están Luffy, Zoro y Sanji. Los Sombrero de Paja y los habitantes se preparan para luchar contra los Piratas de Amigo." [ref=e284] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/428
+          - generic [ref=e286]:
+            - img "Especial de la película. El ataque de los piratas amigos" [ref=e288]
+            - generic [ref=e289]:
+              - generic [ref=e290]: Episodio 428
+              - heading "Especial de la película. El ataque de los piratas amigos" [level=3] [ref=e292]
+              - generic [ref=e293]:
+                - generic [ref=e294]:
+                  - img [ref=e295]
+                  - text: 29 nov 2009
+                - generic [ref=e297]:
+                  - img [ref=e298]
+                  - text: 24 min
+              - paragraph [ref=e301]: Zoro y Sanji intentan atacar a Largo, que utiliza su Ami-Ami para crear redes a partir de materiales que se come y los captura. Largo y Colt amenazan con exterminar la ciudad si no obtienen el escarabajo, y “Jefe” sale a luchar contra ellos, pero es derrotado rápidamente. “Jefe” decide sacrificarse para salvar al pueblo, pese a las objeciones de Yoko, pero las lágrimas de Luffy abren la red y golpea a “jefe”, diciendo que él quiere pelear con él de nuevo. “Jefe” es capaz de volar el tiempo suficiente para quemar la red en donde están Luffy, Zoro y Sanji. Los Sombrero de Paja y los habitantes se preparan para luchar contra los Piratas de Amigo.
+        - link "Especial relacionado con la película. ¡Batalla decisiva! Luffy vs Largo Episodio 429 Especial relacionado con la película. ¡Batalla decisiva! Luffy vs Largo 06 dic 2009 24 min Después de la evitación de la red, Luffy golpea Largo a lo lejos, Nami pretende evacuar a los aldeanos, pero toman otros túneles para sorprender a los piratas de Amigo. Luffy lucha contra Largo, pero queda atrapado cuando él convierte su cuerpo entero en una red. Luffy usa third geard y derrota a largo, además destruye su barco en el proceso. El jefe salva a Luffy de caerse al mar y luego comienza a luchar. Yoko y Nami hablan de sus pasados, antes de que Nami se encuentre con los Sombreros De paja. Es revelado que el Jefe era un insecto sobre todo creado, que se había escapado de Shiki, y que él planifica su utilización para una guerra." [ref=e302] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/429
+          - generic [ref=e304]:
+            - img "Especial relacionado con la película. ¡Batalla decisiva! Luffy vs Largo" [ref=e306]
+            - generic [ref=e307]:
+              - generic [ref=e308]: Episodio 429
+              - heading "Especial relacionado con la película. ¡Batalla decisiva! Luffy vs Largo" [level=3] [ref=e310]
+              - generic [ref=e311]:
+                - generic [ref=e312]:
+                  - img [ref=e313]
+                  - text: 06 dic 2009
+                - generic [ref=e315]:
+                  - img [ref=e316]
+                  - text: 24 min
+              - paragraph [ref=e319]: Después de la evitación de la red, Luffy golpea Largo a lo lejos, Nami pretende evacuar a los aldeanos, pero toman otros túneles para sorprender a los piratas de Amigo. Luffy lucha contra Largo, pero queda atrapado cuando él convierte su cuerpo entero en una red. Luffy usa third geard y derrota a largo, además destruye su barco en el proceso. El jefe salva a Luffy de caerse al mar y luego comienza a luchar. Yoko y Nami hablan de sus pasados, antes de que Nami se encuentre con los Sombreros De paja. Es revelado que el Jefe era un insecto sobre todo creado, que se había escapado de Shiki, y que él planifica su utilización para una guerra.
+        - link "¡Un Shichibukai en la prisión! ¡Jimbei el primer hijo del mar! Episodio 430 ¡Un Shichibukai en la prisión! ¡Jimbei el primer hijo del mar! 13 dic 2009 24 min Ace habla ,en la celda, con Gyojin llamado Jimbei que pertenece a la Ouka Shichibukai y se entera de que Jimbei había querido detener la guerra entre los piratas de Barba Blanca y la Infantería de Marina, porque Barbablanca protege la isla Gyojin de los piratas que pasan a través de ella . Varios piratas en el nivel, incluyendo Crocodile, quieren a Barbablanca muerto por frustrar sus ambiciones. En el Nivel 2, Luffy, Buggy y Mr. 3 se encuentran con la Esfinge, que es el jefe del nivel. Mr. 3 escapa con Buggy a un nivel más alto mientras que usan a Luffy como cebo. Pero la Esfinge destruye el suelo, Luffy, Buggy y Mr. 3 caen al nivel 3." [ref=e320] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/430
+          - generic [ref=e322]:
+            - img "¡Un Shichibukai en la prisión! ¡Jimbei el primer hijo del mar!" [ref=e324]
+            - generic [ref=e325]:
+              - generic [ref=e326]: Episodio 430
+              - heading "¡Un Shichibukai en la prisión! ¡Jimbei el primer hijo del mar!" [level=3] [ref=e328]
+              - generic [ref=e329]:
+                - generic [ref=e330]:
+                  - img [ref=e331]
+                  - text: 13 dic 2009
+                - generic [ref=e333]:
+                  - img [ref=e334]
+                  - text: 24 min
+              - paragraph [ref=e337]: Ace habla ,en la celda, con Gyojin llamado Jimbei que pertenece a la Ouka Shichibukai y se entera de que Jimbei había querido detener la guerra entre los piratas de Barba Blanca y la Infantería de Marina, porque Barbablanca protege la isla Gyojin de los piratas que pasan a través de ella . Varios piratas en el nivel, incluyendo Crocodile, quieren a Barbablanca muerto por frustrar sus ambiciones. En el Nivel 2, Luffy, Buggy y Mr. 3 se encuentran con la Esfinge, que es el jefe del nivel. Mr. 3 escapa con Buggy a un nivel más alto mientras que usan a Luffy como cebo. Pero la Esfinge destruye el suelo, Luffy, Buggy y Mr. 3 caen al nivel 3.
+        - link "La trampa del carcelero jefe Saldeath. Nivel 3, el infierno del hambre Episodio 431 La trampa del carcelero jefe Saldeath. Nivel 3, el infierno del hambre 20 dic 2009 24 min Sin la Esfinge custodiando, un motín estalla en el Nivel 2, los prisioneros salen de sus celdas. Sengoku está indignado por Luffy, señalando que nadie ha escapado de Impel Down desde Shiki hace 20 años. Luffy, Buggy y Mr. 3 pasean por el tercer nivel, un desierto caliente en la que los presos no reciben agua ni comida, hasta que se ven atrapados en una red provocada por Saldeath, comandante de los guardias. La esfinge lucha y rompe la red, y mientras Buggy y Mr. 3 abandonan a Luffy mientras luchan contra los guardias, que no pueden salir del nivel. Mientras tanto, Hancock se acerca a donde esta Ace, se muestra que Mr. 2 esta encarcelado en el Nivel 3." [ref=e338] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/431
+          - generic [ref=e340]:
+            - img "La trampa del carcelero jefe Saldeath. Nivel 3, el infierno del hambre" [ref=e342]
+            - generic [ref=e343]:
+              - generic [ref=e344]: Episodio 431
+              - heading "La trampa del carcelero jefe Saldeath. Nivel 3, el infierno del hambre" [level=3] [ref=e346]
+              - generic [ref=e347]:
+                - generic [ref=e348]:
+                  - img [ref=e349]
+                  - text: 20 dic 2009
+                - generic [ref=e351]:
+                  - img [ref=e352]
+                  - text: 24 min
+              - paragraph [ref=e355]: Sin la Esfinge custodiando, un motín estalla en el Nivel 2, los prisioneros salen de sus celdas. Sengoku está indignado por Luffy, señalando que nadie ha escapado de Impel Down desde Shiki hace 20 años. Luffy, Buggy y Mr. 3 pasean por el tercer nivel, un desierto caliente en la que los presos no reciben agua ni comida, hasta que se ven atrapados en una red provocada por Saldeath, comandante de los guardias. La esfinge lucha y rompe la red, y mientras Buggy y Mr. 3 abandonan a Luffy mientras luchan contra los guardias, que no pueden salir del nivel. Mientras tanto, Hancock se acerca a donde esta Ace, se muestra que Mr. 2 esta encarcelado en el Nivel 3.
+        - link "¡El cisne esta libre! ¡Una reunión con Bon Clay! Episodio 432 ¡El cisne esta libre! ¡Una reunión con Bon Clay! 27 dic 2009 24 min Buggy y Mr. 3 encuentran a Mr. 2 y lo liberan, diciéndole que Luffy se encuentra en la cárcel, y quiere llegar al nivel 5. Mientras tanto, la marina llega a Impel Down para ayudar en la captura de Luffy. El capitán de los guardias, Sadie, a fin de prevenir el exterior de la prisión, como los guardias de Impel Down son perfectamente capaces de capturar a Luffy por sí mismos. Boa Hancock llega a la celda de Ace, y se las arregla para informarle de que Luffy esta viniendo para rescatarle, mientras que Magellan y los demás están ocupados con otros presos. Como Luffy se acerca a las escaleras que conducen al nivel 4, es atacado por Saldeath y sus guardias, pero recibe ayuda inesperada de Mr. 2, que ha decidido ayudarle en su búsqueda." [ref=e356] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/432
+          - generic [ref=e358]:
+            - img "¡El cisne esta libre! ¡Una reunión con Bon Clay!" [ref=e360]
+            - generic [ref=e361]:
+              - generic [ref=e362]: Episodio 432
+              - heading "¡El cisne esta libre! ¡Una reunión con Bon Clay!" [level=3] [ref=e364]
+              - generic [ref=e365]:
+                - generic [ref=e366]:
+                  - img [ref=e367]
+                  - text: 27 dic 2009
+                - generic [ref=e369]:
+                  - img [ref=e370]
+                  - text: 24 min
+              - paragraph [ref=e373]: Buggy y Mr. 3 encuentran a Mr. 2 y lo liberan, diciéndole que Luffy se encuentra en la cárcel, y quiere llegar al nivel 5. Mientras tanto, la marina llega a Impel Down para ayudar en la captura de Luffy. El capitán de los guardias, Sadie, a fin de prevenir el exterior de la prisión, como los guardias de Impel Down son perfectamente capaces de capturar a Luffy por sí mismos. Boa Hancock llega a la celda de Ace, y se las arregla para informarle de que Luffy esta viniendo para rescatarle, mientras que Magellan y los demás están ocupados con otros presos. Como Luffy se acerca a las escaleras que conducen al nivel 4, es atacado por Saldeath y sus guardias, pero recibe ayuda inesperada de Mr. 2, que ha decidido ayudarle en su búsqueda.
+        - link "¡Magellan, Guardián de la Estrategia! ¡Captura del Sombrero de Paja Completada! Episodio 433 ¡Magellan, Guardián de la Estrategia! ¡Captura del Sombrero de Paja Completada! 10 ene 2010 24 min Luffy y Mr. 2 se abren camino a través del nivel 3, finalmente se encuentran con el minotauro y lo derrotan, Luffy se da cuenta de que el cuarto nivel está muy caliente. Se entera de que Mr. 2 está buscando a el legendario travesti Emporio Ivankov, que es \"reina\" de la isla Kamabakka. El minotauro persigue a Buggy, Mr. 3, Luffy y a Mr. 2, y los derrota. Mientras tanto, las órdenes de Magellan son reunir todas sus fuerzas en el nivel 4 con el fin de matar a Luffy." [ref=e374] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/433
+          - generic [ref=e376]:
+            - img "¡Magellan, Guardián de la Estrategia! ¡Captura del Sombrero de Paja Completada!" [ref=e378]
+            - generic [ref=e379]:
+              - generic [ref=e380]: Episodio 433
+              - heading "¡Magellan, Guardián de la Estrategia! ¡Captura del Sombrero de Paja Completada!" [level=3] [ref=e382]
+              - generic [ref=e383]:
+                - generic [ref=e384]:
+                  - img [ref=e385]
+                  - text: 10 ene 2010
+                - generic [ref=e387]:
+                  - img [ref=e388]
+                  - text: 24 min
+              - paragraph [ref=e391]: Luffy y Mr. 2 se abren camino a través del nivel 3, finalmente se encuentran con el minotauro y lo derrotan, Luffy se da cuenta de que el cuarto nivel está muy caliente. Se entera de que Mr. 2 está buscando a el legendario travesti Emporio Ivankov, que es "reina" de la isla Kamabakka. El minotauro persigue a Buggy, Mr. 3, Luffy y a Mr. 2, y los derrota. Mientras tanto, las órdenes de Magellan son reunir todas sus fuerzas en el nivel 4 con el fin de matar a Luffy.
+        - link "¡Todas las fuerzas se han reunido! La batalla en el Nivel 4 - ¡El infierno del calor ardiente! Episodio 434 ¡Todas las fuerzas se han reunido! La batalla en el Nivel 4 - ¡El infierno del calor ardiente! 17 ene 2010 24 min Después de derrotar al minotauro, caen en el nivel 4. Momonga, la serpiente de Hancock, oye hablar de la lucha de Shanks contra Kaidou en el Nuevo Mundo para impedir la guerra. Magellan ordena a Sadi y al resto de los Guardias Demonio proteger la escalera al nivel 5, mientras que los guardias de Hannyabal están en el Nivel 3. Luffy y el Mr. 2 se abren camino a través de los guardias en busca de alimento hasta que Magellan los intercepta." [ref=e392] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/434
+          - generic [ref=e394]:
+            - img "¡Todas las fuerzas se han reunido! La batalla en el Nivel 4 - ¡El infierno del calor ardiente!" [ref=e396]
+            - generic [ref=e397]:
+              - generic [ref=e398]: Episodio 434
+              - heading "¡Todas las fuerzas se han reunido! La batalla en el Nivel 4 - ¡El infierno del calor ardiente!" [level=3] [ref=e400]
+              - generic [ref=e401]:
+                - generic [ref=e402]:
+                  - img [ref=e403]
+                  - text: 17 ene 2010
+                - generic [ref=e405]:
+                  - img [ref=e406]
+                  - text: 24 min
+              - paragraph [ref=e409]: Después de derrotar al minotauro, caen en el nivel 4. Momonga, la serpiente de Hancock, oye hablar de la lucha de Shanks contra Kaidou en el Nuevo Mundo para impedir la guerra. Magellan ordena a Sadi y al resto de los Guardias Demonio proteger la escalera al nivel 5, mientras que los guardias de Hannyabal están en el Nivel 3. Luffy y el Mr. 2 se abren camino a través de los guardias en busca de alimento hasta que Magellan los intercepta.
+        - link "¡El poderoso Magellan! Bon Clay huye Episodio 435 ¡El poderoso Magellan! Bon Clay huye 24 ene 2010 24 min Luffy comienza la lucha contra Magellan a pesar de las advertencias de Bon Clay al huir, ve que es incapaz de pasar a la ofensiva, porque el cuerpo venenoso de Magellan y los ataques son a larga distancia. Bon Clay quiere ayudar, pero sabe que podría morir, y huye de la batalla. Mr. 3 y Buggy tratan de escapar a niveles más altos, y mientras Hannybal está dispuesto a dejar el pasado para dejar a Magellan en problemas. Luffy decide atacar, incluso si eso significa sacrificarse. Luffy usa el Gear Second, y hiere a Magellan pero es envenenado." [ref=e410] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/435
+          - generic [ref=e412]:
+            - img "¡El poderoso Magellan! Bon Clay huye" [ref=e414]
+            - generic [ref=e415]:
+              - generic [ref=e416]: Episodio 435
+              - heading "¡El poderoso Magellan! Bon Clay huye" [level=3] [ref=e418]
+              - generic [ref=e419]:
+                - generic [ref=e420]:
+                  - img [ref=e421]
+                  - text: 24 ene 2010
+                - generic [ref=e423]:
+                  - img [ref=e424]
+                  - text: 24 min
+              - paragraph [ref=e427]: Luffy comienza la lucha contra Magellan a pesar de las advertencias de Bon Clay al huir, ve que es incapaz de pasar a la ofensiva, porque el cuerpo venenoso de Magellan y los ataques son a larga distancia. Bon Clay quiere ayudar, pero sabe que podría morir, y huye de la batalla. Mr. 3 y Buggy tratan de escapar a niveles más altos, y mientras Hannybal está dispuesto a dejar el pasado para dejar a Magellan en problemas. Luffy decide atacar, incluso si eso significa sacrificarse. Luffy usa el Gear Second, y hiere a Magellan pero es envenenado.
+        - link "¡El arreglo de cuentas ha llegado! ¡El desesperado último ataque de Luffy! Episodio 436 ¡El arreglo de cuentas ha llegado! ¡El desesperado último ataque de Luffy! 31 ene 2010 24 min Hannybal rápidamente derrota a Buggy y Mr. 3. Luffy se debilita en consecuencia de la absorción del veneno de Magellan, y ya no es capaz de luchar con eficacia. No dispuesto a darse por vencido, sigue atacando, finalmente es derrotado y tirado en el suelo, fatalmente envenenado." [ref=e428] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/436
+          - generic [ref=e430]:
+            - img "¡El arreglo de cuentas ha llegado! ¡El desesperado último ataque de Luffy!" [ref=e432]
+            - generic [ref=e433]:
+              - generic [ref=e434]: Episodio 436
+              - heading "¡El arreglo de cuentas ha llegado! ¡El desesperado último ataque de Luffy!" [level=3] [ref=e436]
+              - generic [ref=e437]:
+                - generic [ref=e438]:
+                  - img [ref=e439]
+                  - text: 31 ene 2010
+                - generic [ref=e441]:
+                  - img [ref=e442]
+                  - text: 24 min
+              - paragraph [ref=e445]: Hannybal rápidamente derrota a Buggy y Mr. 3. Luffy se debilita en consecuencia de la absorción del veneno de Magellan, y ya no es capaz de luchar con eficacia. No dispuesto a darse por vencido, sigue atacando, finalmente es derrotado y tirado en el suelo, fatalmente envenenado.
+        - link "¡Por su amigo! ¡Bon Clay va al Rescate! Episodio 437 ¡Por su amigo! ¡Bon Clay va al Rescate! 07 feb 2010 24 min Después de la derrota de Luffy, Magellan lo encarcela en el nivel 5 hasta que el veneno lo mate. Mr. 2, habiendo tomado la apariencia de Hannybal, decide rescatar a Luffy con el fin de compensar el abandono en la lucha contra Magellan, pero se entera de que hay antídotos que pueden salvarlo ahora. Mr. 2 decide entonces buscar a Emporio Ivankov, Reina de Kamabakka, para curar a Luffy, pero se entera de que ha desaparecido en uno de los incidentes. Mr.2 va al nivel 5 con Buggy y Mr. 3, quienes rápidamente lo abandonan cuando la unidad de lobos los ataca. Luffy sigue decidido a rescatar a Ace a pesar de su condición, y Mr. 2 llega a su celda para salvarlo." [ref=e446] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/437
+          - generic [ref=e448]:
+            - img "¡Por su amigo! ¡Bon Clay va al Rescate!" [ref=e450]
+            - generic [ref=e451]:
+              - generic [ref=e452]: Episodio 437
+              - heading "¡Por su amigo! ¡Bon Clay va al Rescate!" [level=3] [ref=e454]
+              - generic [ref=e455]:
+                - generic [ref=e456]:
+                  - img [ref=e457]
+                  - text: 07 feb 2010
+                - generic [ref=e459]:
+                  - img [ref=e460]
+                  - text: 24 min
+              - paragraph [ref=e463]: Después de la derrota de Luffy, Magellan lo encarcela en el nivel 5 hasta que el veneno lo mate. Mr. 2, habiendo tomado la apariencia de Hannybal, decide rescatar a Luffy con el fin de compensar el abandono en la lucha contra Magellan, pero se entera de que hay antídotos que pueden salvarlo ahora. Mr. 2 decide entonces buscar a Emporio Ivankov, Reina de Kamabakka, para curar a Luffy, pero se entera de que ha desaparecido en uno de los incidentes. Mr.2 va al nivel 5 con Buggy y Mr. 3, quienes rápidamente lo abandonan cuando la unidad de lobos los ataca. Luffy sigue decidido a rescatar a Ace a pesar de su condición, y Mr. 2 llega a su celda para salvarlo.
+        - link "¡Un paraíso en el infierno! ¡Impel Down - Nivel 5.5! Episodio 438 ¡Un paraíso en el infierno! ¡Impel Down - Nivel 5.5! 14 feb 2010 24 min Mr. 2 pide disculpas por abandonar a Luffy y busca a Ivankov. En el camino, es atacado por el Ejército de los lobos, pero Luffy los derrota con Haki y un misterioso extraño llamado Inazuma se los lleva. En otros lugares, Buggy y Mr. 3 intentan escapar del nivel 5, Saldeath suprime el motín en el Nivel 2, las búsquedas para el Sadi en el nivel 3, Magellan se encuentra en el baño con diarrea, y Hannybal está atado en un cuarto de almacenamiento, después de haber sido engañado y tomado por sorpresa por Mr. 2, Mr. 2 se despierta en \"Nivel 5.5,\" un paraíso para los travestis \", donde están todos los prisioneros que se creyeron desaparecidos y encuentra a Emporio Ivankov." [ref=e464] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/438
+          - generic [ref=e466]:
+            - img "¡Un paraíso en el infierno! ¡Impel Down - Nivel 5.5!" [ref=e468]
+            - generic [ref=e469]:
+              - generic [ref=e470]: Episodio 438
+              - heading "¡Un paraíso en el infierno! ¡Impel Down - Nivel 5.5!" [level=3] [ref=e472]
+              - generic [ref=e473]:
+                - generic [ref=e474]:
+                  - img [ref=e475]
+                  - text: 14 feb 2010
+                - generic [ref=e477]:
+                  - img [ref=e478]
+                  - text: 24 min
+              - paragraph [ref=e481]: Mr. 2 pide disculpas por abandonar a Luffy y busca a Ivankov. En el camino, es atacado por el Ejército de los lobos, pero Luffy los derrota con Haki y un misterioso extraño llamado Inazuma se los lleva. En otros lugares, Buggy y Mr. 3 intentan escapar del nivel 5, Saldeath suprime el motín en el Nivel 2, las búsquedas para el Sadi en el nivel 3, Magellan se encuentra en el baño con diarrea, y Hannybal está atado en un cuarto de almacenamiento, después de haber sido engañado y tomado por sorpresa por Mr. 2, Mr. 2 se despierta en "Nivel 5.5," un paraíso para los travestis ", donde están todos los prisioneros que se creyeron desaparecidos y encuentra a Emporio Ivankov.
+        - link "¡¡El tratamiento de Luffy comienza!! ¡El poder milagroso de Iva-san! Episodio 439 ¡¡El tratamiento de Luffy comienza!! ¡El poder milagroso de Iva-san! 21 feb 2010 24 min Ivankov muestra sus poderes, y luego se transforma en una mujer. Bon Clay le ruega a Ivankov que cure a Luffy con sus poderes a base de hormonas, que sólo funcionan en las personas con extraordinaria voluntad de vivir. Lamentablemente, el tratamiento acortaría la vida de Luffy, lo deja en el dolor agonizante, y tendrá una duración de más de dos días, la ejecución de Ace es en sólo 16 horas." [ref=e482] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/439
+          - generic [ref=e484]:
+            - img "¡¡El tratamiento de Luffy comienza!! ¡El poder milagroso de Iva-san!" [ref=e486]
+            - generic [ref=e487]:
+              - generic [ref=e488]: Episodio 439
+              - heading "¡¡El tratamiento de Luffy comienza!! ¡El poder milagroso de Iva-san!" [level=3] [ref=e490]
+              - generic [ref=e491]:
+                - generic [ref=e492]:
+                  - img [ref=e493]
+                  - text: 21 feb 2010
+                - generic [ref=e495]:
+                  - img [ref=e496]
+                  - text: 24 min
+              - paragraph [ref=e499]: Ivankov muestra sus poderes, y luego se transforma en una mujer. Bon Clay le ruega a Ivankov que cure a Luffy con sus poderes a base de hormonas, que sólo funcionan en las personas con extraordinaria voluntad de vivir. Lamentablemente, el tratamiento acortaría la vida de Luffy, lo deja en el dolor agonizante, y tendrá una duración de más de dos días, la ejecución de Ace es en sólo 16 horas.
+        - link "¡Cree en los milagros! ¡Bon Clay Grita desde el Corazón! Episodio 440 ¡Cree en los milagros! ¡Bon Clay Grita desde el Corazón! 28 feb 2010 24 min Ivankov le dice a Bon Clay que ha comido la Horu Horu no Mi, lo que le permite manipular las hormonas de las personas para diversos fines, y que se encuentran entre el nivel 5 y el nivel 6. Dice que el nivel 6 en verdad existe y es un lugar donde los presos que son increíblemente peligrosos o de importancia para mantener la reputación del Gobierno Mundial, como el ex jefe de la prisión, Shiryu. A pesar del largo tiempo del tratamiento y bajo riesgo de supervivencia, Bon Clay sigue animando a Luffy hasta que su voz le llega, los guardias descubren que Luffy desapareció y se prepara el transporte de Ace para llevarlo a su ejecución. Finalmente, Luffy despierta a gritos, se come una gran cantidad de comida y declara que se ha recuperado." [ref=e500] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/440
+          - generic [ref=e502]:
+            - img "¡Cree en los milagros! ¡Bon Clay Grita desde el Corazón!" [ref=e504]
+            - generic [ref=e505]:
+              - generic [ref=e506]: Episodio 440
+              - heading "¡Cree en los milagros! ¡Bon Clay Grita desde el Corazón!" [level=3] [ref=e508]
+              - generic [ref=e509]:
+                - generic [ref=e510]:
+                  - img [ref=e511]
+                  - text: 28 feb 2010
+                - generic [ref=e513]:
+                  - img [ref=e514]
+                  - text: 24 min
+              - paragraph [ref=e517]: Ivankov le dice a Bon Clay que ha comido la Horu Horu no Mi, lo que le permite manipular las hormonas de las personas para diversos fines, y que se encuentran entre el nivel 5 y el nivel 6. Dice que el nivel 6 en verdad existe y es un lugar donde los presos que son increíblemente peligrosos o de importancia para mantener la reputación del Gobierno Mundial, como el ex jefe de la prisión, Shiryu. A pesar del largo tiempo del tratamiento y bajo riesgo de supervivencia, Bon Clay sigue animando a Luffy hasta que su voz le llega, los guardias descubren que Luffy desapareció y se prepara el transporte de Ace para llevarlo a su ejecución. Finalmente, Luffy despierta a gritos, se come una gran cantidad de comida y declara que se ha recuperado.
+        - link "¡Volver! ¡El plan de fuga de Iva-san Comienza! Episodio 441 ¡Volver! ¡El plan de fuga de Iva-san Comienza! 07 mar 2010 24 min Luffy se despierta del tratamiento, Ivankov se entera de que él es el hijo de dragón y Iva se revela como uno de los comandantes del ejercito revolucionario de Dragón. A pesar de estar agotados y que necesitan varios días para descansar, Luffy se da un tratamiento de hormonas especiales que le permite ignorar la fatiga por un día, él, Ivankov y Inazuma se abren camino hasta el nivel 6. Mientras tanto, Buggy y Mr.3 se abren paso al nivel 4, Hannybal hace los arreglos para capturar a los intrusos, y Magellan llega a la celda de Ace para entregarlo a los infantes de marina, que lo llevarán a Marineford." [ref=e518] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/441
+          - generic [ref=e520]:
+            - img "¡Volver! ¡El plan de fuga de Iva-san Comienza!" [ref=e522]
+            - generic [ref=e523]:
+              - generic [ref=e524]: Episodio 441
+              - heading "¡Volver! ¡El plan de fuga de Iva-san Comienza!" [level=3] [ref=e526]
+              - generic [ref=e527]:
+                - generic [ref=e528]:
+                  - img [ref=e529]
+                  - text: 07 mar 2010
+                - generic [ref=e531]:
+                  - img [ref=e532]
+                  - text: 24 min
+              - paragraph [ref=e535]: Luffy se despierta del tratamiento, Ivankov se entera de que él es el hijo de dragón y Iva se revela como uno de los comandantes del ejercito revolucionario de Dragón. A pesar de estar agotados y que necesitan varios días para descansar, Luffy se da un tratamiento de hormonas especiales que le permite ignorar la fatiga por un día, él, Ivankov y Inazuma se abren camino hasta el nivel 6. Mientras tanto, Buggy y Mr.3 se abren paso al nivel 4, Hannybal hace los arreglos para capturar a los intrusos, y Magellan llega a la celda de Ace para entregarlo a los infantes de marina, que lo llevarán a Marineford.
+        - link "!El convoy de Ace comienza!¡Batalla en el piso más bajo, Nivel 6! Episodio 442 !El convoy de Ace comienza!¡Batalla en el piso más bajo, Nivel 6! 14 mar 2010 24 min Luffy, Ivankov y Inazuma llegan al nivel 6 después de que se lleven a Ace, son casi atrapados por una trampa de gas hasta que Inazuma usa su Akuma No Mi con el fin de cortar el suelo y cerrar el gas. Ace se entera de que Luffy viene y está muy preocupado por la noticia. Luffy se niega a renunciar a pesar de los peligros que le esperaban, y se encuentra con Crocodile." [ref=e536] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/442
+          - generic [ref=e538]:
+            - img "!El convoy de Ace comienza!¡Batalla en el piso más bajo, Nivel 6!" [ref=e540]
+            - generic [ref=e541]:
+              - generic [ref=e542]: Episodio 442
+              - heading "!El convoy de Ace comienza!¡Batalla en el piso más bajo, Nivel 6!" [level=3] [ref=e544]
+              - generic [ref=e545]:
+                - generic [ref=e546]:
+                  - img [ref=e547]
+                  - text: 14 mar 2010
+                - generic [ref=e549]:
+                  - img [ref=e550]
+                  - text: 24 min
+              - paragraph [ref=e553]: Luffy, Ivankov y Inazuma llegan al nivel 6 después de que se lleven a Ace, son casi atrapados por una trampa de gas hasta que Inazuma usa su Akuma No Mi con el fin de cortar el suelo y cerrar el gas. Ace se entera de que Luffy viene y está muy preocupado por la noticia. Luffy se niega a renunciar a pesar de los peligros que le esperaban, y se encuentra con Crocodile.
+        - link "¡El Ultímate Team se ha formado! ¡Sacudir a Impel Down! Episodio 443 ¡El Ultímate Team se ha formado! ¡Sacudir a Impel Down! 21 mar 2010 24 min Luffy se niega a liberar a Crocodile, pero Ivankov ofrece tenerlo limitado porque sino dirá una debilidad que él conoce. Jimbei se une con el fin de detener la guerra entre Barbablanca y la Infantería de Marina. Se reúnen con Bon Clay y los demás prisioneros liberados y pelean contra los guardias del nivel 4, donde Crocodile libera y recluta a Mr.1. Mientras los guardias son derrotados, Hannybal, no queriendo ser deshonrado, decide pelear. En otros lugares, Ace está siendo transportado por un barco hacia la Puerta de la Justicia, Buggy y Mr. 3 han alcanzado el nivel 2." [ref=e554] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/443
+          - generic [ref=e556]:
+            - img "¡El Ultímate Team se ha formado! ¡Sacudir a Impel Down!" [ref=e558]
+            - generic [ref=e559]:
+              - generic [ref=e560]: Episodio 443
+              - heading "¡El Ultímate Team se ha formado! ¡Sacudir a Impel Down!" [level=3] [ref=e562]
+              - generic [ref=e563]:
+                - generic [ref=e564]:
+                  - img [ref=e565]
+                  - text: 21 mar 2010
+                - generic [ref=e567]:
+                  - img [ref=e568]
+                  - text: 24 min
+              - paragraph [ref=e571]: Luffy se niega a liberar a Crocodile, pero Ivankov ofrece tenerlo limitado porque sino dirá una debilidad que él conoce. Jimbei se une con el fin de detener la guerra entre Barbablanca y la Infantería de Marina. Se reúnen con Bon Clay y los demás prisioneros liberados y pelean contra los guardias del nivel 4, donde Crocodile libera y recluta a Mr.1. Mientras los guardias son derrotados, Hannybal, no queriendo ser deshonrado, decide pelear. En otros lugares, Ace está siendo transportado por un barco hacia la Puerta de la Justicia, Buggy y Mr. 3 han alcanzado el nivel 2.
+        - link "¡Aun Mas caos! ¡Aquí viene Barbanegra Teach! Episodio 444 ¡Aun Mas caos! ¡Aquí viene Barbanegra Teach! 28 mar 2010 24 min Mientras Luffy y sus aliados siguen luchando en el Nivel 4, Buggy y Mr. 3 alcanzar el Nivel 2 y liberan a los prisioneros para provocar un motín para cubrir su huida. Mientras tanto, Barbanegra llega a la cárcel y comienza a atacar a los guardias para forzar su camino Hannybal, en el nivel 4, se siente abrumado por estos hechos hasta que Magellan, revela que ha suprimido los disturbios en el nivel 2 y decide liberar a Shiryu para hacer frente a Barbanegra. Shiryu, inmediatamente después de ser liberado, mata a todos los guardias." [ref=e572] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/444
+          - generic [ref=e574]:
+            - img "¡Aun Mas caos! ¡Aquí viene Barbanegra Teach!" [ref=e576]
+            - generic [ref=e577]:
+              - generic [ref=e578]: Episodio 444
+              - heading "¡Aun Mas caos! ¡Aquí viene Barbanegra Teach!" [level=3] [ref=e580]
+              - generic [ref=e581]:
+                - generic [ref=e582]:
+                  - img [ref=e583]
+                  - text: 28 mar 2010
+                - generic [ref=e585]:
+                  - img [ref=e586]
+                  - text: 24 min
+              - paragraph [ref=e589]: Mientras Luffy y sus aliados siguen luchando en el Nivel 4, Buggy y Mr. 3 alcanzar el Nivel 2 y liberan a los prisioneros para provocar un motín para cubrir su huida. Mientras tanto, Barbanegra llega a la cárcel y comienza a atacar a los guardias para forzar su camino Hannybal, en el nivel 4, se siente abrumado por estos hechos hasta que Magellan, revela que ha suprimido los disturbios en el nivel 2 y decide liberar a Shiryu para hacer frente a Barbanegra. Shiryu, inmediatamente después de ser liberado, mata a todos los guardias.
+        - link "¡Un encuentro peligroso! ¡Barbanegra y Shiryu de la lluvia! Episodio 445 ¡Un encuentro peligroso! ¡Barbanegra y Shiryu de la lluvia! 04 abr 2010 24 min Los Guardias Demonio llegan y dominan a muchos de los prisioneros, pero Luffy, Jimbei y Crocodile los derrotan de un solo ataque. Buggy y Mr.3 están atrapados en el nivel 2 por una barrera hecha de veneno puesta por Magellan. En el Nivel 1, Shiryu se encuentra con Barbanegra. Hannybal recibe la orden de mantener a raya a los prisioneros hasta que Magellan alcance el nivel 4. Sadie ataca a los prisioneros, pero Ivankov se transforma en una mujer que lucha contra ella y permite a Luffy continuar. Luffy entonces se encuentra con Hannybal, que llega dispuesto a pelear con él." [ref=e590] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/445
+          - generic [ref=e592]:
+            - img "¡Un encuentro peligroso! ¡Barbanegra y Shiryu de la lluvia!" [ref=e594]
+            - generic [ref=e595]:
+              - generic [ref=e596]: Episodio 445
+              - heading "¡Un encuentro peligroso! ¡Barbanegra y Shiryu de la lluvia!" [level=3] [ref=e598]
+              - generic [ref=e599]:
+                - generic [ref=e600]:
+                  - img [ref=e601]
+                  - text: 04 abr 2010
+                - generic [ref=e603]:
+                  - img [ref=e604]
+                  - text: 24 min
+              - paragraph [ref=e607]: Los Guardias Demonio llegan y dominan a muchos de los prisioneros, pero Luffy, Jimbei y Crocodile los derrotan de un solo ataque. Buggy y Mr.3 están atrapados en el nivel 2 por una barrera hecha de veneno puesta por Magellan. En el Nivel 1, Shiryu se encuentra con Barbanegra. Hannybal recibe la orden de mantener a raya a los prisioneros hasta que Magellan alcance el nivel 4. Sadie ataca a los prisioneros, pero Ivankov se transforma en una mujer que lucha contra ella y permite a Luffy continuar. Luffy entonces se encuentra con Hannybal, que llega dispuesto a pelear con él.
+        - link "¡No hay un precio demasiado alto! ¡Hannybal serio! Episodio 446 ¡No hay un precio demasiado alto! ¡Hannybal serio! 11 abr 2010 24 min Hannybal pelea contra Luffy, pero es superado contra el Gear Second de Luffy. Mientras tanto, Barbanegra usa sus poderes para hacer desaparecer la pared de veneno de Magellan, liberando a Buggy y sus hombres, mientras que Magellan llega al nivel 4. Hannybal, a pesar de estar muy golpeado, está decidido en no dejar a Luffy para proteger el futuro del mundo, pero Barbanegra lanza un ataque sorpresa que lo golpea a él y sus guardias. Barbanegra le dice a Luffy que él había planeado su captura para asegurarse un lugar entre los Shichibukai, pero después de la captura de Ace, en parte como resultado de su negativa en dar marcha atrás después de enterarse de sus planes con Luffy. Luffy, furioso, golpea a Barbanegra con un Jet Pistol." [ref=e608] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/446
+          - generic [ref=e610]:
+            - img "¡No hay un precio demasiado alto! ¡Hannybal serio!" [ref=e612]
+            - generic [ref=e613]:
+              - generic [ref=e614]: Episodio 446
+              - heading "¡No hay un precio demasiado alto! ¡Hannybal serio!" [level=3] [ref=e616]
+              - generic [ref=e617]:
+                - generic [ref=e618]:
+                  - img [ref=e619]
+                  - text: 11 abr 2010
+                - generic [ref=e621]:
+                  - img [ref=e622]
+                  - text: 24 min
+              - paragraph [ref=e625]: Hannybal pelea contra Luffy, pero es superado contra el Gear Second de Luffy. Mientras tanto, Barbanegra usa sus poderes para hacer desaparecer la pared de veneno de Magellan, liberando a Buggy y sus hombres, mientras que Magellan llega al nivel 4. Hannybal, a pesar de estar muy golpeado, está decidido en no dejar a Luffy para proteger el futuro del mundo, pero Barbanegra lanza un ataque sorpresa que lo golpea a él y sus guardias. Barbanegra le dice a Luffy que él había planeado su captura para asegurarse un lugar entre los Shichibukai, pero después de la captura de Ace, en parte como resultado de su negativa en dar marcha atrás después de enterarse de sus planes con Luffy. Luffy, furioso, golpea a Barbanegra con un Jet Pistol.
+        - link "¡Un Jet Pistol lleno de ira! ¡Luffy vs. Barbanegra! Episodio 447 ¡Un Jet Pistol lleno de ira! ¡Luffy vs. Barbanegra! 18 abr 2010 24 min Después de que Luffy golpe a Barbanegra, Barbanegra lo agarra y lo asota contra el suelo, hiriendo a Luffy por anular sus poderes de goma. Jimbei convence a Luffy que no puede permitirse el lujo de perder tiempo luchando contra Barbanegra cuando tiene que salvar a Ace. Crocodile se pregunta porque Barbanegra atacaría la prisión, al hacerlo significaría que renuncia a su título, pero Barbanegra revela que es parte de un plan más amplio. Como Magellan se enfoca en los prisioneros, Luffy derrota fácilmente al revivido minotauro, mientras que Ivankov derrota a Sadie. Buggy y Mr. 3 alcanzan el Nivel 1 con los presos. Magellan envenena a Barbanegra y a su tripulación, ahora se enfoca totalmente en Luffy." [ref=e626] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/447
+          - generic [ref=e628]:
+            - img "¡Un Jet Pistol lleno de ira! ¡Luffy vs. Barbanegra!" [ref=e630]
+            - generic [ref=e631]:
+              - generic [ref=e632]: Episodio 447
+              - heading "¡Un Jet Pistol lleno de ira! ¡Luffy vs. Barbanegra!" [level=3] [ref=e634]
+              - generic [ref=e635]:
+                - generic [ref=e636]:
+                  - img [ref=e637]
+                  - text: 18 abr 2010
+                - generic [ref=e639]:
+                  - img [ref=e640]
+                  - text: 24 min
+              - paragraph [ref=e643]: Después de que Luffy golpe a Barbanegra, Barbanegra lo agarra y lo asota contra el suelo, hiriendo a Luffy por anular sus poderes de goma. Jimbei convence a Luffy que no puede permitirse el lujo de perder tiempo luchando contra Barbanegra cuando tiene que salvar a Ace. Crocodile se pregunta porque Barbanegra atacaría la prisión, al hacerlo significaría que renuncia a su título, pero Barbanegra revela que es parte de un plan más amplio. Como Magellan se enfoca en los prisioneros, Luffy derrota fácilmente al revivido minotauro, mientras que Ivankov derrota a Sadie. Buggy y Mr. 3 alcanzan el Nivel 1 con los presos. Magellan envenena a Barbanegra y a su tripulación, ahora se enfoca totalmente en Luffy.
+        - link "¡Detener a Magellan! Estalla la técnica secreta de Iva-san Episodio 448 ¡Detener a Magellan! Estalla la técnica secreta de Iva-san 25 abr 2010 24 min Luffy y los presos pasan a través del nivel 3, Magellan los alcanza. Ivankov e Inazuma se quedan, pero ambos son derrotados. Luffy y Jimbei planean robar un barco para llegar a Marineford. Luffy y su grupo llegan al nivel 1, pero Magellan se las arregla para llegar a ellos de nuevo." [ref=e644] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/448
+          - generic [ref=e646]:
+            - img "¡Detener a Magellan! Estalla la técnica secreta de Iva-san" [ref=e648]
+            - generic [ref=e649]:
+              - generic [ref=e650]: Episodio 448
+              - heading "¡Detener a Magellan! Estalla la técnica secreta de Iva-san" [level=3] [ref=e652]
+              - generic [ref=e653]:
+                - generic [ref=e654]:
+                  - img [ref=e655]
+                  - text: 25 abr 2010
+                - generic [ref=e657]:
+                  - img [ref=e658]
+                  - text: 24 min
+              - paragraph [ref=e661]: Luffy y los presos pasan a través del nivel 3, Magellan los alcanza. Ivankov e Inazuma se quedan, pero ambos son derrotados. Luffy y Jimbei planean robar un barco para llegar a Marineford. Luffy y su grupo llegan al nivel 1, pero Magellan se las arregla para llegar a ellos de nuevo.
+        - link "¡El inteligente plan de Magellan! Frustrado el plan de fuga Episodio 449 ¡El inteligente plan de Magellan! Frustrado el plan de fuga 02 may 2010 24 min Luffy se enfurece al enterarse de que Magellan derroto a Ivankov y Inazuma, pero Mr.2 y Jimbei lo persuaden de que escapar tiene prioridad. Magellan inicia un plan para mover los barcos marinos fuera de Impel Down, atrapando a los fugados. Mr. 3 bloquea a Magellan con su cera, a Luffy se le ocurre que le tape los puños y pies con una capa de cera para que él pueda golpear a Magellan sin ser envenenado. Jimbei encuentra una manera de llegar a los barcos." [ref=e662] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/449
+          - generic [ref=e664]:
+            - img "¡El inteligente plan de Magellan! Frustrado el plan de fuga" [ref=e666]
+            - generic [ref=e667]:
+              - generic [ref=e668]: Episodio 449
+              - heading "¡El inteligente plan de Magellan! Frustrado el plan de fuga" [level=3] [ref=e670]
+              - generic [ref=e671]:
+                - generic [ref=e672]:
+                  - img [ref=e673]
+                  - text: 02 may 2010
+                - generic [ref=e675]:
+                  - img [ref=e676]
+                  - text: 24 min
+              - paragraph [ref=e679]: Luffy se enfurece al enterarse de que Magellan derroto a Ivankov y Inazuma, pero Mr.2 y Jimbei lo persuaden de que escapar tiene prioridad. Magellan inicia un plan para mover los barcos marinos fuera de Impel Down, atrapando a los fugados. Mr. 3 bloquea a Magellan con su cera, a Luffy se le ocurre que le tape los puños y pies con una capa de cera para que él pueda golpear a Magellan sin ser envenenado. Jimbei encuentra una manera de llegar a los barcos.
+        - link "El equipo de fugitivos en aprietos. El movimiento prohibido Venom Demon Episodio 450 El equipo de fugitivos en aprietos. El movimiento prohibido Venom Demon 09 may 2010 24 min Magellan utiliza una técnica prohibida \" Venom Demon \" que derrite todo lo que toca, haciendo inútil la cera de Mr.3, esto los hace retroceder, Mr. 1 y Crocodile logran capturar un barco, pero no son capaces de volver a la cárcel con la suficiente rapidez, obligando a los fugitivos a idear un plan alternativo para llegar al barco. Ivankov se recupera de las intoxicaciones y llega a Luffy. Ivankov y los prisioneros caen al agua pero Jimbei llama a las ballenas tiburones para llevarlos al barco." [ref=e680] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/450
+          - generic [ref=e682]:
+            - img "El equipo de fugitivos en aprietos. El movimiento prohibido Venom Demon" [ref=e684]
+            - generic [ref=e685]:
+              - generic [ref=e686]: Episodio 450
+              - heading "El equipo de fugitivos en aprietos. El movimiento prohibido Venom Demon" [level=3] [ref=e688]
+              - generic [ref=e689]:
+                - generic [ref=e690]:
+                  - img [ref=e691]
+                  - text: 09 may 2010
+                - generic [ref=e693]:
+                  - img [ref=e694]
+                  - text: 24 min
+              - paragraph [ref=e697]: Magellan utiliza una técnica prohibida " Venom Demon " que derrite todo lo que toca, haciendo inútil la cera de Mr.3, esto los hace retroceder, Mr. 1 y Crocodile logran capturar un barco, pero no son capaces de volver a la cárcel con la suficiente rapidez, obligando a los fugitivos a idear un plan alternativo para llegar al barco. Ivankov se recupera de las intoxicaciones y llega a Luffy. Ivankov y los prisioneros caen al agua pero Jimbei llama a las ballenas tiburones para llevarlos al barco.
+        - link "Creando un último milagro. Atravesar la Puerta de la Justicia Episodio 451 Creando un último milagro. Atravesar la Puerta de la Justicia 16 may 2010 24 min Luffy y el resto de los prisioneros llegan gracias a los tiburones ballenas, pero la puerta de la Justicia esta todavía cerrada, y el barco es atacado por los barcos restantes. Mr. 2 se hace pasar por Magellan y logra que abran la puerta el tiempo suficiente para salir. Luffy se molesta, de que Mr.2 se quede atrás, pero Mr.2 acepta que no había otra opción, y le da las gracias a Luffy. Mr. 2 se queda para luchar contra Magellan." [ref=e698] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/451
+          - generic [ref=e700]:
+            - img "Creando un último milagro. Atravesar la Puerta de la Justicia" [ref=e702]
+            - generic [ref=e703]:
+              - generic [ref=e704]: Episodio 451
+              - heading "Creando un último milagro. Atravesar la Puerta de la Justicia" [level=3] [ref=e706]
+              - generic [ref=e707]:
+                - generic [ref=e708]:
+                  - img [ref=e709]
+                  - text: 16 may 2010
+                - generic [ref=e711]:
+                  - img [ref=e712]
+                  - text: 24 min
+              - paragraph [ref=e715]: Luffy y el resto de los prisioneros llegan gracias a los tiburones ballenas, pero la puerta de la Justicia esta todavía cerrada, y el barco es atacado por los barcos restantes. Mr. 2 se hace pasar por Magellan y logra que abran la puerta el tiempo suficiente para salir. Luffy se molesta, de que Mr.2 se quede atrás, pero Mr.2 acepta que no había otra opción, y le da las gracias a Luffy. Mr. 2 se queda para luchar contra Magellan.
+        - link "Hacia el Cuartel General de la Marina. ¡Zarpando para rescatar a Ace! Episodio 452 Hacia el Cuartel General de la Marina. ¡Zarpando para rescatar a Ace! 23 may 2010 24 min Shiryu salva a Barbanegra y a su tripulación, dándoles antídotos contra el veneno de Magellan y se une a la tripulación. Los prisioneros celebran su huida, pero los marinos através de un Den Den Mushi advierten que La puerta de la justicia que va a hacia Marine Ford no se abrirá para piratas. Durante la conversación, el marino revela el pasado de Buggy en los Piratas de Roger y la conexión que tiene con Shanks. Buggy se las arregla para convencer a los prisioneros de ir con ellos a la sede de la Marina, con la esperanza de derrotar a Barbablanca y de convertirse en el rey de los piratas. Mientras tanto, el buque que transporta a Ace llega a Marine Ford." [ref=e716] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/452
+          - generic [ref=e718]:
+            - img "Hacia el Cuartel General de la Marina. ¡Zarpando para rescatar a Ace!" [ref=e720]
+            - generic [ref=e721]:
+              - generic [ref=e722]: Episodio 452
+              - heading "Hacia el Cuartel General de la Marina. ¡Zarpando para rescatar a Ace!" [level=3] [ref=e724]
+              - generic [ref=e725]:
+                - generic [ref=e726]:
+                  - img [ref=e727]
+                  - text: 23 may 2010
+                - generic [ref=e729]:
+                  - img [ref=e730]
+                  - text: 24 min
+              - paragraph [ref=e733]: Shiryu salva a Barbanegra y a su tripulación, dándoles antídotos contra el veneno de Magellan y se une a la tripulación. Los prisioneros celebran su huida, pero los marinos através de un Den Den Mushi advierten que La puerta de la justicia que va a hacia Marine Ford no se abrirá para piratas. Durante la conversación, el marino revela el pasado de Buggy en los Piratas de Roger y la conexión que tiene con Shanks. Buggy se las arregla para convencer a los prisioneros de ir con ellos a la sede de la Marina, con la esperanza de derrotar a Barbablanca y de convertirse en el rey de los piratas. Mientras tanto, el buque que transporta a Ace llega a Marine Ford.
+        - link [ref=e734] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/453
+          - generic [ref=e736]:
+            - img "El paradero de los nakamas. El pronostico de Weatheria y los animales cyborg" [ref=e738]
+            - generic [ref=e739]:
+              - generic [ref=e740]: Episodio 453
+              - heading "El paradero de los nakamas. El pronostico de Weatheria y los animales cyborg" [level=3] [ref=e742]
+              - generic [ref=e743]:
+                - generic [ref=e744]:
+                  - img [ref=e745]
+                  - text: 30 may 2010
+                - generic [ref=e747]:
+                  - img [ref=e748]
+                  - text: 24 min
+              - paragraph [ref=e751]: Luffy se dirige hacia Marine Ford, la sede de la Marina, la escena cambia hace unos días atrás, Nami esta todavía en la isla del clima, que lentamente se dirige hacia el archipiélago Sabaody a un ritmo determinado por los vientos. Ella ve al viejo, demostrando su capacidad de convocar grandes lluvias y tormentas eléctricas. Mientras tanto, Franky sigue actuando como un caballero bajo los efectos del té, y el niño que esta con él se pregunta cuándo llegará la cola para devolverlo a la normalidad. Franky es atacado por varios cyborgs en el bosque, haciendo que el té haga burbujas y vuelva a la normalidad, que le permite derrotar a los cyborgs con facilidad. Franky se entera de que el Dr. Vegapunk, hizo los cyborgs, y llega a una casa con el nombre de Vegapunk en él, lo que provocó una alarma.
+        - link "El paradero de los nakamas. El polluelo de pájaro gigante y un enfrentamiento rosa Episodio 454 El paradero de los nakamas. El polluelo de pájaro gigante y un enfrentamiento rosa 06 jun 2010 24 min Sanji trata desesperadamente de escapar de los travestis, hasta que se encuentra con la \"reina\" sustituta de Ivankov. Él desafía a Caroline a un duelo para salir de la isla, pero es incapaz de conseguirlo con éxito debido a que es modesto, y finalmente se induce a iniciar el travestismo. Mientras tanto, Chopper se preocupa por un pájaro herido, teniendo la esperanza de que cuando se recupere lo lleve al Archipiélago Sabaody cuando pueda volar. Chopper y el ave caen al acantilado por culpa de unos humanos pero la madre del ave rescata a su cría y a Chopper. Chopper le agradece." [ref=e752] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/454
+          - generic [ref=e754]:
+            - img "El paradero de los nakamas. El polluelo de pájaro gigante y un enfrentamiento rosa" [ref=e756]
+            - generic [ref=e757]:
+              - generic [ref=e758]: Episodio 454
+              - heading "El paradero de los nakamas. El polluelo de pájaro gigante y un enfrentamiento rosa" [level=3] [ref=e760]
+              - generic [ref=e761]:
+                - generic [ref=e762]:
+                  - img [ref=e763]
+                  - text: 06 jun 2010
+                - generic [ref=e765]:
+                  - img [ref=e766]
+                  - text: 24 min
+              - paragraph [ref=e769]: Sanji trata desesperadamente de escapar de los travestis, hasta que se encuentra con la "reina" sustituta de Ivankov. Él desafía a Caroline a un duelo para salir de la isla, pero es incapaz de conseguirlo con éxito debido a que es modesto, y finalmente se induce a iniciar el travestismo. Mientras tanto, Chopper se preocupa por un pájaro herido, teniendo la esperanza de que cuando se recupere lo lleve al Archipiélago Sabaody cuando pueda volar. Chopper y el ave caen al acantilado por culpa de unos humanos pero la madre del ave rescata a su cría y a Chopper. Chopper le agradece.
+        - link [ref=e770] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/455
+          - generic [ref=e772]:
+            - img "El paradero de los nakamas. El Ejercito Revolucionario y la trampa del bosque de la gula" [ref=e774]
+            - generic [ref=e775]:
+              - generic [ref=e776]: Episodio 455
+              - heading "El paradero de los nakamas. El Ejercito Revolucionario y la trampa del bosque de la gula" [level=3] [ref=e778]
+              - generic [ref=e779]:
+                - generic [ref=e780]:
+                  - img [ref=e781]
+                  - text: 13 jun 2010
+                - generic [ref=e783]:
+                  - img [ref=e784]
+                  - text: 24 min
+              - paragraph [ref=e787]: Robin es encarcelada en una torre y es interrogada para que revele el paradero de los Sombrero de Paja, pero sus captores mantienen su verdadera identidad en secreto. Soran se reúne con la mujer que traicionó a Robin, que lamenta lo que hizo pero lo hizo para sobrevivir. Algunos revolucionarios comienzan a levantarse y liberan a Robin de su celda, lo que les permitió derrotar a unos guardias y se une con los revolucionarios para escapar. Mientras tanto, Usopp está siendo constantemente atacado por los animales y plantas, ya que es la forma más débil de vida en la isla, y heraclesn le dice que comer lo hará más fuerte. No escucha sus consejos de ejercitación, se come todo lo que puede, y apenas evita ser comido por la isla en sí cuando la tierra se inclina y caen muchos animales en un extraño agujero.
+        - link [ref=e788] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/456
+          - generic [ref=e790]:
+            - img "El paradero de los nakamas. La lápida gigante y la deuda de bragas" [ref=e792]
+            - generic [ref=e793]:
+              - generic [ref=e794]: Episodio 456
+              - heading "El paradero de los nakamas. La lápida gigante y la deuda de bragas" [level=3] [ref=e796]
+              - generic [ref=e797]:
+                - generic [ref=e798]:
+                  - img [ref=e799]
+                  - text: 20 jun 2010
+                - generic [ref=e801]:
+                  - img [ref=e802]
+                  - text: 24 min
+              - paragraph [ref=e805]: Zoro intenta recuperar sus espadas, pero no entiende las instrucciones sencillas de Perona. Trata de salir de la isla, pero se pierde, y Perona lo encuentra después de que accidentalmente vuelve al castillo y lo lleva hacia el mar, con la esperanza de manipularlo para que ella pueda encontrar Thriller Bark de nuevo. Después Zoro se pierde y encuentra su camino a ella, observa una gran tumba, y con figura de bestia. Mientras tanto, Brook se entera de que los residentes están dando la poca comida que tienen como homenaje a él con el fin de obtener la protección de la tribu Longarm. Cuando la tribu Longarm secuestra a las mujeres, el culto le pide ayuda, y él está de acuerdo con su ayuda antes de reunirse con el resto de la tripulación. La historia vuelve al presente en el buque de Luffy.
+        - link "Un episodio especial en retrospectiva antes de Marine Ford. ¡El juramento de hermandad! Episodio 457 Un episodio especial en retrospectiva antes de Marine Ford. ¡El juramento de hermandad! 27 jun 2010 24 min Luffy recuerda su infancia con Ace, el reencuentro en Arabasta, el primer encuentro con Barbanegra, oír sobre la ejecución de Ace, y hacer frente a Barbanegra en Impel Down. Ace, espera su ejecución en Marineford y recuerda su encuentro con Barbanegra." [ref=e806] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/457
+          - generic [ref=e808]:
+            - img "Un episodio especial en retrospectiva antes de Marine Ford. ¡El juramento de hermandad!" [ref=e810]
+            - generic [ref=e811]:
+              - generic [ref=e812]: Episodio 457
+              - heading "Un episodio especial en retrospectiva antes de Marine Ford. ¡El juramento de hermandad!" [level=3] [ref=e814]
+              - generic [ref=e815]:
+                - generic [ref=e816]:
+                  - img [ref=e817]
+                  - text: 27 jun 2010
+                - generic [ref=e819]:
+                  - img [ref=e820]
+                  - text: 24 min
+              - paragraph [ref=e823]: Luffy recuerda su infancia con Ace, el reencuentro en Arabasta, el primer encuentro con Barbanegra, oír sobre la ejecución de Ace, y hacer frente a Barbanegra en Impel Down. Ace, espera su ejecución en Marineford y recuerda su encuentro con Barbanegra.
+        - link "Un episodio especial en retrospectiva antes de Marine Ford. ¡Reúnanse! Los tres Almirantes Episodio 458 Un episodio especial en retrospectiva antes de Marine Ford. ¡Reúnanse! Los tres Almirantes 11 jul 2010 24 min Tres horas antes de la ejecución, los cinco jefes militares están presentes en la batalla y los 3 almirantes están en sus posiciones a la espera del ataque de Barba Blanca. En este momento, los guardias llegan con Ace." [ref=e824] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/458
+          - generic [ref=e826]:
+            - img "Un episodio especial en retrospectiva antes de Marine Ford. ¡Reúnanse! Los tres Almirantes" [ref=e828]
+            - generic [ref=e829]:
+              - generic [ref=e830]: Episodio 458
+              - heading "Un episodio especial en retrospectiva antes de Marine Ford. ¡Reúnanse! Los tres Almirantes" [level=3] [ref=e832]
+              - generic [ref=e833]:
+                - generic [ref=e834]:
+                  - img [ref=e835]
+                  - text: 11 jul 2010
+                - generic [ref=e837]:
+                  - img [ref=e838]
+                  - text: 24 min
+              - paragraph [ref=e841]: Tres horas antes de la ejecución, los cinco jefes militares están presentes en la batalla y los 3 almirantes están en sus posiciones a la espera del ataque de Barba Blanca. En este momento, los guardias llegan con Ace.
+        - link "¡Se aproxima el momento de la batalla decisiva! La alineación más fuerte de la Marina en sus puestos Episodio 459 ¡Se aproxima el momento de la batalla decisiva! La alineación más fuerte de la Marina en sus puestos 18 jul 2010 24 min Ace alcanza la plataforma de ejecución. Mientras tanto, el barco de Luffy se acerca a la Puerta de la Justicia, que bloquea su camino a Marineford. Después de que Ace finalmente llegue a la plataforma de ejecución, Sengoku revela quién es el padre de Ace, pero Ace insiste en que Barba Blanca es su padre. Sin embargo, Sengoku revela al mundo a través del Den Den Mushi que la madre de Ace es Portgas D. Rouge, que lo mantuvo dentro de su vientre durante 20 meses y que tomó el apellido de su madre para convertirse él mismo en pirata. También revela que Ace es el hijo del Rey de los Piratas, Gold Roger, para el horror de Ace, los marines y los periodistas." [ref=e842] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/459
+          - generic [ref=e844]:
+            - img "¡Se aproxima el momento de la batalla decisiva! La alineación más fuerte de la Marina en sus puestos" [ref=e846]
+            - generic [ref=e847]:
+              - generic [ref=e848]: Episodio 459
+              - heading "¡Se aproxima el momento de la batalla decisiva! La alineación más fuerte de la Marina en sus puestos" [level=3] [ref=e850]
+              - generic [ref=e851]:
+                - generic [ref=e852]:
+                  - img [ref=e853]
+                  - text: 18 jul 2010
+                - generic [ref=e855]:
+                  - img [ref=e856]
+                  - text: 24 min
+              - paragraph [ref=e859]: Ace alcanza la plataforma de ejecución. Mientras tanto, el barco de Luffy se acerca a la Puerta de la Justicia, que bloquea su camino a Marineford. Después de que Ace finalmente llegue a la plataforma de ejecución, Sengoku revela quién es el padre de Ace, pero Ace insiste en que Barba Blanca es su padre. Sin embargo, Sengoku revela al mundo a través del Den Den Mushi que la madre de Ace es Portgas D. Rouge, que lo mantuvo dentro de su vientre durante 20 meses y que tomó el apellido de su madre para convertirse él mismo en pirata. También revela que Ace es el hijo del Rey de los Piratas, Gold Roger, para el horror de Ace, los marines y los periodistas.
+        - link [ref=e860] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/460
+          - generic [ref=e862]:
+            - img "Aparece una enorme flota. ¡Invasión! Los Piratas de Shirohige" [ref=e864]
+            - generic [ref=e865]:
+              - generic [ref=e866]: Episodio 460
+              - heading "Aparece una enorme flota. ¡Invasión! Los Piratas de Shirohige" [level=3] [ref=e868]
+              - generic [ref=e869]:
+                - generic [ref=e870]:
+                  - img [ref=e871]
+                  - text: 01 ago 2010
+                - generic [ref=e873]:
+                  - img [ref=e874]
+                  - text: 24 min
+              - paragraph [ref=e877]: "Mientras que los infantes de marina están a la espera del asalto de Barba Blanca y la ejecución de Ace, Garp tiene un flashback: meses antes de que Gold Roger fue ejecutado, reveló a Garp que va a tener un hijo y le dijo a Garp que lo cuide. Los infantes de marina han buscado a gente que estén conectados con Roger. Portgas D. Rouge, la madre de Ace, mantiene al niño dentro de su vientre durante 20 meses. Sin embargo, después Rouge dio a luz al niño, un niño al que llamó Gol D. Ace y murió de agotamiento. Ace fue mandado por Garp con Dadan poco después. Garp también introdujo a Luffy a la vida de Ace y se hicieron amigos. Durante el discurso de la ejecución de Sengoku, él se entera de que las puertas de Justicia se han abierto sin una orden, lo que permite al barco de Luffy pasar. Después la flota de Barbablanca aparece, el Moby Dick aparece bajo el agua frente a la plataforma de ejecución."
+        - link [ref=e878] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/461
+          - generic [ref=e880]:
+            - img "¡Comienza la batalla decisiva! El pasado de Ace y Shirohige" [ref=e882]
+            - generic [ref=e883]:
+              - generic [ref=e884]: Episodio 461
+              - heading "¡Comienza la batalla decisiva! El pasado de Ace y Shirohige" [level=3] [ref=e886]
+              - generic [ref=e887]:
+                - generic [ref=e888]:
+                  - img [ref=e889]
+                  - text: 08 ago 2010
+                - generic [ref=e891]:
+                  - img [ref=e892]
+                  - text: 24 min
+              - paragraph [ref=e895]: "Barba Blanca revela su poder de Akuma No Mi frente a la Marina. Entramos en el pasado de Ace y Barbablanca: Ace fue el capitán de los Piratas de Spade. Ace se enfrenta a Jimbei para satisfacer a Barbablanca desde el rechazo de Ace a una oferta para convertirse en un Shichibukai. BarbaBlanca ofreció a Ace unirse a su tripulación cuando la batalla termino, Ace intentó matar a Barbablanca en vano. Barbablanca nombra a Ace comandante de la 2da división. Sin embargo, cuando Barbanegra deserto de la tripulación y asesino a un nakama, Ace dejó a Barbiblanca para capturar a Barbanegra. Cuando Ace le dice a BarbaBlanca en la plataforma de ejecución que hizo caso omiso a sus consejos, BarbaBlanca dice que él fue quien lo envió, cuando en realidad le dijo que no fuera, para que el rescate fuese justificado."
+        - link "¡Un poder capaz de destruir el mundo! La habilidad de la Gura Gura no Mi Episodio 462 ¡Un poder capaz de destruir el mundo! La habilidad de la Gura Gura no Mi 15 ago 2010 24 min BarbaBlanca y sus aliados declaran a los infantes de marina su determinación de rescatar a Ace, mientras que Luffy y su grupo están llegando a Marineford. Un tsunami se acerca a Marineford en ambos lados como resultado de la Gura Gura No Mi. Sin embargo, Aokiji lo detiene con su habilidad, mediante la congelación. La división de comandantes de Barbablanca entran en acción, al igual que los Vice-Almirantes. Mihawk a continuación, lanza un gran ataque hacia Barbablanca." [ref=e896] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/462
+          - generic [ref=e898]:
+            - img "¡Un poder capaz de destruir el mundo! La habilidad de la Gura Gura no Mi" [ref=e900]
+            - generic [ref=e901]:
+              - generic [ref=e902]: Episodio 462
+              - heading "¡Un poder capaz de destruir el mundo! La habilidad de la Gura Gura no Mi" [level=3] [ref=e904]
+              - generic [ref=e905]:
+                - generic [ref=e906]:
+                  - img [ref=e907]
+                  - text: 15 ago 2010
+                - generic [ref=e909]:
+                  - img [ref=e910]
+                  - text: 24 min
+              - paragraph [ref=e913]: BarbaBlanca y sus aliados declaran a los infantes de marina su determinación de rescatar a Ace, mientras que Luffy y su grupo están llegando a Marineford. Un tsunami se acerca a Marineford en ambos lados como resultado de la Gura Gura No Mi. Sin embargo, Aokiji lo detiene con su habilidad, mediante la congelación. La división de comandantes de Barbablanca entran en acción, al igual que los Vice-Almirantes. Mihawk a continuación, lanza un gran ataque hacia Barbablanca.
+        - link "¡¡Todo reducido a cenizas!! ¡La habilidad del Almirante Akainu! Episodio 463 ¡¡Todo reducido a cenizas!! ¡La habilidad del Almirante Akainu! 22 ago 2010 24 min Jozu logra soportar el ataque de Mihawk con su poder de fruta del diablo, que convierte su cuerpo en diamante. Kizaru intenta atacar a Barbablanca, pero Marco lo bloquea convirtiéndose en un ave fénix con su poder de fruta del diablo, y golpea a Kizaru. Jozu arroja un bloque gigante de hielo hacia los marinos pero, Akainu lo funde con su magma basado en su poder de Fruta del Diablo. Akainu contraataca, y hunde uno de los barcos de Barba Blanca, pero Barbablanca extingue el magma. Mientras tanto, Coby y Helmeppo empiezan a tener miedo, Oars Jr., un descendiente del original Oars, fuerza el paso hacia Ace, a quien él ve como un amigo cercano." [ref=e914] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/463
+          - generic [ref=e916]:
+            - img "¡¡Todo reducido a cenizas!! ¡La habilidad del Almirante Akainu!" [ref=e918]
+            - generic [ref=e919]:
+              - generic [ref=e920]: Episodio 463
+              - heading "¡¡Todo reducido a cenizas!! ¡La habilidad del Almirante Akainu!" [level=3] [ref=e922]
+              - generic [ref=e923]:
+                - generic [ref=e924]:
+                  - img [ref=e925]
+                  - text: 22 ago 2010
+                - generic [ref=e927]:
+                  - img [ref=e928]
+                  - text: 24 min
+              - paragraph [ref=e931]: Jozu logra soportar el ataque de Mihawk con su poder de fruta del diablo, que convierte su cuerpo en diamante. Kizaru intenta atacar a Barbablanca, pero Marco lo bloquea convirtiéndose en un ave fénix con su poder de fruta del diablo, y golpea a Kizaru. Jozu arroja un bloque gigante de hielo hacia los marinos pero, Akainu lo funde con su magma basado en su poder de Fruta del Diablo. Akainu contraataca, y hunde uno de los barcos de Barba Blanca, pero Barbablanca extingue el magma. Mientras tanto, Coby y Helmeppo empiezan a tener miedo, Oars Jr., un descendiente del original Oars, fuerza el paso hacia Ace, a quien él ve como un amigo cercano.
+        - link "¡Descendiente del demonio! ¡El pequeño Oars Jr. se precipita! Episodio 464 ¡Descendiente del demonio! ¡El pequeño Oars Jr. se precipita! 29 ago 2010 24 min Oars Jr. se esfuerza en su camino a la plaza y derrota a la Unidad de los gigantes, lo que permite a los Piratas de Barbablanca avanzar. Él continúa a pesar de las protestas de Ace albergando que es un objetivo demasiado grande y Oars recuerda el momento en que Ace le hizo un sombrero que le protegía de la intemperie. Oars es atacado varias veces por Kuma, Doflamingo y Moria lo que le causó un colapso al intentar llegar a Ace." [ref=e932] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/464
+          - generic [ref=e934]:
+            - img "¡Descendiente del demonio! ¡El pequeño Oars Jr. se precipita!" [ref=e936]
+            - generic [ref=e937]:
+              - generic [ref=e938]: Episodio 464
+              - heading "¡Descendiente del demonio! ¡El pequeño Oars Jr. se precipita!" [level=3] [ref=e940]
+              - generic [ref=e941]:
+                - generic [ref=e942]:
+                  - img [ref=e943]
+                  - text: 29 ago 2010
+                - generic [ref=e945]:
+                  - img [ref=e946]
+                  - text: 24 min
+              - paragraph [ref=e949]: Oars Jr. se esfuerza en su camino a la plaza y derrota a la Unidad de los gigantes, lo que permite a los Piratas de Barbablanca avanzar. Él continúa a pesar de las protestas de Ace albergando que es un objetivo demasiado grande y Oars recuerda el momento en que Ace le hizo un sombrero que le protegía de la intemperie. Oars es atacado varias veces por Kuma, Doflamingo y Moria lo que le causó un colapso al intentar llegar a Ace.
+        - link "El vencedor será la justicia. ¡En marcha! La estrategia de Sengoku Episodio 465 El vencedor será la justicia. ¡En marcha! La estrategia de Sengoku 05 sept 2010 24 min Oars Jr. trata de llegar hacia Ace, pero no puede y cae. Vicealmirante Ronse lanzó un ataque sorpresa a Barbablanca, pero fue derrotado fácilmente por un puñetazo terremoto. Barba Blanca ordenó a sus soldados atacar la plaza. Coby y Helmeppo se ocultan dentro de Marineford para escapar de la batalla, pero ellos ven que Akainu mata a un marino por intentar hacer lo mismo. Sengoku les dice que olviden la estrategia y ejecuten a Ace. Algo que cae del cielo, son Luffy y los presos que escaparon de Impel Down." [ref=e950] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/465
+          - generic [ref=e952]:
+            - img "El vencedor será la justicia. ¡En marcha! La estrategia de Sengoku" [ref=e954]
+            - generic [ref=e955]:
+              - generic [ref=e956]: Episodio 465
+              - heading "El vencedor será la justicia. ¡En marcha! La estrategia de Sengoku" [level=3] [ref=e958]
+              - generic [ref=e959]:
+                - generic [ref=e960]:
+                  - img [ref=e961]
+                  - text: 05 sept 2010
+                - generic [ref=e963]:
+                  - img [ref=e964]
+                  - text: 24 min
+              - paragraph [ref=e967]: Oars Jr. trata de llegar hacia Ace, pero no puede y cae. Vicealmirante Ronse lanzó un ataque sorpresa a Barbablanca, pero fue derrotado fácilmente por un puñetazo terremoto. Barba Blanca ordenó a sus soldados atacar la plaza. Coby y Helmeppo se ocultan dentro de Marineford para escapar de la batalla, pero ellos ven que Akainu mata a un marino por intentar hacer lo mismo. Sengoku les dice que olviden la estrategia y ejecuten a Ace. Algo que cae del cielo, son Luffy y los presos que escaparon de Impel Down.
+        - link "Llega el equipo Sombrero de Paja. La tensión crece en el campo de batalla Episodio 466 Llega el equipo Sombrero de Paja. La tensión crece en el campo de batalla 12 sept 2010 24 min En un flashback, el tsunami creado por Barbablanca precipita al buque de Luffy. Tratan de subirse a la ola, pero se quedan bloqueados en la parte superior cuando Aokiji lo congela. Después de escuchar un informe de que la ejecución va a suceder pronto, en un intento de liberarse, caen. Luffy ve que Ace está vivo, entonces detiene a Crocodile que intenta atacar a Barbablanca. Luffy le avisa a Barbablanca que la ejecución será pronto y este le pregunta sobre el sombrero, Luffy dice que es de Shanks, y le advierte a Barba Blanca que él va a rescatar a Ace y que él va a convertirse en Rey de los Piratas." [ref=e968] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/466
+          - generic [ref=e970]:
+            - img "Llega el equipo Sombrero de Paja. La tensión crece en el campo de batalla" [ref=e972]
+            - generic [ref=e973]:
+              - generic [ref=e974]: Episodio 466
+              - heading "Llega el equipo Sombrero de Paja. La tensión crece en el campo de batalla" [level=3] [ref=e976]
+              - generic [ref=e977]:
+                - generic [ref=e978]:
+                  - img [ref=e979]
+                  - text: 12 sept 2010
+                - generic [ref=e981]:
+                  - img [ref=e982]
+                  - text: 24 min
+              - paragraph [ref=e985]: En un flashback, el tsunami creado por Barbablanca precipita al buque de Luffy. Tratan de subirse a la ola, pero se quedan bloqueados en la parte superior cuando Aokiji lo congela. Después de escuchar un informe de que la ejecución va a suceder pronto, en un intento de liberarse, caen. Luffy ve que Ace está vivo, entonces detiene a Crocodile que intenta atacar a Barbablanca. Luffy le avisa a Barbablanca que la ejecución será pronto y este le pregunta sobre el sombrero, Luffy dice que es de Shanks, y le advierte a Barba Blanca que él va a rescatar a Ace y que él va a convertirse en Rey de los Piratas.
+        - link [ref=e986] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/467
+          - generic [ref=e988]:
+            - img "Te salvaré aunque muera. Comienza la batalla Luffy vs. Marines" [ref=e990]
+            - generic [ref=e991]:
+              - generic [ref=e992]: Episodio 467
+              - heading "Te salvaré aunque muera. Comienza la batalla Luffy vs. Marines" [level=3] [ref=e994]
+              - generic [ref=e995]:
+                - generic [ref=e996]:
+                  - img [ref=e997]
+                  - text: 19 sept 2010
+                - generic [ref=e999]:
+                  - img [ref=e1000]
+                  - text: 24 min
+              - paragraph [ref=e1003]: Luffy sigue para salvar a Ace, luchando contra los infantes de marina en el camino. Kizaru lo ataca con un rayo de luz, pero Ivankov lo salva, sólo para ser atacado por Kuma, quien afirma conocer. Luffy se encuentra con Jango y Fullbody; Jango accidentalmente se hipnotiza a sí mismo y a Fullbody, y se escapa de Hina con el Gear Second. En otras partes, los Piratas de Barbablanca tienen dificultades para derrotar a los Vice-almirantes, y Squardo intenta colarse, sólo para encontrarse con alguien. Moria ataca con un grupo de zombies, mientras tanto Ace le grita a Luffy que no soportaría ser salvado por un débil, mientras que en realidad no quiere que Luffy muera. Sin embargo, Luffy le dice que no le importa, y decide salvarlo aunque muera. Jimbei llega, derrotando a los zombis de Moria con un chorro de agua salada, y Luffy derrota a un oficial gigante con el Gear Third, Sengoku revela a los infantes de marina que Luffy es el hijo de Dragón el Revolucionario.
+        - link [ref=e1004] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/468
+          - generic [ref=e1006]:
+            - img "¡Sucesión de batallas sin cuartel! Ejercito de usuarios de las habilidades vs. Ejercito de usuarios de las habilidades" [ref=e1008]
+            - generic [ref=e1009]:
+              - generic [ref=e1010]: Episodio 468
+              - heading "¡Sucesión de batallas sin cuartel! Ejercito de usuarios de las habilidades vs. Ejercito de usuarios de las habilidades" [level=3] [ref=e1012]
+              - generic [ref=e1013]:
+                - generic [ref=e1014]:
+                  - img [ref=e1015]
+                  - text: 26 sept 2010
+                - generic [ref=e1017]:
+                  - img [ref=e1018]
+                  - text: 24 min
+              - paragraph [ref=e1021]: Ace esta molesto porque los Piratas de Barbablanca y Luffy todavía están tratando de salvarlo, pero decide aceptar si vive o muere. Barbablanca acepta la ayuda de Buggy, y señaló que a pesar de ser débil, tiene seguidores poderosos que podrían representar una amenaza. Barbablanca, siente que la Marina tiene un plan. Jimbei pelea contra Moria y lo derrota, incluso cuando se roba algunas sombras para aumentar su poder. Smoker ataca a Luffy y lo arrincona, pero Hancock, enojada por el ataque que recibió Luffy, lo ataca y consigue darle una patada a pesar de sus poderes Logia con su Haki. Ivankov es encuentra con Kuma, diciendo que ellos se conocían. Sin embargo, Doflamingo revela a Ivankov que Kuma está muerto.
+        - link "Kuma está extraño. El furioso golpe de Iva-san Episodio 469 Kuma está extraño. El furioso golpe de Iva-san 03 oct 2010 24 min Doflamingo le dice a Ivankov que Kuma se ha modificado poco a poco en un Pacifista a lo largo del tiempo y que hace unos días, perdió por completo su personalidad. Luffy recibe la llave de las esposas de Ace de Hancock, quien sueña con una boda celebrada en Amazon Lily entre ella y Luffy con toda la tribu Kuja de testigos. Ivankov lucha contra Kuma, Luffy mientras sigue avanzando por el campo de batalla. Crocodile vence a una multitud de hombres de menor rango de los piratas de Barba Blanca, para llegar a él, pero es detenido por Jozu, pero Crocodile luego se detuvo por Doflamingo. Mihawk se acerca para bloquear el camino de Luffy." [ref=e1022] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/469
+          - generic [ref=e1024]:
+            - img "Kuma está extraño. El furioso golpe de Iva-san" [ref=e1026]
+            - generic [ref=e1027]:
+              - generic [ref=e1028]: Episodio 469
+              - heading "Kuma está extraño. El furioso golpe de Iva-san" [level=3] [ref=e1030]
+              - generic [ref=e1031]:
+                - generic [ref=e1032]:
+                  - img [ref=e1033]
+                  - text: 03 oct 2010
+                - generic [ref=e1035]:
+                  - img [ref=e1036]
+                  - text: 24 min
+              - paragraph [ref=e1039]: Doflamingo le dice a Ivankov que Kuma se ha modificado poco a poco en un Pacifista a lo largo del tiempo y que hace unos días, perdió por completo su personalidad. Luffy recibe la llave de las esposas de Ace de Hancock, quien sueña con una boda celebrada en Amazon Lily entre ella y Luffy con toda la tribu Kuja de testigos. Ivankov lucha contra Kuma, Luffy mientras sigue avanzando por el campo de batalla. Crocodile vence a una multitud de hombres de menor rango de los piratas de Barba Blanca, para llegar a él, pero es detenido por Jozu, pero Crocodile luego se detuvo por Doflamingo. Mihawk se acerca para bloquear el camino de Luffy.
+        - link "Mihawk el maestro espadachín. Luffy se escabulle bajo el corte de la Kokutou Episodio 470 Mihawk el maestro espadachín. Luffy se escabulle bajo el corte de la Kokutou 10 oct 2010 24 min Mihawk comienza a atacar a Luffy, mientras que Hancock y Ivankov están ocupadas. Luffy se las arregla para escapar utilizando a Buggy como un escudo humano, y el comandante de la quinta división llega para luchar contra Mihawk. Buggy y sus seguidores logran conseguir uno de los Den Den Mushi en el marco de su plan para convertirse en alguien famoso. Las órdenes de Sengoku son que se corte la transmisión, ya que el mundo sólo sabe que por ahora los marinos están ganando. Un ejército de Pacifistas, dirigido por Sentoumaru, ataca a los Piratas de Barbablanca por detrás." [ref=e1040] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/470
+          - generic [ref=e1042]:
+            - img "Mihawk el maestro espadachín. Luffy se escabulle bajo el corte de la Kokutou" [ref=e1044]
+            - generic [ref=e1045]:
+              - generic [ref=e1046]: Episodio 470
+              - heading "Mihawk el maestro espadachín. Luffy se escabulle bajo el corte de la Kokutou" [level=3] [ref=e1048]
+              - generic [ref=e1049]:
+                - generic [ref=e1050]:
+                  - img [ref=e1051]
+                  - text: 10 oct 2010
+                - generic [ref=e1053]:
+                  - img [ref=e1054]
+                  - text: 24 min
+              - paragraph [ref=e1057]: Mihawk comienza a atacar a Luffy, mientras que Hancock y Ivankov están ocupadas. Luffy se las arregla para escapar utilizando a Buggy como un escudo humano, y el comandante de la quinta división llega para luchar contra Mihawk. Buggy y sus seguidores logran conseguir uno de los Den Den Mushi en el marco de su plan para convertirse en alguien famoso. Las órdenes de Sengoku son que se corte la transmisión, ya que el mundo sólo sabe que por ahora los marinos están ganando. Un ejército de Pacifistas, dirigido por Sentoumaru, ataca a los Piratas de Barbablanca por detrás.
+        - link "Comienza la operación de exterminio. El poder del ejército Pacifista Episodio 471 Comienza la operación de exterminio. El poder del ejército Pacifista 17 oct 2010 24 min Los Pacifistas, derrotan a los Piratas de Barbablanca en su camino, pero el plan no es totalmente eficaz, debido a que Barba Blanca ataca a los buques. Los infantes de marina se retiran de la plaza, con la intención de elevar el muro de fortificación y ejecutar a Ace antes de terminar con los Piratas de Barbablanca y Luffy, y los comandantes de Barbablanca se apresuran para llegar a Ace. Las órdenes de Sengoku son aplicadas y todos los Den Den Mushi dejan de emitir, pero el que robo Buggy todavía sigue transmitiendo imágenes. Squardo, uno de los aliados de Barba Blanca que había estado ausente por algún tiempo, apuñala a Barba Blanca en el pecho con su espada." [ref=e1058] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/471
+          - generic [ref=e1060]:
+            - img "Comienza la operación de exterminio. El poder del ejército Pacifista" [ref=e1062]
+            - generic [ref=e1063]:
+              - generic [ref=e1064]: Episodio 471
+              - heading "Comienza la operación de exterminio. El poder del ejército Pacifista" [level=3] [ref=e1066]
+              - generic [ref=e1067]:
+                - generic [ref=e1068]:
+                  - img [ref=e1069]
+                  - text: 17 oct 2010
+                - generic [ref=e1071]:
+                  - img [ref=e1072]
+                  - text: 24 min
+              - paragraph [ref=e1075]: Los Pacifistas, derrotan a los Piratas de Barbablanca en su camino, pero el plan no es totalmente eficaz, debido a que Barba Blanca ataca a los buques. Los infantes de marina se retiran de la plaza, con la intención de elevar el muro de fortificación y ejecutar a Ace antes de terminar con los Piratas de Barbablanca y Luffy, y los comandantes de Barbablanca se apresuran para llegar a Ace. Las órdenes de Sengoku son aplicadas y todos los Den Den Mushi dejan de emitir, pero el que robo Buggy todavía sigue transmitiendo imágenes. Squardo, uno de los aliados de Barba Blanca que había estado ausente por algún tiempo, apuñala a Barba Blanca en el pecho con su espada.
+        - link "¡La conspiración de Akainu! Shirohige cae en la trampa Episodio 472 ¡La conspiración de Akainu! Shirohige cae en la trampa 17 oct 2010 24 min Squardo apuñala a Barbablanca, Squardo afirma que Barbablanca hizo un acuerdo con la marina y consistía en sacrificar a sus aliados para salvar a Ace. Como los piratas de Barbablanca cuestionan a Barbablanca y se desmoralizan, la Infantería de Marina aprovecha y Aokiji congela Buggy, cortando las imágenes. Barbablanca castiga a Squardo, pero lo perdona. Se abre un camino y Barbablanca, dice que lo siguieran si están dispuestos a dar la vida. Barbablanca salta a la palestra, decidido a salvar a Ace, aunque muera en el intento." [ref=e1076] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/472
+          - generic [ref=e1078]:
+            - img "¡La conspiración de Akainu! Shirohige cae en la trampa" [ref=e1080]
+            - generic [ref=e1081]:
+              - generic [ref=e1082]: Episodio 472
+              - heading "¡La conspiración de Akainu! Shirohige cae en la trampa" [level=3] [ref=e1084]
+              - generic [ref=e1085]:
+                - generic [ref=e1086]:
+                  - img [ref=e1087]
+                  - text: 17 oct 2010
+                - generic [ref=e1089]:
+                  - img [ref=e1090]
+                  - text: 24 min
+              - paragraph [ref=e1093]: Squardo apuñala a Barbablanca, Squardo afirma que Barbablanca hizo un acuerdo con la marina y consistía en sacrificar a sus aliados para salvar a Ace. Como los piratas de Barbablanca cuestionan a Barbablanca y se desmoralizan, la Infantería de Marina aprovecha y Aokiji congela Buggy, cortando las imágenes. Barbablanca castiga a Squardo, pero lo perdona. Se abre un camino y Barbablanca, dice que lo siguieran si están dispuestos a dar la vida. Barbablanca salta a la palestra, decidido a salvar a Ace, aunque muera en el intento.
+        - link [ref=e1094] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/473
+          - generic [ref=e1096]:
+            - img "¡Inicia la operación de asedio! Los Piratas de Shirohige reducidos a una esquina" [ref=e1098]
+            - generic [ref=e1099]:
+              - generic [ref=e1100]: Episodio 473
+              - heading "¡Inicia la operación de asedio! Los Piratas de Shirohige reducidos a una esquina" [level=3] [ref=e1102]
+              - generic [ref=e1103]:
+                - generic [ref=e1104]:
+                  - img [ref=e1105]
+                  - text: 31 oct 2010
+                - generic [ref=e1107]:
+                  - img [ref=e1108]
+                  - text: 24 min
+              - paragraph [ref=e1111]: En un desesperado intento de detener el avance de Barbablanca, los infantes de marina activan las paredes para bloquearle el camino, pero se detuvo por el hielo. Squardo se da cuenta de su error en el apuñalamiento de Barbablanca y llora, pero Marco lo calma. Mientras tanto, Luffy y sus aliados se acercan a la plataforma de ejecución y la Marina no puede pararlos. Barbablanca se enfrenta a John el gigante, y lo derrota con un golpe en el pecho. Luffy estira sus brazos para alcanzar a Ace, pero los marines activan las paredes y Luffy cae. Sin embargo, queda un camino libre en el que Oars jr. cayo herido y impide que el muro se levante. Akainu utiliza su ataque Meteoro Volcán para derretir el hielo en un intento de evitar que los piratas de Barbablanca alcancen a Ace.
+        - link "Se ha dado la orden de ejecución. ¡Atravesar el Muro de contención! Episodio 474 Se ha dado la orden de ejecución. ¡Atravesar el Muro de contención! 07 nov 2010 24 min El ataque de Akainu derrite casi todo el hielo y destruye los barcos de Barbablanca, colocándolos en agua hirviendo, lo que les permite a los cañones bombardear, mientras que los Pacifistas bloquean la salida. El hueco dejado abierto por Oars Jr. es vulnerable, Luffy y algunos Piratas de Barbablanca tratan de romperlo, pero son obligados a regresar. Sengoku se prepara para ejecutar ahora a Ace. Ya que los Piratas de Barbablanca no pueden salvarlo o escapar, pero Oars recupera la conciencia. Jimbei lanza a Luffy por encima del muro, y Luffy comienza a luchar contra los tres almirantes, como Barbablanca decide jugar su carta de triunfo." [ref=e1112] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/474
+          - generic [ref=e1114]:
+            - img "Se ha dado la orden de ejecución. ¡Atravesar el Muro de contención!" [ref=e1116]
+            - generic [ref=e1117]:
+              - generic [ref=e1118]: Episodio 474
+              - heading "Se ha dado la orden de ejecución. ¡Atravesar el Muro de contención!" [level=3] [ref=e1120]
+              - generic [ref=e1121]:
+                - generic [ref=e1122]:
+                  - img [ref=e1123]
+                  - text: 07 nov 2010
+                - generic [ref=e1125]:
+                  - img [ref=e1126]
+                  - text: 24 min
+              - paragraph [ref=e1129]: El ataque de Akainu derrite casi todo el hielo y destruye los barcos de Barbablanca, colocándolos en agua hirviendo, lo que les permite a los cañones bombardear, mientras que los Pacifistas bloquean la salida. El hueco dejado abierto por Oars Jr. es vulnerable, Luffy y algunos Piratas de Barbablanca tratan de romperlo, pero son obligados a regresar. Sengoku se prepara para ejecutar ahora a Ace. Ya que los Piratas de Barbablanca no pueden salvarlo o escapar, pero Oars recupera la conciencia. Jimbei lanza a Luffy por encima del muro, y Luffy comienza a luchar contra los tres almirantes, como Barbablanca decide jugar su carta de triunfo.
+        - link [ref=e1130] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/475
+          - generic [ref=e1132]:
+            - img "¡Adentrándose en la última fase! Shirohige juega su triunfo para la remontada" [ref=e1134]
+            - generic [ref=e1135]:
+              - generic [ref=e1136]: Episodio 475
+              - heading "¡Adentrándose en la última fase! Shirohige juega su triunfo para la remontada" [level=3] [ref=e1138]
+              - generic [ref=e1139]:
+                - generic [ref=e1140]:
+                  - img [ref=e1141]
+                  - text: 14 nov 2010
+                - generic [ref=e1143]:
+                  - img [ref=e1144]
+                  - text: 24 min
+              - paragraph [ref=e1147]: Luffy intenta burlar a los almirantes, pero Kizaru fácilmente lo alcanza y lo golpea contra el suelo. Los verdugos se preparan para ejecutar a Ace, pero interviene Crocodile, diciendo que él puede matar a Barbablanca más tarde y no quiere que los infantes de marina ganen. Aokiji ataca a Luffy, pero Marco lo golpea lejos antes de que pueda acabar con él. Mr. 3 se esconde en los pasajes debajo de Marineford, después de haber logrado escapar de la congelación de Aokiji. Los piratas de Barbablanca se apuran en llegar hacia la abertura en la pared, lo que llevó a las fuerzas de la marina en disparar sus cañones contra ellos, pero Barbablanca había ocultado un barco sumergido y lo saca, Oars agarra el barco y lo impulsa dentro de la plaza con los piratas a bordo. Mientras las fuerzas de Barbablanca llegan a la plaza, Sengoku y Garp se preparan para luchar contra ellos.
+        - link "¡Luffy al límite de sus fuerzas! ¡¡Una guerra sin cuartel en la Plaza Oris!! Episodio 476 ¡Luffy al límite de sus fuerzas! ¡¡Una guerra sin cuartel en la Plaza Oris!! 21 nov 2010 24 min Barbablanca ataca a la marina en la plaza, Aokiji viene a pelear con él pero Jozu llega a manejarlo. Luffy es atacado por dos vicealmirantes y Kizaru, a continuación, se derrumba por sus lesiones y cansancio. Barbablanca le dice a Luffy que se mantenga al margen del resto de la batalla, pero admira su persistencia. La batalla continúa, Akainu contra Barbablanca, los piratas aliados llegan para ayudar a los piratas de Barbablanca, y los Pacifistas llegan para luchar contra ellos. Marco vuela para rescatar a Ace, pero Garp lo golpea de nuevo y declara que cualquiera que trate de rescatar a Ace tendrá que matarlo primero." [ref=e1148] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/476
+          - generic [ref=e1150]:
+            - img "¡Luffy al límite de sus fuerzas! ¡¡Una guerra sin cuartel en la Plaza Oris!!" [ref=e1152]
+            - generic [ref=e1153]:
+              - generic [ref=e1154]: Episodio 476
+              - heading "¡Luffy al límite de sus fuerzas! ¡¡Una guerra sin cuartel en la Plaza Oris!!" [level=3] [ref=e1156]
+              - generic [ref=e1157]:
+                - generic [ref=e1158]:
+                  - img [ref=e1159]
+                  - text: 21 nov 2010
+                - generic [ref=e1161]:
+                  - img [ref=e1162]
+                  - text: 24 min
+              - paragraph [ref=e1165]: Barbablanca ataca a la marina en la plaza, Aokiji viene a pelear con él pero Jozu llega a manejarlo. Luffy es atacado por dos vicealmirantes y Kizaru, a continuación, se derrumba por sus lesiones y cansancio. Barbablanca le dice a Luffy que se mantenga al margen del resto de la batalla, pero admira su persistencia. La batalla continúa, Akainu contra Barbablanca, los piratas aliados llegan para ayudar a los piratas de Barbablanca, y los Pacifistas llegan para luchar contra ellos. Marco vuela para rescatar a Ace, pero Garp lo golpea de nuevo y declara que cualquiera que trate de rescatar a Ace tendrá que matarlo primero.
+        - link "¡Reducir la vida a cambio de poder! Usando una vez más la Tensión Hormonal Episodio 477 ¡Reducir la vida a cambio de poder! Usando una vez más la Tensión Hormonal 28 nov 2010 24 min Shirohige tiene un momento de debilidad y Akainu lo aprovecha para asestarle un golpe crítico. Dos de sus comandantes, Marco y Jozu, son también víctimas de los ataques de Kizaru y Aokiji respectivamente. Luffy suplica a Ivankov que le vuelva a inyectar una nueva dosis de Tensión Hormonal para poder salvar a su hermano, pero Iva-san le advierte que eso reduciría drásticamente su esperanza de vida." [ref=e1166] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/477
+          - generic [ref=e1168]:
+            - img "¡Reducir la vida a cambio de poder! Usando una vez más la Tensión Hormonal" [ref=e1170]
+            - generic [ref=e1171]:
+              - generic [ref=e1172]: Episodio 477
+              - heading "¡Reducir la vida a cambio de poder! Usando una vez más la Tensión Hormonal" [level=3] [ref=e1174]
+              - generic [ref=e1175]:
+                - generic [ref=e1176]:
+                  - img [ref=e1177]
+                  - text: 28 nov 2010
+                - generic [ref=e1179]:
+                  - img [ref=e1180]
+                  - text: 24 min
+              - paragraph [ref=e1183]: Shirohige tiene un momento de debilidad y Akainu lo aprovecha para asestarle un golpe crítico. Dos de sus comandantes, Marco y Jozu, son también víctimas de los ataques de Kizaru y Aokiji respectivamente. Luffy suplica a Ivankov que le vuelva a inyectar una nueva dosis de Tensión Hormonal para poder salvar a su hermano, pero Iva-san le advierte que eso reduciría drásticamente su esperanza de vida.
+        - link "¡Mantendré mi promesa! ¡Colisión! Luffy y Coby Episodio 478 ¡Mantendré mi promesa! ¡Colisión! Luffy y Coby 05 dic 2010 24 min Luffy ha recuperado sus energias gracias a Ivankov y vuelve a correr hacia su hermano. En el patíbulo, dos nuevos soldados de La Marina se preparan para ejecutar a Ace. En el camino de Luffy aparece Coby que no duda en enfrentarse al Sombrero de Paja. Shirohige continua enfrentándose a varios marines y Jinbe acude a ayudarle junto a otros piratas. Mientras, Sengoku ordena que se ejecute inmediatamente a Ace y cuando los dos ejecutores se disponen a ello, Luffy lanza involuntariamente su Haki del Rey provocando el desconcierto en Marineford." [ref=e1184] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/478
+          - generic [ref=e1186]:
+            - img "¡Mantendré mi promesa! ¡Colisión! Luffy y Coby" [ref=e1188]
+            - generic [ref=e1189]:
+              - generic [ref=e1190]: Episodio 478
+              - heading "¡Mantendré mi promesa! ¡Colisión! Luffy y Coby" [level=3] [ref=e1192]
+              - generic [ref=e1193]:
+                - generic [ref=e1194]:
+                  - img [ref=e1195]
+                  - text: 05 dic 2010
+                - generic [ref=e1197]:
+                  - img [ref=e1198]
+                  - text: 24 min
+              - paragraph [ref=e1201]: Luffy ha recuperado sus energias gracias a Ivankov y vuelve a correr hacia su hermano. En el patíbulo, dos nuevos soldados de La Marina se preparan para ejecutar a Ace. En el camino de Luffy aparece Coby que no duda en enfrentarse al Sombrero de Paja. Shirohige continua enfrentándose a varios marines y Jinbe acude a ayudarle junto a otros piratas. Mientras, Sengoku ordena que se ejecute inmediatamente a Ace y cuando los dos ejecutores se disponen a ello, Luffy lanza involuntariamente su Haki del Rey provocando el desconcierto en Marineford.
+        - link "¡El patíbulo a tiro de piedra! ¡Se abre el camino hacia Ace! Episodio 479 ¡El patíbulo a tiro de piedra! ¡Se abre el camino hacia Ace! 12 dic 2010 24 min Shirohige ordena a sus hombres que protegan a Luffy para que pueda llegar hasta Ace. La Marina intenta detenerlo a toda costa pero Sombrero de Paja cuenta con la ayuda además de todos los travestis de Ivankov, que aún está sorprendido de la explosión de Haki de Luffy. Cuando faltan pocos metros para llegar al patíbulo, Inazuma reaparece y crea para Luffy un puente para llegar hasta Ace." [ref=e1202] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/479
+          - generic [ref=e1204]:
+            - img "¡El patíbulo a tiro de piedra! ¡Se abre el camino hacia Ace!" [ref=e1206]
+            - generic [ref=e1207]:
+              - generic [ref=e1208]: Episodio 479
+              - heading "¡El patíbulo a tiro de piedra! ¡Se abre el camino hacia Ace!" [level=3] [ref=e1210]
+              - generic [ref=e1211]:
+                - generic [ref=e1212]:
+                  - img [ref=e1213]
+                  - text: 12 dic 2010
+                - generic [ref=e1215]:
+                  - img [ref=e1216]
+                  - text: 24 min
+              - paragraph [ref=e1219]: Shirohige ordena a sus hombres que protegan a Luffy para que pueda llegar hasta Ace. La Marina intenta detenerlo a toda costa pero Sombrero de Paja cuenta con la ayuda además de todos los travestis de Ivankov, que aún está sorprendido de la explosión de Haki de Luffy. Cuando faltan pocos metros para llegar al patíbulo, Inazuma reaparece y crea para Luffy un puente para llegar hasta Ace.
+        - link "Los diferentes caminos que elegimos ¡Luffy contra Garp! Episodio 480 Los diferentes caminos que elegimos ¡Luffy contra Garp! 19 dic 2010 24 min Cuando Luffy veía su camino libre hasta Ace, Garp se interpone en su camino. Abuelo y nieto se enfrentan para defender cada uno los caminos que han elegido mientras el puente creado por Inazuma se viene abajo. Cuando Luffy llega al patíbulo, intenta liberar a Ace con la ayuda de Mr. 3 que resultó estar disfrazado de soldado ejecutor. Pero Sengoku desata el poder de su habilidad con la intención de aplastar él mismo a Ace y Luffy." [ref=e1220] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/480
+          - generic [ref=e1222]:
+            - img "Los diferentes caminos que elegimos ¡Luffy contra Garp!" [ref=e1224]
+            - generic [ref=e1225]:
+              - generic [ref=e1226]: Episodio 480
+              - heading "Los diferentes caminos que elegimos ¡Luffy contra Garp!" [level=3] [ref=e1228]
+              - generic [ref=e1229]:
+                - generic [ref=e1230]:
+                  - img [ref=e1231]
+                  - text: 19 dic 2010
+                - generic [ref=e1233]:
+                  - img [ref=e1234]
+                  - text: 24 min
+              - paragraph [ref=e1237]: Cuando Luffy veía su camino libre hasta Ace, Garp se interpone en su camino. Abuelo y nieto se enfrentan para defender cada uno los caminos que han elegido mientras el puente creado por Inazuma se viene abajo. Cuando Luffy llega al patíbulo, intenta liberar a Ace con la ayuda de Mr. 3 que resultó estar disfrazado de soldado ejecutor. Pero Sengoku desata el poder de su habilidad con la intención de aplastar él mismo a Ace y Luffy.
+        - link "¡Ace liberado! ¡La última orden del capitán Shirohige! Episodio 481 ¡Ace liberado! ¡La última orden del capitán Shirohige! 26 dic 2010 24 min Ace ha sido liberado y sus aliados lo celebran, pero La Marina se echa encima de él y de Luffy, por lo que tienen que luchar juntos para salir ahora de Marineford. Shirohige entonces ordena a su banda y al resto de capitanes que regresen al Nuevo Mundo sin él. Sus hombres tienen que aceptar a regañadientes su orden y Ace agradece a Shirohige todo lo que ha hecho por él." [ref=e1238] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/481
+          - generic [ref=e1240]:
+            - img "¡Ace liberado! ¡La última orden del capitán Shirohige!" [ref=e1242]
+            - generic [ref=e1243]:
+              - generic [ref=e1244]: Episodio 481
+              - heading "¡Ace liberado! ¡La última orden del capitán Shirohige!" [level=3] [ref=e1246]
+              - generic [ref=e1247]:
+                - generic [ref=e1248]:
+                  - img [ref=e1249]
+                  - text: 26 dic 2010
+                - generic [ref=e1251]:
+                  - img [ref=e1252]
+                  - text: 24 min
+              - paragraph [ref=e1255]: Ace ha sido liberado y sus aliados lo celebran, pero La Marina se echa encima de él y de Luffy, por lo que tienen que luchar juntos para salir ahora de Marineford. Shirohige entonces ordena a su banda y al resto de capitanes que regresen al Nuevo Mundo sin él. Sus hombres tienen que aceptar a regañadientes su orden y Ace agradece a Shirohige todo lo que ha hecho por él.
+        - link "¡La energía que quema incluso el Fuego! El ataque despiadado de Akainu Episodio 482 ¡La energía que quema incluso el Fuego! El ataque despiadado de Akainu 09 ene 2011 24 min Shirohige cree que es el momento de huir de Marineford y ordena a su tripulación y al resto de piratas que emprendan la retirada sin él. Ace le da su último agradecimiento antes de emprender su huída con Luffy y los demás. Es entonces cuando Akainu empieza a burlarse e increpar a Shirohige y Ace, que no puede pasar por alto tal afrenta, se dispone a hacerle tragar sus palabras." [ref=e1256] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/482
+          - generic [ref=e1258]:
+            - img "¡La energía que quema incluso el Fuego! El ataque despiadado de Akainu" [ref=e1260]
+            - generic [ref=e1261]:
+              - generic [ref=e1262]: Episodio 482
+              - heading "¡La energía que quema incluso el Fuego! El ataque despiadado de Akainu" [level=3] [ref=e1264]
+              - generic [ref=e1265]:
+                - generic [ref=e1266]:
+                  - img [ref=e1267]
+                  - text: 09 ene 2011
+                - generic [ref=e1269]:
+                  - img [ref=e1270]
+                  - text: 24 min
+              - paragraph [ref=e1273]: Shirohige cree que es el momento de huir de Marineford y ordena a su tripulación y al resto de piratas que emprendan la retirada sin él. Ace le da su último agradecimiento antes de emprender su huída con Luffy y los demás. Es entonces cuando Akainu empieza a burlarse e increpar a Shirohige y Ace, que no puede pasar por alto tal afrenta, se dispone a hacerle tragar sus palabras.
+        - 'link "En busca de una respuesta. Ace muere en el campo de batalla Episodio 483 En busca de una respuesta. Ace muere en el campo de batalla 16 ene 2011 24 min Ace es golpeado y atravesado por el puño de magma del almirante Akainu y cae en los brazos de Luffy. Es entonces cuando piensa sobre su pasado y recuerda su objetivo en la vida: averiguar el motivo por el cual había nacido. Akainu continua su ataque esta vez sobre Luffy, pero Jinbe, Marco y Vista le paran los pies. Todos los piratas están conmocionados por la herida de Ace y no creen en su recuperación." [ref=e1274] [cursor=pointer]':
+          - /url: /details/tv/37854/season/13/episode/483
+          - generic [ref=e1276]:
+            - img "En busca de una respuesta. Ace muere en el campo de batalla" [ref=e1278]
+            - generic [ref=e1279]:
+              - generic [ref=e1280]: Episodio 483
+              - heading "En busca de una respuesta. Ace muere en el campo de batalla" [level=3] [ref=e1282]
+              - generic [ref=e1283]:
+                - generic [ref=e1284]:
+                  - img [ref=e1285]
+                  - text: 16 ene 2011
+                - generic [ref=e1287]:
+                  - img [ref=e1288]
+                  - text: 24 min
+              - paragraph [ref=e1291]: "Ace es golpeado y atravesado por el puño de magma del almirante Akainu y cae en los brazos de Luffy. Es entonces cuando piensa sobre su pasado y recuerda su objetivo en la vida: averiguar el motivo por el cual había nacido. Akainu continua su ataque esta vez sobre Luffy, pero Jinbe, Marco y Vista le paran los pies. Todos los piratas están conmocionados por la herida de Ace y no creen en su recuperación."
+        - link "¡La sede de la Marina se desmorona! ¡La rabia silenciosa de Shirohige! Episodio 484 ¡La sede de la Marina se desmorona! ¡La rabia silenciosa de Shirohige! 23 ene 2011 24 min Luffy se derrumba tras el trauma emocional de ver morir a Ace en sus brazos y pierde el conocimiento, por lo que Jinbe se hace cargo de llevarlo a un lugar seguro. Los piratas de Shirohige y sus aliados prometen protegerlo a toda costa. Mientras tanto Shirohige, enmudecido por la rabia, inicia una despiadada lucha contra Akainu que provoca el derrumbe de Marineford y hace una brecha entre él y sus piratas. Es entonces cuando entra en escena alguien a quien nadie esperaba." [ref=e1292] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/484
+          - generic [ref=e1294]:
+            - img "¡La sede de la Marina se desmorona! ¡La rabia silenciosa de Shirohige!" [ref=e1296]
+            - generic [ref=e1297]:
+              - generic [ref=e1298]: Episodio 484
+              - heading "¡La sede de la Marina se desmorona! ¡La rabia silenciosa de Shirohige!" [level=3] [ref=e1300]
+              - generic [ref=e1301]:
+                - generic [ref=e1302]:
+                  - img [ref=e1303]
+                  - text: 23 ene 2011
+                - generic [ref=e1305]:
+                  - img [ref=e1306]
+                  - text: 24 min
+              - paragraph [ref=e1309]: Luffy se derrumba tras el trauma emocional de ver morir a Ace en sus brazos y pierde el conocimiento, por lo que Jinbe se hace cargo de llevarlo a un lugar seguro. Los piratas de Shirohige y sus aliados prometen protegerlo a toda costa. Mientras tanto Shirohige, enmudecido por la rabia, inicia una despiadada lucha contra Akainu que provoca el derrumbe de Marineford y hace una brecha entre él y sus piratas. Es entonces cuando entra en escena alguien a quien nadie esperaba.
+        - link "¡Ajuste de cuentas! Shirohige contra los piratas de Kurohige Episodio 485 ¡Ajuste de cuentas! Shirohige contra los piratas de Kurohige 30 ene 2011 24 min Kurohige y sus piratas llegan a Marineford y Shirohige se lanza contra él para vengar a sus dos hijos muertos por su culpa. La lucha entre ambos empieza y Shirohige consigue neutralizar los poderes de Kurohige, pero las heridas que acumula son demasiadas para continuar el combate, y los piratas de Kurohige aprovechan para atacarle a la vez. Shirohige ve llegar su hora y hace una importante revelación antes de morir." [ref=e1310] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/485
+          - generic [ref=e1312]:
+            - img "¡Ajuste de cuentas! Shirohige contra los piratas de Kurohige" [ref=e1314]
+            - generic [ref=e1315]:
+              - generic [ref=e1316]: Episodio 485
+              - heading "¡Ajuste de cuentas! Shirohige contra los piratas de Kurohige" [level=3] [ref=e1318]
+              - generic [ref=e1319]:
+                - generic [ref=e1320]:
+                  - img [ref=e1321]
+                  - text: 30 ene 2011
+                - generic [ref=e1323]:
+                  - img [ref=e1324]
+                  - text: 24 min
+              - paragraph [ref=e1327]: Kurohige y sus piratas llegan a Marineford y Shirohige se lanza contra él para vengar a sus dos hijos muertos por su culpa. La lucha entre ambos empieza y Shirohige consigue neutralizar los poderes de Kurohige, pero las heridas que acumula son demasiadas para continuar el combate, y los piratas de Kurohige aprovechan para atacarle a la vez. Shirohige ve llegar su hora y hace una importante revelación antes de morir.
+        - link "¡El espectáculo comienza! Se revela el plan de Kurohige Episodio 486 ¡El espectáculo comienza! Se revela el plan de Kurohige 06 feb 2011 24 min La muerte de Edward Newgate da la vuelta al mundo, creando un falsa sensación de paz. Mientras, Kurohige empieza su plan y sus hombres lo cubren junto al cuerpo de Shirohige con una lona. Mientras, Jinbe continua con la intención de poner a salvo a Luffy, y más ahora que Akainu vuelve a aparecer dispuesto a acabar con la vida del hijo de Dragon. Inazuma e Ivankov le intentarán parar los pies. Entonces, Kurohige sale de debajo de la lona para enseñar al mundo el porqué ésta va a ser su era." [ref=e1328] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/486
+          - generic [ref=e1330]:
+            - img "¡El espectáculo comienza! Se revela el plan de Kurohige" [ref=e1332]
+            - generic [ref=e1333]:
+              - generic [ref=e1334]: Episodio 486
+              - heading "¡El espectáculo comienza! Se revela el plan de Kurohige" [level=3] [ref=e1336]
+              - generic [ref=e1337]:
+                - generic [ref=e1338]:
+                  - img [ref=e1339]
+                  - text: 06 feb 2011
+                - generic [ref=e1341]:
+                  - img [ref=e1342]
+                  - text: 24 min
+              - paragraph [ref=e1345]: La muerte de Edward Newgate da la vuelta al mundo, creando un falsa sensación de paz. Mientras, Kurohige empieza su plan y sus hombres lo cubren junto al cuerpo de Shirohige con una lona. Mientras, Jinbe continua con la intención de poner a salvo a Luffy, y más ahora que Akainu vuelve a aparecer dispuesto a acabar con la vida del hijo de Dragon. Inazuma e Ivankov le intentarán parar los pies. Entonces, Kurohige sale de debajo de la lona para enseñar al mundo el porqué ésta va a ser su era.
+        - link "¡La tenacidad de Akainu! El puño de magma ataca a Luffy Episodio 487 ¡La tenacidad de Akainu! El puño de magma ataca a Luffy 13 feb 2011 24 min Kurohige declara que destruirá Marineford con sus nuevos poderes y hunde en el desánimo a todos los marines que están allí. Pero Sengoku planta cara a Kurohige y con sus palabras vuelve a levantar el ánimo a sus hombres que se lanzan a por los piratas que huyen. Coby entonces se preguntan donde está la justicia de asesinar a piratas que huyen cuando la guerra claramente ya ha acabado. Mientras, Akainu continua su persecución a Luffy y Jinbe, a pesar de las interferencias de varios aliados de Luffy que le salen al paso, consigue alcanzarles y herir de gravedad a ambos." [ref=e1346] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/487
+          - generic [ref=e1348]:
+            - img "¡La tenacidad de Akainu! El puño de magma ataca a Luffy" [ref=e1350]
+            - generic [ref=e1351]:
+              - generic [ref=e1352]: Episodio 487
+              - heading "¡La tenacidad de Akainu! El puño de magma ataca a Luffy" [level=3] [ref=e1354]
+              - generic [ref=e1355]:
+                - generic [ref=e1356]:
+                  - img [ref=e1357]
+                  - text: 13 feb 2011
+                - generic [ref=e1359]:
+                  - img [ref=e1360]
+                  - text: 24 min
+              - paragraph [ref=e1363]: Kurohige declara que destruirá Marineford con sus nuevos poderes y hunde en el desánimo a todos los marines que están allí. Pero Sengoku planta cara a Kurohige y con sus palabras vuelve a levantar el ánimo a sus hombres que se lanzan a por los piratas que huyen. Coby entonces se preguntan donde está la justicia de asesinar a piratas que huyen cuando la guerra claramente ya ha acabado. Mientras, Akainu continua su persecución a Luffy y Jinbe, a pesar de las interferencias de varios aliados de Luffy que le salen al paso, consigue alcanzarles y herir de gravedad a ambos.
+        - link "¡Un grito desesperado! Segundos de valor que cambian el destino Episodio 488 ¡Un grito desesperado! Segundos de valor que cambian el destino 20 feb 2011 24 min La batalla en Marineford continua, aunque claramente ya hay un bando vencedor. Trafalgar Law ha llegado con la intención de rescatar a Luffy, Sengoku continua su lucha con Kurohige mientras que Akainu ahora lucha contra los comandantes de Shirohige. Coby no logra entender como es posible que la guerra continue y sigan muriendo hombres en ambos bandos, por lo que decide detener la guerra interponiéndose entre Akainu y los piratas de Shirohige." [ref=e1364] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/488
+          - generic [ref=e1366]:
+            - img "¡Un grito desesperado! Segundos de valor que cambian el destino" [ref=e1368]
+            - generic [ref=e1369]:
+              - generic [ref=e1370]: Episodio 488
+              - heading "¡Un grito desesperado! Segundos de valor que cambian el destino" [level=3] [ref=e1372]
+              - generic [ref=e1373]:
+                - generic [ref=e1374]:
+                  - img [ref=e1375]
+                  - text: 20 feb 2011
+                - generic [ref=e1377]:
+                  - img [ref=e1378]
+                  - text: 24 min
+              - paragraph [ref=e1381]: La batalla en Marineford continua, aunque claramente ya hay un bando vencedor. Trafalgar Law ha llegado con la intención de rescatar a Luffy, Sengoku continua su lucha con Kurohige mientras que Akainu ahora lucha contra los comandantes de Shirohige. Coby no logra entender como es posible que la guerra continue y sigan muriendo hombres en ambos bandos, por lo que decide detener la guerra interponiéndose entre Akainu y los piratas de Shirohige.
+        - link "¡Aparece Shanks! La guerra decisiva llega a su fin Episodio 489 ¡Aparece Shanks! La guerra decisiva llega a su fin 06 mar 2011 24 min Law y su tripulación llevan a Luffy y Jinbe al interior de su submarino para atender sus heridas y emprender la huida. Mientras, la aparición de Shanks parece que ha detenido la batalla por unos instantes y le pide a Sengoku que de por terminada la guerra y le entregue los cuerpos de Ace y Shirohige para que tengan un entierro digno." [ref=e1382] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/489
+          - generic [ref=e1384]:
+            - img "¡Aparece Shanks! La guerra decisiva llega a su fin" [ref=e1386]
+            - generic [ref=e1387]:
+              - generic [ref=e1388]: Episodio 489
+              - heading "¡Aparece Shanks! La guerra decisiva llega a su fin" [level=3] [ref=e1390]
+              - generic [ref=e1391]:
+                - generic [ref=e1392]:
+                  - img [ref=e1393]
+                  - text: 06 mar 2011
+                - generic [ref=e1395]:
+                  - img [ref=e1396]
+                  - text: 24 min
+              - paragraph [ref=e1399]: Law y su tripulación llevan a Luffy y Jinbe al interior de su submarino para atender sus heridas y emprender la huida. Mientras, la aparición de Shanks parece que ha detenido la batalla por unos instantes y le pide a Sengoku que de por terminada la guerra y le entregue los cuerpos de Ace y Shirohige para que tengan un entierro digno.
+        - 'link "¡Poderosos rivales independientes! El comienzo de la Nueva Era Episodio 490 ¡Poderosos rivales independientes! El comienzo de la Nueva Era 20 mar 2011 24 min Con el destino de Luffy en juego, Law empieza la operación para salvarle la vida. Mientras, las noticias del fin de la guerra y la victoria de la Marina llena de celebraciones el mundo entero, pero a pesar de todo, hay nuevos problemas: Kurohige está libre con sus nuevos compañeros reclutados en el nivel 6 de Impel Down, los territorios protegidos por Shirohige caen bajo el ataque de sus enemigos y las palabras postumas de éste, anunciando que el One Piece existe, desencadena una ola de piratería por todos los mares." [ref=e1400] [cursor=pointer]':
+          - /url: /details/tv/37854/season/13/episode/490
+          - generic [ref=e1402]:
+            - img "¡Poderosos rivales independientes! El comienzo de la Nueva Era" [ref=e1404]
+            - generic [ref=e1405]:
+              - generic [ref=e1406]: Episodio 490
+              - heading "¡Poderosos rivales independientes! El comienzo de la Nueva Era" [level=3] [ref=e1408]
+              - generic [ref=e1409]:
+                - generic [ref=e1410]:
+                  - img [ref=e1411]
+                  - text: 20 mar 2011
+                - generic [ref=e1413]:
+                  - img [ref=e1414]
+                  - text: 24 min
+              - paragraph [ref=e1417]: "Con el destino de Luffy en juego, Law empieza la operación para salvarle la vida. Mientras, las noticias del fin de la guerra y la victoria de la Marina llena de celebraciones el mundo entero, pero a pesar de todo, hay nuevos problemas: Kurohige está libre con sus nuevos compañeros reclutados en el nivel 6 de Impel Down, los territorios protegidos por Shirohige caen bajo el ataque de sus enemigos y las palabras postumas de éste, anunciando que el One Piece existe, desencadena una ola de piratería por todos los mares."
+        - link "Llegada a la isla de las mujeres. Luffy se enfrenta a la cruda realidad. Episodio 491 Llegada a la isla de las mujeres. Luffy se enfrenta a la cruda realidad. 27 mar 2011 24 min Iva se despide de Jinbe y los otros para dirigirse a su reino Kamabakka. Boa Hancock, los piratas de Law y Jinbe se dirigen a Amazon Lily para ocultar a Luffy hasta que se recupere. Ya instalados, Luffy se despierta y empieza a arrasarlo todo en busca de Ace." [ref=e1418] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/491
+          - generic [ref=e1420]:
+            - img "Llegada a la isla de las mujeres. Luffy se enfrenta a la cruda realidad." [ref=e1422]
+            - generic [ref=e1423]:
+              - generic [ref=e1424]: Episodio 491
+              - heading "Llegada a la isla de las mujeres. Luffy se enfrenta a la cruda realidad." [level=3] [ref=e1426]
+              - generic [ref=e1427]:
+                - generic [ref=e1428]:
+                  - img [ref=e1429]
+                  - text: 27 mar 2011
+                - generic [ref=e1431]:
+                  - img [ref=e1432]
+                  - text: 24 min
+              - paragraph [ref=e1435]: Iva se despide de Jinbe y los otros para dirigirse a su reino Kamabakka. Boa Hancock, los piratas de Law y Jinbe se dirigen a Amazon Lily para ocultar a Luffy hasta que se recupere. Ya instalados, Luffy se despierta y empieza a arrasarlo todo en busca de Ace.
+        - link "¡La combinación más potente! ¡La lucha de Luffy y Toriko! Episodio 492 ¡La combinación más potente! ¡La lucha de Luffy y Toriko! 03 abr 2011 24 min Luffy y su tripulacion se quedan sin víveres y encuentran una extraña isla donde descubren que todo es comestible, desde árboles de carne hasta hongos de azúcar. Allí conocen a un extraño hombre llamado Toriko que busca el ingrediente legendario que yace en esa isla." [ref=e1436] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/492
+          - generic [ref=e1438]:
+            - img "¡La combinación más potente! ¡La lucha de Luffy y Toriko!" [ref=e1440]
+            - generic [ref=e1441]:
+              - generic [ref=e1442]: Episodio 492
+              - heading "¡La combinación más potente! ¡La lucha de Luffy y Toriko!" [level=3] [ref=e1444]
+              - generic [ref=e1445]:
+                - generic [ref=e1446]:
+                  - img [ref=e1447]
+                  - text: 03 abr 2011
+                - generic [ref=e1449]:
+                  - img [ref=e1450]
+                  - text: 24 min
+              - paragraph [ref=e1453]: Luffy y su tripulacion se quedan sin víveres y encuentran una extraña isla donde descubren que todo es comestible, desde árboles de carne hasta hongos de azúcar. Allí conocen a un extraño hombre llamado Toriko que busca el ingrediente legendario que yace en esa isla.
+        - link "Luffy y Ace ¡La historia del encuentro entre los hermanos! Episodio 493 Luffy y Ace ¡La historia del encuentro entre los hermanos! 10 abr 2011 24 min Luffy es llevado por su abuelo hasta el hogar de la Familia Dadan y allí conoce a Ace, que muestra un gran desprecio hacía Luffy, incluso cuando éste lo único que quiere es ser su amigo y acompañarlo a todas partes, pero Ace se deshace de él siempre molesto por su presencia. Aún así Luffy no se rendirá." [ref=e1454] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/493
+          - generic [ref=e1456]:
+            - img "Luffy y Ace ¡La historia del encuentro entre los hermanos!" [ref=e1458]
+            - generic [ref=e1459]:
+              - generic [ref=e1460]: Episodio 493
+              - heading "Luffy y Ace ¡La historia del encuentro entre los hermanos!" [level=3] [ref=e1462]
+              - generic [ref=e1463]:
+                - generic [ref=e1464]:
+                  - img [ref=e1465]
+                  - text: 10 abr 2011
+                - generic [ref=e1467]:
+                  - img [ref=e1468]
+                  - text: 24 min
+              - paragraph [ref=e1471]: Luffy es llevado por su abuelo hasta el hogar de la Familia Dadan y allí conoce a Ace, que muestra un gran desprecio hacía Luffy, incluso cuando éste lo único que quiere es ser su amigo y acompañarlo a todas partes, pero Ace se deshace de él siempre molesto por su presencia. Aún así Luffy no se rendirá.
+        - link "¡Aparece Sabo! El niño de Gray Terminal Episodio 494 ¡Aparece Sabo! El niño de Gray Terminal 17 abr 2011 24 min Después de cruzar el bosque en busca de Ace, Luffy llega hasta un lugar llamado Gray Terminal, donde no hay leyes y es el hogar de muchos sin techo. Allí ve como Ace roba a unos piratas y se lleva el botín al bosque, hasta un escondite donde comparte un gran tesoro con otro niño llamado Sabo. Entonces aparecen unos piratas y se llevan a Luffy como rehén para interrogarle sobre dónde esconde Ace y Sabo el tesoro." [ref=e1472] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/494
+          - generic [ref=e1474]:
+            - img "¡Aparece Sabo! El niño de Gray Terminal" [ref=e1476]
+            - generic [ref=e1477]:
+              - generic [ref=e1478]: Episodio 494
+              - heading "¡Aparece Sabo! El niño de Gray Terminal" [level=3] [ref=e1480]
+              - generic [ref=e1481]:
+                - generic [ref=e1482]:
+                  - img [ref=e1483]
+                  - text: 17 abr 2011
+                - generic [ref=e1485]:
+                  - img [ref=e1486]
+                  - text: 24 min
+              - paragraph [ref=e1489]: Después de cruzar el bosque en busca de Ace, Luffy llega hasta un lugar llamado Gray Terminal, donde no hay leyes y es el hogar de muchos sin techo. Allí ve como Ace roba a unos piratas y se lleva el botín al bosque, hasta un escondite donde comparte un gran tesoro con otro niño llamado Sabo. Entonces aparecen unos piratas y se llevan a Luffy como rehén para interrogarle sobre dónde esconde Ace y Sabo el tesoro.
+        - link "¡No huiré! ¡La desesperada operación de rescate de Ace! Episodio 495 ¡No huiré! ¡La desesperada operación de rescate de Ace! 24 abr 2011 24 min Ace y Luffy consiguen rescatar a Luffy derrotando a Porchemy, pero el capitán de los piratas Bluejam no pasa por alto este ataque a su banda y jura vengarse. Gracias a este rescate, Luffy por fin empieza a llevase bien con Ace y Sabo." [ref=e1490] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/495
+          - generic [ref=e1492]:
+            - img "¡No huiré! ¡La desesperada operación de rescate de Ace!" [ref=e1494]
+            - generic [ref=e1495]:
+              - generic [ref=e1496]: Episodio 495
+              - heading "¡No huiré! ¡La desesperada operación de rescate de Ace!" [level=3] [ref=e1498]
+              - generic [ref=e1499]:
+                - generic [ref=e1500]:
+                  - img [ref=e1501]
+                  - text: 24 abr 2011
+                - generic [ref=e1503]:
+                  - img [ref=e1504]
+                  - text: 24 min
+              - paragraph [ref=e1507]: Ace y Luffy consiguen rescatar a Luffy derrotando a Porchemy, pero el capitán de los piratas Bluejam no pasa por alto este ataque a su banda y jura vengarse. Gracias a este rescate, Luffy por fin empieza a llevase bien con Ace y Sabo.
+        - link "¡Algún día saldremos al mar! ¡El brindis de hermandad de los tres granujas! Episodio 496 ¡Algún día saldremos al mar! ¡El brindis de hermandad de los tres granujas! 01 may 2011 24 min Sabo se instala a vivir con la Familia Dadan en el Monte Corvo, estrechando así la amistad con Ace y Luffy. Los tres hacen incursiones a Gray Terminal y a la ciudad con frecuencia, y en una de éstas, Sabo se cruza con su padre y hace ver que no lo conoce. Después de esto, les cuenta a Ace y Luffy quien es él en realidad." [ref=e1508] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/496
+          - generic [ref=e1510]:
+            - img "¡Algún día saldremos al mar! ¡El brindis de hermandad de los tres granujas!" [ref=e1512]
+            - generic [ref=e1513]:
+              - generic [ref=e1514]: Episodio 496
+              - heading "¡Algún día saldremos al mar! ¡El brindis de hermandad de los tres granujas!" [level=3] [ref=e1516]
+              - generic [ref=e1517]:
+                - generic [ref=e1518]:
+                  - img [ref=e1519]
+                  - text: 01 may 2011
+                - generic [ref=e1521]:
+                  - img [ref=e1522]
+                  - text: 24 min
+              - paragraph [ref=e1525]: Sabo se instala a vivir con la Familia Dadan en el Monte Corvo, estrechando así la amistad con Ace y Luffy. Los tres hacen incursiones a Gray Terminal y a la ciudad con frecuencia, y en una de éstas, Sabo se cruza con su padre y hace ver que no lo conoce. Después de esto, les cuenta a Ace y Luffy quien es él en realidad.
+        - link "¿¡Adiós a la Familia Dadan!? ¡La base secreta está lista! Episodio 497 ¿¡Adiós a la Familia Dadan!? ¡La base secreta está lista! 08 may 2011 24 min Hartos de estar siempre de malas con Dadan, Ace, Luffy y Sabo deciden valerse por si mismos y construir una guarida para ellos y así continuar con sus sueños de llegar a ser piratas." [ref=e1526] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/497
+          - generic [ref=e1528]:
+            - img "¿¡Adiós a la Familia Dadan!? ¡La base secreta está lista!" [ref=e1530]
+            - generic [ref=e1531]:
+              - generic [ref=e1532]: Episodio 497
+              - heading "¿¡Adiós a la Familia Dadan!? ¡La base secreta está lista!" [level=3] [ref=e1534]
+              - generic [ref=e1535]:
+                - generic [ref=e1536]:
+                  - img [ref=e1537]
+                  - text: 08 may 2011
+                - generic [ref=e1539]:
+                  - img [ref=e1540]
+                  - text: 24 min
+              - paragraph [ref=e1543]: Hartos de estar siempre de malas con Dadan, Ace, Luffy y Sabo deciden valerse por si mismos y construir una guarida para ellos y así continuar con sus sueños de llegar a ser piratas.
+        - link "¿¡Luffy aprendiz!? ¡El hombre que luchó contra el Rey de los Piratas! Episodio 498 ¿¡Luffy aprendiz!? ¡El hombre que luchó contra el Rey de los Piratas! 15 may 2011 24 min Ace, Sabo y Luffy están de caza y aparece un enorme oso que pone en aprietos a los tres hermanos, entonces un viejo capitán pirata que pasaba por allí les salva la vida usando Haki para detener al oso. Éste les cuenta que hace años luchó contra Gold Roger y perdió la batalla y a su tripulación. Ace al oír esto se marcha enfadado y Sabo le cuenta a Luffy quien es el padre de Ace." [ref=e1544] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/498
+          - generic [ref=e1546]:
+            - img "¿¡Luffy aprendiz!? ¡El hombre que luchó contra el Rey de los Piratas!" [ref=e1548]
+            - generic [ref=e1549]:
+              - generic [ref=e1550]: Episodio 498
+              - heading "¿¡Luffy aprendiz!? ¡El hombre que luchó contra el Rey de los Piratas!" [level=3] [ref=e1552]
+              - generic [ref=e1553]:
+                - generic [ref=e1554]:
+                  - img [ref=e1555]
+                  - text: 15 may 2011
+                - generic [ref=e1557]:
+                  - img [ref=e1558]
+                  - text: 24 min
+              - paragraph [ref=e1561]: Ace, Sabo y Luffy están de caza y aparece un enorme oso que pone en aprietos a los tres hermanos, entonces un viejo capitán pirata que pasaba por allí les salva la vida usando Haki para detener al oso. Éste les cuenta que hace años luchó contra Gold Roger y perdió la batalla y a su tripulación. Ace al oír esto se marcha enfadado y Sabo le cuenta a Luffy quien es el padre de Ace.
+        - link "¡Duelo contra el tigre gigante! ¿¡Quién será el capitán!? Episodio 499 ¡Duelo contra el tigre gigante! ¿¡Quién será el capitán!? 22 may 2011 24 min Ace, Sabo y Luffy ayudan a Naguri en la construcción de su barco pirata. Al mismo tiempo se lanzan un desafío entre ellos, aquel de los tres que consiga derrotar al tigre gigante será capitán cuando tengan su propio barco. Pese a todo, los intentos por vencer al felino van fracasando uno tras otro." [ref=e1562] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/499
+          - generic [ref=e1564]:
+            - img "¡Duelo contra el tigre gigante! ¿¡Quién será el capitán!?" [ref=e1566]
+            - generic [ref=e1567]:
+              - generic [ref=e1568]: Episodio 499
+              - heading "¡Duelo contra el tigre gigante! ¿¡Quién será el capitán!?" [level=3] [ref=e1570]
+              - generic [ref=e1571]:
+                - generic [ref=e1572]:
+                  - img [ref=e1573]
+                  - text: 22 may 2011
+                - generic [ref=e1575]:
+                  - img [ref=e1576]
+                  - text: 24 min
+              - paragraph [ref=e1579]: Ace, Sabo y Luffy ayudan a Naguri en la construcción de su barco pirata. Al mismo tiempo se lanzan un desafío entre ellos, aquel de los tres que consiga derrotar al tigre gigante será capitán cuando tengan su propio barco. Pese a todo, los intentos por vencer al felino van fracasando uno tras otro.
+        - link "¡Libertad robada! La trampa de los nobles se cierne sobre los tres hermanos. Episodio 500 ¡Libertad robada! La trampa de los nobles se cierne sobre los tres hermanos. 29 may 2011 24 min Sabo, Luffy y Ace son capturados en Grey Terminal por los piratas Bluejam que habían sido contratados por el padre de Sabo para recuperar a su hijo. Con la promesa de su padre de que Ace y Luffy no sufrirán ningún daño si vuelve a casa, a Sabo no le queda más remedio que volver a la alta sociedad. Pero una vez allí se entera del plan del rey para \"limpiar la basura\" de Gray Terminal antes de la llegada de un Tenryuubito al país." [ref=e1580] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/500
+          - generic [ref=e1582]:
+            - img "¡Libertad robada! La trampa de los nobles se cierne sobre los tres hermanos." [ref=e1584]
+            - generic [ref=e1585]:
+              - generic [ref=e1586]: Episodio 500
+              - heading "¡Libertad robada! La trampa de los nobles se cierne sobre los tres hermanos." [level=3] [ref=e1588]
+              - generic [ref=e1589]:
+                - generic [ref=e1590]:
+                  - img [ref=e1591]
+                  - text: 29 may 2011
+                - generic [ref=e1593]:
+                  - img [ref=e1594]
+                  - text: 24 min
+              - paragraph [ref=e1597]: Sabo, Luffy y Ace son capturados en Grey Terminal por los piratas Bluejam que habían sido contratados por el padre de Sabo para recuperar a su hijo. Con la promesa de su padre de que Ace y Luffy no sufrirán ningún daño si vuelve a casa, a Sabo no le queda más remedio que volver a la alta sociedad. Pero una vez allí se entera del plan del rey para "limpiar la basura" de Gray Terminal antes de la llegada de un Tenryuubito al país.
+        - link "¡El fuego se extiende! Gray Terminal en peligro Episodio 501 ¡El fuego se extiende! Gray Terminal en peligro 05 jun 2011 24 min Sabo queda atónito de la pasividad e indiferencia de los nobles de la ciudad frente al plan de incendiar Gray Terminal con todos sus habitantes y corre para advertir a sus hermanos del peligro. Ace y Luffy, ajenos al desastre que se avecina, están ayudando a los piratas Bluejam a colocar unas misteriosas cajas por todo Gray Terminal sin saber su contenido. Cuando el fuego estalla, todos se ven atrapados entre las llamas." [ref=e1598] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/501
+          - generic [ref=e1600]:
+            - img "¡El fuego se extiende! Gray Terminal en peligro" [ref=e1602]
+            - generic [ref=e1603]:
+              - generic [ref=e1604]: Episodio 501
+              - heading "¡El fuego se extiende! Gray Terminal en peligro" [level=3] [ref=e1606]
+              - generic [ref=e1607]:
+                - generic [ref=e1608]:
+                  - img [ref=e1609]
+                  - text: 05 jun 2011
+                - generic [ref=e1611]:
+                  - img [ref=e1612]
+                  - text: 24 min
+              - paragraph [ref=e1615]: Sabo queda atónito de la pasividad e indiferencia de los nobles de la ciudad frente al plan de incendiar Gray Terminal con todos sus habitantes y corre para advertir a sus hermanos del peligro. Ace y Luffy, ajenos al desastre que se avecina, están ayudando a los piratas Bluejam a colocar unas misteriosas cajas por todo Gray Terminal sin saber su contenido. Cuando el fuego estalla, todos se ven atrapados entre las llamas.
+        - link "¿Donde está la libertad? La triste partida del niño Episodio 502 ¿Donde está la libertad? La triste partida del niño 12 jun 2011 24 min Mientras Dadan y Ace se quedan atrás luchando contra Bluejam entre las llamas, el resto de la familia Dadan y Luffy consiguen escapar, pero les queda la incógnita de si Dadan y Ace regresarán. Días después, Sabo acepta que nunca tendrá la libertad que él busca viviendo entre nobles y prepara todo para huir de la isla el mismo día que el Tenryuubito visita el país." [ref=e1616] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/502
+          - generic [ref=e1618]:
+            - img "¿Donde está la libertad? La triste partida del niño" [ref=e1620]
+            - generic [ref=e1621]:
+              - generic [ref=e1622]: Episodio 502
+              - heading "¿Donde está la libertad? La triste partida del niño" [level=3] [ref=e1624]
+              - generic [ref=e1625]:
+                - generic [ref=e1626]:
+                  - img [ref=e1627]
+                  - text: 12 jun 2011
+                - generic [ref=e1629]:
+                  - img [ref=e1630]
+                  - text: 24 min
+              - paragraph [ref=e1633]: Mientras Dadan y Ace se quedan atrás luchando contra Bluejam entre las llamas, el resto de la familia Dadan y Luffy consiguen escapar, pero les queda la incógnita de si Dadan y Ace regresarán. Días después, Sabo acepta que nunca tendrá la libertad que él busca viviendo entre nobles y prepara todo para huir de la isla el mismo día que el Tenryuubito visita el país.
+        - link "¡Cuento contigo! La carta de un hermano Episodio 503 ¡Cuento contigo! La carta de un hermano 19 jun 2011 24 min El barco de Sabo es completamente destruido por el fuego del Tenryuubito que no puede soportar su presencia. Al mismo tiempo, Ace y Dadan regresan a la casa de los bandidos para alivio de Luffy y el resto de la familia, pero la alegría dura poco, Dogra llega con las malas noticias de la muerte de Sabo. Días después, Ace recibe una carta de Sabo que fue escrita antes de que emprendiera su corto viaje por el mar." [ref=e1634] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/503
+          - generic [ref=e1636]:
+            - img "¡Cuento contigo! La carta de un hermano" [ref=e1638]
+            - generic [ref=e1639]:
+              - generic [ref=e1640]: Episodio 503
+              - heading "¡Cuento contigo! La carta de un hermano" [level=3] [ref=e1642]
+              - generic [ref=e1643]:
+                - generic [ref=e1644]:
+                  - img [ref=e1645]
+                  - text: 19 jun 2011
+                - generic [ref=e1647]:
+                  - img [ref=e1648]
+                  - text: 24 min
+              - paragraph [ref=e1651]: El barco de Sabo es completamente destruido por el fuego del Tenryuubito que no puede soportar su presencia. Al mismo tiempo, Ace y Dadan regresan a la casa de los bandidos para alivio de Luffy y el resto de la familia, pero la alegría dura poco, Dogra llega con las malas noticias de la muerte de Sabo. Días después, Ace recibe una carta de Sabo que fue escrita antes de que emprendiera su corto viaje por el mar.
+        - link "¡Mantendré la promesa! Levando anclas por separado Episodio 504 ¡Mantendré la promesa! Levando anclas por separado 26 jun 2011 24 min Aunque van pasando los años, Ace y Luffy no dejan de entrenar duro ni un día con tal de conseguir ser lo bastante fuertes como para salir al mar a cumplir sus sueños. El primero en hacerlo es Ace, y tres años después le llega el turno a Luffy de emprender su propia aventura." [ref=e1652] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/504
+          - generic [ref=e1654]:
+            - img "¡Mantendré la promesa! Levando anclas por separado" [ref=e1656]
+            - generic [ref=e1657]:
+              - generic [ref=e1658]: Episodio 504
+              - heading "¡Mantendré la promesa! Levando anclas por separado" [level=3] [ref=e1660]
+              - generic [ref=e1661]:
+                - generic [ref=e1662]:
+                  - img [ref=e1663]
+                  - text: 26 jun 2011
+                - generic [ref=e1665]:
+                  - img [ref=e1666]
+                  - text: 24 min
+              - paragraph [ref=e1669]: Aunque van pasando los años, Ace y Luffy no dejan de entrenar duro ni un día con tal de conseguir ser lo bastante fuertes como para salir al mar a cumplir sus sueños. El primero en hacerlo es Ace, y tres años después le llega el turno a Luffy de emprender su propia aventura.
+        - link "¡Quiero volver a verles! El llanto desconsolado de Luffy Episodio 505 ¡Quiero volver a verles! El llanto desconsolado de Luffy 03 jul 2011 24 min Garp llega a la isla Fuschia con la intención de protegerla de cualquier ataque debido al auge de la piratería tras la muerte de Shirohige, pero Dadan no verá con buenos ojos su visita. Mientras, en algún lugar del Nuevo Mundo, tiene lugar el funeral de Ace y Shirohige. En Amazon Lily, Luffy sigue descontrolado por la rabia y tristeza de haber perdido a su hermano y se enfrenta a Jinbe que intenta calmarlo aún teniendo que emplear su fuerza contra él. Jinbe recuerda a Luffy que todavía tiene compañeros por los que seguir viviendo." [ref=e1670] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/505
+          - generic [ref=e1672]:
+            - img "¡Quiero volver a verles! El llanto desconsolado de Luffy" [ref=e1674]
+            - generic [ref=e1675]:
+              - generic [ref=e1676]: Episodio 505
+              - heading "¡Quiero volver a verles! El llanto desconsolado de Luffy" [level=3] [ref=e1678]
+              - generic [ref=e1679]:
+                - generic [ref=e1680]:
+                  - img [ref=e1681]
+                  - text: 03 jul 2011
+                - generic [ref=e1683]:
+                  - img [ref=e1684]
+                  - text: 24 min
+              - paragraph [ref=e1687]: Garp llega a la isla Fuschia con la intención de protegerla de cualquier ataque debido al auge de la piratería tras la muerte de Shirohige, pero Dadan no verá con buenos ojos su visita. Mientras, en algún lugar del Nuevo Mundo, tiene lugar el funeral de Ace y Shirohige. En Amazon Lily, Luffy sigue descontrolado por la rabia y tristeza de haber perdido a su hermano y se enfrenta a Jinbe que intenta calmarlo aún teniendo que emplear su fuerza contra él. Jinbe recuerda a Luffy que todavía tiene compañeros por los que seguir viviendo.
+        - link "¡Los Sombrero de Paja conmocionados! La llegada de las terribles noticias Episodio 506 ¡Los Sombrero de Paja conmocionados! La llegada de las terribles noticias 10 jul 2011 24 min Zoro se enfrenta a los Babuinos pero sus heridas se vuelven a abrir y no le permiten luchar bien, pero cuando todo parecía perdido aparece Mihawk que asusta a los animales armados solo con su presencia y se dirige hacía Zoro. Lejos de allí, Chopper logra que las aves gigantes y los humanos dejen de enfrentarse tras entender los motivos de su enfrentamiento. Es entonces cuando las noticias de lo sucedido en Marineford empiezan a llegar a cada uno de los compañeros de Luffy." [ref=e1688] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/506
+          - generic [ref=e1690]:
+            - img "¡Los Sombrero de Paja conmocionados! La llegada de las terribles noticias" [ref=e1692]
+            - generic [ref=e1693]:
+              - generic [ref=e1694]: Episodio 506
+              - heading "¡Los Sombrero de Paja conmocionados! La llegada de las terribles noticias" [level=3] [ref=e1696]
+              - generic [ref=e1697]:
+                - generic [ref=e1698]:
+                  - img [ref=e1699]
+                  - text: 10 jul 2011
+                - generic [ref=e1701]:
+                  - img [ref=e1702]
+                  - text: 24 min
+              - paragraph [ref=e1705]: Zoro se enfrenta a los Babuinos pero sus heridas se vuelven a abrir y no le permiten luchar bien, pero cuando todo parecía perdido aparece Mihawk que asusta a los animales armados solo con su presencia y se dirige hacía Zoro. Lejos de allí, Chopper logra que las aves gigantes y los humanos dejen de enfrentarse tras entender los motivos de su enfrentamiento. Es entonces cuando las noticias de lo sucedido en Marineford empiezan a llegar a cada uno de los compañeros de Luffy.
+        - link "¡Encuentro con el Rey Oscuro Rayleigh! Luffy debe tomar una decisión Episodio 507 ¡Encuentro con el Rey Oscuro Rayleigh! Luffy debe tomar una decisión 17 jul 2011 24 min Rayleigh ha aparecido en Amazon Lily con la intención de hablar con Luffy sobre sus planes de futuro, momento que aprovecha Trafalgar Law para marcharse. Mientras, en el archipiélago Boin, Usopp no termina de asimilar las malas noticias y busca desesperadamente la forma de regresar al archipiélago Sabaody." [ref=e1706] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/507
+          - generic [ref=e1708]:
+            - img "¡Encuentro con el Rey Oscuro Rayleigh! Luffy debe tomar una decisión" [ref=e1710]
+            - generic [ref=e1711]:
+              - generic [ref=e1712]: Episodio 507
+              - heading "¡Encuentro con el Rey Oscuro Rayleigh! Luffy debe tomar una decisión" [level=3] [ref=e1714]
+              - generic [ref=e1715]:
+                - generic [ref=e1716]:
+                  - img [ref=e1717]
+                  - text: 17 jul 2011
+                - generic [ref=e1719]:
+                  - img [ref=e1720]
+                  - text: 24 min
+              - paragraph [ref=e1723]: Rayleigh ha aparecido en Amazon Lily con la intención de hablar con Luffy sobre sus planes de futuro, momento que aprovecha Trafalgar Law para marcharse. Mientras, en el archipiélago Boin, Usopp no termina de asimilar las malas noticias y busca desesperadamente la forma de regresar al archipiélago Sabaody.
+        - link "¡Volvamos con nuestro capitán! Fuga de la isla del cielo y el incidente en la isla de invierno Episodio 508 ¡Volvamos con nuestro capitán! Fuga de la isla del cielo y el incidente en la isla de invierno 31 jul 2011 24 min Mientras Luffy y Rayleigh deciden que hacer a continuación, Nami es encarcelada por intentar robar una barca y diverso material de los investigadores meteorológicos. Por otro lado, Franky busca la forma de regresar con Luffy y vuelve al laboratorio del Dr. Vegapunk en busca de un barco rompehielos que le ayude a salir de la isla de invierno." [ref=e1724] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/508
+          - generic [ref=e1726]:
+            - img "¡Volvamos con nuestro capitán! Fuga de la isla del cielo y el incidente en la isla de invierno" [ref=e1728]
+            - generic [ref=e1729]:
+              - generic [ref=e1730]: Episodio 508
+              - heading "¡Volvamos con nuestro capitán! Fuga de la isla del cielo y el incidente en la isla de invierno" [level=3] [ref=e1732]
+              - generic [ref=e1733]:
+                - generic [ref=e1734]:
+                  - img [ref=e1735]
+                  - text: 31 jul 2011
+                - generic [ref=e1737]:
+                  - img [ref=e1738]
+                  - text: 24 min
+              - paragraph [ref=e1741]: Mientras Luffy y Rayleigh deciden que hacer a continuación, Nami es encarcelada por intentar robar una barca y diverso material de los investigadores meteorológicos. Por otro lado, Franky busca la forma de regresar con Luffy y vuelve al laboratorio del Dr. Vegapunk en busca de un barco rompehielos que le ayude a salir de la isla de invierno.
+        - link "¡Encuentro! El gran espadachín Mihawk y la lucha desesperada de Zoro Episodio 509 ¡Encuentro! El gran espadachín Mihawk y la lucha desesperada de Zoro 07 ago 2011 24 min Zoro despierta en la mansión de Mihawk donde se recupera de sus heridas, pero decide que no tiene tiempo que perder e intentará salir de la isla Kuraigana. Los Humandril se vuelven a interponer en su camino y empieza una lucha mortal bajo la mirada de Mihawk. Por otro lado, Brook también quiere regresar con Luffy, pero antes debe ayudar a los aldeanos de Namakura en su lucha contra la tribu Longarm." [ref=e1742] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/509
+          - generic [ref=e1744]:
+            - img "¡Encuentro! El gran espadachín Mihawk y la lucha desesperada de Zoro" [ref=e1746]
+            - generic [ref=e1747]:
+              - generic [ref=e1748]: Episodio 509
+              - heading "¡Encuentro! El gran espadachín Mihawk y la lucha desesperada de Zoro" [level=3] [ref=e1750]
+              - generic [ref=e1751]:
+                - generic [ref=e1752]:
+                  - img [ref=e1753]
+                  - text: 07 ago 2011
+                - generic [ref=e1755]:
+                  - img [ref=e1756]
+                  - text: 24 min
+              - paragraph [ref=e1759]: Zoro despierta en la mansión de Mihawk donde se recupera de sus heridas, pero decide que no tiene tiempo que perder e intentará salir de la isla Kuraigana. Los Humandril se vuelven a interponer en su camino y empieza una lucha mortal bajo la mirada de Mihawk. Por otro lado, Brook también quiere regresar con Luffy, pero antes debe ayudar a los aldeanos de Namakura en su lucha contra la tribu Longarm.
+        - link "¡El sufrimiento de Sanji! ¡La Reina vuelve a su Reino! Episodio 510 ¡El sufrimiento de Sanji! ¡La Reina vuelve a su Reino! 14 ago 2011 24 min Luffy pone rumbo de nuevo a Marineford. Mientras, Chopper y Nico Robin se dirigen al Archipiélago Sabaody cuando reciben nuevas noticias de su capitán. Por otro lado, Sanji se ve las caras con Emporio Ivankov en su intento por salir del Reino Kamabakka." [ref=e1760] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/510
+          - generic [ref=e1762]:
+            - img "¡El sufrimiento de Sanji! ¡La Reina vuelve a su Reino!" [ref=e1764]
+            - generic [ref=e1765]:
+              - generic [ref=e1766]: Episodio 510
+              - heading "¡El sufrimiento de Sanji! ¡La Reina vuelve a su Reino!" [level=3] [ref=e1768]
+              - generic [ref=e1769]:
+                - generic [ref=e1770]:
+                  - img [ref=e1771]
+                  - text: 14 ago 2011
+                - generic [ref=e1773]:
+                  - img [ref=e1774]
+                  - text: 24 min
+              - paragraph [ref=e1777]: Luffy pone rumbo de nuevo a Marineford. Mientras, Chopper y Nico Robin se dirigen al Archipiélago Sabaody cuando reciben nuevas noticias de su capitán. Por otro lado, Sanji se ve las caras con Emporio Ivankov en su intento por salir del Reino Kamabakka.
+        - link "¡Un regreso inexplicable! Luffy en el Cuartel General de La Marina Episodio 511 ¡Un regreso inexplicable! Luffy en el Cuartel General de La Marina 21 ago 2011 24 min Luffy regresa brevemente a Marineford en compañía de Jimbe y Rayleigh. La noticia sobre el extraño comportamiento del capitán de los Mugiwaras da la vuelta a un mundo que está en pleno proceso de transición entre dos eras." [ref=e1778] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/511
+          - generic [ref=e1780]:
+            - img "¡Un regreso inexplicable! Luffy en el Cuartel General de La Marina" [ref=e1782]
+            - generic [ref=e1783]:
+              - generic [ref=e1784]: Episodio 511
+              - heading "¡Un regreso inexplicable! Luffy en el Cuartel General de La Marina" [level=3] [ref=e1786]
+              - generic [ref=e1787]:
+                - generic [ref=e1788]:
+                  - img [ref=e1789]
+                  - text: 21 ago 2011
+                - generic [ref=e1791]:
+                  - img [ref=e1792]
+                  - text: 24 min
+              - paragraph [ref=e1795]: Luffy regresa brevemente a Marineford en compañía de Jimbe y Rayleigh. La noticia sobre el extraño comportamiento del capitán de los Mugiwaras da la vuelta a un mundo que está en pleno proceso de transición entre dos eras.
+        - link "Mensaje para los compañeros ¡Las grandes noticias llegan a ellos! Episodio 512 Mensaje para los compañeros ¡Las grandes noticias llegan a ellos! 28 ago 2011 24 min Buggy se reúne con Alvida y su antigua tripulación cuando le llega las nuevas noticias sobre Luffy. Mientras tanto, la banda de Duval se encarga de defender el Thousand Sunny de los bandidos que intentan robarlo. Por otro lado, la banda de Sombrero de Paja va captando el mensaje que su capitán les ha hecho llegar a través del News Co." [ref=e1796] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/512
+          - generic [ref=e1798]:
+            - img "Mensaje para los compañeros ¡Las grandes noticias llegan a ellos!" [ref=e1800]
+            - generic [ref=e1801]:
+              - generic [ref=e1802]: Episodio 512
+              - heading "Mensaje para los compañeros ¡Las grandes noticias llegan a ellos!" [level=3] [ref=e1804]
+              - generic [ref=e1805]:
+                - generic [ref=e1806]:
+                  - img [ref=e1807]
+                  - text: 28 ago 2011
+                - generic [ref=e1809]:
+                  - img [ref=e1810]
+                  - text: 24 min
+              - paragraph [ref=e1813]: Buggy se reúne con Alvida y su antigua tripulación cuando le llega las nuevas noticias sobre Luffy. Mientras tanto, la banda de Duval se encarga de defender el Thousand Sunny de los bandidos que intentan robarlo. Por otro lado, la banda de Sombrero de Paja va captando el mensaje que su capitán les ha hecho llegar a través del News Co.
+        - link "¡Los piratas avanzan! El movidito Nuevo Mundo Episodio 513 ¡Los piratas avanzan! El movidito Nuevo Mundo 04 sept 2011 24 min Los piratas que llegan de la Grand Line empiezan a moverse y agitar el Nuevo Mundo para ocupar el puesto dejado por Shirohige. Por otro lado, Chopper regresa a la isla Torino con la intención de quedarse y aprovechar los conocimientos médicos de los habitantes para ser de más ayuda a su capitán en el futuro." [ref=e1814] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/513
+          - generic [ref=e1816]:
+            - img "¡Los piratas avanzan! El movidito Nuevo Mundo" [ref=e1818]
+            - generic [ref=e1819]:
+              - generic [ref=e1820]: Episodio 513
+              - heading "¡Los piratas avanzan! El movidito Nuevo Mundo" [level=3] [ref=e1822]
+              - generic [ref=e1823]:
+                - generic [ref=e1824]:
+                  - img [ref=e1825]
+                  - text: 04 sept 2011
+                - generic [ref=e1827]:
+                  - img [ref=e1828]
+                  - text: 24 min
+              - paragraph [ref=e1831]: Los piratas que llegan de la Grand Line empiezan a moverse y agitar el Nuevo Mundo para ocupar el puesto dejado por Shirohige. Por otro lado, Chopper regresa a la isla Torino con la intención de quedarse y aprovechar los conocimientos médicos de los habitantes para ser de más ayuda a su capitán en el futuro.
+        - link "Sobreviviendo en el infierno. La lucha de Sanji por su hombría Episodio 514 Sobreviviendo en el infierno. La lucha de Sanji por su hombría 11 sept 2011 24 min Nami toma la decisión de quedarse en Weatheria y le pide a Haredas que le enseñe todo lo que sabe sobre climatología. Franky, por su parte, tiene el cuerpo destrozado por la explosión del laboratorio y encuentra un lugar en el que aprender de los conocimientos de Vegapunk. Sanji acepta el reto de Ivankov y se enfrentará a los maestros del Okama Kenpo para hacerse más fuerte." [ref=e1832] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/514
+          - generic [ref=e1834]:
+            - img "Sobreviviendo en el infierno. La lucha de Sanji por su hombría" [ref=e1836]
+            - generic [ref=e1837]:
+              - generic [ref=e1838]: Episodio 514
+              - heading "Sobreviviendo en el infierno. La lucha de Sanji por su hombría" [level=3] [ref=e1840]
+              - generic [ref=e1841]:
+                - generic [ref=e1842]:
+                  - img [ref=e1843]
+                  - text: 11 sept 2011
+                - generic [ref=e1845]:
+                  - img [ref=e1846]
+                  - text: 24 min
+              - paragraph [ref=e1849]: Nami toma la decisión de quedarse en Weatheria y le pide a Haredas que le enseñe todo lo que sabe sobre climatología. Franky, por su parte, tiene el cuerpo destrozado por la explosión del laboratorio y encuentra un lugar en el que aprender de los conocimientos de Vegapunk. Sanji acepta el reto de Ivankov y se enfrentará a los maestros del Okama Kenpo para hacerse más fuerte.
+        - link "¡Seré mucho más fuerte! ¡El juramento de Zoro a su capitán! Episodio 515 ¡Seré mucho más fuerte! ¡El juramento de Zoro a su capitán! 18 sept 2011 24 min En la Isla Nakamura, Brook toma la decisión de fortalecerse para poder serle de más ayuda a Luffy. Mientras, Nico Robin viaja en barco hacia Baltigo donde se reunirá con el jefe del ejército revolucionario, Dragon. En el Archipiélago Boin, Ussop se entrena para perder peso y así hacerse más fuerte para poder ayudar a Luffy a ser el Rey de los Piratas. En Kuraigana, Zoro suplica a Mihawk para que sea su maestro y así poder cumplir la promesa que le hizo a Luffy." [ref=e1850] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/515
+          - generic [ref=e1852]:
+            - img "¡Seré mucho más fuerte! ¡El juramento de Zoro a su capitán!" [ref=e1854]
+            - generic [ref=e1855]:
+              - generic [ref=e1856]: Episodio 515
+              - heading "¡Seré mucho más fuerte! ¡El juramento de Zoro a su capitán!" [level=3] [ref=e1858]
+              - generic [ref=e1859]:
+                - generic [ref=e1860]:
+                  - img [ref=e1861]
+                  - text: 18 sept 2011
+                - generic [ref=e1863]:
+                  - img [ref=e1864]
+                  - text: 24 min
+              - paragraph [ref=e1867]: En la Isla Nakamura, Brook toma la decisión de fortalecerse para poder serle de más ayuda a Luffy. Mientras, Nico Robin viaja en barco hacia Baltigo donde se reunirá con el jefe del ejército revolucionario, Dragon. En el Archipiélago Boin, Ussop se entrena para perder peso y así hacerse más fuerte para poder ayudar a Luffy a ser el Rey de los Piratas. En Kuraigana, Zoro suplica a Mihawk para que sea su maestro y así poder cumplir la promesa que le hizo a Luffy.
+        - link "¡Empieza el entrenamiento de Luffy! Nos veremos dentro de dos años, en el lugar pactado Episodio 516 ¡Empieza el entrenamiento de Luffy! Nos veremos dentro de dos años, en el lugar pactado 25 sept 2011 24 min Tras despedirse de Jimbe, Luffy viaja con Rayleigh hasta Rusukaina, una temible isla donde se llevará a cabo su entrenamiento para conseguir dominar los distintos tipos de Haki que existen. Tendrá dos años por delante antes de reunirse con sus compañeros en Sabaody." [ref=e1868] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/516
+          - generic [ref=e1870]:
+            - img "¡Empieza el entrenamiento de Luffy! Nos veremos dentro de dos años, en el lugar pactado" [ref=e1872]
+            - generic [ref=e1873]:
+              - generic [ref=e1874]: Episodio 516
+              - heading "¡Empieza el entrenamiento de Luffy! Nos veremos dentro de dos años, en el lugar pactado" [level=3] [ref=e1876]
+              - generic [ref=e1877]:
+                - generic [ref=e1878]:
+                  - img [ref=e1879]
+                  - text: 25 sept 2011
+                - generic [ref=e1881]:
+                  - img [ref=e1882]
+                  - text: 24 min
+              - paragraph [ref=e1885]: Tras despedirse de Jimbe, Luffy viaja con Rayleigh hasta Rusukaina, una temible isla donde se llevará a cabo su entrenamiento para conseguir dominar los distintos tipos de Haki que existen. Tendrá dos años por delante antes de reunirse con sus compañeros en Sabaody.
+        - link "¡Comienza un nuevo capítulo! ¡Los Sombrero de Paja juntos de nuevo! Episodio 517 ¡Comienza un nuevo capítulo! ¡Los Sombrero de Paja juntos de nuevo! 02 oct 2011 24 min Han pasado dos años desde que la banda de Sombrero de Paja se separara. Uno a uno, van regresando al archipiélago Sabaody con muchas ganas de volver a verse. Pero su desaparición durante dos años ha provocado que unos falsos Sombrero de Paja se hagan pasar por ellos en Sabaody. Luffy se separa de Hancock y de las piratas Kuja al llegar al archipiélago. Brook reaparece dando un concierto en el parque de atracciones y Sanji llega desde el infierno donde ha vivido los últimos dos años. Nami y Ussop se reencuentran en un bar y dan una lección a los falsos Sombrero de Paja que estaban allí." [ref=e1886] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/517
+          - generic [ref=e1888]:
+            - img "¡Comienza un nuevo capítulo! ¡Los Sombrero de Paja juntos de nuevo!" [ref=e1890]
+            - generic [ref=e1891]:
+              - generic [ref=e1892]: Episodio 517
+              - heading "¡Comienza un nuevo capítulo! ¡Los Sombrero de Paja juntos de nuevo!" [level=3] [ref=e1894]
+              - generic [ref=e1895]:
+                - generic [ref=e1896]:
+                  - img [ref=e1897]
+                  - text: 02 oct 2011
+                - generic [ref=e1899]:
+                  - img [ref=e1900]
+                  - text: 24 min
+              - paragraph [ref=e1903]: Han pasado dos años desde que la banda de Sombrero de Paja se separara. Uno a uno, van regresando al archipiélago Sabaody con muchas ganas de volver a verse. Pero su desaparición durante dos años ha provocado que unos falsos Sombrero de Paja se hagan pasar por ellos en Sabaody. Luffy se separa de Hancock y de las piratas Kuja al llegar al archipiélago. Brook reaparece dando un concierto en el parque de atracciones y Sanji llega desde el infierno donde ha vivido los últimos dos años. Nami y Ussop se reencuentran en un bar y dan una lección a los falsos Sombrero de Paja que estaban allí.
+        - link "¡Situación explosiva! Luffy contra el falso Luffy Episodio 518 ¡Situación explosiva! Luffy contra el falso Luffy 09 oct 2011 24 min Luffy tropieza con su falso imitador y sus compañeros, y como quiere evitar meterse en lios, se deshace de ellos rápidamente. Mientras, Chopper se encuentra con los falsos Zoro, Sanji y Robin y los confunde con los verdaderos, entonces unos agentes del gobierno secuestran a la falsa Robin. En otro Grove, Sanji, despues de visitar el Sunny, busca comida para llenar la despensa y acaba por encontrarse con Zoro." [ref=e1904] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/518
+          - generic [ref=e1906]:
+            - img "¡Situación explosiva! Luffy contra el falso Luffy" [ref=e1908]
+            - generic [ref=e1909]:
+              - generic [ref=e1910]: Episodio 518
+              - heading "¡Situación explosiva! Luffy contra el falso Luffy" [level=3] [ref=e1912]
+              - generic [ref=e1913]:
+                - generic [ref=e1914]:
+                  - img [ref=e1915]
+                  - text: 09 oct 2011
+                - generic [ref=e1917]:
+                  - img [ref=e1918]
+                  - text: 24 min
+              - paragraph [ref=e1921]: Luffy tropieza con su falso imitador y sus compañeros, y como quiere evitar meterse en lios, se deshace de ellos rápidamente. Mientras, Chopper se encuentra con los falsos Zoro, Sanji y Robin y los confunde con los verdaderos, entonces unos agentes del gobierno secuestran a la falsa Robin. En otro Grove, Sanji, despues de visitar el Sunny, busca comida para llenar la despensa y acaba por encontrarse con Zoro.
+        - link "Los marines de movilizan. El objetivo es la banda de Sombero de Paja Episodio 519 Los marines de movilizan. El objetivo es la banda de Sombero de Paja 16 oct 2011 24 min Chopper se decepciona profundamente al ver que, los que el cree son sus antiguos compañeros, no tienen intención de rescatar a Robin y se propone rescatarla él solo. Por otro lado, la Marina se empieza a preparar para frustrar el intento de reclutamiento de nuevos miembros que la banda de Sombrero de Paja ha organizado en el Grove 46. Mientras, los verdaderos Usopp y Nami encuentran a Chopper. Por su parte, Luffy se cruza con los falsos Zoro y Sanji mientras los verdaderos tienen una discusión lejos de allí." [ref=e1922] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/519
+          - generic [ref=e1924]:
+            - img "Los marines de movilizan. El objetivo es la banda de Sombero de Paja" [ref=e1926]
+            - generic [ref=e1927]:
+              - generic [ref=e1928]: Episodio 519
+              - heading "Los marines de movilizan. El objetivo es la banda de Sombero de Paja" [level=3] [ref=e1930]
+              - generic [ref=e1931]:
+                - generic [ref=e1932]:
+                  - img [ref=e1933]
+                  - text: 16 oct 2011
+                - generic [ref=e1935]:
+                  - img [ref=e1936]
+                  - text: 24 min
+              - paragraph [ref=e1939]: Chopper se decepciona profundamente al ver que, los que el cree son sus antiguos compañeros, no tienen intención de rescatar a Robin y se propone rescatarla él solo. Por otro lado, la Marina se empieza a preparar para frustrar el intento de reclutamiento de nuevos miembros que la banda de Sombrero de Paja ha organizado en el Grove 46. Mientras, los verdaderos Usopp y Nami encuentran a Chopper. Por su parte, Luffy se cruza con los falsos Zoro y Sanji mientras los verdaderos tienen una discusión lejos de allí.
+        - link "Reunión masiva. La amenaza de los falsos Sombrero de Paja Episodio 520 Reunión masiva. La amenaza de los falsos Sombrero de Paja 23 oct 2011 24 min En el Grove 46 se han reunido más de 100 piratas, algunos de ellos con recompensas altas, con la intención de unirse a la tripulación de Sombrero de Paja, sin sospechar que éstos son unos farsantes. Mientras tanto, en el Sabaody Dome, Brook esta listo para dar el último concierto a su público mientras La Marina se prepara para detenerle. En el Thousand Sunny, Rayleigh se reune con los que ya están allí para informarles que no deben atrasar más su salida del archipiélago, la Marina está a punto de actuar." [ref=e1940] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/520
+          - generic [ref=e1942]:
+            - img "Reunión masiva. La amenaza de los falsos Sombrero de Paja" [ref=e1944]
+            - generic [ref=e1945]:
+              - generic [ref=e1946]: Episodio 520
+              - heading "Reunión masiva. La amenaza de los falsos Sombrero de Paja" [level=3] [ref=e1948]
+              - generic [ref=e1949]:
+                - generic [ref=e1950]:
+                  - img [ref=e1951]
+                  - text: 23 oct 2011
+                - generic [ref=e1953]:
+                  - img [ref=e1954]
+                  - text: 24 min
+              - paragraph [ref=e1957]: En el Grove 46 se han reunido más de 100 piratas, algunos de ellos con recompensas altas, con la intención de unirse a la tripulación de Sombrero de Paja, sin sospechar que éstos son unos farsantes. Mientras tanto, en el Sabaody Dome, Brook esta listo para dar el último concierto a su público mientras La Marina se prepara para detenerle. En el Thousand Sunny, Rayleigh se reune con los que ya están allí para informarles que no deben atrasar más su salida del archipiélago, la Marina está a punto de actuar.
+        - link "¡Comienza la batalla! ¡Los resultados del entrenamiento! Episodio 521 ¡Comienza la batalla! ¡Los resultados del entrenamiento! 30 oct 2011 24 min La Marina ha llegado al lugar donde los falsos Sombrero de Paja tienen reunidos a más de cien hombres para su tripulación. Al empezar un enfrentamiento entre ellos, un Pacifista localiza al verdadero Monkey D. Luffy y éste pierde su disfraz con el que pasaba desapercibido. Tras derrotar a un Pacifista demostrando su evolución en los dos años de entrenamiento, Luffy se reune con Zoro y Sanji que han llegado al Grove 46." [ref=e1958] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/521
+          - generic [ref=e1960]:
+            - img "¡Comienza la batalla! ¡Los resultados del entrenamiento!" [ref=e1962]
+            - generic [ref=e1963]:
+              - generic [ref=e1964]: Episodio 521
+              - heading "¡Comienza la batalla! ¡Los resultados del entrenamiento!" [level=3] [ref=e1966]
+              - generic [ref=e1967]:
+                - generic [ref=e1968]:
+                  - img [ref=e1969]
+                  - text: 30 oct 2011
+                - generic [ref=e1971]:
+                  - img [ref=e1972]
+                  - text: 24 min
+              - paragraph [ref=e1975]: La Marina ha llegado al lugar donde los falsos Sombrero de Paja tienen reunidos a más de cien hombres para su tripulación. Al empezar un enfrentamiento entre ellos, un Pacifista localiza al verdadero Monkey D. Luffy y éste pierde su disfraz con el que pasaba desapercibido. Tras derrotar a un Pacifista demostrando su evolución en los dos años de entrenamiento, Luffy se reune con Zoro y Sanji que han llegado al Grove 46.
+        - link "Todos a bordo. Luffy da la señal para ir al Nuevo Mundo Episodio 522 Todos a bordo. Luffy da la señal para ir al Nuevo Mundo 06 nov 2011 24 min Toda la tripulación de Sombrero de Paja espera la llegada de su capitán en el Grove 42, y así comenzar de una vez el viaje submarino hacía la isla Gyojin. Pero la Marina se les está echando encima con tal de impedir este viaje. Sin embargo, los amigos que han echo los Sombrero de Paja en los dos años anteriores les echan una mano para que puedan zarpar sin problemas. La banda al completo se reune dos años después." [ref=e1976] [cursor=pointer]:
+          - /url: /details/tv/37854/season/13/episode/522
+          - generic [ref=e1978]:
+            - img "Todos a bordo. Luffy da la señal para ir al Nuevo Mundo" [ref=e1980]
+            - generic [ref=e1981]:
+              - generic [ref=e1982]: Episodio 522
+              - heading "Todos a bordo. Luffy da la señal para ir al Nuevo Mundo" [level=3] [ref=e1984]
+              - generic [ref=e1985]:
+                - generic [ref=e1986]:
+                  - img [ref=e1987]
+                  - text: 06 nov 2011
+                - generic [ref=e1989]:
+                  - img [ref=e1990]
+                  - text: 24 min
+              - paragraph [ref=e1993]: Toda la tripulación de Sombrero de Paja espera la llegada de su capitán en el Grove 42, y así comenzar de una vez el viaje submarino hacía la isla Gyojin. Pero la Marina se les está echando encima con tal de impedir este viaje. Sin embargo, los amigos que han echo los Sombrero de Paja en los dos años anteriores les echan una mano para que puedan zarpar sin problemas. La banda al completo se reune dos años después.
+  - button "Open Next.js Dev Tools" [ref=e1999] [cursor=pointer]:
+    - img [ref=e2000]
+  - alert [ref=e2003]

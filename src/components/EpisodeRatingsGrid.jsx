@@ -11,6 +11,8 @@ import {
   Info,
 } from "lucide-react";
 
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
 /* =======================
    Hooks (perf / mobile)
 ======================= */
@@ -167,6 +169,67 @@ export default function EpisodeRatingsGrid({
   const episodeTitlePreloadKeyRef = useRef(null);
   const activeHoverTitleKeyRef = useRef(null);
 
+  // Caché (por temporada) de los números de episodio REALES de TMDb. Necesaria
+  // porque algunas series —sobre todo anime como One Piece— numeran los
+  // episodios de forma ABSOLUTA dentro de cada temporada (p. ej. la T13 va del
+  // episodio 422 al 522, no del 1 al 101). El conteo por temporada no basta
+  // para deducir el número real, así que lo leemos de la propia temporada.
+  const seasonEpisodeNumbersCacheRef = useRef(new Map());
+  const fetchSeasonEpisodeNumbers = useCallback(
+    (seasonNumber) => {
+      const cache = seasonEpisodeNumbersCacheRef.current;
+      const key = Number(seasonNumber);
+      if (cache.has(key)) return cache.get(key);
+      const promise = (async () => {
+        try {
+          const res = await fetch(
+            `https://api.themoviedb.org/3/tv/${showId}/season/${key}?api_key=${TMDB_API_KEY}`,
+            { cache: "force-cache" },
+          );
+          if (!res.ok) return [];
+          const json = await res.json();
+          return Array.isArray(json?.episodes)
+            ? json.episodes
+                .map((e) => Number(e?.episode_number))
+                .filter((n) => Number.isFinite(n))
+                .sort((a, b) => a - b)
+            : [];
+        } catch {
+          return [];
+        }
+      })();
+      cache.set(key, promise);
+      return promise;
+    },
+    [showId],
+  );
+
+  // Convierte el destino "tentativo" (calculado por posición acumulada) en el
+  // número de episodio REAL de TMDb. Solo hace una petición cuando el destino
+  // se obtuvo por la vía ordinal (estructuras de temporadas distintas); en el
+  // resto de casos el destino ya es correcto y se devuelve tal cual.
+  const resolveTmdbEpisode = useCallback(
+    async (routeTarget) => {
+      if (!routeTarget) return null;
+      if (
+        routeTarget.via !== "ordinal" ||
+        !Number.isFinite(routeTarget.position)
+      ) {
+        return {
+          seasonNumber: routeTarget.seasonNumber,
+          episodeNumber: routeTarget.episodeNumber,
+        };
+      }
+      const numbers = await fetchSeasonEpisodeNumbers(routeTarget.seasonNumber);
+      const real = numbers[routeTarget.position - 1];
+      return {
+        seasonNumber: routeTarget.seasonNumber,
+        episodeNumber: Number.isFinite(real) ? real : routeTarget.episodeNumber,
+      };
+    },
+    [fetchSeasonEpisodeNumbers],
+  );
+
   const ensureSpanishEpisodeTitle = useCallback(
     async (tooltipData) => {
       if (!showId || !tooltipData?.titleKey || !tooltipData?.routeTarget)
@@ -179,10 +242,13 @@ export default function EpisodeRatingsGrid({
         return episodeTitleInFlightRef.current.get(titleKey);
       }
 
-      const request = fetch(
-        `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(routeTarget.seasonNumber)}/episode/${encodeURIComponent(routeTarget.episodeNumber)}`,
-        { cache: "force-cache" },
-      )
+      const request = resolveTmdbEpisode(routeTarget)
+        .then((resolved) =>
+          fetch(
+            `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(resolved.seasonNumber)}/episode/${encodeURIComponent(resolved.episodeNumber)}`,
+            { cache: "force-cache" },
+          ),
+        )
         .then((res) => (res.ok ? res.json() : null))
         .then((json) => {
           const name =
@@ -219,7 +285,7 @@ export default function EpisodeRatingsGrid({
       episodeTitleInFlightRef.current.set(titleKey, request);
       return request;
     },
-    [episodeTitleCache, showId],
+    [episodeTitleCache, showId, resolveTmdbEpisode],
   );
 
   const handleMouseEnter = useCallback(
@@ -551,9 +617,13 @@ export default function EpisodeRatingsGrid({
       let remaining = ordinal;
       for (const season of tmdbSeasonsSorted) {
         if (remaining <= season.episodeCount) {
+          // `position` = índice (1-based) del episodio dentro de la temporada.
+          // El `episodeNumber` aquí es solo tentativo (asume numeración 1..N);
+          // `resolveTmdbEpisode` lo corrige con el número real de la temporada.
           return {
             seasonNumber: season.seasonNumber,
             episodeNumber: remaining,
+            position: remaining,
           };
         }
         remaining -= season.episodeCount;
@@ -579,12 +649,13 @@ export default function EpisodeRatingsGrid({
         return {
           seasonNumber: visualSeason,
           episodeNumber: visualEpisode,
+          via: "direct",
         };
       }
 
       const ordinal = visualEpisodeOrdinal(visualSeason, visualEpisode);
       const mapped = mapOrdinalToTmdbEpisode(ordinal);
-      if (mapped) return mapped;
+      if (mapped) return { ...mapped, via: "ordinal" };
 
       const originalSeason = Number(ep?._origSeasonNumber);
       const originalEpisode = Number(ep?._origEpisodeNumber);
@@ -592,12 +663,14 @@ export default function EpisodeRatingsGrid({
         return {
           seasonNumber: originalSeason,
           episodeNumber: originalEpisode,
+          via: "orig",
         };
       }
 
       return {
         seasonNumber: visualSeason,
         episodeNumber: visualEpisode,
+        via: "visual",
       };
     },
     [mapOrdinalToTmdbEpisode, tmdbSeasonsSorted, visualEpisodeOrdinal],
@@ -758,18 +831,22 @@ export default function EpisodeRatingsGrid({
 
   // navegación a detalles
   const goToEpisode = useCallback(
-    (ep, seasonNumber, episodeNumber) => {
+    async (ep, seasonNumber, episodeNumber) => {
       if (!showId) return;
       if (!ep || ep.isUnaired) return;
 
       const target = resolveEpisodeRouteTarget(ep, seasonNumber, episodeNumber);
-      const s = target?.seasonNumber;
-      const e = target?.episodeNumber;
+      // Corrige el número de episodio al real de TMDb antes de navegar (evita
+      // 404 en series con numeración absoluta cuyas estructuras de temporadas
+      // no coinciden con la tabla de valoraciones).
+      const resolved = await resolveTmdbEpisode(target);
+      const s = resolved?.seasonNumber;
+      const e = resolved?.episodeNumber;
       if (s == null || e == null) return;
 
       router.push(`/details/tv/${showId}/season/${s}/episode/${e}`);
     },
-    [resolveEpisodeRouteTarget, router, showId],
+    [resolveEpisodeRouteTarget, resolveTmdbEpisode, router, showId],
   );
 
   const gridSize = seasonsSorted.length * maxEpisodes;

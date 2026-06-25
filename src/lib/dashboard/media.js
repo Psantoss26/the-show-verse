@@ -114,7 +114,12 @@ export function getArtworkPreference(movieId) {
 }
 
 export function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
+  const {
+    preferLangs = ["en", "en-US"],
+    minWidth = 1200,
+    offset = 0,
+    includeNoLanguage = true,
+  } = opts;
 
   if (!Array.isArray(list) || list.length === 0) return null;
 
@@ -137,28 +142,30 @@ export function pickBestBackdropByLangResVotes(list, opts = {}) {
     const candidates = (sizeFiltered.length ? sizeFiltered : pool).slice(0, 3);
     if (!candidates.length) return null;
 
-    // 1) 1920x1080
-    const b1080 = candidates.find(
-      (b) => (b?.width || 0) === 1920 && (b?.height || 0) === 1080,
-    );
-    if (b1080) return b1080;
+    const preferredSizes = [
+      [1920, 1080],
+      [1712, 964],
+      [3840, 2160],
+    ];
+    const ordered = [];
+    for (const [width, height] of preferredSizes) {
+      const match = candidates.find(
+        (b) => (b?.width || 0) === width && (b?.height || 0) === height,
+      );
+      if (match && !ordered.includes(match)) ordered.push(match);
+    }
+    for (const candidate of candidates) {
+      if (!ordered.includes(candidate)) ordered.push(candidate);
+    }
 
-    // 2) 1712x964
-    const b1712 = candidates.find(
-      (b) => (b?.width || 0) === 1712 && (b?.height || 0) === 964,
-    );
-    if (b1712) return b1712;
-
-    // 3) 4K 3840x2160
-    const b4k = candidates.find(
-      (b) => (b?.width || 0) === 3840 && (b?.height || 0) === 2160,
-    );
-    if (b4k) return b4k;
-
-    return candidates[0];
+    return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
   };
 
-  return pickFrom(preferred) || pickFrom(withLanguage) || pickFrom(noLanguage);
+  return (
+    pickFrom(preferred) ||
+    pickFrom(withLanguage) ||
+    (includeNoLanguage ? pickFrom(noLanguage) : null)
+  );
 }
 
 export function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -222,7 +229,7 @@ export async function getMovieImages(itemId, mediaType = "movie") {
   }
 }
 
-export async function fetchBestBackdrop(itemId, mediaType = "movie") {
+export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) {
   const { backdrops } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
@@ -230,6 +237,7 @@ export async function fetchBestBackdrop(itemId, mediaType = "movie") {
     preferLangs: ["en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
+    ...opts,
   });
 
   return best?.file_path || null;
@@ -237,28 +245,39 @@ export async function fetchBestBackdrop(itemId, mediaType = "movie") {
 
 // Selecciona el mejor backdrop SIN idioma (textless, iso_639_1 nulo), ideal para
 // superponer un logotipo encima. Si no hay textless, cae al de mayor resolución.
-export function pickBestBackdropNoLang(list, { minWidth = 1280 } = {}) {
+export function pickBestBackdropNoLang(
+  list,
+  { minWidth = 1280, offset = 0, limit = 0, excludePaths = [] } = {},
+) {
   if (!Array.isArray(list) || list.length === 0) return null;
 
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const noLang = list.filter((b) => !norm(b?.iso_639_1));
   const pool = noLang.length ? noLang : list;
+  const excluded = new Set(excludePaths.filter(Boolean));
 
   const sized = pool.filter((b) => (b?.width || 0) >= minWidth);
   const candidates = sized.length ? sized : pool;
+  const limitedCandidates =
+    Number.isFinite(limit) && limit > 0 ? candidates.slice(0, limit) : candidates;
+  const sorted = limitedCandidates
+    .map((backdrop, position) => ({ backdrop, position }))
+    .filter(({ backdrop }) => !excluded.has(backdrop?.file_path))
+    .sort((a, b) =>
+      (b.backdrop?.width || 0) - (a.backdrop?.width || 0) ||
+      (b.backdrop?.height || 0) - (a.backdrop?.height || 0) ||
+      (b.backdrop?.vote_average || 0) - (a.backdrop?.vote_average || 0) ||
+      a.position - b.position,
+    )
+    .map(({ backdrop }) => backdrop);
 
-  return (
-    [...candidates].sort(
-      (a, b) =>
-        (b?.width || 0) - (a?.width || 0) ||
-        (b?.vote_average || 0) - (a?.vote_average || 0),
-    )[0] || null
-  );
+  const index = Math.max(0, Math.min(sorted.length - 1, Number(offset) || 0));
+  return sorted[index] || null;
 }
 
-export async function fetchBestBackdropNoLang(itemId, mediaType = "movie") {
+export async function fetchBestBackdropNoLang(itemId, mediaType = "movie", opts = {}) {
   const { backdrops } = await getMovieImages(itemId, mediaType);
-  const best = pickBestBackdropNoLang(backdrops);
+  const best = pickBestBackdropNoLang(backdrops, opts);
   return best?.file_path || null;
 }
 

@@ -12,14 +12,20 @@ import { Play, Heart, BookmarkPlus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
 import {
+  getVideos,
   getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
 } from "@/lib/api/tmdb";
+import {
+  uniqBy,
+  isPlayableVideo,
+  rankVideo,
+  videoEmbedUrl,
+} from "@/lib/details/videos";
 import LiquidButton from "@/components/LiquidButton";
 import {
   buildImg,
-  PREVIEW_BACKDROP_SIZE,
   fetchBestBackdrop,
   getArtworkPreference,
   movieBackdropCache,
@@ -134,6 +140,9 @@ const shimmer = {
 /* =================== STYLE CONSTANTS =================== */
 // Tamaños base (backdrop horizontal ~16:9) y alto de fila compartido.
 const ROW_HEIGHT = "h-[126px] sm:h-[146px] md:h-[168px] xl:h-[190px]";
+const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
+const CONTINUE_WATCHING_IMAGE_QUALITY = 92;
+const CONTINUE_WATCHING_TRAILER_LANGUAGES = ["es-ES", "en-US"];
 
 const cwPreviewCardClass =
   "relative isolate grid h-full w-full grid-rows-[72%_28%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu " +
@@ -146,6 +155,75 @@ const cwBackdropFadeStyle = {
   maskImage:
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
 };
+
+function normalizePreviewVideos(rawVideos) {
+  const source = Array.isArray(rawVideos) ? rawVideos : EMPTY_ARRAY;
+  const merged = uniqBy(source, (v) => `${v?.site}:${v?.key}`).filter(
+    isPlayableVideo,
+  );
+  merged.sort((a, b) => rankVideo(a) - rankVideo(b));
+  return merged;
+}
+
+function getVideoIdentity(video) {
+  return video?.site && video?.key ? `${video.site}:${video.key}` : "";
+}
+
+async function fetchPreviewTrailerVideos(tvId) {
+  if (!tvId) return EMPTY_ARRAY;
+  const responses = await Promise.all(
+    CONTINUE_WATCHING_TRAILER_LANGUAGES.map((language) =>
+      getVideos("tv", tvId, language).catch(() => ({ results: EMPTY_ARRAY })),
+    ),
+  );
+  return normalizePreviewVideos(
+    responses.flatMap((data) =>
+      Array.isArray(data?.results) ? data.results : EMPTY_ARRAY,
+    ),
+  );
+}
+
+function pickNextPreviewTrailer(videos, currentVideo, skippedKeys) {
+  if (!Array.isArray(videos) || !videos.length) return null;
+  const currentKey = getVideoIdentity(currentVideo);
+  const currentIndex = videos.findIndex(
+    (candidate) => getVideoIdentity(candidate) === currentKey,
+  );
+
+  for (let i = 1; i <= videos.length; i += 1) {
+    const candidate = videos[(Math.max(currentIndex, 0) + i) % videos.length];
+    const candidateKey = getVideoIdentity(candidate);
+    if (candidateKey && !skippedKeys.has(candidateKey)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function buildPreviewTrailerSrc(video) {
+  const embedUrl = videoEmbedUrl(video, true);
+  if (!embedUrl) return null;
+
+  if (video.site === "YouTube") {
+    const origin =
+      typeof window !== "undefined"
+        ? encodeURIComponent(window.location.origin)
+        : "";
+    return (
+      `https://www.youtube-nocookie.com/embed/${video.key}` +
+      `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+      `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
+      `&start=5&enablejsapi=1&widget_referrer=${origin}&origin=${origin}`
+    );
+  }
+
+  if (video.site === "Vimeo") {
+    const separator = embedUrl.includes("?") ? "&" : "?";
+    return `${embedUrl}${separator}muted=1&controls=0#t=5s`;
+  }
+
+  return embedUrl;
+}
 
 /* =================== HELPERS =================== */
 function clampPct(value) {
@@ -167,7 +245,8 @@ function genresText(show) {
   return names.slice(0, 2).join(" • ");
 }
 
-// Carga el mejor backdrop EN (inglés) de la serie, con caché compartida.
+// Carga una variante del backdrop EN de la serie, separada del criterio normal
+// del dashboard para que Continuar viendo no repita siempre la misma imagen.
 function useShowBackdrop(show) {
   const [backdropPath, setBackdropPath] = useState(null);
   const [ready, setReady] = useState(false);
@@ -189,7 +268,7 @@ function useShowBackdrop(show) {
         backdrop_path: show.backdrop_path,
         poster_path: show.poster_path,
       };
-      const cacheKey = getBackdropCacheKey(movie, "tv");
+      const cacheKey = `${getBackdropCacheKey(movie, "tv")}:continue-next`;
 
       const { backdrop: userBackdrop } = getArtworkPreference(show.id);
       if (userBackdrop) {
@@ -205,7 +284,10 @@ function useShowBackdrop(show) {
       }
 
       try {
-        const preferred = await fetchBestBackdrop(show.id, "tv");
+        const preferred = await fetchBestBackdrop(show.id, "tv", {
+          offset: 1,
+          includeNoLanguage: false,
+        });
         const chosen = preferred || getPreviewBackdropFallback(movie);
         movieBackdropCache.set(cacheKey, chosen);
         reveal(chosen);
@@ -230,7 +312,9 @@ function useShowBackdrop(show) {
  * ==================================================================== */
 function ContinueWatchingBaseCard({ show }) {
   const { backdropPath, ready } = useShowBackdrop(show);
-  const bgSrc = backdropPath ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE) : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
+    : null;
   const pct = clampPct(show?.pct);
   const ep = show?.nextEpisode;
 
@@ -254,6 +338,7 @@ function ContinueWatchingBaseCard({ show }) {
           alt={show?.title || ""}
           fill
           sizes="(min-width:1280px) 338px, (min-width:768px) 300px, 224px"
+          quality={CONTINUE_WATCHING_IMAGE_QUALITY}
           className={`object-cover transition-opacity duration-200 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
@@ -284,7 +369,15 @@ function ContinueWatchingBaseCard({ show }) {
  * Tarjeta hover: backdrop ampliado (16:9) + panel de info
  * con botones Continuar / Favoritos / Pendientes
  * ==================================================================== */
-function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, perView = 6 }) {
+function ContinueWatchingPreviewCard({
+  show,
+  index,
+  totalCount,
+  activeIndex,
+  perView = 6,
+  onPreviewMouseEnter,
+  onPreviewMouseLeave,
+}) {
   const { session, account } = useAuth();
   const router = useRouter();
   const { backdropPath, ready } = useShowBackdrop(show);
@@ -294,9 +387,17 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, per
   const [watchlist, setWatchlist] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [trailer, setTrailer] = useState(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const [trailerReady, setTrailerReady] = useState(false);
+  const [trailerVisible, setTrailerVisible] = useState(false);
 
   const href = nextEpisodeHref(show);
   const prefetchedRef = useRef(false);
+  const trailerIframeRef = useRef(null);
+  const trailerRevealTimerRef = useRef(null);
+  const trailerVideosRef = useRef(EMPTY_ARRAY);
+  const skippedTrailerKeysRef = useRef(new Set());
 
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
@@ -333,6 +434,106 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, per
       cancel = true;
     };
   }, [show, session, account]);
+
+  useEffect(() => {
+    let cancel = false;
+    setTrailer(null);
+    setTrailerReady(false);
+    setTrailerVisible(false);
+    trailerVideosRef.current = EMPTY_ARRAY;
+    skippedTrailerKeysRef.current = new Set();
+    if (trailerRevealTimerRef.current) {
+      window.clearTimeout(trailerRevealTimerRef.current);
+      trailerRevealTimerRef.current = null;
+    }
+
+    const load = async () => {
+      if (!show?.id) return;
+      try {
+        setTrailerLoading(true);
+        const videos = await fetchPreviewTrailerVideos(show.id);
+        if (!cancel) {
+          trailerVideosRef.current = videos;
+          setTrailer(videos[0] || null);
+        }
+      } catch {
+        if (!cancel) setTrailer(null);
+      } finally {
+        if (!cancel) setTrailerLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancel = true;
+      if (trailerRevealTimerRef.current) {
+        window.clearTimeout(trailerRevealTimerRef.current);
+        trailerRevealTimerRef.current = null;
+      }
+    };
+  }, [show?.id]);
+
+  useEffect(() => {
+    if (!trailer?.key || trailer.site !== "YouTube") return;
+
+    const handleMessage = (event) => {
+      if (
+        event.origin !== "https://www.youtube-nocookie.com" &&
+        event.origin !== "https://www.youtube.com"
+      ) {
+        return;
+      }
+
+      let data = event.data;
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+
+      if (data?.event === "onError") {
+        setTrailer((currentTrailer) => {
+          const currentKey = getVideoIdentity(currentTrailer);
+          if (currentKey) skippedTrailerKeysRef.current.add(currentKey);
+          return pickNextPreviewTrailer(
+            trailerVideosRef.current,
+            currentTrailer,
+            skippedTrailerKeysRef.current,
+          );
+        });
+        setTrailerReady(false);
+        setTrailerVisible(false);
+        return;
+      }
+
+      const state = Number(data?.info);
+      const isPlayingOrBuffering =
+        data?.event === "onStateChange" && (state === 1 || state === 3);
+      if (!isPlayingOrBuffering) return;
+
+      setTrailerReady(true);
+      if (trailerRevealTimerRef.current) {
+        window.clearTimeout(trailerRevealTimerRef.current);
+      }
+      // YouTube suele mostrar un icono central de pausa/play durante el arranque.
+      // Revelamos el iframe un instante después de empezar para no mostrarlo.
+      trailerRevealTimerRef.current = window.setTimeout(() => {
+        setTrailerVisible(true);
+        trailerRevealTimerRef.current = null;
+      }, 700);
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      if (trailerRevealTimerRef.current) {
+        window.clearTimeout(trailerRevealTimerRef.current);
+        trailerRevealTimerRef.current = null;
+      }
+    };
+  }, [trailer?.key, trailer?.site]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -399,7 +600,10 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, per
     }
   };
 
-  const bgSrc = backdropPath ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE) : null;
+  const bgSrc = backdropPath
+    ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
+    : null;
+  const trailerSrc = buildPreviewTrailerSrc(trailer);
   const pct = clampPct(show?.pct);
   const ep = show?.nextEpisode;
   const genres = genresText(show);
@@ -431,25 +635,52 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, per
     transformOrigin = "right center";
   }
 
+  const previewWidthPercent =
+    visibleCount <= 3
+      ? 158
+      : visibleCount === 4
+        ? 154
+        : visibleCount === 5
+          ? 148
+          : 144;
+  const previewScale = visibleCount >= 6 ? 1.07 : 1.09;
+  const previewMaxWidth =
+    visibleCount >= 6 ? "min(144%, 470px)" : `${previewWidthPercent}%`;
+  const previewImageSizes =
+    visibleCount <= 3
+      ? "(min-width:1280px) 560px, (min-width:768px) 500px, 420px"
+      : visibleCount === 4
+        ? "(min-width:1280px) 500px, (min-width:768px) 450px, 380px"
+        : visibleCount === 5
+          ? "(min-width:1536px) 480px, (min-width:1280px) 440px, 380px"
+          : "(min-width:1536px) 470px, (min-width:1280px) 430px, 380px";
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.88, y: 0 }}
-      animate={{ opacity: 1, scale: 1.12, y: -10 }}
-      exit={{ opacity: 0, scale: 0.88, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
+      initial={{ opacity: 0, scale: 0.9, y: 0 }}
+      animate={{ opacity: 1, scale: previewScale, y: -8 }}
+      exit={{ opacity: 0, scale: 0.9, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
       transition={{
         type: "spring",
         stiffness: 180,
         damping: 20,
         mass: 0.8
       }}
-      // El ancho es proporcional a la tarjeta base (150% del ancho de la
-      // columna, que es el contenedor relativo): si las tarjetas se reducen, la
-      // vista previa se reduce con ellas.
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[150%] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
+      // El ancho se calcula según las tarjetas visibles del breakpoint activo:
+      // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
+      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
       onClick={() => router.push(href)}
-      onMouseEnter={prefetchHref}
+      onMouseEnter={(event) => {
+        onPreviewMouseEnter?.(event);
+        prefetchHref();
+      }}
+      onMouseLeave={onPreviewMouseLeave}
       onFocus={prefetchHref}
-      style={{ willChange: "transform, opacity", transformOrigin }}
+      style={{
+        width: previewMaxWidth,
+        willChange: "transform, opacity",
+        transformOrigin,
+      }}
     >
       {/* Backdrop de 16:9 */}
       <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
@@ -476,13 +707,68 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, per
               src={bgSrc}
               alt={show?.title || ""}
               fill
-              sizes="(min-width:1280px) 420px, (min-width:768px) 380px, 320px"
-              className={`scale-[1.015] object-cover transition-opacity duration-200 ${
+              sizes={previewImageSizes}
+              quality={CONTINUE_WATCHING_IMAGE_QUALITY}
+              className={`object-cover transition-opacity duration-200 ${
                 ready ? "opacity-100" : "opacity-0"
               }`}
               style={cwBackdropFadeStyle}
               loading="eager"
-              fetchPriority="high"
+              fetchPriority="low"
+            />
+          </motion.div>
+        )}
+
+        {trailerLoading && !trailerReady && (
+          <div className="pointer-events-none absolute inset-0 bg-black/10" />
+        )}
+
+        {trailerSrc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: trailerVisible ? 1 : 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+          >
+            <iframe
+              key={getVideoIdentity(trailer)}
+              ref={trailerIframeRef}
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[178%] w-[138%] -translate-x-1/2 -translate-y-1/2"
+              src={trailerSrc}
+              title={`Trailer - ${show?.title || ""}`}
+              width="1280"
+              height="720"
+              loading="eager"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen={false}
+              referrerPolicy="strict-origin-when-cross-origin"
+              onLoad={() => {
+                try {
+                  if (trailer.site !== "YouTube") {
+                    window.setTimeout(() => {
+                      setTrailerReady(true);
+                      setTrailerVisible(true);
+                    }, 350);
+                    return;
+                  }
+
+                  const win = trailerIframeRef.current?.contentWindow;
+                  if (!win) return;
+                  const target = "https://www.youtube-nocookie.com";
+                  const cmd = (func, args = []) =>
+                    win.postMessage(
+                      JSON.stringify({ event: "command", func, args }),
+                      target,
+                    );
+                  window.setTimeout(() => {
+                    cmd("mute");
+                    cmd("seekTo", [5, true]);
+                    cmd("playVideo");
+                  }, 180);
+                } catch {
+                  // El fallback visual sigue siendo el backdrop.
+                }
+              }}
             />
           </motion.div>
         )}
@@ -644,6 +930,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   // cuántas diapositivas avanzar con las flechas.
   const [perView, setPerView] = useState(6);
   const hoverTimeoutRef = useRef(null);
+  const hoverCloseTimeoutRef = useRef(null);
+  const hoveredIdRef = useRef(null);
 
   // Limpiar temporizador al desmontar
   useEffect(() => {
@@ -651,34 +939,62 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
+      if (hoverCloseTimeoutRef.current) {
+        clearTimeout(hoverCloseTimeoutRef.current);
+      }
     };
   }, []);
 
-  const handleMouseEnterItem = (itemKey, index) => {
-    if (isMobile) return;
+  useEffect(() => {
+    hoveredIdRef.current = hoveredId;
+  }, [hoveredId]);
+
+  const clearHoverOpenTimer = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
+  };
+
+  const clearHoverCloseTimer = () => {
+    if (hoverCloseTimeoutRef.current) {
+      clearTimeout(hoverCloseTimeoutRef.current);
+      hoverCloseTimeoutRef.current = null;
+    }
+  };
+
+  const openPreview = (itemKey, index) => {
+    clearHoverCloseTimer();
+    hoveredIdRef.current = itemKey;
+    setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
+    setHoveredId(itemKey);
+    setHoveredIndex(index);
+  };
+
+  const closePreview = (itemKey) => {
+    if (hoveredIdRef.current !== itemKey) return;
+    hoveredIdRef.current = null;
+    setAnimatingOutId(itemKey);
+    setHoveredId(null);
+    setHoveredIndex(null);
+  };
+
+  const handleMouseEnterItem = (itemKey, index) => {
+    if (isMobile) return;
+    clearHoverCloseTimer();
+    clearHoverOpenTimer();
     hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredId(itemKey);
-      setHoveredIndex(index);
+      openPreview(itemKey, index);
     }, 250); // 250ms de retraso para evitar activaciones accidentales y agilizar la apertura
   };
 
   const handleMouseLeaveItem = (itemKey) => {
     if (isMobile) return;
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setHoveredId((prev) => {
-      if (prev === itemKey) {
-        setAnimatingOutId(itemKey);
-        return null;
-      }
-      return prev;
-    });
-    setHoveredIndex(null);
+    clearHoverOpenTimer();
+    clearHoverCloseTimer();
+    hoverCloseTimeoutRef.current = window.setTimeout(() => {
+      closePreview(itemKey);
+    }, 120);
   };
 
 
@@ -816,9 +1132,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   }
 
   // En escritorio el nº de tarjetas por fila escala con el ancho disponible
-  // (el dashboard ocupa todo el viewport, sin contenedor max-width), de modo
-  // que cada vista previa 16:9 conserva un tamaño legible (~230px) en lugar de
-  // comprimir siempre 6 tarjetas. En móvil se mantiene el ancho fijo con scroll.
+  // hasta un máximo de 6. En móvil se mantiene el ancho fijo con scroll.
   const breakpoints = isMobile
     ? {
         0: { slidesPerView: 2, spaceBetween: 10 },
@@ -829,12 +1143,6 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         1024: { slidesPerView: 4, spaceBetween: 16 },
         1280: { slidesPerView: 5, spaceBetween: 18 },
         1536: { slidesPerView: 6, spaceBetween: 20 },
-        1920: { slidesPerView: 7, spaceBetween: 20 },
-        // En pantallas muy anchas seguimos añadiendo columnas para acotar el
-        // ancho de tarjeta (~260px) y que la vista previa proporcional no
-        // exceda el espacio vertical reservado.
-        2304: { slidesPerView: 8, spaceBetween: 20 },
-        2560: { slidesPerView: 9, spaceBetween: 20 },
       };
 
   const swiperKey = `continue-watching-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
@@ -853,18 +1161,12 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         className="relative"
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
-          if (hoverTimeoutRef.current) {
-            clearTimeout(hoverTimeoutRef.current);
-            hoverTimeoutRef.current = null;
-          }
+          clearHoverOpenTimer();
           setIsHoveredRow(false);
-          setHoveredId((prev) => {
-            if (prev) {
-              setAnimatingOutId(prev);
-            }
-            return null;
-          });
-          setHoveredIndex(null);
+          const currentHoveredId = hoveredIdRef.current;
+          if (currentHoveredId) {
+            handleMouseLeaveItem(currentHoveredId);
+          }
         }}
       >
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
@@ -932,7 +1234,9 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                       isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
                     }`}
                     onMouseEnter={() => handleMouseEnterItem(itemKey, i)}
-                    onMouseLeave={() => handleMouseLeaveItem(itemKey)}
+                    onMouseLeave={() => {
+                      if (!isActive) handleMouseLeaveItem(itemKey);
+                    }}
                   >
                     <AnimatePresence
                       initial={false}
@@ -945,6 +1249,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                         <div
                           key="preview"
                           className="hidden sm:block"
+                          onMouseEnter={() => openPreview(itemKey, i)}
                         >
                           <ContinueWatchingPreviewCard
                             show={show}
@@ -952,6 +1257,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                             totalCount={shows.length}
                             activeIndex={activeIndex}
                             perView={perView}
+                            onPreviewMouseEnter={() => openPreview(itemKey, i)}
+                            onPreviewMouseLeave={() => closePreview(itemKey)}
                           />
                         </div>
                       ) : (

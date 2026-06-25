@@ -75,6 +75,48 @@ function getNormalizedRatingSeasons(ratings) {
     .sort((a, b) => a.seasonNumber - b.seasonNumber);
 }
 
+function getTmdbSeasonsSorted(tmdbSeasons) {
+  return (Array.isArray(tmdbSeasons) ? tmdbSeasons : [])
+    .map((season) => {
+      const number = Number(season?.season_number ?? season?.seasonNumber);
+      const count = Number(season?.episode_count ?? season?.episodeCount);
+      if (!Number.isFinite(number) || number <= 0) return null;
+      if (!Number.isFinite(count) || count <= 0) return null;
+      return { number, count };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.number - b.number);
+}
+
+// Rango de número de episodio ABSOLUTO que cubre una temporada de TMDb,
+// asumiendo numeración acumulada (la que usa el anime tipo One Piece). Para la
+// T13 de One Piece (101 eps, con 421 antes) devuelve { start: 422, end: 522 }.
+function getAbsoluteRangeForTmdbSeason(tmdbSeasonsSorted, seasonNumber) {
+  const target = Number(seasonNumber);
+  let start = 1;
+  for (const season of tmdbSeasonsSorted) {
+    if (season.number === target) {
+      return { start, end: start + season.count - 1 };
+    }
+    if (season.number < target) start += season.count;
+  }
+  return null;
+}
+
+function aggregateEpisodeRatings(episodes) {
+  const list = Array.isArray(episodes) ? episodes : [];
+  const values = list
+    .map((episode) => getSeriesGraphRating(episode))
+    .filter((rating) => rating != null);
+  if (!values.length) return null;
+  const votes = list.reduce(
+    (sum, episode) => sum + (getSeriesGraphVotes(episode) || 0),
+    0,
+  );
+  const rating = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return { rating: Number(rating.toFixed(1)), votes: votes > 0 ? votes : null };
+}
+
 function getTmdbEpisodeOrdinal(tmdbSeasons, seasonNumber, episodeNumber) {
   const targetSeasonNumber = Number(seasonNumber);
   const targetEpisodeNumber = Number(episodeNumber);
@@ -87,26 +129,27 @@ function getTmdbEpisodeOrdinal(tmdbSeasons, seasonNumber, episodeNumber) {
     return null;
   }
 
-  const seasons = (Array.isArray(tmdbSeasons) ? tmdbSeasons : [])
-    .map((season) => {
-      const number = Number(season?.season_number ?? season?.seasonNumber);
-      const count = Number(season?.episode_count ?? season?.episodeCount);
-      if (!Number.isFinite(number) || number <= 0) return null;
-      if (!Number.isFinite(count) || count <= 0) return null;
-      return { number, count };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.number - b.number);
-
+  const seasons = getTmdbSeasonsSorted(tmdbSeasons);
   if (!seasons.length) return null;
 
-  let ordinal = targetEpisodeNumber;
+  let cumulativeStart = 0;
+  let targetCount = null;
   for (const season of seasons) {
-    if (season.number >= targetSeasonNumber) break;
-    ordinal += season.count;
+    if (season.number === targetSeasonNumber) {
+      targetCount = season.count;
+      break;
+    }
+    if (season.number < targetSeasonNumber) cumulativeStart += season.count;
   }
 
-  return ordinal;
+  // Si el número de episodio ya supera el tamaño de su temporada, TMDb usa
+  // numeración ABSOLUTA (p. ej. T13 de One Piece = 422..522), así que el número
+  // ya ES el ordinal. En caso contrario es relativo a la temporada y sumamos el
+  // desplazamiento de las temporadas anteriores.
+  if (targetCount != null && targetEpisodeNumber > targetCount) {
+    return targetEpisodeNumber;
+  }
+  return targetEpisodeNumber + cumulativeStart;
 }
 
 function mapTmdbRouteToRatingsEpisode({
@@ -198,9 +241,49 @@ export async function fetchSeriesGraphRatingsCached({
   return promise;
 }
 
+// Media de SeriesGraph por temporada de TMDb. Devuelve un Map(seasonNumber ->
+// { rating, votes }). Cuando SeriesGraph entrega una única temporada absoluta
+// pero TMDb reparte los episodios en varias temporadas (anime), reparte los
+// episodios por el rango absoluto que cubre cada temporada de TMDb; así las
+// puntuaciones dejan de mostrarse solo en la temporada 1.
+export function getSeriesGraphSeasonAverages({ ratings, tmdbSeasons } = {}) {
+  const seasons = getNormalizedRatingSeasons(ratings);
+  const result = new Map();
+  if (!seasons.length) return result;
+
+  const tmdbSorted = getTmdbSeasonsSorted(tmdbSeasons);
+  const flattened = seasons.length === 1 && tmdbSorted.length > 1;
+
+  if (!flattened) {
+    seasons.forEach(({ seasonNumber, episodes }) => {
+      const aggregate = aggregateEpisodeRatings(episodes);
+      if (aggregate) result.set(seasonNumber, aggregate);
+    });
+    return result;
+  }
+
+  const allEpisodes = seasons[0].episodes;
+  for (const tmdbSeason of tmdbSorted) {
+    const range = getAbsoluteRangeForTmdbSeason(tmdbSorted, tmdbSeason.number);
+    if (!range) continue;
+    const inRange = allEpisodes.filter((episode) => {
+      const number = getEpisodeNumber(episode);
+      return (
+        Number.isFinite(number) &&
+        number >= range.start &&
+        number <= range.end
+      );
+    });
+    const aggregate = aggregateEpisodeRatings(inRange);
+    if (aggregate) result.set(tmdbSeason.number, aggregate);
+  }
+  return result;
+}
+
 export function getSeriesGraphSeasonAggregate({
   ratings,
   seasonNumber,
+  tmdbSeasons,
   showId,
   title,
 } = {}) {
@@ -209,28 +292,14 @@ export function getSeriesGraphSeasonAggregate({
     return null;
   }
 
-  const seasons = getNormalizedRatingSeasons(ratings);
-  const seasonWrapper = seasons.find(
-    (item) => item.seasonNumber === targetSeasonNumber,
-  );
-  const season = seasonWrapper?.season;
-  const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
-  const values = episodes
-    .map((episode) => getSeriesGraphRating(episode))
-    .filter((rating) => rating != null);
-
-  if (!values.length) return null;
-
-  const voteTotal = episodes.reduce(
-    (sum, episode) => sum + (getSeriesGraphVotes(episode) || 0),
-    0,
-  );
-  const rating = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const averages = getSeriesGraphSeasonAverages({ ratings, tmdbSeasons });
+  const aggregate = averages.get(targetSeasonNumber);
+  if (!aggregate || aggregate.rating == null) return null;
 
   return {
     id: null,
-    rating: Number(rating.toFixed(1)),
-    votes: voteTotal > 0 ? voteTotal : null,
+    rating: aggregate.rating,
+    votes: aggregate.votes,
     source: "seriesgraph",
     url: ratings?.meta?.providerUrl || buildSeriesGraphUrl(showId, title),
   };

@@ -195,6 +195,7 @@ import {
   rankVideo,
   pickPreferredVideo,
 } from "@/lib/details/videos";
+import { getSeriesGraphSeasonAverages } from "@/lib/details/seriesGraphRatings";
 
 // -- Componentes atomicos para la UI de detalle --
 import {
@@ -6887,40 +6888,36 @@ export default function DetailsClient({
   );
 
   const seriesGraphSeasonRatings = useMemo(() => {
-    const rawSeasons = Array.isArray(ratings?.seasons)
-      ? ratings.seasons
-      : Array.isArray(ratings)
-        ? ratings
-        : [];
-
-    const map = new Map();
-
-    rawSeasons.forEach((season) => {
-      const seasonNumber = getSeasonNumber(season);
-      if (seasonNumber == null || seasonNumber <= 0) return;
-
-      const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
-      const values = episodes
-        .map((episode) =>
-          toRatingNumber(
-            episode?.seriesGraphRating ??
-              episode?.seriesgraphRating ??
-              episode?.series_graph_rating ??
-              episode?.rating ??
-              episode?.vote_average,
-          ),
-        )
-        .filter((rating) => rating != null);
-
-      if (!values.length) return;
-
-      const average =
-        values.reduce((sum, rating) => sum + rating, 0) / values.length;
-      map.set(seasonNumber, Number(average.toFixed(1)));
+    // Reparte la media de SeriesGraph por temporada de TMDb. Necesita las
+    // temporadas de TMDb porque algunas series (anime tipo One Piece) traen una
+    // única temporada absoluta en SeriesGraph que TMDb divide en varias; sin
+    // esto las puntuaciones solo aparecerían en la temporada 1.
+    const averages = getSeriesGraphSeasonAverages({
+      ratings,
+      tmdbSeasons: Array.isArray(data?.seasons) ? data.seasons : [],
     });
-
+    const map = new Map();
+    averages.forEach((aggregate, seasonNumber) => {
+      if (aggregate?.rating != null) map.set(seasonNumber, aggregate.rating);
+    });
     return map;
-  }, [ratings]);
+  }, [ratings, data?.seasons]);
+
+  // Estructura "aplanada": SeriesGraph trae una sola temporada con numeración
+  // absoluta (anime tipo One Piece) que TMDb divide en varias. En ese caso la
+  // nota por temporada del dataset IMDb (/api/ratings/season) no es fiable —su
+  // numeración no coincide y devuelve la media global para la T1—, así que
+  // damos prioridad a la media por rango de SeriesGraph, que sí es consistente.
+  const seriesGraphIsFlattened = useMemo(() => {
+    const sgSeasons = Array.isArray(ratings?.seasons) ? ratings.seasons : [];
+    const airedTmdbSeasons = (
+      Array.isArray(data?.seasons) ? data.seasons : []
+    ).filter(
+      (s) =>
+        Number(s?.season_number) > 0 && Number(s?.episode_count) > 0,
+    );
+    return sgSeasons.length === 1 && airedTmdbSeasons.length > 1;
+  }, [ratings, data?.seasons]);
 
   useEffect(() => {
     if (type !== "tv" || !resolvedImdbId || !visibleSeasonNumbers.length) {
@@ -12125,7 +12122,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               );
                               const seriesGraphRating =
                                 seriesGraphSeasonRatings.get(sn) ?? null;
-                              const rating = imdbRating ?? seriesGraphRating;
+                              const rating = seriesGraphIsFlattened
+                                ? (seriesGraphRating ?? imdbRating)
+                                : (imdbRating ?? seriesGraphRating);
                               const imdbSeasonUrl = resolvedImdbId
                                 ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
                                 : null;
