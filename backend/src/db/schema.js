@@ -15,6 +15,7 @@ import {
   index,
   check,
   real,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -224,4 +225,35 @@ export const subscriptions = pgTable('subscriptions', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   userIdIdx: index('idx_subscriptions_user_id').on(t.userId),
+}));
+
+// ─────────────────────────────────────────────
+// DASHBOARD POOLS
+// ─────────────────────────────────────────────
+export const dashboardPools = pgTable('dashboard_pools', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  poolKey: text('pool_key').notNull(),          // 'trending','popular','top_rated','acclaimed','blockbusters','hidden_gems','new_releases','region_top','genre:28','decade:1990'
+  mediaType: text('media_type').notNull(),       // 'movie' | 'tv'
+  items: jsonb('items').notNull().default([]),    // card item array
+  builtAt: timestamp('built_at', { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  keyTypeUq: unique('uq_dashboard_pools_key_type').on(t.poolKey, t.mediaType),
+  expiresIdx: index('idx_dashboard_pools_expires').on(t.expiresAt),
+}));
+
+// ─────────────────────────────────────────────
+// USER RECOMMENDATIONS
+// ─────────────────────────────────────────────
+export const userRecommendations = pgTable('user_recommendations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaType: text('media_type').notNull(),       // 'movie' | 'tv'
+  items: jsonb('items').notNull().default([]),    // rec item array
+  basisHash: text('basis_hash').notNull().default(''),
+  builtAt: timestamp('built_at', { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  userTypeUq: unique('uq_user_rec_user_type').on(t.userId, t.mediaType),
+  userIdx: index('idx_user_rec_user').on(t.userId),
 }));
