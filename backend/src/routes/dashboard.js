@@ -33,6 +33,11 @@ async function resolvePoolItems(poolKey, mediaType) {
   return getPool(poolKey, mediaType).catch(() => []);
 }
 
+// Desfase de semilla por superficie: la rotación diaria sigue cambiando cada
+// día, pero con una fase distinta en Inicio/Películas/Series para que "Para ti"
+// (y las filas rotativas) no muestren exactamente el mismo set entre dashboards.
+const SURFACE_SEED_OFFSET = { home: 0, movies: 1009, series: 2017 };
+
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 export default async function dashboardRoutes(fastify) {
   fastify.get('/:surface', async (req, reply) => {
@@ -40,7 +45,7 @@ export default async function dashboardRoutes(fastify) {
     const surface = SURFACES[surfaceKey];
     if (!surface) return reply.status(404).send({ error: 'Unknown surface' });
 
-    const seed = dayNumber();
+    const seed = dayNumber() + (SURFACE_SEED_OFFSET[surfaceKey] || 0);
     const userId = req.user?.id || null;
 
     // ── Build generic specs ──────────────────────────────────────────────────
@@ -124,7 +129,10 @@ export default async function dashboardRoutes(fastify) {
     // ── Personalized specs (authed only) ─────────────────────────────────────
     let personalized = false;
     let personalSpecs = [];
-    const excludeIds = new Set();
+    // Títulos "ya vistos" (historial ∪ favoritos ∪ valorados). Las filas
+    // genéricas los permiten sin límite; las personalizadas, de forma acotada
+    // (seenRatioLimit). NO se excluyen por completo de ninguna fila.
+    const seenIds = new Set();
 
     if (userId) {
       try {
@@ -136,8 +144,8 @@ export default async function dashboardRoutes(fastify) {
         }
         personalSpecs = personalizedRowDefs(recsByType, surface);
         personalized = personalSpecs.length > 0;
-        for (const r of [...lib.history, ...lib.favorites]) {
-          excludeIds.add(`${r.mediaType}:${r.tmdbId}`);
+        for (const r of [...lib.history, ...lib.favorites, ...lib.ratings]) {
+          seenIds.add(`${r.mediaType}:${r.tmdbId}`);
         }
       } catch (e) {
         req.log?.warn?.({ e }, 'dashboard personalization failed');
@@ -150,7 +158,7 @@ export default async function dashboardRoutes(fastify) {
       rotationSeed: seed,
       perRow: 20,
       minItems: 15, // toda fila debe tener al menos 15 elementos
-      excludeIds,
+      seenIds,
     });
 
     reply.header('Cache-Control', 'private, max-age=300');

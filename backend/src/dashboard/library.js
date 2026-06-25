@@ -19,11 +19,18 @@ function fnv1a(str) {
 // ─────────────────────────────────────────────
 // Weight helper: rating → weight contribution
 // ─────────────────────────────────────────────
+// Las valoraciones altas son la señal principal y pesan por encima de favoritos,
+// historial y watchlist. Por debajo de 7 no genera semilla (no gustó lo bastante).
 function ratingWeight(rating) {
-  if (rating >= 8) return 5;
-  if (rating === 7) return 3;
+  if (rating >= 9) return 10; // señal principal
+  if (rating === 8) return 7; // señal positiva
+  if (rating === 7) return 4; // señal secundaria
   return 0;
 }
+
+const FAVORITE_WEIGHT = 6;  // fuerte, pero por debajo de valoraciones muy altas
+const HISTORY_WEIGHT = 2;   // visionado sin valoración: señal débil
+const WATCHLIST_WEIGHT = 1; // pendiente: señal muy débil
 
 // ─────────────────────────────────────────────
 // buildSeeds — pure
@@ -32,52 +39,65 @@ function ratingWeight(rating) {
  * Build a weighted seed list from the user's library.
  *
  * Weights (summed when a title appears in multiple sources):
- *   rating ≥ 8  → 5
- *   favorite    → 4
- *   rating === 7 → 3
- *   recent history (distinct tmdbId:mediaType) → 2
- *   watchlist   → 1
+ *   rating ≥ 9  → 10   (señal principal)
+ *   rating = 8  → 7    (señal positiva)
+ *   favorite    → 6    (fuerte, bajo valoraciones muy altas)
+ *   rating = 7  → 4    (señal secundaria)
+ *   history     → 2    (visionado sin valoración)
+ *   watchlist   → 1    (pendiente)
+ *
+ * `strongPositive` = el usuario realmente disfrutó el título (rating ≥ 8 o
+ * favorito). Solo estas semillas habilitan filas "Porque viste…".
  *
  * @param {{ favorites: {tmdbId, mediaType, title?}[], ratings: {tmdbId, mediaType, rating, title?}[], history: {tmdbId, mediaType, title?}[], watchlist: {tmdbId, mediaType, title?}[] }} param0
- * @returns {{ tmdbId: number, mediaType: string, weight: number, title: string|null }[]}
+ * @returns {{ tmdbId: number, mediaType: string, weight: number, title: string|null, strongPositive: boolean }[]}
  */
 export function buildSeeds({ favorites: favs = [], ratings = [], history = [], watchlist: wl = [] }) {
-  /** @type {Map<string, { tmdbId: number, mediaType: string, weight: number, title: string|null }>} */
+  /** @type {Map<string, { tmdbId: number, mediaType: string, weight: number, title: string|null, maxRating: number, favorite: boolean }>} */
   const map = new Map();
 
-  function addWeight(tmdbId, mediaType, delta, title) {
+  function ensure(tmdbId, mediaType, title) {
     const key = `${mediaType}:${tmdbId}`;
     if (!map.has(key)) {
-      map.set(key, { tmdbId, mediaType, weight: 0, title: title || null });
+      map.set(key, { tmdbId, mediaType, weight: 0, title: title || null, maxRating: 0, favorite: false });
     } else if (title && !map.get(key).title) {
       map.get(key).title = title;
     }
-    map.get(key).weight += delta;
+    return map.get(key);
   }
 
-  // ratings (≥8 → 5, ===7 → 3, <7 → 0)
+  // ratings (≥9 → 10, =8 → 7, =7 → 4, <7 → 0)
   for (const r of ratings) {
-    const w = ratingWeight(r.rating);
-    if (w > 0) addWeight(r.tmdbId, r.mediaType, w, r.title);
+    const entry = ensure(r.tmdbId, r.mediaType, r.title);
+    if (typeof r.rating === 'number' && r.rating > entry.maxRating) entry.maxRating = r.rating;
+    entry.weight += ratingWeight(r.rating);
   }
 
-  // favorites → 4
+  // favorites → 6
   for (const f of favs) {
-    addWeight(f.tmdbId, f.mediaType, 4, f.title);
+    const entry = ensure(f.tmdbId, f.mediaType, f.title);
+    entry.favorite = true;
+    entry.weight += FAVORITE_WEIGHT;
   }
 
   // history (each distinct tmdbId:mediaType) → 2
   for (const h of history) {
-    addWeight(h.tmdbId, h.mediaType, 2, h.title);
+    ensure(h.tmdbId, h.mediaType, h.title).weight += HISTORY_WEIGHT;
   }
 
   // watchlist → 1
   for (const w of wl) {
-    addWeight(w.tmdbId, w.mediaType, 1, w.title);
+    ensure(w.tmdbId, w.mediaType, w.title).weight += WATCHLIST_WEIGHT;
   }
 
-  // Sort by weight desc, cap to 25
+  // Descartamos las entradas sin peso (p. ej. solo valoraciones < 7).
+  // Marcamos strongPositive y ordenamos por peso (valoración alta primero).
   return Array.from(map.values())
+    .filter((s) => s.weight > 0)
+    .map(({ maxRating, favorite, ...s }) => ({
+      ...s,
+      strongPositive: maxRating >= 8 || favorite,
+    }))
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 25);
 }

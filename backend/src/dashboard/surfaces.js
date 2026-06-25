@@ -196,14 +196,36 @@ export const SURFACES = {
   },
 };
 
+// Proporción máxima de títulos ya vistos en filas personalizadas.
+const FOR_YOU_SEEN_LIMIT = 0.3;   // "Para ti"/"Más para ti": algunos vistos, sin dominar
+const BECAUSE_SEEN_LIMIT = 0.15;  // "Porque viste…": vistos solo como excepción
+
+// Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (20) para que
+// la rotación con semilla por superficie produzca subconjuntos distintos entre
+// Inicio/Películas/Series (variedad) sin salir de las mejores recomendaciones.
+const FOR_YOU_POOL = 40;
+const BECAUSE_POOL = 30;
+
+// Intercala dos listas conservando el orden de cada una (para mezclar pelis y
+// series en Inicio sin que un tipo domine por puntuación).
+function interleaveByScore(a, b) {
+  const out = [];
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i += 1) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
 /**
  * Build personalized row defs from recommendation items.
  *
  * @param {{ movie: recItem[], tv: recItem[] }} recsByType
  * @param {{ mediaTypes: ('movie'|'tv')[], genericRows: any[] }} surface
- * @returns {Array<{ key: string, title: string, reason?: string, mediaType: string, items: object[], rotate: boolean }>}
+ * @returns {Array<{ key, title, reason?, mediaType, items, rotate, seenRatioLimit }>}
  *
- * recItem = { ...card, score: number, reasons: Array<{ type: 'because'|'based_on_genres', seedTmdbId?: number, seedTitle?: string }> }
+ * recItem = { ...card, score, reasons: Array<{ type:'because'|'based_on_genres', seedTmdbId?, seedTitle? }> }
  */
 export function personalizedRowDefs(recsByType, surface) {
   // 1. Merge all recItems across the surface's mediaTypes, sorted by score desc
@@ -218,18 +240,29 @@ export function personalizedRowDefs(recsByType, surface) {
 
   const rows = [];
 
-  // 2. "Para ti" row — top 20
+  // 2. "Para ti" — en Inicio mezcla pelis y series; pool amplio + rotación por
+  //    superficie para que no se repita el mismo set entre dashboards.
+  let forYouPool;
+  if (isHome) {
+    const mv = all.filter((i) => i.mediaType === 'movie');
+    const tv = all.filter((i) => i.mediaType === 'tv');
+    forYouPool = interleaveByScore(mv, tv);
+  } else {
+    forYouPool = all;
+  }
   rows.push({
     key: 'for_you',
     title: 'Para ti',
     reason: undefined,
     mediaType: primaryMediaType,
-    items: all.slice(0, 20),
-    rotate: false,
+    items: forYouPool.slice(0, FOR_YOU_POOL),
+    rotate: true,
+    seenRatioLimit: FOR_YOU_SEEN_LIMIT,
   });
 
-  // 3. "Porque viste {seedTitle}" rows (max 2)
-  // Group by first 'because' reason's seedTmdbId
+  // 3. "Porque viste {seedTitle}" (máx 2). Las razones 'because' solo provienen
+  //    de semillas que el usuario disfrutó (rating ≥ 8 o favorito; ver score.js),
+  //    así que estas filas reflejan gustos reales, no visionados casuales.
   const becauseGroups = new Map(); // seedTmdbId -> { seedTitle, items: recItem[] }
   for (const item of all) {
     const becauseReason = item.reasons?.find((r) => r.type === 'because');
@@ -242,7 +275,7 @@ export function personalizedRowDefs(recsByType, surface) {
     becauseGroups.get(seedTmdbId).items.push(item);
   }
 
-  // Sort by group size desc, take top 2 with >= 15 items (mínimo por fila)
+  // Top 2 grupos con >= 15 candidatos (mínimo por fila)
   const topBecauseGroups = [...becauseGroups.entries()]
     .filter(([, g]) => g.items.length >= 15)
     .sort(([, a], [, b]) => b.items.length - a.items.length)
@@ -252,14 +285,15 @@ export function personalizedRowDefs(recsByType, surface) {
     rows.push({
       key: `because_${seedTmdbId}`,
       title: `Porque viste ${seedTitle}`,
-      reason: 'Recomendado por tu historial',
+      reason: 'Porque te gustó',
       mediaType: primaryMediaType,
-      items: items.slice(0, 20),
-      rotate: false,
+      items: items.slice(0, BECAUSE_POOL),
+      rotate: true,
+      seenRatioLimit: BECAUSE_SEEN_LIMIT,
     });
   }
 
-  // 4. "Más para ti según tus gustos" row — items with based_on_genres reason
+  // 4. "Más para ti" — relleno por afinidad de género
   const genreFillItems = all.filter((item) =>
     item.reasons?.some((r) => r.type === 'based_on_genres'),
   );
@@ -270,8 +304,9 @@ export function personalizedRowDefs(recsByType, surface) {
       title: 'Más para ti',
       reason: undefined,
       mediaType: primaryMediaType,
-      items: genreFillItems.slice(0, 20),
-      rotate: false,
+      items: genreFillItems.slice(0, FOR_YOU_POOL),
+      rotate: true,
+      seenRatioLimit: FOR_YOU_SEEN_LIMIT,
     });
   }
 
