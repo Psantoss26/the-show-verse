@@ -59,10 +59,28 @@ function readContinueWatchingCache() {
     ) {
       return null;
     }
-    return parsed.shows;
+    // La caché pudo escribirse con una versión anterior que duplicaba series:
+    // deduplicamos al leer para no renderizar keys `tv:<id>` repetidas.
+    return dedupeByKey(parsed.shows, (s) => s?.id);
   } catch {
     return null;
   }
+}
+
+// Deduplica una lista por una clave (normalizada a string, así "1" y 1 no se
+// tratan como distintos). Conserva la primera aparición y descarta claves nulas.
+function dedupeByKey(list, getKey) {
+  const seen = new Set();
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    const raw = getKey(x);
+    if (raw == null) continue;
+    const key = String(raw);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(x);
+  }
+  return out;
 }
 
 function writeContinueWatchingCache(shows) {
@@ -82,17 +100,10 @@ function writeContinueWatchingCache(shows) {
 }
 
 function mapInProgressItems(items) {
-  // Deduplicar por tmdbId: una misma serie puede tener varios episodios en curso,
-  // pero solo mostramos una tarjeta por serie (y evitamos keys `tv:<id>` repetidas).
+  // Deduplicar por tmdbId (una misma serie puede tener varios episodios en curso):
+  // solo mostramos una tarjeta por serie y evitamos keys `tv:<id>` repetidas.
   // Se conserva la primera aparición (la fuente viene ordenada por más reciente).
-  const seen = new Set();
-  return (Array.isArray(items) ? items : EMPTY_ARRAY)
-    .filter((it) => {
-      if (!it?.tmdbId) return false;
-      if (seen.has(it.tmdbId)) return false;
-      seen.add(it.tmdbId);
-      return true;
-    })
+  return dedupeByKey(items, (it) => it?.tmdbId)
     .slice(0, MAX_ITEMS)
     .map((it) => {
       const season = Number(it?.nextEpisode?.season);
