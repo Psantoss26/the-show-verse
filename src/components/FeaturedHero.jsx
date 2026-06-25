@@ -44,12 +44,10 @@ import {
   formatRuntime,
 } from "@/lib/dashboard/media";
 
-// El hero convive con previews interactivas en la misma vista. Usamos tamaños
-// acotados para no competir con los backdrops de hover del dashboard.
-// El backdrop se sirve a un tamaño acotado (no "original") para que la primera
-// carga sea rápida: Next reoptimiza, así que w1280 cubre el hero a pantalla
-// completa con una fracción del peso/decodificado de la imagen original.
-const HERO_BACKDROP_SIZE = "w1280";
+// El backdrop del hero se pide en la variante original de TMDB y Next lo sirve
+// optimizado para el viewport activo, preservando la máxima calidad disponible.
+const HERO_BACKDROP_SIZE = "original";
+const HERO_IMAGE_QUALITY = 100;
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 7000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
@@ -58,6 +56,10 @@ const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
 
 const traktTypeOf = (mediaType) => (mediaType === "tv" ? "show" : "movie");
+
+function uniquePaths(paths) {
+  return [...new Set(paths.filter(Boolean))];
+}
 
 /* =================== PREFERENCIA GLOBAL DE SOUNDTRACK ===================
  * El soundtrack del Hero suena por defecto. Si el usuario lo silencia con el
@@ -674,6 +676,7 @@ function FeaturedSlide({
               fill
               priority={isActive}
               sizes="100vw"
+              quality={HERO_IMAGE_QUALITY}
               onLoad={() => setLoadedBackdropSrc(bgSrc)}
               className={
                 isMobile
@@ -1214,10 +1217,12 @@ function FeaturedSlide({
 export default function FeaturedHero({ items = [], isMobile }) {
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
+  const lastBackdropChoiceRef = useRef(new Map());
   const pointerStartRef = useRef(null);
   const suppressClickRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [assets, setAssets] = useState({}); // id -> { backdrop, poster, logo }
+  const [assets, setAssets] = useState({}); // id -> { backdrop, backdrops, poster, logo }
+  const [selectedBackdrops, setSelectedBackdrops] = useState({});
   const [isInteracting, setIsInteracting] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
 
@@ -1243,17 +1248,27 @@ export default function FeaturedHero({ items = [], isMobile }) {
       resolvingAssetsRef.current.add(id);
       const mediaType = getMediaTypeForItem(movie);
       let backdrop = null;
+      let backdrops = [];
       let poster = null;
       let logo = null;
 
       try {
         const { backdrop: userBackdrop } = getArtworkPreference(id);
-        backdrop =
-          userBackdrop ||
-          (await fetchBestBackdropNoLang(id, mediaType)) ||
-          getPreviewBackdropFallback(movie);
+        const primaryBackdrop =
+          userBackdrop || (await fetchBestBackdropNoLang(id, mediaType));
+        const secondaryBackdrop = await fetchBestBackdropNoLang(id, mediaType, {
+          limit: 5,
+          excludePaths: [primaryBackdrop],
+        });
+        backdrops = uniquePaths([
+          primaryBackdrop,
+          secondaryBackdrop,
+          getPreviewBackdropFallback(movie),
+        ]).slice(0, 2);
+        backdrop = backdrops[0] || null;
       } catch {
         backdrop = getPreviewBackdropFallback(movie);
+        backdrops = uniquePaths([backdrop]);
       }
 
       try {
@@ -1267,7 +1282,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
       } catch { }
 
       setAssets((prev) =>
-        prev[id] ? prev : { ...prev, [id]: { backdrop, poster, logo } },
+        prev[id] ? prev : { ...prev, [id]: { backdrop, backdrops, poster, logo } },
       );
       resolvingAssetsRef.current.delete(id);
     },
@@ -1300,12 +1315,55 @@ export default function FeaturedHero({ items = [], isMobile }) {
     return () => window.clearTimeout(timer);
   }, [activeIndex, goToNext, isInteracting, list.length, trailerOpen]);
 
+  const activeMovie = list[activeIndex] || list[0] || null;
+  const activeAssets = activeMovie ? assets[activeMovie.id] || {} : {};
+  const activeBackdropOptions = useMemo(
+    () =>
+      activeMovie
+        ? uniquePaths([
+            ...(Array.isArray(activeAssets.backdrops)
+              ? activeAssets.backdrops
+              : []),
+            activeAssets.backdrop,
+            getPreviewBackdropFallback(activeMovie),
+          ])
+        : [],
+    [activeAssets.backdrop, activeAssets.backdrops, activeMovie],
+  );
+  const activeBackdropSignature = activeBackdropOptions.join("|");
+  const selectedBackdrop = activeMovie ? selectedBackdrops[activeMovie.id] : null;
+  const activeBackdrop =
+    selectedBackdrop?.signature === activeBackdropSignature
+      ? selectedBackdrop.path
+      : activeBackdropOptions[0] || null;
+
+  useEffect(() => {
+    if (!activeMovie?.id || activeBackdropOptions.length === 0) return;
+
+    const lastIndex = lastBackdropChoiceRef.current.get(activeMovie.id);
+    let nextIndex = 0;
+
+    if (activeBackdropOptions.length > 1) {
+      nextIndex =
+        typeof lastIndex === "number"
+          ? lastIndex === 0
+            ? 1
+            : 0
+          : Math.floor(Math.random() * activeBackdropOptions.length);
+    }
+
+    lastBackdropChoiceRef.current.set(activeMovie.id, nextIndex);
+    setSelectedBackdrops((prev) => ({
+      ...prev,
+      [activeMovie.id]: {
+        path: activeBackdropOptions[nextIndex],
+        signature: activeBackdropSignature,
+      },
+    }));
+  }, [activeMovie?.id, activeIndex, activeBackdropOptions, activeBackdropSignature]);
+
   if (!list.length) return null;
 
-  const activeMovie = list[activeIndex] || list[0];
-  const activeAssets = assets[activeMovie.id] || {};
-  const activeBackdrop =
-    activeAssets.backdrop || getPreviewBackdropFallback(activeMovie) || null;
   // Fallback inmediato del póster (móvil) con el dato ya disponible del servidor
   // para pintar al instante, mientras se resuelve en segundo plano el mejor.
   const activePoster =

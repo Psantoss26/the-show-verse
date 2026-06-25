@@ -685,6 +685,7 @@ export default function SeasonDetailsClient({
         nextImdb = getSeriesGraphSeasonAggregate({
           ratings: seriesGraphRatings,
           seasonNumber,
+          tmdbSeasons: show?.seasons,
           showId,
           title: showName,
         });
@@ -712,7 +713,7 @@ export default function SeasonDetailsClient({
       controller.abort();
       cancelSchedule();
     };
-  }, [showId, showImdbId, seasonNumber, imdb, showName]);
+  }, [showId, showImdbId, seasonNumber, imdb, showName, show?.seasons]);
 
   // Rate (Trakt)
   const [userRating, setUserRating] = useState(null);

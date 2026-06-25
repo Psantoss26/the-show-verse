@@ -1,0 +1,324 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - link "Películas" [ref=e10] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e11] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e12] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e13] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e15]:
+        - link "Listas" [ref=e16] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e18]
+        - link "Calendario" [ref=e20] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e22]
+        - link "En Progreso" [ref=e24] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e26]
+        - link "Historial" [ref=e28] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e30]
+        - link "Favoritas" [ref=e33] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e35]
+        - link "Pendientes" [ref=e37] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e39]
+      - generic [ref=e42]:
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e49]
+        - button "Abrir recomendador de qué ver" [ref=e50]:
+          - img [ref=e51]
+  - generic [ref=e55]:
+    - generic [ref=e62]:
+      - generic [ref=e63]:
+        - heading "One Piece" [level=1] [ref=e64]
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - generic [ref=e67]: "1999"
+            - generic [ref=e69]: 24m
+            - generic [ref=e71]: En emisión
+          - generic [ref=e73]:
+            - generic [ref=e74]: Acción y aventura
+            - generic [ref=e75]: Comedia
+            - generic [ref=e76]: Animación
+      - generic [ref=e78]:
+        - button "Sin Tráiler" [disabled] [ref=e79]:
+          - img [ref=e81]
+        - button "Reproducir soundtrack" [ref=e83]:
+          - img [ref=e85]
+        - button "Cargando estado de Trakt..." [disabled] [ref=e90]:
+          - img [ref=e92]
+        - button "Puntuar" [disabled] [ref=e94]:
+          - img [ref=e96]
+        - button "Cargando estado de favoritos" [disabled] [ref=e98]:
+          - img [ref=e100]
+        - button "Cargando estado de pendientes" [disabled] [ref=e102]:
+          - img [ref=e104]
+      - generic [ref=e108]:
+        - link "Ver en TMDb" [ref=e110] [cursor=pointer]:
+          - /url: https://www.themoviedb.org/tv/37854
+          - img "Provider" [ref=e112]
+          - generic [ref=e113]:
+            - generic [ref=e115]: "8.7"
+            - generic [ref=e117]: 5,4K
+          - generic: Ver en TMDb
+        - generic [ref=e120]:
+          - button "Enlace externo" [ref=e122]:
+            - generic: Enlace externo
+          - button "JustWatch" [ref=e123]:
+            - generic: JustWatch
+          - button "Enlace externo" [ref=e124]:
+            - generic: Enlace externo
+          - button "FilmAffinity" [ref=e125]:
+            - generic: FilmAffinity
+        - button "Compartir" [ref=e128]:
+          - img [ref=e129]
+          - generic [ref=e135]: Compartir
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - button "Detalles" [ref=e139]: Detalles
+          - button "Producción" [ref=e141]
+          - button "Sinopsis" [ref=e142]
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - img [ref=e148]
+            - generic [ref=e151]:
+              - generic [ref=e152]: Título Original
+              - generic [ref=e153]: ワンピース
+          - generic [ref=e154]:
+            - img [ref=e156]
+            - generic [ref=e160]:
+              - generic [ref=e161]: Formato
+              - generic [ref=e162]: 23 Temp. / 1181 Caps.
+          - generic [ref=e163]:
+            - img [ref=e165]
+            - generic [ref=e167]:
+              - generic [ref=e168]: Inicio
+              - generic [ref=e169]: 20 oct 1999
+          - generic [ref=e170]:
+            - img [ref=e172]
+            - generic [ref=e174]:
+              - generic [ref=e175]: Última emisión
+              - generic [ref=e176]: 21 jun 2026
+    - generic [ref=e177]:
+      - navigation [ref=e181]:
+        - generic [ref=e188]:
+          - button "Reparto" [ref=e189]:
+            - generic [ref=e190]:
+              - img [ref=e192]
+              - generic [ref=e197]: Reparto
+          - button "Recomendaciones" [ref=e198]:
+            - generic [ref=e199]:
+              - img [ref=e201]
+              - generic [ref=e204]: Recomendaciones
+          - button "Media" [ref=e205]:
+            - generic [ref=e206]:
+              - img [ref=e208]
+              - generic [ref=e212]: Media
+          - button "Sentimientos" [ref=e213]:
+            - generic [ref=e214]:
+              - img [ref=e216]
+              - generic [ref=e218]: Sentimientos
+          - button "Temporadas" [ref=e219]:
+            - generic [ref=e220]:
+              - img [ref=e222]
+              - generic [ref=e226]: Temporadas
+          - button "Episodios" [ref=e227]:
+            - generic [ref=e228]:
+              - img [ref=e230]
+              - generic [ref=e233]: Episodios
+          - button "Comentarios" [ref=e234]:
+            - generic [ref=e235]:
+              - img [ref=e237]
+              - generic [ref=e239]: Comentarios
+          - button "Listas" [ref=e240]:
+            - generic [ref=e241]:
+              - img [ref=e243]
+              - generic [ref=e245]: Listas
+      - generic [ref=e246]:
+        - generic [ref=e249]:
+          - generic [ref=e250]:
+            - img [ref=e253]
+            - heading "Reparto Principal" [level=2] [ref=e258]
+          - generic [ref=e265]:
+            - link "Mayumi Tanaka Mayumi Tanaka Monkey D. Luffy (voice)" [ref=e267] [cursor=pointer]:
+              - /url: /details/person/65510
+              - generic [ref=e268]:
+                - img "Mayumi Tanaka" [ref=e269]
+                - generic [ref=e271]:
+                  - paragraph [ref=e272]: Mayumi Tanaka
+                  - paragraph [ref=e273]: Monkey D. Luffy (voice)
+            - link "Kazuya Nakai Kazuya Nakai Roronoa Zoro (voice)" [ref=e275] [cursor=pointer]:
+              - /url: /details/person/84507
+              - generic [ref=e276]:
+                - img "Kazuya Nakai" [ref=e277]
+                - generic [ref=e279]:
+                  - paragraph [ref=e280]: Kazuya Nakai
+                  - paragraph [ref=e281]: Roronoa Zoro (voice)
+            - link "矢口真里 矢口真里 Yoko (voice)" [ref=e283] [cursor=pointer]:
+              - /url: /details/person/1089376
+              - generic [ref=e284]:
+                - img "矢口真里" [ref=e285]
+                - generic [ref=e287]:
+                  - paragraph [ref=e288]: 矢口真里
+                  - paragraph [ref=e289]: Yoko (voice)
+            - link "Akemi Okamura Akemi Okamura Nami (voice)" [ref=e291] [cursor=pointer]:
+              - /url: /details/person/90133
+              - generic [ref=e292]:
+                - img "Akemi Okamura" [ref=e293]
+                - generic [ref=e295]:
+                  - paragraph [ref=e296]: Akemi Okamura
+                  - paragraph [ref=e297]: Nami (voice)
+            - link "Kappei Yamaguchi Kappei Yamaguchi Usopp (voice)" [ref=e299] [cursor=pointer]:
+              - /url: /details/person/68472
+              - generic [ref=e300]:
+                - img "Kappei Yamaguchi" [ref=e301]
+                - generic [ref=e303]:
+                  - paragraph [ref=e304]: Kappei Yamaguchi
+                  - paragraph [ref=e305]: Usopp (voice)
+            - link "Hiroaki Hirata Hiroaki Hirata Sanji (voice)" [ref=e307] [cursor=pointer]:
+              - /url: /details/person/84505
+              - generic [ref=e308]:
+                - img "Hiroaki Hirata" [ref=e309]
+                - generic [ref=e311]:
+                  - paragraph [ref=e312]: Hiroaki Hirata
+                  - paragraph [ref=e313]: Sanji (voice)
+            - link "Ikue Otani Ikue Otani Tony Tony Chopper (voice)" [ref=e315] [cursor=pointer]:
+              - /url: /details/person/73044
+              - generic [ref=e316]:
+                - img "Ikue Otani" [ref=e317]
+                - generic [ref=e319]:
+                  - paragraph [ref=e320]: Ikue Otani
+                  - paragraph [ref=e321]: Tony Tony Chopper (voice)
+            - link "Yuriko Yamaguchi Yuriko Yamaguchi Nico Robin (voice)" [ref=e323] [cursor=pointer]:
+              - /url: /details/person/77933
+              - generic [ref=e324]:
+                - img "Yuriko Yamaguchi" [ref=e325]
+                - generic [ref=e327]:
+                  - paragraph [ref=e328]: Yuriko Yamaguchi
+                  - paragraph [ref=e329]: Nico Robin (voice)
+            - link "Kazuki Yao Kazuki Yao Franky (voice)" [ref=e331] [cursor=pointer]:
+              - /url: /details/person/112276
+              - generic [ref=e332]:
+                - img "Kazuki Yao" [ref=e333]
+                - generic [ref=e335]:
+                  - paragraph [ref=e336]: Kazuki Yao
+                  - paragraph [ref=e337]: Franky (voice)
+            - link "Katsuhisa Houki Katsuhisa Houki Jinbe (voice)" [ref=e339] [cursor=pointer]:
+              - /url: /details/person/554432
+              - generic [ref=e340]:
+                - img "Katsuhisa Houki" [ref=e341]
+                - generic [ref=e343]:
+                  - paragraph [ref=e344]: Katsuhisa Houki
+                  - paragraph [ref=e345]: Jinbe (voice)
+            - link "Cho Cho Brook (voice)" [ref=e347] [cursor=pointer]:
+              - /url: /details/person/560354
+              - generic [ref=e348]:
+                - img "Cho" [ref=e349]
+                - generic [ref=e351]:
+                  - paragraph [ref=e352]: Cho
+                  - paragraph [ref=e353]: Brook (voice)
+            - link "Hideyuki Tanaka Hideyuki Tanaka Donquixote Doflamingo (voice)" [ref=e355] [cursor=pointer]:
+              - /url: /details/person/67471
+              - generic [ref=e356]:
+                - img "Hideyuki Tanaka" [ref=e357]
+                - generic [ref=e359]:
+                  - paragraph [ref=e360]: Hideyuki Tanaka
+                  - paragraph [ref=e361]: Donquixote Doflamingo (voice)
+        - generic [ref=e362]:
+          - generic [ref=e365]:
+            - generic [ref=e366]:
+              - img [ref=e369]
+              - heading "Portadas y fondos" [level=2] [ref=e373]
+            - generic [ref=e377]:
+              - generic [ref=e378]:
+                - generic [ref=e379]:
+                  - button "Portada" [ref=e380]
+                  - button "Vista previa" [ref=e381]
+                  - button "Fondo" [ref=e382]
+                - button "Resolución" [ref=e384]:
+                  - generic [ref=e385]:
+                    - generic [ref=e386]: RES
+                    - generic [ref=e387]: Todas
+                  - img [ref=e388]
+                - generic "Idioma" [ref=e390]:
+                  - button "ES" [ref=e391]
+                  - button "EN" [ref=e392]
+              - button "Restaurar valores por defecto" [ref=e393]:
+                - img [ref=e394]
+          - generic [ref=e404]:
+            - img [ref=e407]
+            - heading "Tráiler y vídeos" [level=2] [ref=e410]
+        - generic [ref=e478]:
+          - generic [ref=e479]:
+            - img [ref=e482]
+            - heading "Análisis de sentimientos" [level=2] [ref=e484]
+          - generic [ref=e488]:
+            - generic [ref=e490]:
+              - img "Trakt" [ref=e492]
+              - generic [ref=e493]:
+                - heading "Opiniones de la comunidad de Trakt" [level=3] [ref=e494]
+                - paragraph [ref=e495]: Resumen oficial de sentimientos de Trakt sobre One Piece
+            - generic [ref=e497]:
+              - generic [ref=e498]:
+                - generic [ref=e499]:
+                  - img [ref=e501]
+                  - generic [ref=e503]: Positivo
+                - generic [ref=e504]: No hay suficientes datos positivos.
+              - generic [ref=e505]:
+                - generic [ref=e506]:
+                  - img [ref=e508]
+                  - generic [ref=e510]: Negativo
+                - generic [ref=e511]: No hay suficientes datos negativos.
+        - generic [ref=e515]:
+          - img [ref=e518]
+          - heading "Temporadas" [level=2] [ref=e522]
+        - generic [ref=e528]:
+          - generic [ref=e529]:
+            - img [ref=e532]
+            - heading "Valoración de Episodios" [level=2] [ref=e535]
+          - paragraph [ref=e540]: No hay datos de episodios disponibles.
+        - generic [ref=e541]:
+          - generic [ref=e543]:
+            - generic [ref=e544]:
+              - img [ref=e547]
+              - heading "Críticas de Usuarios" [level=2] [ref=e549]
+            - generic [ref=e554]:
+              - generic [ref=e555]:
+                - img "ignazi" [ref=e556]
+                - generic [ref=e557]:
+                  - heading "ignazi" [level=4] [ref=e558]
+                  - generic [ref=e559]:
+                    - generic [ref=e560]: 14/6/2026
+                    - generic [ref=e561]: ★ 10
+              - generic [ref=e562]: "\"One piece es esas series que comienzas a ver de niño y te llevan toda la vida, un curita para el corazón ❤️.\""
+          - generic [ref=e564]:
+            - generic [ref=e565]:
+              - img [ref=e568]
+              - heading "Comentarios" [level=2] [ref=e570]
+            - generic [ref=e574]:
+              - generic [ref=e576]:
+                - button "Top 30 Días" [ref=e577]
+                - button "Top Histórico" [ref=e578]
+                - button "Recientes" [ref=e579]
+              - generic [ref=e581]:
+                - img [ref=e582]
+                - paragraph [ref=e584]: Sé el primero en comentar.
+        - generic [ref=e588]:
+          - img [ref=e591]
+          - heading "Listas" [level=2] [ref=e593]
+  - button "Open Next.js Dev Tools" [ref=e602] [cursor=pointer]:
+    - img [ref=e603]

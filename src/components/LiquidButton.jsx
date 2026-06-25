@@ -651,12 +651,6 @@ export default function LiquidButton({
         )}
       </div>
 
-      {title && (
-        <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/liquid:scale-100 group-hover/liquid:opacity-100 group-hover/liquid:delay-[2000ms]">
-          {title}
-        </div>
-      )}
-
       <style jsx>{`
         @keyframes liquidShine {
           0%,
