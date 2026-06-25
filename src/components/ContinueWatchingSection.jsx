@@ -82,8 +82,17 @@ function writeContinueWatchingCache(shows) {
 }
 
 function mapInProgressItems(items) {
+  // Deduplicar por tmdbId: una misma serie puede tener varios episodios en curso,
+  // pero solo mostramos una tarjeta por serie (y evitamos keys `tv:<id>` repetidas).
+  // Se conserva la primera aparición (la fuente viene ordenada por más reciente).
+  const seen = new Set();
   return (Array.isArray(items) ? items : EMPTY_ARRAY)
-    .filter((it) => it?.tmdbId)
+    .filter((it) => {
+      if (!it?.tmdbId) return false;
+      if (seen.has(it.tmdbId)) return false;
+      seen.add(it.tmdbId);
+      return true;
+    })
     .slice(0, MAX_ITEMS)
     .map((it) => {
       const season = Number(it?.nextEpisode?.season);
