@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // El resto de imágenes usan 75 (por defecto). Mantenemos 100 declarada para
-    // no romper chunks cacheados que aún la pidan; el Hero ya usa 75.
-    qualities: [75, 100],
+    // Calidades que usa la app: 75 (por defecto cuando no se especifica),
+    // 92 (ContinueWatchingSection) y 100 (FeaturedHero). Toda calidad usada por
+    // un <Image> debe estar declarada aquí o Next avisa en consola.
+    qualities: [75, 92, 100],
     remotePatterns: [
       {
         protocol: "https",
