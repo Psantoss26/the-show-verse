@@ -24,6 +24,30 @@ export function dedupeCards(cards) {
   return out;
 }
 
+// ─── Filtros de calidad ───────────────────────────────────────────────────────
+// Piso de votos por tipo para las listas amplias (trending/popular/top_rated/
+// region_top): descartamos solo lo MUY desconocido (poco representativo) sin
+// matar estrenos populares recientes (que aún acumulan votos). Las filas
+// "curadas" (géneros, décadas, aclamadas, taquillazos…) usan umbrales más
+// altos definidos abajo. TV acumula menos votos que cine.
+const MIN_VOTES = { movie: 80, tv: 40 };
+
+// Umbrales de vote_count por tipo para cada categoría discover.
+const GENRE_VOTES = { movie: 500, tv: 150 };
+const DECADE_VOTES = { movie: 800, tv: 150 };
+const ACCLAIMED_VOTES = { movie: 3000, tv: 400 };
+const BLOCKBUSTER_VOTES = { movie: 5000, tv: 800 };
+const GEM_VOTES = {
+  movie: { gte: 800, lte: 6000 },
+  tv: { gte: 300, lte: 2500 },
+};
+
+// Dedup + filtra por piso de votos (descarta lo poco representativo).
+function refine(cards, mediaType, floor) {
+  const min = floor ?? MIN_VOTES[mediaType] ?? 0;
+  return dedupeCards(cards).filter((c) => (c?.voteCount || 0) >= min);
+}
+
 // ─── Helper: discover across N pages ─────────────────────────────────────────
 async function discoverPages(mediaType, params, pages) {
   const all = [];
@@ -45,98 +69,103 @@ function addPool(poolKey, mediaType, ttlMs, build) {
 // trending (12h)
 for (const mediaType of ['movie', 'tv']) {
   addPool('trending', mediaType, TTL_12H, async () =>
-    dedupeCards(await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 2 }))
+    refine(await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 4 }), mediaType)
   );
 }
 
-// popular (24h)
+// popular (24h) — pool profundo: trending/region_top/popular se solapan mucho,
+// así que necesitamos suficientes títulos únicos para que tras la deduplicación
+// "Populares" conserve >= 15 elementos.
 for (const mediaType of ['movie', 'tv']) {
   addPool('popular', mediaType, TTL_24H, async () =>
-    dedupeCards(await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 3 }))
+    refine(await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 7 }), mediaType)
   );
 }
 
 // top_rated (7d)
 for (const mediaType of ['movie', 'tv']) {
   addPool('top_rated', mediaType, TTL_7D, async () =>
-    dedupeCards(await tmdbList({ path: `/${mediaType}/top_rated`, mediaType, pages: 3 }))
+    refine(await tmdbList({ path: `/${mediaType}/top_rated`, mediaType, pages: 3 }), mediaType)
   );
 }
 
-// acclaimed (7d) — vote_average >= 7.5, vote_count >= 2000
+// acclaimed (7d) — vote_average alto + muchos votos
 for (const mediaType of ['movie', 'tv']) {
   addPool('acclaimed', mediaType, TTL_7D, async () =>
-    dedupeCards(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, {
       sort_by: 'vote_average.desc',
       'vote_average.gte': 7.5,
-      'vote_count.gte': 2000,
-    }, 3))
+      'vote_count.gte': ACCLAIMED_VOTES[mediaType],
+    }, 3), mediaType, ACCLAIMED_VOTES[mediaType])
   );
 }
 
-// blockbusters (7d) — popularity desc, vote_count >= 4000
+// blockbusters (7d) — populares con muchísimos votos
 for (const mediaType of ['movie', 'tv']) {
   addPool('blockbusters', mediaType, TTL_7D, async () =>
-    dedupeCards(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, {
       sort_by: 'popularity.desc',
-      'vote_count.gte': 4000,
-    }, 3))
+      'vote_count.gte': BLOCKBUSTER_VOTES[mediaType],
+    }, 3), mediaType, BLOCKBUSTER_VOTES[mediaType])
   );
 }
 
-// hidden_gems (7d) — vote_average >= 7.5, 500 <= vote_count <= 3000
+// hidden_gems (7d) — bien valoradas con votos suficientes pero no masivos
 for (const mediaType of ['movie', 'tv']) {
   addPool('hidden_gems', mediaType, TTL_7D, async () =>
-    dedupeCards(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, {
       sort_by: 'vote_average.desc',
       'vote_average.gte': 7.5,
-      'vote_count.gte': 500,
-      'vote_count.lte': 3000,
-    }, 3))
+      'vote_count.gte': GEM_VOTES[mediaType].gte,
+      'vote_count.lte': GEM_VOTES[mediaType].lte,
+    }, 3), mediaType, GEM_VOTES[mediaType].gte)
   );
 }
 
-// new_releases (24h)
+// new_releases (24h) — contenido nuevo (por su naturaleza tiene pocos votos:
+// NO se aplica el piso de votos; ordenamos por popularidad para los más sonados)
 addPool('new_releases', 'movie', TTL_24H, async () =>
-  dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 2 }))
+  dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 }))
 );
 addPool('new_releases', 'tv', TTL_24H, async () =>
-  dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 2 }))
+  dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 }))
 );
 
-// region_top (24h) — region ES, popularity desc
+// region_top (24h) — populares en ES con votos suficientes
 addPool('region_top', 'movie', TTL_24H, async () =>
-  dedupeCards(await discoverPages('movie', {
+  refine(await discoverPages('movie', {
     region: 'ES',
     sort_by: 'popularity.desc',
-  }, 2))
+    'vote_count.gte': MIN_VOTES.movie,
+  }, 4), 'movie')
 );
 addPool('region_top', 'tv', TTL_24H, async () =>
-  dedupeCards(await discoverPages('tv', {
+  refine(await discoverPages('tv', {
     region: 'ES',
     sort_by: 'popularity.desc',
-  }, 2))
+    'vote_count.gte': MIN_VOTES.tv,
+  }, 4), 'tv')
 );
 
-// genre pools (7d) — per genre in MOVIE_GENRES and TV_GENRES
+// genre pools (7d) — por género en MOVIE_GENRES y TV_GENRES
 for (const { id } of MOVIE_GENRES) {
   const poolKey = `genre:${id}`;
   addPool(poolKey, 'movie', TTL_7D, async () =>
-    dedupeCards(await discoverPages('movie', {
+    refine(await discoverPages('movie', {
       with_genres: id,
       sort_by: 'popularity.desc',
-      'vote_count.gte': 300,
-    }, 3))
+      'vote_count.gte': GENRE_VOTES.movie,
+    }, 3), 'movie', GENRE_VOTES.movie)
   );
 }
 for (const { id } of TV_GENRES) {
   const poolKey = `genre:${id}`;
   addPool(poolKey, 'tv', TTL_7D, async () =>
-    dedupeCards(await discoverPages('tv', {
+    refine(await discoverPages('tv', {
       with_genres: id,
       sort_by: 'popularity.desc',
-      'vote_count.gte': 300,
-    }, 3))
+      'vote_count.gte': GENRE_VOTES.tv,
+    }, 3), 'tv', GENRE_VOTES.tv)
   );
 }
 
@@ -147,22 +176,25 @@ for (const year of DECADES) {
   const dateGte = `${year}-01-01`;
   const dateLte = `${year + 9}-12-31`;
 
+  // Pool profundo (5 págs): las décadas recientes (2010/2020) se solapan mucho
+  // con tendencias/populares/géneros, así que necesitan títulos suficientes para
+  // que tras la deduplicación conserven >= 15 elementos.
   addPool(poolKey, 'movie', TTL_30D, async () =>
-    dedupeCards(await discoverPages('movie', {
+    refine(await discoverPages('movie', {
       'primary_release_date.gte': dateGte,
       'primary_release_date.lte': dateLte,
       sort_by: 'popularity.desc',
-      'vote_count.gte': 500,
-    }, 2))
+      'vote_count.gte': DECADE_VOTES.movie,
+    }, 5), 'movie', DECADE_VOTES.movie)
   );
 
   addPool(poolKey, 'tv', TTL_30D, async () =>
-    dedupeCards(await discoverPages('tv', {
+    refine(await discoverPages('tv', {
       'first_air_date.gte': dateGte,
       'first_air_date.lte': dateLte,
       sort_by: 'popularity.desc',
-      'vote_count.gte': 500,
-    }, 2))
+      'vote_count.gte': DECADE_VOTES.tv,
+    }, 5), 'tv', DECADE_VOTES.tv)
   );
 }
 

@@ -9,6 +9,12 @@ import { loadLibrary, buildSeeds, libraryBasisHash } from './library.js';
 import { aggregateCandidates, excludeSeen, mergeGenreFill } from './score.js';
 import { tmdbList, tmdbDiscover } from './tmdb.js';
 
+// Piso de votos para las recomendaciones: descartamos candidatos con muy pocos
+// votos (poco representativos). TV acumula menos votos que cine.
+const REC_MIN_VOTES = { movie: 150, tv: 60 };
+// Umbral de votos para el relleno por afinidad de género (títulos conocidos).
+const GENRE_FILL_VOTES = { movie: 1000, tv: 300 };
+
 /**
  * Get personalised recommendations for a user, backed by a 24h DB cache.
  *
@@ -83,6 +89,10 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     }
     items = excludeSeen(items, seen);
 
+    // Descartar candidatos con muy pocos votos (poco representativos).
+    const minVotes = REC_MIN_VOTES[mediaType] ?? 0;
+    items = items.filter((c) => (c.voteCount || 0) >= minVotes);
+
     // ── Genre-affinity fill ────────────────────────────────────────────────
     // Tally genreIds across the top 30 items (already scored candidates)
     const genreCounts = new Map();
@@ -106,7 +116,7 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
             params: {
               with_genres: genreId,
               sort_by: 'popularity.desc',
-              'vote_count.gte': 800,
+              'vote_count.gte': GENRE_FILL_VOTES[mediaType] ?? 800,
             },
           }).catch(() => [])
         )

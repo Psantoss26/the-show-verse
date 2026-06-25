@@ -29,6 +29,7 @@ export function toCard(raw, mediaType) {
     posterPath,
     backdropPath,
     voteAverage: typeof raw.vote_average === 'number' ? raw.vote_average : 0,
+    voteCount: typeof raw.vote_count === 'number' ? raw.vote_count : 0,
     year,
     genreIds: Array.isArray(raw.genre_ids) ? raw.genre_ids : [],
     popularity: typeof raw.popularity === 'number' ? raw.popularity : 0,
