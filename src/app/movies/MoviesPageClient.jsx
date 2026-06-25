@@ -245,7 +245,7 @@ function getArtworkPreference(movieId) {
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
 function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
+  const { preferLangs = ["en", "en-US"], minWidth = 1200, offset = 0 } = opts;
   if (!Array.isArray(list) || list.length === 0) return null;
 
   // normaliza a 'en'
@@ -272,20 +272,21 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
 
-  // Prioridades: 1920x1080, 2560x1440, 3840x2160, 1280x720.
-  const b1080 = candidates.find((b) => isRes(b, 1920, 1080));
-  if (b1080) return b1080;
+  const ordered = [];
+  for (const [width, height] of [
+    [1920, 1080],
+    [2560, 1440],
+    [3840, 2160],
+    [1280, 720],
+  ]) {
+    const match = candidates.find((b) => isRes(b, width, height));
+    if (match && !ordered.includes(match)) ordered.push(match);
+  }
+  for (const candidate of candidates) {
+    if (!ordered.includes(candidate)) ordered.push(candidate);
+  }
 
-  const b1440 = candidates.find((b) => isRes(b, 2560, 1440));
-  if (b1440) return b1440;
-
-  const b4k = candidates.find((b) => isRes(b, 3840, 2160));
-  if (b4k) return b4k;
-
-  const b720 = candidates.find((b) => isRes(b, 1280, 720));
-  if (b720) return b720;
-
-  return candidates[0];
+  return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -356,7 +357,7 @@ async function fetchBestPoster(movieId) {
   return best?.file_path || null;
 }
 
-async function fetchBestBackdrop(movieId) {
+async function fetchBestBackdrop(movieId, opts = {}) {
   const { backdrops } = await getMovieImages(movieId);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
@@ -364,6 +365,7 @@ async function fetchBestBackdrop(movieId) {
     preferLangs: ["en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
+    ...opts,
   });
 
   return best?.file_path || null;
@@ -580,6 +582,7 @@ function Top10MobileBackdropCard({
   imageClassName = "object-contain",
 }) {
   const [backdropPath, setBackdropPath] = useState(null);
+  const [extraBackdropPath, setExtraBackdropPath] = useState(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -587,6 +590,7 @@ function Top10MobileBackdropCard({
 
     const load = async () => {
       if (!movie?.id) return;
+      if (!abort) setExtraBackdropPath(null);
 
       const revealBackdrop = (path) => {
         if (abort) return;
@@ -594,16 +598,31 @@ function Top10MobileBackdropCard({
         setReady(!!path);
       };
 
+      const revealExtraBackdrop = async (path, primaryPath) => {
+        if (!path || path === primaryPath) {
+          if (!abort) setExtraBackdropPath(null);
+          return;
+        }
+        await preloadImage(buildImg(path, "w780"));
+        if (!abort) setExtraBackdropPath(path);
+      };
+
       const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
       if (userBackdrop) {
         movieBackdropCache.set(movie.id, userBackdrop);
         revealBackdrop(userBackdrop);
+        fetchBestBackdrop(movie.id, { offset: 1 })
+          .then((extra) => revealExtraBackdrop(extra, userBackdrop))
+          .catch(() => {});
         return;
       }
 
       const cached = movieBackdropCache.get(movie.id);
       if (cached !== undefined) {
         revealBackdrop(cached);
+        fetchBestBackdrop(movie.id, { offset: 1 })
+          .then((extra) => revealExtraBackdrop(extra, cached))
+          .catch(() => {});
         return;
       }
 
@@ -612,10 +631,13 @@ function Top10MobileBackdropCard({
         const chosen = preferred || getPreviewBackdropFallback(movie);
         movieBackdropCache.set(movie.id, chosen);
         revealBackdrop(chosen);
+        const extra = await fetchBestBackdrop(movie.id, { offset: 1 });
+        await revealExtraBackdrop(extra, chosen);
       } catch {
         const fallback = getPreviewBackdropFallback(movie);
         movieBackdropCache.set(movie.id, fallback);
         revealBackdrop(fallback);
+        setExtraBackdropPath(null);
       }
     };
 
@@ -627,11 +649,14 @@ function Top10MobileBackdropCard({
 
   const href = `/details/movie/${movie.id}`;
   const src = backdropPath ? buildImg(backdropPath, "w1280") : null;
+  const extraSrc = extraBackdropPath
+    ? buildImg(extraBackdropPath, "w1280")
+    : null;
 
   return (
     <Link href={href} prefetch className="block w-full h-full">
       <div
-        className={`relative w-full overflow-hidden bg-neutral-900 ${frameClassName}`}
+        className={`group/top10 relative w-full overflow-hidden bg-neutral-900 ${frameClassName}`}
       >
         {!ready && <div className="absolute inset-0 bg-neutral-900" />}
 
@@ -648,10 +673,22 @@ function Top10MobileBackdropCard({
             <OptimizedImage
               src={src}
               alt={movie.title || movie.name}
-              className={`absolute inset-0 w-full h-full ${imageClassName}`}
+              className={`absolute inset-0 h-full w-full transition-[opacity,transform] duration-700 ease-out group-hover/top10:scale-[1.025] ${
+                extraSrc ? "group-hover/top10:opacity-0" : ""
+              } motion-reduce:transition-none ${imageClassName}`}
               priority={rank === 1}
               decoding="async"
             />
+            {extraSrc && (
+              <OptimizedImage
+                src={extraSrc}
+                alt=""
+                aria-hidden="true"
+                className={`absolute inset-0 h-full w-full opacity-0 transition-[opacity,transform] duration-700 ease-out group-hover/top10:scale-[1.025] group-hover/top10:opacity-100 motion-reduce:transition-none ${imageClassName}`}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
           </>
         )}
 

@@ -7,7 +7,7 @@ import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import { useRouter } from "next/navigation";
-import { Play, Heart, BookmarkPlus } from "lucide-react";
+import { Heart, BookmarkPlus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
@@ -890,13 +890,13 @@ function ContinueWatchingPreviewCard({
             <LiquidButton
               onClick={handleContinue}
               active
-              activeColor="yellow"
+              activeColor="green"
               groupId="continue-watching-actions"
-              title="Continuar viendo"
-              className="!h-9 !w-9 !bg-white !text-black [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <Play className="ml-0.5 fill-current text-black" />
-            </LiquidButton>
+              title={`Continuar viendo · ${pct}% visto`}
+              progressPercent={`${pct}%`}
+              fillPercentage={pct}
+              className="!h-9 !w-9 [&_div>span:first-child]:!text-base [&_div>span:first-child]:!tracking-[-0.02em] [&_div>span:last-child]:!text-[9px] [&_span]:!text-white"
+            />
 
             <LiquidButton
               onClick={handleToggleFavorite}
