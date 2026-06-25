@@ -20,6 +20,8 @@ import {
   buildFeatured,
   getFeaturedExclusionKeys,
 } from "@/lib/dashboard/featured";
+import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
+import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
 
 // Ajusta el revalidate según lo fresco que quieras el contenido
 export const revalidate = 1800; // 30 minutos
@@ -45,7 +47,7 @@ function getBaseUrl() {
 async function fetchTopRatedImdbServer() {
   const baseUrl = getBaseUrl();
 
-  const url = `${baseUrl}/api/imdb/top-rated?type=movie&pages=3&limit=80&minVotes=15000`;
+  const url = `${baseUrl}/api/imdb/top-rated?type=movie&pages=3&limit=120&minVotes=15000`;
 
   // Timeout para que este self-fetch (scraping de IMDb, lento) nunca cuelgue la
   // carga del resto de secciones diferidas en producción.
@@ -84,7 +86,10 @@ async function fetchTopRatedImdbServer() {
 
 /* ======== Curado de listas tipo Netflix/Prime (solo servidor) ======== */
 const sortByVotes = (list = []) =>
-  [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+  balanceSoftLimitedDashboardContent(
+    [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0)),
+    "movie",
+  );
 
 function curateList(
   list,
@@ -172,7 +177,7 @@ async function getCriticalDashboardData() {
       minVotes: 1500,
       minRating: 6.2,
       minSize: 30,
-      maxSize: 80,
+      maxSize: 100,
     });
 
     const curatedTopES = sortByVotes(topES).slice(0, 10);
@@ -180,7 +185,7 @@ async function getCriticalDashboardData() {
       minVotes: 1200,
       minRating: 6.8,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
     const mainFeatured = buildFeatured(
       {
@@ -291,42 +296,42 @@ async function getDeferredDashboardData() {
       minVotes: 20000,
       minRating: 7.3,
       minSize: 30,
-      maxSize: 80,
+      maxSize: 100,
     });
 
     const curatedAction = curateList(action, {
       minVotes: 2000,
       minRating: 6.2,
       minSize: 25,
-      maxSize: 70,
+      maxSize: 84,
     });
 
     const curatedScifi = curateList(scifi, {
       minVotes: 1500,
       minRating: 6.3,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedThrillers = curateList(thrillers, {
       minVotes: 1500,
       minRating: 6.3,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedRomance = curateList(romance, {
       minVotes: 1500,
       minRating: 6.2,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedVengeance = curateList(vengeance, {
       minVotes: 800,
       minRating: 6.0,
       minSize: 20,
-      maxSize: 50,
+      maxSize: 60,
     });
 
     const curatedBaseSections = {};
@@ -343,21 +348,21 @@ async function getDeferredDashboardData() {
           minVotes: 1200,
           minRating: 6.8,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key === "Superéxito") {
         params = {
           minVotes: 3000,
           minRating: 6.5,
           minSize: 25,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key.startsWith("Década de")) {
         params = {
           minVotes: 800,
           minRating: 6.2,
           minSize: 15,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key === "Por género") {
         continue;
@@ -366,7 +371,7 @@ async function getDeferredDashboardData() {
           minVotes: 700,
           minRating: 6.0,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       }
 
@@ -377,11 +382,12 @@ async function getDeferredDashboardData() {
     const byGenreRaw = baseSections?.["Por género"] || {};
     for (const [gname, list] of Object.entries(byGenreRaw)) {
       if (!Array.isArray(list) || list.length === 0) continue;
+      const softLimitedGenre = /animaci[oó]n|documental/i.test(gname);
       curatedByGenre[gname] = curateList(list, {
-        minVotes: 600,
-        minRating: 6.0,
-        minSize: 15,
-        maxSize: 50,
+        minVotes: softLimitedGenre ? 1000 : 600,
+        minRating: softLimitedGenre ? 7.0 : 6.0,
+        minSize: softLimitedGenre ? 10 : 15,
+        maxSize: softLimitedGenre ? 40 : 60,
       });
     }
     if (Object.keys(curatedByGenre).length > 0) {
@@ -393,7 +399,7 @@ async function getDeferredDashboardData() {
       minVotes: 4000,
       minRating: 6.5,
       minSize: 25,
-      maxSize: 80,
+      maxSize: 100,
     });
 
     const imdbIdSet = new Set(curatedTopIMDb.map((m) => m.id));
@@ -430,13 +436,17 @@ async function getDeferredDashboardData() {
 
 /* =================== Componente de servidor =================== */
 export default async function MoviesPage() {
-  const initialData = await getCriticalDashboardData();
+  const [initialData, initialEngineRows] = await Promise.all([
+    getCriticalDashboardData(),
+    fetchAnonymousDashboardRows("movies"),
+  ]);
   const deferredDataPromise = getDeferredDashboardData();
 
   return (
     <MoviesPageClient
       initialData={initialData}
       deferredDataPromise={deferredDataPromise}
+      initialEngineRows={initialEngineRows}
     />
   );
 }

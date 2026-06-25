@@ -163,8 +163,8 @@ export function pickBestBackdropByLangResVotes(list, opts = {}) {
 
   return (
     pickFrom(preferred) ||
-    pickFrom(withLanguage) ||
-    (includeNoLanguage ? pickFrom(noLanguage) : null)
+    (includeNoLanguage ? pickFrom(noLanguage) : null) ||
+    pickFrom(withLanguage)
   );
 }
 
@@ -180,10 +180,11 @@ export function pickBestPosterByLangThenResolution(list, opts = {}) {
     minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list;
   const pool0 = sizeFiltered.length ? sizeFiltered : list;
 
-  const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)));
-  const pool1 = hasPreferred
-    ? pool0.filter((p) => preferLangs.includes(lang(p)))
-    : pool0;
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
+  const english = pool0.filter((p) => preferSet.has(norm(lang(p))));
+  const noLanguage = pool0.filter((p) => !norm(lang(p)));
+  const pool1 = english.length ? english : noLanguage.length ? noLanguage : pool0;
 
   let maxArea = 0;
   for (const p of pool1) maxArea = Math.max(maxArea, area(p));

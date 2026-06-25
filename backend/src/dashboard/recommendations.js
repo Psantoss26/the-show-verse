@@ -135,7 +135,7 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     }
 
     // ── Cap ────────────────────────────────────────────────────────────────
-    items = items.slice(0, 80);
+    items = items.slice(0, 120);
 
     // ── Upsert ────────────────────────────────────────────────────────────
     await db

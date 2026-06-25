@@ -45,6 +45,29 @@ export const ASIAN_MAX_RATIO = 0.4;
 // eliminar los más conocidos: Attack on Titan, Squid Game, El viaje de Chihiro…).
 const ASIAN_MIN_KEEP = 3;
 
+const SOFT_LIMITED_GENRES = new Set([
+  16, // Animation
+  99, // Documentary
+]);
+
+const SOFT_LIMIT_QUALITY = {
+  movie: {
+    goodVotes: 900,
+    goodRating: 7.0,
+    standoutVotes: 2500,
+    standoutRating: 7.7,
+  },
+  tv: {
+    goodVotes: 250,
+    goodRating: 7.1,
+    standoutVotes: 700,
+    standoutRating: 7.8,
+  },
+};
+
+const PREFERRED_LANGS = new Set(['en', 'es']);
+const PREFERRED_COUNTRIES = new Set(['US', 'ES']);
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** ¿La card pertenece a un género excluido (infantil/reality/talk/news)? */
@@ -60,6 +83,69 @@ export function isExcludedGenre(card) {
 /** Quita contenido infantil y reality (por género). */
 export function excludeKidsReality(cards) {
   return (cards || []).filter((c) => c && !isExcludedGenre(c));
+}
+
+function genreIds(card) {
+  return Array.isArray(card?.genreIds) ? card.genreIds : [];
+}
+
+function mediaTypeOf(card) {
+  return card?.mediaType === 'tv' ? 'tv' : 'movie';
+}
+
+function originCountries(card) {
+  return Array.isArray(card?.originCountry) ? card.originCountry : [];
+}
+
+export function localePriorityWeight(card) {
+  const lang = card?.originalLanguage || null;
+  const countries = originCountries(card);
+  const hasPreferredLang = PREFERRED_LANGS.has(lang);
+  const hasPreferredCountry = countries.some((country) => PREFERRED_COUNTRIES.has(country));
+
+  if (hasPreferredLang && hasPreferredCountry) return 1.18;
+  if (hasPreferredCountry) return 1.13;
+  if (hasPreferredLang) return 1.1;
+  return 1;
+}
+
+export function isSoftLimitedContent(card) {
+  const ids = genreIds(card);
+  const hasSoftGenre = ids.some((id) => SOFT_LIMITED_GENRES.has(id));
+  const isAnimeLike = card?.originalLanguage === 'ja' && ids.includes(16);
+  return hasSoftGenre || isAnimeLike;
+}
+
+export function softLimitedContentWeight(card) {
+  if (!isSoftLimitedContent(card)) return 1;
+
+  const type = mediaTypeOf(card);
+  const quality = SOFT_LIMIT_QUALITY[type] || SOFT_LIMIT_QUALITY.movie;
+  const votes = Number(card?.voteCount) || 0;
+  const rating = Number(card?.voteAverage) || 0;
+
+  if (votes >= quality.standoutVotes && rating >= quality.standoutRating) {
+    return 0.94;
+  }
+  if (votes >= quality.goodVotes && rating >= quality.goodRating) {
+    return 0.78;
+  }
+  return 0.58;
+}
+
+export function contentPriorityWeight(card) {
+  return softLimitedContentWeight(card) * localePriorityWeight(card);
+}
+
+export function balanceSoftLimitedContent(cards) {
+  return (cards || [])
+    .map((card, index, list) => ({
+      card,
+      index,
+      weightedRank: (list.length - index) * contentPriorityWeight(card),
+    }))
+    .sort((a, b) => b.weightedRank - a.weightedRank || a.index - b.index)
+    .map(({ card }) => card);
 }
 
 /**
