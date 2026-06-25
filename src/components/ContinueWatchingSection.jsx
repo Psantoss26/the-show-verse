@@ -134,8 +134,6 @@ const shimmer = {
 /* =================== STYLE CONSTANTS =================== */
 // Tamaños base (backdrop horizontal ~16:9) y alto de fila compartido.
 const ROW_HEIGHT = "h-[126px] sm:h-[146px] md:h-[168px] xl:h-[190px]";
-const BASE_WIDTH = "w-[224px] sm:w-[260px] md:w-[300px] xl:w-[338px]";
-const ACTIVE_WIDTH = "sm:w-[400px] md:w-[470px] xl:w-[520px]";
 
 const cwPreviewCardClass =
   "relative isolate grid h-full w-full grid-rows-[72%_28%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu " +
@@ -286,7 +284,7 @@ function ContinueWatchingBaseCard({ show }) {
  * Tarjeta hover: backdrop ampliado (16:9) + panel de info
  * con botones Continuar / Favoritos / Pendientes
  * ==================================================================== */
-function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex }) {
+function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex, perView = 6 }) {
   const { session, account } = useAuth();
   const router = useRouter();
   const { backdropPath, ready } = useShowBackdrop(show);
@@ -417,8 +415,10 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex }) {
 
   // Determinar la alineación horizontal de la tarjeta absoluta
   const activeIdx = typeof activeIndex === "number" ? activeIndex : 0;
+  const visibleCount = Number.isFinite(perView) && perView > 0 ? perView : 6;
   const isLeftBoundary = index === activeIdx || index === 0;
-  const isRightBoundary = index === activeIdx + 5 || index === totalCount - 1;
+  const isRightBoundary =
+    index === activeIdx + visibleCount - 1 || index === totalCount - 1;
 
   let alignmentClass = "left-1/2 -translate-x-1/2";
   let transformOrigin = "center center";
@@ -442,7 +442,10 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex }) {
         damping: 20,
         mass: 0.8
       }}
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[280px] sm:w-[320px] md:w-[380px] xl:w-[420px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
+      // El ancho es proporcional a la tarjeta base (150% del ancho de la
+      // columna, que es el contenedor relativo): si las tarjetas se reducen, la
+      // vista previa se reduce con ellas.
+      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} w-[150%] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
       onClick={() => router.push(href)}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
@@ -574,7 +577,18 @@ function ContinueWatchingPreviewCard({ show, index, totalCount, activeIndex }) {
 
 /* =================== SKELETON =================== */
 function ContinueWatchingSkeleton({ isMobile }) {
-  const count = isMobile ? 5 : 6;
+  const count = isMobile ? 2 : 6;
+  // En escritorio ocultamos las tarjetas sobrantes por breakpoint para que el
+  // nº visible (y, vía flex-1, el ancho de cada una) coincida con el contenido
+  // real: 3 (md) · 4 (lg) · 5 (xl) · 6 (2xl).
+  const desktopVisibility = [
+    "flex",
+    "flex",
+    "flex",
+    "hidden lg:flex",
+    "hidden xl:flex",
+    "hidden 2xl:flex",
+  ];
   return (
     <div className="flex gap-4 overflow-hidden">
       {Array.from({ length: count }).map((_, i) => (
@@ -582,8 +596,8 @@ function ContinueWatchingSkeleton({ isMobile }) {
           key={i}
           className={`relative overflow-hidden rounded-lg bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 ${
             isMobile
-              ? `flex-shrink-0 ${BASE_WIDTH} ${ROW_HEIGHT}`
-              : "aspect-video min-w-0 flex-1"
+              ? `min-w-0 flex-1 ${ROW_HEIGHT}`
+              : `aspect-video min-w-0 flex-1 ${desktopVisibility[i] ?? "flex"}`
           }`}
         >
           <motion.div
@@ -625,6 +639,10 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [animatingOutId, setAnimatingOutId] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Tarjetas visibles por fila (lo fija el breakpoint activo de Swiper). Se usa
+  // para alinear la vista previa ampliada en el borde derecho y para saber
+  // cuántas diapositivas avanzar con las flechas.
+  const [perView, setPerView] = useState(6);
   const hoverTimeoutRef = useRef(null);
 
   // Limpiar temporizador al desmontar
@@ -735,6 +753,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
     setActiveIndex(swiper.activeIndex);
+    const spv = swiper?.params?.slidesPerView;
+    if (typeof spv === "number" && Number.isFinite(spv)) setPerView(spv);
   };
 
   const handleSwiper = (swiper) => {
@@ -745,7 +765,9 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   const moveSlides = (dir) => {
     const swiper = swiperRef.current;
     if (!swiper) return;
-    const count = isMobile ? 1 : 3;
+    // Avanzar (casi) una página completa: el nº de tarjetas visibles menos una
+    // para mantener una de referencia, con un mínimo de 1.
+    const count = isMobile ? 1 : Math.max(1, perView - 1);
     for (let i = 0; i < count; i += 1) {
       if (dir < 0) swiper.slidePrev();
       else swiper.slideNext();
@@ -793,17 +815,26 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     );
   }
 
-  // En escritorio mostramos exactamente 6 títulos por fila (Swiper calcula el
-  // ancho); en móvil se mantiene el ancho fijo con scroll horizontal.
+  // En escritorio el nº de tarjetas por fila escala con el ancho disponible
+  // (el dashboard ocupa todo el viewport, sin contenedor max-width), de modo
+  // que cada vista previa 16:9 conserva un tamaño legible (~230px) en lugar de
+  // comprimir siempre 6 tarjetas. En móvil se mantiene el ancho fijo con scroll.
   const breakpoints = isMobile
     ? {
-        0: { slidesPerView: "auto", spaceBetween: 12 },
-        640: { slidesPerView: "auto", spaceBetween: 14 },
+        0: { slidesPerView: 2, spaceBetween: 10 },
+        640: { slidesPerView: 2, spaceBetween: 12 },
       }
     : {
-        768: { slidesPerView: 6, spaceBetween: 14 },
-        1024: { slidesPerView: 6, spaceBetween: 16 },
-        1280: { slidesPerView: 6, spaceBetween: 18 },
+        768: { slidesPerView: 3, spaceBetween: 14 },
+        1024: { slidesPerView: 4, spaceBetween: 16 },
+        1280: { slidesPerView: 5, spaceBetween: 18 },
+        1536: { slidesPerView: 6, spaceBetween: 20 },
+        1920: { slidesPerView: 7, spaceBetween: 20 },
+        // En pantallas muy anchas seguimos añadiendo columnas para acotar el
+        // ancho de tarjeta (~260px) y que la vista previa proporcional no
+        // exceda el espacio vertical reservado.
+        2304: { slidesPerView: 8, spaceBetween: 20 },
+        2560: { slidesPerView: 9, spaceBetween: 20 },
       };
 
   const swiperKey = `continue-watching-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
@@ -839,8 +870,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
           <Swiper
             key={swiperKey}
-            slidesPerView={isMobile ? "auto" : 6}
-            spaceBetween={isMobile ? 12 : 16}
+            slidesPerView={isMobile ? 2 : 3}
+            spaceBetween={isMobile ? 10 : 16}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -861,7 +892,16 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                 : false
             }
             modules={[Navigation, FreeMode]}
-            className="group relative !py-14 sm:!py-16 md:!py-20 !-my-14 sm:!-my-16 md:!-my-20"
+            // En escritorio el padding vertical amplio crea el espacio para que
+            // la vista previa NUNCA se recorte por arriba/abajo (el truco
+            // py + -my no altera la altura de fila). `pointer-events-none` en el
+            // Swiper hace que ese padding transparente sea atravesable: así no
+            // roba el hover/clic a las filas vecinas; las tarjetas reactivan los
+            // eventos (pointer-events es heredado y el arrastre sigue funcionando
+            // por propagación desde la tarjeta).
+            className={`group relative !py-14 sm:!py-16 md:!py-32 !-my-14 sm:!-my-16 md:!-my-32 ${
+              isMobile ? "" : "pointer-events-none"
+            }`}
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >
@@ -872,10 +912,11 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
               const base =
                 "relative flex-shrink-0 transition-all duration-300 ease-in-out";
-              // Escritorio: el ancho lo fija Swiper (6 por fila) y el alto sale
-              // del aspect-video. Móvil: ancho/alto fijos con scroll.
+              // Escritorio: el ancho lo fija Swiper (según breakpoint) y el alto
+              // sale del aspect-video. Móvil: 2 por fila (ancho lo fija Swiper)
+              // con alto fijo para mantener legible el overlay de progreso.
               const dimensionClasses = isMobile
-                ? `${BASE_WIDTH} ${ROW_HEIGHT}`
+                ? `w-full ${ROW_HEIGHT}`
                 : "w-full aspect-video";
               const sizeClasses = `${dimensionClasses} ${
                 isActive || isAnimatingOut ? "z-[90]" : "z-10"
@@ -884,7 +925,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={isMobile ? "!w-auto select-none" : "select-none"}
+                  className={isMobile ? "select-none" : "select-none pointer-events-auto"}
                 >
                   <div
                     className={`${base} ${sizeClasses} ${
@@ -910,6 +951,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                             index={i}
                             totalCount={shows.length}
                             activeIndex={activeIndex}
+                            perView={perView}
                           />
                         </div>
                       ) : (
