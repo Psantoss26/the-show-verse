@@ -1,7 +1,7 @@
 // backend/src/dashboard/library.js
 import { db } from '../db/client.js';
 import { favorites, watchlist, watchHistory, userRatings } from '../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 
 // ─────────────────────────────────────────────
 // FNV-1a 32-bit hash (hex string output)
@@ -136,11 +136,11 @@ export async function loadLibrary(userId) {
       .from(favorites)
       .where(eq(favorites.userId, userId)),
 
-    // ratings — all rows for userId
+    // ratings — only movie/tv rows for userId (episode ratings are not valid TMDB discovery types)
     db
       .select({ tmdbId: userRatings.tmdbId, mediaType: userRatings.mediaType, rating: userRatings.rating })
       .from(userRatings)
-      .where(eq(userRatings.userId, userId)),
+      .where(and(eq(userRatings.userId, userId), inArray(userRatings.mediaType, ['movie', 'tv']))),
 
     // history — most-recent 100 rows, then distinct by mediaType:tmdbId in JS
     db
