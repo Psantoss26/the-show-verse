@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NextImage from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Play,
@@ -45,7 +46,10 @@ import {
 
 // El hero convive con previews interactivas en la misma vista. Usamos tamaños
 // acotados para no competir con los backdrops de hover del dashboard.
-const HERO_BACKDROP_SIZE = "original";
+// El backdrop se sirve a un tamaño acotado (no "original") para que la primera
+// carga sea rápida: Next reoptimiza, así que w1280 cubre el hero a pantalla
+// completa con una fracción del peso/decodificado de la imagen original.
+const HERO_BACKDROP_SIZE = "w1280";
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 7000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
@@ -315,6 +319,28 @@ function FeaturedSlide({
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
   const audioRef = useRef(null);
 
+  // Prioridad de carga: backdrop/póster/logo + interactividad primero. Las
+  // cargas secundarias (soundtrack, duración/notas) se difieren a un hueco de
+  // inactividad para no competir por la red ni bloquear el hilo principal
+  // durante la animación de entrada.
+  const [secondaryReady, setSecondaryReady] = useState(false);
+  useEffect(() => {
+    if (!isActive) {
+      setSecondaryReady(false);
+      return;
+    }
+    const ric =
+      typeof window !== "undefined" && window.requestIdleCallback
+        ? window.requestIdleCallback
+        : (cb) => window.setTimeout(() => cb(), 250);
+    const cic =
+      typeof window !== "undefined" && window.cancelIdleCallback
+        ? window.cancelIdleCallback
+        : (id) => window.clearTimeout(id);
+    const id = ric(() => setSecondaryReady(true), { timeout: 1500 });
+    return () => cic(id);
+  }, [isActive]);
+
   // Al dejar de ser el slide activo, cerramos el trailer.
   useEffect(() => {
     if (isActive) return;
@@ -331,7 +357,7 @@ function FeaturedSlide({
   // Carga la mejor pista del soundtrack (preview) del título activo.
   useEffect(() => {
     let abort = false;
-    if (!isActive || !movie?.id) return;
+    if (!isActive || !secondaryReady || !movie?.id) return;
     setSoundtrackTrack(null);
     setSoundtrackPlaying(false);
 
@@ -374,7 +400,7 @@ function FeaturedSlide({
     return () => {
       abort = true;
     };
-  }, [isActive, movie, mediaType]);
+  }, [isActive, secondaryReady, movie, mediaType]);
 
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
   // no se está viendo el trailer (que tiene su propio audio). Si el navegador
@@ -457,7 +483,7 @@ function FeaturedSlide({
   // Extras: duración/temporadas + nota IMDb
   useEffect(() => {
     let abort = false;
-    if (!isActive || !movie) return;
+    if (!isActive || !secondaryReady || !movie) return;
 
     const load = async () => {
       try {
@@ -503,7 +529,7 @@ function FeaturedSlide({
     return () => {
       abort = true;
     };
-  }, [isActive, movie, mediaType]);
+  }, [isActive, secondaryReady, movie, mediaType]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -646,9 +672,7 @@ function FeaturedSlide({
               src={bgSrc}
               alt={title}
               fill
-              loading={isActive ? "eager" : "lazy"}
-              fetchPriority={isActive ? "high" : "low"}
-              quality={100}
+              priority={isActive}
               sizes="100vw"
               onLoad={() => setLoadedBackdropSrc(bgSrc)}
               className={
@@ -887,19 +911,19 @@ function FeaturedSlide({
               className="hero-reveal flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-start sm:gap-3"
               style={{ "--hero-delay": "360ms" }}
             >
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigateToDetails();
-                }}
+              {/* Enlace real (no solo onClick): la navegación a los detalles
+                  funciona aunque la animación de entrada siga en curso o aún no
+                  haya hidratado el JS. */}
+              <Link
+                href={href}
+                onClick={(e) => e.stopPropagation()}
                 className="featured-info-button inline-flex h-9 w-9 cursor-default items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white px-0 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm"
               >
                 <Info className="h-5 w-5 sm:h-4 sm:w-4" />
                 <span className="hidden [text-box:trim-both_cap_alphabetic] sm:inline">
                   Más información
                 </span>
-              </button>
+              </Link>
 
               <HeroActionButton
                 onClick={handleToggleTrailer}
@@ -1282,7 +1306,10 @@ export default function FeaturedHero({ items = [], isMobile }) {
   const activeAssets = assets[activeMovie.id] || {};
   const activeBackdrop =
     activeAssets.backdrop || getPreviewBackdropFallback(activeMovie) || null;
-  const activePoster = activeAssets.poster || null;
+  // Fallback inmediato del póster (móvil) con el dato ya disponible del servidor
+  // para pintar al instante, mientras se resuelve en segundo plano el mejor.
+  const activePoster =
+    activeAssets.poster || activeMovie.poster_path || activeMovie.backdrop_path || null;
 
   const handlePointerDown = (event) => {
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -1355,7 +1382,7 @@ export default function FeaturedHero({ items = [], isMobile }) {
   return (
     <>
       <section
-        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100dvh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[88dvh]"
+        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[88dvh]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
