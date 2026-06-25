@@ -38,17 +38,19 @@ function ratingWeight(rating) {
  *   recent history (distinct tmdbId:mediaType) → 2
  *   watchlist   → 1
  *
- * @param {{ favorites: {tmdbId, mediaType}[], ratings: {tmdbId, mediaType, rating}[], history: {tmdbId, mediaType}[], watchlist: {tmdbId, mediaType}[] }} param0
- * @returns {{ tmdbId: number, mediaType: string, weight: number }[]}
+ * @param {{ favorites: {tmdbId, mediaType, title?}[], ratings: {tmdbId, mediaType, rating, title?}[], history: {tmdbId, mediaType, title?}[], watchlist: {tmdbId, mediaType, title?}[] }} param0
+ * @returns {{ tmdbId: number, mediaType: string, weight: number, title: string|null }[]}
  */
 export function buildSeeds({ favorites: favs = [], ratings = [], history = [], watchlist: wl = [] }) {
-  /** @type {Map<string, { tmdbId: number, mediaType: string, weight: number }>} */
+  /** @type {Map<string, { tmdbId: number, mediaType: string, weight: number, title: string|null }>} */
   const map = new Map();
 
-  function addWeight(tmdbId, mediaType, delta) {
+  function addWeight(tmdbId, mediaType, delta, title) {
     const key = `${mediaType}:${tmdbId}`;
     if (!map.has(key)) {
-      map.set(key, { tmdbId, mediaType, weight: 0 });
+      map.set(key, { tmdbId, mediaType, weight: 0, title: title || null });
+    } else if (title && !map.get(key).title) {
+      map.get(key).title = title;
     }
     map.get(key).weight += delta;
   }
@@ -56,22 +58,22 @@ export function buildSeeds({ favorites: favs = [], ratings = [], history = [], w
   // ratings (≥8 → 5, ===7 → 3, <7 → 0)
   for (const r of ratings) {
     const w = ratingWeight(r.rating);
-    if (w > 0) addWeight(r.tmdbId, r.mediaType, w);
+    if (w > 0) addWeight(r.tmdbId, r.mediaType, w, r.title);
   }
 
   // favorites → 4
   for (const f of favs) {
-    addWeight(f.tmdbId, f.mediaType, 4);
+    addWeight(f.tmdbId, f.mediaType, 4, f.title);
   }
 
   // history (each distinct tmdbId:mediaType) → 2
   for (const h of history) {
-    addWeight(h.tmdbId, h.mediaType, 2);
+    addWeight(h.tmdbId, h.mediaType, 2, h.title);
   }
 
   // watchlist → 1
   for (const w of wl) {
-    addWeight(w.tmdbId, w.mediaType, 1);
+    addWeight(w.tmdbId, w.mediaType, 1, w.title);
   }
 
   // Sort by weight desc, cap to 25
@@ -126,25 +128,25 @@ export function libraryBasisHash({ favorites: favs = [], ratings = [], history =
  * Load the user's library from the database.
  *
  * @param {string} userId
- * @returns {Promise<{ favorites: {tmdbId, mediaType}[], ratings: {tmdbId, mediaType, rating}[], history: {tmdbId, mediaType}[], watchlist: {tmdbId, mediaType}[] }>}
+ * @returns {Promise<{ favorites: {tmdbId, mediaType, title}[], ratings: {tmdbId, mediaType, rating, title}[], history: {tmdbId, mediaType, title}[], watchlist: {tmdbId, mediaType, title}[] }>}
  */
 export async function loadLibrary(userId) {
   const [favRows, ratingRows, histRows, wlRows] = await Promise.all([
     // favorites — all rows for userId
     db
-      .select({ tmdbId: favorites.tmdbId, mediaType: favorites.mediaType })
+      .select({ tmdbId: favorites.tmdbId, mediaType: favorites.mediaType, title: favorites.title })
       .from(favorites)
       .where(eq(favorites.userId, userId)),
 
     // ratings — only movie/tv rows for userId (episode ratings are not valid TMDB discovery types)
     db
-      .select({ tmdbId: userRatings.tmdbId, mediaType: userRatings.mediaType, rating: userRatings.rating })
+      .select({ tmdbId: userRatings.tmdbId, mediaType: userRatings.mediaType, rating: userRatings.rating, title: userRatings.title })
       .from(userRatings)
       .where(and(eq(userRatings.userId, userId), inArray(userRatings.mediaType, ['movie', 'tv']))),
 
     // history — most-recent 100 rows, then distinct by mediaType:tmdbId in JS
     db
-      .select({ tmdbId: watchHistory.tmdbId, mediaType: watchHistory.mediaType })
+      .select({ tmdbId: watchHistory.tmdbId, mediaType: watchHistory.mediaType, title: watchHistory.title })
       .from(watchHistory)
       .where(eq(watchHistory.userId, userId))
       .orderBy(desc(watchHistory.watchedAt))
@@ -152,7 +154,7 @@ export async function loadLibrary(userId) {
 
     // watchlist — all rows for userId
     db
-      .select({ tmdbId: watchlist.tmdbId, mediaType: watchlist.mediaType })
+      .select({ tmdbId: watchlist.tmdbId, mediaType: watchlist.mediaType, title: watchlist.title })
       .from(watchlist)
       .where(eq(watchlist.userId, userId)),
   ]);

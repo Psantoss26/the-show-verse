@@ -19,12 +19,13 @@ import { tmdbList, tmdbDiscover } from './tmdb.js';
  *
  * @param {string} userId
  * @param {'movie'|'tv'} mediaType
+ * @param {{ lib: object, basisHash: string } | null} [preloaded=null] - Optional preloaded library to avoid re-loading.
  * @returns {Promise<Array>} recItem[]
  */
-export async function getUserRecommendations(userId, mediaType) {
+export async function getUserRecommendations(userId, mediaType, preloaded = null) {
   // ── 1. Load library + compute hash ──────────────────────────────────────
-  const lib = await loadLibrary(userId);
-  const basisHash = libraryBasisHash(lib);
+  const lib = preloaded?.lib || await loadLibrary(userId);
+  const basisHash = preloaded?.basisHash || libraryBasisHash(lib);
 
   // ── 2. Read cached row ───────────────────────────────────────────────────
   const [row] = await db
