@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { excludeKidsReality, capAsian, TV_WITHOUT_GENRES } from './filters.js';
 
 // ─── TTLs (ms) ────────────────────────────────────────────────────────────────
 const TTL_12H  = 12 * 60 * 60 * 1000;
@@ -42,10 +43,22 @@ const GEM_VOTES = {
   tv: { gte: 300, lte: 2500 },
 };
 
-// Dedup + filtra por piso de votos (descarta lo poco representativo).
+// Dedup + reglas de contenido (sin infantil/reality, anime/asiático no
+// predominante) + piso de votos (descarta lo poco representativo).
 function refine(cards, mediaType, floor) {
   const min = floor ?? MIN_VOTES[mediaType] ?? 0;
-  return dedupeCards(cards).filter((c) => (c?.voteCount || 0) >= min);
+  const cleaned = excludeKidsReality(dedupeCards(cards)).filter(
+    (c) => (c?.voteCount || 0) >= min,
+  );
+  return capAsian(cleaned);
+}
+
+// Parámetros de discover por tipo: en TV excluimos géneros no deseados
+// (infantil/reality/talk/news) ya en la propia petición.
+function discoverParams(mediaType, params) {
+  return mediaType === 'tv'
+    ? { without_genres: TV_WITHOUT_GENRES, ...params }
+    : params;
 }
 
 // ─── Helper: discover across N pages ─────────────────────────────────────────
@@ -66,10 +79,12 @@ function addPool(poolKey, mediaType, ttlMs, build) {
   POOL_DEFS.set(`${poolKey}:${mediaType}`, { poolKey, mediaType, ttlMs, build });
 }
 
-// trending (12h)
+// trending (12h) — pool profundo (5 págs): las tendencias de TV en TMDB traen
+// mucho anime/reality; tras filtrar contenido y limitar el asiático necesitamos
+// margen para conservar >= 15 tras la deduplicación cruzada.
 for (const mediaType of ['movie', 'tv']) {
   addPool('trending', mediaType, TTL_12H, async () =>
-    refine(await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 4 }), mediaType)
+    refine(await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 5 }), mediaType)
   );
 }
 
@@ -92,43 +107,45 @@ for (const mediaType of ['movie', 'tv']) {
 // acclaimed (7d) — vote_average alto + muchos votos
 for (const mediaType of ['movie', 'tv']) {
   addPool('acclaimed', mediaType, TTL_7D, async () =>
-    refine(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, discoverParams(mediaType, {
       sort_by: 'vote_average.desc',
       'vote_average.gte': 7.5,
       'vote_count.gte': ACCLAIMED_VOTES[mediaType],
-    }, 3), mediaType, ACCLAIMED_VOTES[mediaType])
+    }), 3), mediaType, ACCLAIMED_VOTES[mediaType])
   );
 }
 
 // blockbusters (7d) — populares con muchísimos votos
 for (const mediaType of ['movie', 'tv']) {
   addPool('blockbusters', mediaType, TTL_7D, async () =>
-    refine(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, discoverParams(mediaType, {
       sort_by: 'popularity.desc',
       'vote_count.gte': BLOCKBUSTER_VOTES[mediaType],
-    }, 3), mediaType, BLOCKBUSTER_VOTES[mediaType])
+    }), 3), mediaType, BLOCKBUSTER_VOTES[mediaType])
   );
 }
 
 // hidden_gems (7d) — bien valoradas con votos suficientes pero no masivos
 for (const mediaType of ['movie', 'tv']) {
   addPool('hidden_gems', mediaType, TTL_7D, async () =>
-    refine(await discoverPages(mediaType, {
+    refine(await discoverPages(mediaType, discoverParams(mediaType, {
       sort_by: 'vote_average.desc',
       'vote_average.gte': 7.5,
       'vote_count.gte': GEM_VOTES[mediaType].gte,
       'vote_count.lte': GEM_VOTES[mediaType].lte,
-    }, 3), mediaType, GEM_VOTES[mediaType].gte)
+    }), 3), mediaType, GEM_VOTES[mediaType].gte)
   );
 }
 
 // new_releases (24h) — contenido nuevo (por su naturaleza tiene pocos votos:
-// NO se aplica el piso de votos; ordenamos por popularidad para los más sonados)
+// NO se aplica el piso de votos; ordenamos por popularidad para los más sonados).
+// Sí aplicamos las reglas de contenido (sin infantil/reality, asiático no
+// predominante).
 addPool('new_releases', 'movie', TTL_24H, async () =>
-  dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 }))
+  capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 }))))
 );
 addPool('new_releases', 'tv', TTL_24H, async () =>
-  dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 }))
+  capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 }))))
 );
 
 // region_top (24h) — populares en ES con votos suficientes
@@ -140,14 +157,16 @@ addPool('region_top', 'movie', TTL_24H, async () =>
   }, 4), 'movie')
 );
 addPool('region_top', 'tv', TTL_24H, async () =>
-  refine(await discoverPages('tv', {
+  refine(await discoverPages('tv', discoverParams('tv', {
     region: 'ES',
     sort_by: 'popularity.desc',
     'vote_count.gte': MIN_VOTES.tv,
-  }, 4), 'tv')
+  }), 4), 'tv')
 );
 
-// genre pools (7d) — por género en MOVIE_GENRES y TV_GENRES
+// genre pools (7d) — por género en MOVIE_GENRES y TV_GENRES.
+// Pool más profundo (4 págs): tras limitar el contenido asiático (p. ej. el
+// género Animación es mayoritariamente anime) necesitamos margen para >= 15.
 for (const { id } of MOVIE_GENRES) {
   const poolKey = `genre:${id}`;
   addPool(poolKey, 'movie', TTL_7D, async () =>
@@ -155,17 +174,17 @@ for (const { id } of MOVIE_GENRES) {
       with_genres: id,
       sort_by: 'popularity.desc',
       'vote_count.gte': GENRE_VOTES.movie,
-    }, 3), 'movie', GENRE_VOTES.movie)
+    }, 4), 'movie', GENRE_VOTES.movie)
   );
 }
 for (const { id } of TV_GENRES) {
   const poolKey = `genre:${id}`;
   addPool(poolKey, 'tv', TTL_7D, async () =>
-    refine(await discoverPages('tv', {
+    refine(await discoverPages('tv', discoverParams('tv', {
       with_genres: id,
       sort_by: 'popularity.desc',
       'vote_count.gte': GENRE_VOTES.tv,
-    }, 3), 'tv', GENRE_VOTES.tv)
+    }), 4), 'tv', GENRE_VOTES.tv)
   );
 }
 
@@ -189,12 +208,12 @@ for (const year of DECADES) {
   );
 
   addPool(poolKey, 'tv', TTL_30D, async () =>
-    refine(await discoverPages('tv', {
+    refine(await discoverPages('tv', discoverParams('tv', {
       'first_air_date.gte': dateGte,
       'first_air_date.lte': dateLte,
       sort_by: 'popularity.desc',
       'vote_count.gte': DECADE_VOTES.tv,
-    }, 5), 'tv', DECADE_VOTES.tv)
+    }), 5), 'tv', DECADE_VOTES.tv)
   );
 }
 

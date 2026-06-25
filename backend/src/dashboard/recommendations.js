@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import { loadLibrary, buildSeeds, libraryBasisHash } from './library.js';
 import { aggregateCandidates, excludeSeen, mergeGenreFill } from './score.js';
 import { tmdbList, tmdbDiscover } from './tmdb.js';
+import { excludeKidsReality, TV_WITHOUT_GENRES } from './filters.js';
 
 // Piso de votos para las recomendaciones: descartamos candidatos con muy pocos
 // votos (poco representativos). TV acumula menos votos que cine.
@@ -89,6 +90,10 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     }
     items = excludeSeen(items, seen);
 
+    // Regla de contenido: nunca recomendar infantil ni reality (aunque el
+    // idioma/anime sí se respeta según el gusto del usuario).
+    items = excludeKidsReality(items);
+
     // Descartar candidatos con muy pocos votos (poco representativos).
     const minVotes = REC_MIN_VOTES[mediaType] ?? 0;
     items = items.filter((c) => (c.voteCount || 0) >= minVotes);
@@ -117,13 +122,14 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
               with_genres: genreId,
               sort_by: 'popularity.desc',
               'vote_count.gte': GENRE_FILL_VOTES[mediaType] ?? 800,
+              ...(mediaType === 'tv' ? { without_genres: TV_WITHOUT_GENRES } : {}),
             },
           }).catch(() => [])
         )
       );
 
       const allFill = fillArrays.flat();
-      const filteredFill = excludeSeen(allFill, seen);
+      const filteredFill = excludeKidsReality(excludeSeen(allFill, seen));
       items = mergeGenreFill(items, filteredFill, 0.5);
     }
 
