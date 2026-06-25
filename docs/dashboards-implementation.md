@@ -293,15 +293,23 @@ Pipeline en [`backend/src/dashboard/recommendations.js`](../backend/src/dashboar
 ### 5.1 De biblioteca a "seeds"
 
 `buildSeeds(lib)` convierte la biblioteca en semillas ponderadas (peso sumado si
-un título aparece en varias fuentes), ordena por peso y corta a 25:
+un título aparece en varias fuentes), descarta las de peso 0, ordena por peso y
+corta a 25. **Las valoraciones altas son la señal principal** y pesan por encima
+de favoritos, historial y pendientes:
 
-| Señal                                | Peso |
-| ------------------------------------ | ---- |
-| Valoración ≥ 8                       | 5    |
-| Favorito                            | 4    |
-| Valoración = 7                       | 3    |
-| Historial (cada id+tipo distinto)    | 2    |
-| Pendiente (watchlist)                | 1    |
+| Señal                                | Peso | `strongPositive` |
+| ------------------------------------ | ---- | ---------------- |
+| Valoración ≥ 9 (señal principal)     | 10   | sí               |
+| Valoración = 8 (señal positiva)      | 7    | sí               |
+| Favorito                             | 6    | sí               |
+| Valoración = 7 (señal secundaria)    | 4    | no               |
+| Historial (cada id+tipo distinto)    | 2    | no               |
+| Pendiente (watchlist)                | 1    | no               |
+| Valoración < 7                       | 0    | (no genera seed) |
+
+`strongPositive` = el usuario realmente disfrutó el título (rating ≥ 8 o
+favorito). **Solo estas semillas habilitan filas "Porque viste…"** — un visionado
+casual o un pendiente nunca crean esas filas.
 
 ### 5.2 De seeds a candidatos puntuados
 
@@ -310,33 +318,40 @@ un título aparece en varias fuentes), ordena por peso y corta a 25:
 2. `aggregateCandidates` acumula puntuación por candidato:
    `score += seed.weight · sourceWeight · positionDecay`
    donde `sourceWeight` = 1.0 (recommendations) / 0.6 (similar) y
-   `positionDecay = 1/(1+index·0.15)`. Cada candidato guarda su(s) `reasons`
-   (`type: 'because'` con la seed que lo originó).
-3. `excludeSeen` quita lo que ya está en biblioteca (historial+favoritos+
-   pendientes+seeds).
-4. **Sin infantil/reality:** `excludeKidsReality` (regla de contenido; el cap
-   asiático NO se aplica aquí, se respeta el gusto del usuario).
+   `positionDecay = 1/(1+index·0.15)`. La razón `because` solo se adjunta si la
+   seed es `strongPositive` (los candidatos puntúan igual, pero solo los de
+   semillas que gustaron pueden formar "Porque viste…").
+3. **No se excluye la biblioteca entera.** Los títulos ya vistos **se conservan**
+   como candidatos: el límite de vistos se aplica por fila en el ensamblaje
+   (§7.2). Solo se evita que una semilla se recomiende a sí misma.
+4. **Sin infantil/reality:** `excludeKidsReality` (el cap asiático NO se aplica
+   aquí, se respeta el gusto del usuario).
 5. **Filtro de votos** de recomendaciones: `REC_MIN_VOTES = { movie: 150, tv: 60 }`.
 6. **Relleno por afinidad de género:** se cuentan los géneros más frecuentes del
    top 30, se hace discover de los 2 géneros top con
    `GENRE_FILL_VOTES = { movie: 1000, tv: 300 }` (en TV con `without_genres`),
-   se filtra con `excludeKidsReality` y se fusiona con `mergeGenreFill`
-   (peso 0.5, `reason: 'based_on_genres'`).
+   se filtra con `excludeKidsReality` (evitando semillas) y se fusiona con
+   `mergeGenreFill` (peso 0.5, `reason: 'based_on_genres'`).
 7. Se cortan a 80 y se guardan en `user_recommendations`.
 
 ### 5.3 De recomendaciones a filas
 
 `personalizedRowDefs(recsByType, surface)`
 ([`surfaces.js`](../backend/src/dashboard/surfaces.js)) fusiona los `recItem` de
-los `mediaTypes` de la superficie (ordenados por `score`) y produce:
+los `mediaTypes` de la superficie (ordenados por `score`) y produce filas con un
+**pool amplio + `rotate: true`** (la rotación con semilla por superficie evita que
+se repita el mismo set entre Inicio/Películas/Series) y un **límite de vistos**:
 
-- **"Para ti"** — top 20.
-- **"Porque viste {título}"** — agrupando por la seed de la primera razón
-  `because`; máximo 2 grupos, **solo si tienen ≥ 15 ítems**.
-- **"Más para ti"** — ítems con razón `based_on_genres`, **solo si hay ≥ 15**.
+| Fila                | Pool | `seenRatioLimit` | Notas                                            |
+| ------------------- | ---- | ---------------- | ------------------------------------------------ |
+| **Para ti**         | 40   | 0.30             | En Inicio intercala pelis y series (mezcla real) |
+| **Porque viste {X}**| 30   | 0.15             | Máx 2 grupos, solo seeds `strongPositive`, ≥ 15  |
+| **Más para ti**     | 40   | 0.30             | `based_on_genres`, solo si ≥ 15                   |
 
 En `home` el `mediaType` de estas filas es `mixed`; en `movies`/`series` es el
-único tipo de la superficie.
+único tipo de la superficie. Como Películas solo usa recs `movie` y Series solo
+`tv`, sus "Para ti" ya difieren entre sí; el desfase de semilla diferencia además
+el de Inicio.
 
 ---
 
@@ -367,18 +382,32 @@ Así, qué géneros/décadas se muestran (`pickRotating`) y el orden dentro de c
 fila cambian cada día sin aleatoriedad inestable entre peticiones. Las décadas se
 muestran además **en orden cronológico** tras elegirlas.
 
+**Desfase de semilla por superficie** (`SURFACE_SEED_OFFSET` en
+[`routes/dashboard.js`](../backend/src/routes/dashboard.js)): `home` 0, `movies`
+1009, `series` 2017. La rotación sigue cambiando cada día, pero con una fase
+distinta por superficie, de modo que "Para ti" y las filas rotativas **no
+muestran el mismo set** entre Inicio/Películas/Series.
+
 ### 7.2 Ensamblaje ([`assemble.js`](../backend/src/dashboard/assemble.js))
 
-`assembleRows({ rowSpecs, rotationSeed, perRow = 20, minItems = 15, excludeIds })`:
+`assembleRows({ rowSpecs, rotationSeed, perRow = 20, minItems = 15, seenIds })`:
 
 1. Recorre las filas en orden (**personalizadas primero**, luego genéricas).
-2. Para cada fila rotable, baraja con la semilla del día.
+2. Para cada fila rotable, baraja con la semilla (de la superficie/día).
 3. Toma hasta `perRow` (20) tarjetas **saltando las ya usadas** (`used`) →
    **deduplicación entre filas**: un título no se repite en dos carruseles.
-4. **Si la fila queda con < `minItems` (15) se descarta** y **no** marca sus
+4. **Política de "ya visto"** (`seenIds` = historial ∪ favoritos ∪ valorados):
+   - Filas **genéricas** (sin `seenRatioLimit`): permiten vistos **sin límite**
+     (tendencias, populares, mejor valoradas, Top 10, géneros, décadas, estrenos,
+     joyas ocultas). Un título que ya viste **sí** aparece en Populares.
+   - Filas **personalizadas** (`seenRatioLimit`): limitan los vistos a esa
+     proporción de la fila (Para ti/Más para ti 30 %, Porque viste 15 %), para
+     que no estén dominadas por lo ya visto.
+5. **Si la fila queda con < `minItems` (15) se descarta** y **no** marca sus
    títulos como usados (quedan disponibles para filas posteriores).
-5. `excludeIds` pre-excluye lo que el usuario ya tiene (historial+favoritos),
-   para no recomendar lo ya visto.
+
+> `excludeIds` sigue existiendo como exclusión dura opcional, pero la ruta ya no
+> lo usa: la política pasó de "siempre excluir biblioteca" a este control por fila.
 
 ### 7.3 Respuesta de la ruta
 
@@ -441,6 +470,13 @@ En `MainDashboardClient.jsx`, las filas del motor se pintan con el componente
 - **Flechas de desplazamiento** (`showPrev`/`showNext`): aparecen al hacer hover
   sobre la fila cuando hay más contenido (`canPrev`/`canNext`).
 - Swiper con 20 tarjetas por fila, lazy de imágenes y overrides de póster/backdrop.
+
+**Interacción inmediata:** los carruseles se pueden deslizar nada más pintarse.
+La `key` del `Swiper` **no incluye `hydrated`** (incluirlo lo remontaba al
+hidratar) y **no** se envuelve en `pointer-events-none/touch-none`. Solo la vista
+previa al hover espera a la hidratación; el desliz funciona desde el primer
+render. (Las filas de Películas/Series ya eran interactivas: sus `Swiper` no
+llevan `key` ni bloqueo.)
 
 El título de algunas filas (Tendencias, Populares, Recomendados, Más esperadas)
 se renderiza como **enlace** (`ExpandableSectionTitle` → `EXPANDABLE_SECTION_HREFS`)
@@ -533,6 +569,15 @@ cd backend && node --test 'src/dashboard/*.test.js'
 - ✅ **Sin duplicados** entre filas (dedup cruzada en `assemble.js`).
 - ✅ **Calidad de contenido** vía pisos de `vote_count` por tipo y categoría.
 - ✅ **Décadas** 1980–2020 en orden cronológico.
+- ✅ **Recomendaciones por valoración:** rating ≥ 9/8 pesan por encima de
+  favoritos, historial y pendientes; "Porque viste…" solo desde títulos que
+  gustaron (rating ≥ 8 o favorito).
+- ✅ **Política de "ya visto" por fila:** genéricas muestran vistos sin límite;
+  personalizadas los acotan (Para ti 30 %, Porque viste 15 %).
+- ✅ **Variedad entre dashboards:** Inicio mezcla pelis y series; Películas/Series
+  priorizan su tipo; desfase de semilla por superficie evita repetir "Para ti".
+- ✅ **Interacción inmediata:** los carruseles se deslizan al pintarse (sin
+  remount ni bloqueo por `hydrated`).
 - ✅ **Rotación diaria** estable (misma semilla durante el día).
 - ✅ **Caché con TTL** en dos tablas; reconstrucción perezosa y tolerante a fallos.
 - ✅ **Personalización opcional**: genérico para anónimos, "Para ti" para

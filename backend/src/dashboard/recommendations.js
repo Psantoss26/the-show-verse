@@ -83,12 +83,11 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     // ── Aggregate candidates ───────────────────────────────────────────────
     let items = await aggregateCandidates({ seeds, fetchSimilar });
 
-    // ── Build seen set (history + favorites + watchlist + seeds) ───────────
-    const seen = new Set();
-    for (const r of [...lib.history, ...lib.favorites, ...lib.watchlist, ...seeds]) {
-      seen.add(`${r.mediaType}:${r.tmdbId}`);
-    }
-    items = excludeSeen(items, seen);
+    // NO excluimos toda la biblioteca: los títulos ya vistos se permiten de
+    // forma limitada por fila en el ensamblaje (seenRatioLimit). Solo evitamos
+    // que una semilla se recomiende a sí misma (aggregateCandidates ya excluye
+    // las semillas de `items`; lo reforzamos en el relleno por género más abajo).
+    const seedKeys = new Set(seeds.map((s) => `${s.mediaType}:${s.tmdbId}`));
 
     // Regla de contenido: nunca recomendar infantil ni reality (aunque el
     // idioma/anime sí se respeta según el gusto del usuario).
@@ -129,7 +128,9 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
       );
 
       const allFill = fillArrays.flat();
-      const filteredFill = excludeKidsReality(excludeSeen(allFill, seen));
+      // El relleno evita las semillas (no recomendar lo que originó la rec) pero
+      // sí puede traer otros vistos: el límite por fila los acota.
+      const filteredFill = excludeKidsReality(excludeSeen(allFill, seedKeys));
       items = mergeGenreFill(items, filteredFill, 0.5);
     }
 

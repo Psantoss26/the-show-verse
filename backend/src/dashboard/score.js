@@ -44,16 +44,20 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
         const item = candidateMap.get(key);
         item.score += contribution;
 
-        // Dedupe reasons by seedTmdbId
-        const alreadyHasReason = item.reasons.some(
-          (r) => r.seedTmdbId === seed.tmdbId
-        );
-        if (!alreadyHasReason) {
-          item.reasons.push({
-            type: 'because',
-            seedTmdbId: seed.tmdbId,
-            seedTitle: seed.title ?? null,
-          });
+        // Solo las semillas que el usuario realmente disfrutó (strongPositive:
+        // rating ≥ 8 o favorito) generan razón "porque viste…". El visionado
+        // casual o los pendientes puntúan, pero no crean esas filas.
+        if (seed.strongPositive) {
+          const alreadyHasReason = item.reasons.some(
+            (r) => r.seedTmdbId === seed.tmdbId
+          );
+          if (!alreadyHasReason) {
+            item.reasons.push({
+              type: 'because',
+              seedTmdbId: seed.tmdbId,
+              seedTitle: seed.title ?? null,
+            });
+          }
         }
       });
     }

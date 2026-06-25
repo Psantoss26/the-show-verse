@@ -2005,7 +2005,9 @@ function Row({
     1280: { slidesPerView: "auto", spaceBetween: 20 },
   };
 
-  const swiperKey = `${title}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  // No incluimos `hydrated` en la key: hacerlo remonta el Swiper al hidratar y
+  // bloquea el primer desliz. La config solo cambia con el layout (móvil/desktop).
+  const swiperKey = `${title}-${isMobile ? "m" : "d"}`;
 
   return (
     <motion.div
@@ -2055,7 +2057,7 @@ function Row({
           setHoveredIndex(null);
         }}
       >
-        <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
+        <div>
           <Swiper
             key={swiperKey}
             slidesPerView={3}
@@ -2836,7 +2838,9 @@ function TopRatedHero({
   const showPrev = isHoveredHero && canPrev;
   const showNext = isHoveredHero && canNext;
 
-  const heroKey = `hero-${activeTab}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  // Sin `hydrated` en la key (remontaría el Swiper al hidratar y bloquearía el
+  // primer desliz). Solo cambia con el tab y el layout.
+  const heroKey = `hero-${activeTab}-${isMobile ? "m" : "d"}`;
 
   return (
     <motion.div
@@ -2886,7 +2890,7 @@ function TopRatedHero({
         onMouseLeave={() => setIsHoveredHero(false)}
       >
         <>
-          <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
+          <div>
             <Swiper
               key={heroKey}
               slidesPerView={isMobile ? 1 : 3}
