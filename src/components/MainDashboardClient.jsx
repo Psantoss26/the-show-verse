@@ -23,12 +23,12 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 import {
-  getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
   getMovieDetails,
   getExternalIds,
 } from "@/lib/api/tmdb";
+import { getBackendItemStatus } from "@/lib/api/itemStatus";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -568,7 +568,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       try {
         setLoadingStates(true);
         const type = movie.media_type || "movie";
-        const st = await getMediaAccountStates(type, movie.id, session);
+        const st = await getBackendItemStatus({ type, tmdbId: movie.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
@@ -977,8 +977,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                   src="/logo-TMDb.png"
                   alt="TMDb"
                   className="h-3 w-auto"
-                  width={36}
-                  height={12}
+                  width={2560}
+                  height={1846}
+                  sizes="32px"
                   loading="lazy"
                 />
                 <span className="font-medium">{ratingOf(movie)}</span>
@@ -990,8 +991,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
                     src="/logo-IMDb.svg"
                     alt="IMDb"
                     className="h-4 w-auto"
-                    width={34}
-                    height={16}
+                    width={575}
+                    height={290}
+                    sizes="40px"
                     loading="lazy"
                   />
                   <span className="font-medium">
@@ -1124,7 +1126,7 @@ function InlinePreviewCardAnticipated({
           movie.first_air_date
             ? "tv"
             : "movie";
-        const st = await getMediaAccountStates(mediaType, movie.id, session);
+        const st = await getBackendItemStatus({ type: mediaType, tmdbId: movie.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
@@ -2950,7 +2952,11 @@ function TopRatedHero({
                           fill
                           sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
                           className="object-cover blur-2xl opacity-35 scale-110"
-                          loading="lazy"
+                          // Carga ansiosa en las primeras diapositivas (above the
+                          // fold): en móvil el principal va en object-contain y
+                          // este fondo difuminado puede ser el LCP, así que no
+                          // debe quedar en lazy.
+                          loading={index < (isMobile ? 1 : 3) ? "eager" : "lazy"}
                         />
                         <NextImage
                           src={buildImg(heroBackdrop, "w1280")}

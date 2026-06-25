@@ -26,12 +26,12 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 import {
-  getMediaAccountStates,
   markAsFavorite,
   markInWatchlist,
   getMovieDetails,
   getExternalIds,
 } from "@/lib/api/tmdb";
+import { getBackendItemStatus } from "@/lib/api/itemStatus";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -718,7 +718,7 @@ function InlinePreviewCard({ movie, heightClass }) {
       try {
         setLoadingStates(true);
         const type = movie.media_type || "movie";
-        const st = await getMediaAccountStates(type, movie.id, session);
+        const st = await getBackendItemStatus({ type, tmdbId: movie.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);

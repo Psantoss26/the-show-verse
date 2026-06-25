@@ -1,0 +1,819 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - text: Inicio
+          - link "Películas" [ref=e11] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e12] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e13] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e14] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e16]:
+        - link "Listas" [ref=e17] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e19]
+        - link "Calendario" [ref=e21] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e23]
+        - link "En Progreso" [ref=e25] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e27]
+        - link "Historial" [ref=e29] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e31]
+        - link "Favoritas" [ref=e34] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e36]
+        - link "Pendientes" [ref=e38] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e40]
+      - generic [ref=e43]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e50]
+        - button "Abrir recomendador de qué ver" [ref=e51]:
+          - img [ref=e52]
+  - generic [ref=e56]:
+    - region "Contenido destacado" [ref=e58]:
+      - generic [ref=e59] [cursor=pointer]:
+        - img "The Boys" [ref=e62]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - generic [ref=e66]: "2019"
+            - generic [ref=e67]:
+              - img "TMDb" [ref=e68]
+              - generic [ref=e69]: "8.5"
+          - generic [ref=e70]: Ciencia ficción y fantasía · Acción y aventura
+          - paragraph [ref=e71]: La serie tiene lugar en un mundo en el que los superhéroes representan el lado oscuro de la celebridad y la fama. Un grupo de vigilantes que se hacen llamar "The Boys" decide hacer todo lo posible por frenar a los superhéroes que están perjudicando a la sociedad, independientemente de los riesgos que ello conlleva.
+          - generic [ref=e73]:
+            - link "Más información" [ref=e74]:
+              - /url: /details/tv/76479
+              - img [ref=e75]
+              - generic [ref=e77]: Más información
+            - button "Ver trailer" [pressed] [ref=e78]:
+              - img [ref=e80]
+            - button "Silenciar soundtrack" [pressed] [ref=e82]:
+              - img [ref=e84]
+            - button "Añadir a favoritos" [ref=e88]:
+              - img [ref=e90]
+            - button "Añadir a pendientes" [ref=e92]:
+              - img [ref=e94]
+            - button "No visto":
+              - generic:
+                - img
+      - button "Anterior" [ref=e96]:
+        - img [ref=e97]
+      - button "Siguiente" [ref=e99]:
+        - img [ref=e100]
+      - generic "Diapositivas destacadas" [ref=e103]:
+        - button "Ver destacado 1" [ref=e104]
+        - button "Ver destacado 2" [ref=e105]
+        - button "Ver destacado 3" [ref=e106]
+        - button "Ver destacado 4" [ref=e107]
+        - button "Ver destacado 5" [ref=e108]
+        - button "Ver destacado 6" [ref=e109]
+        - button "Ver destacado 7" [ref=e110]
+        - button "Ver destacado 8" [ref=e111]
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - generic [ref=e117]: DESTACADAS
+          - generic [ref=e118]:
+            - heading "Mejor valoradas." [level=3] [ref=e119]
+            - generic [ref=e120]:
+              - button "Películas" [ref=e121]
+              - button "Series" [ref=e122]
+        - generic [ref=e123]:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - link:
+                    - /url: /details/movie/278
+                - generic:
+                  - link:
+                    - /url: /details/movie/687163
+                - generic:
+                  - link:
+                    - /url: /details/movie/238
+                - generic:
+                  - link:
+                    - /url: /details/movie/240
+                - generic:
+                  - link:
+                    - /url: /details/movie/424
+                - generic:
+                  - link:
+                    - /url: /details/movie/389
+                - generic:
+                  - link:
+                    - /url: /details/movie/129
+                - generic:
+                  - link:
+                    - /url: /details/movie/155
+                - generic:
+                  - link:
+                    - /url: /details/movie/497
+                - generic:
+                  - link:
+                    - /url: /details/movie/122
+                - generic:
+                  - link:
+                    - /url: /details/movie/13
+                - generic:
+                  - link:
+                    - /url: /details/movie/496243
+                - generic:
+                  - link:
+                    - /url: /details/movie/680
+                - generic:
+                  - link:
+                    - /url: /details/movie/372058
+                - generic:
+                  - link:
+                    - /url: /details/movie/157336
+                - generic:
+                  - link:
+                    - /url: /details/movie/429
+                - generic:
+                  - link:
+                    - /url: /details/movie/769
+                - generic:
+                  - link:
+                    - /url: /details/movie/12477
+                - generic:
+                  - link:
+                    - /url: /details/movie/637
+                - generic:
+                  - link:
+                    - /url: /details/movie/550
+      - generic [ref=e124]:
+        - generic [ref=e127]:
+          - generic [ref=e130]: PRÓXIMAMENTE
+          - link "Ver todos los títulos de Más esperadas" [ref=e131] [cursor=pointer]:
+            - /url: /dashboard/mas-esperadas
+            - generic [ref=e132]: Más esperadas
+            - generic [ref=e133]: .
+            - img [ref=e134]
+        - generic [ref=e145]:
+          - generic [ref=e148]: TRAKT
+          - link "Ver todos los títulos de Recomendados" [ref=e149] [cursor=pointer]:
+            - /url: /dashboard/recomendados
+            - generic [ref=e150]: Recomendados
+            - generic [ref=e151]: .
+            - img [ref=e152]
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e165]: TMDB
+            - generic [ref=e166]:
+              - link "Ver todos los títulos de Tendencias" [ref=e167] [cursor=pointer]:
+                - /url: /dashboard/tendencias
+                - generic [ref=e168]: Tendencias
+                - generic [ref=e169]: .
+                - img [ref=e170]
+              - button "TMDb" [ref=e173]
+          - generic [ref=e175]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1084244
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1339713
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1083381
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1301421
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/614945
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/969681
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1275779
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1451344
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/454639
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1340206
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1318413
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/936075
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1273221
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1315772
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1477317
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1413976
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1081003
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/931285
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/687163
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1228710
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/94997
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/278178
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/124364
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/270476
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/219971
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/82452
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/37854
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/65942
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/220102
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/276161
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/136315
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/60625
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/203744
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/299167
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/289763
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/296285
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/277439
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/135934
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/76479
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/456
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - generic [ref=e180]: TMDB
+            - generic [ref=e181]:
+              - link "Ver todos los títulos de Populares" [ref=e182] [cursor=pointer]:
+                - /url: /dashboard/populares
+                - generic [ref=e183]: Populares
+                - generic [ref=e184]: .
+                - img [ref=e185]
+              - button "TMDb" [ref=e188]
+          - generic [ref=e190]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1392469
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1339713
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/936075
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/28322
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/931285
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1084244
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1239134
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1523145
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/11012
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1477317
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1228710
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1226293
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1367220
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1226863
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1275779
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1127384
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1057265
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1280738
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/1103473
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/614945
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/124364
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/284631
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/94997
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/107447
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/273240
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/2734
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/76479
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/79744
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/549
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/276880
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1399
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/288603
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1416
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/278178
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1622
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/5920
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/4614
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/456
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/4057
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/218613
+        - generic [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e195]: GALARDONADAS
+            - heading "Premiadas y nominadas." [level=3] [ref=e196]
+          - generic [ref=e197]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/157336
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/155
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/278
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/680
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/13
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/122
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/238
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/496243
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/497
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/129
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/424
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/769
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/240
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/372058
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/389
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/429
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/687163
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/19404
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/346
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/movie/936075
+        - generic [ref=e198]:
+          - generic [ref=e199]:
+            - generic [ref=e202]: GÉNERO
+            - heading "Dramas que enganchan." [level=3] [ref=e203]
+          - generic [ref=e204]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1399
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1396
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1416
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1622
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1408
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1412
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/94997
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/4604
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/5920
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/2734
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/4057
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/124364
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/46952
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1911
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/34307
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/79744
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/73586
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/4614
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/71790
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /details/tv/1431
+  - button "Open Next.js Dev Tools" [ref=e210] [cursor=pointer]:
+    - img [ref=e211]

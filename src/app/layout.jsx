@@ -48,6 +48,15 @@ export default function RootLayout({ children }) {
       <body
         className={`${ptSans.className} ${ptSans.variable} ${anton.variable} bg-black text-white antialiased`}
       >
+        {/* Adelanta la conexión a TMDb (arte) y a YouTube (trailers de las
+            vistas previas) para que el iframe del trailer cargue lo antes
+            posible y se reproduzca de forma casi instantánea al hacer hover. */}
+        <link rel="preconnect" href="https://api.themoviedb.org" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.youtube.com" />
+        <link rel="preconnect" href="https://s.ytimg.com" />
+        <link rel="preconnect" href="https://i.ytimg.com" />
+        <link rel="dns-prefetch" href="https://www.youtube.com" />
         <AuthProvider>
           <ScrollRestoration />
           <Navbar />
