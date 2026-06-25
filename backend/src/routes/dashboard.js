@@ -37,6 +37,8 @@ async function resolvePoolItems(poolKey, mediaType) {
 // día, pero con una fase distinta en Inicio/Películas/Series para que "Para ti"
 // (y las filas rotativas) no muestren exactamente el mismo set entre dashboards.
 const SURFACE_SEED_OFFSET = { home: 0, movies: 1009, series: 2017 };
+const DASHBOARD_ITEMS_PER_ROW = 28;
+const DASHBOARD_MIN_ITEMS_PER_ROW = 15;
 
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 export default async function dashboardRoutes(fastify) {
@@ -156,8 +158,8 @@ export default async function dashboardRoutes(fastify) {
     const rows = assembleRows({
       rowSpecs: [...personalSpecs, ...genericSpecs],
       rotationSeed: seed,
-      perRow: 20,
-      minItems: 15, // toda fila debe tener al menos 15 elementos
+      perRow: DASHBOARD_ITEMS_PER_ROW,
+      minItems: DASHBOARD_MIN_ITEMS_PER_ROW,
       seenIds,
     });
 

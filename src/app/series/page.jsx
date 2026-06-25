@@ -18,6 +18,8 @@ import {
   buildFeatured,
   getFeaturedExclusionKeys,
 } from "@/lib/dashboard/featured";
+import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
+import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
 
 export const revalidate = 1800; // 30 min
 // Margen para que la carga + streaming de datos diferidos termine en Vercel.
@@ -41,7 +43,7 @@ function getBaseUrl() {
 async function fetchTopRatedImdbTvServer() {
   const baseUrl = getBaseUrl();
 
-  const url = `${baseUrl}/api/imdb/top-rated?type=tv&pages=3&limit=80&minVotes=5000`;
+  const url = `${baseUrl}/api/imdb/top-rated?type=tv&pages=3&limit=120&minVotes=5000`;
 
   // Timeout para que este self-fetch (scraping de IMDb, lento) nunca cuelgue la
   // carga del resto de secciones diferidas en producción.
@@ -79,7 +81,10 @@ async function fetchTopRatedImdbTvServer() {
 
 /* ======== Curado de listas tipo Netflix/Prime ======== */
 const sortByVotes = (list = []) =>
-  [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+  balanceSoftLimitedDashboardContent(
+    [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0)),
+    "tv",
+  );
 
 function curateList(
   list,
@@ -167,7 +172,7 @@ async function getCriticalDashboardData() {
       minVotes: 1200,
       minRating: 6.3,
       minSize: 30,
-      maxSize: 80,
+      maxSize: 100,
     });
 
     const curatedTopES = (topES || []).slice(0, 10);
@@ -175,7 +180,7 @@ async function getCriticalDashboardData() {
       minVotes: 1200,
       minRating: 6.8,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
     const mainFeatured = buildFeatured(
       {
@@ -263,7 +268,7 @@ async function getDeferredDashboardData() {
       fetchMediaByGenre({
         type: "tv",
         genreId: 16,
-        minVotes: 400,
+        minVotes: 700,
         language: lang,
       }).catch(() => []), // Animación
       discoverTV({
@@ -281,49 +286,49 @@ async function getDeferredDashboardData() {
       minVotes: 8000,
       minRating: 7.4,
       minSize: 30,
-      maxSize: 80,
+      maxSize: 100,
     });
 
     const curatedDrama = curateList(drama, {
       minVotes: 1000,
       minRating: 6.5,
       minSize: 25,
-      maxSize: 70,
+      maxSize: 84,
     });
 
     const curatedScifiFantasy = curateList(scifi_fantasy, {
       minVotes: 800,
       minRating: 6.4,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedCrime = curateList(crime, {
       minVotes: 800,
       minRating: 6.4,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedRomance = curateList(romance, {
       minVotes: 50,
       minRating: 6.0,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedAnimation = curateList(animation, {
-      minVotes: 400,
-      minRating: 6.2,
-      minSize: 20,
-      maxSize: 60,
+      minVotes: 700,
+      minRating: 7.0,
+      minSize: 14,
+      maxSize: 36,
     });
 
     const curatedKDrama = curateList(kDrama, {
       minVotes: 300,
       minRating: 6.0,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     const curatedBaseSections = {};
@@ -343,28 +348,28 @@ async function getDeferredDashboardData() {
           minVotes: 800,
           minRating: 7.2,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key === "Superéxito") {
         params = {
           minVotes: 1500,
           minRating: 6.5,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key === "Más votadas") {
         params = {
           minVotes: 600,
           minRating: 6.2,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key.startsWith("Década de")) {
         params = {
           minVotes: 600,
           minRating: 6.2,
           minSize: 15,
-          maxSize: 60,
+          maxSize: 72,
         };
       } else if (key === "Por género") {
         continue;
@@ -373,7 +378,7 @@ async function getDeferredDashboardData() {
           minVotes: 500,
           minRating: 6.0,
           minSize: 20,
-          maxSize: 60,
+          maxSize: 72,
         };
       }
 
@@ -384,11 +389,12 @@ async function getDeferredDashboardData() {
     const byGenreRaw = baseSections?.["Por género"] || {};
     for (const [gname, list] of Object.entries(byGenreRaw)) {
       if (!Array.isArray(list) || list.length === 0) continue;
+      const softLimitedGenre = /animaci[oó]n|documental/i.test(gname);
       curatedByGenre[gname] = curateList(list, {
-        minVotes: 400,
-        minRating: 6.0,
-        minSize: 15,
-        maxSize: 50,
+        minVotes: softLimitedGenre ? 700 : 400,
+        minRating: softLimitedGenre ? 7.0 : 6.0,
+        minSize: softLimitedGenre ? 10 : 15,
+        maxSize: softLimitedGenre ? 40 : 60,
       });
     }
     if (Object.keys(curatedByGenre).length > 0) {
@@ -413,13 +419,17 @@ async function getDeferredDashboardData() {
 
 /* =================== Componente de servidor =================== */
 export default async function SeriesPage() {
-  const initialData = await getCriticalDashboardData();
+  const [initialData, initialEngineRows] = await Promise.all([
+    getCriticalDashboardData(),
+    fetchAnonymousDashboardRows("series"),
+  ]);
   const deferredDataPromise = getDeferredDashboardData();
 
   return (
     <SeriesPageClient
       initialData={initialData}
       deferredDataPromise={deferredDataPromise}
+      initialEngineRows={initialEngineRows}
     />
   );
 }

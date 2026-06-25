@@ -1,7 +1,7 @@
 // backend/src/dashboard/filters.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { excludeKidsReality, capAsian, isExcludedGenre } from './filters.js';
+import { excludeKidsReality, capAsian, isExcludedGenre, localePriorityWeight } from './filters.js';
 
 test('isExcludedGenre flags kids/reality/talk/news, allows general genres', () => {
   assert.equal(isExcludedGenre({ genreIds: [10762] }), true); // Kids
@@ -39,4 +39,16 @@ test('capAsian keeps a minimum of Asian titles when the rest is small', () => {
   const out = capAsian([...rest, ...asian]);
   const keptAsian = out.filter((c) => c.originalLanguage === 'ko');
   assert.equal(keptAsian.length, 3); // max(3, round(1 * 0.4)) = 3
+});
+
+test('localePriorityWeight boosts English/Spanish and US/Spain content', () => {
+  const neutral = { tmdbId: 1, originalLanguage: 'fr', originCountry: ['FR'] };
+  const english = { tmdbId: 2, originalLanguage: 'en', originCountry: ['GB'] };
+  const us = { tmdbId: 3, originalLanguage: 'fr', originCountry: ['US'] };
+  const spanishSpain = { tmdbId: 4, originalLanguage: 'es', originCountry: ['ES'] };
+
+  assert.equal(localePriorityWeight(neutral), 1);
+  assert.ok(localePriorityWeight(english) > localePriorityWeight(neutral));
+  assert.ok(localePriorityWeight(us) > localePriorityWeight(english));
+  assert.ok(localePriorityWeight(spanishSpain) > localePriorityWeight(us));
 });

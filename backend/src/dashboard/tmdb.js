@@ -34,6 +34,7 @@ export function toCard(raw, mediaType) {
     voteAverage: typeof raw.vote_average === 'number' ? raw.vote_average : 0,
     voteCount: typeof raw.vote_count === 'number' ? raw.vote_count : 0,
     originalLanguage: raw.original_language || null,
+    originCountry: Array.isArray(raw.origin_country) ? raw.origin_country : [],
     year,
     genreIds: Array.isArray(raw.genre_ids) ? raw.genre_ids : [],
     popularity: typeof raw.popularity === 'number' ? raw.popularity : 0,

@@ -3,6 +3,8 @@
  * No DB/network access — all data comes in as arguments.
  */
 
+import { contentPriorityWeight } from './filters.js';
+
 /**
  * For each seed, fetch its similar/recommended candidates and accumulate
  * a weighted score. Returns rec items sorted by score descending.
@@ -35,7 +37,7 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
         if (seedKeys.has(key)) return;
 
         const positionDecay = 1 / (1 + index * 0.15);
-        const contribution = seed.weight * sourceWeight * positionDecay;
+        const contribution = seed.weight * sourceWeight * positionDecay * contentPriorityWeight(card);
 
         if (!candidateMap.has(key)) {
           candidateMap.set(key, { ...card, score: 0, reasons: [] });
@@ -96,7 +98,7 @@ export function mergeGenreFill(recItems, fillCards, weight = 0.5) {
     .filter((card) => !existingKeys.has(`${card.mediaType}:${card.tmdbId}`))
     .map((card) => ({
       ...card,
-      score: weight,
+      score: weight * contentPriorityWeight(card),
       reasons: [{ type: 'based_on_genres', seedTmdbId: null, seedTitle: null }],
     }));
 

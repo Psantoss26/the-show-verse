@@ -3,7 +3,7 @@ import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
-import { excludeKidsReality, capAsian, TV_WITHOUT_GENRES } from './filters.js';
+import { balanceSoftLimitedContent, excludeKidsReality, capAsian, TV_WITHOUT_GENRES } from './filters.js';
 
 // ─── TTLs (ms) ────────────────────────────────────────────────────────────────
 const TTL_12H  = 12 * 60 * 60 * 1000;
@@ -50,7 +50,7 @@ function refine(cards, mediaType, floor) {
   const cleaned = excludeKidsReality(dedupeCards(cards)).filter(
     (c) => (c?.voteCount || 0) >= min,
   );
-  return capAsian(cleaned);
+  return balanceSoftLimitedContent(capAsian(cleaned));
 }
 
 // Parámetros de discover por tipo: en TV excluimos géneros no deseados
@@ -142,10 +142,10 @@ for (const mediaType of ['movie', 'tv']) {
 // Sí aplicamos las reglas de contenido (sin infantil/reality, asiático no
 // predominante).
 addPool('new_releases', 'movie', TTL_24H, async () =>
-  capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 }))))
+  balanceSoftLimitedContent(capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 })))))
 );
 addPool('new_releases', 'tv', TTL_24H, async () =>
-  capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 }))))
+  balanceSoftLimitedContent(capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 })))))
 );
 
 // region_top (24h) — populares en ES con votos suficientes

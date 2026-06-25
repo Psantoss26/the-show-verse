@@ -67,6 +67,8 @@ const DASHBOARD_RECOMMENDED_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DASHBOARD_SECTION_CACHE_PREFIX = "showverse:dashboard:section:v1:";
 const DASHBOARD_SECTION_CACHE_TTL_MS = 60 * 60 * 1000;
 const DASHBOARD_FETCH_TIMEOUT_MS = 8500;
+const INITIAL_VISIBLE_ENGINE_ROWS = 6;
+const ENGINE_ROW_REVEAL_BATCH_SIZE = 4;
 
 function toItemsArray(value) {
   if (Array.isArray(value)) return value;
@@ -405,9 +407,19 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
           movie.profile_path ||
           null;
         if (!abort) {
-          if (existingPoster) cache.current.set(posterCacheKey, existingPoster);
           setPosterPath(existingPoster);
           setReady(!!existingPoster);
+        }
+        return;
+      }
+
+      if (posterOverride) {
+        const url = buildImg(posterOverride, "w342");
+        await preloadImage(url);
+        if (!abort) {
+          cache.current.set(posterCacheKey, posterOverride);
+          setPosterPath(posterOverride);
+          setReady(true);
         }
         return;
       }
@@ -426,17 +438,13 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
       const existingPoster =
         movie.poster_path || movie.backdrop_path || movie.profile_path || null;
       if (existingPoster) {
-        const url = buildImg(existingPoster, "w342");
-        await preloadImage(url);
         if (!abort) {
-          cache.current.set(posterCacheKey, existingPoster);
           setPosterPath(existingPoster);
           setReady(true);
         }
-        return;
       }
 
-      setReady(false);
+      if (!existingPoster) setReady(false);
       const preferred = await fetchBestPoster(movie.id, mediaType);
       const chosen =
         preferred ||
@@ -2093,7 +2101,7 @@ function Row({
                 m.first_air_date
                   ? "tv"
                   : "movie";
-              const itemKey = `${itemType}:${m.id}`;
+              const itemKey = `${itemType}:${m.id}:${i}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = anticipatedAnimatingOutId === itemKey;
               const isLast = i === normalizedItems.length - 1;
@@ -2944,7 +2952,7 @@ function TopRatedHero({
 
                 if (!heroBackdrop) {
                   return (
-                    <SwiperSlide key={movie.id} className={slideClass}>
+                    <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
                       <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
                         <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
                       </Link>
@@ -2953,7 +2961,7 @@ function TopRatedHero({
                 }
 
                 return (
-                  <SwiperSlide key={movie.id} className={slideClass}>
+                  <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
                     <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
                       <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
                         <NextImage
@@ -3066,7 +3074,7 @@ function TopRatedHero({
 }
 
 /* =================== MainDashboard (CLIENTE) =================== */
-export default function MainDashboardClient({ initialData }) {
+export default function MainDashboardClient({ initialData, initialEngineRows = EMPTY_ARRAY }) {
   const isMobile = useIsMobileLayout(768);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
@@ -3139,7 +3147,41 @@ export default function MainDashboardClient({ initialData }) {
   // Filas de la engine de dashboards (recomendaciones personalizadas + genérico
   // rotativo, ya deduplicado por el backend; sin Trakt). Sustituyen a las filas
   // genéricas repetitivas anteriores.
-  const { rows: engineRows } = useEngineRows("home");
+  const { rows: engineRows } = useEngineRows("home", {
+    initialRows: initialEngineRows,
+  });
+  const [visibleEngineRowCount, setVisibleEngineRowCount] = useState(
+    INITIAL_VISIBLE_ENGINE_ROWS,
+  );
+  const renderableEngineRows = useMemo(
+    () => engineRows.filter((row) => row.key !== "top_rated"),
+    [engineRows],
+  );
+
+  useEffect(() => {
+    if (visibleEngineRowCount >= renderableEngineRows.length) return undefined;
+
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      if (cancelled) return;
+      setVisibleEngineRowCount((count) =>
+        Math.min(
+          renderableEngineRows.length,
+          count + ENGINE_ROW_REVEAL_BATCH_SIZE,
+        ),
+      );
+    }, 80);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [renderableEngineRows.length, visibleEngineRowCount]);
+
+  const visibleEngineRows = renderableEngineRows.slice(
+    0,
+    visibleEngineRowCount,
+  );
 
   const allMovieIds = useMemo(() => {
     const keys = [
@@ -3272,9 +3314,7 @@ export default function MainDashboardClient({ initialData }) {
               genérico rotativo, deduplicado por el backend (sin Trakt). Se usa el
               componente Row (con vista previa al hover y flechas de desplazamiento).
               Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero. */}
-          {engineRows
-            .filter((row) => row.key !== "top_rated")
-            .map((row) => (
+          {visibleEngineRows.map((row) => (
               <Row
                 key={row.key}
                 title={row.title}

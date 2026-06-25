@@ -2,8 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregateCandidates, excludeSeen } from './score.js';
+import { balanceSoftLimitedContent, softLimitedContentWeight } from './filters.js';
 
-const card = (id) => ({ tmdbId: id, mediaType: 'movie', title: `M${id}` });
+const card = (id, extra = {}) => ({ tmdbId: id, mediaType: 'movie', title: `M${id}`, ...extra });
 
 test('aggregateCandidates scores recommendations above similar and aggregates seeds', async () => {
   const seeds = [
@@ -43,4 +44,24 @@ test('aggregateCandidates only attaches because-reasons for strongPositive seeds
 test('excludeSeen removes library items', () => {
   const items = [card(10), card(11)];
   assert.deepEqual(excludeSeen(items, new Set(['movie:11'])).map((c) => c.tmdbId), [10]);
+});
+
+test('soft-limited animation/documentary content is downweighted unless strongly representative', () => {
+  const weakAnimation = card(30, { genreIds: [16], voteAverage: 6.6, voteCount: 300 });
+  const strongDocumentary = card(31, { genreIds: [99], voteAverage: 8.1, voteCount: 4000 });
+  const drama = card(32, { genreIds: [18], voteAverage: 6.8, voteCount: 400 });
+
+  assert.ok(softLimitedContentWeight(weakAnimation) < softLimitedContentWeight(drama));
+  assert.ok(softLimitedContentWeight(strongDocumentary) > softLimitedContentWeight(weakAnimation));
+});
+
+test('balanceSoftLimitedContent lowers weaker animation/documentary items without removing them', () => {
+  const items = [
+    card(42, { genreIds: [99], voteAverage: 8.2, voteCount: 4000 }),
+    card(41, { genreIds: [18], voteAverage: 6.8, voteCount: 300 }),
+    card(40, { genreIds: [16], voteAverage: 6.4, voteCount: 300 }),
+  ];
+
+  const out = balanceSoftLimitedContent(items);
+  assert.deepEqual(out.map((c) => c.tmdbId), [42, 41, 40]);
 });

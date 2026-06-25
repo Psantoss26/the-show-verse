@@ -70,8 +70,8 @@ const scaleIn = {
   },
 };
 
-const INITIAL_VISIBLE_ROWS = 3;
-const ROW_REVEAL_BATCH_SIZE = 2;
+const INITIAL_VISIBLE_ROWS = 6;
+const ROW_REVEAL_BATCH_SIZE = 4;
 const EMPTY_ARRAY = [];
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
@@ -513,14 +513,16 @@ function PosterImage({ movie, cache }) {
 
       // 3) Usar primero el poster ya disponible para no bloquear el primer render
       if (basePoster) {
-        cache.current.set(movie.id, basePoster);
-        return;
+        if (!abort) {
+          setPosterPath(basePoster);
+          setReady(true);
+        }
       }
 
-      // 4) Solo buscar una alternativa si realmente falta artwork base
-      setReady(false);
+      // 4) Buscar el poster preferido en inglés; el base solo actúa como placeholder.
+      if (!basePoster) setReady(false);
       const preferred = await fetchBestPoster(movie.id);
-      const chosen = preferred || null;
+      const chosen = preferred || basePoster || null;
 
       if (!abort) {
         cache.current.set(movie.id, chosen);
@@ -1434,7 +1436,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           breakpoints={breakpointsRow}
         >
           {safeItems.map((m, i) => {
-            const itemKey = `movie:${m.id}`;
+            const itemKey = `movie:${m.id}:${i}`;
             const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
 
             const base =
@@ -1623,7 +1625,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
-export default function MoviesPageClient({ initialData, deferredDataPromise }) {
+export default function MoviesPageClient({
+  initialData,
+  deferredDataPromise,
+  initialEngineRows = EMPTY_ARRAY,
+}) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
@@ -1649,7 +1655,9 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
   // Filas de la engine de dashboards (genérico rotativo + recomendaciones,
   // deduplicado por el backend; sin Trakt). Sustituyen a las filas TMDb
   // genéricas que repetían títulos.
-  const { rows: engineRows } = useEngineRows("movies");
+  const { rows: engineRows } = useEngineRows("movies", {
+    initialRows: initialEngineRows,
+  });
   const rowConfigs = useMemo(
     () =>
       engineRows.map((row) => ({
@@ -1664,26 +1672,19 @@ export default function MoviesPageClient({ initialData, deferredDataPromise }) {
     if (visibleRowCount >= rowConfigs.length) return undefined;
 
     let cancelled = false;
-    const schedule =
-      window.requestIdleCallback ||
-      ((callback) => window.setTimeout(callback, 120));
-    const cancel =
-      window.cancelIdleCallback ||
-      ((handle) => window.clearTimeout(handle));
-
-    const handle = schedule(
+    const handle = window.setTimeout(
       () => {
         if (cancelled) return;
         setVisibleRowCount((count) =>
           Math.min(rowConfigs.length, count + ROW_REVEAL_BATCH_SIZE),
         );
       },
-      { timeout: 350 },
+      80,
     );
 
     return () => {
       cancelled = true;
-      cancel(handle);
+      window.clearTimeout(handle);
     };
   }, [rowConfigs.length, visibleRowCount]);
 

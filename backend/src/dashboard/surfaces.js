@@ -200,11 +200,11 @@ export const SURFACES = {
 const FOR_YOU_SEEN_LIMIT = 0.3;   // "Para ti"/"Más para ti": algunos vistos, sin dominar
 const BECAUSE_SEEN_LIMIT = 0.15;  // "Porque viste…": vistos solo como excepción
 
-// Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (20) para que
+// Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (28) para que
 // la rotación con semilla por superficie produzca subconjuntos distintos entre
 // Inicio/Películas/Series (variedad) sin salir de las mejores recomendaciones.
-const FOR_YOU_POOL = 40;
-const BECAUSE_POOL = 30;
+const FOR_YOU_POOL = 64;
+const BECAUSE_POOL = 48;
 
 // Intercala dos listas conservando el orden de cada una (para mezclar pelis y
 // series en Inicio sin que un tipo domine por puntuación).

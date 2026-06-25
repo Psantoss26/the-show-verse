@@ -12,6 +12,8 @@ import {
   discoverTV,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
+import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
+import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
 import { buildFeatured } from "@/lib/dashboard/featured";
 
 export const dynamic = "force-static";
@@ -23,16 +25,19 @@ export const metadata = {
 };
 
 /* ======== Curado de listas (mismo criterio que Películas/Series) ======== */
-const sortByVotes = (list = []) =>
-  [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+const sortByVotes = (list = [], mediaType = "movie") =>
+  balanceSoftLimitedDashboardContent(
+    [...list].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0)),
+    mediaType,
+  );
 
 function curateList(
   list,
-  { minVotes = 0, minRating = 0, minSize = 20, maxSize = 60 } = {},
+  { minVotes = 0, minRating = 0, minSize = 20, maxSize = 60, mediaType = "movie" } = {},
 ) {
   if (!Array.isArray(list)) return [];
 
-  const sorted = sortByVotes(list);
+  const sorted = sortByVotes(list, mediaType);
 
   const applyFilter = (minV, minR) =>
     sorted.filter((m) => {
@@ -117,24 +122,28 @@ async function getDashboardData() {
     // La mejora a backdrop EN se hace client-side en TopRatedHero (ya implementado).
     const topRatedMoviesSSR = topRatedMovies
       .map((m) => ({ ...m, media_type: "movie" }))
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
-      .slice(0, 20);
+      .sort((a, b) => (
+        (b.vote_average || 0) - (a.vote_average || 0)
+      ));
+    const balancedTopRatedMoviesSSR = balanceSoftLimitedDashboardContent(topRatedMoviesSSR, "movie")
+      .slice(0, 28);
 
     const topRatedTVSSR = topRatedTV
       .map((s) => ({ ...s, media_type: "tv" }))
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
-      .slice(0, 20);
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    const balancedTopRatedTVSSR = balanceSoftLimitedDashboardContent(topRatedTVSSR, "tv")
+      .slice(0, 28);
 
     const awardedSSR = curateList(awarded, {
       minVotes: 1200,
       minRating: 6.8,
       minSize: 20,
-      maxSize: 60,
+      maxSize: 72,
     });
 
     return {
-      topRatedMovies: topRatedMoviesSSR,
-      topRatedTV: topRatedTVSSR,
+      topRatedMovies: balancedTopRatedMoviesSSR,
+      topRatedTV: balancedTopRatedTVSSR,
       featured: buildFeatured(
         {
           trendingMovies,
@@ -152,10 +161,11 @@ async function getDashboardData() {
         minVotes: 1000,
         minRating: 6.5,
         minSize: 25,
-        maxSize: 70,
+        maxSize: 84,
+        mediaType: "tv",
       }),
-      trending: [...trendingMovies, ...trendingTV],
-      popular: [...popularMovies, ...popularTV],
+      trending: balanceSoftLimitedDashboardContent([...trendingMovies, ...trendingTV], "movie"),
+      popular: balanceSoftLimitedDashboardContent([...popularMovies, ...popularTV], "movie"),
 
       // Trakt se carga en el cliente para que Inicio no bloquee la navegación
       // validando cookies/tokens ni esperando endpoints externos.
@@ -188,6 +198,15 @@ async function getDashboardData() {
 
 /* =================== Página de Inicio =================== */
 export default async function HomePage() {
-  const dashboardData = await getDashboardData();
-  return <MainDashboardClient initialData={dashboardData} />;
+  const [dashboardData, initialEngineRows] = await Promise.all([
+    getDashboardData(),
+    fetchAnonymousDashboardRows("home"),
+  ]);
+
+  return (
+    <MainDashboardClient
+      initialData={dashboardData}
+      initialEngineRows={initialEngineRows}
+    />
+  );
 }

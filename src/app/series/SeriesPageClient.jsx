@@ -70,8 +70,8 @@ const scaleIn = {
   },
 };
 
-const INITIAL_VISIBLE_ROWS = 3;
-const ROW_REVEAL_BATCH_SIZE = 2;
+const INITIAL_VISIBLE_ROWS = 6;
+const ROW_REVEAL_BATCH_SIZE = 4;
 const EMPTY_ARRAY = [];
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
@@ -488,14 +488,16 @@ function PosterImage({ show, cache }) {
 
       // 3) Usar primero el poster ya presente para no bloquear la primera pintura
       if (basePoster) {
-        cache.current.set(show.id, basePoster);
-        return;
+        if (!abort) {
+          setPosterPath(basePoster);
+          setReady(true);
+        }
       }
 
-      // 4) Solo pedir imágenes extra si el item no trae artwork base
-      setReady(false);
+      // 4) Buscar el poster preferido en inglés; el base solo actúa como placeholder.
+      if (!basePoster) setReady(false);
       const preferred = await fetchBestTVPoster(show.id);
-      const chosen = preferred || null;
+      const chosen = preferred || basePoster || null;
 
       if (!abort) {
         cache.current.set(show.id, chosen);
@@ -1387,7 +1389,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
           breakpoints={breakpointsRow}
         >
           {safeItems.map((s, i) => {
-            const itemKey = `tv:${s.id}`;
+            const itemKey = `tv:${s.id}:${i}`;
             const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
 
             const base =
@@ -1576,7 +1578,11 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 /* ====================================================================
  * Componente Principal (CLIENTE): recibe datos ya cargados en servidor
  * ==================================================================== */
-export default function SeriesPageClient({ initialData, deferredDataPromise }) {
+export default function SeriesPageClient({
+  initialData,
+  deferredDataPromise,
+  initialEngineRows = EMPTY_ARRAY,
+}) {
   const isMobile = useIsMobileLayout(768);
 
   const posterCacheRef = useRef(new Map());
@@ -1602,7 +1608,9 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
   // Filas de la engine de dashboards (genérico rotativo + recomendaciones,
   // deduplicado por el backend; sin Trakt). Sustituyen a las filas TMDb
   // genéricas que repetían títulos.
-  const { rows: engineRows } = useEngineRows("series");
+  const { rows: engineRows } = useEngineRows("series", {
+    initialRows: initialEngineRows,
+  });
   const rowConfigs = useMemo(
     () =>
       engineRows.map((row) => ({
@@ -1617,26 +1625,19 @@ export default function SeriesPageClient({ initialData, deferredDataPromise }) {
     if (visibleRowCount >= rowConfigs.length) return undefined;
 
     let cancelled = false;
-    const schedule =
-      window.requestIdleCallback ||
-      ((callback) => window.setTimeout(callback, 120));
-    const cancel =
-      window.cancelIdleCallback ||
-      ((handle) => window.clearTimeout(handle));
-
-    const handle = schedule(
+    const handle = window.setTimeout(
       () => {
         if (cancelled) return;
         setVisibleRowCount((count) =>
           Math.min(rowConfigs.length, count + ROW_REVEAL_BATCH_SIZE),
         );
       },
-      { timeout: 350 },
+      80,
     );
 
     return () => {
       cancelled = true;
-      cancel(handle);
+      window.clearTimeout(handle);
     };
   }, [rowConfigs.length, visibleRowCount]);
 

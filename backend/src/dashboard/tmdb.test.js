@@ -6,11 +6,11 @@ import { toCard } from './tmdb.js';
 test('toCard maps a TMDB movie result to the card shape', () => {
   const card = toCard({
     id: 27205, title: 'Inception', poster_path: '/p.jpg', backdrop_path: '/b.jpg',
-    vote_average: 8.4, vote_count: 35000, original_language: 'en', release_date: '2010-07-15', genre_ids: [28, 878], popularity: 50.1,
+    vote_average: 8.4, vote_count: 35000, original_language: 'en', origin_country: ['US'], release_date: '2010-07-15', genre_ids: [28, 878], popularity: 50.1,
   }, 'movie');
   assert.deepEqual(card, {
     tmdbId: 27205, mediaType: 'movie', title: 'Inception', posterPath: '/p.jpg',
-    backdropPath: '/b.jpg', voteAverage: 8.4, voteCount: 35000, originalLanguage: 'en', year: 2010, genreIds: [28, 878], popularity: 50.1,
+    backdropPath: '/b.jpg', voteAverage: 8.4, voteCount: 35000, originalLanguage: 'en', originCountry: ['US'], year: 2010, genreIds: [28, 878], popularity: 50.1,
   });
 });
 
