@@ -61,9 +61,12 @@ export async function tmdbDiscover({ mediaType, params = {} }) {
 }
 
 export async function tmdbList({ path, mediaType, pages = 1 }) {
+  // Páginas en paralelo (antes en serie).
+  const pageJsons = await Promise.all(
+    Array.from({ length: pages }, (_, i) => tmdbGet(path, { page: i + 1 }).catch(() => null)),
+  );
   const all = [];
-  for (let page = 1; page <= pages; page += 1) {
-    const json = await tmdbGet(path, { page });
+  for (const json of pageJsons) {
     for (const r of json?.results || []) {
       const c = toCard(r, mediaType);
       if (c) all.push(c);

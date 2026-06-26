@@ -55,82 +55,82 @@ export default async function dashboardRoutes(fastify) {
     const userId = req.user?.id || null;
 
     // ── Build generic specs ──────────────────────────────────────────────────
-    const genericSpecs = [];
+    // Todas las filas en paralelo (antes en serie): con los pools ya calientes,
+    // pasa de ~N×latencia de lecturas a ~1×. Se preserva el orden de definición
+    // (importante para la deduplicación cruzada del ensamblaje).
+    const genericSpecGroups = await Promise.all(
+      surface.genericRows.map(async (def) => {
+        try {
+          const { kind } = def.source;
 
-    for (const def of surface.genericRows) {
-      try {
-        const { kind } = def.source;
+          if (kind === 'pool') {
+            const items = await resolvePoolItems(def.source.poolKey, def.mediaType);
+            return [{
+              key: def.key,
+              title: def.title,
+              reason: null,
+              mediaType: def.mediaType,
+              items,
+              rotate: !NON_ROTATING_POOLS.has(def.source.poolKey),
+            }];
+          }
 
-        if (kind === 'pool') {
-          const items = await resolvePoolItems(def.source.poolKey, def.mediaType);
-          genericSpecs.push({
-            key: def.key,
-            title: def.title,
-            reason: null,
-            mediaType: def.mediaType,
-            items,
-            rotate: !NON_ROTATING_POOLS.has(def.source.poolKey),
-          });
-        } else if (kind === 'genreRotating') {
-          const genres = def.mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;
-          const picked = pickRotating(genres, seed, def.source.count);
-          for (const g of picked) {
-            try {
-              let items;
-              if (def.mediaType === 'mixed') {
-                items = dedupeCards([
-                  ...(await getPool(`genre:${g.id}`, 'movie').catch(() => [])),
-                  ...(await getPool(`genre:${g.id}`, 'tv').catch(() => [])),
-                ]);
-              } else {
-                items = await getPool(`genre:${g.id}`, def.mediaType).catch(() => []);
+          if (kind === 'genreRotating') {
+            const genres = def.mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;
+            const picked = pickRotating(genres, seed, def.source.count);
+            const rows = await Promise.all(picked.map(async (g) => {
+              try {
+                let items;
+                if (def.mediaType === 'mixed') {
+                  const [mv, tv] = await Promise.all([
+                    getPool(`genre:${g.id}`, 'movie').catch(() => []),
+                    getPool(`genre:${g.id}`, 'tv').catch(() => []),
+                  ]);
+                  items = dedupeCards([...mv, ...tv]);
+                } else {
+                  items = await getPool(`genre:${g.id}`, def.mediaType).catch(() => []);
+                }
+                return { key: `genre_${g.id}`, title: g.label, reason: null, mediaType: def.mediaType, items, rotate: true };
+              } catch {
+                return null;
               }
-              genericSpecs.push({
-                key: `genre_${g.id}`,
-                title: g.label,
-                reason: null,
-                mediaType: def.mediaType,
-                items,
-                rotate: true,
-              });
-            } catch {
-              // skip this genre row if it fails
-            }
+            }));
+            return rows.filter(Boolean);
           }
-        } else if (kind === 'decadeRotating') {
-          const decades = ['1980', '1990', '2000', '2010', '2020'];
-          // Mostramos las décadas elegidas en orden cronológico (1980 → 2020).
-          const picked = pickRotating(decades, seed + 7, def.source.count).sort(
-            (a, b) => Number(a) - Number(b),
-          );
-          for (const d of picked) {
-            try {
-              let items;
-              if (def.mediaType === 'mixed') {
-                items = dedupeCards([
-                  ...(await getPool(`decade:${d}`, 'movie').catch(() => [])),
-                  ...(await getPool(`decade:${d}`, 'tv').catch(() => [])),
-                ]);
-              } else {
-                items = await getPool(`decade:${d}`, def.mediaType).catch(() => []);
+
+          if (kind === 'decadeRotating') {
+            const decades = ['1980', '1990', '2000', '2010', '2020'];
+            // Décadas en orden cronológico (1980 → 2020).
+            const picked = pickRotating(decades, seed + 7, def.source.count).sort(
+              (a, b) => Number(a) - Number(b),
+            );
+            const rows = await Promise.all(picked.map(async (d) => {
+              try {
+                let items;
+                if (def.mediaType === 'mixed') {
+                  const [mv, tv] = await Promise.all([
+                    getPool(`decade:${d}`, 'movie').catch(() => []),
+                    getPool(`decade:${d}`, 'tv').catch(() => []),
+                  ]);
+                  items = dedupeCards([...mv, ...tv]);
+                } else {
+                  items = await getPool(`decade:${d}`, def.mediaType).catch(() => []);
+                }
+                return { key: `decade_${d}`, title: `Lo mejor de los ${d}`, reason: null, mediaType: def.mediaType, items, rotate: true };
+              } catch {
+                return null;
               }
-              genericSpecs.push({
-                key: `decade_${d}`,
-                title: `Lo mejor de los ${d}`,
-                reason: null,
-                mediaType: def.mediaType,
-                items,
-                rotate: true,
-              });
-            } catch {
-              // skip this decade row if it fails
-            }
+            }));
+            return rows.filter(Boolean);
           }
+
+          return [];
+        } catch {
+          return [];
         }
-      } catch {
-        // skip this entire row def if it fails
-      }
-    }
+      }),
+    );
+    const genericSpecs = genericSpecGroups.flat();
 
     // ── Personalized specs (authed only) ─────────────────────────────────────
     let personalized = false;
@@ -145,9 +145,12 @@ export default async function dashboardRoutes(fastify) {
         const lib = await loadLibrary(userId);
         const basisHash = libraryBasisHash(lib);
         const recsByType = {};
-        for (const mt of surface.mediaTypes) {
-          recsByType[mt] = await getUserRecommendations(userId, mt, { lib, basisHash });
-        }
+        // movie y tv en paralelo (en Inicio eran 2 builds en serie).
+        await Promise.all(
+          surface.mediaTypes.map(async (mt) => {
+            recsByType[mt] = await getUserRecommendations(userId, mt, { lib, basisHash });
+          }),
+        );
         personalSpecs = personalizedRowDefs(recsByType, surface);
         personalized = personalSpecs.length > 0;
         for (const r of [...lib.history, ...lib.favorites, ...lib.ratings]) {
