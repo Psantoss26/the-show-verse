@@ -233,12 +233,52 @@ export async function getMovieImages(itemId, mediaType = "movie") {
   }
 }
 
+// Caché de imágenes SIN restricción de idioma (todos los idiomas). getMovieImages
+// restringe a en/es/null (bien para pósters y para el backdrop "textless" del
+// hero), pero para los LOGOS y para el backdrop de la VISTA PREVIA necesitamos los
+// de cualquier idioma: así nunca falta el logo ni se muestra un backdrop sin
+// idioma cuando existe uno con idioma (aunque sea el original).
+export const broadImagesCache = new Map(); // `${mediaType}:${id}` -> { backdrops, posters, logos }
+
+export async function getBroadImages(itemId, mediaType = "movie") {
+  const cacheKey = `${mediaType}:${itemId}`;
+  if (broadImagesCache.has(cacheKey)) return broadImagesCache.get(cacheKey);
+
+  const empty = { backdrops: [], posters: [], logos: [] };
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (!apiKey || !itemId) {
+    broadImagesCache.set(cacheKey, empty);
+    return empty;
+  }
+
+  try {
+    const type = mediaType === "tv" ? "tv" : "movie";
+    // SIN include_image_language → TMDb devuelve imágenes de TODOS los idiomas.
+    const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
+    const r = await fetch(url, { cache: "force-cache" });
+    const j = await r.json();
+    const data = {
+      backdrops: Array.isArray(j?.backdrops) ? j.backdrops : [],
+      posters: Array.isArray(j?.posters) ? j.posters : [],
+      logos: Array.isArray(j?.logos) ? j.logos : [],
+    };
+    broadImagesCache.set(cacheKey, data);
+    return data;
+  } catch {
+    broadImagesCache.set(cacheKey, empty);
+    return empty;
+  }
+}
+
+// Backdrop de la VISTA PREVIA: de todos los idiomas, priorizando es/en → cualquier
+// otro idioma → y SOLO como último recurso sin idioma (textless). Así nunca se
+// muestra el textless cuando existe un backdrop con idioma.
 export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) {
-  const { backdrops } = await getMovieImages(itemId, mediaType);
+  const { backdrops } = await getBroadImages(itemId, mediaType);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
   const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
+    preferLangs: ["es", "en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
@@ -363,44 +403,12 @@ function pickBestLogoByLang(logos, order = ["es", "en", null]) {
   return [...logos].sort((a, b) => score(b) - score(a))[0] || null;
 }
 
-// Caché dedicada de logos. A diferencia de getMovieImages (que restringe los
-// idiomas a en/es/null para backdrops/pósters), aquí pedimos los logos SIN
-// `include_image_language` para que TMDb devuelva los de TODOS los idiomas. Así
-// nunca nos quedamos sin logo cuando un título solo lo tiene en otro idioma
-// (p. ej. solo el original); el selector ya prioriza es/en/null y, si no, el más
-// votado de cualquier idioma.
-export const movieLogosCache = new Map(); // `${mediaType}:${id}` -> logos[]
-
-export async function getTitleLogos(itemId, mediaType = "movie") {
-  const cacheKey = `${mediaType}:${itemId}`;
-  if (movieLogosCache.has(cacheKey)) return movieLogosCache.get(cacheKey);
-
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey || !itemId) {
-    movieLogosCache.set(cacheKey, []);
-    return [];
-  }
-
-  try {
-    const type = mediaType === "tv" ? "tv" : "movie";
-    const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    const j = await r.json();
-    const logos = Array.isArray(j?.logos) ? j.logos : [];
-    movieLogosCache.set(cacheKey, logos);
-    return logos;
-  } catch {
-    movieLogosCache.set(cacheKey, []);
-    return [];
-  }
-}
-
 export async function fetchBestLogo(
   itemId,
   mediaType = "movie",
   preferLangs = ["es", "en", null],
 ) {
-  const logos = await getTitleLogos(itemId, mediaType);
+  const { logos } = await getBroadImages(itemId, mediaType);
   const best = pickBestLogoByLang(logos, preferLangs);
   return best?.file_path || null;
 }
