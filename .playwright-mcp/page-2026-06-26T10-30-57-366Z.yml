@@ -1,0 +1,512 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - text: Inicio
+          - link "Películas" [ref=e11] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e12] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e13] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e14] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e16]:
+        - link "Listas" [ref=e17] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e19]
+        - link "Calendario" [ref=e21] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e23]
+        - link "En Progreso" [ref=e25] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e27]
+        - link "Historial" [ref=e29] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e31]
+        - link "Favoritas" [ref=e34] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e36]
+        - link "Pendientes" [ref=e38] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e40]
+      - generic [ref=e43]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e50]
+        - button "Abrir recomendador de qué ver" [ref=e51]:
+          - img [ref=e52]
+  - generic [ref=e56]:
+    - region "Contenido destacado" [ref=e58]:
+      - generic [ref=e59] [cursor=pointer]:
+        - img "Michael" [ref=e62]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - generic [ref=e66]: "2026"
+            - generic [ref=e67]:
+              - img "TMDb" [ref=e68]
+              - generic [ref=e69]: "8.7"
+          - generic [ref=e70]: Música · Drama
+          - paragraph [ref=e71]: El viaje de Michael Jackson más allá de la música, desde el descubrimiento de su extraordinario talento como líder de los Jackson Five hasta convertirse en una visionaria estrella cuya ambición creativa despertó un incansable afán por consagrarse como el mayor icono de la industria del entretenimiento.
+          - generic [ref=e73]:
+            - link "Más información" [ref=e74]:
+              - /url: /details/movie/936075
+              - img [ref=e75]
+              - generic [ref=e77]: Más información
+            - button "Ver trailer" [pressed] [ref=e78]:
+              - img [ref=e80]
+            - button "Silenciar soundtrack" [pressed] [ref=e82]:
+              - img [ref=e84]
+            - button "Añadir a favoritos" [ref=e88]:
+              - img [ref=e90]
+            - button "Añadir a pendientes" [ref=e92]:
+              - img [ref=e94]
+            - button "No visto":
+              - generic:
+                - img
+      - button "Anterior" [ref=e96]:
+        - img [ref=e97]
+      - button "Siguiente" [ref=e99]:
+        - img [ref=e100]
+      - generic "Diapositivas destacadas" [ref=e103]:
+        - button "Ver destacado 1" [ref=e104]
+        - button "Ver destacado 2" [ref=e105]
+        - button "Ver destacado 3" [ref=e106]
+        - button "Ver destacado 4" [ref=e107]
+        - button "Ver destacado 5" [ref=e108]
+        - button "Ver destacado 6" [ref=e109]
+        - button "Ver destacado 7" [ref=e110]
+        - button "Ver destacado 8" [ref=e111]
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - generic [ref=e117]: DESTACADAS
+          - generic [ref=e118]:
+            - heading "Mejor valoradas." [level=3] [ref=e119]
+            - generic [ref=e120]:
+              - button "Películas" [ref=e121]
+              - button "Series" [ref=e122]
+        - generic [ref=e126]:
+          - link [ref=e128] [cursor=pointer]:
+            - /url: /details/movie/278
+          - link [ref=e131] [cursor=pointer]:
+            - /url: /details/movie/687163
+          - link [ref=e134] [cursor=pointer]:
+            - /url: /details/movie/238
+          - link [ref=e137] [cursor=pointer]:
+            - /url: /details/movie/240
+          - link [ref=e140] [cursor=pointer]:
+            - /url: /details/movie/424
+          - link [ref=e143] [cursor=pointer]:
+            - /url: /details/movie/389
+          - link [ref=e146] [cursor=pointer]:
+            - /url: /details/movie/155
+          - link [ref=e149] [cursor=pointer]:
+            - /url: /details/movie/497
+          - link [ref=e152] [cursor=pointer]:
+            - /url: /details/movie/129
+          - link [ref=e155] [cursor=pointer]:
+            - /url: /details/movie/122
+          - link [ref=e158] [cursor=pointer]:
+            - /url: /details/movie/496243
+          - link [ref=e161] [cursor=pointer]:
+            - /url: /details/movie/680
+          - link [ref=e164] [cursor=pointer]:
+            - /url: /details/movie/429
+          - link [ref=e167] [cursor=pointer]:
+            - /url: /details/movie/157336
+          - link [ref=e170] [cursor=pointer]:
+            - /url: /details/movie/372058
+          - link [ref=e173] [cursor=pointer]:
+            - /url: /details/movie/13
+          - link [ref=e176] [cursor=pointer]:
+            - /url: /details/movie/769
+          - link [ref=e179] [cursor=pointer]:
+            - /url: /details/movie/12477
+          - link [ref=e182] [cursor=pointer]:
+            - /url: /details/movie/637
+          - link [ref=e185] [cursor=pointer]:
+            - /url: /details/movie/550
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e192]: TENDENCIAS
+            - link "Ver todos los títulos de Tendencias" [ref=e193] [cursor=pointer]:
+              - /url: /dashboard/tendencias
+              - generic [ref=e194]: Tendencias
+              - generic [ref=e195]: .
+              - img [ref=e196]
+          - generic [ref=e201]:
+            - link [ref=e205] [cursor=pointer]:
+              - /url: /details/movie/1159559
+            - link [ref=e211] [cursor=pointer]:
+              - /url: /details/tv/2190
+            - link [ref=e217] [cursor=pointer]:
+              - /url: /details/tv/209867
+            - link [ref=e223] [cursor=pointer]:
+              - /url: /details/tv/106449
+            - link [ref=e229] [cursor=pointer]:
+              - /url: /details/movie/1242332
+            - link [ref=e235] [cursor=pointer]:
+              - /url: /details/movie/1233413
+            - link [ref=e241] [cursor=pointer]:
+              - /url: /details/movie/454639
+            - link [ref=e247] [cursor=pointer]:
+              - /url: /details/tv/60625
+            - link [ref=e253] [cursor=pointer]:
+              - /url: /details/tv/86031
+            - link [ref=e259] [cursor=pointer]:
+              - /url: /details/movie/1122573
+            - link [ref=e265] [cursor=pointer]:
+              - /url: /details/movie/1198994
+            - link [ref=e271] [cursor=pointer]:
+              - /url: /details/tv/30984
+            - link [ref=e277] [cursor=pointer]:
+              - /url: /details/tv/278178
+            - link [ref=e283] [cursor=pointer]:
+              - /url: /details/tv/456
+            - link [ref=e289] [cursor=pointer]:
+              - /url: /details/tv/219971
+            - link [ref=e295] [cursor=pointer]:
+              - /url: /details/tv/1434
+            - link [ref=e301] [cursor=pointer]:
+              - /url: /details/tv/299167
+            - link [ref=e307] [cursor=pointer]:
+              - /url: /details/movie/936075
+            - link [ref=e313] [cursor=pointer]:
+              - /url: /details/tv/220102
+            - link [ref=e319] [cursor=pointer]:
+              - /url: /details/movie/1061474
+            - link [ref=e325] [cursor=pointer]:
+              - /url: /details/movie/1290821
+            - link [ref=e331] [cursor=pointer]:
+              - /url: /details/movie/1340206
+            - link [ref=e337] [cursor=pointer]:
+              - /url: /details/tv/136315
+            - link [ref=e343] [cursor=pointer]:
+              - /url: /details/movie/1297842
+            - link [ref=e349] [cursor=pointer]:
+              - /url: /details/movie/1667198
+            - link [ref=e355] [cursor=pointer]:
+              - /url: /details/tv/303143
+            - link [ref=e361] [cursor=pointer]:
+              - /url: /details/tv/106379
+            - link [ref=e367] [cursor=pointer]:
+              - /url: /details/tv/224372
+        - generic [ref=e370]:
+          - generic [ref=e371]:
+            - generic [ref=e374]: POPULARES
+            - link "Ver todos los títulos de Populares" [ref=e375] [cursor=pointer]:
+              - /url: /dashboard/populares
+              - generic [ref=e376]: Populares
+              - generic [ref=e377]: .
+              - img [ref=e378]
+          - generic [ref=e383]:
+            - link [ref=e387] [cursor=pointer]:
+              - /url: /details/movie/1311031
+            - link [ref=e393] [cursor=pointer]:
+              - /url: /details/tv/79744
+            - link [ref=e399] [cursor=pointer]:
+              - /url: /details/tv/56570
+            - link [ref=e405] [cursor=pointer]:
+              - /url: /details/tv/32692
+            - link [ref=e411] [cursor=pointer]:
+              - /url: /details/movie/1582770
+            - link [ref=e417] [cursor=pointer]:
+              - /url: /details/tv/5920
+            - link [ref=e423] [cursor=pointer]:
+              - /url: /details/tv/76479
+            - link [ref=e429] [cursor=pointer]:
+              - /url: /details/movie/1084242
+            - link [ref=e435] [cursor=pointer]:
+              - /url: /details/tv/4604
+            - link [ref=e441] [cursor=pointer]:
+              - /url: /details/tv/44217
+            - link [ref=e447] [cursor=pointer]:
+              - /url: /details/movie/235271
+            - link [ref=e453] [cursor=pointer]:
+              - /url: /details/tv/1400
+            - link [ref=e459] [cursor=pointer]:
+              - /url: /details/tv/2288
+            - link [ref=e465] [cursor=pointer]:
+              - /url: /details/tv/1911
+            - link [ref=e471] [cursor=pointer]:
+              - /url: /details/tv/276161
+            - link [ref=e477] [cursor=pointer]:
+              - /url: /details/movie/1242898
+            - link [ref=e483] [cursor=pointer]:
+              - /url: /details/movie/39254
+            - link [ref=e489] [cursor=pointer]:
+              - /url: /details/tv/1435
+            - link [ref=e495] [cursor=pointer]:
+              - /url: /details/movie/1294203
+            - link [ref=e501] [cursor=pointer]:
+              - /url: /details/tv/60735
+            - link [ref=e507] [cursor=pointer]:
+              - /url: /details/tv/36
+            - link [ref=e513] [cursor=pointer]:
+              - /url: /details/movie/83533
+            - link [ref=e519] [cursor=pointer]:
+              - /url: /details/movie/1246049
+            - link [ref=e525] [cursor=pointer]:
+              - /url: /details/tv/80748
+            - link [ref=e531] [cursor=pointer]:
+              - /url: /details/movie/976912
+            - link [ref=e537] [cursor=pointer]:
+              - /url: /details/movie/157336
+            - link [ref=e543] [cursor=pointer]:
+              - /url: /details/tv/45140
+            - link [ref=e549] [cursor=pointer]:
+              - /url: /details/movie/1010581
+        - generic [ref=e552]:
+          - generic [ref=e553]:
+            - generic [ref=e556]: GÉNERO
+            - heading "Estrenos y novedades." [level=3] [ref=e557]
+          - generic [ref=e561]:
+            - link [ref=e565] [cursor=pointer]:
+              - /url: /details/movie/1303331
+            - link [ref=e571] [cursor=pointer]:
+              - /url: /details/tv/91555
+            - link [ref=e577] [cursor=pointer]:
+              - /url: /details/movie/1291335
+            - link [ref=e583] [cursor=pointer]:
+              - /url: /details/movie/1084244
+            - link [ref=e589] [cursor=pointer]:
+              - /url: /details/movie/1375646
+            - link [ref=e595] [cursor=pointer]:
+              - /url: /details/movie/1092936
+            - link [ref=e601] [cursor=pointer]:
+              - /url: /details/movie/1469930
+            - link [ref=e607] [cursor=pointer]:
+              - /url: /details/movie/5915
+            - link [ref=e613] [cursor=pointer]:
+              - /url: /details/movie/1445363
+            - link [ref=e619] [cursor=pointer]:
+              - /url: /details/tv/277439
+            - link [ref=e625] [cursor=pointer]:
+              - /url: /details/tv/1871
+            - link [ref=e631] [cursor=pointer]:
+              - /url: /details/tv/315038
+            - link [ref=e637] [cursor=pointer]:
+              - /url: /details/tv/72071
+            - link [ref=e643] [cursor=pointer]:
+              - /url: /details/tv/235484
+            - link [ref=e649] [cursor=pointer]:
+              - /url: /details/movie/1127384
+            - link [ref=e655] [cursor=pointer]:
+              - /url: /details/movie/1422096
+            - link [ref=e661] [cursor=pointer]:
+              - /url: /details/movie/1194963
+            - link [ref=e667] [cursor=pointer]:
+              - /url: /details/tv/223911
+            - link [ref=e673] [cursor=pointer]:
+              - /url: /details/movie/1284465
+            - link [ref=e679] [cursor=pointer]:
+              - /url: /details/movie/1317288
+            - link [ref=e685] [cursor=pointer]:
+              - /url: /details/movie/1202033
+            - link [ref=e691] [cursor=pointer]:
+              - /url: /details/movie/1273221
+            - link [ref=e697] [cursor=pointer]:
+              - /url: /details/movie/1130948
+            - link [ref=e703] [cursor=pointer]:
+              - /url: /details/movie/1058424
+            - link [ref=e709] [cursor=pointer]:
+              - /url: /details/movie/1220564
+            - link [ref=e715] [cursor=pointer]:
+              - /url: /details/tv/124364
+            - link [ref=e721] [cursor=pointer]:
+              - /url: /details/movie/1430077
+            - link [ref=e727] [cursor=pointer]:
+              - /url: /details/movie/1020047
+        - generic [ref=e730]:
+          - generic [ref=e731]:
+            - generic [ref=e734]: GÉNERO
+            - heading "Joyas ocultas." [level=3] [ref=e735]
+          - generic [ref=e739]:
+            - link [ref=e743] [cursor=pointer]:
+              - /url: /details/movie/110420
+            - link [ref=e749] [cursor=pointer]:
+              - /url: /details/movie/3082
+            - link [ref=e755] [cursor=pointer]:
+              - /url: /details/tv/273240
+            - link [ref=e761] [cursor=pointer]:
+              - /url: /details/movie/18491
+            - link [ref=e767] [cursor=pointer]:
+              - /url: /details/tv/68595
+            - link [ref=e773] [cursor=pointer]:
+              - /url: /details/movie/637920
+            - link [ref=e779] [cursor=pointer]:
+              - /url: /details/movie/9702
+            - link [ref=e785] [cursor=pointer]:
+              - /url: /details/tv/85077
+            - link [ref=e791] [cursor=pointer]:
+              - /url: /details/movie/1226863
+            - link [ref=e797] [cursor=pointer]:
+              - /url: /details/movie/12493
+            - link [ref=e803] [cursor=pointer]:
+              - /url: /details/tv/1430
+            - link [ref=e809] [cursor=pointer]:
+              - /url: /details/movie/504253
+            - link [ref=e815] [cursor=pointer]:
+              - /url: /details/tv/2192
+            - link [ref=e821] [cursor=pointer]:
+              - /url: /details/movie/1439930
+            - link [ref=e827] [cursor=pointer]:
+              - /url: /details/tv/57706
+            - link [ref=e833] [cursor=pointer]:
+              - /url: /details/tv/72637
+            - link [ref=e839] [cursor=pointer]:
+              - /url: /details/tv/62741
+            - link [ref=e845] [cursor=pointer]:
+              - /url: /details/movie/284
+            - link [ref=e851] [cursor=pointer]:
+              - /url: /details/tv/60863
+            - link [ref=e857] [cursor=pointer]:
+              - /url: /details/movie/164558
+            - link [ref=e863] [cursor=pointer]:
+              - /url: /details/tv/61617
+            - link [ref=e869] [cursor=pointer]:
+              - /url: /details/movie/5156
+            - link [ref=e875] [cursor=pointer]:
+              - /url: /details/movie/490
+            - link [ref=e881] [cursor=pointer]:
+              - /url: /details/movie/901
+            - link [ref=e887] [cursor=pointer]:
+              - /url: /details/movie/635302
+            - link [ref=e893] [cursor=pointer]:
+              - /url: /details/tv/2098
+            - link [ref=e899] [cursor=pointer]:
+              - /url: /details/tv/98214
+            - link [ref=e905] [cursor=pointer]:
+              - /url: /details/movie/92321
+        - generic [ref=e908]:
+          - generic [ref=e909]:
+            - generic [ref=e912]: GÉNERO
+            - heading "Drama." [level=3] [ref=e913]
+          - generic [ref=e917]:
+            - link [ref=e921] [cursor=pointer]:
+              - /url: /details/tv/4614
+            - link [ref=e927] [cursor=pointer]:
+              - /url: /details/movie/1495
+            - link [ref=e933] [cursor=pointer]:
+              - /url: /details/tv/1416
+            - link [ref=e939] [cursor=pointer]:
+              - /url: /details/movie/350
+            - link [ref=e945] [cursor=pointer]:
+              - /url: /details/tv/1398
+            - link [ref=e951] [cursor=pointer]:
+              - /url: /details/tv/17610
+            - link [ref=e957] [cursor=pointer]:
+              - /url: /details/tv/1411
+            - link [ref=e963] [cursor=pointer]:
+              - /url: /details/movie/597
+            - link [ref=e969] [cursor=pointer]:
+              - /url: /details/movie/475557
+            - link [ref=e975] [cursor=pointer]:
+              - /url: /details/movie/911430
+            - link [ref=e981] [cursor=pointer]:
+              - /url: /details/tv/270476
+            - link [ref=e987] [cursor=pointer]:
+              - /url: /details/movie/2251
+            - link [ref=e993] [cursor=pointer]:
+              - /url: /details/movie/1325734
+            - link [ref=e999] [cursor=pointer]:
+              - /url: /details/movie/329865
+            - link [ref=e1005] [cursor=pointer]:
+              - /url: /details/movie/979
+            - link [ref=e1011] [cursor=pointer]:
+              - /url: /details/tv/1412
+            - link [ref=e1017] [cursor=pointer]:
+              - /url: /details/tv/1620
+            - link [ref=e1023] [cursor=pointer]:
+              - /url: /details/tv/1399
+            - link [ref=e1029] [cursor=pointer]:
+              - /url: /details/tv/18165
+            - link [ref=e1035] [cursor=pointer]:
+              - /url: /details/tv/4601
+            - link [ref=e1041] [cursor=pointer]:
+              - /url: /details/movie/769
+            - link [ref=e1047] [cursor=pointer]:
+              - /url: /details/movie/150540
+            - link [ref=e1053] [cursor=pointer]:
+              - /url: /details/tv/1431
+            - link [ref=e1059] [cursor=pointer]:
+              - /url: /details/tv/32798
+            - link [ref=e1065] [cursor=pointer]:
+              - /url: /details/movie/496243
+            - link [ref=e1071] [cursor=pointer]:
+              - /url: /details/tv/58841
+            - link [ref=e1077] [cursor=pointer]:
+              - /url: /details/tv/71728
+            - link [ref=e1083] [cursor=pointer]:
+              - /url: /details/movie/680493
+        - generic [ref=e1086]:
+          - generic [ref=e1087]:
+            - generic [ref=e1090]: GÉNERO
+            - heading "Acción." [level=3] [ref=e1091]
+          - generic [ref=e1095]:
+            - link [ref=e1099] [cursor=pointer]:
+              - /url: /details/movie/68726
+            - link [ref=e1105] [cursor=pointer]:
+              - /url: /details/movie/209112
+            - link [ref=e1111] [cursor=pointer]:
+              - /url: /details/movie/1726
+            - link [ref=e1117] [cursor=pointer]:
+              - /url: /details/movie/634649
+            - link [ref=e1123] [cursor=pointer]:
+              - /url: /details/movie/1011985
+            - link [ref=e1129] [cursor=pointer]:
+              - /url: /details/movie/299536
+            - link [ref=e1135] [cursor=pointer]:
+              - /url: /details/movie/1119449
+            - link [ref=e1141] [cursor=pointer]:
+              - /url: /details/movie/1218925
+            - link [ref=e1147] [cursor=pointer]:
+              - /url: /details/movie/1318447
+            - link [ref=e1153] [cursor=pointer]:
+              - /url: /details/movie/290764
+            - link [ref=e1159] [cursor=pointer]:
+              - /url: /details/movie/912649
+            - link [ref=e1165] [cursor=pointer]:
+              - /url: /details/movie/429617
+            - link [ref=e1171] [cursor=pointer]:
+              - /url: /details/movie/561
+            - link [ref=e1177] [cursor=pointer]:
+              - /url: /details/movie/1579
+            - link [ref=e1183] [cursor=pointer]:
+              - /url: /details/movie/396535
+            - link [ref=e1189] [cursor=pointer]:
+              - /url: /details/movie/120
+            - link [ref=e1195] [cursor=pointer]:
+              - /url: /details/movie/575265
+            - link [ref=e1201] [cursor=pointer]:
+              - /url: /details/movie/1228710
+            - link [ref=e1207] [cursor=pointer]:
+              - /url: /details/movie/1168190
+            - link [ref=e1213] [cursor=pointer]:
+              - /url: /details/movie/198663
+            - link [ref=e1219] [cursor=pointer]:
+              - /url: /details/movie/315635
+            - link [ref=e1225] [cursor=pointer]:
+              - /url: /details/movie/980477
+            - link [ref=e1231] [cursor=pointer]:
+              - /url: /details/movie/559
+            - link [ref=e1237] [cursor=pointer]:
+              - /url: /details/movie/1419406
+            - link [ref=e1243] [cursor=pointer]:
+              - /url: /details/movie/27205
+            - link [ref=e1249] [cursor=pointer]:
+              - /url: /details/movie/76600
+            - link [ref=e1255] [cursor=pointer]:
+              - /url: /details/movie/121
+            - link [ref=e1261] [cursor=pointer]:
+              - /url: /details/movie/1265609
+  - button "Open Next.js Dev Tools" [ref=e1269] [cursor=pointer]:
+    - img [ref=e1270]

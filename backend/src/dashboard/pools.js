@@ -50,6 +50,11 @@ const GEM_VOTES = {
 const TRENDING_VOTES = { movie: 150, tv: 60 };
 const POPULAR_VOTES = { movie: 500, tv: 200 };
 const REGION_VOTES = { movie: 150, tv: 60 };
+const CURATED_VOTES = {
+  drama: { movie: 700, tv: 180 },
+  actionAdventure: { movie: 900, tv: 220 },
+  nostalgia: { movie: 1200, tv: 280 },
+};
 
 // Fecha YYYY-MM-DD desplazada `days` respecto a hoy (para ventanas de estrenos
 // y de "lo reciente" del Top en España). Se recalcula en cada rebuild del pool.
@@ -220,6 +225,78 @@ addPool('region_top', 'tv', TTL_24H, async () =>
     'first_air_date.gte': dateOffset(-1095),         // ~3 años
     'vote_count.gte': REGION_VOTES.tv,
   }), 4), 'tv', REGION_VOTES.tv)
+);
+
+// curated rows (7d) — filas editoriales inspiradas en plataformas de streaming:
+// temas amplios, reconocibles y con suficiente validación social para que sean
+// útiles como recomendación general, no solo como clasificación por género.
+addPool('curated:drama', 'movie', TTL_7D, async () =>
+  refine(await discoverPages('movie', {
+    with_genres: 18,
+    sort_by: 'popularity.desc',
+    'vote_average.gte': 6.6,
+    'vote_count.gte': CURATED_VOTES.drama.movie,
+  }, 4), 'movie', CURATED_VOTES.drama.movie)
+);
+addPool('curated:drama', 'tv', TTL_7D, async () =>
+  refine(await discoverPages('tv', discoverParams('tv', {
+    with_genres: 18,
+    sort_by: 'popularity.desc',
+    'vote_average.gte': 6.8,
+    'vote_count.gte': CURATED_VOTES.drama.tv,
+  }), 4), 'tv', CURATED_VOTES.drama.tv)
+);
+
+addPool('curated:action_adventure', 'movie', TTL_7D, async () =>
+  refine(dedupeCards([
+    ...(await discoverPages('movie', {
+      with_genres: 28,
+      sort_by: 'popularity.desc',
+      'vote_average.gte': 6.4,
+      'vote_count.gte': CURATED_VOTES.actionAdventure.movie,
+    }, 3)),
+    ...(await discoverPages('movie', {
+      with_genres: 12,
+      sort_by: 'popularity.desc',
+      'vote_average.gte': 6.4,
+      'vote_count.gte': CURATED_VOTES.actionAdventure.movie,
+    }, 3)),
+  ]), 'movie', CURATED_VOTES.actionAdventure.movie)
+);
+addPool('curated:action_adventure', 'tv', TTL_7D, async () =>
+  refine(dedupeCards([
+    ...(await discoverPages('tv', discoverParams('tv', {
+      with_genres: 10759,
+      sort_by: 'popularity.desc',
+      'vote_average.gte': 6.7,
+      'vote_count.gte': CURATED_VOTES.actionAdventure.tv,
+    }), 3)),
+    ...(await discoverPages('tv', discoverParams('tv', {
+      with_genres: 10765,
+      sort_by: 'popularity.desc',
+      'vote_average.gte': 6.7,
+      'vote_count.gte': CURATED_VOTES.actionAdventure.tv,
+    }), 3)),
+  ]), 'tv', CURATED_VOTES.actionAdventure.tv)
+);
+
+addPool('curated:nostalgia_millennial', 'movie', TTL_30D, async () =>
+  refine(await discoverPages('movie', {
+    'primary_release_date.gte': '1995-01-01',
+    'primary_release_date.lte': '2012-12-31',
+    sort_by: 'popularity.desc',
+    'vote_average.gte': 6.6,
+    'vote_count.gte': CURATED_VOTES.nostalgia.movie,
+  }, 5), 'movie', CURATED_VOTES.nostalgia.movie)
+);
+addPool('curated:nostalgia_millennial', 'tv', TTL_30D, async () =>
+  refine(await discoverPages('tv', discoverParams('tv', {
+    'first_air_date.gte': '1995-01-01',
+    'first_air_date.lte': '2012-12-31',
+    sort_by: 'popularity.desc',
+    'vote_average.gte': 6.8,
+    'vote_count.gte': CURATED_VOTES.nostalgia.tv,
+  }), 5), 'tv', CURATED_VOTES.nostalgia.tv)
 );
 
 // genre pools (7d) — por género en MOVIE_GENRES y TV_GENRES.

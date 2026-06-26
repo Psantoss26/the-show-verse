@@ -1177,22 +1177,37 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   // ✅ Detectar si es una fila de género específico
   const isGenreRow = ![
     "Populares",
+    "Series que se están viendo ahora",
     "Tendencias ahora mismo",
     "Series imprescindibles",
     "En emisión ahora mismo",
     "Aclamadas por la crítica",
+    "Series aclamadas para descubrir",
     "Top 10 hoy en España",
     "En Emisión",
+    "Las más valoradas",
+    "Fenómenos que todo el mundo comenta",
+    "Estrenos",
+    "Series que quizá se te escaparon",
+    "Series para una dosis de nostalgia",
   ].includes(title);
 
   // ✅ Determinar etiqueta específica según el título
   let labelText = null;
   if (title === "Tendencias ahora mismo") {
     labelText = "TENDENCIAS";
+  } else if (title === "Series que se están viendo ahora") {
+    labelText = "POPULARES";
   } else if (title === "Series imprescindibles") {
+    labelText = "IMPRESCINDIBLES";
+  } else if (title === "Fenómenos que todo el mundo comenta") {
     labelText = "IMPRESCINDIBLES";
   } else if (title === "Top 10 hoy en España") {
     labelText = "TOP 10";
+  } else if (title === "Series aclamadas para descubrir") {
+    labelText = "ACLAMADAS";
+  } else if (title === "Series para una dosis de nostalgia") {
+    labelText = "NOSTALGIA";
   } else if (title === "Lo mejor de esta década") {
     labelText = "AÑOS 2020";
   } else if (title && title.toLowerCase().includes("2010")) {

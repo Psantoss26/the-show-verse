@@ -1203,11 +1203,18 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const isGenreRow =
     ![
       "Populares",
+      "Películas que todo el mundo está viendo",
       "Taquillazos imprescindibles",
+      "Grandes éxitos de siempre",
       "Superéxito",
       "Historias de venganza",
       "Top 10 hoy en España",
       "Tendencias ahora mismo",
+      "Premiadas y aclamadas",
+      "Las más valoradas",
+      "Estrenos",
+      "Películas que quizá se te escaparon",
+      "Una dosis de nostalgia",
       "Lo mejor de 2020",
       "Clásicos de los 90",
       "Favoritas de los 2000",
@@ -1224,12 +1231,20 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   let labelText = null;
   if (title === "Top 10 hoy en España") {
     labelText = "TOP 10";
+  } else if (title === "Películas que todo el mundo está viendo") {
+    labelText = "POPULARES";
   } else if (title === "Taquillazos imprescindibles") {
+    labelText = "IMPRESCINDIBLES";
+  } else if (title === "Grandes éxitos de siempre") {
     labelText = "IMPRESCINDIBLES";
   } else if (title === "Historias de venganza") {
     labelText = "SUPERHEROES";
   } else if (title === "Tendencias ahora mismo") {
     labelText = "TENDENCIAS";
+  } else if (title === "Premiadas y aclamadas") {
+    labelText = "ACLAMADAS";
+  } else if (title === "Una dosis de nostalgia") {
+    labelText = "NOSTALGIA";
   } else if (title === "Lo mejor de 2020") {
     labelText = "AÑOS 2020";
   } else if (title === "Clásicos de los 90") {
