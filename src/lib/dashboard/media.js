@@ -363,12 +363,44 @@ function pickBestLogoByLang(logos, order = ["es", "en", null]) {
   return [...logos].sort((a, b) => score(b) - score(a))[0] || null;
 }
 
+// Caché dedicada de logos. A diferencia de getMovieImages (que restringe los
+// idiomas a en/es/null para backdrops/pósters), aquí pedimos los logos SIN
+// `include_image_language` para que TMDb devuelva los de TODOS los idiomas. Así
+// nunca nos quedamos sin logo cuando un título solo lo tiene en otro idioma
+// (p. ej. solo el original); el selector ya prioriza es/en/null y, si no, el más
+// votado de cualquier idioma.
+export const movieLogosCache = new Map(); // `${mediaType}:${id}` -> logos[]
+
+export async function getTitleLogos(itemId, mediaType = "movie") {
+  const cacheKey = `${mediaType}:${itemId}`;
+  if (movieLogosCache.has(cacheKey)) return movieLogosCache.get(cacheKey);
+
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (!apiKey || !itemId) {
+    movieLogosCache.set(cacheKey, []);
+    return [];
+  }
+
+  try {
+    const type = mediaType === "tv" ? "tv" : "movie";
+    const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
+    const r = await fetch(url, { cache: "force-cache" });
+    const j = await r.json();
+    const logos = Array.isArray(j?.logos) ? j.logos : [];
+    movieLogosCache.set(cacheKey, logos);
+    return logos;
+  } catch {
+    movieLogosCache.set(cacheKey, []);
+    return [];
+  }
+}
+
 export async function fetchBestLogo(
   itemId,
   mediaType = "movie",
   preferLangs = ["es", "en", null],
 ) {
-  const { logos } = await getMovieImages(itemId, mediaType);
+  const logos = await getTitleLogos(itemId, mediaType);
   const best = pickBestLogoByLang(logos, preferLangs);
   return best?.file_path || null;
 }

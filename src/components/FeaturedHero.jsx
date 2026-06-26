@@ -1277,7 +1277,10 @@ export default function FeaturedHero({ items = [], isMobile }) {
       }
 
       try {
-        logo = await fetchBestLogo(id, mediaType, ["en", null]);
+        // Orden de preferencia: inglés → español → sin idioma → y, si no, el más
+        // votado de cualquier idioma (el fetch trae logos de TODOS los idiomas,
+        // así que nunca debería quedar vacío si TMDb tiene algún logo).
+        logo = await fetchBestLogo(id, mediaType, ["en", "es", null]);
       } catch { }
 
       setAssets((prev) =>
