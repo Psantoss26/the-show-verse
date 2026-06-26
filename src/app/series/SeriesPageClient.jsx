@@ -299,7 +299,7 @@ async function getShowImages(showId) {
     const url =
       `https://api.themoviedb.org/3/tv/${showId}/images` +
       `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,null`;
+      `&include_image_language=en,en-US,es,es-ES,null`;
 
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) throw new Error("TMDb TV images error");
@@ -338,15 +338,19 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
     minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
   const pool = pool0.length ? pool0 : list;
 
-  // Primero 3 con idioma preferido; si no hay, 3 sin idioma.
+  // Forzamos idioma: preferido (en) → cualquier otro idioma (es…) → y SOLO como
+  // último recurso sin idioma (textless). Así la vista previa no muestra portadas
+  // sin título cuando existe una con idioma.
   const top3en = [];
+  const top3OtherLang = [];
   const top3NoLanguage = [];
   for (const b of pool) {
     if (isPreferredLang(b)) top3en.push(b);
     else if (hasNoLanguage(b)) top3NoLanguage.push(b);
-    if (top3en.length === 3) break;
+    else top3OtherLang.push(b);
   }
-  const candidates = top3en.length ? top3en : top3NoLanguage.slice(0, 3);
+  const withLang = top3en.length ? top3en : top3OtherLang;
+  const candidates = (withLang.length ? withLang : top3NoLanguage).slice(0, 3);
   if (!candidates.length) return null;
 
   const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
