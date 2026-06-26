@@ -319,6 +319,49 @@ function FeaturedSlide({
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
   const audioRef = useRef(null);
 
+  // Caso concreto: algunos logos son oscuros (texto/arte casi negro) y NO se leen
+  // sobre el fondo oscuro de la sección de información. SOLO en ese caso los
+  // pasamos a blanco. Detectamos la oscuridad muestreando la luminancia media de
+  // los píxeles opacos de una versión pequeña del logo (TMDb permite CORS para
+  // leer el canvas). Si no es oscuro, no se toca nada.
+  const [logoIsDark, setLogoIsDark] = useState(false);
+  useEffect(() => {
+    setLogoIsDark(false);
+    if (!logoPath || typeof document === "undefined") return;
+    let cancelled = false;
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const size = 48;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let lumSum = 0;
+        let opaque = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 40) continue; // ignora píxeles transparentes
+          lumSum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          opaque += 1;
+        }
+        if (opaque < size * size * 0.02) return; // logo casi vacío: no tocar
+        if (!cancelled) setLogoIsDark(lumSum / opaque < 75); // 0-255; <75 = oscuro
+      } catch {
+        // canvas "tainted" u otro error: dejamos el logo tal cual
+      }
+    };
+    img.src = buildImg(logoPath, "w185");
+    return () => {
+      cancelled = true;
+    };
+  }, [logoPath]);
+
   // Prioridad de carga: backdrop/póster/logo + interactividad primero. Las
   // cargas secundarias (soundtrack, duración/notas) se difieren a un hueco de
   // inactividad para no competir por la red ni bloquear el hilo principal
@@ -840,7 +883,14 @@ function FeaturedSlide({
                   alt={title}
                   fill
                   sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 72vw"
-                  className="object-contain object-center drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] sm:object-left"
+                  className="object-contain object-center sm:object-left"
+                  style={{
+                    // SOLO si el logo es oscuro lo pasamos a blanco para que sea
+                    // legible sobre el fondo oscuro; si no, sombra normal.
+                    filter: logoIsDark
+                      ? "brightness(0) invert(1) drop-shadow(0 3px 12px rgba(0,0,0,0.7))"
+                      : "drop-shadow(0 4px 20px rgba(0,0,0,0.8))",
+                  }}
                 />
               </div>
             )}
