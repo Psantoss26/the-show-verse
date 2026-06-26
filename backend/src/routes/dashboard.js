@@ -40,6 +40,10 @@ const SURFACE_SEED_OFFSET = { home: 0, movies: 1009, series: 2017 };
 const DASHBOARD_ITEMS_PER_ROW = 28;
 const DASHBOARD_MIN_ITEMS_PER_ROW = 15;
 
+// Filas cuyo orden ES la información (no se barajan): "Estrenos" va ordenado por
+// hype/popularidad y "Top hoy en España" es un ranking. El resto rota a diario.
+const NON_ROTATING_POOLS = new Set(['new_releases', 'region_top']);
+
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 export default async function dashboardRoutes(fastify) {
   fastify.get('/:surface', async (req, reply) => {
@@ -65,7 +69,7 @@ export default async function dashboardRoutes(fastify) {
             reason: null,
             mediaType: def.mediaType,
             items,
-            rotate: true,
+            rotate: !NON_ROTATING_POOLS.has(def.source.poolKey),
           });
         } else if (kind === 'genreRotating') {
           const genres = def.mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;

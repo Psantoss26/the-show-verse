@@ -3,7 +3,7 @@ import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
-import { balanceSoftLimitedContent, excludeKidsReality, capAsian, TV_WITHOUT_GENRES } from './filters.js';
+import { balanceSoftLimitedContent, excludeKidsReality, capAsian, localePriorityWeight, TV_WITHOUT_GENRES } from './filters.js';
 
 // ─── TTLs (ms) ────────────────────────────────────────────────────────────────
 const TTL_12H  = 12 * 60 * 60 * 1000;
@@ -42,6 +42,22 @@ const GEM_VOTES = {
   movie: { gte: 800, lte: 6000 },
   tv: { gte: 300, lte: 2500 },
 };
+
+// Pisos de votos por sección, para afinar "lo conocido/representativo":
+// - Tendencias: piso modesto (refleja lo que sube ahora sin colar basura).
+// - Populares: piso alto (solo títulos populares realmente reconocibles).
+// - Top en España: piso moderado (contenido reciente tiene menos votos).
+const TRENDING_VOTES = { movie: 150, tv: 60 };
+const POPULAR_VOTES = { movie: 500, tv: 200 };
+const REGION_VOTES = { movie: 150, tv: 60 };
+
+// Fecha YYYY-MM-DD desplazada `days` respecto a hoy (para ventanas de estrenos
+// y de "lo reciente" del Top en España). Se recalcula en cada rebuild del pool.
+function dateOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 // Dedup + reglas de contenido (sin infantil/reality, anime/asiático no
 // predominante) + piso de votos (descarta lo poco representativo).
@@ -84,7 +100,11 @@ function addPool(poolKey, mediaType, ttlMs, build) {
 // margen para conservar >= 15 tras la deduplicación cruzada.
 for (const mediaType of ['movie', 'tv']) {
   addPool('trending', mediaType, TTL_12H, async () =>
-    refine(await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 5 }), mediaType)
+    refine(
+      await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 5 }),
+      mediaType,
+      TRENDING_VOTES[mediaType],
+    )
   );
 }
 
@@ -93,7 +113,11 @@ for (const mediaType of ['movie', 'tv']) {
 // "Populares" conserve >= 15 elementos.
 for (const mediaType of ['movie', 'tv']) {
   addPool('popular', mediaType, TTL_24H, async () =>
-    refine(await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 7 }), mediaType)
+    refine(
+      await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 7 }),
+      mediaType,
+      POPULAR_VOTES[mediaType],
+    )
   );
 }
 
@@ -137,31 +161,65 @@ for (const mediaType of ['movie', 'tv']) {
   );
 }
 
-// new_releases (24h) — contenido nuevo (por su naturaleza tiene pocos votos:
-// NO se aplica el piso de votos; ordenamos por popularidad para los más sonados).
-// Sí aplicamos las reglas de contenido (sin infantil/reality, asiático no
-// predominante).
+// new_releases (24h) — PRÓXIMOS estrenos ordenados por popularidad (hype): los
+// más esperados/importantes primero. El contenido sin estrenar no tiene votos,
+// así que NO hay piso de votos y NO aplicamos el re-ranking por calidad (que se
+// apoya en votos). Solo reglas de contenido (sin infantil/reality, asiático no
+// predominante) preservando el orden de popularidad. La fila no rota
+// (rotate:false en surfaces.js) para que se vean los más esperados primero.
+function upcomingContentRules(cards) {
+  const cleaned = capAsian(excludeKidsReality(dedupeCards(cards)));
+  // Re-ranking SOLO por afinidad de idioma/país (en/es y US/ES arriba),
+  // preservando el orden de popularidad dentro de cada nivel. No usamos el
+  // re-ranking por calidad (se apoya en votos y los no estrenados no los tienen).
+  // Así los estrenos relevantes para España encabezan y el cine regional
+  // (turco, polaco, panyabí, urdu…) que capAsian no cubre baja de posición.
+  return cleaned
+    .map((card, index) => ({
+      card,
+      index,
+      weightedRank: (cleaned.length - index) * localePriorityWeight(card),
+    }))
+    .sort((a, b) => b.weightedRank - a.weightedRank || a.index - b.index)
+    .map(({ card }) => card);
+}
 addPool('new_releases', 'movie', TTL_24H, async () =>
-  balanceSoftLimitedContent(capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/movie/upcoming', mediaType: 'movie', pages: 3 })))))
+  upcomingContentRules(await discoverPages('movie', {
+    sort_by: 'popularity.desc',
+    'primary_release_date.gte': dateOffset(0),       // de hoy en adelante
+    'primary_release_date.lte': dateOffset(275),     // ~9 meses
+  }, 4))
 );
 addPool('new_releases', 'tv', TTL_24H, async () =>
-  balanceSoftLimitedContent(capAsian(excludeKidsReality(dedupeCards(await tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 3 })))))
+  upcomingContentRules(await discoverPages('tv', discoverParams('tv', {
+    sort_by: 'popularity.desc',
+    'first_air_date.gte': dateOffset(-30),           // novedades muy recientes + próximas
+    'first_air_date.lte': dateOffset(275),
+  }), 4))
 );
 
-// region_top (24h) — populares en ES con votos suficientes
+// region_top (24h) — "Top hoy en España": lo más popular AHORA en streaming en
+// España, RECIENTE (no histórico). Antes usaba popularidad GLOBAL con region=ES,
+// lo que colaba clásicos muy conocidos y antiguos. Ahora filtramos por
+// disponibilidad de streaming en ES (watch_region) y por recencia.
 addPool('region_top', 'movie', TTL_24H, async () =>
   refine(await discoverPages('movie', {
-    region: 'ES',
+    watch_region: 'ES',
+    with_watch_monetization_types: 'flatrate|free|ads',
     sort_by: 'popularity.desc',
-    'vote_count.gte': MIN_VOTES.movie,
-  }, 4), 'movie')
+    'primary_release_date.gte': dateOffset(-900),    // ~2,5 años (excluye histórico)
+    'primary_release_date.lte': dateOffset(0),
+    'vote_count.gte': REGION_VOTES.movie,
+  }, 4), 'movie', REGION_VOTES.movie)
 );
 addPool('region_top', 'tv', TTL_24H, async () =>
   refine(await discoverPages('tv', discoverParams('tv', {
-    region: 'ES',
+    watch_region: 'ES',
+    with_watch_monetization_types: 'flatrate|free|ads',
     sort_by: 'popularity.desc',
-    'vote_count.gte': MIN_VOTES.tv,
-  }), 4), 'tv')
+    'first_air_date.gte': dateOffset(-1095),         // ~3 años
+    'vote_count.gte': REGION_VOTES.tv,
+  }), 4), 'tv', REGION_VOTES.tv)
 );
 
 // genre pools (7d) — por género en MOVIE_GENRES y TV_GENRES.
