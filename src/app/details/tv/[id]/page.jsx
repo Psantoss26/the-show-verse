@@ -4,7 +4,7 @@ import { getDetails } from "@/lib/api/tmdb";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
-  "external_ids,images,videos,credits,reviews";
+  "external_ids,images,videos,credits,reviews,recommendations";
 
 export async function generateMetadata({ params }) {
   const p = await params;
@@ -41,6 +41,9 @@ export default async function TvDetailsPage({ params }) {
   const initialReviews = Array.isArray(data?.reviews?.results)
     ? data.reviews.results
     : [];
+  const initialRecommendations = Array.isArray(data?.recommendations?.results)
+    ? data.recommendations.results
+    : [];
 
   return (
     <DetailsPageLoader
@@ -49,6 +52,7 @@ export default async function TvDetailsPage({ params }) {
       data={data}
       initialCastData={initialCastData}
       initialReviews={initialReviews}
+      initialRecommendations={initialRecommendations}
     />
   );
 }

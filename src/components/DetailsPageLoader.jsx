@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import DetailsClient from "@/components/DetailsClient";
-import { getCredits, getReviews, getWatchProviders } from "@/lib/api/tmdb";
-import { getTraktRelated } from "@/lib/api/traktClient";
+import {
+  getCredits,
+  getRecommendations,
+  getReviews,
+  getWatchProviders,
+} from "@/lib/api/tmdb";
 
 const EMPTY_ARRAY = [];
 const EMPTY_DEFERRED = {
@@ -53,11 +57,17 @@ export default function DetailsPageLoader(props) {
         const skipCast =
           Array.isArray(initialCastData) && initialCastData.length > 0;
 
-        const [credits, related] = await Promise.all([
+        const skipRecommendations =
+          Array.isArray(initialRecommendations) &&
+          initialRecommendations.length > 0;
+
+        const [credits, recommendations] = await Promise.all([
           skipCast
             ? Promise.resolve(null)
             : getCredits(type, id).catch(() => ({ cast: [] })),
-          getTraktRelated({ type, tmdbId: id }).catch(() => ({ results: [] })),
+          skipRecommendations
+            ? Promise.resolve(null)
+            : getRecommendations(type, id).catch(() => ({ results: [] })),
         ]);
 
         if (cancelled) return;
@@ -71,7 +81,13 @@ export default function DetailsPageLoader(props) {
                   : EMPTY_ARRAY,
               }
             : {}),
-          recommendations: related?.results || EMPTY_ARRAY,
+          ...(recommendations != null
+            ? {
+                recommendations: Array.isArray(recommendations?.results)
+                  ? recommendations.results
+                  : EMPTY_ARRAY,
+              }
+            : {}),
         }));
       } catch (error) {
         console.error("Error cargando datos prioritarios del detalle:", error);
@@ -136,7 +152,15 @@ export default function DetailsPageLoader(props) {
       if (priorityTimer) window.clearTimeout(priorityTimer);
       if (secondaryTimer) window.clearTimeout(secondaryTimer);
     };
-  }, [type, id, hasData]);
+  }, [
+    type,
+    id,
+    hasData,
+    initialCastData,
+    initialProviders,
+    initialRecommendations,
+    initialReviews,
+  ]);
 
   return (
     <DetailsClient
