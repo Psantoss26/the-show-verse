@@ -161,10 +161,13 @@ export function pickBestBackdropByLangResVotes(list, opts = {}) {
     return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
   };
 
+  // Forzamos idioma en la vista previa: preferido (en) → cualquier otro idioma
+  // (es…) → y SOLO como último recurso sin idioma (textless). Antes el textless
+  // se elegía antes que un backdrop con idioma, mostrando portadas sin título.
   return (
     pickFrom(preferred) ||
-    (includeNoLanguage ? pickFrom(noLanguage) : null) ||
-    pickFrom(withLanguage)
+    pickFrom(withLanguage) ||
+    (includeNoLanguage ? pickFrom(noLanguage) : null)
   );
 }
 
