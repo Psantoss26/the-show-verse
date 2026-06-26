@@ -267,34 +267,25 @@ export async function getBroadBackdrops(itemId, mediaType = "movie") {
 // 1) Busca con idioma (es/en) sobre el set habitual. 2) Si no hay, amplía a
 // todos los idiomas (solo en esos pocos casos). includeNoLanguage:false impide
 // que el selector elija un backdrop sin idioma.
-// `forceLanguage: true` (VISTA PREVIA): un ÚNICO fetch de TODOS los idiomas y
-// el selector excluye el textless (includeNoLanguage:false) → siempre con idioma
-// y sin el segundo fetch que provocaba el parpadeo.
-// Por defecto (false): comportamiento ORIGINAL (set en/es habitual, permite
-// textless) — lo usan p. ej. los backdrops del hero "Mejor valoradas".
 export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) {
-  const { forceLanguage = false, ...rest } = opts;
-
-  if (forceLanguage) {
-    const backdrops = await getBroadBackdrops(itemId, mediaType);
-    const best = pickBestBackdropByLangResVotes(backdrops, {
-      preferLangs: ["es", "en", "en-US"],
-      resolutionWindow: 0.98,
-      minWidth: 1200,
-      ...rest,
-      includeNoLanguage: false,
-    });
-    return best?.file_path || null;
-  }
-
-  const { backdrops } = await getMovieImages(itemId, mediaType);
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
+  const pickOpts = {
+    preferLangs: ["es", "en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
-    ...rest,
-  });
-  return best?.file_path || null;
+    ...opts,
+    includeNoLanguage: false,
+  };
+
+  const { backdrops } = await getMovieImages(itemId, mediaType);
+  const best = pickBestBackdropByLangResVotes(backdrops, pickOpts);
+  if (best) return best.file_path;
+
+  // Sin backdrop con idioma en en/es → ampliamos a todos los idiomas para
+  // evitar el textless (p. ej. títulos cuyo único backdrop con idioma es el
+  // original). Si tampoco hay ninguno con idioma, devolvemos null.
+  const broad = await getBroadBackdrops(itemId, mediaType);
+  const broadBest = pickBestBackdropByLangResVotes(broad, pickOpts);
+  return broadBest?.file_path || null;
 }
 
 // Selecciona el mejor backdrop SIN idioma (textless, iso_639_1 nulo), ideal para
@@ -346,7 +337,7 @@ export async function preparePreviewBackdrop(item, backdropOverride) {
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestBackdrop(item.id, mediaType, { forceLanguage: true })) ||
+        (await fetchBestBackdrop(item.id, mediaType)) ||
         getPreviewBackdropFallback(item);
     } catch {
       backdropPath = getPreviewBackdropFallback(item);
