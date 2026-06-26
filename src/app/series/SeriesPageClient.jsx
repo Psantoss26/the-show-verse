@@ -413,18 +413,25 @@ async function fetchBestTVPoster(showId) {
 
 /* ========= Backdrop preferido TV ========= */
 // Backdrop de la VISTA PREVIA: SIEMPRE con idioma, NUNCA textless.
-// Un ÚNICO fetch de TODOS los idiomas (sin el segundo fetch que provocaba
-// parpadeo). Si el mejor candidato no tiene idioma, devolvemos null y el
-// componente usa su fallback de siempre.
 async function fetchBestTVBackdrop(showId, opts = {}) {
-  const backdrops = await getBroadBackdrops(showId, "tv");
-  const best = pickBestBackdropByLangResVotes(backdrops, {
+  const pickOpts = {
     preferLangs: ["es", "en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
-  });
-  return best?.iso_639_1 ? best.file_path : null;
+  };
+
+  const { backdrops } = await getShowImages(showId);
+  const best = pickBestBackdropByLangResVotes(backdrops, pickOpts);
+  if (best?.iso_639_1) return best.file_path; // ya tiene idioma
+
+  // Sin backdrop con idioma en en/es → ampliamos a TODOS los idiomas (solo en
+  // estos pocos casos) para no mostrar nunca el textless.
+  const broad = await getBroadBackdrops(showId, "tv");
+  const broadBest = pickBestBackdropByLangResVotes(broad, pickOpts);
+  if (broadBest?.iso_639_1) return broadBest.file_path;
+
+  return null; // ningún backdrop con idioma en TMDB → fallback del componente
 }
 
 async function preparePreviewBackdrop(show) {
