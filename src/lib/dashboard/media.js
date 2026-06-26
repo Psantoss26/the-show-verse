@@ -233,59 +233,18 @@ export async function getMovieImages(itemId, mediaType = "movie") {
   }
 }
 
-// Backdrops de TODOS los idiomas (sin restricción de include_image_language).
-// Solo se usa como RESPALDO cuando un título no tiene backdrop con idioma en
-// en/es, para no mostrar nunca el textless. getMovieImages (restringido) se
-// mantiene intacto para pósters y para el backdrop textless del hero.
-export const broadBackdropsCache = new Map(); // `${mediaType}:${id}` -> backdrops[]
-
-export async function getBroadBackdrops(itemId, mediaType = "movie") {
-  const cacheKey = `${mediaType}:${itemId}`;
-  if (broadBackdropsCache.has(cacheKey)) return broadBackdropsCache.get(cacheKey);
-
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey || !itemId) {
-    broadBackdropsCache.set(cacheKey, []);
-    return [];
-  }
-
-  try {
-    const type = mediaType === "tv" ? "tv" : "movie";
-    const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    const j = await r.json();
-    const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
-    broadBackdropsCache.set(cacheKey, backdrops);
-    return backdrops;
-  } catch {
-    broadBackdropsCache.set(cacheKey, []);
-    return [];
-  }
-}
-
-// Backdrop de la VISTA PREVIA: SIEMPRE con idioma, NUNCA textless.
-// 1) Busca con idioma (es/en) sobre el set habitual. 2) Si no hay, amplía a
-// todos los idiomas (solo en esos pocos casos). includeNoLanguage:false impide
-// que el selector elija un backdrop sin idioma.
 export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) {
-  const pickOpts = {
-    preferLangs: ["es", "en", "en-US"],
+  const { backdrops } = await getMovieImages(itemId, mediaType);
+  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
+
+  const best = pickBestBackdropByLangResVotes(backdrops, {
+    preferLangs: ["en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
-    includeNoLanguage: false,
-  };
+  });
 
-  const { backdrops } = await getMovieImages(itemId, mediaType);
-  const best = pickBestBackdropByLangResVotes(backdrops, pickOpts);
-  if (best) return best.file_path;
-
-  // Sin backdrop con idioma en en/es → ampliamos a todos los idiomas para
-  // evitar el textless (p. ej. títulos cuyo único backdrop con idioma es el
-  // original). Si tampoco hay ninguno con idioma, devolvemos null.
-  const broad = await getBroadBackdrops(itemId, mediaType);
-  const broadBest = pickBestBackdropByLangResVotes(broad, pickOpts);
-  return broadBest?.file_path || null;
+  return best?.file_path || null;
 }
 
 // Selecciona el mejor backdrop SIN idioma (textless, iso_639_1 nulo), ideal para
