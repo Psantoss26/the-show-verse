@@ -84,12 +84,14 @@ function discoverParams(mediaType, params) {
 
 // ─── Helper: discover across N pages ─────────────────────────────────────────
 async function discoverPages(mediaType, params, pages) {
-  const all = [];
-  for (let page = 1; page <= pages; page++) {
-    const cards = await tmdbDiscover({ mediaType, params: { ...params, page } });
-    all.push(...cards);
-  }
-  return all;
+  // Páginas en paralelo (antes en serie): construir un pool baja de N×latencia
+  // a ~1×latencia. Es un único pool, así que la concurrencia con TMDB es acotada.
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      tmdbDiscover({ mediaType, params: { ...params, page: i + 1 } }).catch(() => []),
+    ),
+  );
+  return results.flat();
 }
 
 // ─── POOL_DEFS ────────────────────────────────────────────────────────────────
@@ -353,6 +355,11 @@ for (const year of DECADES) {
 }
 
 // ─── getPool ──────────────────────────────────────────────────────────────────
+// Reconstrucciones en curso por pool: si varias peticiones (o el precalentado y
+// un usuario) piden el MISMO pool frío a la vez, solo se reconstruye una vez y el
+// resto espera esa promesa. Evita trabajo duplicado y ráfagas a TMDB.
+const inFlightBuilds = new Map(); // defKey -> Promise<items>
+
 export async function getPool(poolKey, mediaType) {
   const defKey = `${poolKey}:${mediaType}`;
   const def = POOL_DEFS.get(defKey);
@@ -370,25 +377,35 @@ export async function getPool(poolKey, mediaType) {
     return row.items;
   }
 
-  // Rebuild
-  try {
-    const items = await def.build();
-    const builtAt = new Date();
-    const expiresAt = new Date(Date.now() + def.ttlMs);
+  // ¿Ya hay una reconstrucción en curso para este pool? Reutilízala.
+  const existing = inFlightBuilds.get(defKey);
+  if (existing) return existing;
 
-    await db
-      .insert(dashboardPools)
-      .values({ poolKey, mediaType, items, builtAt, expiresAt })
-      .onConflictDoUpdate({
-        target: [dashboardPools.poolKey, dashboardPools.mediaType],
-        set: { items, builtAt, expiresAt },
-      });
+  const build = (async () => {
+    try {
+      const items = await def.build();
+      const builtAt = new Date();
+      const expiresAt = new Date(Date.now() + def.ttlMs);
 
-    return items;
-  } catch {
-    // On error return stale data if available, else []
-    return row ? row.items : [];
-  }
+      await db
+        .insert(dashboardPools)
+        .values({ poolKey, mediaType, items, builtAt, expiresAt })
+        .onConflictDoUpdate({
+          target: [dashboardPools.poolKey, dashboardPools.mediaType],
+          set: { items, builtAt, expiresAt },
+        });
+
+      return items;
+    } catch {
+      // On error return stale data if available, else []
+      return row ? row.items : [];
+    } finally {
+      inFlightBuilds.delete(defKey);
+    }
+  })();
+
+  inFlightBuilds.set(defKey, build);
+  return build;
 }
 
 // ─── refreshAllPools ──────────────────────────────────────────────────────────
@@ -403,13 +420,19 @@ export async function refreshAllPools() {
   }
 
   const now = new Date();
+  const stale = [];
   for (const [key, def] of POOL_DEFS) {
     const row = rowMap.get(key);
-    // Only rebuild if missing or expired
-    if (!row || row.expiresAt <= now) {
-      await getPool(def.poolKey, def.mediaType);
-      built++;
-    }
+    if (!row || row.expiresAt <= now) stale.push(def);
+  }
+
+  // Reconstruimos en lotes paralelos (concurrencia acotada) para calentar rápido
+  // sin saturar TMDB.
+  const BATCH = 4;
+  for (let i = 0; i < stale.length; i += BATCH) {
+    const batch = stale.slice(i, i + BATCH);
+    await Promise.all(batch.map((def) => getPool(def.poolKey, def.mediaType).catch(() => [])));
+    built += batch.length;
   }
 
   return { built };

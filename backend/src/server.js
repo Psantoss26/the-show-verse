@@ -27,6 +27,7 @@ import importRoutes from './routes/import.js';
 import statsRoutes from './routes/stats.js';
 import usersRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
+import { refreshAllPools } from './dashboard/pools.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
 
@@ -239,6 +240,36 @@ try {
 } catch (err) {
   fastify.log.error(err);
   process.exit(1);
+}
+
+// ────────────────────────────────────────────
+// Precalentado de pools de dashboards
+// La primera petición a un dashboard reconstruye los pools (decenas de llamadas a
+// TMDB) si la caché está fría → carga lenta tras un deploy o al expirar. Aquí los
+// calentamos en segundo plano al arrancar (sin bloquear el boot) y, después, de
+// forma periódica para que estén siempre listos antes de que llegue el usuario.
+// refreshAllPools solo reconstruye los que faltan o han caducado.
+// Ajustable con DASHBOARD_POOL_WARM_MS (0 para desactivar).
+// ────────────────────────────────────────────
+const POOL_WARM_INTERVAL_MS =
+  process.env.DASHBOARD_POOL_WARM_MS !== undefined
+    ? Number(process.env.DASHBOARD_POOL_WARM_MS)
+    : 6 * 60 * 60 * 1000; // 6 h
+
+const warmDashboardPools = () => {
+  refreshAllPools()
+    .then(({ built }) => {
+      if (built > 0) fastify.log.info({ built }, 'dashboard pools warmed');
+    })
+    .catch((err) => fastify.log.warn({ err }, 'dashboard pool warming failed'));
+};
+
+// Calentar al arrancar (en segundo plano, no bloquea el listen).
+warmDashboardPools();
+
+if (Number.isFinite(POOL_WARM_INTERVAL_MS) && POOL_WARM_INTERVAL_MS > 0) {
+  const warmTimer = setInterval(warmDashboardPools, POOL_WARM_INTERVAL_MS);
+  warmTimer.unref?.(); // no impedir el cierre del proceso
 }
 
 // ────────────────────────────────────────────
