@@ -33,6 +33,7 @@ import {
 } from "@/lib/api/tmdb";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
+import { getBroadBackdrops } from "@/lib/dashboard/media";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -411,18 +412,26 @@ async function fetchBestTVPoster(showId) {
 }
 
 /* ========= Backdrop preferido TV ========= */
+// Backdrop de la VISTA PREVIA: SIEMPRE con idioma, NUNCA textless.
 async function fetchBestTVBackdrop(showId, opts = {}) {
-  const { backdrops } = await getShowImages(showId);
-  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
-
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
+  const pickOpts = {
+    preferLangs: ["es", "en", "en-US"],
     resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
-  });
+  };
 
-  return best?.file_path || null;
+  const { backdrops } = await getShowImages(showId);
+  const best = pickBestBackdropByLangResVotes(backdrops, pickOpts);
+  if (best?.iso_639_1) return best.file_path; // ya tiene idioma
+
+  // Sin backdrop con idioma en en/es → ampliamos a TODOS los idiomas (solo en
+  // estos pocos casos) para no mostrar nunca el textless.
+  const broad = await getBroadBackdrops(showId, "tv");
+  const broadBest = pickBestBackdropByLangResVotes(broad, pickOpts);
+  if (broadBest?.iso_639_1) return broadBest.file_path;
+
+  return null; // ningún backdrop con idioma en TMDB → fallback del componente
 }
 
 async function preparePreviewBackdrop(show) {
