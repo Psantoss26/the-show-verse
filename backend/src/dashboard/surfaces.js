@@ -20,13 +20,13 @@ export const SURFACES = {
     genericRows: [
       {
         key: 'trending',
-        title: 'Tendencias',
+        title: 'Tendencias ahora mismo',
         mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'trending' },
       },
       {
         key: 'popular',
-        title: 'Populares',
+        title: 'Lo que más se está viendo',
         mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'popular' },
       },
@@ -43,8 +43,26 @@ export const SURFACES = {
         source: { kind: 'pool', poolKey: 'new_releases' },
       },
       {
+        key: 'acclaimed',
+        title: 'Aclamadas que merecen la pena',
+        mediaType: 'mixed',
+        source: { kind: 'pool', poolKey: 'acclaimed' },
+      },
+      {
+        key: 'action_adventure',
+        title: 'Acción y aventura con ritmo',
+        mediaType: 'mixed',
+        source: { kind: 'pool', poolKey: 'curated:action_adventure' },
+      },
+      {
+        key: 'nostalgia_millennial',
+        title: 'Favoritos de los 90 y 2000',
+        mediaType: 'mixed',
+        source: { kind: 'pool', poolKey: 'curated:nostalgia_millennial' },
+      },
+      {
         key: 'hidden_gems',
-        title: 'Joyas ocultas',
+        title: 'Joyas para descubrir',
         mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'hidden_gems' },
       },
@@ -68,7 +86,7 @@ export const SURFACES = {
     genericRows: [
       {
         key: 'trending',
-        title: 'Tendencias',
+        title: 'Tendencias ahora mismo',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'trending' },
       },
@@ -80,15 +98,27 @@ export const SURFACES = {
       },
       {
         key: 'popular',
-        title: 'Populares',
+        title: 'Películas que todo el mundo está viendo',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'popular' },
       },
       {
         key: 'acclaimed',
-        title: 'Aclamadas por la crítica',
+        title: 'Premiadas y aclamadas',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'acclaimed' },
+      },
+      {
+        key: 'drama',
+        title: 'Dramas que enganchan',
+        mediaType: 'movie',
+        source: { kind: 'pool', poolKey: 'curated:drama' },
+      },
+      {
+        key: 'action_adventure',
+        title: 'Acción y aventura sin pausa',
+        mediaType: 'movie',
+        source: { kind: 'pool', poolKey: 'curated:action_adventure' },
       },
       {
         key: 'top_rated',
@@ -98,7 +128,7 @@ export const SURFACES = {
       },
       {
         key: 'blockbusters',
-        title: 'Taquillazos',
+        title: 'Grandes éxitos de siempre',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'blockbusters' },
       },
@@ -110,9 +140,15 @@ export const SURFACES = {
       },
       {
         key: 'hidden_gems',
-        title: 'Joyas ocultas',
+        title: 'Películas que quizá se te escaparon',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'hidden_gems' },
+      },
+      {
+        key: 'nostalgia_millennial',
+        title: 'Una dosis de nostalgia',
+        mediaType: 'movie',
+        source: { kind: 'pool', poolKey: 'curated:nostalgia_millennial' },
       },
       {
         key: 'genre_rotating',
@@ -134,7 +170,7 @@ export const SURFACES = {
     genericRows: [
       {
         key: 'trending',
-        title: 'Tendencias',
+        title: 'Tendencias ahora mismo',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'trending' },
       },
@@ -146,15 +182,27 @@ export const SURFACES = {
       },
       {
         key: 'popular',
-        title: 'Populares',
+        title: 'Series que se están viendo ahora',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'popular' },
       },
       {
         key: 'acclaimed',
-        title: 'Aclamadas por la crítica',
+        title: 'Series aclamadas para descubrir',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'acclaimed' },
+      },
+      {
+        key: 'action_adventure',
+        title: 'Series de acción y aventura',
+        mediaType: 'tv',
+        source: { kind: 'pool', poolKey: 'curated:action_adventure' },
+      },
+      {
+        key: 'drama',
+        title: 'Dramas seriados que enganchan',
+        mediaType: 'tv',
+        source: { kind: 'pool', poolKey: 'curated:drama' },
       },
       {
         key: 'top_rated',
@@ -164,7 +212,7 @@ export const SURFACES = {
       },
       {
         key: 'blockbusters',
-        title: 'Fenómenos de audiencia',
+        title: 'Fenómenos que todo el mundo comenta',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'blockbusters' },
       },
@@ -176,9 +224,15 @@ export const SURFACES = {
       },
       {
         key: 'hidden_gems',
-        title: 'Joyas ocultas',
+        title: 'Series que quizá se te escaparon',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'hidden_gems' },
+      },
+      {
+        key: 'nostalgia_millennial',
+        title: 'Series para una dosis de nostalgia',
+        mediaType: 'tv',
+        source: { kind: 'pool', poolKey: 'curated:nostalgia_millennial' },
       },
       {
         key: 'genre_rotating',
@@ -197,8 +251,8 @@ export const SURFACES = {
 };
 
 // Proporción máxima de títulos ya vistos en filas personalizadas.
-const FOR_YOU_SEEN_LIMIT = 0.3;   // "Para ti"/"Más para ti": algunos vistos, sin dominar
-const BECAUSE_SEEN_LIMIT = 0.15;  // "Porque viste…": vistos solo como excepción
+const FOR_YOU_SEEN_LIMIT = 0.3;   // Recomendaciones generales: algunos vistos, sin dominar
+const BECAUSE_SEEN_LIMIT = 0.15;  // "Porque te gustó…": vistos solo como excepción
 
 // Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (28) para que
 // la rotación con semilla por superficie produzca subconjuntos distintos entre
@@ -240,8 +294,8 @@ export function personalizedRowDefs(recsByType, surface) {
 
   const rows = [];
 
-  // 2. "Para ti" — en Inicio mezcla pelis y series; pool amplio + rotación por
-  //    superficie para que no se repita el mismo set entre dashboards.
+  // 2. Recomendaciones diarias — en Inicio mezcla pelis y series; pool amplio
+  //    + rotación por superficie para no repetir el mismo set entre dashboards.
   let forYouPool;
   if (isHome) {
     const mv = all.filter((i) => i.mediaType === 'movie');
@@ -252,7 +306,7 @@ export function personalizedRowDefs(recsByType, surface) {
   }
   rows.push({
     key: 'for_you',
-    title: 'Para ti',
+    title: 'Recomendaciones de hoy para ti',
     reason: undefined,
     mediaType: primaryMediaType,
     items: forYouPool.slice(0, FOR_YOU_POOL),
@@ -260,7 +314,7 @@ export function personalizedRowDefs(recsByType, surface) {
     seenRatioLimit: FOR_YOU_SEEN_LIMIT,
   });
 
-  // 3. "Porque viste {seedTitle}" (máx 2). Las razones 'because' solo provienen
+  // 3. "Porque te gustó {seedTitle}" (máx 2). Las razones 'because' solo provienen
   //    de semillas que el usuario disfrutó (rating ≥ 8 o favorito; ver score.js),
   //    así que estas filas reflejan gustos reales, no visionados casuales.
   const becauseGroups = new Map(); // seedTmdbId -> { seedTitle, items: recItem[] }
@@ -284,7 +338,7 @@ export function personalizedRowDefs(recsByType, surface) {
   for (const [seedTmdbId, { seedTitle, items }] of topBecauseGroups) {
     rows.push({
       key: `because_${seedTmdbId}`,
-      title: `Porque viste ${seedTitle}`,
+      title: `Porque te gustó ${seedTitle}`,
       reason: 'Porque te gustó',
       mediaType: primaryMediaType,
       items: items.slice(0, BECAUSE_POOL),
@@ -293,7 +347,7 @@ export function personalizedRowDefs(recsByType, surface) {
     });
   }
 
-  // 4. "Más para ti" — relleno por afinidad de género
+  // 4. Afinidad de género — relleno personalizado para ampliar variedad
   const genreFillItems = all.filter((item) =>
     item.reasons?.some((r) => r.type === 'based_on_genres'),
   );
@@ -301,7 +355,7 @@ export function personalizedRowDefs(recsByType, surface) {
   if (genreFillItems.length >= 15) {
     rows.push({
       key: 'genre_fill',
-      title: 'Más para ti',
+      title: 'Creemos que te van a encantar',
       reason: undefined,
       mediaType: primaryMediaType,
       items: genreFillItems.slice(0, FOR_YOU_POOL),

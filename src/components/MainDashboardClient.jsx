@@ -311,8 +311,12 @@ const dashboardPreviewBackdropFadeStyle = {
 
 const EXPANDABLE_SECTION_HREFS = {
   Tendencias: "/dashboard/tendencias",
+  "Tendencias ahora mismo": "/dashboard/tendencias",
   Populares: "/dashboard/populares",
+  "Lo que más se está viendo": "/dashboard/populares",
   Recomendados: "/dashboard/recomendados",
+  "Recomendaciones de hoy para ti": "/dashboard/recomendados",
+  "Creemos que te van a encantar": "/dashboard/recomendados",
   "Más esperadas": "/dashboard/mas-esperadas",
 };
 
@@ -398,17 +402,23 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         return;
       }
 
-      // Si todavía NO sabemos si hay override (porque aún no cargó el fetch batch),
-      // pintamos con el poster base y dejamos que el override lo sustituya después.
-      if (posterOverride === undefined) {
-        const existingPoster =
-          movie.poster_path ||
-          movie.backdrop_path ||
-          movie.profile_path ||
-          null;
+      const cached = cache.current.get(posterCacheKey);
+      if (cached) {
+        const url = buildImg(cached, "w342");
+        await preloadImage(url);
         if (!abort) {
-          setPosterPath(existingPoster);
-          setReady(!!existingPoster);
+          setPosterPath(cached);
+          setReady(true);
+        }
+        return;
+      }
+
+      // Si todavía NO sabemos si hay override (porque aún no cargó el fetch batch),
+      // no pintamos el poster base: eso provoca el cambio visible base → final.
+      if (posterOverride === undefined) {
+        if (!abort) {
+          setPosterPath(null);
+          setReady(false);
         }
         return;
       }
@@ -424,27 +434,11 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         return;
       }
 
-      const cached = cache.current.get(posterCacheKey);
-      if (cached) {
-        const url = buildImg(cached, "w342");
-        await preloadImage(url);
-        if (!abort) {
-          setPosterPath(cached);
-          setReady(true);
-        }
-        return;
+      if (!abort) {
+        setPosterPath(null);
+        setReady(false);
       }
 
-      const existingPoster =
-        movie.poster_path || movie.backdrop_path || movie.profile_path || null;
-      if (existingPoster) {
-        if (!abort) {
-          setPosterPath(existingPoster);
-          setReady(true);
-        }
-      }
-
-      if (!existingPoster) setReady(false);
       const preferred = await fetchBestPoster(movie.id, mediaType);
       const chosen =
         preferred ||
@@ -1807,15 +1801,23 @@ function Row({
       "Recomendado",
       "Recomendados",
       "Tendencias",
+      "Tendencias ahora mismo",
       "Más esperadas",
       "Populares",
+      "Lo que más se está viendo",
       "Taquillazos imprescindibles",
       "Premiadas y nominadas",
+      "Aclamadas que merecen la pena",
       "Historias de venganza",
       "Populares en EE.UU.",
+      "Acción y aventura con ritmo",
+      "Favoritos de los 90 y 2000",
       "Películas de culto",
       "Infravaloradas",
       "En ascenso",
+      "Joyas para descubrir",
+      "Recomendaciones de hoy para ti",
+      "Creemos que te van a encantar",
     ].includes(title) &&
     !title.includes("década") &&
     !title.includes("Clásicos") &&
@@ -1828,8 +1830,20 @@ function Row({
       labelText = "ANTICIPADAS";
     } else if (title === "Populares") {
       labelText = "POPULARES";
+    } else if (title === "Lo que más se está viendo") {
+      labelText = "POPULARES";
     } else if (title === "Tendencias") {
       labelText = "TENDENCIAS";
+    } else if (title === "Tendencias ahora mismo") {
+      labelText = "TENDENCIAS";
+    } else if (title === "Aclamadas que merecen la pena") {
+      labelText = "ACLAMADAS";
+    } else if (title === "Acción y aventura con ritmo") {
+      labelText = "SELECCIÓN";
+    } else if (title === "Favoritos de los 90 y 2000") {
+      labelText = "NOSTALGIA";
+    } else if (title === "Joyas para descubrir") {
+      labelText = "DESCUBRIR";
     } else if (isGenreRow) {
       labelText = "GÉNERO";
     }
@@ -2330,15 +2344,23 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
       "Recomendado",
       "Recomendados",
       "Tendencias",
+      "Tendencias ahora mismo",
       "Más esperadas",
       "Populares",
+      "Lo que más se está viendo",
       "Taquillazos imprescindibles",
       "Premiadas y nominadas",
+      "Aclamadas que merecen la pena",
       "Historias de venganza",
       "Populares en EE.UU.",
+      "Acción y aventura con ritmo",
+      "Favoritos de los 90 y 2000",
       "Películas de culto",
       "Infravaloradas",
       "En ascenso",
+      "Joyas para descubrir",
+      "Recomendaciones de hoy para ti",
+      "Creemos que te van a encantar",
     ].includes(title) &&
     !title.includes("década") &&
     !title.includes("Clásicos") &&
@@ -2351,8 +2373,20 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
     labelText = "ANTICIPADAS";
   } else if (title === "Populares") {
     labelText = "POPULARES";
+  } else if (title === "Lo que más se está viendo") {
+    labelText = "POPULARES";
   } else if (title === "Tendencias") {
     labelText = "TENDENCIAS";
+  } else if (title === "Tendencias ahora mismo") {
+    labelText = "TENDENCIAS";
+  } else if (title === "Aclamadas que merecen la pena") {
+    labelText = "ACLAMADAS";
+  } else if (title === "Acción y aventura con ritmo") {
+    labelText = "SELECCIÓN";
+  } else if (title === "Favoritos de los 90 y 2000") {
+    labelText = "NOSTALGIA";
+  } else if (title === "Joyas para descubrir") {
+    labelText = "DESCUBRIR";
   } else if (isGenreRow) {
     labelText = "GÉNERO";
   }

@@ -18,7 +18,7 @@ test('each surface defines media types and generic rows', () => {
   assert.deepEqual(SURFACES.series.mediaTypes, ['tv']);
 });
 
-test('personalizedRowDefs builds a rotating, seen-capped, mixed "Para ti" on home', () => {
+test('personalizedRowDefs builds a rotating, seen-capped, mixed daily recommendations row on home', () => {
   const recs = Array.from({ length: 30 }, (_, i) => rec(i + 1, i % 2 ? 'tv' : 'movie', 30 - i));
   const rows = personalizedRowDefs(
     { movie: recs.filter((r) => r.mediaType === 'movie'), tv: recs.filter((r) => r.mediaType === 'tv') },
@@ -26,6 +26,7 @@ test('personalizedRowDefs builds a rotating, seen-capped, mixed "Para ti" on hom
   );
   const forYou = rows.find((r) => r.key === 'for_you');
   assert.ok(forYou);
+  assert.equal(forYou.title, 'Recomendaciones de hoy para ti');
   assert.equal(forYou.rotate, true);                 // rotación → variedad entre superficies
   assert.equal(forYou.mediaType, 'mixed');
   assert.ok(forYou.seenRatioLimit > 0 && forYou.seenRatioLimit < 1); // límite de vistos
@@ -33,7 +34,7 @@ test('personalizedRowDefs builds a rotating, seen-capped, mixed "Para ti" on hom
   assert.ok(types.has('movie') && types.has('tv'));  // mezcla pelis y series en Inicio
 });
 
-test('personalizedRowDefs "Porque viste" only with a because-reason and >=15 items, capped tighter than Para ti', () => {
+test('personalizedRowDefs "Porque te gustó" only with a because-reason and >=15 items, capped tighter than daily recommendations', () => {
   const liked = Array.from({ length: 16 }, (_, i) =>
     rec(100 + i, 'movie', 50 - i, [{ type: 'because', seedTmdbId: 99, seedTitle: 'Origen' }]));
   const noReason = Array.from({ length: 5 }, (_, i) => rec(200 + i, 'movie', 10 - i));
@@ -41,11 +42,11 @@ test('personalizedRowDefs "Porque viste" only with a because-reason and >=15 ite
   const because = rows.find((r) => r.key === 'because_99');
   const forYou = rows.find((r) => r.key === 'for_you');
   assert.ok(because, 'crea la fila porque hay >=15 candidatos con razón');
-  assert.equal(because.title, 'Porque viste Origen');
-  assert.ok(because.seenRatioLimit <= forYou.seenRatioLimit); // "porque viste" admite menos vistos
+  assert.equal(because.title, 'Porque te gustó Origen');
+  assert.ok(because.seenRatioLimit <= forYou.seenRatioLimit); // "porque te gustó" admite menos vistos
 });
 
-test('personalizedRowDefs drops a "Porque viste" group below 15 items', () => {
+test('personalizedRowDefs drops a "Porque te gustó" group below 15 items', () => {
   const liked = Array.from({ length: 10 }, (_, i) =>
     rec(100 + i, 'movie', 50 - i, [{ type: 'because', seedTmdbId: 99, seedTitle: 'Origen' }]));
   const rows = personalizedRowDefs({ movie: liked }, SURFACES.movies);
