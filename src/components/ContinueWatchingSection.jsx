@@ -365,7 +365,7 @@ function useShowBackdrop(show) {
       try {
         const preferred = await fetchBestBackdrop(show.id, "tv", {
           offset: 1,
-          includeNoLanguage: false,
+          forceLanguage: true,
         });
         const chosen = preferred || getPreviewBackdropFallback(movie);
         movieBackdropCache.set(cacheKey, chosen);

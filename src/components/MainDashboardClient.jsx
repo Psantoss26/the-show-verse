@@ -614,7 +614,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const preferred = await fetchBestBackdrop(movie.id, mediaType);
+            const preferred = await fetchBestBackdrop(movie.id, mediaType, {
+              forceLanguage: true,
+            });
             const chosen = preferred || getPreviewBackdropFallback(movie);
 
             movieBackdropCache.set(backdropCacheKey, chosen);
@@ -1175,6 +1177,7 @@ function InlinePreviewCardAnticipated({
             const preferred = await fetchBestBackdrop(
               movie.id,
               mediaTypeForBackdrop,
+              { forceLanguage: true },
             );
             const chosen = preferred || getPreviewBackdropFallback(movie);
 
