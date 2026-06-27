@@ -8,13 +8,21 @@ import { and, eq } from 'drizzle-orm';
 import { loadLibrary, buildSeeds, libraryBasisHash } from './library.js';
 import { aggregateCandidates, excludeSeen, mergeGenreFill } from './score.js';
 import { tmdbList, tmdbDiscover } from './tmdb.js';
-import { excludeKidsReality, TV_WITHOUT_GENRES } from './filters.js';
+import { excludeKidsReality, hasReliablePublicSignal, TV_WITHOUT_GENRES } from './filters.js';
 
 // Piso de votos para las recomendaciones: descartamos candidatos con muy pocos
-// votos (poco representativos). TV acumula menos votos que cine.
-const REC_MIN_VOTES = { movie: 150, tv: 60 };
+// votos (poco representativos). Después se contrasta además rating + masa
+// crítica en hasReliablePublicSignal().
+const REC_MIN_VOTES = { movie: 500, tv: 180 };
 // Umbral de votos para el relleno por afinidad de género (títulos conocidos).
 const GENRE_FILL_VOTES = { movie: 1000, tv: 300 };
+
+function refineRecommendationItems(items, mediaType) {
+  const minVotes = REC_MIN_VOTES[mediaType] ?? 0;
+  return (items || []).filter(
+    (c) => (c?.voteCount || 0) >= minVotes && hasReliablePublicSignal(c),
+  );
+}
 
 /**
  * Get personalised recommendations for a user, backed by a 24h DB cache.
@@ -47,7 +55,7 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     .limit(1);
 
   if (row && row.expiresAt > new Date() && row.basisHash === basisHash) {
-    return row.items;
+    return refineRecommendationItems(row.items, mediaType);
   }
 
   // ── 3. Rebuild ───────────────────────────────────────────────────────────
@@ -94,8 +102,7 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     items = excludeKidsReality(items);
 
     // Descartar candidatos con muy pocos votos (poco representativos).
-    const minVotes = REC_MIN_VOTES[mediaType] ?? 0;
-    items = items.filter((c) => (c.voteCount || 0) >= minVotes);
+    items = refineRecommendationItems(items, mediaType);
 
     // ── Genre-affinity fill ────────────────────────────────────────────────
     // Tally genreIds across the top 30 items (already scored candidates)
@@ -130,7 +137,9 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
       const allFill = fillArrays.flat();
       // El relleno evita las semillas (no recomendar lo que originó la rec) pero
       // sí puede traer otros vistos: el límite por fila los acota.
-      const filteredFill = excludeKidsReality(excludeSeen(allFill, seedKeys));
+      const filteredFill = excludeKidsReality(excludeSeen(allFill, seedKeys)).filter(
+        (c) => hasReliablePublicSignal(c),
+      );
       items = mergeGenreFill(items, filteredFill, 0.5);
     }
 

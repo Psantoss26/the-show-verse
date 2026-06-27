@@ -65,6 +65,51 @@ const SOFT_LIMIT_QUALITY = {
   },
 };
 
+// Señal pública mínima para que un título sea representativo en dashboards.
+// TMDb puede inflar medias cuando la muestra es pequeña, así que combinamos:
+//   - votos mínimos absolutos,
+//   - nota mínima,
+//   - y un tramo "borderline" donde se exige algo más de nota si aún no hay
+//     suficiente masa crítica. Si en el futuro la card llega enriquecida con
+//     IMDb, también se contrasta aquí.
+const PUBLIC_SIGNAL = {
+  movie: {
+    minVotes: 500,
+    minRating: 5.8,
+    trustedVotes: 1000,
+    trustedRating: 6.4,
+    imdbMinVotes: 1200,
+    imdbMinRating: 5.8,
+  },
+  tv: {
+    minVotes: 180,
+    minRating: 6.0,
+    trustedVotes: 360,
+    trustedRating: 6.5,
+    imdbMinVotes: 900,
+    imdbMinRating: 6.0,
+  },
+};
+
+const SOFT_LIMIT_PUBLIC_SIGNAL = {
+  movie: {
+    minVotes: 900,
+    minRating: 6.5,
+    trustedVotes: 1800,
+    trustedRating: 7.0,
+    imdbMinVotes: 1500,
+    imdbMinRating: 6.2,
+  },
+  tv: {
+    minVotes: 350,
+    minRating: 6.7,
+    trustedVotes: 700,
+    trustedRating: 7.1,
+    imdbMinVotes: 1200,
+    imdbMinRating: 6.4,
+  },
+};
+
 const PREFERRED_LANGS = new Set(['en', 'es']);
 const PREFERRED_COUNTRIES = new Set(['US', 'ES']);
 
@@ -93,6 +138,11 @@ function mediaTypeOf(card) {
   return card?.mediaType === 'tv' ? 'tv' : 'movie';
 }
 
+function numberOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function originCountries(card) {
   return Array.isArray(card?.originCountry) ? card.originCountry : [];
 }
@@ -114,6 +164,32 @@ export function isSoftLimitedContent(card) {
   const hasSoftGenre = ids.some((id) => SOFT_LIMITED_GENRES.has(id));
   const isAnimeLike = card?.originalLanguage === 'ja' && ids.includes(16);
   return hasSoftGenre || isAnimeLike;
+}
+
+export function hasReliablePublicSignal(card, opts = {}) {
+  const { allowUnrated = false } = opts;
+  if (!card) return false;
+
+  const type = mediaTypeOf(card);
+  const rules = isSoftLimitedContent(card)
+    ? SOFT_LIMIT_PUBLIC_SIGNAL[type] || SOFT_LIMIT_PUBLIC_SIGNAL.movie
+    : PUBLIC_SIGNAL[type] || PUBLIC_SIGNAL.movie;
+
+  const votes = Number(card?.voteCount) || 0;
+  const rating = Number(card?.voteAverage) || 0;
+
+  if (votes <= 0 && allowUnrated) return true;
+  if (votes < rules.minVotes) return false;
+  if (rating < rules.minRating) return false;
+  if (votes < rules.trustedVotes && rating < rules.trustedRating) return false;
+
+  const imdbRating = numberOrNull(card?.imdbRating ?? card?.imdb?.rating);
+  const imdbVotes = numberOrNull(card?.imdbVotes ?? card?.imdb?.votes);
+
+  if (imdbRating != null && imdbRating < rules.imdbMinRating) return false;
+  if (imdbVotes != null && imdbVotes < rules.imdbMinVotes) return false;
+
+  return true;
 }
 
 export function softLimitedContentWeight(card) {

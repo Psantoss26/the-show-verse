@@ -26,10 +26,12 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import {
   buildImg,
+  fetchBestBackdrop,
   getArtworkPreference,
   movieBackdropCache,
   getBackdropCacheKey,
   getPreviewBackdropFallback,
+  preloadImage,
 } from "@/lib/dashboard/media";
 
 const EMPTY_ARRAY = [];
@@ -344,22 +346,68 @@ function useShowBackdrop(show) {
     };
     const cacheKey = `${getBackdropCacheKey(movie, "tv")}:continue-next`;
 
-    // Resolución SÍNCRONA: preferencia del usuario → caché → el backdrop que ya
-    // trae el backend. Nunca dejamos la tarjeta vacía esperando una llamada a
-    // TMDB (eso era lo que la mantenía en blanco un buen rato la primera vez).
+    let canceled = false;
+
+    // Resolución inmediata solo con rutas ya decididas: preferencia del usuario
+    // o caché. El fallback del item se reserva para el último caso, tras intentar
+    // obtener una imagen con idioma desde TMDb.
     const { backdrop: userBackdrop } = getArtworkPreference(show.id);
     const cached = movieBackdropCache.get(cacheKey);
-    const initial =
-      userBackdrop ||
-      (cached != null ? cached : null) ||
-      getPreviewBackdropFallback(movie) ||
-      null;
+    const initial = userBackdrop || (cached != null ? cached : null) || null;
 
-    movieBackdropCache.set(cacheKey, initial);
     setBackdropPath(initial);
     setReady(!!initial);
 
-    return undefined;
+    const resolveBackdrop = async () => {
+      if (userBackdrop) {
+        movieBackdropCache.set(cacheKey, userBackdrop);
+        return;
+      }
+
+      try {
+        const localized =
+          (await fetchBestBackdrop(show.id, "tv", {
+            offset: 1,
+            includeNoLanguage: false,
+          })) ||
+          (await fetchBestBackdrop(show.id, "tv", {
+            includeNoLanguage: false,
+          }));
+
+        const fallback =
+          localized ||
+          cached ||
+          (await fetchBestBackdrop(show.id, "tv", {
+            offset: 1,
+            includeNoLanguage: true,
+          })) ||
+          getPreviewBackdropFallback(movie) ||
+          null;
+
+        if (fallback) {
+          await preloadImage(buildImg(fallback, CONTINUE_WATCHING_BACKDROP_SIZE));
+        }
+
+        if (!canceled) {
+          movieBackdropCache.set(cacheKey, fallback);
+          setBackdropPath(fallback);
+          setReady(!!fallback);
+        }
+      } catch {
+        const fallback = cached || getPreviewBackdropFallback(movie) || null;
+        if (!canceled) {
+          movieBackdropCache.set(cacheKey, fallback);
+          setBackdropPath(fallback);
+          setReady(!!fallback);
+        }
+      }
+    };
+
+    resolveBackdrop();
+
+    return () => {
+      canceled = true;
+    };
   }, [show]);
 
   return { backdropPath, ready };
