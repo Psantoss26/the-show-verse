@@ -528,6 +528,21 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
   );
 }
 
+function getInitialDashboardPreviewBackdrop(movie, backdropOverride) {
+  if (!movie?.id) return null;
+
+  const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
+  if (userBackdrop) return userBackdrop;
+  if (backdropOverride) return backdropOverride;
+
+  const mediaType = getMediaTypeForItem(movie);
+  const cachedBackdrop = movieBackdropCache.get(
+    getBackdropCacheKey(movie, mediaType),
+  );
+
+  return cachedBackdrop || null;
+}
+
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
  * ==================================================================== */
@@ -540,8 +555,19 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     awards: null,
     imdbRating: null,
   });
-  const [backdropPath, setBackdropPath] = useState(null);
-  const [backdropReady, setBackdropReady] = useState(false);
+  const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
+  const [stableBackdropState, setStableBackdropState] = useState(() => ({
+    mediaIdentity,
+    value: backdropOverride,
+  }));
+  const stableBackdropOverride =
+    stableBackdropState.mediaIdentity === mediaIdentity
+      ? stableBackdropState.value
+      : backdropOverride;
+  const [backdropPath, setBackdropPath] = useState(() =>
+    getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
+  );
+  const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -553,6 +579,14 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+
+  useEffect(() => {
+    setStableBackdropState((prev) =>
+      prev.mediaIdentity === mediaIdentity
+        ? prev
+        : { mediaIdentity, value: backdropOverride },
+    );
+  }, [mediaIdentity, backdropOverride]);
 
   useEffect(() => {
     setShowTrailer(false);
@@ -605,9 +639,9 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       if (userBackdrop) {
         movieBackdropCache.set(backdropCacheKey, userBackdrop);
         revealBackdrop(userBackdrop);
-      } else if (backdropOverride) {
-        movieBackdropCache.set(backdropCacheKey, backdropOverride);
-        revealBackdrop(backdropOverride);
+      } else if (stableBackdropOverride) {
+        movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
+        revealBackdrop(stableBackdropOverride);
       } else {
         const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
@@ -697,7 +731,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     return () => {
       abort = true;
     };
-  }, [movie, backdropOverride]);
+  }, [movie, stableBackdropOverride]);
 
   const mediaType =
     movie.media_type === "tv" ||
@@ -904,7 +938,7 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             onError={() => {
               const fallback = getPreviewBackdropFallback(movie);
               if (fallback && fallback !== backdropPath) {
-                movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
                 setBackdropPath(fallback);
                 setBackdropReady(true);
                 return;
@@ -1093,8 +1127,19 @@ function InlinePreviewCardAnticipated({
     runtime: null,
     country: null,
   });
-  const [backdropPath, setBackdropPath] = useState(null);
-  const [backdropReady, setBackdropReady] = useState(false);
+  const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
+  const [stableBackdropState, setStableBackdropState] = useState(() => ({
+    mediaIdentity,
+    value: backdropOverride,
+  }));
+  const stableBackdropOverride =
+    stableBackdropState.mediaIdentity === mediaIdentity
+      ? stableBackdropState.value
+      : backdropOverride;
+  const [backdropPath, setBackdropPath] = useState(() =>
+    getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
+  );
+  const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -1106,6 +1151,14 @@ function InlinePreviewCardAnticipated({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+
+  useEffect(() => {
+    setStableBackdropState((prev) =>
+      prev.mediaIdentity === mediaIdentity
+        ? prev
+        : { mediaIdentity, value: backdropOverride },
+    );
+  }, [mediaIdentity, backdropOverride]);
 
   useEffect(() => {
     setShowTrailer(false);
@@ -1163,9 +1216,9 @@ function InlinePreviewCardAnticipated({
       if (userBackdrop) {
         movieBackdropCache.set(backdropCacheKey, userBackdrop);
         revealBackdrop(userBackdrop);
-      } else if (backdropOverride) {
-        movieBackdropCache.set(backdropCacheKey, backdropOverride);
-        revealBackdrop(backdropOverride);
+      } else if (stableBackdropOverride) {
+        movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
+        revealBackdrop(stableBackdropOverride);
       } else {
         const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
@@ -1236,7 +1289,7 @@ function InlinePreviewCardAnticipated({
     return () => {
       abort = true;
     };
-  }, [movie, backdropOverride]);
+  }, [movie, stableBackdropOverride]);
 
   const mediaType =
     movie.media_type === "tv" ||
@@ -1466,7 +1519,7 @@ function InlinePreviewCardAnticipated({
               onError={() => {
                 const fallback = getPreviewBackdropFallback(movie);
                 if (fallback && fallback !== backdropPath) {
-                  movieBackdropCache.set(getBackdropCacheKey(movie), fallback);
+                  movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
                   setBackdropPath(fallback);
                   setBackdropReady(true);
                   return;
@@ -1894,23 +1947,23 @@ function Row({
       );
     }
 
-    if (previewKind === "anticipated") {
-      // Iniciar precarga de imagen de fondo de inmediato
-      preparePreviewBackdrop(m, backdropOverride);
+    const hoverToken = hoverIntentRef.current + 1;
+    hoverIntentRef.current = hoverToken;
+    setHoveredIndex(index);
 
-      hoverTimeoutRef.current = setTimeout(() => {
-        setHoveredId(itemKey);
-        setHoveredIndex(index);
-      }, 250);
-    } else {
-      const hoverToken = hoverIntentRef.current + 1;
-      hoverIntentRef.current = hoverToken;
-      setHoveredIndex(index);
+    const revealWhenReady = () => {
       preparePreviewBackdrop(m, backdropOverride).finally(() => {
         if (hoverIntentRef.current === hoverToken) {
           setHoveredId(itemKey);
+          setHoveredIndex(index);
         }
       });
+    };
+
+    if (previewKind === "anticipated") {
+      hoverTimeoutRef.current = setTimeout(revealWhenReady, 120);
+    } else {
+      revealWhenReady();
     }
   };
 
@@ -1920,6 +1973,7 @@ function Row({
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    hoverIntentRef.current += 1;
     setHoveredId((prev) => {
       if (prev === itemKey) {
         if (previewKind === "anticipated") {
@@ -2104,6 +2158,7 @@ function Row({
             clearTimeout(hoverTimeoutRef.current);
             hoverTimeoutRef.current = null;
           }
+          hoverIntentRef.current += 1;
           setIsHoveredRow(false);
           setHoveredId((prev) => {
             if (prev) {
