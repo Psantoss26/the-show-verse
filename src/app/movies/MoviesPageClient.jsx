@@ -1273,7 +1273,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const isInView = useInView(rowRef, { once: true, margin: "-100px" });
+  // Montamos la fila un poco antes de que entre en pantalla, no todas a la vez.
+  const isInView = useInView(rowRef, { once: true, margin: "600px" });
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   useEffect(() => {
@@ -1302,6 +1303,30 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
   if (!hasItems) return null;
+
+  // Montaje perezoso: hasta acercarse al viewport NO montamos el Swiper (caro:
+  // ~28 slides + imágenes). Reservamos altura y mostramos el título → carga
+  // inicial ligera y scroll vertical inmediato.
+  if (!isInView) {
+    return (
+      <div ref={rowRef} className="relative">
+        <div className="mb-4 px-1 sm:px-0">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+            {title}
+            <span className="text-emerald-500">.</span>
+          </h3>
+        </div>
+        <div
+          aria-hidden="true"
+          className={
+            isMobile
+              ? "min-h-[200px]"
+              : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
+          }
+        />
+      </div>
+    );
+  }
 
   // ✅ TOP 10 SOLO MÓVIL (<768): backdrop completo + 1 por vista
   if (isTop10 && isMobile) {
