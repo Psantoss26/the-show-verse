@@ -1710,6 +1710,7 @@ export default function MoviesPageClient({
   // genéricas que repetían títulos.
   const { rows: engineRows } = useEngineRows("movies", {
     initialRows: initialEngineRows,
+    deferInitialRowsUntilHydrated: true,
   });
   const rowConfigs = useMemo(
     () =>

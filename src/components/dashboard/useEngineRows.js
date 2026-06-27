@@ -171,24 +171,33 @@ async function fetchEngineRows(surface, key) {
 // Obtiene las filas de la engine para una superficie ('home'|'movies'|'series').
 // Hace fetch en cliente al proxy /api/dashboard/:surface (que reenvía la auth
 // para personalizar, o sirve genérico si el usuario es anónimo).
-export function useEngineRows(surface, { initialRows = [] } = {}) {
+export function useEngineRows(
+  surface,
+  { initialRows = [], deferInitialRowsUntilHydrated = false } = {},
+) {
   const { account, hydrated } = useAuth();
   const scope = hydrated ? (account?.id ? `user:${account.id}` : "anon") : null;
   const initialMappedRows = useMemo(
     () => mapRows({ rows: initialRows }),
     [initialRows],
   );
-  const [rows, setRows] = useState(initialMappedRows);
-  const [loading, setLoading] = useState(initialMappedRows.length === 0);
+  const shouldHoldInitialRows = deferInitialRowsUntilHydrated && !scope;
+  const [rows, setRows] = useState(() =>
+    shouldHoldInitialRows ? [] : initialMappedRows,
+  );
+  const [loading, setLoading] = useState(
+    shouldHoldInitialRows || initialMappedRows.length === 0,
+  );
   const [personalized, setPersonalized] = useState(false);
 
   useEffect(() => {
+    if (deferInitialRowsUntilHydrated && scope !== "anon") return;
     if (initialMappedRows.length === 0) return;
     setRows((current) =>
       current.length ? stabilizeRows(current, initialMappedRows) : initialMappedRows,
     );
     setLoading(false);
-  }, [initialMappedRows]);
+  }, [deferInitialRowsUntilHydrated, initialMappedRows, scope]);
 
   useEffect(() => {
     if (!surface || !scope) return;
@@ -201,8 +210,13 @@ export function useEngineRows(surface, { initialRows = [] } = {}) {
       setPersonalized(!!cached.personalized);
       setLoading(false);
     } else if (initialMappedRows.length) {
-      setRowsStable(setRows, initialMappedRows);
-      setLoading(false);
+      if (deferInitialRowsUntilHydrated && scope !== "anon") {
+        setRows([]);
+        setLoading(true);
+      } else {
+        setRowsStable(setRows, initialMappedRows);
+        setLoading(false);
+      }
     } else {
       setLoading(true);
     }
@@ -237,7 +251,7 @@ export function useEngineRows(surface, { initialRows = [] } = {}) {
     return () => {
       cancel = true;
     };
-  }, [surface, scope, initialMappedRows]);
+  }, [deferInitialRowsUntilHydrated, surface, scope, initialMappedRows]);
 
   return { rows, loading, personalized };
 }
