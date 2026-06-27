@@ -1932,9 +1932,11 @@ function Row({
     setHoveredIndex(null);
     setHoveredAlignment("center");
   };
+  // Montamos la fila un poco ANTES de que entre en pantalla (margen positivo) para
+  // que el Swiper esté listo sin huecos al hacer scroll, pero NO todas a la vez.
   const isInView = eager
     ? true
-    : useInView(rowRef, { once: true, margin: "-100px" });
+    : useInView(rowRef, { once: true, margin: "600px" });
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   // Precargar backdrops cuando el usuario está sobre la fila
@@ -1976,6 +1978,41 @@ function Row({
         aria-hidden="true"
         className="relative pointer-events-none select-none min-h-[285px] sm:min-h-[315px] md:min-h-[360px] xl:min-h-[405px]"
       />
+    );
+  }
+
+  // Montaje perezoso: hasta que la fila se acerca al viewport NO montamos el
+  // Swiper (caro: ~28 slides + imágenes). Reservamos su altura y mostramos el
+  // título, de modo que la carga inicial sea ligera y el scroll vertical responda
+  // de inmediato. El Swiper se monta al acercarse (margin del useInView).
+  if (!isInView) {
+    return (
+      <div ref={rowRef} className="relative">
+        {!hideTitle && (
+          <div className="mb-5 px-1 sm:px-0">
+            {labelText && (
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="h-px w-8 bg-amber-500" />
+                <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
+                  {labelText}
+                </span>
+              </div>
+            )}
+            <ExpandableSectionTitle
+              title={title}
+              href={sectionHref || EXPANDABLE_SECTION_HREFS[title]}
+            />
+          </div>
+        )}
+        <div
+          aria-hidden="true"
+          className={
+            isMobile
+              ? "min-h-[200px]"
+              : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
+          }
+        />
+      </div>
     );
   }
 
