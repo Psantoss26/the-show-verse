@@ -26,7 +26,6 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import {
   buildImg,
-  fetchBestBackdrop,
   getArtworkPreference,
   movieBackdropCache,
   getBackdropCacheKey,
@@ -331,56 +330,36 @@ function useShowBackdrop(show) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let abort = false;
-    if (!show?.id) return;
+    if (!show?.id) {
+      setBackdropPath(null);
+      setReady(false);
+      return undefined;
+    }
 
-    const reveal = (path) => {
-      if (abort) return;
-      setBackdropPath(path);
-      setReady(!!path);
+    const movie = {
+      id: show.id,
+      media_type: "tv",
+      backdrop_path: show.backdrop_path,
+      poster_path: show.poster_path,
     };
+    const cacheKey = `${getBackdropCacheKey(movie, "tv")}:continue-next`;
 
-    const load = async () => {
-      const movie = {
-        id: show.id,
-        media_type: "tv",
-        backdrop_path: show.backdrop_path,
-        poster_path: show.poster_path,
-      };
-      const cacheKey = `${getBackdropCacheKey(movie, "tv")}:continue-next`;
+    // Resolución SÍNCRONA: preferencia del usuario → caché → el backdrop que ya
+    // trae el backend. Nunca dejamos la tarjeta vacía esperando una llamada a
+    // TMDB (eso era lo que la mantenía en blanco un buen rato la primera vez).
+    const { backdrop: userBackdrop } = getArtworkPreference(show.id);
+    const cached = movieBackdropCache.get(cacheKey);
+    const initial =
+      userBackdrop ||
+      (cached != null ? cached : null) ||
+      getPreviewBackdropFallback(movie) ||
+      null;
 
-      const { backdrop: userBackdrop } = getArtworkPreference(show.id);
-      if (userBackdrop) {
-        movieBackdropCache.set(cacheKey, userBackdrop);
-        reveal(userBackdrop);
-        return;
-      }
+    movieBackdropCache.set(cacheKey, initial);
+    setBackdropPath(initial);
+    setReady(!!initial);
 
-      const cached = movieBackdropCache.get(cacheKey);
-      if (cached !== undefined) {
-        reveal(cached);
-        return;
-      }
-
-      try {
-        const preferred = await fetchBestBackdrop(show.id, "tv", {
-          offset: 1,
-          includeNoLanguage: false,
-        });
-        const chosen = preferred || getPreviewBackdropFallback(movie);
-        movieBackdropCache.set(cacheKey, chosen);
-        reveal(chosen);
-      } catch {
-        const fallback = getPreviewBackdropFallback(movie);
-        movieBackdropCache.set(cacheKey, fallback);
-        reveal(fallback);
-      }
-    };
-
-    load();
-    return () => {
-      abort = true;
-    };
+    return undefined;
   }, [show]);
 
   return { backdropPath, ready };
@@ -390,16 +369,22 @@ function useShowBackdrop(show) {
  * Tarjeta base (sin hover): backdrop + overlay de progreso
  * ==================================================================== */
 function ContinueWatchingBaseCard({ show }) {
-  const { backdropPath, ready } = useShowBackdrop(show);
+  const { backdropPath } = useShowBackdrop(show);
   const bgSrc = backdropPath
     ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
     : null;
+  // El backdrop ya se conoce al instante (lo trae el backend); el shimmer se
+  // mantiene solo MIENTRAS carga la imagen y luego hace un fundido suave.
+  const [imgReady, setImgReady] = useState(false);
+  useEffect(() => {
+    setImgReady(false);
+  }, [bgSrc]);
   const pct = clampPct(show?.pct);
   const ep = show?.nextEpisode;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-900">
-      {!ready && (
+      {!imgReady && (
         <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
@@ -419,9 +404,10 @@ function ContinueWatchingBaseCard({ show }) {
           sizes="(min-width:1280px) 338px, (min-width:768px) 300px, 224px"
           quality={CONTINUE_WATCHING_IMAGE_QUALITY}
           className={`object-cover transition-opacity duration-200 ${
-            ready ? "opacity-100" : "opacity-0"
+            imgReady ? "opacity-100" : "opacity-0"
           }`}
-          loading="lazy"
+          loading="eager"
+          onLoad={() => setImgReady(true)}
         />
       )}
 
