@@ -1662,6 +1662,7 @@ export default function SeriesPageClient({
   // genéricas que repetían títulos.
   const { rows: engineRows } = useEngineRows("series", {
     initialRows: initialEngineRows,
+    deferInitialRowsUntilHydrated: true,
   });
   const rowConfigs = useMemo(
     () =>
