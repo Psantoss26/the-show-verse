@@ -246,7 +246,13 @@ function getArtworkPreference(movieId) {
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
 function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200, offset = 0 } = opts;
+  const {
+    preferLangs = ["en", "en-US"],
+    minWidth = 1200,
+    offset = 0,
+    includeNoLanguage = true,
+  } = opts;
+
   if (!Array.isArray(list) || list.length === 0) return null;
 
   // normaliza a 'en'
@@ -255,43 +261,45 @@ function pickBestBackdropByLangResVotes(list, opts = {}) {
   const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
   const hasNoLanguage = (img) => !norm(img?.iso_639_1);
 
-  // Mantener orden + minWidth (si no hay, cae al original)
-  const pool0 =
-    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
-  const pool = pool0.length ? pool0 : list;
+  const preferred = list.filter(isPreferredLang);
+  const withLanguage = list.filter(
+    (img) => norm(img?.iso_639_1) && !isPreferredLang(img),
+  );
+  const noLanguage = list.filter(hasNoLanguage);
 
-  // Forzamos idioma: preferido (en) → cualquier otro idioma (es…) → y SOLO como
-  // último recurso sin idioma (textless). Así la vista previa no muestra portadas
-  // sin título cuando existe una con idioma.
-  const top3en = [];
-  const top3OtherLang = [];
-  const top3NoLanguage = [];
-  for (const b of pool) {
-    if (isPreferredLang(b)) top3en.push(b);
-    else if (hasNoLanguage(b)) top3NoLanguage.push(b);
-    else top3OtherLang.push(b);
-  }
-  const withLang = top3en.length ? top3en : top3OtherLang;
-  const candidates = (withLang.length ? withLang : top3NoLanguage).slice(0, 3);
-  if (!candidates.length) return null;
+  const pickFrom = (pool) => {
+    if (!pool.length) return null;
 
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
+    const sizeFiltered =
+      minWidth > 0 ? pool.filter((b) => (b?.width || 0) >= minWidth) : pool;
+    const candidates = (sizeFiltered.length ? sizeFiltered : pool).slice(0, 3);
+    if (!candidates.length) return null;
 
-  const ordered = [];
-  for (const [width, height] of [
-    [1920, 1080],
-    [2560, 1440],
-    [3840, 2160],
-    [1280, 720],
-  ]) {
-    const match = candidates.find((b) => isRes(b, width, height));
-    if (match && !ordered.includes(match)) ordered.push(match);
-  }
-  for (const candidate of candidates) {
-    if (!ordered.includes(candidate)) ordered.push(candidate);
-  }
+    const preferredSizes = [
+      [1920, 1080],
+      [1712, 964],
+      [3840, 2160],
+    ];
+    const ordered = [];
+    for (const [width, height] of preferredSizes) {
+      const match = candidates.find(
+        (b) => (b?.width || 0) === width && (b?.height || 0) === height,
+      );
+      if (match && !ordered.includes(match)) ordered.push(match);
+    }
+    for (const candidate of candidates) {
+      if (!ordered.includes(candidate)) ordered.push(candidate);
+    }
 
-  return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
+    return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
+  };
+
+  // Mismo criterio que MainDashboard: ingles -> cualquier idioma -> sin idioma.
+  return (
+    pickFrom(preferred) ||
+    pickFrom(withLanguage) ||
+    (includeNoLanguage ? pickFrom(noLanguage) : null)
+  );
 }
 
 function pickBestPosterByLangThenResolution(list, opts = {}) {
@@ -330,10 +338,11 @@ async function getMovieImages(movieId) {
   }
 
   try {
+    // No limitamos idiomas aqui: el selector prioriza ingles y solo cae a
+    // backdrops sin idioma como ultimo recurso.
     const url =
       `https://api.themoviedb.org/3/movie/${movieId}/images` +
-      `?api_key=${apiKey}` +
-      `&include_image_language=en,en-US,es,es-ES,null`;
+      `?api_key=${apiKey}`;
 
     const r = await fetch(url, { cache: "force-cache" });
     const j = await r.json();
@@ -1753,7 +1762,11 @@ export default function MoviesPageClient({
       <div className="relative z-10">
         {hasFeaturedHero && (
           <div className="relative isolate" style={{ contain: "layout paint" }}>
-            <FeaturedHero items={featuredItems} isMobile={isMobile} />
+            <FeaturedHero
+              items={featuredItems}
+              isMobile={isMobile}
+              deferInitialBackdrop
+            />
           </div>
         )}
 

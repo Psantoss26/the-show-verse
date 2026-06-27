@@ -1263,7 +1263,11 @@ function FeaturedSlide({
 /* ====================================================================
  * Hero destacado a pantalla completa (carrusel)
  * ==================================================================== */
-export default function FeaturedHero({ items = [], isMobile }) {
+export default function FeaturedHero({
+  items = [],
+  isMobile,
+  deferInitialBackdrop = false,
+}) {
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
   const lastBackdropChoiceRef = useRef(new Map());
@@ -1333,12 +1337,40 @@ export default function FeaturedHero({ items = [], isMobile }) {
         logo = await fetchBestLogo(id, mediaType, ["en", "es", null]);
       } catch { }
 
+      const backdropSignature = backdrops.join("|");
+      if (deferInitialBackdrop && backdropSignature) {
+        const lastIndex = lastBackdropChoiceRef.current.get(id);
+        let nextIndex = 0;
+
+        if (backdrops.length > 1) {
+          nextIndex =
+            typeof lastIndex === "number"
+              ? lastIndex === 0
+                ? 1
+                : 0
+              : Math.floor(Math.random() * backdrops.length);
+        }
+
+        lastBackdropChoiceRef.current.set(id, nextIndex);
+        setSelectedBackdrops((prev) =>
+          prev[id]?.signature === backdropSignature
+            ? prev
+            : {
+                ...prev,
+                [id]: {
+                  path: backdrops[nextIndex],
+                  signature: backdropSignature,
+                },
+              },
+        );
+      }
+
       setAssets((prev) =>
         prev[id] ? prev : { ...prev, [id]: { backdrop, backdrops, poster, logo } },
       );
       resolvingAssetsRef.current.delete(id);
     },
-    [],
+    [deferInitialBackdrop],
   );
 
   // Carga solo los assets del slide activo. No hay precarga de slides futuros:
@@ -1369,19 +1401,24 @@ export default function FeaturedHero({ items = [], isMobile }) {
 
   const activeMovie = list[activeIndex] || list[0] || null;
   const activeAssets = activeMovie ? assets[activeMovie.id] || {} : {};
-  const activeBackdropOptions = useMemo(
-    () =>
-      activeMovie
-        ? uniquePaths([
-            ...(Array.isArray(activeAssets.backdrops)
-              ? activeAssets.backdrops
-              : []),
-            activeAssets.backdrop,
-            getPreviewBackdropFallback(activeMovie),
-          ])
-        : [],
-    [activeAssets.backdrop, activeAssets.backdrops, activeMovie],
-  );
+  const activeBackdropOptions = useMemo(() => {
+    if (!activeMovie) return [];
+
+    const resolvedBackdrops = uniquePaths([
+      ...(Array.isArray(activeAssets.backdrops) ? activeAssets.backdrops : []),
+      activeAssets.backdrop,
+    ]);
+
+    if (resolvedBackdrops.length > 0) return resolvedBackdrops;
+    return deferInitialBackdrop
+      ? []
+      : uniquePaths([getPreviewBackdropFallback(activeMovie)]);
+  }, [
+    activeAssets.backdrop,
+    activeAssets.backdrops,
+    activeMovie,
+    deferInitialBackdrop,
+  ]);
   const activeBackdropSignature = activeBackdropOptions.join("|");
   const selectedBackdrop = activeMovie ? selectedBackdrops[activeMovie.id] : null;
   const activeBackdrop =
@@ -1390,7 +1427,12 @@ export default function FeaturedHero({ items = [], isMobile }) {
       : activeBackdropOptions[0] || null;
 
   useEffect(() => {
-    if (!activeMovie?.id || activeBackdropOptions.length === 0) return;
+    if (
+      deferInitialBackdrop ||
+      !activeMovie?.id ||
+      activeBackdropOptions.length === 0
+    )
+      return;
 
     const lastIndex = lastBackdropChoiceRef.current.get(activeMovie.id);
     let nextIndex = 0;
@@ -1412,7 +1454,13 @@ export default function FeaturedHero({ items = [], isMobile }) {
         signature: activeBackdropSignature,
       },
     }));
-  }, [activeMovie?.id, activeIndex, activeBackdropOptions, activeBackdropSignature]);
+  }, [
+    activeMovie?.id,
+    activeIndex,
+    activeBackdropOptions,
+    activeBackdropSignature,
+    deferInitialBackdrop,
+  ]);
 
   if (!list.length) return null;
 

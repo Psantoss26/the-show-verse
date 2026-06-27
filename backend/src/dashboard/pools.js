@@ -3,7 +3,14 @@ import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
-import { balanceSoftLimitedContent, excludeKidsReality, capAsian, localePriorityWeight, TV_WITHOUT_GENRES } from './filters.js';
+import {
+  balanceSoftLimitedContent,
+  excludeKidsReality,
+  capAsian,
+  hasReliablePublicSignal,
+  localePriorityWeight,
+  TV_WITHOUT_GENRES,
+} from './filters.js';
 
 // ─── TTLs (ms) ────────────────────────────────────────────────────────────────
 const TTL_12H  = 12 * 60 * 60 * 1000;
@@ -26,12 +33,10 @@ export function dedupeCards(cards) {
 }
 
 // ─── Filtros de calidad ───────────────────────────────────────────────────────
-// Piso de votos por tipo para las listas amplias (trending/popular/top_rated/
-// region_top): descartamos solo lo MUY desconocido (poco representativo) sin
-// matar estrenos populares recientes (que aún acumulan votos). Las filas
-// "curadas" (géneros, décadas, aclamadas, taquillazos…) usan umbrales más
-// altos definidos abajo. TV acumula menos votos que cine.
-const MIN_VOTES = { movie: 80, tv: 40 };
+// Piso de votos por tipo para listas amplias. Después se aplica también
+// hasReliablePublicSignal(), que combina votos + nota y endurece animación,
+// documental y anime para evitar títulos con muestras demasiado pequeñas.
+const MIN_VOTES = { movie: 500, tv: 180 };
 
 // Umbrales de vote_count por tipo para cada categoría discover.
 const GENRE_VOTES = { movie: 500, tv: 150 };
@@ -47,9 +52,9 @@ const GEM_VOTES = {
 // - Tendencias: piso modesto (refleja lo que sube ahora sin colar basura).
 // - Populares: piso alto (solo títulos populares realmente reconocibles).
 // - Top en España: piso moderado (contenido reciente tiene menos votos).
-const TRENDING_VOTES = { movie: 150, tv: 60 };
+const TRENDING_VOTES = { movie: 500, tv: 180 };
 const POPULAR_VOTES = { movie: 500, tv: 200 };
-const REGION_VOTES = { movie: 150, tv: 60 };
+const REGION_VOTES = { movie: 500, tv: 180 };
 const CURATED_VOTES = {
   drama: { movie: 700, tv: 180 },
   actionAdventure: { movie: 900, tv: 220 },
@@ -69,9 +74,15 @@ function dateOffset(days) {
 function refine(cards, mediaType, floor) {
   const min = floor ?? MIN_VOTES[mediaType] ?? 0;
   const cleaned = excludeKidsReality(dedupeCards(cards)).filter(
-    (c) => (c?.voteCount || 0) >= min,
+    (c) => (c?.voteCount || 0) >= min && hasReliablePublicSignal(c),
   );
   return balanceSoftLimitedContent(capAsian(cleaned));
+}
+
+function shouldRefineCachedPool(poolKey) {
+  // Estrenos incluye próximos lanzamientos sin votos: no se debe filtrar por
+  // señal pública hasta que estén estrenados.
+  return poolKey !== 'new_releases';
 }
 
 // Parámetros de discover por tipo: en TV excluimos géneros no deseados
@@ -374,7 +385,7 @@ export async function getPool(poolKey, mediaType) {
 
   // Return cached if still fresh
   if (row && row.expiresAt > new Date()) {
-    return row.items;
+    return shouldRefineCachedPool(poolKey) ? refine(row.items, mediaType) : row.items;
   }
 
   // ¿Ya hay una reconstrucción en curso para este pool? Reutilízala.

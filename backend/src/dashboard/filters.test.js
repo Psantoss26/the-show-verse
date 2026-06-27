@@ -1,7 +1,13 @@
 // backend/src/dashboard/filters.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { excludeKidsReality, capAsian, isExcludedGenre, localePriorityWeight } from './filters.js';
+import {
+  excludeKidsReality,
+  capAsian,
+  hasReliablePublicSignal,
+  isExcludedGenre,
+  localePriorityWeight,
+} from './filters.js';
 
 test('isExcludedGenre flags kids/reality/talk/news, allows general genres', () => {
   assert.equal(isExcludedGenre({ genreIds: [10762] }), true); // Kids
@@ -51,4 +57,77 @@ test('localePriorityWeight boosts English/Spanish and US/Spain content', () => {
   assert.ok(localePriorityWeight(english) > localePriorityWeight(neutral));
   assert.ok(localePriorityWeight(us) > localePriorityWeight(english));
   assert.ok(localePriorityWeight(spanishSpain) > localePriorityWeight(us));
+});
+
+test('hasReliablePublicSignal rejects low-sample and weak public ratings', () => {
+  assert.equal(
+    hasReliablePublicSignal({
+      tmdbId: 1,
+      mediaType: 'movie',
+      voteAverage: 7.5,
+      voteCount: 163,
+      genreIds: [16],
+    }),
+    false,
+  );
+
+  assert.equal(
+    hasReliablePublicSignal({
+      tmdbId: 2,
+      mediaType: 'movie',
+      voteAverage: 8.4,
+      voteCount: 300,
+      genreIds: [18],
+    }),
+    false,
+  );
+
+  assert.equal(
+    hasReliablePublicSignal({
+      tmdbId: 3,
+      mediaType: 'movie',
+      voteAverage: 7.1,
+      voteCount: 1300,
+      genreIds: [18],
+    }),
+    true,
+  );
+});
+
+test('hasReliablePublicSignal contrasts IMDb fields when present', () => {
+  assert.equal(
+    hasReliablePublicSignal({
+      tmdbId: 10,
+      mediaType: 'movie',
+      voteAverage: 7.4,
+      voteCount: 1800,
+      imdbRating: 5.7,
+      imdbVotes: 5000,
+      genreIds: [18],
+    }),
+    false,
+  );
+
+  assert.equal(
+    hasReliablePublicSignal({
+      tmdbId: 11,
+      mediaType: 'movie',
+      voteAverage: 7.4,
+      voteCount: 1800,
+      imdbRating: 6.4,
+      imdbVotes: 500,
+      genreIds: [18],
+    }),
+    false,
+  );
+});
+
+test('hasReliablePublicSignal can allow unreleased titles without votes explicitly', () => {
+  assert.equal(
+    hasReliablePublicSignal(
+      { tmdbId: 20, mediaType: 'movie', voteAverage: 0, voteCount: 0, genreIds: [18] },
+      { allowUnrated: true },
+    ),
+    true,
+  );
 });

@@ -106,6 +106,47 @@ function writeCache(key, value) {
   }
 }
 
+function itemIdentity(item) {
+  if (!item?.id) return "";
+  return `${item.media_type || ""}:${item.id}`;
+}
+
+function rowIdentity(row) {
+  const ids = (Array.isArray(row?.items) ? row.items : [])
+    .map(itemIdentity)
+    .join(",");
+  return `${row?.key || ""}:${row?.title || ""}:${ids}`;
+}
+
+function rowsIdentity(rows) {
+  return (Array.isArray(rows) ? rows : []).map(rowIdentity).join("|");
+}
+
+function stabilizeRows(currentRows, nextRows) {
+  const current = Array.isArray(currentRows) ? currentRows : [];
+  const next = Array.isArray(nextRows) ? nextRows : [];
+
+  if (rowsIdentity(current) === rowsIdentity(next)) return current;
+
+  const currentByIdentity = new Map(
+    current.map((row) => [rowIdentity(row), row]),
+  );
+  let changed = current.length !== next.length;
+
+  const stableRows = next.map((row, index) => {
+    const stable = currentByIdentity.get(rowIdentity(row));
+    if (stable) return stable;
+    if (current[index] !== row) changed = true;
+    return row;
+  });
+
+  return changed ? stableRows : current;
+}
+
+function setRowsStable(setRows, nextRows) {
+  setRows((current) => stabilizeRows(current, nextRows));
+}
+
 async function fetchEngineRows(surface, key) {
   if (inFlight.has(key)) return inFlight.get(key);
 
@@ -143,7 +184,9 @@ export function useEngineRows(surface, { initialRows = [] } = {}) {
 
   useEffect(() => {
     if (initialMappedRows.length === 0) return;
-    setRows((current) => (current.length ? current : initialMappedRows));
+    setRows((current) =>
+      current.length ? stabilizeRows(current, initialMappedRows) : initialMappedRows,
+    );
     setLoading(false);
   }, [initialMappedRows]);
 
@@ -154,21 +197,32 @@ export function useEngineRows(surface, { initialRows = [] } = {}) {
     const cached = readMemoryCache(key) || readSessionCache(key);
 
     if (cached?.rows?.length) {
-      setRows(cached.rows);
+      setRowsStable(setRows, cached.rows);
       setPersonalized(!!cached.personalized);
       setLoading(false);
     } else if (initialMappedRows.length) {
-      setRows(initialMappedRows);
+      setRowsStable(setRows, initialMappedRows);
       setLoading(false);
     } else {
       setLoading(true);
+    }
+
+    if (scope === "anon" && initialMappedRows.length && !cached?.rows?.length) {
+      writeCache(key, {
+        rows: initialMappedRows,
+        personalized: false,
+      });
+      setPersonalized(false);
+      return () => {
+        cancel = true;
+      };
     }
 
     fetchEngineRows(surface, key)
       .then((payload) => {
         if (cancel) return;
         writeCache(key, payload);
-        setRows(payload.rows);
+        setRowsStable(setRows, payload.rows);
         setPersonalized(payload.personalized);
       })
       .catch(() => {
