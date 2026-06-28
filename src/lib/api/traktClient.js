@@ -232,7 +232,7 @@ export async function traktGetItemStatus({
   }
 }
 
-export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
+export async function traktSetWatched({ type, tmdbId, watched, watchedAt, title, posterPath }) {
   const watchedAtYmd = normalizeWatchedAtForApi(watchedAt);
 
   const payload = { type, tmdbId, watched };
@@ -250,9 +250,12 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt watched HTTP ${res.status}`);
-  // Marcar visto cambia En progreso/Completadas e Historial: invalidamos sus
-  // cachés para que esas páginas muestren las novedades junto al resto.
+  // En progreso/Completadas cambia al marcar visto: invalidamos esas cachés.
   clearWatchDerivedCaches();
+  // Historial: al MARCAR visto (no al quitar) añadimos la entrada de forma
+  // OPTIMISTA para que el título aparezca al instante en /history junto al resto
+  // (es el botón "visto" de la ficha, la vía principal de añadir al historial).
+  if (watched) cacheAddHistory({ type, tmdbId, watchedAt, title, posterPath });
   return json;
 }
 
