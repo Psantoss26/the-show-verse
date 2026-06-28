@@ -12,6 +12,8 @@ import {
   useInView,
   useReducedMotion,
 } from "framer-motion";
+import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1208,71 +1210,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   }, [items]);
   const hasItems = safeItems.length > 0;
 
-  // ✅ Detectar si es una fila de género específico
-  const isGenreRow =
-    ![
-      "Populares",
-      "Películas que todo el mundo está viendo",
-      "Taquillazos imprescindibles",
-      "Grandes éxitos de siempre",
-      "Superéxito",
-      "Historias de venganza",
-      "Top 10 hoy en España",
-      "Tendencias ahora mismo",
-      "Premiadas y aclamadas",
-      "Las más valoradas",
-      "Estrenos",
-      "Películas que quizá se te escaparon",
-      "Una dosis de nostalgia",
-      "Lo mejor de 2020",
-      "Clásicos de los 90",
-      "Favoritas de los 2000",
-      "Hits de 2010",
-      "Recientes de 2020",
-    ].includes(title) &&
-    !title.includes("década") &&
-    !title.includes("Clásicos") &&
-    !title.includes("Favoritas") &&
-    !title.includes("Hits") &&
-    !title.includes("Recientes");
-
-  // ✅ Determinar etiqueta específica según el título
-  let labelText = null;
-  if (title === "Top 10 hoy en España") {
-    labelText = "TOP 10";
-  } else if (title === "Películas que todo el mundo está viendo") {
-    labelText = "POPULARES";
-  } else if (title === "Taquillazos imprescindibles") {
-    labelText = "IMPRESCINDIBLES";
-  } else if (title === "Grandes éxitos de siempre") {
-    labelText = "IMPRESCINDIBLES";
-  } else if (title === "Historias de venganza") {
-    labelText = "SUPERHEROES";
-  } else if (title === "Tendencias ahora mismo") {
-    labelText = "TENDENCIAS";
-  } else if (title === "Premiadas y aclamadas") {
-    labelText = "ACLAMADAS";
-  } else if (title === "Una dosis de nostalgia") {
-    labelText = "NOSTALGIA";
-  } else if (title === "Lo mejor de 2020") {
-    labelText = "AÑOS 2020";
-  } else if (title === "Clásicos de los 90") {
-    labelText = "AÑOS 90";
-  } else if (title === "Favoritas de los 2000") {
-    labelText = "AÑOS 2000";
-  } else if (title === "Hits de 2010") {
-    labelText = "AÑOS 2010";
-  } else if (title === "Recientes de 2020") {
-    labelText = "AÑOS 2020";
-  } else if (title === "Lo mejor de esta década") {
-    labelText = "AÑOS 2020";
-  } else if (title && title.toLowerCase().includes("2010")) {
-    labelText = "AÑOS 2010";
-  } else if (title && title.toLowerCase().includes("2020")) {
-    labelText = "AÑOS 2020";
-  } else if (isGenreRow) {
-    labelText = "GÉNERO";
-  }
+  // ✅ Etiqueta superior representativa (centralizada): todas las filas la tienen.
+  const labelText = deriveSectionLabel(title);
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -1284,6 +1223,10 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Montamos la fila un poco antes de que entre en pantalla, no todas a la vez.
   const isInView = useInView(rowRef, { once: true, margin: "600px" });
+  // Revelado: la fila se monta antes (isInView, Swiper listo) pero permanece
+  // oculta y solo se anima al hacer scroll y entrar en la ventana. (Hook: debe
+  // llamarse ANTES del return condicional del placeholder.)
+  const revealProps = useScrollRevealProps();
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   useEffect(() => {
@@ -1318,7 +1261,15 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   // inicial ligera y scroll vertical inmediato.
   if (!isInView) {
     return (
-      <div ref={rowRef} className="relative">
+      // Placeholder: reserva la altura, pero OCULTO (mismas revealProps que la
+      // fila montada). Si no, el título de la primera fila —que va justo tras el
+      // hero— se vería al cargar/recargar antes de que la fila se monte.
+      <motion.div
+        ref={rowRef}
+        {...revealProps}
+        variants={fadeInUp}
+        className="relative"
+      >
         <div className="mb-4 px-1 sm:px-0">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
@@ -1333,7 +1284,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
               : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
           }
         />
-      </div>
+      </motion.div>
     );
   }
 
@@ -1413,8 +1364,6 @@ function Row({ title, items, isMobile, posterCacheRef }) {
 
   const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
-  const motionInitial = reduceMotion ? false : "hidden";
-  const motionAnimate = reduceMotion || isInView ? "visible" : "hidden";
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: isTop10 ? 16 : 12 },
@@ -1427,14 +1376,12 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   return (
     <motion.div
       ref={rowRef}
-      initial={motionInitial}
-      animate={motionAnimate}
+      {...revealProps}
       variants={fadeInUp}
       className="relative group sv-deferred-row"
     >
       <motion.div
-        initial={motionInitial}
-        animate={motionAnimate}
+        {...revealProps}
         variants={scaleIn}
         className="mb-4 px-1 sm:px-0"
       >

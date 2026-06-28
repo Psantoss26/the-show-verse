@@ -33,6 +33,7 @@ import {
   getPreviewBackdropFallback,
   preloadImage,
 } from "@/lib/dashboard/media";
+import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
@@ -1244,6 +1245,9 @@ function ContinueWatchingSkeleton({ isMobile }) {
 function ContinueWatchingSection({ isMobile, hydrated }) {
   const { authenticated, hydrated: authReady } = useAuth();
   const router = useRouter();
+  // Igual que las demás filas: oculta al cargar, se revela con animación al
+  // hacer scroll y entrar en la ventana.
+  const revealProps = useScrollRevealProps();
 
   // null = cargando, [] = vacío confirmado (sin sesión / sin series en curso)
   const [shows, setShows] = useState(null);
@@ -1489,8 +1493,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     return (
       <motion.div
         ref={rowRef}
-        initial="hidden"
-        animate="visible"
+        {...revealProps}
         variants={fadeInUp}
         className="relative"
       >
@@ -1519,8 +1522,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   return (
     <motion.div
       ref={rowRef}
-      initial="hidden"
-      animate="visible"
+      {...revealProps}
       variants={fadeInUp}
       className="relative group"
     >
