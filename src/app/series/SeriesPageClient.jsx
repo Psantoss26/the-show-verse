@@ -648,7 +648,7 @@ function Top10MobileBackdropCardTV({
     : null;
 
   return (
-    <Link href={href} prefetch className="block w-full h-full">
+    <Link href={href} prefetch={false} className="block w-full h-full">
       <div
         className={`group/top10 relative w-full overflow-hidden bg-neutral-900 ${frameClassName}`}
       >
@@ -863,10 +863,10 @@ function InlinePreviewCard({ show, heightClass }) {
   const href = `/details/tv/${show.id}`;
 
   const prefetchHref = () => {
+    // Prefetch de RUTA (RSC) bajo intención real (hover / focus / touch). Se
+    // elimina el fetch(href) de la página completa para no duplicar peticiones
+    // y transferencia en Vercel; router.prefetch basta para navegación rápida.
     router.prefetch(href);
-    if (typeof window !== "undefined") {
-      fetch(href, { priority: "low" }).catch(() => {});
-    }
   };
 
   const navigateToDetails = () => {
@@ -1552,7 +1552,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
                       ) : (
                         <Link
                           href={`/details/tv/${s.id}`}
-                          prefetch
+                          prefetch={false}
                           className="block w-full h-full"
                         >
                           <PosterImage show={s} cache={posterCacheRef} />

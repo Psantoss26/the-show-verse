@@ -475,7 +475,7 @@ function SectionCard({
       >
         <Link
           href={href}
-          prefetch
+          prefetch={false}
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-amber-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -533,7 +533,7 @@ function SectionCard({
       >
         <Link
           href={href}
-          prefetch
+          prefetch={false}
           className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
         >
           <motion.div
@@ -618,7 +618,7 @@ function SectionCard({
     >
       <Link
         href={href}
-        prefetch
+        prefetch={false}
         className="block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
       >
         <div

@@ -145,5 +145,15 @@ export async function middleware(req) {
 }
 
 export const config = {
-    matcher: ['/((?!_next/static).*)']
+    // El middleware solo necesita ejecutarse para:
+    //  - rutas de página (gate de acceso privado + reescritura para bots en /details/*)
+    //  - rutas /api/* (gate de acceso privado)
+    // NO debe ejecutarse para recursos internos de Next ni assets estáticos:
+    // cada ejecución cuenta como invocación/Edge Request en Vercel y antes se
+    // disparaba en /_next/image, /_next/data, fuentes, favicon, sitemap y todo
+    // fichero con extensión. Los excluimos del matcher para no malgastar
+    // recursos (su lógica interna ya los trataba como públicos de todos modos).
+    matcher: [
+        '/((?!_next/static|_next/image|_next/data|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|map|json|txt|woff2?|webmanifest)$).*)',
+    ],
 }
