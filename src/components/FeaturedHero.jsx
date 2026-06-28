@@ -1299,6 +1299,7 @@ export default function FeaturedHero({
   const [selectedBackdrops, setSelectedBackdrops] = useState({});
   const [isInteracting, setIsInteracting] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const [scrollCueVisible, setScrollCueVisible] = useState(true);
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
@@ -1312,6 +1313,27 @@ export default function FeaturedHero({
   useEffect(() => {
     if (activeIndex >= list.length) setActiveIndex(0);
   }, [activeIndex, list.length]);
+
+  useEffect(() => {
+    const heroHost = heroSectionRef.current?.parentElement;
+    const dashboardContent = heroHost?.nextElementSibling;
+    if (!dashboardContent || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setScrollCueVisible(!entry.isIntersecting);
+      },
+      {
+        // Oculta la ayuda cuando la siguiente sección alcanza el 75% superior
+        // de la pantalla, evitando que desaparezca por un pequeño vistazo inicial.
+        rootMargin: "0px 0px -25% 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(dashboardContent);
+    return () => observer.disconnect();
+  }, []);
 
   const resolveAssetsFor = useCallback(
     async (movie) => {
@@ -1593,15 +1615,23 @@ export default function FeaturedHero({
     <button
       type="button"
       aria-label="Ver más contenido"
+      aria-hidden={!scrollCueVisible}
       title="Ver más contenido"
+      tabIndex={scrollCueVisible ? 0 : -1}
       onClick={scrollToDashboardContent}
-      className="group flex h-10 w-10 items-center justify-center text-white/65 transition-colors duration-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+      className={`group flex h-10 w-10 items-center justify-center text-white/65 transition-[color,opacity,visibility] duration-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+        scrollCueVisible
+          ? "visible opacity-100"
+          : "pointer-events-none invisible opacity-0"
+      }`}
     >
-      <span className="hero-scroll-cue inline-flex drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-        <ChevronDown
-          aria-hidden="true"
-          className="h-6 w-6 transition-transform duration-300 group-hover:translate-y-0.5"
-        />
+      <span className="inline-flex translate-y-[6px]">
+        <span className="hero-scroll-cue inline-flex drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+          <ChevronDown
+            aria-hidden="true"
+            className="h-7 w-7 transition-transform duration-300 group-hover:translate-y-0.5"
+          />
+        </span>
       </span>
     </button>
   );
@@ -1660,7 +1690,7 @@ export default function FeaturedHero({
         )}
 
         {!isMobile && (
-          <div className="absolute bottom-1 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
+          <div className="absolute bottom-0 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3">
             {indicators && indicators}
             {scrollCue}
           </div>
@@ -1691,11 +1721,11 @@ export default function FeaturedHero({
           0%,
           100% {
             opacity: 0.52;
-            transform: translate3d(0, -3px, 0);
+            transform: translate3d(0, -4px, 0);
           }
           50% {
             opacity: 1;
-            transform: translate3d(0, 4px, 0);
+            transform: translate3d(0, 0, 0);
           }
         }
 
