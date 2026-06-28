@@ -171,6 +171,40 @@ function mergeBackendProgressCandidates(...lists) {
   return Array.from(byTmdbId.values());
 }
 
+function normalizeBackendFastInProgressItem(item) {
+  const tmdbId = getItemTmdbId(item);
+  const completed = positiveNumber(item?.completed);
+  const aired = positiveNumber(item?.aired || item?.total_episodes || item?.totalEpisodes);
+  return {
+    ...item,
+    tmdbId: item?.tmdbId || tmdbId || null,
+    aired,
+    completed,
+    pct: calculateProgressPct(completed, aired, item?.pct),
+    nextEpisode:
+      normalizeEpisodeRef(item?.nextEpisode) ||
+      normalizeEpisodeRef(item?.next_episode) ||
+      null,
+    lastEpisode:
+      normalizeEpisodeRef(item?.lastEpisode) ||
+      normalizeEpisodeRef(item?.last_episode) ||
+      null,
+    hasKnownAired: Boolean(item?.hasKnownAired ?? aired > 0),
+    title_es: item?.title_es || item?.title || item?.name || null,
+    poster_path: item?.poster_path || item?.posterPath || null,
+    backdrop_path: item?.backdrop_path || item?.backdropPath || null,
+    first_air_date: item?.first_air_date || item?.firstAirDate || null,
+    vote_average: item?.vote_average ?? item?.voteAverage ?? null,
+    overview: item?.overview || null,
+    number_of_seasons: item?.number_of_seasons || item?.numberOfSeasons || null,
+    total_episodes: aired || item?.total_episodes || item?.totalEpisodes || null,
+    genres: Array.isArray(item?.genres) ? item.genres : [],
+    tmdb_status: item?.tmdb_status || item?.status || null,
+    networks: Array.isArray(item?.networks) ? item.networks : [],
+    detailsHref: item?.detailsHref || (tmdbId ? `/details/tv/${tmdbId}` : null),
+  };
+}
+
 async function normalizeBackendInProgressItem(item) {
   const tmdbId = getItemTmdbId(item);
   const currentAired = positiveNumber(item?.aired);
@@ -257,36 +291,62 @@ async function fetchShowProgress(
 }
 
 export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const fast = searchParams.get("fast") === "1";
+  const requestedLimit = Number(searchParams.get("limit") || 0);
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.min(100, Math.floor(requestedLimit))
+    : null;
+
   if (hasBackendCredentials(request)) {
     try {
-      const [backend, completedBackend] = await Promise.all([
-        backendFetchJson(request, "/v1/stats/shows/in-progress?limit=1000"),
-        backendFetchJson(request, "/v1/stats/shows/completed"),
-      ]);
+      const backendLimit = fast ? Math.max(limit || 20, 30) : 1000;
+      const backend = await backendFetchJson(
+        request,
+        `/v1/stats/shows/in-progress?limit=${backendLimit}`,
+      );
       if (backend.ok) {
         const backendItems = Array.isArray(backend.json?.results)
           ? backend.json.results
           : [];
-        const completedItems =
-          completedBackend.ok && Array.isArray(completedBackend.json?.results)
-            ? completedBackend.json.results
-            : [];
-        const candidates = mergeBackendProgressCandidates(
-          backendItems,
-          completedItems,
-        );
-        const inProgress = (
-          await mapLimit(candidates, 8, normalizeBackendInProgressItem)
-        ).filter(
-          (item) =>
-            item.completed > 0 &&
-            (!item.hasKnownAired || item.completed < item.aired),
-        );
+
+        let inProgress;
+        if (fast) {
+          inProgress = backendItems
+            .map(normalizeBackendFastInProgressItem)
+            .filter(
+              (item) =>
+                item.completed > 0 &&
+                (!item.hasKnownAired || item.completed < item.aired),
+            );
+        } else {
+          const completedBackend = await backendFetchJson(
+            request,
+            "/v1/stats/shows/completed",
+          );
+          const completedItems =
+            completedBackend.ok && Array.isArray(completedBackend.json?.results)
+              ? completedBackend.json.results
+              : [];
+          const candidates = mergeBackendProgressCandidates(
+            backendItems,
+            completedItems,
+          );
+          inProgress = (
+            await mapLimit(candidates, 8, normalizeBackendInProgressItem)
+          ).filter(
+            (item) =>
+              item.completed > 0 &&
+              (!item.hasKnownAired || item.completed < item.aired),
+          );
+        }
+
         inProgress.sort((a, b) => {
           const ta = new Date(a.lastWatchedAt || 0).getTime();
           const tb = new Date(b.lastWatchedAt || 0).getTime();
           return tb - ta;
         });
+        if (limit) inProgress = inProgress.slice(0, limit);
         const itemsWithKnownProgress = inProgress.filter((item) => Number(item.aired || 0) > 0);
 
         const responseData = {
@@ -304,7 +364,7 @@ export async function GET(request) {
               0,
             ),
           },
-          source: "backend"
+          source: fast ? "backend-fast" : "backend"
         };
         const res = NextResponse.json(responseData);
         setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });

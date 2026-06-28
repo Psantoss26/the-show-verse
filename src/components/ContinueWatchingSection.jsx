@@ -168,11 +168,6 @@ const CONTINUE_WATCHING_TRAILER_LANGUAGES = ["es-ES", "en-US"];
 let youtubeIframeApiPromise = null;
 const previewTrailerVideosCache = new Map();
 
-const cwPreviewCardClass =
-  "relative isolate grid h-full w-full grid-rows-[72%_28%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu " +
-  "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] " +
-  "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)] transition-all duration-300";
-
 const cwBackdropFadeStyle = {
   WebkitMaskImage:
     "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
@@ -1038,12 +1033,10 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
-  const hoverIntentRef = useRef(0);
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
-  const [hoveredIndex, setHoveredIndex] = useState(null);
   const [animatingOutId, setAnimatingOutId] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
   // Tarjetas visibles por fila (lo fija el breakpoint activo de Swiper). Se usa
@@ -1105,12 +1098,11 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     }
   };
 
-  const openPreview = (itemKey, index) => {
+  const openPreview = (itemKey) => {
     clearHoverCloseTimer();
     hoveredIdRef.current = itemKey;
     setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
     setHoveredId(itemKey);
-    setHoveredIndex(index);
   };
 
   const closePreview = (itemKey) => {
@@ -1118,7 +1110,6 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     hoveredIdRef.current = null;
     setAnimatingOutId(itemKey);
     setHoveredId(null);
-    setHoveredIndex(null);
   };
 
   const prewarmVisibleTrailers = () => {
@@ -1128,13 +1119,13 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       .forEach((show) => prewarmPreviewTrailer(show?.id));
   };
 
-  const handleMouseEnterItem = (itemKey, index, tvId) => {
+  const handleMouseEnterItem = (itemKey, tvId) => {
     if (isMobile) return;
     prewarmPreviewTrailer(tvId);
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     hoverTimeoutRef.current = setTimeout(() => {
-      openPreview(itemKey, index);
+      openPreview(itemKey);
     }, 120);
   };
 
@@ -1164,7 +1155,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
     const load = async () => {
       try {
-        const res = await traktGetInProgress();
+        const res = await traktGetInProgress({ fast: true, limit: MAX_ITEMS });
         const mapped = mapInProgressItems(res?.items);
         if (abort) return;
 
@@ -1386,7 +1377,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                     className={`${base} ${sizeClasses} ${
                       isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
                     }`}
-                    onMouseEnter={() => handleMouseEnterItem(itemKey, i, show.id)}
+                    onMouseEnter={() => handleMouseEnterItem(itemKey, show.id)}
                     onMouseLeave={() => {
                       if (!isActive) handleMouseLeaveItem(itemKey);
                     }}
@@ -1402,7 +1393,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                         <div
                           key="preview"
                           className="hidden sm:block"
-                          onMouseEnter={() => openPreview(itemKey, i)}
+                          onMouseEnter={() => openPreview(itemKey)}
                         >
                           <ContinueWatchingPreviewCard
                             show={show}
@@ -1410,7 +1401,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                             totalCount={shows.length}
                             activeIndex={activeIndex}
                             perView={perView}
-                            onPreviewMouseEnter={() => openPreview(itemKey, i)}
+                            onPreviewMouseEnter={() => openPreview(itemKey)}
                             onPreviewMouseLeave={() => closePreview(itemKey)}
                           />
                         </div>

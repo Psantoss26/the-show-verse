@@ -685,8 +685,17 @@ export async function traktAddShowPlay({ tmdbId, watchedAt }) {
 /**
  * Obtiene las series en progreso del usuario
  */
-export async function traktGetInProgress() {
-  const res = await fetch("/api/trakt/show/in-progress", { cache: "no-store" });
+export async function traktGetInProgress({ fast = false, limit } = {}) {
+  const qs = new URLSearchParams();
+  if (fast) qs.set("fast", "1");
+  if (limit != null) qs.set("limit", String(limit));
+  const url = `/api/trakt/show/in-progress${qs.size ? `?${qs.toString()}` : ""}`;
+
+  const res = await fetch(url, {
+    cache: "no-store",
+    credentials: "include",
+    priority: fast ? "high" : undefined,
+  });
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt in-progress HTTP ${res.status}`);
