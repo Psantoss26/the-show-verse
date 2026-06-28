@@ -1,0 +1,251 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - text: Inicio
+          - link "Películas" [ref=e11] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e12] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e13] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e14] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - link "Listas" [ref=e17] [cursor=pointer]:
+            - /url: /lists
+            - img [ref=e19]
+          - link "Calendario" [ref=e21] [cursor=pointer]:
+            - /url: /calendar
+            - img [ref=e23]
+          - link "En Progreso" [ref=e25] [cursor=pointer]:
+            - /url: /in-progress
+            - img [ref=e27]
+          - link "Historial" [ref=e29] [cursor=pointer]:
+            - /url: /history
+            - img [ref=e31]
+          - link "Favoritas" [ref=e34] [cursor=pointer]:
+            - /url: /favorites
+            - img [ref=e36]
+          - link "Pendientes" [ref=e38] [cursor=pointer]:
+            - /url: /watchlist
+            - img [ref=e40]
+        - link "Iniciar sesión" [ref=e245] [cursor=pointer]:
+          - /url: /login?next=%2F
+      - generic [ref=e43]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e50]
+        - button "Abrir recomendador de qué ver" [ref=e51]:
+          - img [ref=e52]
+  - generic [ref=e3232]:
+    - region "Contenido destacado" [ref=e3234]:
+      - generic [ref=e3235] [cursor=pointer]:
+        - img "Michael" [ref=e3238]
+        - generic [ref=e3240]:
+          - img "Michael" [ref=e3242]
+          - generic [ref=e3243]:
+            - generic [ref=e3244]: "2026"
+            - generic [ref=e3245]:
+              - img "TMDb" [ref=e3246]
+              - generic [ref=e3247]: "8.7"
+          - generic [ref=e3248]: Música · Drama
+          - paragraph [ref=e3249]: El viaje de Michael Jackson más allá de la música, desde el descubrimiento de su extraordinario talento como líder de los Jackson Five hasta convertirse en una visionaria estrella cuya ambición creativa despertó un incansable afán por consagrarse como el mayor icono de la industria del entretenimiento.
+          - generic [ref=e3251]:
+            - link "Más información" [ref=e3252]:
+              - /url: /details/movie/936075
+              - img [ref=e3253]
+              - generic [ref=e3255]: Más información
+            - button "Ver trailer" [pressed] [ref=e3256]:
+              - img [ref=e3258]
+            - button "Activar soundtrack" [pressed] [ref=e3260]:
+              - img [ref=e3262]
+            - button "Añadir a favoritos" [ref=e3266]:
+              - img [ref=e3268]
+            - button "Añadir a pendientes" [ref=e3270]:
+              - img [ref=e3272]
+            - button "No visto":
+              - generic:
+                - img
+      - button "Anterior" [ref=e3274]:
+        - img [ref=e3275]
+      - button "Siguiente" [ref=e3277]:
+        - img [ref=e3278]
+      - generic "Diapositivas destacadas" [ref=e3281]:
+        - button "Ver destacado 1" [ref=e3282]
+        - button "Ver destacado 2" [ref=e3283]
+        - button "Ver destacado 3" [ref=e3284]
+        - button "Ver destacado 4" [ref=e3285]
+        - button "Ver destacado 5" [ref=e3286]
+        - button "Ver destacado 6" [ref=e3287]
+        - button "Ver destacado 7" [ref=e3288]
+        - button "Ver destacado 8" [ref=e3289]
+    - generic [ref=e3290]:
+      - generic [ref=e3291]:
+        - generic [ref=e3292]:
+          - generic [ref=e3295]: DESTACADAS
+          - generic [ref=e3296]:
+            - heading "Mejor valoradas." [level=3] [ref=e3297]
+            - generic [ref=e3298]:
+              - button "Películas" [ref=e3299]
+              - button "Series" [ref=e3300]
+        - generic [ref=e3304]:
+          - link "Cadena perpetua" [ref=e3306] [cursor=pointer]:
+            - /url: /details/movie/278
+            - generic [ref=e3307]:
+              - img [ref=e3308]
+              - img "Cadena perpetua" [ref=e3309]
+              - img [ref=e3310]
+          - link "Proyecto Salvación" [ref=e3313] [cursor=pointer]:
+            - /url: /details/movie/687163
+            - generic [ref=e3314]:
+              - img [ref=e3315]
+              - img "Proyecto Salvación" [ref=e3316]
+              - img [ref=e3317]
+          - link "El padrino" [ref=e3320] [cursor=pointer]:
+            - /url: /details/movie/238
+            - generic [ref=e3321]:
+              - img [ref=e3322]
+              - img "El padrino" [ref=e3323]
+              - img [ref=e3324]
+          - link "La lista de Schindler" [ref=e3327] [cursor=pointer]:
+            - /url: /details/movie/424
+            - generic [ref=e3328]:
+              - img [ref=e3329]
+              - img "La lista de Schindler" [ref=e3330]
+              - img [ref=e3331]
+          - link "El Padrino Parte II" [ref=e3334] [cursor=pointer]:
+            - /url: /details/movie/240
+            - generic [ref=e3335]:
+              - img [ref=e3336]
+              - img "El Padrino Parte II" [ref=e3337]
+              - img [ref=e3338]
+          - link "12 hombres sin piedad" [ref=e3341] [cursor=pointer]:
+            - /url: /details/movie/389
+            - generic [ref=e3342]:
+              - img [ref=e3343]
+              - img "12 hombres sin piedad" [ref=e3344]
+              - img [ref=e3345]
+          - link "El caballero oscuro" [ref=e3348] [cursor=pointer]:
+            - /url: /details/movie/155
+            - generic [ref=e3349]:
+              - img [ref=e3350]
+              - img "El caballero oscuro" [ref=e3351]
+              - img [ref=e3352]
+          - link "La milla verde" [ref=e3355] [cursor=pointer]:
+            - /url: /details/movie/497
+            - generic [ref=e3356]:
+              - img [ref=e3357]
+              - img "La milla verde" [ref=e3358]
+              - img [ref=e3359]
+          - link "El viaje de Chihiro" [ref=e3362] [cursor=pointer]:
+            - /url: /details/movie/129
+            - generic [ref=e3363]:
+              - img [ref=e3364]
+              - img "El viaje de Chihiro" [ref=e3365]
+              - img [ref=e3366]
+          - 'link "El señor de los anillos: El retorno del rey" [ref=e3369] [cursor=pointer]':
+            - /url: /details/movie/122
+            - generic [ref=e3370]:
+              - img [ref=e3371]
+              - 'img "El señor de los anillos: El retorno del rey" [ref=e3372]'
+              - img [ref=e3373]
+          - link "Parásitos" [ref=e3376] [cursor=pointer]:
+            - /url: /details/movie/496243
+            - generic [ref=e3377]:
+              - img [ref=e3378]
+              - img "Parásitos" [ref=e3379]
+              - img [ref=e3380]
+          - link "Pulp Fiction" [ref=e3383] [cursor=pointer]:
+            - /url: /details/movie/680
+            - generic [ref=e3384]:
+              - img [ref=e3385]
+              - img "Pulp Fiction" [ref=e3386]
+              - img [ref=e3387]
+          - link "Interstellar" [ref=e3390] [cursor=pointer]:
+            - /url: /details/movie/157336
+            - generic [ref=e3391]:
+              - img [ref=e3392]
+              - img "Interstellar" [ref=e3393]
+              - img [ref=e3394]
+          - link "Your Name." [ref=e3397] [cursor=pointer]:
+            - /url: /details/movie/372058
+            - generic [ref=e3398]:
+              - img [ref=e3399]
+              - img "Your Name." [ref=e3400]
+              - img [ref=e3401]
+          - link "El bueno, el feo y el malo" [ref=e3404] [cursor=pointer]:
+            - /url: /details/movie/429
+            - generic [ref=e3405]:
+              - img [ref=e3406]
+              - img "El bueno, el feo y el malo" [ref=e3407]
+              - img [ref=e3408]
+          - link "Forrest Gump" [ref=e3411] [cursor=pointer]:
+            - /url: /details/movie/13
+            - generic [ref=e3412]:
+              - img [ref=e3413]
+              - img "Forrest Gump" [ref=e3414]
+              - img [ref=e3415]
+          - link "Uno de los nuestros" [ref=e3418] [cursor=pointer]:
+            - /url: /details/movie/769
+            - generic [ref=e3419]:
+              - img [ref=e3420]
+              - img "Uno de los nuestros" [ref=e3421]
+              - img [ref=e3422]
+          - link "La tumba de las luciérnagas" [ref=e3425] [cursor=pointer]:
+            - /url: /details/movie/12477
+            - generic [ref=e3426]:
+              - img [ref=e3427]
+              - img "La tumba de las luciérnagas" [ref=e3428]
+              - img [ref=e3429]
+          - link "La vida es bella" [ref=e3432] [cursor=pointer]:
+            - /url: /details/movie/637
+            - generic [ref=e3433]:
+              - img [ref=e3434]
+              - img "La vida es bella" [ref=e3435]
+              - img [ref=e3436]
+          - link "El club de la lucha" [ref=e3439] [cursor=pointer]:
+            - /url: /details/movie/550
+            - generic [ref=e3440]:
+              - img [ref=e3441]
+              - img "El club de la lucha" [ref=e3442]
+              - img [ref=e3443]
+      - generic [ref=e3445]:
+        - generic [ref=e3447]:
+          - generic [ref=e3450]: TENDENCIAS
+          - link "Ver todos los títulos de Tendencias ahora mismo" [ref=e3451] [cursor=pointer]:
+            - /url: /dashboard/tendencias
+            - generic [ref=e3452]: Tendencias ahora mismo
+            - generic [ref=e3453]: .
+            - img [ref=e3454]
+        - generic [ref=e3458]:
+          - generic [ref=e3461]: POPULARES
+          - link "Ver todos los títulos de Lo que más se está viendo" [ref=e3462] [cursor=pointer]:
+            - /url: /dashboard/populares
+            - generic [ref=e3463]: Lo que más se está viendo
+            - generic [ref=e3464]: .
+            - img [ref=e3465]
+        - generic [ref=e3469]:
+          - generic [ref=e3472]: GÉNERO
+          - heading "Estrenos y novedades." [level=3] [ref=e3473]
+        - generic [ref=e3476]:
+          - generic [ref=e3479]: ACLAMADAS
+          - heading "Aclamadas que merecen la pena." [level=3] [ref=e3480]
+        - generic [ref=e3483]:
+          - generic [ref=e3486]: SELECCIÓN
+          - heading "Acción y aventura con ritmo." [level=3] [ref=e3487]
+        - generic [ref=e3490]:
+          - generic [ref=e3493]: NOSTALGIA
+          - heading "Favoritos de los 90 y 2000." [level=3] [ref=e3494]
+  - button "Open Next.js Dev Tools" [ref=e241] [cursor=pointer]:
+    - img [ref=e242]
+  - alert [ref=e3224]: Inicio
+  - button "Instalar app" [ref=e3225]:
+    - img [ref=e3227]

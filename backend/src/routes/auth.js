@@ -13,7 +13,8 @@ import {
   hashToken,
   refreshTokenExpiresAt,
 } from '../lib/jwt.js';
-import { eq, and, gt } from 'drizzle-orm';
+import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
+import { eq, and, gt, lt } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -646,8 +647,26 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ error: 'Refresh token not found or expired' });
     }
 
-    // Rotación: eliminar el token usado y emitir uno nuevo
-    await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
+    // Rotación TOLERANTE A CONCURRENCIA: en vez de BORRAR el token usado de
+    // inmediato —lo que hacía que refrescos concurrentes del mismo token (al
+    // volver a la app y cargar el dashboard, con el access token ya caducado)
+    // recibieran 401 y cerraran la sesión sin motivo— lo «retiramos» acortando
+    // su expiración a una breve ventana de gracia. Durante esa ventana, los
+    // refrescos concurrentes con el mismo token siguen siendo válidos y reciben
+    // un par nuevo. Pasada la ventana, el token caduca de forma natural y deja
+    // de aceptarse (la rotación sigue siendo efectiva).
+    // La misma lógica está modelada y testeada en lib/refreshRotation.js.
+    const graceExpiry = new Date(Date.now() + REFRESH_ROTATION_GRACE_MS);
+    await db
+      .update(refreshTokens)
+      .set({ expiresAt: graceExpiry })
+      .where(
+        and(
+          eq(refreshTokens.id, storedToken.id),
+          // Sólo acortar, nunca extender (idempotente si ya estaba retirado).
+          gt(refreshTokens.expiresAt, graceExpiry),
+        ),
+      );
 
     const { accessToken, refreshToken: newRefreshToken } = await issueTokenPair(
       payload.sub,
@@ -656,6 +675,18 @@ export default async function authRoutes(fastify) {
         ipAddress: req.ip,
       }
     );
+
+    // Mantenimiento: eliminar los refresh tokens del usuario ya caducados
+    // (incluidos los retirados hace más de la ventana de gracia) para que la
+    // tabla no crezca sin límite ahora que no borramos en cada rotación.
+    await db
+      .delete(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, storedToken.userId),
+          lt(refreshTokens.expiresAt, new Date()),
+        ),
+      );
 
     return reply.send({ accessToken, refreshToken: newRefreshToken });
   });

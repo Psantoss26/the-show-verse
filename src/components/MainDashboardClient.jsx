@@ -3371,6 +3371,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
           <FeaturedHero
             items={dashboardData.featured || EMPTY_ARRAY}
             isMobile={isMobile}
+            deferInitialBackdrop
           />
         </div>
 

@@ -1,5 +1,10 @@
 // /src/lib/api/traktClient.js
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+import {
+  cacheAddHistory,
+  cacheRemoveHistory,
+  clearWatchDerivedCaches,
+} from "@/lib/userLists/optimisticListCache";
 
 async function safeJson(res) {
   try {
@@ -245,6 +250,9 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt }) {
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt watched HTTP ${res.status}`);
+  // Marcar visto cambia En progreso/Completadas e Historial: invalidamos sus
+  // cachés para que esas páginas muestren las novedades junto al resto.
+  clearWatchDerivedCaches();
   return json;
 }
 
@@ -286,6 +294,10 @@ export async function traktHistoryOp({
     err.payload = json;
     throw err;
   }
+  // Actualización OPTIMISTA de la caché de la página Historial: la nueva
+  // visualización aparece al instante al entrar en /history, junto al resto.
+  if (op === "add") cacheAddHistory({ type, tmdbId, watchedAt, title, posterPath });
+  else if (op === "remove" && historyId != null) cacheRemoveHistory(historyId);
   return json;
 }
 
@@ -435,6 +447,7 @@ export async function traktSetEpisodeWatched({
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`);
+  clearWatchDerivedCaches();
   return json; // { watchedBySeason }
 }
 
@@ -461,6 +474,7 @@ export async function traktSetSeasonWatched({
   const json = await safeJson(res);
   if (!res.ok)
     throw new Error(json?.error || `Trakt season watched HTTP ${res.status}`);
+  clearWatchDerivedCaches();
   return json;
 }
 
