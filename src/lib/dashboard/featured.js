@@ -10,6 +10,10 @@ const FEATURED_SOURCE_WEIGHTS = {
   awarded: 0.34,
 };
 
+const FEATURED_ROTATION_WINDOW_MS = 30 * 60 * 1000;
+const FEATURED_ROTATION_POOL_MULTIPLIER = 3;
+const FEATURED_ROTATION_JITTER = 0.32;
+
 const normalize01 = (value, max) => {
   const n = Number(value || 0);
   if (!Number.isFinite(n) || n <= 0) return 0;
@@ -18,6 +22,16 @@ const normalize01 = (value, max) => {
 
 const logScore = (value, maxLog = 5) =>
   Math.min(1, Math.log10(Number(value || 0) + 1) / maxLog);
+
+function stableNoise(value) {
+  const input = String(value || "");
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
 
 function getReleaseDate(item) {
   const raw = item?.release_date || item?.first_air_date || "";
@@ -96,10 +110,11 @@ export function buildFeatured(
     awarded = [],
   } = {},
   {
-    size = 8,
+    size = 10,
     mediaTypes = ["movie", "tv"],
     excludeMediaKeys = new Set(),
     excludeTitleKeys = new Set(),
+    rotationBucket = Math.floor(Date.now() / FEATURED_ROTATION_WINDOW_MS),
   } = {},
 ) {
   const allowedTypes = new Set(mediaTypes);
@@ -176,7 +191,7 @@ export function buildFeatured(
     );
   };
 
-  const ranked = [...pool.values()]
+  const rankedByRelevance = [...pool.values()]
     .filter((item) => {
       const votes = Number(item?.vote_count || 0);
       const rating = Number(item?.vote_average || 0);
@@ -188,7 +203,33 @@ export function buildFeatured(
       );
       return rating >= 6.6 && (votes >= 700 || hasDemandSource);
     })
-    .sort((a, b) => scoreOf(b) - scoreOf(a));
+    .map((item) => ({ item, score: scoreOf(item) }))
+    .sort((a, b) => b.score - a.score);
+
+  // Solo rotamos dentro de la parte alta del ranking. El pequeño desempate
+  // determinista cambia cada 30 minutos, pero mantiene estables los resultados
+  // entre recargas y nunca permite entrar a títulos fuera del pool relevante.
+  const rotationPoolSize = Math.min(
+    rankedByRelevance.length,
+    Math.max(size, size * FEATURED_ROTATION_POOL_MULTIPLIER),
+  );
+  const rotatingPool = rankedByRelevance
+    .slice(0, rotationPoolSize)
+    .map(({ item, score }) => ({
+      item,
+      rotatedScore:
+        score +
+        stableNoise(`${rotationBucket}:${item.__featuredKey}`) *
+          FEATURED_ROTATION_JITTER,
+    }))
+    .sort((a, b) => b.rotatedScore - a.rotatedScore)
+    .map(({ item }) => item);
+  const ranked = [
+    ...rotatingPool,
+    ...rankedByRelevance
+      .slice(rotationPoolSize)
+      .map(({ item }) => item),
+  ];
 
   const result = [];
   const typeCounts = { movie: 0, tv: 0 };
@@ -217,7 +258,16 @@ export function buildFeatured(
     }
   }
 
-  return result.slice(0, size).map((item) => {
+  const selected = result.slice(0, size);
+  const startIndex = selected.length
+    ? Math.abs(Number(rotationBucket) || 0) % selected.length
+    : 0;
+  const rotatedSelection = [
+    ...selected.slice(startIndex),
+    ...selected.slice(0, startIndex),
+  ];
+
+  return rotatedSelection.map((item) => {
     const cleanItem = { ...item };
     delete cleanItem.__featuredKey;
     delete cleanItem.__featuredSources;

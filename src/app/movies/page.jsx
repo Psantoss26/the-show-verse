@@ -197,7 +197,7 @@ async function getCriticalDashboardData() {
         recognizedTV,
         awarded: curatedAwarded,
       },
-      { size: 8 },
+      { size: 10 },
     );
     const { mediaKeys, titleKeys } = getFeaturedExclusionKeys(mainFeatured);
     const featured = buildFeatured(
@@ -208,7 +208,7 @@ async function getCriticalDashboardData() {
         awarded: curatedAwarded,
       },
       {
-        size: 8,
+        size: 10,
         mediaTypes: ["movie"],
         excludeMediaKeys: mediaKeys,
         excludeTitleKeys: titleKeys,
