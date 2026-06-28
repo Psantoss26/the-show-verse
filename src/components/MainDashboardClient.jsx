@@ -5,6 +5,8 @@ import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useInView } from "framer-motion";
+import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -1804,59 +1806,9 @@ function Row({
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
 
-  // Detectar si es una fila de género específico
-  const isGenreRow =
-    ![
-      "Recomendado",
-      "Recomendados",
-      "Tendencias",
-      "Tendencias ahora mismo",
-      "Más esperadas",
-      "Populares",
-      "Lo que más se está viendo",
-      "Taquillazos imprescindibles",
-      "Premiadas y nominadas",
-      "Aclamadas que merecen la pena",
-      "Historias de venganza",
-      "Populares en EE.UU.",
-      "Acción y aventura con ritmo",
-      "Favoritos de los 90 y 2000",
-      "Películas de culto",
-      "Infravaloradas",
-      "En ascenso",
-      "Joyas para descubrir",
-      "Recomendaciones de hoy para ti",
-      "Creemos que te van a encantar",
-    ].includes(title) &&
-    !title.includes("década") &&
-    !title.includes("Clásicos") &&
-    !title.includes("Favoritas") &&
-    !title.includes("Hits");
-
-  // Determinar etiqueta específica según el título (si no viene como prop)
-  if (!labelText) {
-    if (title === "Más esperadas") {
-      labelText = "ANTICIPADAS";
-    } else if (title === "Populares") {
-      labelText = "POPULARES";
-    } else if (title === "Lo que más se está viendo") {
-      labelText = "POPULARES";
-    } else if (title === "Tendencias") {
-      labelText = "TENDENCIAS";
-    } else if (title === "Tendencias ahora mismo") {
-      labelText = "TENDENCIAS";
-    } else if (title === "Aclamadas que merecen la pena") {
-      labelText = "ACLAMADAS";
-    } else if (title === "Acción y aventura con ritmo") {
-      labelText = "SELECCIÓN";
-    } else if (title === "Favoritos de los 90 y 2000") {
-      labelText = "NOSTALGIA";
-    } else if (title === "Joyas para descubrir") {
-      labelText = "DESCUBRIR";
-    } else if (isGenreRow) {
-      labelText = "GÉNERO";
-    }
-  }
+  // Etiqueta superior representativa (centralizada). Respeta la que llega como
+  // prop; si no, la deriva del título (todas las filas tienen etiqueta).
+  labelText = deriveSectionLabel(title, labelText);
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -1947,6 +1899,9 @@ function Row({
   const isInView = eager
     ? true
     : useInView(rowRef, { once: true, margin: "600px" });
+  // Revelado: la fila se monta antes (isInView, para tener el Swiper listo) pero
+  // solo se anima al entrar en la ventana y SOLO tras hacer scroll.
+  const revealProps = useScrollRevealProps();
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   // Precargar backdrops cuando el usuario está sobre la fila
@@ -1997,7 +1952,15 @@ function Row({
   // de inmediato. El Swiper se monta al acercarse (margin del useInView).
   if (!isInView) {
     return (
-      <div ref={rowRef} className="relative">
+      // Placeholder: reserva la altura, pero OCULTO (mismas revealProps que la
+      // fila montada). Si no, el título de una fila que asome bajo el hero se
+      // vería al cargar/recargar antes de que la fila se monte.
+      <motion.div
+        ref={rowRef}
+        {...revealProps}
+        variants={fadeInUp}
+        className="relative"
+      >
         {!hideTitle && (
           <div className="mb-5 px-1 sm:px-0">
             {labelText && (
@@ -2022,7 +1985,7 @@ function Row({
               : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
           }
         />
-      </div>
+      </motion.div>
     );
   }
 
@@ -2081,8 +2044,7 @@ function Row({
   return (
     <motion.div
       ref={rowRef}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
+      {...revealProps}
       variants={fadeInUp}
       // En "Más esperadas" la vista previa se superpone fuera de la fila, así
       // que NO usamos `sv-deferred-row` (content-visibility recortaría el
@@ -2386,58 +2348,8 @@ function Row({
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
   if (!items || items.length === 0) return null;
 
-  // Detectar si es una fila de género específico
-  const isGenreRow =
-    ![
-      "Recomendado",
-      "Recomendados",
-      "Tendencias",
-      "Tendencias ahora mismo",
-      "Más esperadas",
-      "Populares",
-      "Lo que más se está viendo",
-      "Taquillazos imprescindibles",
-      "Premiadas y nominadas",
-      "Aclamadas que merecen la pena",
-      "Historias de venganza",
-      "Populares en EE.UU.",
-      "Acción y aventura con ritmo",
-      "Favoritos de los 90 y 2000",
-      "Películas de culto",
-      "Infravaloradas",
-      "En ascenso",
-      "Joyas para descubrir",
-      "Recomendaciones de hoy para ti",
-      "Creemos que te van a encantar",
-    ].includes(title) &&
-    !title.includes("década") &&
-    !title.includes("Clásicos") &&
-    !title.includes("Favoritas") &&
-    !title.includes("Hits");
-
-  // Determinar etiqueta específica según el título
-  let labelText = null;
-  if (title === "Más esperadas") {
-    labelText = "ANTICIPADAS";
-  } else if (title === "Populares") {
-    labelText = "POPULARES";
-  } else if (title === "Lo que más se está viendo") {
-    labelText = "POPULARES";
-  } else if (title === "Tendencias") {
-    labelText = "TENDENCIAS";
-  } else if (title === "Tendencias ahora mismo") {
-    labelText = "TENDENCIAS";
-  } else if (title === "Aclamadas que merecen la pena") {
-    labelText = "ACLAMADAS";
-  } else if (title === "Acción y aventura con ritmo") {
-    labelText = "SELECCIÓN";
-  } else if (title === "Favoritos de los 90 y 2000") {
-    labelText = "NOSTALGIA";
-  } else if (title === "Joyas para descubrir") {
-    labelText = "DESCUBRIR";
-  } else if (isGenreRow) {
-    labelText = "GÉNERO";
-  }
+  // Etiqueta superior representativa (centralizada): todas las filas la tienen.
+  const labelText = deriveSectionLabel(title);
 
   const rowRef = useRef(null);
   const isInView = useInView(rowRef, { once: true, margin: "-100px" });
@@ -2811,7 +2723,9 @@ function TopRatedHero({
   const [isHoveredHero, setIsHoveredHero] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const isInView = useInView(heroRef, { once: true, margin: "0px" });
+  // "Mejor valoradas" es la sección que va justo tras el hero: debe permanecer
+  // oculta al cargar (aunque asome) y revelarse con animación al hacer scroll.
+  const revealProps = useScrollRevealProps();
 
   const [heroBackdrops, setHeroBackdrops] = useState(null);
   const [heroExtraBackdrops, setHeroExtraBackdrops] = useState(null);
@@ -2935,8 +2849,7 @@ function TopRatedHero({
   return (
     <motion.div
       ref={heroRef}
-      initial="hidden"
-      animate="visible"
+      {...revealProps}
       variants={fadeInUp}
       className="relative group mb-10 sm:mb-14"
     >
