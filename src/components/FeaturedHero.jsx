@@ -852,14 +852,15 @@ function FeaturedSlide({
       {/* Tapa-hueco lateral izquierdo (solo escritorio): el backdrop es
           object-contain object-right, así que al ensanchar la ventana queda un
           hueco a la izquierda cuyo tamaño = 100% - anchoImagen, donde
-          anchoImagen = 88dvh * 16/9 (alto limitado por max-h-[88dvh]). Este
-          panel negro cubre SIEMPRE ese hueco (+2rem de margen) y se funde 14rem
-          dentro de la imagen, escalando con el ancho de la ventana para que el
-          borde izquierdo del backdrop no sea visible nunca. */}
+          anchoImagen = alto máximo del hero * 16/9. Este panel negro cubre
+          SIEMPRE ese hueco (+2rem de margen) y se funde 14rem dentro de la
+          imagen, escalando con el ancho de la ventana para que el borde
+          izquierdo del backdrop no sea visible nunca. */}
       <div
         className="pointer-events-none absolute inset-y-0 left-0 hidden sm:block"
         style={{
-          width: "calc(100% - 88dvh * 16 / 9 + 42rem)",
+          width:
+            "calc(100% - var(--hero-desktop-max-height, 88dvh) * 16 / 9 + 42rem)",
           background:
             "linear-gradient(to right," +
             " #000 0%," +
@@ -1625,11 +1626,11 @@ export default function FeaturedHero({
           : "pointer-events-none invisible opacity-0"
       }`}
     >
-      <span className="inline-flex translate-y-[6px]">
+      <span className="inline-flex translate-y-[6px] sm:translate-y-0">
         <span className="hero-scroll-cue inline-flex drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
           <ChevronDown
             aria-hidden="true"
-            className="h-7 w-7 transition-transform duration-300 group-hover:translate-y-0.5"
+            className="h-7 w-7 transition-transform duration-300 group-hover:translate-y-0.5 sm:h-8 sm:w-8"
           />
         </span>
       </span>
@@ -1640,7 +1641,7 @@ export default function FeaturedHero({
     <>
       <section
         ref={heroSectionRef}
-        className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[88dvh]"
+        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[var(--hero-desktop-max-height)]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -1690,12 +1691,19 @@ export default function FeaturedHero({
         )}
 
         {!isMobile && (
-          <div className="absolute bottom-0 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3">
+          <div className="absolute bottom-[3.25rem] left-1/2 z-20 -translate-x-1/2">
             {indicators && indicators}
-            {scrollCue}
           </div>
         )}
       </section>
+
+      {!isMobile && (
+        <div className="pointer-events-none relative z-20 hidden h-0 sm:block">
+          <div className="pointer-events-auto absolute left-1/2 top-2 -translate-x-1/2">
+            {scrollCue}
+          </div>
+        </div>
+      )}
 
       {isMobile && (
         <div className="relative h-14 bg-black sm:hidden">
@@ -1711,6 +1719,16 @@ export default function FeaturedHero({
       )}
 
       <style jsx>{`
+        .featured-hero-shell {
+          --hero-desktop-max-height: 88dvh;
+        }
+
+        @media (min-width: 100rem) and (min-height: 53.125rem) and (min-aspect-ratio: 3 / 2) and (max-aspect-ratio: 2 / 1) {
+          .featured-hero-shell {
+            --hero-desktop-max-height: 94dvh;
+          }
+        }
+
         .hero-scroll-cue {
           animation: heroScrollCue 1.8s cubic-bezier(0.45, 0, 0.55, 1)
             infinite;

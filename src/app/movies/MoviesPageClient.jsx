@@ -1709,7 +1709,10 @@ export default function MoviesPageClient({
     >
       <div className="relative z-10">
         {hasFeaturedHero && (
-          <div className="relative isolate" style={{ contain: "layout paint" }}>
+          <div
+            className="relative isolate z-20 sm:-mb-12 sm:pb-12"
+            style={{ contain: "layout paint" }}
+          >
             <FeaturedHero
               items={featuredItems}
               isMobile={isMobile}
@@ -1724,7 +1727,7 @@ export default function MoviesPageClient({
           animate="visible"
           className={
             hasFeaturedHero
-              ? "space-y-12 px-4 pt-4 pb-6 sm:px-6 sm:pt-12"
+              ? "space-y-12 px-4 pt-4 pb-6 sm:px-6 sm:pt-11"
               : "space-y-12 pt-2"
           }
         >

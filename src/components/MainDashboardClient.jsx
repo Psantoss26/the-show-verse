@@ -3280,7 +3280,10 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
       variants={fadeInUp}
     >
       <div className="relative z-10">
-        <div className="relative isolate" style={{ contain: "layout paint" }}>
+        <div
+          className="relative isolate z-20 sm:-mb-12 sm:pb-12"
+          style={{ contain: "layout paint" }}
+        >
           <FeaturedHero
             items={dashboardData.featured || EMPTY_ARRAY}
             isMobile={isMobile}
@@ -3288,7 +3291,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
           />
         </div>
 
-        <div className="px-4 pt-4 pb-6 sm:px-6 sm:pt-12 sm:pb-8">
+        <div className="px-4 pt-4 pb-6 sm:px-6 sm:pt-11 sm:pb-8">
           <TopRatedHero
             movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
             tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
