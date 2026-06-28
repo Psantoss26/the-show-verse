@@ -1,0 +1,162 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - text: Inicio
+          - link "Películas" [ref=e11] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e12] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e13] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e14] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e16]:
+        - link "Listas" [ref=e17] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e19]
+        - link "Calendario" [ref=e21] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e23]
+        - link "En Progreso" [ref=e25] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e27]
+        - link "Historial" [ref=e29] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e31]
+        - link "Favoritas" [ref=e34] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e36]
+        - link "Pendientes" [ref=e38] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e40]
+      - generic [ref=e43]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e50]
+        - button "Abrir recomendador de qué ver" [ref=e51]:
+          - img [ref=e52]
+  - generic [ref=e56]:
+    - region "Contenido destacado" [ref=e58]:
+      - generic [ref=e62] [cursor=pointer]:
+        - generic [ref=e63]:
+          - generic [ref=e64]: "2019"
+          - generic [ref=e65]:
+            - img "TMDb" [ref=e66]
+            - generic [ref=e67]: "8.4"
+        - generic [ref=e68]: Ciencia ficción y fantasía · Acción y aventura
+        - paragraph [ref=e69]: La serie tiene lugar en un mundo en el que los superhéroes representan el lado oscuro de la celebridad y la fama. Un grupo de vigilantes que se hacen llamar "The Boys" decide hacer todo lo posible por frenar a los superhéroes que están perjudicando a la sociedad, independientemente de los riesgos que ello conlleva.
+        - generic [ref=e71]:
+          - link "Más información" [ref=e72]:
+            - /url: /details/tv/76479
+            - img [ref=e73]
+            - generic [ref=e75]: Más información
+          - button "Ver trailer" [pressed] [ref=e76]:
+            - img [ref=e78]
+          - button "Silenciar soundtrack" [pressed] [ref=e80]:
+            - img [ref=e82]
+          - button "Añadir a favoritos" [ref=e86]:
+            - img [ref=e88]
+          - button "Añadir a pendientes" [ref=e90]:
+            - img [ref=e92]
+          - button "No visto":
+            - generic:
+              - img
+      - button "Anterior" [ref=e94]:
+        - img [ref=e95]
+      - button "Siguiente" [ref=e97]:
+        - img [ref=e98]
+      - generic "Diapositivas destacadas" [ref=e101]:
+        - button "Ver destacado 1" [ref=e102]
+        - button "Ver destacado 2" [ref=e103]
+        - button "Ver destacado 3" [ref=e104]
+        - button "Ver destacado 4" [ref=e105]
+        - button "Ver destacado 5" [ref=e106]
+        - button "Ver destacado 6" [ref=e107]
+        - button "Ver destacado 7" [ref=e108]
+        - button "Ver destacado 8" [ref=e109]
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - generic [ref=e112]:
+          - generic [ref=e115]: DESTACADAS
+          - generic [ref=e116]:
+            - heading "Mejor valoradas." [level=3] [ref=e117]
+            - generic [ref=e118]:
+              - button "Películas" [ref=e119]
+              - button "Series" [ref=e120]
+        - generic [ref=e124]:
+          - link [ref=e126] [cursor=pointer]:
+            - /url: /details/movie/278
+          - link [ref=e129] [cursor=pointer]:
+            - /url: /details/movie/687163
+          - link [ref=e132] [cursor=pointer]:
+            - /url: /details/movie/238
+          - link [ref=e135] [cursor=pointer]:
+            - /url: /details/movie/424
+          - link [ref=e138] [cursor=pointer]:
+            - /url: /details/movie/240
+          - link [ref=e141] [cursor=pointer]:
+            - /url: /details/movie/389
+          - link [ref=e144] [cursor=pointer]:
+            - /url: /details/movie/155
+          - link [ref=e147] [cursor=pointer]:
+            - /url: /details/movie/497
+          - link [ref=e150] [cursor=pointer]:
+            - /url: /details/movie/129
+          - link [ref=e153] [cursor=pointer]:
+            - /url: /details/movie/122
+          - link [ref=e156] [cursor=pointer]:
+            - /url: /details/movie/496243
+          - link [ref=e159] [cursor=pointer]:
+            - /url: /details/movie/680
+          - link [ref=e162] [cursor=pointer]:
+            - /url: /details/movie/157336
+          - link [ref=e165] [cursor=pointer]:
+            - /url: /details/movie/372058
+          - link [ref=e168] [cursor=pointer]:
+            - /url: /details/movie/429
+          - link [ref=e171] [cursor=pointer]:
+            - /url: /details/movie/13
+          - link [ref=e174] [cursor=pointer]:
+            - /url: /details/movie/769
+          - link [ref=e177] [cursor=pointer]:
+            - /url: /details/movie/12477
+          - link [ref=e180] [cursor=pointer]:
+            - /url: /details/movie/637
+          - link [ref=e183] [cursor=pointer]:
+            - /url: /details/movie/550
+      - generic [ref=e185]:
+        - generic [ref=e187]:
+          - generic [ref=e190]: TENDENCIAS
+          - link "Ver todos los títulos de Tendencias ahora mismo" [ref=e191] [cursor=pointer]:
+            - /url: /dashboard/tendencias
+            - generic [ref=e192]: Tendencias ahora mismo
+            - generic [ref=e193]: .
+            - img [ref=e194]
+        - generic [ref=e198]:
+          - generic [ref=e201]: POPULARES
+          - link "Ver todos los títulos de Lo que más se está viendo" [ref=e202] [cursor=pointer]:
+            - /url: /dashboard/populares
+            - generic [ref=e203]: Lo que más se está viendo
+            - generic [ref=e204]: .
+            - img [ref=e205]
+        - generic [ref=e209]:
+          - generic [ref=e212]: GÉNERO
+          - heading "Estrenos y novedades." [level=3] [ref=e213]
+        - generic [ref=e216]:
+          - generic [ref=e219]: ACLAMADAS
+          - heading "Aclamadas que merecen la pena." [level=3] [ref=e220]
+        - generic [ref=e223]:
+          - generic [ref=e226]: SELECCIÓN
+          - heading "Acción y aventura con ritmo." [level=3] [ref=e227]
+        - generic [ref=e230]:
+          - generic [ref=e233]: NOSTALGIA
+          - heading "Favoritos de los 90 y 2000." [level=3] [ref=e234]
+  - button "Open Next.js Dev Tools" [ref=e241] [cursor=pointer]:
+    - img [ref=e242]

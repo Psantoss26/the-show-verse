@@ -44,12 +44,11 @@ import {
   formatRuntime,
 } from "@/lib/dashboard/media";
 
-// El backdrop del hero se carga DIRECTO del CDN de TMDb (sin optimizador de
-// Vercel). Usamos w1280 en lugar de `original`: cubre de sobra un hero a pantalla
-// completa (va atenuado con degradado + texto encima, la diferencia no se nota)
-// y evita descargar la imagen original (varios MB) en el elemento LCP de Inicio.
+// El backdrop se carga directamente desde TMDb. El <picture> usa `original`
+// únicamente cuando w1280 tendría que ampliarse (viewport ancho o pantalla de
+// alta densidad), manteniendo una sola descarga por slide y sin coste de Vercel.
 const HERO_BACKDROP_SIZE = "w1280";
-const HERO_IMAGE_QUALITY = 100;
+const HERO_BACKDROP_MAX_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 7000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
@@ -673,13 +672,16 @@ function FeaturedSlide({
       .join(" · ");
   }, [movie]);
 
-  const bgSrc = isMobile
-    ? posterPath
-      ? buildImg(posterPath, HERO_POSTER_SIZE)
-      : null
-    : backdropPath
-      ? buildImg(backdropPath, HERO_BACKDROP_SIZE)
-      : null;
+  const posterSrc = posterPath
+    ? buildImg(posterPath, HERO_POSTER_SIZE)
+    : null;
+  const backdropSrc = backdropPath
+    ? buildImg(backdropPath, HERO_BACKDROP_SIZE)
+    : null;
+  const maxBackdropSrc = backdropPath
+    ? buildImg(backdropPath, HERO_BACKDROP_MAX_SIZE)
+    : null;
+  const bgSrc = isMobile ? posterSrc : backdropSrc;
   const logoSrc = logoPath ? buildImg(logoPath, "original") : null;
   const title = movie.title || movie.name || "";
   const overview =
@@ -714,39 +716,54 @@ function FeaturedSlide({
                 : "hero-backdrop-reveal-desktop"
             } ${loadedBackdropSrc === bgSrc ? "hero-backdrop-ready" : "hero-backdrop-loading"}`}
           >
-            <NextImage
-              src={bgSrc}
-              alt={title}
-              fill
-              priority={isActive}
-              sizes="100vw"
-              quality={HERO_IMAGE_QUALITY}
-              onLoad={() => setLoadedBackdropSrc(bgSrc)}
-              className={
-                isMobile
-                  ? "object-contain object-top"
-                  : "object-contain object-right"
-              }
-              // Fundido mínimo en el borde inferior de la propia imagen para que
-              // su corte nunca sea una línea dura, ni siquiera durante los
-              // estados transitorios de carga del layout. Queda bajo el
-              // difuminado inferior, así que no resta imagen visible.
-              style={
-                isMobile
-                  ? {
-                      WebkitMaskImage:
-                        "linear-gradient(to bottom, black 90%, transparent 100%)",
-                      maskImage:
-                        "linear-gradient(to bottom, black 90%, transparent 100%)",
-                    }
-                  : {
-                      WebkitMaskImage:
-                        "linear-gradient(to bottom, black 92%, transparent 100%)",
-                      maskImage:
-                        "linear-gradient(to bottom, black 92%, transparent 100%)",
-                    }
-              }
-            />
+            <picture className="absolute inset-0 block h-full w-full">
+              {posterSrc && (
+                <source media="(max-width: 639px)" srcSet={posterSrc} />
+              )}
+              {maxBackdropSrc && (
+                <source
+                  media="(min-width: 1440px), (min-resolution: 1.5dppx)"
+                  srcSet={maxBackdropSrc}
+                />
+              )}
+              {backdropSrc && (
+                <source media="(min-width: 640px)" srcSet={backdropSrc} />
+              )}
+              {/* La selección responsive requiere <picture>; Next Image está
+                  configurado como unoptimized y no generaría srcset. */}
+              <img
+                src={bgSrc}
+                alt={title}
+                width={isMobile ? 780 : 1280}
+                height={isMobile ? 1170 : 720}
+                loading="eager"
+                decoding="async"
+                fetchPriority={isActive ? "high" : "low"}
+                onLoad={() => setLoadedBackdropSrc(bgSrc)}
+                className={`absolute inset-0 h-full w-full ${
+                  isMobile
+                    ? "object-contain object-top"
+                    : "object-contain object-right"
+                }`}
+                // Fundido mínimo en el borde inferior de la propia imagen para
+                // que su corte nunca sea una línea dura durante la carga.
+                style={
+                  isMobile
+                    ? {
+                        WebkitMaskImage:
+                          "linear-gradient(to bottom, black 90%, transparent 100%)",
+                        maskImage:
+                          "linear-gradient(to bottom, black 90%, transparent 100%)",
+                      }
+                    : {
+                        WebkitMaskImage:
+                          "linear-gradient(to bottom, black 92%, transparent 100%)",
+                        maskImage:
+                          "linear-gradient(to bottom, black 92%, transparent 100%)",
+                      }
+                }
+              />
+            </picture>
           </div>
         )}
 

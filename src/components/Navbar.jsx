@@ -29,6 +29,71 @@ import {
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 
+function normalizeSearchText(value = "") {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSearchTitle(item) {
+  return (
+    item?.title ||
+    item?.name ||
+    item?.original_title ||
+    item?.original_name ||
+    ""
+  );
+}
+
+function scoreSearchResult(item, normalizedQuery) {
+  const title = normalizeSearchText(getSearchTitle(item));
+  if (!title || !normalizedQuery) return 0;
+
+  let score = 0;
+  if (title === normalizedQuery) score += 10000;
+  else if (title.startsWith(normalizedQuery)) score += 7000;
+  else if (title.includes(normalizedQuery)) score += 5000;
+
+  const queryTokens = normalizedQuery.split(" ").filter(Boolean);
+  const matchedTokens = queryTokens.filter((token) => title.includes(token));
+  if (queryTokens.length) {
+    score += (matchedTokens.length / queryTokens.length) * 3000;
+  }
+
+  const popularity = Number(item?.popularity || 0);
+  const votes = Number(item?.vote_count || 0);
+  score += Math.min(popularity, 500) * 6;
+  score += Math.min(votes, 2500) * 0.2;
+
+  return score;
+}
+
+function normalizeSearchResult(item, fallbackMediaType = null) {
+  if (!item?.id) return null;
+  const mediaType = item.media_type || fallbackMediaType;
+  if (!["movie", "tv", "person"].includes(mediaType)) return null;
+  return { ...item, media_type: mediaType };
+}
+
+function dedupeSearchResults(results) {
+  const seen = new Set();
+  const out = [];
+  for (const item of results) {
+    const normalized = normalizeSearchResult(item);
+    if (!normalized) continue;
+    const key = `${normalized.media_type}:${normalized.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(normalized);
+  }
+  return out;
+}
+
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
@@ -84,32 +149,84 @@ function SearchBar({ onResultClick, isMobile = false }) {
 
     setIsSearching(true);
     const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+    const trimmedQuery = query.trim();
+    const normalizedQuery = normalizeSearchText(trimmedQuery);
+    const controller = new AbortController();
+
     const searchTimer = setTimeout(async () => {
       try {
-        const [multiRes, collRes] = await Promise.all([
-          fetch(
-            `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&language=es-ES&query=${encodeURIComponent(query)}`,
-          ),
-          fetch(
-            `https://api.themoviedb.org/3/search/collection?api_key=${apiKey}&language=es-ES&query=${encodeURIComponent(query)}`,
-          ),
+        const buildSearchUrl = (path, page = 1) => {
+          const params = new URLSearchParams({
+            api_key: apiKey || "",
+            language: "es-ES",
+            query: trimmedQuery,
+            page: String(page),
+            include_adult: "false",
+          });
+          return `https://api.themoviedb.org/3${path}?${params.toString()}`;
+        };
+
+        const fetchJson = async (path, page = 1) => {
+          const res = await fetch(buildSearchUrl(path, page), {
+            signal: controller.signal,
+          });
+          if (!res.ok) return { results: [] };
+          return res.json();
+        };
+
+        const [
+          multiData,
+          moviePage1,
+          moviePage2,
+          tvPage1,
+          tvPage2,
+          personPage1,
+          personPage2,
+          collData,
+        ] = await Promise.all([
+          fetchJson("/search/multi"),
+          fetchJson("/search/movie"),
+          fetchJson("/search/movie", 2),
+          fetchJson("/search/tv"),
+          fetchJson("/search/tv", 2),
+          fetchJson("/search/person"),
+          fetchJson("/search/person", 2),
+          fetchJson("/search/collection"),
         ]);
 
-        const multiData = await multiRes.json();
-        const collData = await collRes.json();
-
         const multiResults = (multiData.results || [])
-          .filter(
-            (item) =>
-              item.media_type !== "person" ||
-              item.known_for_department === "Acting",
-          )
-          .sort((a, b) => {
-            const aVotes = a.vote_count || 0;
-            const bVotes = b.vote_count || 0;
-            if (aVotes !== bVotes) return bVotes - aVotes;
-            return (b.popularity || 0) - (a.popularity || 0);
-          });
+          .map((item) => normalizeSearchResult(item))
+          .filter(Boolean);
+        const movieResults = [
+          ...(moviePage1.results || []),
+          ...(moviePage2.results || []),
+        ]
+          .map((item) => normalizeSearchResult(item, "movie"))
+          .filter(Boolean);
+        const tvResults = [
+          ...(tvPage1.results || []),
+          ...(tvPage2.results || []),
+        ]
+          .map((item) => normalizeSearchResult(item, "tv"))
+          .filter(Boolean);
+        const personResults = [
+          ...(personPage1.results || []),
+          ...(personPage2.results || []),
+        ]
+          .map((item) => normalizeSearchResult(item, "person"))
+          .filter(Boolean);
+
+        const multiResultsSorted = dedupeSearchResults([
+          ...multiResults,
+          ...movieResults,
+          ...tvResults,
+          ...personResults,
+        ]).sort(
+          (a, b) =>
+            scoreSearchResult(b, normalizedQuery) -
+              scoreSearchResult(a, normalizedQuery) ||
+            (b.popularity || 0) - (a.popularity || 0),
+        );
 
         // Precargar colección en ref para mostrarla instantáneamente tras la pausa
         const topColl = (collData.results || []).slice(0, 1).map((c) => ({
@@ -119,10 +236,11 @@ function SearchBar({ onResultClick, isMobile = false }) {
         }));
         pendingCollectionRef.current = topColl.length > 0 ? topColl[0] : null;
 
-        setResults(multiResults);
+        setResults(multiResultsSorted);
         setShowDropdown(true);
         setIsSearching(false);
       } catch (err) {
+        if (err?.name === "AbortError") return;
         console.error("Error buscando en TMDb:", err);
         setIsSearching(false);
       }
@@ -130,6 +248,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
 
     return () => {
       clearTimeout(searchTimer);
+      controller.abort();
     };
   }, [query]);
 
@@ -269,7 +388,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
               rounded-2xl bg-black/95 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-[100px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
           >
             <div className="p-2">
-              {results.slice(0, 8).map((item, index) => {
+              {results.slice(0, 8).map((item) => {
                 const isCollection = item.media_type === "collection";
                 const href = isCollection
                   ? `/lists/collection/${item.id}`

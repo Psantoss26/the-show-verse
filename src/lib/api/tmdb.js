@@ -1,5 +1,11 @@
 // /lib/api/tmdb.js
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+import {
+  cacheAddFavorite,
+  cacheRemoveFavorite,
+  cacheAddWatchlist,
+  cacheRemoveWatchlist,
+} from "@/lib/userLists/optimisticListCache";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -627,6 +633,11 @@ export async function markAsFavorite({
     console.error('markAsFavorite error:', data);
     throw new Error(data?.error || 'No se pudo actualizar favorito');
   }
+  // Actualización OPTIMISTA de la caché de la página Favoritos: el título recién
+  // añadido aparece al instante al entrar en /favorites, junto al resto (el
+  // refresco en segundo plano reescribe la lista con los datos completos).
+  if (favorite) cacheAddFavorite({ type, mediaId, title, posterPath });
+  else cacheRemoveFavorite({ type, mediaId });
   return data;
 }
 
@@ -661,6 +672,9 @@ export async function markInWatchlist({
     console.error('markInWatchlist error:', data);
     throw new Error(data?.error || 'No se pudo actualizar la lista de pendientes');
   }
+  // Actualización OPTIMISTA de la caché de la página Pendientes.
+  if (watchlist) cacheAddWatchlist({ type, mediaId, title, posterPath });
+  else cacheRemoveWatchlist({ type, mediaId });
   return data;
 }
 
