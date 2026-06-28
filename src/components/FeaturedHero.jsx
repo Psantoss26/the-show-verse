@@ -17,6 +17,7 @@ import {
   VolumeX,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -50,7 +51,7 @@ import {
 const HERO_BACKDROP_SIZE = "w1280";
 const HERO_BACKDROP_MAX_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
-const HERO_AUTO_ADVANCE_MS = 7000;
+const HERO_AUTO_ADVANCE_MS = 6000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
@@ -1290,6 +1291,7 @@ export default function FeaturedHero({
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
   const lastBackdropChoiceRef = useRef(new Map());
+  const heroSectionRef = useRef(null);
   const pointerStartRef = useRef(null);
   const suppressClickRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -1392,12 +1394,29 @@ export default function FeaturedHero({
     [deferInitialBackdrop],
   );
 
-  // Carga solo los assets del slide activo. No hay precarga de slides futuros:
-  // las previews del dashboard conservan prioridad absoluta.
+  // El slide activo se resuelve inmediatamente.
   useEffect(() => {
     if (!list.length) return;
     resolveAssetsFor(list[activeIndex]);
   }, [list, activeIndex, resolveAssetsFor]);
+
+  // Preparamos únicamente los metadatos del siguiente título cuando el
+  // navegador queda libre. No descargamos su imagen, por lo que las filas del
+  // dashboard conservan el ancho de banda y el siguiente cambio evita esperas
+  // de selección de backdrop/logo.
+  useEffect(() => {
+    if (list.length <= 1) return;
+    const nextMovie = list[(activeIndex + 1) % list.length];
+    const prepareNext = () => resolveAssetsFor(nextMovie);
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(prepareNext, { timeout: 2500 });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+
+    const timer = window.setTimeout(prepareNext, 1200);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, list, resolveAssetsFor]);
 
   const goToPrevious = useCallback(() => {
     setActiveIndex((current) =>
@@ -1534,6 +1553,20 @@ export default function FeaturedHero({
     event.stopPropagation();
   };
 
+  const scrollToDashboardContent = () => {
+    const heroHost = heroSectionRef.current?.parentElement;
+    const content = heroHost?.nextElementSibling;
+    if (!content) return;
+
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    content.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  };
+
   const indicators = list.length > 1 && (
     <div className="flex items-center justify-center gap-2" aria-label="Diapositivas destacadas">
       {list.map((movie, index) => (
@@ -1556,9 +1589,27 @@ export default function FeaturedHero({
     </div>
   );
 
+  const scrollCue = (
+    <button
+      type="button"
+      aria-label="Ver más contenido"
+      title="Ver más contenido"
+      onClick={scrollToDashboardContent}
+      className="group flex h-10 w-10 items-center justify-center text-white/65 transition-colors duration-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+    >
+      <span className="hero-scroll-cue inline-flex drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+        <ChevronDown
+          aria-hidden="true"
+          className="h-6 w-6 transition-transform duration-300 group-hover:translate-y-0.5"
+        />
+      </span>
+    </button>
+  );
+
   return (
     <>
       <section
+        ref={heroSectionRef}
         className="relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[88dvh]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
@@ -1608,18 +1659,55 @@ export default function FeaturedHero({
           </>
         )}
 
-        {!isMobile && indicators && (
-          <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-            {indicators}
+        {!isMobile && (
+          <div className="absolute bottom-1 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
+            {indicators && indicators}
+            {scrollCue}
           </div>
         )}
       </section>
 
-      {isMobile && indicators && (
-        <div className="flex items-center justify-center bg-black pb-3 pt-7 sm:hidden">
-          {indicators}
+      {isMobile && (
+        <div className="relative h-14 bg-black sm:hidden">
+          {indicators && (
+            <div className="absolute left-1/2 top-1 -translate-x-1/2">
+              {indicators}
+            </div>
+          )}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+            {scrollCue}
+          </div>
         </div>
       )}
+
+      <style jsx>{`
+        .hero-scroll-cue {
+          animation: heroScrollCue 1.8s cubic-bezier(0.45, 0, 0.55, 1)
+            infinite;
+          will-change: transform, opacity;
+        }
+
+        @keyframes heroScrollCue {
+          0%,
+          100% {
+            opacity: 0.52;
+            transform: translate3d(0, -3px, 0);
+          }
+          50% {
+            opacity: 1;
+            transform: translate3d(0, 4px, 0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hero-scroll-cue {
+            animation: none;
+            opacity: 0.8;
+            transform: none;
+            will-change: auto;
+          }
+        }
+      `}</style>
     </>
   );
 }

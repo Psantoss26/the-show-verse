@@ -154,7 +154,7 @@ async function getDashboardData() {
           recognizedTV,
           awarded: awardedSSR,
         },
-        { size: 8 },
+        { size: 10 },
       ),
       awarded: awardedSSR,
       dramaTV: curateList(dramaTV, {

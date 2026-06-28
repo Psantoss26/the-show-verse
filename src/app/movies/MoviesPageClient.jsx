@@ -1295,8 +1295,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
         {/* Título para Top 10 móvil con diseño igual a escritorio */}
         <div className="mb-4 px-1 sm:px-0">
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            <div className="h-px w-8 bg-sky-500" />
+            <span className="text-sky-400 font-bold uppercase tracking-widest text-[10px]">
               TOP 10
             </span>
           </div>
@@ -1387,8 +1387,8 @@ function Row({ title, items, isMobile, posterCacheRef }) {
       >
         {labelText && (
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            <div className="h-px w-8 bg-sky-500" />
+            <span className="text-sky-400 font-bold uppercase tracking-widest text-[10px]">
               {labelText}
             </span>
           </div>
