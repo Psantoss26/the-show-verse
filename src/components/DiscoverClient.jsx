@@ -591,7 +591,7 @@ function DiscoverCard({ item }) {
   return (
     <Link
       href={href}
-      prefetch
+      prefetch={false}
       className="group relative flex flex-col w-full h-full"
       onMouseEnter={handlePrefetch}
       onFocus={handlePrefetch}

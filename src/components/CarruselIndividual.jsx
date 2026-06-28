@@ -43,7 +43,7 @@ export default function CarruselIndividual({ movies = [], title = '', type = 'mo
       >
         {movies.map((movie) => (
           <SwiperSlide key={movie.id}>
-            <Link href={`/details/${type}/${movie.id}`} prefetch>
+            <Link href={`/details/${type}/${movie.id}`} prefetch={false}>
               <div className="cursor-pointer">
                 <OptimizedImage
                   src={`https://image.tmdb.org/t/p/w300${movie.poster_path}`}

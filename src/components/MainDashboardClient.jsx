@@ -747,35 +747,13 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
+    // Prefetch de RUTA (RSC) solo bajo intención real del usuario (hover /
+    // focus / touch). Se elimina el prefetch automático al entrar en viewport y
+    // el fetch(href) de la página completa: por cada tarjeta disparaban muchas
+    // invocaciones y transferencia en Vercel al hacer scroll. router.prefetch
+    // basta para que la navegación al pulsar sea inmediata.
     router.prefetch(href);
-    if (typeof window !== "undefined") {
-      // Calienta la caché de ruta completa (ISR) para que el push sea inmediato.
-      fetch(href, { priority: "low" }).catch(() => {});
-    }
   };
-
-  // Prefetch al entrar en viewport (como hace <Link>), clave en móvil donde no
-  // hay hover: al pulsar, el destino ya está precargado y la navegación es
-  // instantánea sin estados de carga.
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            prefetchHref();
-            observer.disconnect();
-            break;
-          }
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [href]);
 
   const navigateToDetails = () => {
     router.push(href);
@@ -1305,35 +1283,13 @@ function InlinePreviewCardAnticipated({
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
+    // Prefetch de RUTA (RSC) solo bajo intención real del usuario (hover /
+    // focus / touch). Se elimina el prefetch automático al entrar en viewport y
+    // el fetch(href) de la página completa: por cada tarjeta disparaban muchas
+    // invocaciones y transferencia en Vercel al hacer scroll. router.prefetch
+    // basta para que la navegación al pulsar sea inmediata.
     router.prefetch(href);
-    if (typeof window !== "undefined") {
-      // Calienta la caché de ruta completa (ISR) para que el push sea inmediato.
-      fetch(href, { priority: "low" }).catch(() => {});
-    }
   };
-
-  // Prefetch al entrar en viewport (como hace <Link>), clave en móvil donde no
-  // hay hover: al pulsar, el destino ya está precargado y la navegación es
-  // instantánea sin estados de carga.
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            prefetchHref();
-            observer.disconnect();
-            break;
-          }
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [href]);
 
   const navigateToDetails = () => {
     router.push(href);
@@ -2355,7 +2311,7 @@ function Row({
                         >
                           <Link
                             href={`/details/${m.media_type === "tv" || (m.name && !m.title) || m.first_air_date ? "tv" : "movie"}/${m.id}`}
-                            prefetch
+                            prefetch={false}
                           >
                             <PosterImage
                               movie={m}
@@ -3079,7 +3035,7 @@ function TopRatedHero({
                 if (!heroBackdrop) {
                   return (
                     <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
-                      <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
+                      <Link href={`/details/${mediaType}/${movie.id}`} prefetch={false}>
                         <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
                       </Link>
                     </SwiperSlide>
@@ -3088,7 +3044,7 @@ function TopRatedHero({
 
                 return (
                   <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
-                    <Link href={`/details/${mediaType}/${movie.id}`} prefetch>
+                    <Link href={`/details/${mediaType}/${movie.id}`} prefetch={false}>
                       <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
                         <NextImage
                           src={buildImg(heroBackdrop, "w780")}

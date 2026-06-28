@@ -1010,7 +1010,7 @@ function ProfileUnifiedCard({
   return (
     <Link
       href={href}
-      prefetch
+      prefetch={false}
       className={`relative z-0 block hover:z-[300] focus:z-[300] focus:outline-none ${isScrollable ? "w-32 sm:w-40 flex-shrink-0" : "w-full"}`}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}

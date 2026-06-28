@@ -44,9 +44,11 @@ import {
   formatRuntime,
 } from "@/lib/dashboard/media";
 
-// El backdrop del hero se pide en la variante original de TMDB y Next lo sirve
-// optimizado para el viewport activo, preservando la máxima calidad disponible.
-const HERO_BACKDROP_SIZE = "original";
+// El backdrop del hero se carga DIRECTO del CDN de TMDb (sin optimizador de
+// Vercel). Usamos w1280 en lugar de `original`: cubre de sobra un hero a pantalla
+// completa (va atenuado con degradado + texto encima, la diferencia no se nota)
+// y evita descargar la imagen original (varios MB) en el elemento LCP de Inicio.
+const HERO_BACKDROP_SIZE = "w1280";
 const HERO_IMAGE_QUALITY = 100;
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 7000;
