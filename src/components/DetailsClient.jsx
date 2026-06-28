@@ -5617,7 +5617,13 @@ export default function DetailsClient({
     setTraktBusy("watched");
     try {
       const next = !trakt.watched;
-      await traktSetWatched({ type: traktType, tmdbId: id, watched: next });
+      await traktSetWatched({
+        type: traktType,
+        tmdbId: id,
+        watched: next,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
+      });
       invalidateTraktGetCache({
         tmdbId: id,
         traktId: traktResolvedIdRef.current ?? undefined,

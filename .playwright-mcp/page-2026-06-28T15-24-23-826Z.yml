@@ -1,0 +1,415 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - link "Películas" [ref=e10] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e11] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e12] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e13] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e15]:
+        - link "Listas" [ref=e16] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e18]
+        - link "Calendario" [ref=e20] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e22]
+        - link "En Progreso" [ref=e24] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e26]
+        - link "Historial" [ref=e28] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e30]
+        - link "Favoritas" [ref=e33] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e35]
+        - link "Pendientes" [ref=e37] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e39]
+      - generic [ref=e42]:
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e49]
+        - button "Abrir recomendador de qué ver" [ref=e50]:
+          - img [ref=e51]
+  - generic [ref=e55]:
+    - generic [ref=e62]:
+      - generic [ref=e63]:
+        - heading "El caballero oscuro" [level=1] [ref=e64]
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - generic [ref=e67]: "2008"
+            - generic [ref=e69]: 2h 32m
+            - generic [ref=e71]: Estrenada
+          - generic [ref=e73]:
+            - generic [ref=e74]: Acción
+            - generic [ref=e75]: Crimen
+            - generic [ref=e76]: Suspense
+      - generic [ref=e78]:
+        - button "Sin Tráiler" [disabled] [ref=e79]:
+          - img [ref=e81]
+        - button "Reproducir soundtrack" [ref=e83]:
+          - img [ref=e85]
+        - button "Cargando estado de Trakt..." [disabled] [ref=e90]:
+          - img [ref=e92]
+        - button "Puntuar" [disabled] [ref=e94]:
+          - img [ref=e96]
+        - button "Cargando estado de favoritos" [disabled] [ref=e98]:
+          - img [ref=e100]
+        - button "Cargando estado de pendientes" [disabled] [ref=e102]:
+          - img [ref=e104]
+        - button "Añadir a lista" [ref=e106]:
+          - img [ref=e108]
+      - generic [ref=e112]:
+        - link "Ver en TMDb" [ref=e114] [cursor=pointer]:
+          - /url: https://www.themoviedb.org/movie/155
+          - img "Provider" [ref=e116]
+          - generic [ref=e117]:
+            - generic [ref=e119]: "8.5"
+            - generic [ref=e121]: 36K
+          - generic: Ver en TMDb
+        - generic [ref=e124]:
+          - generic [ref=e125]:
+            - button "Enlace externo" [disabled]:
+              - generic: Enlace externo
+          - button "JustWatch" [ref=e126]:
+            - generic: JustWatch
+          - button "Enlace externo" [ref=e127]:
+            - generic: Enlace externo
+          - button "FilmAffinity" [ref=e128]:
+            - generic: FilmAffinity
+        - button "Compartir" [ref=e131]:
+          - img [ref=e132]
+          - generic [ref=e138]: Compartir
+      - generic [ref=e140]:
+        - generic [ref=e141]:
+          - button "Detalles" [ref=e142]: Detalles
+          - button "Producción" [ref=e144]
+          - button "Sinopsis" [ref=e145]
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - img [ref=e151]
+            - generic [ref=e153]:
+              - generic [ref=e154]: Título Original
+              - generic [ref=e155]: The Dark Knight
+          - generic [ref=e156]:
+            - img [ref=e158]
+            - generic [ref=e160]:
+              - generic [ref=e161]: Estreno
+              - generic [ref=e162]: 16 jul 2008
+          - generic [ref=e163]:
+            - img [ref=e165]
+            - generic [ref=e168]:
+              - generic [ref=e169]: Presupuesto
+              - generic [ref=e170]: $185.0M
+          - generic [ref=e171]:
+            - img [ref=e173]
+            - generic [ref=e176]:
+              - generic [ref=e177]: Recaudación
+              - generic [ref=e178]: $1004.6M
+    - generic [ref=e179]:
+      - navigation [ref=e183]:
+        - generic [ref=e190]:
+          - button "Reparto" [ref=e191]:
+            - generic [ref=e192]:
+              - img [ref=e194]
+              - generic [ref=e199]: Reparto
+          - button "Recomendaciones" [ref=e200]:
+            - generic [ref=e201]:
+              - img [ref=e203]
+              - generic [ref=e206]: Recomendaciones
+          - button "Colección" [ref=e207]:
+            - generic [ref=e208]:
+              - img [ref=e210]
+              - generic [ref=e214]: Colección
+          - button "Media" [ref=e215]:
+            - generic [ref=e216]:
+              - img [ref=e218]
+              - generic [ref=e222]: Media
+          - button "Sentimientos" [ref=e223]:
+            - generic [ref=e224]:
+              - img [ref=e226]
+              - generic [ref=e228]: Sentimientos
+          - button "Comentarios" [ref=e229]:
+            - generic [ref=e230]:
+              - img [ref=e232]
+              - generic [ref=e234]: Comentarios
+          - button "Listas" [ref=e235]:
+            - generic [ref=e236]:
+              - img [ref=e238]
+              - generic [ref=e240]: Listas
+      - generic [ref=e241]:
+        - generic [ref=e244]:
+          - generic [ref=e245]:
+            - img [ref=e248]
+            - heading "Reparto Principal" [level=2] [ref=e253]
+          - generic [ref=e260]:
+            - link "Christopher Nolan Christopher Nolan Director" [ref=e262] [cursor=pointer]:
+              - /url: /details/person/525
+              - generic [ref=e263]:
+                - img "Christopher Nolan" [ref=e264]
+                - generic [ref=e266]:
+                  - paragraph [ref=e267]: Christopher Nolan
+                  - paragraph [ref=e268]: Director
+            - link "Christian Bale Christian Bale Bruce Wayne" [ref=e270] [cursor=pointer]:
+              - /url: /details/person/3894
+              - generic [ref=e271]:
+                - img "Christian Bale" [ref=e272]
+                - generic [ref=e274]:
+                  - paragraph [ref=e275]: Christian Bale
+                  - paragraph [ref=e276]: Bruce Wayne
+            - link "Heath Ledger Heath Ledger Joker" [ref=e278] [cursor=pointer]:
+              - /url: /details/person/1810
+              - generic [ref=e279]:
+                - img "Heath Ledger" [ref=e280]
+                - generic [ref=e282]:
+                  - paragraph [ref=e283]: Heath Ledger
+                  - paragraph [ref=e284]: Joker
+            - link "Aaron Eckhart Aaron Eckhart Harvey Dent" [ref=e286] [cursor=pointer]:
+              - /url: /details/person/6383
+              - generic [ref=e287]:
+                - img "Aaron Eckhart" [ref=e288]
+                - generic [ref=e290]:
+                  - paragraph [ref=e291]: Aaron Eckhart
+                  - paragraph [ref=e292]: Harvey Dent
+            - link "Michael Caine Michael Caine Alfred" [ref=e294] [cursor=pointer]:
+              - /url: /details/person/3895
+              - generic [ref=e295]:
+                - img "Michael Caine" [ref=e296]
+                - generic [ref=e298]:
+                  - paragraph [ref=e299]: Michael Caine
+                  - paragraph [ref=e300]: Alfred
+            - link "Maggie Gyllenhaal Maggie Gyllenhaal Rachel" [ref=e302] [cursor=pointer]:
+              - /url: /details/person/1579
+              - generic [ref=e303]:
+                - img "Maggie Gyllenhaal" [ref=e304]
+                - generic [ref=e306]:
+                  - paragraph [ref=e307]: Maggie Gyllenhaal
+                  - paragraph [ref=e308]: Rachel
+            - link "Gary Oldman Gary Oldman Gordon" [ref=e310] [cursor=pointer]:
+              - /url: /details/person/64
+              - generic [ref=e311]:
+                - img "Gary Oldman" [ref=e312]
+                - generic [ref=e314]:
+                  - paragraph [ref=e315]: Gary Oldman
+                  - paragraph [ref=e316]: Gordon
+            - link "Morgan Freeman Morgan Freeman Lucius Fox" [ref=e318] [cursor=pointer]:
+              - /url: /details/person/192
+              - generic [ref=e319]:
+                - img "Morgan Freeman" [ref=e320]
+                - generic [ref=e322]:
+                  - paragraph [ref=e323]: Morgan Freeman
+                  - paragraph [ref=e324]: Lucius Fox
+            - link "Monique Gabriela Curnen Monique Gabriela Curnen Ramirez" [ref=e326] [cursor=pointer]:
+              - /url: /details/person/53651
+              - generic [ref=e327]:
+                - img "Monique Gabriela Curnen" [ref=e328]
+                - generic [ref=e330]:
+                  - paragraph [ref=e331]: Monique Gabriela Curnen
+                  - paragraph [ref=e332]: Ramirez
+            - link "Ron Dean Ron Dean Wuertz" [ref=e334] [cursor=pointer]:
+              - /url: /details/person/57597
+              - generic [ref=e335]:
+                - img "Ron Dean" [ref=e336]
+                - generic [ref=e338]:
+                  - paragraph [ref=e339]: Ron Dean
+                  - paragraph [ref=e340]: Wuertz
+            - link "Cillian Murphy Cillian Murphy Scarecrow" [ref=e342] [cursor=pointer]:
+              - /url: /details/person/2037
+              - generic [ref=e343]:
+                - img "Cillian Murphy" [ref=e344]
+                - generic [ref=e346]:
+                  - paragraph [ref=e347]: Cillian Murphy
+                  - paragraph [ref=e348]: Scarecrow
+            - link "Chin Han Chin Han Lau" [ref=e350] [cursor=pointer]:
+              - /url: /details/person/101015
+              - generic [ref=e351]:
+                - img "Chin Han" [ref=e352]
+                - generic [ref=e354]:
+                  - paragraph [ref=e355]: Chin Han
+                  - paragraph [ref=e356]: Lau
+            - link "Nestor Carbonell Nestor Carbonell Mayor" [ref=e358] [cursor=pointer]:
+              - /url: /details/person/21316
+              - generic [ref=e359]:
+                - img "Nestor Carbonell" [ref=e360]
+                - generic [ref=e362]:
+                  - paragraph [ref=e363]: Nestor Carbonell
+                  - paragraph [ref=e364]: Mayor
+            - link "Eric Roberts Eric Roberts Maroni" [ref=e366] [cursor=pointer]:
+              - /url: /details/person/21315
+              - generic [ref=e367]:
+                - img "Eric Roberts" [ref=e368]
+                - generic [ref=e370]:
+                  - paragraph [ref=e371]: Eric Roberts
+                  - paragraph [ref=e372]: Maroni
+            - link "Ritchie Coster Ritchie Coster Chechen" [ref=e374] [cursor=pointer]:
+              - /url: /details/person/13939
+              - generic [ref=e375]:
+                - img "Ritchie Coster" [ref=e376]
+                - generic [ref=e378]:
+                  - paragraph [ref=e379]: Ritchie Coster
+                  - paragraph [ref=e380]: Chechen
+            - link "Anthony Michael Hall Anthony Michael Hall Engel" [ref=e382] [cursor=pointer]:
+              - /url: /details/person/1904
+              - generic [ref=e383]:
+                - img "Anthony Michael Hall" [ref=e384]
+                - generic [ref=e386]:
+                  - paragraph [ref=e387]: Anthony Michael Hall
+                  - paragraph [ref=e388]: Engel
+            - link "Keith Szarabajka Keith Szarabajka Stephens" [ref=e390] [cursor=pointer]:
+              - /url: /details/person/87957
+              - generic [ref=e391]:
+                - img "Keith Szarabajka" [ref=e392]
+                - generic [ref=e394]:
+                  - paragraph [ref=e395]: Keith Szarabajka
+                  - paragraph [ref=e396]: Stephens
+            - link "Colin McFarlane Colin McFarlane Loeb" [ref=e398] [cursor=pointer]:
+              - /url: /details/person/128386
+              - generic [ref=e399]:
+                - img "Colin McFarlane" [ref=e400]
+                - generic [ref=e402]:
+                  - paragraph [ref=e403]: Colin McFarlane
+                  - paragraph [ref=e404]: Loeb
+            - link "Joshua Harto Joshua Harto Reese" [ref=e406] [cursor=pointer]:
+              - /url: /details/person/34544
+              - generic [ref=e407]:
+                - img "Joshua Harto" [ref=e408]
+                - generic [ref=e410]:
+                  - paragraph [ref=e411]: Joshua Harto
+                  - paragraph [ref=e412]: Reese
+            - link "Melinda McGraw Melinda McGraw Barbara Gordon" [ref=e414] [cursor=pointer]:
+              - /url: /details/person/58692
+              - generic [ref=e415]:
+                - img "Melinda McGraw" [ref=e416]
+                - generic [ref=e418]:
+                  - paragraph [ref=e419]: Melinda McGraw
+                  - paragraph [ref=e420]: Barbara Gordon
+        - generic [ref=e423]:
+          - generic [ref=e424]:
+            - img [ref=e427]
+            - heading "Recomendaciones" [level=2] [ref=e430]
+          - generic [ref=e437]:
+            - link "Batman" [ref=e439] [cursor=pointer]:
+              - /url: /details/movie/268
+              - img "Batman" [ref=e441]
+            - 'link "El caballero oscuro: La leyenda renace" [ref=e443] [cursor=pointer]':
+              - /url: /details/movie/49026
+              - 'img "El caballero oscuro: La leyenda renace" [ref=e445]'
+            - link "Batman Begins" [ref=e447] [cursor=pointer]:
+              - /url: /details/movie/272
+              - img "Batman Begins" [ref=e449]
+            - link "The Batman" [ref=e451] [cursor=pointer]:
+              - /url: /details/movie/414906
+              - img "The Batman" [ref=e453]
+            - link "The Flash" [ref=e455] [cursor=pointer]:
+              - /url: /details/movie/232842
+              - img "The Flash" [ref=e457]
+            - link "Sin Culpa" [ref=e459] [cursor=pointer]:
+              - /url: /details/movie/854467
+              - img "Sin Culpa" [ref=e461]
+            - 'link "Batman: El asalto de Arkham" [ref=e463] [cursor=pointer]':
+              - /url: /details/movie/242643
+              - 'img "Batman: El asalto de Arkham" [ref=e465]'
+            - link "Cazando al Asesino" [ref=e467] [cursor=pointer]:
+              - /url: /details/movie/1319895
+              - img "Cazando al Asesino" [ref=e469]
+            - link "Soy el número cuatro" [ref=e471] [cursor=pointer]:
+              - /url: /details/movie/46529
+              - img "Soy el número cuatro" [ref=e473]
+            - link "Hora punta 3" [ref=e475] [cursor=pointer]:
+              - /url: /details/movie/5174
+              - img "Hora punta 3" [ref=e477]
+            - link "Hora punta 2" [ref=e479] [cursor=pointer]:
+              - /url: /details/movie/5175
+              - img "Hora punta 2" [ref=e481]
+            - link "El Mediador" [ref=e483] [cursor=pointer]:
+              - /url: /details/movie/823625
+              - img "El Mediador" [ref=e485]
+            - 'link "Batman: El misterio de Batwoman" [ref=e487] [cursor=pointer]':
+              - /url: /details/movie/21683
+              - 'img "Batman: El misterio de Batwoman" [ref=e489]'
+            - link "Los Implacables, Patrulla Especial" [ref=e491] [cursor=pointer]:
+              - /url: /details/movie/32080
+              - img "Los Implacables, Patrulla Especial" [ref=e493]
+            - 'link "La serie Divergente: Insurgente" [ref=e495] [cursor=pointer]':
+              - /url: /details/movie/262500
+              - 'img "La serie Divergente: Insurgente" [ref=e497]'
+        - generic [ref=e500]:
+          - link "Ver detalles de la colección" [ref=e501] [cursor=pointer]:
+            - /url: /lists/collection/263
+            - img [ref=e504]
+            - heading "Colección" [level=2] [ref=e508]:
+              - text: Colección
+              - img [ref=e509]
+          - generic [ref=e514]: No hay datos de colección.
+        - generic [ref=e515]:
+          - generic [ref=e518]:
+            - generic [ref=e519]:
+              - img [ref=e522]
+              - heading "Portadas y fondos" [level=2] [ref=e526]
+            - generic [ref=e530]:
+              - generic [ref=e531]:
+                - generic [ref=e532]:
+                  - button "Portada" [ref=e533]
+                  - button "Vista previa" [ref=e534]
+                  - button "Fondo" [ref=e535]
+                - button "Resolución" [ref=e537]:
+                  - generic [ref=e538]:
+                    - generic [ref=e539]: RES
+                    - generic [ref=e540]: Todas
+                  - img [ref=e541]
+                - generic "Idioma" [ref=e543]:
+                  - button "ES" [ref=e544]
+                  - button "EN" [ref=e545]
+              - button "Restaurar valores por defecto" [ref=e546]:
+                - img [ref=e547]
+          - generic [ref=e557]:
+            - img [ref=e560]
+            - heading "Tráiler y vídeos" [level=2] [ref=e563]
+        - generic [ref=e631]:
+          - generic [ref=e632]:
+            - img [ref=e635]
+            - heading "Análisis de sentimientos" [level=2] [ref=e637]
+          - generic [ref=e641]:
+            - generic [ref=e643]:
+              - img "Trakt" [ref=e645]
+              - generic [ref=e646]:
+                - heading "Opiniones de la comunidad de Trakt" [level=3] [ref=e647]
+                - paragraph [ref=e648]: Resumen oficial de sentimientos de Trakt sobre El caballero oscuro
+            - generic [ref=e650]:
+              - generic [ref=e651]:
+                - generic [ref=e652]:
+                  - img [ref=e654]
+                  - generic [ref=e656]: Positivo
+                - generic [ref=e657]: No hay suficientes datos positivos.
+              - generic [ref=e658]:
+                - generic [ref=e659]:
+                  - img [ref=e661]
+                  - generic [ref=e663]: Negativo
+                - generic [ref=e664]: No hay suficientes datos negativos.
+        - generic [ref=e667]:
+          - generic [ref=e668]:
+            - img [ref=e671]
+            - heading "Comentarios" [level=2] [ref=e673]
+          - generic [ref=e677]:
+            - generic [ref=e679]:
+              - button "Top 30 Días" [ref=e680]
+              - button "Top Histórico" [ref=e681]
+              - button "Recientes" [ref=e682]
+            - generic [ref=e684]:
+              - img [ref=e685]
+              - paragraph [ref=e687]: Sé el primero en comentar.
+        - generic [ref=e691]:
+          - img [ref=e694]
+          - heading "Listas" [level=2] [ref=e696]
+  - button "Open Next.js Dev Tools" [ref=e705] [cursor=pointer]:
+    - img [ref=e706]

@@ -112,7 +112,6 @@ const LISTS = {
 // a esa página tras una marca de visto; el resto sigue con su pintado instantáneo.
 const IN_PROGRESS_CACHE_KEY = "showverse:showverse:in-progress:v6";
 const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v4";
-const HISTORY_CACHE_KEY = "showverse:history:items:v4";
 
 function removeKeys(keys) {
   try {
@@ -199,12 +198,11 @@ export function cacheRemoveHistory(historyId) {
   );
 }
 
-// Marcar visto un episodio/temporada/serie cambia DOS páginas: "En progreso"
-// (y Completadas) y el "Historial" (crea entradas de visualización). Invalidamos
-// sus cachés para que, en la siguiente visita, pidan la lista fresca y muestren
-// las novedades junto al resto, en vez de pintar una caché obsoleta que aún no
-// las contiene. Solo afecta a esas páginas tras marcar algo visto; el resto de
-// la navegación conserva su pintado instantáneo.
+// Marcar visto cambia la página "En progreso" (y "Completadas"): invalidamos sus
+// cachés para que en la siguiente visita pidan la lista fresca. NO tocamos el
+// "Historial": ese se actualiza de forma OPTIMISTA al añadir una visualización
+// (cacheAddHistory), para que el título nuevo salga al instante junto al resto
+// y no "después de cargar" (borrar su caché forzaría justo eso).
 export function clearWatchDerivedCaches() {
-  removeKeys([IN_PROGRESS_CACHE_KEY, COMPLETED_CACHE_KEY, HISTORY_CACHE_KEY]);
+  removeKeys([IN_PROGRESS_CACHE_KEY, COMPLETED_CACHE_KEY]);
 }

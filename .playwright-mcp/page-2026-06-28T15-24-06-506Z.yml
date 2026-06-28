@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - link "Películas" [ref=e10] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e11] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e12] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e13] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e15]:
+        - link "Listas" [ref=e16] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e18]
+        - link "Calendario" [ref=e20] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e22]
+        - link "En Progreso" [ref=e24] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e26]
+        - link "Historial" [ref=e28] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e30]
+        - link "Favoritas" [ref=e33] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e36]
+        - link "Pendientes" [ref=e38] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e40]
+      - generic [ref=e43]:
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e50]
+        - button "Abrir recomendador de qué ver" [ref=e51]:
+          - img [ref=e52]
+  - button "Open Next.js Dev Tools" [ref=e61] [cursor=pointer]:
+    - img [ref=e62]

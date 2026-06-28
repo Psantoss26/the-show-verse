@@ -1,0 +1,74 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "The Show Verse" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "The Show Verse" [ref=e7]
+        - generic [ref=e8]:
+          - link "Inicio" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - link "Películas" [ref=e10] [cursor=pointer]:
+            - /url: /movies
+          - link "Series" [ref=e11] [cursor=pointer]:
+            - /url: /series
+          - link "Descubrir" [ref=e12] [cursor=pointer]:
+            - /url: /discover
+          - link "Biblioteca" [ref=e13] [cursor=pointer]:
+            - /url: /biblioteca
+      - generic [ref=e15]:
+        - link "Listas" [ref=e16] [cursor=pointer]:
+          - /url: /lists
+          - img [ref=e18]
+        - link "Calendario" [ref=e20] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e22]
+        - link "En Progreso" [ref=e24] [cursor=pointer]:
+          - /url: /in-progress
+          - img [ref=e26]
+        - link "Historial" [ref=e28] [cursor=pointer]:
+          - /url: /history
+          - img [ref=e30]
+        - link "Favoritas" [ref=e33] [cursor=pointer]:
+          - /url: /favorites
+          - img [ref=e35]
+        - link "Pendientes" [ref=e37] [cursor=pointer]:
+          - /url: /watchlist
+          - img [ref=e39]
+      - generic [ref=e42]:
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - textbox "Buscar películas, series, actores o colecciones..." [ref=e49]
+        - button "Abrir recomendador de qué ver" [ref=e50]:
+          - img [ref=e51]
+  - main [ref=e53]:
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - img "The Show Verse" [ref=e58]
+        - heading "Iniciar sesión" [level=1] [ref=e59]
+      - link "Continuar con Google" [ref=e60] [cursor=pointer]:
+        - /url: /api/auth/google/start?next=%2F
+        - img [ref=e61]
+        - text: Continuar con Google
+      - generic [ref=e68]: o
+      - generic [ref=e70]:
+        - button "Entrar" [ref=e71]: Entrar
+        - button "Crear" [ref=e73]
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - generic [ref=e76]: Email
+          - generic [ref=e77]:
+            - img
+            - textbox "tu@email.com" [ref=e78]
+        - generic [ref=e79]:
+          - generic [ref=e80]: Contraseña
+          - generic [ref=e81]:
+            - img
+            - textbox "Tu contraseña" [ref=e82]
+            - button [ref=e83]:
+              - img [ref=e84]
+      - button "Entrar" [ref=e87] [cursor=pointer]:
+        - img [ref=e88]
+        - generic [ref=e91]: Entrar
+  - button "Open Next.js Dev Tools" [ref=e97] [cursor=pointer]:
+    - img [ref=e98]
