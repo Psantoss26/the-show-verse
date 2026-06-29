@@ -993,10 +993,10 @@ export default function Navbar() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed left-4 right-4 z-30 mx-auto max-w-lg rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-2 overflow-visible transition-[height,bottom] duration-300 ease-out ${
+        className={`lg:hidden fixed z-30 mx-auto rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-2 overflow-visible transition-all duration-300 ease-out ${
           isScrolled
-            ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
-            : "bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
+            ? "left-12 right-12 max-w-md bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
+            : "left-4 right-4 max-w-lg bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
         }`}
       >
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
