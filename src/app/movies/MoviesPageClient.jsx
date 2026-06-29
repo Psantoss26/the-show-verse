@@ -17,6 +17,7 @@ import {
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1677,9 +1678,14 @@ export default function MoviesPageClient({
   // Filas de la engine de dashboards (genérico rotativo + recomendaciones,
   // deduplicado por el backend; sin Trakt). Sustituyen a las filas TMDb
   // genéricas que repetían títulos.
+  // NO ocultar las filas SSR mientras llega la versión personalizada: si se
+  // ocultan, un usuario con sesión se queda solo con el hero (sin secciones y
+  // sin poder hacer scroll) hasta que responde /api/dashboard/movies —varios
+  // segundos si el backend está frío—. Mostramos las filas SSR al instante y la
+  // engine las sustituye por las personalizadas en segundo plano (stabilizeRows
+  // minimiza el reordenado).
   const { rows: engineRows } = useEngineRows("movies", {
     initialRows: initialEngineRows,
-    deferInitialRowsUntilHydrated: true,
   });
   const rowConfigs = useMemo(
     () =>
@@ -1712,7 +1718,10 @@ export default function MoviesPageClient({
   }, [rowConfigs.length, visibleRowCount]);
 
   const visibleRows = rowConfigs.slice(0, visibleRowCount);
-  const featuredItems = dashboardData.featured || EMPTY_ARRAY;
+  // Reduce en el hero los títulos ya vistos / en favoritos (criterio cliente).
+  const featuredItems = usePersonalizedFeatured(
+    dashboardData.featured || EMPTY_ARRAY,
+  );
   const hasFeaturedHero = featuredItems.length > 0;
 
   if (!initialData || Object.keys(initialData).length === 0) {

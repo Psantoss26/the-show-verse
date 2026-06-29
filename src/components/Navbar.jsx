@@ -643,12 +643,27 @@ export default function Navbar() {
     const toneClass = active ? t.active : t.inactive;
 
     return (
-      "relative group mx-1 my-2 flex h-12 flex-1 items-center justify-center rounded-full " +
-      "transition-all duration-300 ease-out " +
-      "hover:-translate-y-0.5 active:scale-95 focus:outline-none " +
+      "relative group flex h-[calc(100%_-_0.25rem)] min-w-0 flex-1 items-center justify-center rounded-full " +
+      "transition-[color,transform] duration-300 ease-out " +
+      "active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 " +
       `${toneClass}`
     );
   };
+
+  const mobileBottomIconSlotClass =
+    "absolute left-1/2 top-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center transition-all duration-300 ease-out " +
+    (isScrolled ? "-translate-y-1/2" : "-translate-y-[85%]");
+
+  const mobileBottomIconClass =
+    "shrink-0 transition-[width,height] duration-300 ease-out " +
+    (isScrolled ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5");
+
+  const mobileBottomLabelClass =
+    "pointer-events-none absolute inset-x-0 bottom-1.5 z-10 block truncate px-0.5 text-center text-[9px] font-semibold leading-[11px] tracking-tight " +
+    "transition-[opacity,transform] duration-200 ease-out " +
+    (isScrolled
+      ? "translate-y-1 opacity-0"
+      : "translate-y-0 opacity-100");
 
   // Menú inferior fijo: las secciones siempre son accesibles; cada página muestra
   // su conexión necesaria si la cuenta correspondiente no está enlazada.
@@ -976,7 +991,14 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      <div className="lg:hidden fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 mx-auto max-w-lg h-16 rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-4 overflow-visible">
+      <nav
+        aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
+        className={`lg:hidden fixed left-4 right-4 z-30 mx-auto max-w-lg rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-2 overflow-visible transition-[height,bottom] duration-300 ease-out ${
+          isScrolled
+            ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
+            : "bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
+        }`}
+      >
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
         <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
 
@@ -986,6 +1008,7 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/movies")}
           onFocus={() => prefetchNavRoute("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
+          aria-current={isActive("/movies") ? "page" : undefined}
         >
           {isActive("/movies") && (
             <motion.div
@@ -994,8 +1017,11 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <FilmIcon className="w-6 h-6" />
+          <span className={mobileBottomIconSlotClass}>
+            <FilmIcon className={mobileBottomIconClass} />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_movies", "Películas")}
           </span>
         </Link>
 
@@ -1005,6 +1031,7 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/series")}
           onFocus={() => prefetchNavRoute("/series")}
           className={navLinkClassMobileBottom("/series", "purple")}
+          aria-current={isActive("/series") ? "page" : undefined}
         >
           {isActive("/series") && (
             <motion.div
@@ -1013,8 +1040,11 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <TvIcon className="w-6 h-6" />
+          <span className={mobileBottomIconSlotClass}>
+            <TvIcon className={mobileBottomIconClass} />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_series", "Series")}
           </span>
         </Link>
 
@@ -1023,6 +1053,7 @@ export default function Navbar() {
           prefetch
           {...navPrefetchHandlers("/in-progress")}
           className={navLinkClassMobileBottom("/in-progress", "green")}
+          aria-current={isActive("/in-progress") ? "page" : undefined}
         >
           {isActive("/in-progress") && (
             <motion.div
@@ -1031,8 +1062,11 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <Play className="w-6 h-6" fill="currentColor" />
+          <span className={mobileBottomIconSlotClass}>
+            <Play className={mobileBottomIconClass} fill="currentColor" />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_in_progress_short", "En curso")}
           </span>
         </Link>
 
@@ -1041,6 +1075,7 @@ export default function Navbar() {
           prefetch
           {...navPrefetchHandlers("/history")}
           className={navLinkClassMobileBottom("/history", "green")}
+          aria-current={isActive("/history") ? "page" : undefined}
         >
           {isActive("/history") && (
             <motion.div
@@ -1049,8 +1084,11 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <Eye className="w-6 h-6" />
+          <span className={mobileBottomIconSlotClass}>
+            <Eye className={mobileBottomIconClass} />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_history", "Historial")}
           </span>
         </Link>
 
@@ -1059,6 +1097,7 @@ export default function Navbar() {
           prefetch
           {...navPrefetchHandlers(favHref)}
           className={navLinkClassMobileBottom("/favorites", "red")}
+          aria-current={isActive(favHref) ? "page" : undefined}
         >
           {isActive(favHref) && (
             <motion.div
@@ -1067,8 +1106,11 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <Heart className="w-6 h-6" />
+          <span className={mobileBottomIconSlotClass}>
+            <Heart className={mobileBottomIconClass} />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_favorites", "Favoritas")}
           </span>
         </Link>
 
@@ -1077,6 +1119,7 @@ export default function Navbar() {
           prefetch
           {...navPrefetchHandlers(watchHref)}
           className={navLinkClassMobileBottom("/watchlist", "blue")}
+          aria-current={isActive(watchHref) ? "page" : undefined}
         >
           {isActive(watchHref) && (
             <motion.div
@@ -1085,11 +1128,14 @@ export default function Navbar() {
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
-          <span className="relative z-10 flex items-center justify-center">
-            <Bookmark className="w-6 h-6" />
+          <span className={mobileBottomIconSlotClass}>
+            <Bookmark className={mobileBottomIconClass} />
+          </span>
+          <span className={mobileBottomLabelClass}>
+            {t("nav_watchlist", "Pendientes")}
           </span>
         </Link>
-      </div>
+      </nav>
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
       <AnimatePresence>

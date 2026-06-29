@@ -42,3 +42,6 @@ coverage/
 .gstack/
 .specify/
 specs/
+
+# Capturas/volcados de Playwright MCP (solo locales)
+.playwright-mcp/

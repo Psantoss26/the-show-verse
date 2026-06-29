@@ -320,6 +320,110 @@ function prewarmPreviewTrailer(tvId) {
   return videosPromise;
 }
 
+/* ============== PRECALENTADO DE EMBEDS (HOVER-INTENT) ==============
+ * El retardo al hacer hover viene de que el iframe de YouTube SOLO empieza a
+ * cargar cuando se expande la tarjeta: hay que descargar el reproductor, abrir
+ * la conexión con YouTube y bufferear, todo en frío (~1-3 s).
+ *
+ * Para que arranque rápido, "calentamos" el embed en cuanto el cursor se ACERCA
+ * (entra en la fila / en una tarjeta y su vecina): montamos un iframe oculto y
+ * silenciado que ya descarga el player JS y abre la conexión. Cuando luego se
+ * monta el iframe visible de la preview, su carga es mucho más rápida porque el
+ * reproductor y la conexión ya están en caché. El pool está acotado (LRU) para
+ * no descargar de más, y se vacía al salir de la fila. */
+const WARM_EMBED_POOL_MAX = 3;
+const warmEmbedPool = new Map(); // videoKey -> { iframe, ts }
+
+function ensureWarmEmbedHost() {
+  if (typeof document === "undefined") return null;
+  let host = document.getElementById("cw-warm-embed-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "cw-warm-embed-host";
+    host.setAttribute("aria-hidden", "true");
+    // Fuera de pantalla pero RENDERIZADO (no display:none, que en algunos
+    // navegadores bloquea la carga del media). Tamaño mínimo: solo nos interesa
+    // calentar la descarga/conexión, no verlo.
+    host.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;";
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+function releaseWarmEmbed(key) {
+  const entry = warmEmbedPool.get(key);
+  if (!entry) return;
+  try {
+    entry.iframe.src = "about:blank";
+    entry.iframe.remove();
+  } catch {
+    // El nodo pudo haberse retirado ya.
+  }
+  warmEmbedPool.delete(key);
+}
+
+function warmTrailerEmbed(video) {
+  if (typeof document === "undefined" || !video) return;
+  // Solo YouTube: Vimeo (background=1) arranca solo y no tiene el mismo coste.
+  if (video.site !== "YouTube") return;
+  const key = getVideoIdentity(video);
+  if (!key) return;
+
+  const existing = warmEmbedPool.get(key);
+  if (existing) {
+    existing.ts = Date.now(); // refresca posición LRU
+    return;
+  }
+
+  const src = buildPreviewTrailerSrc(video);
+  const host = ensureWarmEmbedHost();
+  if (!src || !host) return;
+
+  const iframe = document.createElement("iframe");
+  iframe.src = src;
+  iframe.tabIndex = -1;
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.setAttribute("allow", "autoplay; encrypted-media");
+  iframe.width = "320";
+  iframe.height = "180";
+  iframe.style.cssText = "width:320px;height:180px;border:0;opacity:0;";
+  host.appendChild(iframe);
+  warmEmbedPool.set(key, { iframe, ts: Date.now() });
+
+  // LRU: no mantener más de N embeds calientes a la vez.
+  if (warmEmbedPool.size > WARM_EMBED_POOL_MAX) {
+    let oldestKey = null;
+    let oldestTs = Infinity;
+    for (const [k, v] of warmEmbedPool) {
+      if (v.ts < oldestTs) {
+        oldestTs = v.ts;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) releaseWarmEmbed(oldestKey);
+  }
+}
+
+// Resuelve el trailer de un show (de caché, o pidiéndolo) y calienta su embed.
+function warmPreviewTrailerEmbed(tvId) {
+  if (!tvId || typeof window === "undefined") return;
+  const cached = readCachedPreviewTrailerVideos(tvId);
+  if (cached && cached[0]) {
+    warmTrailerEmbed(cached[0]);
+    return;
+  }
+  resolvePreviewTrailerVideos(tvId)
+    .then((videos) => {
+      if (videos && videos[0]) warmTrailerEmbed(videos[0]);
+    })
+    .catch(() => {});
+}
+
+function clearWarmEmbedPool() {
+  for (const key of Array.from(warmEmbedPool.keys())) releaseWarmEmbed(key);
+}
+
 function readCachedPreviewTrailerVideos(tvId) {
   if (!tvId) return null;
   const cached = previewTrailerVideosCache.get(`tv:${tvId}`);
@@ -1310,6 +1414,10 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     });
   }, [activeIndex, shows, isMobile, hydrated, perView]);
 
+  // Al desmontar la fila, libera cualquier embed caliente que quedara (p. ej.
+  // si se navega mientras el cursor seguía dentro de la fila).
+  useEffect(() => clearWarmEmbedPool, []);
+
   const clearHoverOpenTimer = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -1353,9 +1461,17 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       .forEach((show) => prewarmPreviewTrailer(show?.id));
   };
 
-  const handleMouseEnterItem = (itemKey, tvId) => {
+  const handleMouseEnterItem = (itemKey, tvId, index) => {
     if (isMobile) return;
     prewarmPreviewTrailer(tvId);
+    // Calienta el embed de ESTA tarjeta y el de la siguiente (anticipando el
+    // movimiento lateral del cursor), para que al expandir el trailer ya esté
+    // casi listo. El pool LRU acotado evita descargar de más.
+    warmPreviewTrailerEmbed(tvId);
+    if (typeof index === "number" && Array.isArray(shows)) {
+      const next = shows[index + 1];
+      if (next?.id) warmPreviewTrailerEmbed(next.id);
+    }
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     openPreview(itemKey);
@@ -1533,10 +1649,17 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         onMouseEnter={() => {
           setIsHoveredRow(true);
           prewarmVisibleTrailers();
+          // Calienta ya el embed de la primera tarjeta visible: cuando el cursor
+          // llegue a ella (o a su vecina), el trailer arrancará casi al instante.
+          const firstVisible = shows?.[Math.max(0, activeIndex)];
+          if (firstVisible?.id) warmPreviewTrailerEmbed(firstVisible.id);
         }}
         onMouseLeave={() => {
           clearHoverOpenTimer();
           setIsHoveredRow(false);
+          // Al salir de la fila liberamos los embeds calientes: paramos cualquier
+          // reproducción de fondo y evitamos consumo innecesario.
+          clearWarmEmbedPool();
           const currentHoveredId = hoveredIdRef.current;
           if (currentHoveredId) {
             handleMouseLeaveItem(currentHoveredId);
@@ -1594,20 +1717,20 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
               const dimensionClasses = isMobile
                 ? `w-full ${ROW_HEIGHT}`
                 : "w-full aspect-video";
-              const sizeClasses = `${dimensionClasses} ${
-                isActive || isAnimatingOut ? "z-[90]" : "z-10"
-              }`;
+              const sizeClasses = dimensionClasses;
 
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={isMobile ? "select-none" : "select-none pointer-events-auto"}
+                  className={`${isMobile ? "select-none" : "select-none pointer-events-auto"} ${
+                    isActive ? "!z-[90] !overflow-visible" : isAnimatingOut ? "!z-[80] !overflow-visible" : "!z-10"
+                  }`}
                 >
                   <div
                     className={`${base} ${sizeClasses} ${
                       isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
                     }`}
-                    onMouseEnter={() => handleMouseEnterItem(itemKey, show.id)}
+                    onMouseEnter={() => handleMouseEnterItem(itemKey, show.id, i)}
                     onMouseLeave={() => {
                       if (!isActive) handleMouseLeaveItem(itemKey);
                     }}
