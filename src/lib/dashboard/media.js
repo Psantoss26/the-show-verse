@@ -250,15 +250,23 @@ export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) 
 }
 
 // Selecciona el mejor backdrop SIN idioma (textless, iso_639_1 nulo), ideal para
-// superponer un logotipo encima. Si no hay textless, cae al de mayor resolución.
+// superponer un logotipo encima. El fallback con idioma puede desactivarse para
+// superficies que necesitan garantizar arte completamente textless.
 export function pickBestBackdropNoLang(
   list,
-  { minWidth = 1280, offset = 0, limit = 0, excludePaths = [] } = {},
+  {
+    minWidth = 1280,
+    offset = 0,
+    limit = 0,
+    excludePaths = [],
+    allowLanguageFallback = true,
+  } = {},
 ) {
   if (!Array.isArray(list) || list.length === 0) return null;
 
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const noLang = list.filter((b) => !norm(b?.iso_639_1));
+  if (!noLang.length && !allowLanguageFallback) return null;
   const pool = noLang.length ? noLang : list;
   const excluded = new Set(excludePaths.filter(Boolean));
 

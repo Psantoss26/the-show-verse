@@ -14,6 +14,7 @@ import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
+import OptimizedImage from "@/components/OptimizedImage";
 import { useRouter } from "next/navigation";
 import {
   Heart,
@@ -25,6 +26,11 @@ import {
   FilmIcon,
   TvIcon,
   ChevronRight,
+  Award,
+  Loader2,
+  Music2,
+  Pause,
+  Volume2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -60,7 +66,9 @@ import {
   movieBackdropCache,
   getArtworkPreference,
   fetchBestBackdrop,
+  fetchBestBackdropNoLang,
   fetchBestPoster,
+  fetchBestLogo,
   preparePreviewBackdrop,
   getBestTrailerCached,
 } from "@/lib/dashboard/media";
@@ -75,6 +83,7 @@ const DASHBOARD_SECTION_CACHE_TTL_MS = 60 * 60 * 1000;
 const DASHBOARD_FETCH_TIMEOUT_MS = 8500;
 const INITIAL_VISIBLE_ENGINE_ROWS = 6;
 const ENGINE_ROW_REVEAL_BATCH_SIZE = 4;
+const spotlightBackdropCache = new Map();
 
 function toItemsArray(value) {
   if (Array.isArray(value)) return value;
@@ -293,11 +302,12 @@ const dashboardSegmentButtonClass = (active) =>
       : "text-zinc-400 hover:bg-white/5 hover:text-white",
   ].join(" ");
 
-const dashboardPreviewCardClass = (heightClass) =>
+const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
   [
-    "relative isolate grid grid-rows-[76%_24%] overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
-    "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px]",
-    "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
+    "relative isolate overflow-hidden text-white cursor-pointer transform-gpu",
+    isSpotlight
+      ? "rounded-2xl bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
+      : "grid grid-rows-[76%_24%] rounded-lg bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
     "transition-all duration-300",
     heightClass,
   ].join(" ");
@@ -534,14 +544,24 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
   );
 }
 
-function getInitialDashboardPreviewBackdrop(movie, backdropOverride) {
+function getInitialDashboardPreviewBackdrop(
+  movie,
+  backdropOverride,
+  isSpotlight = false,
+) {
   if (!movie?.id) return null;
+
+  const mediaType = getMediaTypeForItem(movie);
+  if (isSpotlight) {
+    return (
+      spotlightBackdropCache.get(getBackdropCacheKey(movie, mediaType)) || null
+    );
+  }
 
   const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
   if (userBackdrop) return userBackdrop;
   if (backdropOverride) return backdropOverride;
 
-  const mediaType = getMediaTypeForItem(movie);
   const cachedBackdrop = movieBackdropCache.get(
     getBackdropCacheKey(movie, mediaType),
   );
@@ -552,14 +572,21 @@ function getInitialDashboardPreviewBackdrop(movie, backdropOverride) {
 /* ====================================================================
  * Vista previa inline tipo Amazon (backdrop horizontal) + TRAILER
  * ==================================================================== */
-function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
+function InlinePreviewCard({
+  movie,
+  heightClass,
+  backdropOverride,
+  isSpotlight = false,
+}) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const mediaType = getMediaTypeForItem(movie);
 
   const [extras, setExtras] = useState({
     runtime: null,
     awards: null,
     imdbRating: null,
+    overview: null,
   });
   const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
   const [stableBackdropState, setStableBackdropState] = useState(() => ({
@@ -571,7 +598,11 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       ? stableBackdropState.value
       : backdropOverride;
   const [backdropPath, setBackdropPath] = useState(() =>
-    getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
+    getInitialDashboardPreviewBackdrop(
+      movie,
+      stableBackdropOverride,
+      isSpotlight,
+    ),
   );
   const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
 
@@ -580,6 +611,15 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   const [watchlist, setWatchlist] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+
+  const [logoPath, setLogoPath] = useState(null);
+  const [soundtrackTrack, setSoundtrackTrack] = useState(null);
+  const [soundtrackLoading, setSoundtrackLoading] = useState(false);
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false);
+  const [soundtrackError, setSoundtrackError] = useState("");
+  const audioRef = useRef(null);
+  const soundtrackAbortRef = useRef(null);
 
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
@@ -598,6 +638,14 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     setShowTrailer(false);
     setTrailer(null);
     setTrailerLoading(false);
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackTrack(null);
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+    setSoundtrackError("");
   }, [movie?.id]);
 
   useEffect(() => {
@@ -629,6 +677,41 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
   }, [movie, session, account]);
 
   useEffect(() => {
+    let cancel = false;
+    setLogoPath(null);
+    if (!isSpotlight || !movie?.id) return;
+
+    fetchBestLogo(movie.id, mediaType, ["es", "en", null])
+      .then((path) => {
+        if (!cancel) setLogoPath(path || null);
+      })
+      .catch(() => {
+        if (!cancel) setLogoPath(null);
+      });
+
+    return () => {
+      cancel = true;
+    };
+  }, [isSpotlight, mediaType, movie?.id]);
+
+  useEffect(() => {
+    if (!soundtrackOpen) return;
+
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      soundtrackAbortRef.current?.abort();
+      soundtrackAbortRef.current = null;
+      audioRef.current?.pause();
+      setSoundtrackLoading(false);
+      setSoundtrackPlaying(false);
+      setSoundtrackOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [soundtrackOpen]);
+
+  useEffect(() => {
     let abort = false;
     if (!movie) return;
 
@@ -639,31 +722,49 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
         setBackdropReady(!!path);
       };
 
-      const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-      const mediaType = getMediaTypeForItem(movie);
       const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
-      if (userBackdrop) {
-        movieBackdropCache.set(backdropCacheKey, userBackdrop);
-        revealBackdrop(userBackdrop);
-      } else if (stableBackdropOverride) {
-        movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
-        revealBackdrop(stableBackdropOverride);
-      } else {
-        const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
+      if (isSpotlight) {
+        const cachedBackdrop = spotlightBackdropCache.get(backdropCacheKey);
         if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const preferred = await fetchBestBackdrop(movie.id, mediaType);
-            const chosen = preferred || getPreviewBackdropFallback(movie);
-
-            movieBackdropCache.set(backdropCacheKey, chosen);
-
+            const chosen =
+              await fetchBestBackdropNoLang(movie.id, mediaType, {
+                allowLanguageFallback: false,
+              });
+            spotlightBackdropCache.set(backdropCacheKey, chosen);
             revealBackdrop(chosen);
           } catch {
-            const fallback = getPreviewBackdropFallback(movie);
-            movieBackdropCache.set(backdropCacheKey, fallback);
-            revealBackdrop(fallback);
+            spotlightBackdropCache.set(backdropCacheKey, null);
+            revealBackdrop(null);
+          }
+        }
+      } else {
+        const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
+        if (userBackdrop) {
+          movieBackdropCache.set(backdropCacheKey, userBackdrop);
+          revealBackdrop(userBackdrop);
+        } else if (stableBackdropOverride) {
+          movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
+          revealBackdrop(stableBackdropOverride);
+        } else {
+          const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
+          if (cachedBackdrop !== undefined) {
+            revealBackdrop(cachedBackdrop);
+          } else {
+            try {
+              const preferred = await fetchBestBackdrop(movie.id, mediaType);
+              const chosen = preferred || getPreviewBackdropFallback(movie);
+
+              movieBackdropCache.set(backdropCacheKey, chosen);
+
+              revealBackdrop(chosen);
+            } catch {
+              const fallback = getPreviewBackdropFallback(movie);
+              movieBackdropCache.set(backdropCacheKey, fallback);
+              revealBackdrop(fallback);
+            }
           }
         }
       }
@@ -674,10 +775,15 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       } else {
         try {
           let runtime = null;
+          let overview = null;
           try {
             if (mediaType === "movie") {
               const details = await getMovieDetails(movie.id);
               runtime = details?.runtime ?? null;
+              overview =
+                (typeof details?.overview === "string" &&
+                  details.overview.trim()) ||
+                null;
             } else {
               // Para series, obtener info de la API de TV
               const response = await fetch(
@@ -685,6 +791,10 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
               );
               if (response.ok) {
                 const details = await response.json();
+                overview =
+                  (typeof details?.overview === "string" &&
+                    details.overview.trim()) ||
+                  null;
                 // Para series mostramos temporadas y episodios
                 if (details.number_of_seasons) {
                   runtime = `${details.number_of_seasons} Temp.`;
@@ -723,12 +833,17 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             }
           } catch {}
 
-          const next = { runtime, awards, imdbRating };
+          const next = { runtime, awards, imdbRating, overview };
           movieExtrasCache.set(movie.id, next);
           if (!abort) setExtras(next);
         } catch {
           if (!abort)
-            setExtras({ runtime: null, awards: null, imdbRating: null });
+            setExtras({
+              runtime: null,
+              awards: null,
+              imdbRating: null,
+              overview: null,
+            });
         }
       }
     };
@@ -737,14 +852,8 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     return () => {
       abort = true;
     };
-  }, [movie, stableBackdropOverride]);
+  }, [isSpotlight, mediaType, movie, stableBackdropOverride]);
 
-  const mediaType =
-    movie.media_type === "tv" ||
-    (movie.name && !movie.title) ||
-    movie.first_air_date
-      ? "tv"
-      : "movie";
   const href = `/details/${mediaType}/${movie.id}`;
 
   const cardRef = useRef(null);
@@ -825,8 +934,19 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     }
   };
 
+  const closeSoundtrackOverlay = (e) => {
+    e?.stopPropagation();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+  };
+
   const handleToggleTrailer = async (e) => {
     e.stopPropagation();
+    closeSoundtrackOverlay();
 
     if (showTrailer) {
       setShowTrailer(false);
@@ -857,9 +977,102 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
     }
   };
 
+  const handleToggleSoundtrack = async (e) => {
+    e.stopPropagation();
+    if (soundtrackLoading) return;
+
+    if (soundtrackOpen) {
+      closeSoundtrackOverlay();
+      return;
+    }
+
+    if (showTrailer) setShowTrailer(false);
+    setSoundtrackOpen(true);
+    setSoundtrackError("");
+
+    if (soundtrackTrack?.previewUrl) return;
+
+    const controller = new AbortController();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = controller;
+    setSoundtrackLoading(true);
+
+    try {
+      const title = movie.title || movie.name || "";
+      const params = new URLSearchParams({
+        title,
+        type: mediaType,
+        country: "ES",
+        tmdbId: String(movie.id),
+      });
+      const originalTitle = movie.original_title || movie.original_name;
+      if (originalTitle && originalTitle !== title) {
+        params.set("originalTitle", originalTitle);
+      }
+      const year = yearOf(movie);
+      if (year) params.set("year", String(year));
+
+      const response = await fetch(`/api/soundtrack?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Soundtrack HTTP ${response.status}`);
+
+      const data = await response.json();
+      const track = Array.isArray(data?.tracks)
+        ? data.tracks.find((item) => item?.previewUrl)
+        : null;
+
+      if (!track?.previewUrl) {
+        setSoundtrackError(
+          "No se encontró una canción con preview para este título.",
+        );
+        return;
+      }
+
+      setSoundtrackTrack({
+        id: track.id || track.previewUrl,
+        previewUrl: track.previewUrl,
+        trackName: track.trackName || track.name || "Soundtrack",
+        artistName: track.artistName || "",
+        artworkUrl: track.artworkUrl || "",
+        source: track.source || "",
+      });
+    } catch (requestError) {
+      if (requestError?.name !== "AbortError") {
+        setSoundtrackError("No se pudo cargar el soundtrack.");
+      }
+    } finally {
+      if (soundtrackAbortRef.current === controller) {
+        soundtrackAbortRef.current = null;
+        setSoundtrackLoading(false);
+      }
+    }
+  };
+
+  const handleToggleSoundtrackPlayback = async (e) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio || !soundtrackTrack?.previewUrl) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+
+    audio.volume = 0.3;
+    try {
+      await audio.play();
+    } catch {
+      setSoundtrackPlaying(false);
+    }
+  };
+
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
+  const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
+  const tmdbRating = ratingOf(movie);
+  const hasTmdbRating = tmdbRating !== "–";
 
   const genres = (() => {
     const ids =
@@ -880,6 +1093,11 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       }`
     : null;
 
+  // Botones de la vista previa: más grandes en la fila destacada (×1,6).
+  const previewBtnClass = isSpotlight
+    ? "!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+    : "!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5";
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -887,13 +1105,19 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       ref={cardRef}
-      className={dashboardPreviewCardClass(heightClass)}
+      className={dashboardPreviewCardClass(heightClass, isSpotlight)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
-      <div className={dashboardPreviewMediaClass}>
+      <div
+        className={
+          isSpotlight
+            ? "absolute inset-0 h-full w-full overflow-hidden bg-neutral-950"
+            : dashboardPreviewMediaClass
+        }
+      >
         {!showTrailer && !backdropReady && (
           <div className="relative w-full h-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 overflow-hidden">
             <motion.div
@@ -911,15 +1135,31 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
             src={bgSrc}
             alt={movie.title || movie.name}
             fill
-            sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-            className={`scale-[1.015] object-cover transition-opacity duration-200 ${
+            sizes={
+              isSpotlight
+                ? "(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
+                : "(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
+            }
+            className={`object-cover transition-opacity duration-200 ${
+              isSpotlight ? "" : "scale-[1.015]"
+            } ${
               backdropReady ? "opacity-100" : "opacity-0"
             }`}
-            style={dashboardPreviewBackdropFadeStyle}
+            style={
+              isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle
+            }
             loading="eager"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
             onError={() => {
+              if (isSpotlight) {
+                spotlightBackdropCache.set(
+                  getBackdropCacheKey(movie, mediaType),
+                  null,
+                );
+                setBackdropReady(false);
+                return;
+              }
               const fallback = getPreviewBackdropFallback(movie);
               if (fallback && fallback !== backdropPath) {
                 movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
@@ -975,122 +1215,435 @@ function InlinePreviewCard({ movie, heightClass, backdropOverride }) {
           </>
         )}
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24
-                      bg-gradient-to-b from-transparent via-black/35 to-black/70"
-        />
+        {isSpotlight ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/20" />
+          </>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24
+                        bg-gradient-to-b from-transparent via-black/35 to-black/70"
+          />
+        )}
       </div>
 
-      <div className={dashboardPreviewInfoClass}>
-        <div className="h-full px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-neutral-200">
-              {yearOf(movie) && <span>{yearOf(movie)}</span>}
-              {extras?.runtime && (
-                <span>• {formatRuntime(extras.runtime)}</span>
+      <div
+        className={
+          isSpotlight
+            ? "absolute inset-0 z-10 h-full w-full"
+            : dashboardPreviewInfoClass
+        }
+      >
+        {isSpotlight ? (
+          <div className="flex h-full items-end p-5 md:p-6 xl:p-8">
+            <div className="min-w-0 max-w-[88%] sm:max-w-[82%] md:max-w-[72%] xl:max-w-[68%]">
+              {logoSrc ? (
+                <div className="relative mb-3 h-16 w-full max-w-[17rem] md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
+                  <NextImage
+                    src={logoSrc}
+                    alt={movie.title || movie.name}
+                    fill
+                    sizes="(min-width:1280px) 336px, 272px"
+                    className="object-contain object-left drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]"
+                    loading="eager"
+                  />
+                </div>
+              ) : (
+                <h3 className="mb-3 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl">
+                  {movie.title || movie.name}
+                </h3>
               )}
 
-              <span className="inline-flex items-center gap-1.5">
-                <NextImage
-                  src="/logo-TMDb.png"
-                  alt="TMDb"
-                  className="h-3 w-auto"
-                  width={2560}
-                  height={1846}
-                  sizes="32px"
-                  loading="lazy"
-                />
-                <span className="font-medium">{ratingOf(movie)}</span>
-              </span>
+              <motion.div
+                className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+              >
+                <button
+                  type="button"
+                  onClick={handleToggleTrailer}
+                  disabled={trailerLoading}
+                  aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:px-5 sm:text-base"
+                >
+                  {showTrailer ? (
+                    <X className="h-5 w-5" />
+                  ) : (
+                    <Play className="h-5 w-5 fill-current" />
+                  )}
+                  <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
+                </button>
 
-              {typeof extras?.imdbRating === "number" && (
-                <span className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-IMDb.svg"
-                    alt="IMDb"
-                    className="h-4 w-auto"
-                    width={575}
-                    height={290}
-                    sizes="40px"
-                    loading="lazy"
-                  />
-                  <span className="font-medium">
-                    {extras.imdbRating.toFixed(1)}
+                <LiquidButton
+                  onClick={handleToggleSoundtrack}
+                  loading={soundtrackLoading}
+                  active={soundtrackOpen}
+                  activeColor="yellow"
+                  groupId="dashboard-spotlight-actions"
+                  title={
+                    soundtrackOpen
+                      ? "Cerrar soundtrack"
+                      : "Reproducir soundtrack"
+                  }
+                  aria-label={
+                    soundtrackOpen
+                      ? "Cerrar soundtrack"
+                      : "Reproducir soundtrack"
+                  }
+                  className={previewBtnClass}
+                >
+                  {soundtrackPlaying ? <Pause /> : <Volume2 />}
+                </LiquidButton>
+
+                <LiquidButton
+                  onClick={handleToggleFavorite}
+                  loading={loadingStates || updating}
+                  active={favorite}
+                  activeColor="red"
+                  groupId="dashboard-spotlight-actions"
+                  title={
+                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                  }
+                  aria-label={
+                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                  }
+                  className={previewBtnClass}
+                >
+                  <Heart className={favorite ? "fill-current" : ""} />
+                </LiquidButton>
+
+                <LiquidButton
+                  onClick={handleToggleWatchlist}
+                  loading={loadingStates || updating}
+                  active={watchlist}
+                  activeColor="blue"
+                  groupId="dashboard-spotlight-actions"
+                  title={
+                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                  }
+                  aria-label={
+                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                  }
+                  className={previewBtnClass}
+                >
+                  <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+                </LiquidButton>
+              </motion.div>
+
+              {extras?.awards && (
+                <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{extras.awards}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.68rem] font-semibold text-zinc-200 sm:text-xs">
+                {Number(tmdbRating) >= 7.5 && (
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                    Mejor valorado
                   </span>
-                </span>
+                )}
+                <span>{mediaType === "tv" ? "Serie" : "Película"}</span>
+                {yearOf(movie) && <span>{yearOf(movie)}</span>}
+                {extras?.runtime && (
+                  <span>{formatRuntime(extras.runtime)}</span>
+                )}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:text-sm">
+                {genres && <span>{genres}</span>}
+                {hasTmdbRating && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <NextImage
+                      src="/logo-TMDb.png"
+                      alt="TMDb"
+                      className="h-3 w-auto"
+                      width={2560}
+                      height={1846}
+                      sizes="32px"
+                      loading="lazy"
+                    />
+                    <span className="font-bold">{tmdbRating}</span>
+                  </span>
+                )}
+                {typeof extras?.imdbRating === "number" && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <NextImage
+                      src="/logo-IMDb.svg"
+                      alt="IMDb"
+                      className="h-4 w-auto"
+                      width={575}
+                      height={290}
+                      sizes="40px"
+                      loading="lazy"
+                    />
+                    <span className="font-bold">
+                      {extras.imdbRating.toFixed(1)}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {error && (
+                <p className="mt-2 line-clamp-1 text-xs text-red-300">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-between gap-4 px-4 py-2 sm:px-6 sm:py-2.5 lg:px-8">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-200 sm:text-xs">
+                {yearOf(movie) && <span>{yearOf(movie)}</span>}
+                {extras?.runtime && (
+                  <span>• {formatRuntime(extras.runtime)}</span>
+                )}
+
+                {hasTmdbRating && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <NextImage
+                      src="/logo-TMDb.png"
+                      alt="TMDb"
+                      className="h-3 w-auto"
+                      width={2560}
+                      height={1846}
+                      sizes="32px"
+                      loading="lazy"
+                    />
+                    <span className="font-medium">{tmdbRating}</span>
+                  </span>
+                )}
+
+                {typeof extras?.imdbRating === "number" && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <NextImage
+                      src="/logo-IMDb.svg"
+                      alt="IMDb"
+                      className="h-4 w-auto"
+                      width={575}
+                      height={290}
+                      sizes="40px"
+                      loading="lazy"
+                    />
+                    <span className="font-medium">
+                      {extras.imdbRating.toFixed(1)}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {genres && (
+                <div className="mt-1 line-clamp-1 text-[11px] text-neutral-100/90 sm:text-xs">
+                  {genres}
+                </div>
+              )}
+
+              {extras?.awards && (
+                <div className="mt-1 text-[10px] leading-tight text-emerald-300 sm:text-[11px]">
+                  {extras.awards}
+                </div>
+              )}
+
+              {error && (
+                <p className="mt-1 line-clamp-1 text-[11px] text-red-400">
+                  {error}
+                </p>
               )}
             </div>
 
-            {genres && (
-              <div className="mt-1 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
-                {genres}
-              </div>
-            )}
+            <motion.div
+              className="flex flex-shrink-0 items-center gap-2 sm:gap-3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <LiquidButton
+                onClick={handleToggleTrailer}
+                loading={trailerLoading}
+                active
+                activeColor="yellow"
+                groupId="dashboard-preview-actions"
+                title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+                className={`!bg-white !text-black ${previewBtnClass}`}
+              >
+                {showTrailer ? (
+                  <X className="text-black" />
+                ) : (
+                  <Play className="ml-0.5 fill-current text-black" />
+                )}
+              </LiquidButton>
 
-            {extras?.awards && (
-              <div className="mt-1 text-[10px] sm:text-[11px] leading-tight text-emerald-300">
-                {extras.awards}
-              </div>
-            )}
+              <LiquidButton
+                onClick={handleToggleFavorite}
+                loading={loadingStates || updating}
+                active={favorite}
+                activeColor="red"
+                groupId="dashboard-preview-actions"
+                title={
+                  favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                }
+                className={previewBtnClass}
+              >
+                <Heart className={favorite ? "fill-current" : ""} />
+              </LiquidButton>
 
-            {error && (
-              <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
-                {error}
-              </p>
-            )}
+              <LiquidButton
+                onClick={handleToggleWatchlist}
+                loading={loadingStates || updating}
+                active={watchlist}
+                activeColor="blue"
+                groupId="dashboard-preview-actions"
+                title={
+                  watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                }
+                className={previewBtnClass}
+              >
+                <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+              </LiquidButton>
+            </motion.div>
           </div>
-
-          <motion.div
-            className="flex items-center gap-2 sm:gap-3 flex-shrink-0"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <LiquidButton
-              onClick={handleToggleTrailer}
-              loading={trailerLoading}
-              active
-              activeColor="yellow"
-              groupId="dashboard-preview-actions"
-              title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="!h-9 !w-9 !bg-white !text-black sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              {showTrailer ? (
-                <X className="text-black" />
-              ) : (
-                <Play className="ml-0.5 fill-current text-black" />
-              )}
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={handleToggleFavorite}
-              loading={loadingStates || updating}
-              active={favorite}
-              activeColor="red"
-              groupId="dashboard-preview-actions"
-              title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <Heart className={favorite ? "fill-current" : ""} />
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={handleToggleWatchlist}
-              loading={loadingStates || updating}
-              active={watchlist}
-              activeColor="blue"
-              groupId="dashboard-preview-actions"
-              title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className="!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-            </LiquidButton>
-          </motion.div>
-        </div>
+        )}
       </div>
+
+      <AnimatePresence>
+        {soundtrackOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden rounded-[inherit] p-4"
+            role="dialog"
+            aria-label={`Soundtrack de ${movie.title || movie.name}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {bgSrc && (
+              <NextImage
+                src={bgSrc}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes="(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
+                className="scale-110 object-cover opacity-55 blur-2xl"
+              />
+            )}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl" />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="relative flex min-h-32 w-full max-w-[32rem] items-center gap-4 overflow-hidden rounded-[1.75rem] bg-black/45 bg-gradient-to-br from-white/15 via-white/[0.06] to-black/35 p-4 pr-12 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.16),0_24px_50px_-18px_rgba(0,0,0,0.95)] backdrop-blur-3xl sm:gap-5 sm:p-5 sm:pr-14"
+            >
+              <button
+                type="button"
+                onClick={closeSoundtrackOverlay}
+                autoFocus
+                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:h-10 sm:w-10"
+                aria-label="Cerrar soundtrack"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+
+              {soundtrackLoading ? (
+                <div
+                  className="flex min-h-24 w-full items-center justify-center gap-3 text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Loader2 className="h-7 w-7 animate-spin text-amber-300" />
+                  <span className="text-sm font-semibold">
+                    Buscando música...
+                  </span>
+                </div>
+              ) : soundtrackTrack ? (
+                <>
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_18px_35px_-14px_rgba(0,0,0,0.95)] sm:h-32 sm:w-32">
+                    {soundtrackTrack.artworkUrl ? (
+                      <OptimizedImage
+                        src={soundtrackTrack.artworkUrl}
+                        alt={`Portada de ${soundtrackTrack.trackName}`}
+                        decoding="async"
+                        fetchPriority="high"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Music2
+                          className="h-10 w-10 text-amber-300/60"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1 truncate text-[0.62rem] font-bold uppercase tracking-[0.18em] text-white/45 sm:text-[0.68rem]">
+                      {movie.title || movie.name}
+                    </p>
+                    <h4 className="line-clamp-2 text-base font-black leading-tight text-white drop-shadow-md sm:text-xl">
+                      {soundtrackTrack.trackName}
+                    </h4>
+                    {soundtrackTrack.artistName && (
+                      <p className="mt-1 line-clamp-1 text-xs font-medium text-white/65 sm:text-sm">
+                        {soundtrackTrack.artistName}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleToggleSoundtrackPlayback}
+                      className="mt-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[0_10px_30px_-12px_rgba(255,255,255,0.35)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/20 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                      aria-label={
+                        soundtrackPlaying
+                          ? "Pausar canción"
+                          : "Reproducir canción"
+                      }
+                    >
+                      {soundtrackPlaying ? (
+                        <Pause className="h-5 w-5 fill-current" />
+                      ) : (
+                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                      )}
+                    </button>
+
+                    <audio
+                      ref={audioRef}
+                      src={soundtrackTrack.previewUrl}
+                      autoPlay
+                      loop
+                      preload="metadata"
+                      className="hidden"
+                      onLoadedMetadata={(event) => {
+                        event.currentTarget.volume = 0.3;
+                      }}
+                      onPlay={() => setSoundtrackPlaying(true)}
+                      onPause={() => setSoundtrackPlaying(false)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="flex min-h-24 w-full flex-col items-center justify-center gap-2 text-center text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Music2 className="h-8 w-8 text-amber-300/50" />
+                  <p className="max-w-72 text-sm font-medium">
+                    {soundtrackError ||
+                      "No se encontró música para este título."}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -1806,6 +2359,7 @@ function Row({
   labelText, // Label superior para la sección
   sectionHref,
   reserveWhileEmpty = false,
+  spotlight = false, // Fila DESTACADA (×1,6). La elige el padre (una por dashboard).
 }) {
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
@@ -1936,13 +2490,9 @@ function Row({
   ]);
 
   const hasActivePreview = !!hoveredId;
-  // Fila DESTACADA: mismas tarjetas póster y misma vista previa, pero a ~1,6×
-  // para resaltar UNA sección relevante del dashboard. En Inicio no existe
-  // "Tendencias ahora mismo" (sí en Películas/Series), así que aquí la destacada
-  // es "Estrenos y novedades", la sección más prominente tras el hero.
-  const isSpotlight =
-    (title === "Tendencias ahora mismo" || title === "Estrenos y novedades") &&
-    previewKind !== "anticipated";
+  // Fila DESTACADA (×1,6): la elige el padre (exactamente una por dashboard) y
+  // la pasa por `spotlight`. Nunca en la variante "anticipated".
+  const isSpotlight = spotlight && previewKind !== "anticipated";
   const heightClassDesktop = isSpotlight
     ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
     : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
@@ -1951,7 +2501,7 @@ function Row({
   const normalPosterWidthClass =
     "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
   const spotlightPreviewWidthClass =
-    "w-[440px] sm:w-[480px] md:w-[620px] xl:w-[720px]";
+    "w-[604px] sm:w-[711px] md:w-[818px] xl:w-[924px]";
   const normalPreviewWidthClass =
     "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
@@ -2164,6 +2714,10 @@ function Row({
                 : (isActive && previewKind !== "anticipated")
                   ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
                   : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
+              const itemBoxClass =
+                isActive && isSpotlight && previewKind !== "anticipated"
+                  ? "h-full aspect-video"
+                  : posterBoxClass;
 
               const zOverflowClasses = previewKind === "anticipated"
                 ? isActive
@@ -2234,10 +2788,16 @@ function Row({
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={isMobile ? "select-none" : `!w-auto select-none ${slideZIndexClass}`}
+                  className={
+                    isMobile
+                      ? "select-none"
+                      : `!w-auto select-none ${slideZIndexClass} ${
+                          isSpotlight ? "!flex !items-center" : ""
+                        }`
+                  }
                 >
                   <div
-                    className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${zOverflowClasses}`}
+                    className={`${base} ${sizeClasses} ${itemBoxClass} ${transformClass} ${zOverflowClasses}`}
                     onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
                     onMouseLeave={() => handleMouseLeaveItem(itemKey)}
                   >
@@ -2279,8 +2839,11 @@ function Row({
                           >
                             <InlinePreviewCard
                               movie={m}
-                              heightClass={heightClassDesktop}
+                              heightClass={
+                                isSpotlight ? "h-full" : heightClassDesktop
+                              }
                               backdropOverride={backdropOverride}
+                              isSpotlight={isSpotlight}
                             />
                           </motion.div>
                         )
@@ -3212,6 +3775,22 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
     visibleEngineRowCount,
   );
 
+  // Una ÚNICA fila destacada (×1,6) en Inicio. Las filas de la engine son
+  // dinámicas, así que elegimos por prioridad la primera presente: Tendencias y,
+  // si no existe, Estrenos. Así nunca se destacan dos filas a la vez.
+  const spotlightRowTitle = useMemo(() => {
+    // En Inicio la sección destacada es "Estrenos y novedades": las filas tipo
+    // tendencias/recomendaciones se deduplican entre sí y a veces no se pintan,
+    // mientras que Estrenos aparece de forma fiable. Solo se elige si tiene
+    // contenido (una fila vacía no se pinta). Una única destacada por dashboard.
+    const titles = renderableEngineRows
+      .filter((row) => Array.isArray(row.items) && row.items.length > 0)
+      .map((row) => row.title);
+    return titles.includes("Estrenos y novedades")
+      ? "Estrenos y novedades"
+      : null;
+  }, [renderableEngineRows]);
+
   const allMovieIds = useMemo(() => {
     const keys = [
       "topRatedMovies",
@@ -3362,6 +3941,9 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 posterOverrides={posterOverrides}
                 backdropOverrides={backdropOverrides}
                 overridesReady={overridesReady}
+                spotlight={
+                  !!spotlightRowTitle && row.title === spotlightRowTitle
+                }
               />
             ))}
           </motion.div>
