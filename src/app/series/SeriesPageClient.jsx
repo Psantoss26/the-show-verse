@@ -1239,10 +1239,23 @@ function Row({
   }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
 
   const isTop10 = title === "Top 10 hoy en España";
+  // Fila DESTACADA: mismas tarjetas póster y misma vista previa, pero a ~1,6×
+  // para resaltar la sección más relevante (Tendencias). Solo una por dashboard.
+  const isSpotlight = title === "Tendencias ahora mismo";
   const hasActivePreview = !!hoveredId;
 
-  const heightClassDesktop =
-    "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  const heightClassDesktop = isSpotlight
+    ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
+    : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  // Tokens de tamaño de la tarjeta póster y de la vista previa (hover).
+  const spotlightPosterWidthClass =
+    "w-[200px] sm:w-[220px] md:w-[300px] xl:w-[340px]";
+  const normalPosterWidthClass =
+    "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
+  const spotlightPreviewWidthClass =
+    "w-[440px] sm:w-[480px] md:w-[620px] xl:w-[720px]";
+  const normalPreviewWidthClass =
+    "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
   if (!hasItems) return null;
@@ -1271,8 +1284,10 @@ function Row({
           aria-hidden="true"
           className={
             isMobile
-              ? "min-h-[200px]"
-              : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
+              ? isSpotlight
+                ? "min-h-[300px]"
+                : "min-h-[200px]"
+              : heightClassDesktop
           }
         />
       </motion.div>
@@ -1362,11 +1377,11 @@ function Row({
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
   const breakpointsRow = {
-    0: { slidesPerView: 3, spaceBetween: isTop10 ? 16 : 12 },
-    640: { slidesPerView: 4, spaceBetween: isTop10 ? 18 : 14 },
-    768: { slidesPerView: "auto", spaceBetween: isTop10 ? 24 : 14 },
-    1024: { slidesPerView: "auto", spaceBetween: isTop10 ? 28 : 18 },
-    1280: { slidesPerView: "auto", spaceBetween: isTop10 ? 32 : 20 },
+    0: { slidesPerView: isSpotlight ? 1.5 : 3, spaceBetween: isSpotlight ? 14 : isTop10 ? 16 : 12 },
+    640: { slidesPerView: isSpotlight ? 2.2 : 4, spaceBetween: isSpotlight ? 18 : isTop10 ? 18 : 14 },
+    768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : isTop10 ? 24 : 14 },
+    1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : isTop10 ? 28 : 18 },
+    1280: { slidesPerView: "auto", spaceBetween: isSpotlight ? 36 : isTop10 ? 32 : 20 },
   };
 
   return (
@@ -1406,8 +1421,8 @@ function Row({
         }}
       >
         <Swiper
-          slidesPerView={3}
-          spaceBetween={isTop10 ? 16 : 12}
+          slidesPerView={isSpotlight ? 1.5 : 3}
+          spaceBetween={isSpotlight ? 14 : isTop10 ? 16 : 12}
           onSwiper={handleSwiper}
           onSlideChange={updateNav}
           onResize={updateNav}
@@ -1442,10 +1457,10 @@ function Row({
             const sizeClasses = isMobile
               ? "w-full"
               : isActive
-                ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
+                ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
                 : isTop10
                   ? "w-[280px] sm:w-[320px] md:w-[390px] xl:w-[440px] z-10"
-                : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
+                : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
 
             let transformClass = "";
             if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
@@ -1454,14 +1469,17 @@ function Row({
 
               if (activeIndex >= totalItems - 3 && i <= activeIndex) {
                 if (activeIndex === totalItems - 1) {
-                  transformClass =
-                    "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
+                  transformClass = isSpotlight
+                    ? "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]"
+                    : "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
                 } else if (activeIndex === totalItems - 2) {
-                  transformClass =
-                    "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
+                  transformClass = isSpotlight
+                    ? "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]"
+                    : "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
                 } else if (activeIndex === totalItems - 3) {
-                  transformClass =
-                    "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
+                  transformClass = isSpotlight
+                    ? "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]"
+                    : "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
                 }
               }
             }

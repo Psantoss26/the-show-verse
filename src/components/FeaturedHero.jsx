@@ -1720,12 +1720,16 @@ export default function FeaturedHero({
 
       <style jsx>{`
         .featured-hero-shell {
-          --hero-desktop-max-height: 88dvh;
+          --hero-desktop-max-height: 92dvh;
         }
 
-        @media (min-width: 100rem) and (min-height: 53.125rem) and (min-aspect-ratio: 3 / 2) and (max-aspect-ratio: 2 / 1) {
+        /* Pantallas grandes (FullHD y panorámicas): el hero ocupa casi toda la
+           altura visible, dejando solo un pequeño margen inferior. Se amplía el
+           rango de relación de aspecto hasta 3/1 para cubrir también monitores
+           anchos/ultrapanorámicos, donde antes quedaba demasiado negro abajo. */
+        @media (min-width: 100rem) and (min-height: 53.125rem) and (min-aspect-ratio: 3 / 2) and (max-aspect-ratio: 3 / 1) {
           .featured-hero-shell {
-            --hero-desktop-max-height: 94dvh;
+            --hero-desktop-max-height: 95dvh;
           }
         }
 
