@@ -14,6 +14,15 @@ const FEATURED_ROTATION_WINDOW_MS = 30 * 60 * 1000;
 const FEATURED_ROTATION_POOL_MULTIPLIER = 3;
 const FEATURED_ROTATION_JITTER = 0.32;
 
+// Recomendaciones del hero: "de los últimos 20 años como mucho". Lo anterior se
+// descarta del pool, y dentro de la ventana penalizamos los estrenos muy
+// recientes (este año / el último año largo) para favorecer títulos asentados,
+// populares y bien valorados de las dos últimas décadas.
+const FEATURED_MAX_AGE_YEARS = 20;
+// Un título cuenta como "reciente" (sujeto a penalización y a un tope de cuántos
+// pueden aparecer) si tiene menos de este nº de años.
+const FEATURED_RECENT_YEARS = 1.5;
+
 const normalize01 = (value, max) => {
   const n = Number(value || 0);
   if (!Number.isFinite(n) || n <= 0) return 0;
@@ -43,6 +52,21 @@ function yearsSinceRelease(item) {
   const time = getReleaseDate(item);
   if (!time) return 20;
   return Math.max(0, (Date.now() - time) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+const isRecentRelease = (item) =>
+  yearsSinceRelease(item) < FEATURED_RECENT_YEARS;
+
+// Perfil de "madurez" para el hero: en lugar de premiar lo recién estrenado,
+// penaliza este año y el último año largo, da la máxima puntuación a la franja
+// asentada (~1,5–12 años) y decae suavemente hasta el límite de 20 años.
+function maturityScore(item) {
+  const years = yearsSinceRelease(item);
+  if (years > FEATURED_MAX_AGE_YEARS) return 0; // fuera de ventana (se filtra)
+  if (years < 0.5) return 0.12; // este año / recién estrenado: muy poco
+  if (years < FEATURED_RECENT_YEARS) return 0.4; // último año largo: penalizado
+  if (years <= 12) return 1; // franja óptima
+  return Math.max(0.55, 1 - (years - 12) / 18); // 12–20 años: decae suave
 }
 
 export function getMediaKey(item, fallbackType = "movie") {
@@ -173,7 +197,7 @@ export function buildFeatured(
     const quality = normalize01(bayesianRating, 10);
     const confidence = logScore(voteCount, 5);
     const demand = logScore(popularity, 3);
-    const freshEnough = Math.max(0, 1 - yearsSinceRelease(m) / 12);
+    const maturity = maturityScore(m);
     const sourceScore = Object.values(m.__featuredSources || {}).reduce(
       (sum, source) => {
         const rankBonus = Math.max(0, 1 - (Number(source.rank || 1) - 1) / 20);
@@ -186,7 +210,7 @@ export function buildFeatured(
       quality * 1.25 +
       confidence * 0.72 +
       demand * 0.42 +
-      freshEnough * 0.18 +
+      maturity * 0.6 +
       sourceScore
     );
   };
@@ -195,6 +219,8 @@ export function buildFeatured(
     .filter((item) => {
       const votes = Number(item?.vote_count || 0);
       const rating = Number(item?.vote_average || 0);
+      // Ventana dura: nada anterior a los últimos 20 años.
+      if (yearsSinceRelease(item) > FEATURED_MAX_AGE_YEARS) return false;
       const hasDemandSource = Object.keys(item.__featuredSources || {}).some(
         (source) =>
           source.startsWith("trending") ||
@@ -235,16 +261,24 @@ export function buildFeatured(
   const typeCounts = { movie: 0, tv: 0 };
   const genreCounts = new Map();
   const maxPerType = mediaTypes.length > 1 ? Math.ceil(size * 0.65) : size;
+  // Tope de estrenos recientes: como mucho ~1 de cada 4 (p. ej. 2-3 de 10), para
+  // que el hero no se llene de novedades del año.
+  const maxRecent = Math.max(1, Math.round(size * 0.25));
+  let recentCount = 0;
 
   for (const item of ranked) {
     if (result.length >= size) break;
     if (typeCounts[item.media_type] >= maxPerType) continue;
+
+    const recent = isRecentRelease(item);
+    if (recent && recentCount >= maxRecent) continue;
 
     const primaryGenre = Array.isArray(item.genre_ids) ? item.genre_ids[0] : null;
     if (primaryGenre && (genreCounts.get(primaryGenre) || 0) >= 3) continue;
 
     result.push(item);
     typeCounts[item.media_type] += 1;
+    if (recent) recentCount += 1;
     if (primaryGenre) genreCounts.set(primaryGenre, (genreCounts.get(primaryGenre) || 0) + 1);
   }
 

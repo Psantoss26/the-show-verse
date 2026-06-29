@@ -10,6 +10,7 @@ import {
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -2145,8 +2146,12 @@ function Row({
                   ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
                   : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
 
-              const zOverflowClasses = (previewKind === "anticipated" && (isActive || isAnimatingOut))
-                ? "z-[90] overflow-visible"
+              const zOverflowClasses = previewKind === "anticipated"
+                ? isActive
+                  ? "z-[90] overflow-visible"
+                  : isAnimatingOut
+                    ? "z-[80] overflow-visible"
+                    : "overflow-hidden"
                 : isActive
                   ? "overflow-visible"
                   : "overflow-hidden";
@@ -2200,10 +2205,14 @@ function Row({
                   ? backdropOverrides[m.id]
                   : null;
 
+              const slideZIndexClass = previewKind === "anticipated"
+                ? (isActive ? "!z-[90] !overflow-visible" : isAnimatingOut ? "!z-[80] !overflow-visible" : "!z-10")
+                : (isActive ? "!z-20 !overflow-visible" : "!z-10");
+
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={isMobile ? "select-none" : `!w-auto select-none ${previewKind === "anticipated" ? "!overflow-visible" : ""}`}
+                  className={isMobile ? "select-none" : `!w-auto select-none ${slideZIndexClass}`}
                 >
                   <div
                     className={`${base} ${sizeClasses} ${posterBoxClass} ${transformClass} ${zOverflowClasses}`}
@@ -3270,6 +3279,10 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
 
   // (Eliminado) Cargadores de Trakt: las filas ahora vienen de la engine.
 
+  // Reduce en el hero los títulos ya vistos / en favoritos (criterio cliente).
+  const featuredItems = usePersonalizedFeatured(
+    dashboardData.featured || EMPTY_ARRAY,
+  );
 
   if (!dashboardData || Object.keys(dashboardData).length === 0) {
     return <div className="h-screen bg-black" />;
@@ -3288,7 +3301,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
           style={{ contain: "layout paint" }}
         >
           <FeaturedHero
-            items={dashboardData.featured || EMPTY_ARRAY}
+            items={featuredItems}
             isMobile={isMobile}
             deferInitialBackdrop
           />
