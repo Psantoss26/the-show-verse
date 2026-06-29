@@ -1936,7 +1936,24 @@ function Row({
   ]);
 
   const hasActivePreview = !!hoveredId;
-  const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  // Fila DESTACADA: mismas tarjetas póster y misma vista previa, pero a ~1,6×
+  // para resaltar UNA sección relevante del dashboard. En Inicio no existe
+  // "Tendencias ahora mismo" (sí en Películas/Series), así que aquí la destacada
+  // es "Estrenos y novedades", la sección más prominente tras el hero.
+  const isSpotlight =
+    (title === "Tendencias ahora mismo" || title === "Estrenos y novedades") &&
+    previewKind !== "anticipated";
+  const heightClassDesktop = isSpotlight
+    ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
+    : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  const spotlightPosterWidthClass =
+    "w-[200px] sm:w-[220px] md:w-[300px] xl:w-[340px]";
+  const normalPosterWidthClass =
+    "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
+  const spotlightPreviewWidthClass =
+    "w-[440px] sm:w-[480px] md:w-[620px] xl:w-[720px]";
+  const normalPreviewWidthClass =
+    "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
   if (!hasItems) {
@@ -1985,8 +2002,10 @@ function Row({
           aria-hidden="true"
           className={
             isMobile
-              ? "min-h-[200px]"
-              : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]"
+              ? isSpotlight
+                ? "min-h-[300px]"
+                : "min-h-[200px]"
+              : heightClassDesktop
           }
         />
       </motion.div>
@@ -2034,11 +2053,11 @@ function Row({
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
   const breakpointsRow = {
-    0: { slidesPerView: 3, spaceBetween: 12 },
-    640: { slidesPerView: 4, spaceBetween: 14 },
-    768: { slidesPerView: "auto", spaceBetween: 14 },
-    1024: { slidesPerView: "auto", spaceBetween: 18 },
-    1280: { slidesPerView: "auto", spaceBetween: 20 },
+    0: { slidesPerView: isSpotlight ? 1.5 : 3, spaceBetween: isSpotlight ? 14 : 12 },
+    640: { slidesPerView: isSpotlight ? 2.2 : 4, spaceBetween: isSpotlight ? 18 : 14 },
+    768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : 14 },
+    1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : 18 },
+    1280: { slidesPerView: "auto", spaceBetween: isSpotlight ? 36 : 20 },
   };
 
   // No incluimos `hydrated` en la key: hacerlo remonta el Swiper al hidratar y
@@ -2096,8 +2115,8 @@ function Row({
         <div>
           <Swiper
             key={swiperKey}
-            slidesPerView={3}
-            spaceBetween={12}
+            slidesPerView={isSpotlight ? 1.5 : 3}
+            spaceBetween={isSpotlight ? 14 : 12}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -2143,8 +2162,8 @@ function Row({
               const sizeClasses = isMobile
                 ? "w-full"
                 : (isActive && previewKind !== "anticipated")
-                  ? "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px] z-20"
-                  : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px] z-10";
+                  ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
+                  : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
 
               const zOverflowClasses = previewKind === "anticipated"
                 ? isActive
@@ -2167,14 +2186,17 @@ function Row({
                   if (i <= activeIndex) {
                     // Items antes o igual al activo se desplazan a la izquierda
                     if (activeIndex === totalItems - 1) {
-                      transformClass =
-                        "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
+                      transformClass = isSpotlight
+                        ? "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]"
+                        : "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
                     } else if (activeIndex === totalItems - 2) {
-                      transformClass =
-                        "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
+                      transformClass = isSpotlight
+                        ? "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]"
+                        : "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
                     } else if (activeIndex === totalItems - 3) {
-                      transformClass =
-                        "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
+                      transformClass = isSpotlight
+                        ? "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]"
+                        : "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
                     }
                   }
                 }
