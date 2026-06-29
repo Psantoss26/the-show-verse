@@ -12,7 +12,10 @@ import {
   useInView,
   useReducedMotion,
 } from "framer-motion";
-import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import {
+  useScrollRevealProps,
+  useTopResetRevealProps,
+} from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -1179,7 +1182,13 @@ function InlinePreviewCard({ show, heightClass }) {
 }
 
 /* ---------- Fila reusable ---------- */
-function Row({ title, items, isMobile, posterCacheRef }) {
+function Row({
+  title,
+  items,
+  isMobile,
+  posterCacheRef,
+  replayRevealAtTop = false,
+}) {
   const reduceMotion = useReducedMotion();
   const safeItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = safeItems.length > 0;
@@ -1199,7 +1208,15 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   const isInView = useInView(rowRef, { once: true, margin: "600px" });
   // Revelado: la fila se monta antes pero permanece oculta y solo se anima al
   // hacer scroll y entrar en la ventana. (Hook ANTES del return del placeholder.)
-  const revealProps = useScrollRevealProps();
+  const standardRevealProps = useScrollRevealProps();
+  const topResetRevealProps = useTopResetRevealProps(
+    rowRef,
+    "-80px",
+    replayRevealAtTop,
+  );
+  const revealProps = replayRevealAtTop
+    ? topResetRevealProps
+    : standardRevealProps;
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   useEffect(() => {
@@ -1264,7 +1281,12 @@ function Row({ title, items, isMobile, posterCacheRef }) {
   // ✅ TOP 10 SOLO MÓVIL (<768): backdrop completo + 1 por vista
   if (isTop10 && isMobile) {
     return (
-      <div className="relative group sv-deferred-row">
+      <motion.div
+        ref={rowRef}
+        {...revealProps}
+        variants={fadeInUp}
+        className="relative group sv-deferred-row"
+      >
         {/* Título para Top 10 móvil con diseño igual a escritorio */}
         <div className="mb-4 px-1 sm:px-0">
           <div className="flex items-center gap-2 mb-1.5">
@@ -1297,7 +1319,7 @@ function Row({ title, items, isMobile, posterCacheRef }) {
             </SwiperSlide>
           ))}
         </Swiper>
-      </div>
+      </motion.div>
     );
   }
 
@@ -1704,13 +1726,14 @@ export default function SeriesPageClient({
               : "space-y-12 pt-2"
           }
         >
-          {visibleRows.map(({ key, title, items }) => (
+          {visibleRows.map(({ key, title, items }, index) => (
             <Row
               key={key}
               title={title}
               items={items}
               isMobile={isMobile}
               posterCacheRef={posterCacheRef}
+              replayRevealAtTop={index === 0}
             />
           ))}
         </motion.div>

@@ -5,7 +5,10 @@ import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useInView } from "framer-motion";
-import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import {
+  useScrollRevealProps,
+  useTopResetRevealProps,
+} from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -2725,7 +2728,7 @@ function TopRatedHero({
   const [canNext, setCanNext] = useState(false);
   // "Mejor valoradas" es la sección que va justo tras el hero: debe permanecer
   // oculta al cargar (aunque asome) y revelarse con animación al hacer scroll.
-  const revealProps = useScrollRevealProps();
+  const revealProps = useTopResetRevealProps(heroRef);
 
   const [heroBackdrops, setHeroBackdrops] = useState(null);
   const [heroExtraBackdrops, setHeroExtraBackdrops] = useState(null);
