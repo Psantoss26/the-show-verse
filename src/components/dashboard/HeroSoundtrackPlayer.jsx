@@ -79,7 +79,7 @@ export default function HeroSoundtrackPlayer({
           onInteractionChange?.(false);
         }
       }}
-      className="hero-nowplaying group pointer-events-auto absolute bottom-4 right-4 z-40 w-48 overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.14),0_12px_36px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-56 p-2"
+      className="hero-nowplaying group pointer-events-auto absolute bottom-4 right-4 z-40 w-48 overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.14),0_12px_36px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-56 p-2 hidden sm:block"
     >
       {/* Background artwork blur */}
       {track.artworkUrl && (

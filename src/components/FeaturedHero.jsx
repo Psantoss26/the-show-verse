@@ -507,7 +507,7 @@ function FeaturedSlide({
   // Carga la mejor pista del soundtrack (preview) del título activo.
   useEffect(() => {
     let abort = false;
-    if (!isActive || !secondaryReady || !movie?.id || !soundtrackVisible) return;
+    if (!isActive || !secondaryReady || !movie?.id || !soundtrackVisible || isMobile) return;
     setSoundtrackTracks([]);
     setSoundtrackTrack(null);
     setSoundtrackPlaying(false);
@@ -561,7 +561,7 @@ function FeaturedSlide({
     return () => {
       abort = true;
     };
-  }, [isActive, secondaryReady, movie, mediaType, soundtrackVisible]);
+  }, [isActive, secondaryReady, movie, mediaType, soundtrackVisible, isMobile]);
 
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
   // no se está viendo el trailer (que tiene su propio audio). Si el navegador
@@ -571,8 +571,8 @@ function FeaturedSlide({
     if (!audio) return;
 
     const shouldPlay =
-      isActive && !showTrailer && soundtrackVisible && !soundtrackMuted && !!soundtrackTrack;
-    audio.muted = !soundtrackVisible || soundtrackMuted;
+      isActive && !showTrailer && soundtrackVisible && !soundtrackMuted && !!soundtrackTrack && !isMobile;
+    audio.muted = !soundtrackVisible || soundtrackMuted || isMobile;
 
     if (!shouldPlay) {
       audio.pause();
@@ -609,6 +609,7 @@ function FeaturedSlide({
     soundtrackMuted,
     soundtrackVisible,
     soundtrackTrack,
+    isMobile,
   ]);
 
   useEffect(() => {
@@ -691,7 +692,7 @@ function FeaturedSlide({
     if (!audio) return;
     audio.currentTime = 0;
     setSoundtrackProgress(0);
-    if (isActive && !showTrailer && soundtrackVisible && !soundtrackMuted) {
+    if (isActive && !showTrailer && soundtrackVisible && !soundtrackMuted && !isMobile) {
       audio.play().catch(() => setSoundtrackPlaying(false));
     }
   };
@@ -888,12 +889,13 @@ function FeaturedSlide({
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
+    const limit = isMobile ? 2 : 3;
     return ids
       .map((id) => GENRES[id])
       .filter(Boolean)
-      .slice(0, 3)
+      .slice(0, limit)
       .join(" · ");
-  }, [movie]);
+  }, [movie, isMobile]);
 
   const posterSrc = posterPath
     ? buildImg(posterPath, HERO_POSTER_SIZE)
@@ -1118,7 +1120,7 @@ function FeaturedSlide({
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc && (
               <div
-                className="hero-reveal hero-logo-reveal relative mb-3 h-24 w-[72%] max-w-[17rem] sm:mb-5 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+                className="hero-reveal hero-logo-reveal relative mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
                 style={{ "--hero-delay": "80ms" }}
               >
                 <NextImage
@@ -1313,7 +1315,7 @@ function FeaturedSlide({
               )}
             </div>
 
-            {overview && (
+            {overview && !isMobile && (
               <p
                 className="hero-reveal mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
                 style={{ "--hero-delay": "290ms" }}
@@ -1333,7 +1335,7 @@ function FeaturedSlide({
           </div>
       </div>
 
-      {isActive && !showTrailer && soundtrackVisible && soundtrackTrack && (
+      {isActive && !showTrailer && soundtrackVisible && soundtrackTrack && !isMobile && (
         <HeroSoundtrackPlayer
           track={soundtrackTrack}
           isPlaying={soundtrackPlaying}
