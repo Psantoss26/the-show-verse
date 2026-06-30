@@ -547,8 +547,7 @@ function FeaturedSlide({
       !secondaryReady ||
       !movie?.id ||
       !soundtrackPreferenceReady ||
-      !soundtrackVisible ||
-      isMobile
+      !soundtrackVisible
     )
       return;
     setSoundtrackTracks([]);
@@ -611,7 +610,6 @@ function FeaturedSlide({
     mediaType,
     soundtrackPreferenceReady,
     soundtrackVisible,
-    isMobile,
   ]);
 
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
@@ -627,9 +625,8 @@ function FeaturedSlide({
       soundtrackPreferenceReady &&
       soundtrackVisible &&
       !soundtrackMuted &&
-      !!soundtrackTrack &&
-      !isMobile;
-    audio.muted = !soundtrackVisible || soundtrackMuted || isMobile;
+      !!soundtrackTrack;
+    audio.muted = !soundtrackVisible || soundtrackMuted;
 
     if (!shouldPlay) {
       audio.pause();
@@ -667,7 +664,6 @@ function FeaturedSlide({
     soundtrackPreferenceReady,
     soundtrackVisible,
     soundtrackTrack,
-    isMobile,
   ]);
 
   useEffect(() => {
@@ -757,8 +753,7 @@ function FeaturedSlide({
       !showTrailer &&
       soundtrackPreferenceReady &&
       soundtrackVisible &&
-      !soundtrackMuted &&
-      !isMobile
+      !soundtrackMuted
     ) {
       audio.play().catch(() => setSoundtrackPlaying(false));
     }
@@ -1253,32 +1248,30 @@ function FeaturedSlide({
                 {soundtrackVisible ? <Volume2 /> : <VolumeX />}
               </LiquidButton>
 
-              {!isMobile &&
-                soundtrackVisible &&
-                soundtrackTrack?.previewUrl && (
-                  <audio
-                    ref={audioRef}
-                    src={soundtrackTrack.previewUrl}
-                    preload="metadata"
-                    aria-hidden="true"
-                    className="hidden"
-                    onTimeUpdate={(event) =>
-                      setSoundtrackProgress(event.currentTarget.currentTime)
-                    }
-                    onLoadedMetadata={(event) => {
-                      event.currentTarget.volume = soundtrackVolume;
-                      event.currentTarget.muted =
-                        !soundtrackVisible || soundtrackMuted || isMobile;
-                      setSoundtrackDuration(event.currentTarget.duration || 0);
-                    }}
-                    onDurationChange={(event) =>
-                      setSoundtrackDuration(event.currentTarget.duration || 0)
-                    }
-                    onEnded={handleSoundtrackEnded}
-                    onPlay={() => setSoundtrackPlaying(true)}
-                    onPause={() => setSoundtrackPlaying(false)}
-                  />
-                )}
+              {soundtrackVisible && soundtrackTrack?.previewUrl && (
+                <audio
+                  ref={audioRef}
+                  src={soundtrackTrack.previewUrl}
+                  preload="metadata"
+                  aria-hidden="true"
+                  className="hidden"
+                  onTimeUpdate={(event) =>
+                    setSoundtrackProgress(event.currentTarget.currentTime)
+                  }
+                  onLoadedMetadata={(event) => {
+                    event.currentTarget.volume = soundtrackVolume;
+                    event.currentTarget.muted =
+                      !soundtrackVisible || soundtrackMuted;
+                    setSoundtrackDuration(event.currentTarget.duration || 0);
+                  }}
+                  onDurationChange={(event) =>
+                    setSoundtrackDuration(event.currentTarget.duration || 0)
+                  }
+                  onEnded={handleSoundtrackEnded}
+                  onPlay={() => setSoundtrackPlaying(true)}
+                  onPause={() => setSoundtrackPlaying(false)}
+                />
+              )}
 
               <LiquidButton
                 onClick={handleToggleFavorite}
