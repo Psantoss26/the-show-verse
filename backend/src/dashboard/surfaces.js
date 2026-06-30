@@ -92,7 +92,7 @@ export const SURFACES = {
       },
       {
         key: 'region_top',
-        title: 'Top 10 hoy en España',
+        title: 'Top de hoy en España',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'region_top' },
       },
@@ -176,7 +176,7 @@ export const SURFACES = {
       },
       {
         key: 'region_top',
-        title: 'Top 10 hoy en España',
+        title: 'Top de hoy en España',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'region_top' },
       },

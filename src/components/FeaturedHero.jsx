@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NextImage from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Play,
@@ -12,7 +11,7 @@ import {
   BookmarkPlus,
   Eye,
   EyeOff,
-  Info,
+  Award,
   Volume2,
   VolumeX,
   ChevronLeft,
@@ -28,6 +27,8 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 
 import {
@@ -301,7 +302,11 @@ function FeaturedSlide({
   const mediaType = getMediaTypeForItem(movie);
   const href = `/details/${mediaType}/${movie.id}`;
 
-  const [extras, setExtras] = useState({ runtime: null, imdbRating: null });
+  const [extras, setExtras] = useState({
+    runtime: null,
+    imdbRating: null,
+    awards: null,
+  });
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
   const [watched, setWatched] = useState(false);
@@ -554,20 +559,35 @@ function FeaturedSlide({
         }
 
         let imdbRating = null;
+        let awards = null;
         try {
           if (!imdbId) {
             const ext = await getExternalIds(mediaType, movie.id);
             imdbId = ext?.imdb_id || null;
           }
           if (imdbId) {
-            const ds = await fetchImdbRatingByImdb(imdbId);
+            // Mismo origen que la sección de información del spotlight: OMDb para
+            // premios + IMDb para la nota.
+            const [omdb, ds] = await Promise.all([
+              fetchOmdbByImdb(imdbId).catch(() => null),
+              fetchImdbRatingByImdb(imdbId).catch(() => null),
+            ]);
             if (typeof ds?.rating === "number") imdbRating = ds.rating;
+            const rawAwards = omdb?.Awards;
+            if (
+              rawAwards &&
+              typeof rawAwards === "string" &&
+              rawAwards.trim()
+            ) {
+              awards = formatDashboardAwards(rawAwards);
+            }
           }
         } catch { }
 
-        if (!abort) setExtras({ runtime, imdbRating });
+        if (!abort) setExtras({ runtime, imdbRating, awards });
       } catch {
-        if (!abort) setExtras({ runtime: null, imdbRating: null });
+        if (!abort)
+          setExtras({ runtime: null, imdbRating: null, awards: null });
       }
     };
 
@@ -916,102 +936,30 @@ function FeaturedSlide({
               </div>
             )}
 
-            {/* Metadatos + puntuaciones */}
-            <div
-              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-neutral-200 sm:mb-3 sm:justify-start sm:gap-x-3 sm:gap-y-2 sm:text-sm"
-              style={{ "--hero-delay": "170ms" }}
-            >
-              {yearOf(movie) && (
-                <span className="font-semibold">{yearOf(movie)}</span>
-              )}
-              {extras.runtime && <span>· {extras.runtime}</span>}
-
-              <span className="inline-flex items-center gap-1.5">
-                <NextImage
-                  src="/logo-TMDb.png"
-                  alt="TMDb"
-                  className="h-3 w-auto"
-                  width={2560}
-                  height={1846}
-                  sizes="32px"
-                  loading="lazy"
-                />
-                <span className="font-semibold">{ratingOf(movie)}</span>
-              </span>
-
-              {typeof extras.imdbRating === "number" && (
-                <span className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-IMDb.svg"
-                    alt="IMDb"
-                    className="h-4 w-auto"
-                    width={575}
-                    height={290}
-                    sizes="40px"
-                    loading="lazy"
-                  />
-                  <span className="font-semibold">
-                    {extras.imdbRating.toFixed(1)}
-                  </span>
-                </span>
-              )}
-            </div>
-
-            {genres && (
-              <div
-                className="hero-reveal mb-2 text-xs font-medium text-amber-300/90 sm:mb-3 sm:text-sm"
-                style={{ "--hero-delay": "230ms" }}
-              >
-                {genres}
-              </div>
-            )}
-
-            {overview && (
-              <p
-                className="hero-reveal mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
-                style={{ "--hero-delay": "290ms" }}
-              >
-                {overview}
-              </p>
-            )}
-
-            {/* Contenedor relativo: el indicador de soundtrack se posiciona
-                de forma absoluta debajo para no desplazar la información. Ancho
-                completo en móvil para centrar correctamente botones e indicador. */}
-            <div className="relative w-full sm:w-auto">
-            {/* Botones de acción */}
+            {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
+                Contenedor relativo: el indicador "ahora sonando" se posiciona de
+                forma absoluta debajo para no desplazar la información. */}
+            <div className="relative mb-4 w-full sm:mb-6 sm:w-auto">
             <div
               className="hero-reveal flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-start sm:gap-3"
-              style={{ "--hero-delay": "360ms" }}
+              style={{ "--hero-delay": "130ms" }}
             >
-              {/* Enlace real (no solo onClick): la navegación a los detalles
-                  funciona aunque la animación de entrada siga en curso o aún no
-                  haya hidratado el JS. */}
-              <Link
-                href={href}
-                onClick={(e) => e.stopPropagation()}
-                className="featured-info-button inline-flex h-9 w-9 cursor-default items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white px-0 text-xs font-bold leading-none text-black shadow-lg transition hover:bg-white/90 sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm"
-              >
-                <Info className="h-5 w-5 sm:h-4 sm:w-4" />
-                <span className="hidden [text-box:trim-both_cap_alphabetic] sm:inline">
-                  Más información
-                </span>
-              </Link>
-
-              <HeroActionButton
+              {/* Píldora "Ver trailer" — mismo diseño que la sección de
+                  información del spotlight (×1,6): blanca, icono + texto. */}
+              <button
+                type="button"
                 onClick={handleToggleTrailer}
-                loading={trailerLoading}
-                active
-                activeColor="yellow"
-                solid
-                title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+                disabled={trailerLoading}
+                aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+                className="featured-info-button inline-flex min-h-9 cursor-default items-center justify-center gap-2 rounded-lg bg-white px-4 text-xs font-bold text-black shadow-lg transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-5 sm:text-sm"
               >
                 {showTrailer ? (
-                  <X className="text-black" />
+                  <X className="h-5 w-5" />
                 ) : (
-                  <Play className="ml-0.5 fill-current text-black" />
+                  <Play className="h-5 w-5 fill-current" />
                 )}
-              </HeroActionButton>
+                <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
+              </button>
 
               {/* Soundtrack: suena por defecto; el botón silencia/activa la
                   preferencia global (se guarda para todos los FeaturedHero). */}
@@ -1117,6 +1065,83 @@ function FeaturedSlide({
               </div>
             )}
             </div>
+
+            {/* Premios — mismo estilo que el spotlight (icono + texto esmeralda),
+                situado sobre los metadatos. */}
+            {extras.awards && (
+              <div
+                className="hero-reveal mb-2 flex items-center justify-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:mb-2.5 sm:justify-start sm:text-sm"
+                style={{ "--hero-delay": "140ms" }}
+              >
+                <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="line-clamp-1">{extras.awards}</span>
+              </div>
+            )}
+
+            {/* Metadatos — MISMO estilo que la sección de información de las
+                tarjetas ×1,6 (DashboardSpotlightPreview): fila 1 con badge
+                "Mejor valorado" + tipo + año + duración; fila 2 con géneros +
+                puntuaciones, tipografía/colores (zinc). Se conservan la
+                animación de entrada del hero, la alineación (centro en móvil,
+                izquierda en escritorio) y la ubicación del bloque. */}
+            <div
+              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[0.7rem] font-semibold text-zinc-200 sm:mb-2.5 sm:justify-start sm:text-xs"
+              style={{ "--hero-delay": "170ms" }}
+            >
+              {Number(ratingOf(movie)) >= 7.5 && (
+                <span className="rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                  Mejor valorado
+                </span>
+              )}
+              <span>{mediaType === "tv" ? "Serie" : "Película"}</span>
+              {yearOf(movie) && <span>{yearOf(movie)}</span>}
+              {extras.runtime && <span>{extras.runtime}</span>}
+            </div>
+
+            <div
+              className="hero-reveal mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:mb-4 sm:justify-start sm:text-sm"
+              style={{ "--hero-delay": "230ms" }}
+            >
+              {genres && <span>{genres}</span>}
+              <span className="inline-flex items-center gap-1.5">
+                <NextImage
+                  src="/logo-TMDb.png"
+                  alt="TMDb"
+                  className="h-3 w-auto"
+                  width={2560}
+                  height={1846}
+                  sizes="32px"
+                  loading="lazy"
+                />
+                <span className="font-bold">{ratingOf(movie)}</span>
+              </span>
+
+              {typeof extras.imdbRating === "number" && (
+                <span className="inline-flex items-center gap-1.5">
+                  <NextImage
+                    src="/logo-IMDb.svg"
+                    alt="IMDb"
+                    className="h-4 w-auto"
+                    width={575}
+                    height={290}
+                    sizes="40px"
+                    loading="lazy"
+                  />
+                  <span className="font-bold">
+                    {extras.imdbRating.toFixed(1)}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {overview && (
+              <p
+                className="hero-reveal mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
+                style={{ "--hero-delay": "290ms" }}
+              >
+                {overview}
+              </p>
+            )}
 
             {error && (
               <p
