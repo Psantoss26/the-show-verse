@@ -255,7 +255,16 @@ export default function LiquidButton({
 
   // Animación del canvas optimizada
   useEffect(() => {
-    if (!isHovered && !active && proximityGlow === 0 && !isExploding) {
+    // El bucle del canvas (partículas decorativas) solo corre durante una
+    // INTERACCIÓN real: hover, proximidad del puntero o explosión. NO se mantiene
+    // vivo por el estado `active` (p. ej. el botón de soundtrack del hero, activo
+    // por defecto): un botón siempre montado y `active` dejaba el rAF corriendo
+    // para siempre, y como `animate()` llama a getBoundingClientRect() en cada
+    // frame, forzaba un reflow por frame que competía con las animaciones de
+    // layout (framer-motion) de las vistas previas de las tarjetas → parpadeo.
+    // El "glow" del estado activo es CSS en línea (backgroundColor/boxShadow),
+    // independiente del canvas, así que el aspecto activo se conserva igual.
+    if (!isHovered && proximityGlow === 0 && !isExploding) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;

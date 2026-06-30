@@ -12,12 +12,15 @@ import {
   Eye,
   EyeOff,
   Award,
+  Music2,
   Volume2,
   VolumeX,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import OptimizedImage from "@/components/OptimizedImage";
+import LiquidButton from "@/components/LiquidButton";
 
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -439,6 +442,7 @@ function FeaturedSlide({
             previewUrl: first.previewUrl,
             trackName: first.trackName || first.name || "",
             artistName: first.artistName || "",
+            artworkUrl: first.artworkUrl || "",
           });
         }
       } catch {
@@ -951,7 +955,7 @@ function FeaturedSlide({
                 onClick={handleToggleTrailer}
                 disabled={trailerLoading}
                 aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="featured-info-button inline-flex min-h-9 cursor-default items-center justify-center gap-2 rounded-lg bg-white px-4 text-xs font-bold text-black shadow-lg transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-5 sm:text-sm"
+                className="featured-info-button inline-flex min-h-11 cursor-default items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:px-5 sm:text-base"
               >
                 {showTrailer ? (
                   <X className="h-5 w-5" />
@@ -961,26 +965,24 @@ function FeaturedSlide({
                 <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
               </button>
 
-              {/* Soundtrack: suena por defecto; el botón silencia/activa la
-                  preferencia global (se guarda para todos los FeaturedHero). */}
-              <HeroActionButton
+              {/* Botones de acción: MISMO diseño liquid glass que la sección
+                  spotlight (componente LiquidButton). El funcionamiento no
+                  cambia: el de soundtrack silencia/activa, etc. */}
+              <LiquidButton
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleSoundtrackMuted();
                 }}
-                active
+                active={!soundtrackMuted}
                 activeColor="yellow"
-                solid
+                groupId="featured-hero-actions"
                 title={
                   soundtrackMuted ? "Activar soundtrack" : "Silenciar soundtrack"
                 }
+                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
               >
-                {soundtrackMuted ? (
-                  <VolumeX className="text-black" />
-                ) : (
-                  <Volume2 className="text-black" />
-                )}
-              </HeroActionButton>
+                {soundtrackMuted ? <VolumeX /> : <Volume2 />}
+              </LiquidButton>
 
               {soundtrackTrack?.previewUrl && (
                 <audio
@@ -995,73 +997,101 @@ function FeaturedSlide({
                 />
               )}
 
-              <HeroActionButton
+              <LiquidButton
                 onClick={handleToggleFavorite}
                 loading={updating === "favorite"}
                 active={favorite}
                 activeColor="red"
+                groupId="featured-hero-actions"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
               >
                 <Heart className={favorite ? "fill-current" : ""} />
-              </HeroActionButton>
+              </LiquidButton>
 
-              <HeroActionButton
+              <LiquidButton
                 onClick={handleToggleWatchlist}
                 loading={updating === "watchlist"}
                 active={watchlist}
                 activeColor="blue"
+                groupId="featured-hero-actions"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </HeroActionButton>
+              </LiquidButton>
 
               {/* Indicador de visionado: solo informativo. No se puede accionar
                   desde aquí para evitar borrar el historial de visionado con un
                   único clic. */}
-              <HeroActionButton
+              <LiquidButton
                 active={watched}
                 activeColor="green"
+                groupId="featured-hero-actions"
                 title={watched ? "Visto" : "No visto"}
-                className="pointer-events-none"
+                className="pointer-events-none !h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
               >
                 {watched ? <Eye /> : <EyeOff />}
-              </HeroActionButton>
+              </LiquidButton>
             </div>
 
-            {/* Indicador "ahora sonando" (liquid glass sin borde marcado),
-                absoluto para no desplazar la información. Solo visible mientras
-                el soundtrack se reproduce de verdad. */}
+            {/* Ventana "ahora sonando" — esquina inferior derecha, con el diseño
+                liquid glass de la página (portada del álbum + título + artista).
+                No bloquea clics (pointer-events-none). */}
             {soundtrackPlaying && soundtrackTrack && (
-              <div className="hero-nowplaying absolute left-1/2 top-full mt-3 inline-flex max-w-[min(80vw,22rem)] -translate-x-1/2 items-center gap-2.5 rounded-full bg-black/15 bg-gradient-to-br from-white/[0.12] via-white/[0.03] to-black/30 px-3 py-1.5 backdrop-blur-[50px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),inset_0_-1px_1px_rgba(0,0,0,0.18),0_12px_34px_-14px_rgba(0,0,0,0.6)] sm:left-0 sm:translate-x-0">
-                <span
-                  className="flex h-3.5 items-end gap-[2px]"
-                  aria-hidden="true"
-                >
-                  <span className="hero-eq-bar w-[2px] rounded-full bg-amber-300" />
-                  <span
-                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
-                    style={{ animationDelay: "180ms" }}
-                  />
-                  <span
-                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
-                    style={{ animationDelay: "360ms" }}
-                  />
-                  <span
-                    className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
-                    style={{ animationDelay: "90ms" }}
-                  />
-                </span>
-                <span className="min-w-0 truncate text-[11px] leading-none text-white/90 sm:text-xs">
-                  <span className="font-semibold">
-                    {soundtrackTrack.trackName || "Soundtrack"}
-                  </span>
-                  {soundtrackTrack.artistName && (
-                    <span className="text-white/55">
-                      {" · "}
-                      {soundtrackTrack.artistName}
+              <div className="hero-nowplaying pointer-events-none fixed bottom-5 right-5 z-50 flex w-[min(82vw,19rem)] items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/45 bg-gradient-to-br from-white/15 via-white/[0.06] to-black/35 p-2.5 pr-4 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.16),0_24px_50px_-18px_rgba(0,0,0,0.95)] backdrop-blur-3xl sm:bottom-6 sm:right-6 sm:p-3">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-[0_12px_28px_-12px_rgba(0,0,0,0.9)] sm:h-16 sm:w-16">
+                  {soundtrackTrack.artworkUrl ? (
+                    <OptimizedImage
+                      src={soundtrackTrack.artworkUrl}
+                      alt=""
+                      aria-hidden="true"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center">
+                      <Music2
+                        className="h-6 w-6 text-amber-300/60"
+                        aria-hidden="true"
+                      />
                     </span>
                   )}
-                </span>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span
+                      className="flex h-3 items-end gap-[2px]"
+                      aria-hidden="true"
+                    >
+                      <span className="hero-eq-bar w-[2px] rounded-full bg-amber-300" />
+                      <span
+                        className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                        style={{ animationDelay: "180ms" }}
+                      />
+                      <span
+                        className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                        style={{ animationDelay: "360ms" }}
+                      />
+                      <span
+                        className="hero-eq-bar w-[2px] rounded-full bg-amber-300"
+                        style={{ animationDelay: "90ms" }}
+                      />
+                    </span>
+                    <span className="truncate text-[0.6rem] font-bold uppercase tracking-[0.18em] text-white/45">
+                      Reproduciendo
+                    </span>
+                  </div>
+                  <p className="truncate text-sm font-bold leading-tight text-white">
+                    {soundtrackTrack.trackName || "Soundtrack"}
+                  </p>
+                  {soundtrackTrack.artistName && (
+                    <p className="truncate text-xs text-white/60">
+                      {soundtrackTrack.artistName}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
             </div>
