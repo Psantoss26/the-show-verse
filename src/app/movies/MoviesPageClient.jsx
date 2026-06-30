@@ -775,7 +775,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     setLogoPath(null);
     if (!isSpotlight || !movie?.id) return;
 
-    fetchBestLogo(movie.id, "movie", ["es", "en", null])
+    fetchBestLogo(movie.id, "movie", ["en", "es", null])
       .then((path) => {
         if (!cancelled) setLogoPath(path || null);
       })
@@ -1163,8 +1163,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
 
         {isSpotlight ? (
           <>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/20" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </>
         ) : (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/80" />
@@ -1598,12 +1598,12 @@ function Row({
 
             const base =
               "relative flex-shrink-0 transition-all duration-300 ease-in-out";
-            const cardBoxClass =
-              isActive && isSpotlight
-                ? "h-full aspect-video"
-                : isTop10
-                  ? "aspect-video"
-                  : posterBoxClass;
+            // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
+            // en la vista previa destacada. Si la activa usa una altura derivada
+            // del aspecto (aspect-video / h-full), al cerrar el `transition-all`
+            // anima la altura y desplaza la sección inferior. Con altura fija la
+            // fila nunca cambia de alto y la previa rellena ese marco.
+            const cardBoxClass = isTop10 ? "aspect-video" : posterBoxClass;
 
             const sizeClasses = isMobile
               ? "w-full"

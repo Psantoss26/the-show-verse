@@ -681,7 +681,7 @@ function InlinePreviewCard({
     setLogoPath(null);
     if (!isSpotlight || !movie?.id) return;
 
-    fetchBestLogo(movie.id, mediaType, ["es", "en", null])
+    fetchBestLogo(movie.id, mediaType, ["en", "es", null])
       .then((path) => {
         if (!cancel) setLogoPath(path || null);
       })
@@ -1217,8 +1217,8 @@ function InlinePreviewCard({
 
         {isSpotlight ? (
           <>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/20" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </>
         ) : (
           <motion.div
@@ -2714,10 +2714,12 @@ function Row({
                 : (isActive && previewKind !== "anticipated")
                   ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
                   : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
-              const itemBoxClass =
-                isActive && isSpotlight && previewKind !== "anticipated"
-                  ? "h-full aspect-video"
-                  : posterBoxClass;
+              // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
+              // en la vista previa destacada. Si la activa usa una altura
+              // derivada del aspecto (aspect-video / h-full), al cerrar el
+              // `transition-all` anima la altura y desplaza la sección inferior.
+              // Con altura fija la fila nunca cambia de alto.
+              const itemBoxClass = posterBoxClass;
 
               const zOverflowClasses = previewKind === "anticipated"
                 ? isActive
