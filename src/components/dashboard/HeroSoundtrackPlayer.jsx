@@ -56,7 +56,16 @@ export default function HeroSoundtrackPlayer({
       data-hero-soundtrack-player
       aria-label={`Reproductor de ${track.trackName || "soundtrack"}`}
       onPointerEnter={() => onInteractionChange?.(true)}
-      onPointerLeave={() => onInteractionChange?.(false)}
+      onPointerLeave={(event) => {
+        onInteractionChange?.(false);
+        if (
+          typeof document !== "undefined" &&
+          document.activeElement &&
+          event.currentTarget.contains(document.activeElement)
+        ) {
+          document.activeElement.blur();
+        }
+      }}
       onPointerDown={(event) => {
         event.stopPropagation();
         onInteractionChange?.(true);
@@ -108,23 +117,36 @@ export default function HeroSoundtrackPlayer({
 
           {/* Hover Controls Overlay */}
           <div className="absolute inset-0 bg-black/70 flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 group-hover/cover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto">
-            {/* Top Row: Track Position & Mute */}
-            <div className="flex justify-between items-center w-full">
+            {/* Top Row: Track Position & Volume controls */}
+            <div className="flex justify-between items-center w-full gap-2">
               <span className="text-[10px] sm:text-xs font-semibold text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm select-none">
                 {position}/{total}
               </span>
-              <button
-                type="button"
-                onClick={onToggleMute}
-                aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
-                className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition"
-              >
-                {muted || volume === 0 ? (
-                  <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                ) : (
-                  <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                )}
-              </button>
+              
+              <div className="flex items-center gap-1.5 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                <button
+                  type="button"
+                  onClick={onToggleMute}
+                  aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
+                  className="flex h-5 w-5 items-center justify-center text-white/80 hover:text-white transition"
+                >
+                  {muted || volume === 0 ? (
+                    <VolumeX className="h-3.5 w-3.5" />
+                  ) : (
+                    <Volume2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={onVolumeChange}
+                  aria-label="Volumen de la preview"
+                  className="w-12 h-1 accent-white cursor-pointer bg-white/20 rounded-full transition-all duration-300 sm:w-16 focus:outline-none"
+                />
+              </div>
             </div>
 
             {/* Middle Row: Playback Controls */}
