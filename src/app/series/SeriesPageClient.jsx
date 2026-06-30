@@ -39,6 +39,7 @@ import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
 import { fetchBestBackdropNoLang, fetchBestLogo } from "@/lib/dashboard/media";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
+import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -695,15 +696,11 @@ function Top10MobileBackdropCardTV({
 
         {showRank && (
           <div className="absolute left-4 bottom-3 z-10 select-none">
-            <div
-              className="font-black leading-none text-[72px]
-                bg-gradient-to-b from-blue-900/50 via-blue-600/35 to-blue-400/25
-                bg-clip-text text-transparent
-                drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]"
-              style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
-            >
-              {rank}
-            </div>
+            <DashboardRankNumber
+              rank={rank}
+              tone="series"
+              className="text-[4.5rem] leading-none"
+            />
           </div>
         )}
 
@@ -1384,7 +1381,7 @@ function Row({
         <div className="mb-4 px-1 sm:px-0">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
-            <span className="text-emerald-500">.</span>
+            <span className="text-fuchsia-400">.</span>
           </h3>
         </div>
         <div
@@ -1419,7 +1416,7 @@ function Row({
             </span>
           </div>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            {title}<span className="text-emerald-500">.</span>
+            {title}<span className="text-fuchsia-400">.</span>
           </h3>
         </div>
         <Swiper
@@ -1528,7 +1525,7 @@ function Row({
         )}
         <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
           {title}
-          <span className="text-emerald-500">.</span>
+          <span className="text-fuchsia-400">.</span>
         </h3>
       </motion.div>
 
@@ -1712,19 +1709,11 @@ function Row({
               >
                 {isTop10 ? (
                   <div className="flex items-center">
-                    <div
-                      className="hidden md:block text-[150px] lg:text-[180px] xl:text-[220px] 2xl:text-[260px] font-black z-0 select-none
-                        bg-gradient-to-b from-blue-900/40 via-blue-600/30 to-blue-400/20 bg-clip-text text-transparent
-                        drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
-                      style={{
-                        fontFamily: "system-ui, -apple-system, sans-serif",
-                        lineHeight: 0.8,
-                        marginRight: "-0.15em",
-                        marginLeft: "0.1em",
-                      }}
-                    >
-                      {i + 1}
-                    </div>
+                    <DashboardRankNumber
+                      rank={i + 1}
+                      tone="series"
+                      className="z-0 ml-[0.1em] mr-[-0.15em] hidden text-[9.375rem] leading-[0.8] md:inline-grid lg:text-[11.25rem] xl:text-[13.75rem] 2xl:text-[16.25rem]"
+                    />
                     {cardElement}
                   </div>
                 ) : (
