@@ -2603,7 +2603,7 @@ function Row({
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
   const breakpointsRow = {
-    0: { slidesPerView: isSpotlight ? 1.5 : 3, spaceBetween: isSpotlight ? 14 : 12 },
+    0: { slidesPerView: isSpotlight ? 2 : 3, spaceBetween: isSpotlight ? 14 : 12 },
     640: { slidesPerView: isSpotlight ? 2.2 : 4, spaceBetween: isSpotlight ? 18 : 14 },
     768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : 14 },
     1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : 18 },
@@ -2665,7 +2665,7 @@ function Row({
         <div>
           <Swiper
             key={swiperKey}
-            slidesPerView={isSpotlight ? 1.5 : 3}
+            slidesPerView={isSpotlight ? 2 : 3}
             spaceBetween={isSpotlight ? 14 : 12}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}

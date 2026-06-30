@@ -1,7 +1,14 @@
 // /src/components/FeaturedHero.jsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import NextImage from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -116,59 +123,88 @@ function useSoundtrackMuted() {
 /* =================== VISIBILIDAD DE SOUNDTRACK =================== */
 const SOUNDTRACK_VISIBLE_KEY = "showverse:hero:soundtrack-visible";
 const SOUNDTRACK_VISIBLE_EVENT = "showverse:hero-soundtrack-visible";
+let soundtrackVisibleValue = true;
+let soundtrackVisibleInitialized = false;
 
 function readSoundtrackVisible() {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return soundtrackVisibleValue;
+  if (soundtrackVisibleInitialized) return soundtrackVisibleValue;
+
+  soundtrackVisibleInitialized = true;
   try {
     const val = window.localStorage.getItem(SOUNDTRACK_VISIBLE_KEY);
-    return val === null ? true : val === "1";
-  } catch {
-    return true;
-  }
+    soundtrackVisibleValue = val === null ? true : val === "1";
+  } catch {}
+  return soundtrackVisibleValue;
 }
 
 function writeSoundtrackVisible(visible) {
   if (typeof window === "undefined") return;
+  soundtrackVisibleValue = Boolean(visible);
+  soundtrackVisibleInitialized = true;
   try {
-    window.localStorage.setItem(SOUNDTRACK_VISIBLE_KEY, visible ? "1" : "0");
+    window.localStorage.setItem(
+      SOUNDTRACK_VISIBLE_KEY,
+      soundtrackVisibleValue ? "1" : "0",
+    );
   } catch {}
-  window.dispatchEvent(new CustomEvent(SOUNDTRACK_VISIBLE_EVENT, { detail: visible }));
+  window.dispatchEvent(
+    new CustomEvent(SOUNDTRACK_VISIBLE_EVENT, {
+      detail: soundtrackVisibleValue,
+    }),
+  );
+}
+
+function subscribeSoundtrackVisible(onStoreChange) {
+  const onVisibleChange = (event) => {
+    soundtrackVisibleValue = Boolean(event.detail);
+    soundtrackVisibleInitialized = true;
+    onStoreChange();
+  };
+  const onStorageChange = (event) => {
+    if (event.key !== SOUNDTRACK_VISIBLE_KEY) return;
+    soundtrackVisibleValue =
+      event.newValue === null ? true : event.newValue === "1";
+    soundtrackVisibleInitialized = true;
+    onStoreChange();
+  };
+
+  window.addEventListener(SOUNDTRACK_VISIBLE_EVENT, onVisibleChange);
+  window.addEventListener("storage", onStorageChange);
+  return () => {
+    window.removeEventListener(SOUNDTRACK_VISIBLE_EVENT, onVisibleChange);
+    window.removeEventListener("storage", onStorageChange);
+  };
 }
 
 function useSoundtrackVisible() {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    setVisible(readSoundtrackVisible());
-    const onChange = (e) => setVisible(!!e.detail);
-    window.addEventListener(SOUNDTRACK_VISIBLE_EVENT, onChange);
-    return () => window.removeEventListener(SOUNDTRACK_VISIBLE_EVENT, onChange);
-  }, []);
+  const visible = useSyncExternalStore(
+    subscribeSoundtrackVisible,
+    readSoundtrackVisible,
+    () => true,
+  );
 
   const toggle = useCallback(() => {
     writeSoundtrackVisible(!readSoundtrackVisible());
   }, []);
 
-  const update = useCallback((nextVisible) => {
-    writeSoundtrackVisible(Boolean(nextVisible));
-  }, []);
-
-  return [visible, toggle, update];
+  return [visible, toggle];
 }
 
 /* =================== VOLUMEN DE SOUNDTRACK =================== */
+const DEFAULT_SOUNDTRACK_VOLUME = 0.3;
 const SOUNDTRACK_VOLUME_KEY = "showverse:hero:soundtrack-volume";
 const SOUNDTRACK_VOLUME_EVENT = "showverse:hero-soundtrack-volume";
 
 function readSoundtrackVolume() {
-  if (typeof window === "undefined") return 0.3;
+  if (typeof window === "undefined") return DEFAULT_SOUNDTRACK_VOLUME;
   try {
     const val = window.localStorage.getItem(SOUNDTRACK_VOLUME_KEY);
-    if (val === null) return 0.3;
+    if (val === null) return DEFAULT_SOUNDTRACK_VOLUME;
     const parsed = parseFloat(val);
-    return isNaN(parsed) ? 0.3 : parsed;
+    return isNaN(parsed) ? DEFAULT_SOUNDTRACK_VOLUME : parsed;
   } catch {
-    return 0.3;
+    return DEFAULT_SOUNDTRACK_VOLUME;
   }
 }
 
@@ -181,7 +217,7 @@ function writeSoundtrackVolume(vol) {
 }
 
 function useSoundtrackVolume() {
-  const [volume, setVolume] = useState(0.3);
+  const [volume, setVolume] = useState(DEFAULT_SOUNDTRACK_VOLUME);
 
   useEffect(() => {
     setVolume(readSoundtrackVolume());
@@ -387,6 +423,9 @@ function FeaturedSlide({
   shouldLoadMedia,
   onTrailerVisibilityChange,
   onSoundtrackInteractionChange,
+  soundtrackVisible,
+  soundtrackPreferenceReady,
+  toggleSoundtrackVisible,
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
@@ -411,14 +450,10 @@ function FeaturedSlide({
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
 
-  // Soundtrack: suena por defecto al mostrar el título; el botón de volumen
-  // silencia/activa la preferencia global para todos los FeaturedHero.
-  const [soundtrackMuted, toggleSoundtrackMuted, setSoundtrackMuted] =
-    useSoundtrackMuted();
-  const [soundtrackVisible, toggleSoundtrackVisible, setSoundtrackVisible] =
-    useSoundtrackVisible();
-  const [soundtrackVolume, setSoundtrackVolume] =
-    useSoundtrackVolume();
+  // Soundtrack: suena por defecto al mostrar el título; su visibilidad y el
+  // silencio se conservan como preferencias globales para todos los FeaturedHero.
+  const [soundtrackMuted, , setSoundtrackMuted] = useSoundtrackMuted();
+  const [soundtrackVolume, setSoundtrackVolume] = useSoundtrackVolume();
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackTrack, setSoundtrackTrack] = useState(null);
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
@@ -507,7 +542,15 @@ function FeaturedSlide({
   // Carga la mejor pista del soundtrack (preview) del título activo.
   useEffect(() => {
     let abort = false;
-    if (!isActive || !secondaryReady || !movie?.id || !soundtrackVisible || isMobile) return;
+    if (
+      !isActive ||
+      !secondaryReady ||
+      !movie?.id ||
+      !soundtrackPreferenceReady ||
+      !soundtrackVisible ||
+      isMobile
+    )
+      return;
     setSoundtrackTracks([]);
     setSoundtrackTrack(null);
     setSoundtrackPlaying(false);
@@ -561,7 +604,15 @@ function FeaturedSlide({
     return () => {
       abort = true;
     };
-  }, [isActive, secondaryReady, movie, mediaType, soundtrackVisible, isMobile]);
+  }, [
+    isActive,
+    secondaryReady,
+    movie,
+    mediaType,
+    soundtrackPreferenceReady,
+    soundtrackVisible,
+    isMobile,
+  ]);
 
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
   // no se está viendo el trailer (que tiene su propio audio). Si el navegador
@@ -571,7 +622,13 @@ function FeaturedSlide({
     if (!audio) return;
 
     const shouldPlay =
-      isActive && !showTrailer && soundtrackVisible && !soundtrackMuted && !!soundtrackTrack && !isMobile;
+      isActive &&
+      !showTrailer &&
+      soundtrackPreferenceReady &&
+      soundtrackVisible &&
+      !soundtrackMuted &&
+      !!soundtrackTrack &&
+      !isMobile;
     audio.muted = !soundtrackVisible || soundtrackMuted || isMobile;
 
     if (!shouldPlay) {
@@ -607,6 +664,7 @@ function FeaturedSlide({
     isActive,
     showTrailer,
     soundtrackMuted,
+    soundtrackPreferenceReady,
     soundtrackVisible,
     soundtrackTrack,
     isMobile,
@@ -676,7 +734,9 @@ function FeaturedSlide({
 
   const handleSoundtrackToggleMute = () => {
     if (soundtrackMuted || soundtrackVolume === 0) {
-      if (soundtrackVolume === 0) setSoundtrackVolume(0.3);
+      if (soundtrackVolume === 0) {
+        setSoundtrackVolume(DEFAULT_SOUNDTRACK_VOLUME);
+      }
       setSoundtrackMuted(false);
       return;
     }
@@ -692,7 +752,14 @@ function FeaturedSlide({
     if (!audio) return;
     audio.currentTime = 0;
     setSoundtrackProgress(0);
-    if (isActive && !showTrailer && soundtrackVisible && !soundtrackMuted && !isMobile) {
+    if (
+      isActive &&
+      !showTrailer &&
+      soundtrackPreferenceReady &&
+      soundtrackVisible &&
+      !soundtrackMuted &&
+      !isMobile
+    ) {
       audio.play().catch(() => setSoundtrackPlaying(false));
     }
   };
@@ -885,7 +952,7 @@ function FeaturedSlide({
     }
   };
 
-  const genres = useMemo(() => {
+  const genresList = useMemo(() => {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
@@ -893,8 +960,7 @@ function FeaturedSlide({
     return ids
       .map((id) => GENRES[id])
       .filter(Boolean)
-      .slice(0, limit)
-      .join(" · ");
+      .slice(0, limit);
   }, [movie, isMobile]);
 
   const posterSrc = posterPath
@@ -1166,47 +1232,53 @@ function FeaturedSlide({
               </button>
 
               {/* Botones de acción: MISMO diseño liquid glass que la sección
-                  spotlight (componente LiquidButton). El funcionamiento no
-                  cambia: el de soundtrack silencia/activa, etc. */}
+                  spotlight (componente LiquidButton). */}
               <LiquidButton
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleSoundtrackVisible();
                 }}
-                active={soundtrackVisible}
+                disabled={!soundtrackPreferenceReady}
+                active={soundtrackPreferenceReady && soundtrackVisible}
+                aria-pressed={soundtrackVisible}
                 activeColor="yellow"
                 groupId="featured-hero-actions"
                 title={
                   soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
                 }
-                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                className={`!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6 ${
+                  soundtrackPreferenceReady ? "" : "invisible pointer-events-none"
+                }`}
               >
                 {soundtrackVisible ? <Volume2 /> : <VolumeX />}
               </LiquidButton>
 
-              {soundtrackTrack?.previewUrl && (
-                <audio
-                  ref={audioRef}
-                  src={soundtrackTrack.previewUrl}
-                  preload="metadata"
-                  aria-hidden="true"
-                  className="hidden"
-                  onTimeUpdate={(event) =>
-                    setSoundtrackProgress(event.currentTarget.currentTime)
-                  }
-                  onLoadedMetadata={(event) => {
-                    event.currentTarget.volume = soundtrackVolume;
-                    event.currentTarget.muted = soundtrackMuted;
-                    setSoundtrackDuration(event.currentTarget.duration || 0);
-                  }}
-                  onDurationChange={(event) =>
-                    setSoundtrackDuration(event.currentTarget.duration || 0)
-                  }
-                  onEnded={handleSoundtrackEnded}
-                  onPlay={() => setSoundtrackPlaying(true)}
-                  onPause={() => setSoundtrackPlaying(false)}
-                />
-              )}
+              {!isMobile &&
+                soundtrackVisible &&
+                soundtrackTrack?.previewUrl && (
+                  <audio
+                    ref={audioRef}
+                    src={soundtrackTrack.previewUrl}
+                    preload="metadata"
+                    aria-hidden="true"
+                    className="hidden"
+                    onTimeUpdate={(event) =>
+                      setSoundtrackProgress(event.currentTarget.currentTime)
+                    }
+                    onLoadedMetadata={(event) => {
+                      event.currentTarget.volume = soundtrackVolume;
+                      event.currentTarget.muted =
+                        !soundtrackVisible || soundtrackMuted || isMobile;
+                      setSoundtrackDuration(event.currentTarget.duration || 0);
+                    }}
+                    onDurationChange={(event) =>
+                      setSoundtrackDuration(event.currentTarget.duration || 0)
+                    }
+                    onEnded={handleSoundtrackEnded}
+                    onPlay={() => setSoundtrackPlaying(true)}
+                    onPause={() => setSoundtrackPlaying(false)}
+                  />
+                )}
 
               <LiquidButton
                 onClick={handleToggleFavorite}
@@ -1266,53 +1338,92 @@ function FeaturedSlide({
                 animación de entrada del hero, la alineación (centro en móvil,
                 izquierda en escritorio) y la ubicación del bloque. */}
             <div
-              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[0.7rem] font-semibold text-zinc-200 sm:mb-2.5 sm:justify-start sm:text-xs"
+              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs font-semibold text-zinc-200 sm:mb-2.5 sm:justify-start sm:text-sm"
               style={{ "--hero-delay": "170ms" }}
             >
               {Number(ratingOf(movie)) >= 7.5 && (
-                <span className="rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.72rem] font-black uppercase tracking-wide text-black sm:text-[0.8rem]">
                   Mejor valorado
                 </span>
               )}
-              <span>{mediaType === "tv" ? "Serie" : "Película"}</span>
-              {yearOf(movie) && <span>{yearOf(movie)}</span>}
-              {extras.runtime && <span>{extras.runtime}</span>}
+              {(() => {
+                const items = [];
+                items.push(<span key="type">{mediaType === "tv" ? "Serie" : "Película"}</span>);
+                if (yearOf(movie)) {
+                  items.push(<span key="year">{yearOf(movie)}</span>);
+                }
+                if (extras.runtime) {
+                  items.push(<span key="runtime">{extras.runtime}</span>);
+                }
+                return items.reduce((acc, item, index) => {
+                  if (index === 0) return [item];
+                  return [
+                    ...acc,
+                    <span key={`sep-${index}`} className="text-zinc-500/70 select-none font-bold text-[0.8em]" aria-hidden="true">•</span>,
+                    item
+                  ];
+                }, []);
+              })()}
             </div>
 
             <div
-              className="hero-reveal mb-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:mb-4 sm:justify-start sm:text-sm"
+              className="hero-reveal mb-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-zinc-200 sm:mb-4 sm:justify-start sm:text-sm"
               style={{ "--hero-delay": "230ms" }}
             >
-              {genres && <span>{genres}</span>}
-              <span className="inline-flex items-center gap-1.5">
-                <NextImage
-                  src="/logo-TMDb.png"
-                  alt="TMDb"
-                  className="h-3 w-auto"
-                  width={2560}
-                  height={1846}
-                  sizes="32px"
-                  loading="lazy"
-                />
-                <span className="font-bold">{ratingOf(movie)}</span>
-              </span>
-
-              {typeof extras.imdbRating === "number" && (
-                <span className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-IMDb.svg"
-                    alt="IMDb"
-                    className="h-4 w-auto"
-                    width={575}
-                    height={290}
-                    sizes="40px"
-                    loading="lazy"
-                  />
-                  <span className="font-bold">
-                    {extras.imdbRating.toFixed(1)}
+              {(() => {
+                const items = [];
+                if (Array.isArray(genresList)) {
+                  genresList.forEach((genre, idx) => {
+                    items.push(<span key={`genre-${idx}`}>{genre}</span>);
+                  });
+                }
+                const ratings = [];
+                ratings.push(
+                  <span key="tmdb" className="inline-flex items-center gap-1.5">
+                    <NextImage
+                      src="/logo-TMDb.png"
+                      alt="TMDb"
+                      className="h-3 w-auto"
+                      width={2560}
+                      height={1846}
+                      sizes="32px"
+                      loading="lazy"
+                    />
+                    <span className="font-bold">{ratingOf(movie)}</span>
                   </span>
-                </span>
-              )}
+                );
+                if (typeof extras.imdbRating === "number") {
+                  ratings.push(
+                    <span key="imdb" className="inline-flex items-center gap-1.5">
+                      <NextImage
+                        src="/logo-IMDb.svg"
+                        alt="IMDb"
+                        className="h-4 w-auto"
+                        width={575}
+                        height={290}
+                        sizes="40px"
+                        loading="lazy"
+                      />
+                      <span className="font-bold">
+                        {extras.imdbRating.toFixed(1)}
+                      </span>
+                    </span>
+                  );
+                }
+                items.push(
+                  <span key="ratings" className="inline-flex items-center gap-x-3">
+                    {ratings}
+                  </span>
+                );
+                return items.reduce((acc, item, index) => {
+                  if (index === 0) return [item];
+                  return [
+                    ...acc,
+                    <span key={`sep-${index}`} className="text-zinc-500/70 select-none font-bold text-[0.8em]" aria-hidden="true">•</span>,
+                    item
+                  ];
+                }, []);
+              })()}
             </div>
 
             {overview && !isMobile && (
@@ -1335,27 +1446,32 @@ function FeaturedSlide({
           </div>
       </div>
 
-      {isActive && !showTrailer && soundtrackVisible && soundtrackTrack && !isMobile && (
-        <HeroSoundtrackPlayer
-          track={soundtrackTrack}
-          isPlaying={soundtrackPlaying}
-          progress={soundtrackProgress}
-          duration={soundtrackDuration}
-          volume={soundtrackVolume}
-          muted={soundtrackMuted}
-          position={soundtrackTrackIndex + 1}
-          total={soundtrackTracks.length}
-          hasPrevious={soundtrackHasPrevious}
-          hasNext={soundtrackHasNext}
-          onPrevious={handleSoundtrackPrevious}
-          onNext={handleSoundtrackNext}
-          onTogglePlayback={handleSoundtrackTogglePlayback}
-          onSeek={handleSoundtrackSeek}
-          onToggleMute={handleSoundtrackToggleMute}
-          onVolumeChange={handleSoundtrackVolumeChange}
-          onInteractionChange={onSoundtrackInteractionChange}
-        />
-      )}
+      {isActive &&
+        !showTrailer &&
+        soundtrackPreferenceReady &&
+        soundtrackVisible &&
+        soundtrackTrack &&
+        !isMobile && (
+          <HeroSoundtrackPlayer
+            track={soundtrackTrack}
+            isPlaying={soundtrackPlaying}
+            progress={soundtrackProgress}
+            duration={soundtrackDuration}
+            volume={soundtrackVolume}
+            muted={soundtrackMuted}
+            position={soundtrackTrackIndex + 1}
+            total={soundtrackTracks.length}
+            hasPrevious={soundtrackHasPrevious}
+            hasNext={soundtrackHasNext}
+            onPrevious={handleSoundtrackPrevious}
+            onNext={handleSoundtrackNext}
+            onTogglePlayback={handleSoundtrackTogglePlayback}
+            onSeek={handleSoundtrackSeek}
+            onToggleMute={handleSoundtrackToggleMute}
+            onVolumeChange={handleSoundtrackVolumeChange}
+            onInteractionChange={onSoundtrackInteractionChange}
+          />
+        )}
 
       <style jsx>{`
         .hero-backdrop-reveal {
@@ -1530,6 +1646,13 @@ export default function FeaturedHero({
   const [soundtrackInteracting, setSoundtrackInteracting] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [scrollCueVisible, setScrollCueVisible] = useState(true);
+  const [soundtrackVisible, toggleSoundtrackVisible] = useSoundtrackVisible();
+  const [soundtrackPreferenceReady, setSoundtrackPreferenceReady] =
+    useState(false);
+
+  useEffect(() => {
+    setSoundtrackPreferenceReady(true);
+  }, []);
 
   const list = useMemo(
     () => (Array.isArray(items) ? items.filter((m) => m?.id) : []),
@@ -1920,6 +2043,9 @@ export default function FeaturedHero({
           shouldLoadMedia
           onTrailerVisibilityChange={setTrailerOpen}
           onSoundtrackInteractionChange={setSoundtrackInteracting}
+          soundtrackVisible={soundtrackVisible}
+          soundtrackPreferenceReady={soundtrackPreferenceReady}
+          toggleSoundtrackVisible={toggleSoundtrackVisible}
         />
 
         {/* Flechas (solo desktop) */}
