@@ -1510,7 +1510,7 @@ function Row({
 
   const breakpointsRow = {
     0: {
-      slidesPerView: isSpotlight ? 1.5 : 3,
+      slidesPerView: isSpotlight ? 2 : 3,
       spaceBetween: isSpotlight ? 14 : isTop10 ? 16 : 12,
     },
     640: {
@@ -1568,7 +1568,7 @@ function Row({
         }}
       >
         <Swiper
-          slidesPerView={isSpotlight ? 1.5 : 3}
+          slidesPerView={isSpotlight ? 2 : 3}
           spaceBetween={isSpotlight ? 14 : isTop10 ? 16 : 12}
           onSwiper={handleSwiper}
           onSlideChange={updateNav}
