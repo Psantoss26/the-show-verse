@@ -1155,28 +1155,6 @@ function FeaturedSlide({
                 {watched ? <Eye /> : <EyeOff />}
               </LiquidButton>
             </div>
-
-            {isActive && !showTrailer && soundtrackTrack && (
-              <HeroSoundtrackPlayer
-                track={soundtrackTrack}
-                isPlaying={soundtrackPlaying}
-                progress={soundtrackProgress}
-                duration={soundtrackDuration}
-                volume={soundtrackVolume}
-                muted={soundtrackMuted}
-                position={soundtrackTrackIndex + 1}
-                total={soundtrackTracks.length}
-                hasPrevious={soundtrackHasPrevious}
-                hasNext={soundtrackHasNext}
-                onPrevious={handleSoundtrackPrevious}
-                onNext={handleSoundtrackNext}
-                onTogglePlayback={handleSoundtrackTogglePlayback}
-                onSeek={handleSoundtrackSeek}
-                onToggleMute={handleSoundtrackToggleMute}
-                onVolumeChange={handleSoundtrackVolumeChange}
-                onInteractionChange={onSoundtrackInteractionChange}
-              />
-            )}
             </div>
 
             {/* Premios — mismo estilo que el spotlight (icono + texto esmeralda),
@@ -1266,6 +1244,28 @@ function FeaturedSlide({
             )}
           </div>
       </div>
+
+      {isActive && !showTrailer && soundtrackTrack && (
+        <HeroSoundtrackPlayer
+          track={soundtrackTrack}
+          isPlaying={soundtrackPlaying}
+          progress={soundtrackProgress}
+          duration={soundtrackDuration}
+          volume={soundtrackVolume}
+          muted={soundtrackMuted}
+          position={soundtrackTrackIndex + 1}
+          total={soundtrackTracks.length}
+          hasPrevious={soundtrackHasPrevious}
+          hasNext={soundtrackHasNext}
+          onPrevious={handleSoundtrackPrevious}
+          onNext={handleSoundtrackNext}
+          onTogglePlayback={handleSoundtrackTogglePlayback}
+          onSeek={handleSoundtrackSeek}
+          onToggleMute={handleSoundtrackToggleMute}
+          onVolumeChange={handleSoundtrackVolumeChange}
+          onInteractionChange={onSoundtrackInteractionChange}
+        />
+      )}
 
       <style jsx>{`
         .hero-backdrop-reveal {

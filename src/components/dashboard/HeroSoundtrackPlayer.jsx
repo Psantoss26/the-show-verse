@@ -70,7 +70,7 @@ export default function HeroSoundtrackPlayer({
           onInteractionChange?.(false);
         }
       }}
-      className="hero-nowplaying group pointer-events-auto fixed bottom-[5.75rem] right-3 z-50 w-40 overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.14),0_12px_36px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-44 p-2"
+      className="hero-nowplaying group pointer-events-auto absolute bottom-4 right-4 z-40 w-48 overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.14),0_12px_36px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-56 p-2"
     >
       {/* Background artwork blur */}
       {track.artworkUrl && (
@@ -100,55 +100,55 @@ export default function HeroSoundtrackPlayer({
           ) : (
             <span className="flex h-full w-full items-center justify-center">
               <Music2
-                className="h-8 w-8 text-white/35"
+                className="h-10 w-10 text-white/35"
                 aria-hidden="true"
               />
             </span>
           )}
 
           {/* Hover Controls Overlay */}
-          <div className="absolute inset-0 bg-black/70 flex flex-col justify-between p-2 opacity-0 group-hover:opacity-100 group-hover/cover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto">
+          <div className="absolute inset-0 bg-black/70 flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 group-hover/cover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto">
             {/* Top Row: Track Position & Mute */}
             <div className="flex justify-between items-center w-full">
-              <span className="text-[9px] font-semibold text-white/80 bg-black/40 px-1.5 py-0.5 rounded-md backdrop-blur-sm select-none">
+              <span className="text-[10px] sm:text-xs font-semibold text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm select-none">
                 {position}/{total}
               </span>
               <button
                 type="button"
                 onClick={onToggleMute}
                 aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
-                className="flex h-5 w-5 items-center justify-center rounded-md bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition"
+                className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition"
               >
                 {muted || volume === 0 ? (
-                  <VolumeX className="h-3 w-3" />
+                  <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 ) : (
-                  <Volume2 className="h-3 w-3" />
+                  <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 )}
               </button>
             </div>
 
             {/* Middle Row: Playback Controls */}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={onPrevious}
                 disabled={!hasPrevious}
                 aria-label="Pista anterior"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
               >
-                <SkipBack className="h-3.5 w-3.5 fill-current" />
+                <SkipBack className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-current" />
               </button>
 
               <button
                 type="button"
                 onClick={onTogglePlayback}
                 aria-label={isPlaying && !muted ? "Pausar preview" : "Reproducir preview"}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition shadow-sm"
+                className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition shadow-sm"
               >
                 {isPlaying && !muted ? (
-                  <Pause className="h-4 w-4 fill-current" />
+                  <Pause className="h-4.5 w-4.5 sm:h-5.5 sm:w-5.5 fill-current" />
                 ) : (
-                  <Play className="ml-0.5 h-4 w-4 fill-current" />
+                  <Play className="ml-0.5 h-4.5 w-4.5 sm:h-5.5 sm:w-5.5 fill-current" />
                 )}
               </button>
 
@@ -157,15 +157,15 @@ export default function HeroSoundtrackPlayer({
                 onClick={onNext}
                 disabled={!hasNext}
                 aria-label="Pista siguiente"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
               >
-                <SkipForward className="h-3.5 w-3.5 fill-current" />
+                <SkipForward className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-current" />
               </button>
             </div>
 
             {/* Bottom Row: Progress */}
-            <div className="flex w-full items-center gap-1">
-              <span className="w-5 text-right text-[8px] font-medium tabular-nums text-white/70">
+            <div className="flex w-full items-center gap-1.5">
+              <span className="w-6 text-right text-[9px] sm:text-[10px] font-medium tabular-nums text-white/70">
                 {formatTime(progress)}
               </span>
               <div className="group/progress relative flex h-3 min-w-0 flex-1 items-center">
@@ -185,7 +185,7 @@ export default function HeroSoundtrackPlayer({
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0 z-20"
                 />
               </div>
-              <span className="w-5 text-[8px] font-medium tabular-nums text-white/70">
+              <span className="w-6 text-[9px] sm:text-[10px] font-medium tabular-nums text-white/70">
                 {formatTime(duration)}
               </span>
             </div>
@@ -193,16 +193,16 @@ export default function HeroSoundtrackPlayer({
         </div>
 
         {/* Text Metadata (Fixed Height to prevent size changes) */}
-        <div className="h-14 flex flex-col justify-center px-1 pt-1.5">
+        <div className="h-16 flex flex-col justify-center px-1 pt-2">
           <h3
-            className="truncate text-xs font-bold leading-snug text-white select-none"
+            className="truncate text-xs font-bold leading-snug text-white select-none sm:text-sm"
             title={track.trackName}
           >
             {track.trackName || "Soundtrack"}
           </h3>
           {track.artistName && (
             <p
-              className="truncate text-[10px] font-medium text-white/50 select-none mt-0.5"
+              className="truncate text-[10px] font-medium text-white/50 select-none mt-0.5 sm:text-xs"
               title={track.artistName}
             >
               {track.artistName}
