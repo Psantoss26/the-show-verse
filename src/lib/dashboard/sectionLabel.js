@@ -50,7 +50,8 @@ const EXACT_LABELS = {
   "Series que se están viendo ahora": "POPULARES",
   "En emisión ahora mismo": "EN EMISIÓN",
   "En Emisión": "EN EMISIÓN",
-  "Top 10 hoy en España": "TOP 10",
+  "Top de hoy en España": "TOP",
+  "Top 10 hoy en España": "TOP", // título antiguo: por si el backend aún no ha desplegado
   "Populares en EE.UU.": "POPULARES",
   "En ascenso": "EN ASCENSO",
 

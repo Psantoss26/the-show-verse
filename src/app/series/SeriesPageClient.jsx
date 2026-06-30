@@ -1288,6 +1288,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
 /* ---------- Fila reusable ---------- */
 function Row({
   title,
+  rowKey,
   items,
   isMobile,
   posterCacheRef,
@@ -1341,7 +1342,10 @@ function Row({
     return () => window.clearTimeout(timer);
   }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
 
-  const isTop10 = title === "Top 10 hoy en España";
+  // Fila "Top ... en España": estilo ranking con número. Se identifica por la
+  // KEY estable de la engine (region_top), no por el título —así el título se
+  // puede cambiar libremente sin romper el diseño de ranking—.
+  const isTop10 = rowKey === "region_top";
   // Fila DESTACADA: mismas tarjetas póster y misma vista previa, pero a ~1,6×
   // para resaltar la sección más relevante (Tendencias). Solo una por dashboard.
   const isSpotlight = title === "Tendencias ahora mismo";
@@ -1415,7 +1419,7 @@ function Row({
             </span>
           </div>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Top 10 hoy en España<span className="text-emerald-500">.</span>
+            {title}<span className="text-emerald-500">.</span>
           </h3>
         </div>
         <Swiper
@@ -1883,6 +1887,7 @@ export default function SeriesPageClient({
           {visibleRows.map(({ key, title, items }, index) => (
             <Row
               key={key}
+              rowKey={key}
               title={title}
               items={items}
               isMobile={isMobile}
