@@ -1632,6 +1632,7 @@ export default function FeaturedHero({
   const heroSectionRef = useRef(null);
   const pointerStartRef = useRef(null);
   const suppressClickRef = useRef(false);
+  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [assets, setAssets] = useState({}); // id -> { backdrop, backdrops, poster, logo }
   const [selectedBackdrops, setSelectedBackdrops] = useState({});
@@ -1938,10 +1939,41 @@ export default function FeaturedHero({
 
   const handlePointerEnd = (event) => {
     const start = pointerStartRef.current;
+    const wasSwipe = suppressClickRef.current;
     if (start?.id === event.pointerId) pointerStartRef.current = null;
     window.setTimeout(() => {
       setIsInteracting(false);
     }, 120);
+
+    // Navegación por "tap" en dispositivos táctiles. NO dependemos del evento
+    // `click` sintetizado por el navegador: los motores móviles lo suprimen o
+    // retrasan cuando el elemento pulsado se está animando, y la animación de
+    // entrada del hero transforma el logo y los textos durante ~1s. Eso obligaba
+    // en móvil a esperar a que terminara la animación para poder pulsar el título
+    // y navegar. Con el pointerup real se puede pulsar en cualquier momento. En
+    // ratón se mantiene el onClick normal del slide (escritorio no se ve afectado).
+    if (
+      event.type === "pointerup" &&
+      event.pointerType !== "mouse" &&
+      !wasSwipe &&
+      start &&
+      start.id === event.pointerId &&
+      activeMovie?.id
+    ) {
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      const onInteractive = event.target?.closest?.(
+        'button, a, input, label, select, textarea, [role="button"], [role="slider"]',
+      );
+      if (Math.hypot(dx, dy) <= 10 && !onInteractive) {
+        // Si el navegador sí llega a emitir el click, handleClickCapture lo
+        // cancelará al ver suppressClickRef activo, evitando doble navegación.
+        suppressClickRef.current = true;
+        router.push(
+          `/details/${getMediaTypeForItem(activeMovie)}/${activeMovie.id}`,
+        );
+      }
+    }
   };
 
   const handleClickCapture = (event) => {
