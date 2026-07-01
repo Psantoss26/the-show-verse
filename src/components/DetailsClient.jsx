@@ -158,6 +158,7 @@ import {
   preloadTmdb,
   pickBestImage,
   pickBestNeutralPosterByResVotes,
+  resolveNeutralBackdropPath,
   pickBestBackdropByLangResVotes,
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
@@ -2906,13 +2907,20 @@ export default function DetailsClient({
     [posterLayoutMode, displayPosterPath, isBackdropPath],
   );
 
-  // Backdrop de fondo: seleccion manual > calculado > fallback final.
-  // Evita pintar data.backdrop_path antes de saber cual es la imagen final.
-  const displayBackdropPath =
-    asTmdbPath(selectedBackgroundPath) ||
-    asTmdbPath(baseBackdropPath) ||
-    (artworkInitialized ? asTmdbPath(data?.backdrop_path) : null) ||
-    null;
+  // Backdrop de fondo: solo se admiten imagenes confirmadas por TMDb como
+  // neutras. La ruta principal no incluye metadatos de idioma y no es segura.
+  const displayBackdropPath = useMemo(
+    () =>
+      resolveNeutralBackdropPath(imagesState?.backdrops || [], [
+        selectedBackgroundPath,
+        baseBackdropPath,
+      ]),
+    [
+      imagesState?.backdrops,
+      selectedBackgroundPath,
+      baseBackdropPath,
+    ],
+  );
 
   // Mejor poster neutro (sin idioma) para uso en movil como fondo.
   // En series excluimos data.poster_path ("main") porque llega sin metadatos
@@ -7054,9 +7062,7 @@ export default function DetailsClient({
   // Selecciona una imagen de fondo con transicion crossfade suave
   const handleSelectBackground = (filePath) => {
     // Guardar la imagen anterior para el fade
-    setPrevBackgroundPath(
-      selectedBackgroundPath || baseBackdropPath || data?.backdrop_path,
-    );
+    setPrevBackgroundPath(displayBackdropPath);
     setIsTransitioning(true);
 
     setSelectedBackgroundPath(filePath);

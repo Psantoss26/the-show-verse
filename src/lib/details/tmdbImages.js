@@ -101,6 +101,60 @@ export function pickBestNeutralPosterByResVotes(list, opts = {}) {
     return sorted[0] || pool1[0] || null
 }
 
+export const isLanguageNeutralImage = (img) => {
+    if (!img?.file_path) return false
+    if (!Object.prototype.hasOwnProperty.call(img, 'iso_639_1')) return false
+
+    const language = img.iso_639_1
+    return language == null || String(language).trim() === ''
+}
+
+export function pickBestNeutralBackdropByResVotes(list, opts = {}) {
+    const { resolutionWindow = 0.98, minWidth = 1200 } = opts
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    const neutral = list.filter(isLanguageNeutralImage)
+    if (neutral.length === 0) return null
+
+    const sizeFiltered = minWidth > 0
+        ? neutral.filter((img) => (img?.width || 0) >= minWidth)
+        : neutral
+    const pool = sizeFiltered.length ? sizeFiltered : neutral
+
+    const maxArea = Math.max(...pool.map(area))
+    const threshold = maxArea * (typeof resolutionWindow === 'number' ? resolutionWindow : 1.0)
+    const candidates = pool.filter((img) => area(img) >= threshold)
+
+    const sorted = [...candidates].sort((a, b) => {
+        const areaDifference = area(b) - area(a)
+        if (areaDifference !== 0) return areaDifference
+
+        const widthDifference = (b.width || 0) - (a.width || 0)
+        if (widthDifference !== 0) return widthDifference
+
+        const voteCountDifference = (b.vote_count || 0) - (a.vote_count || 0)
+        if (voteCountDifference !== 0) return voteCountDifference
+
+        return (b.vote_average || 0) - (a.vote_average || 0)
+    })
+
+    return sorted[0] || pool[0] || null
+}
+
+export function resolveNeutralBackdropPath(list, preferredPaths = []) {
+    const neutralImages = Array.isArray(list) ? list.filter(isLanguageNeutralImage) : []
+    if (neutralImages.length === 0) return null
+
+    const neutralPaths = new Set(neutralImages.map((img) => img.file_path))
+    for (const value of preferredPaths || []) {
+        const path = typeof value === 'string' ? value : value?.file_path
+        if (path && neutralPaths.has(path)) return path
+    }
+
+    return pickBestNeutralBackdropByResVotes(neutralImages)?.file_path || null
+}
+
 export function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],
@@ -144,7 +198,7 @@ export const pickBestPosterTV = (posters) => {
 }
 
 export const pickBestBackdropTVNeutralFirst = (backs) => {
-    const best = pickBestImage(backs || [])
+    const best = pickBestNeutralBackdropByResVotes(backs || [])
     return best?.file_path || null
 }
 
