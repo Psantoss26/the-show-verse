@@ -37,6 +37,7 @@ import {
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -495,6 +496,13 @@ export default function EpisodeDetailsClient({
   const [isMounted, setIsMounted] = useState(false);
   const [episodeStreamingProviders, setEpisodeStreamingProviders] = useState(
     [],
+  );
+
+  // Plataforma principal del overlay, según orden de prioridad (Netflix, Prime,
+  // Crunchyroll, HBO Max, Disney+, Movistar+).
+  const primaryEpisodeProvider = useMemo(
+    () => pickPrimaryProvider(episodeStreamingProviders),
+    [episodeStreamingProviders],
   );
 
   useEffect(() => {
@@ -1451,14 +1459,14 @@ export default function EpisodeDetailsClient({
               aspect="video"
               overlay={
                 <StreamingHoverOverlay
-                  provider={episodeStreamingProviders[0]}
+                  provider={primaryEpisodeProvider}
                   watched={trakt.watched}
                   part="visual"
                 />
               }
               hitLayer={
                 <StreamingHoverOverlay
-                  provider={episodeStreamingProviders[0]}
+                  provider={primaryEpisodeProvider}
                   part="hit"
                 />
               }

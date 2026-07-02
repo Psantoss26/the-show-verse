@@ -56,6 +56,49 @@ export function platformKeyFromProvider(provider) {
   return null;
 }
 
+// Orden de prioridad de plataformas para elegir cuál se muestra como principal
+// en el overlay de la portada (la primera disponible según este orden).
+const PLATFORM_PRIORITY = [
+  "netflix",
+  "prime",
+  "crunchyroll",
+  "hbo-max",
+  "disney",
+  "movistar",
+];
+
+/**
+ * Elige el proveedor principal de una lista según PLATFORM_PRIORITY (solo los
+ * que tengan URL http válida). Si ninguno está en la lista de prioridad, cae al
+ * primero disponible (respetando el orden recibido). Devuelve null si no hay.
+ */
+export function pickPrimaryProvider(providers) {
+  if (!Array.isArray(providers)) return null;
+
+  const withUrl = providers.filter(
+    (p) => typeof p?.url === "string" && p.url.startsWith("http"),
+  );
+  if (!withUrl.length) return null;
+
+  const rank = (provider) => {
+    const key = platformKeyFromProvider(provider);
+    const idx = key ? PLATFORM_PRIORITY.indexOf(key) : -1;
+    // En prioridad: 0..N. Fuera de prioridad: al final, conservando orden.
+    return idx === -1 ? PLATFORM_PRIORITY.length : idx;
+  };
+
+  let best = withUrl[0];
+  let bestRank = rank(best);
+  for (let i = 1; i < withUrl.length; i += 1) {
+    const r = rank(withUrl[i]);
+    if (r < bestRank) {
+      best = withUrl[i];
+      bestRank = r;
+    }
+  }
+  return best;
+}
+
 /**
  * Devuelve { key, wordmarkSrc, name } para pintar "Ver en {wordmark|name}".
  * `wordmarkSrc` es null cuando la plataforma no tiene *-text.png (fallback a
