@@ -100,21 +100,15 @@ export default function AnimatedPosterFrame({
 
       const now =
         time ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
-      // Animación 3D por defecto: al inclinar sigue al puntero y, en reposo,
-      // flota suavemente de forma continua. Los elementos clicables (enlace/
-      // flechas) van en la capa FIJA (`hitLayer`, fuera del marco), así que el
-      // marco puede moverse libremente sin romper el clic.
-      const idle = now - lastInputRef.current > 220;
-      let target = targetRef.current;
-
-      if (idle) {
-        const seconds = now / 1000;
-        target = {
-          rx: Math.sin(seconds * 1.05) * 4.8,
-          ry: Math.cos(seconds * 0.9) * 7.2,
-          s: 1.025 + Math.sin(seconds * 1.6) * 0.008,
-        };
-      }
+      // ÚNICA animación: flotación 3D continua. No se inclina siguiendo al
+      // puntero (eso dejaba la portada "clavada" en un ángulo fijo al parar el
+      // ratón). Los clics los recibe la capa FIJA (`hitLayer`, fuera del marco).
+      const seconds = now / 1000;
+      const target = {
+        rx: Math.sin(seconds * 1.05) * 4.8,
+        ry: Math.cos(seconds * 0.9) * 7.2,
+        s: 1.025 + Math.sin(seconds * 1.6) * 0.008,
+      };
 
       const current = stateRef.current;
       const easing = 0.14;

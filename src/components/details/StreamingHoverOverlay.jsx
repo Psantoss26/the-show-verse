@@ -60,7 +60,7 @@ export default function StreamingHoverOverlay({
       return (
         <a
           {...linkAttrs}
-          className="pointer-events-none group-hover/still:pointer-events-auto absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none"
+          className="pointer-events-none group-hover/still:pointer-events-auto absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline-none"
         />
       );
     }
@@ -75,26 +75,26 @@ export default function StreamingHoverOverlay({
   }
 
   // ---- Capa VISUAL (dentro del marco 3D, integrada, sin eventos) ----
-  const playVisualClass = `absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 scale-90 items-center justify-center rounded-full text-white ring-1 ring-white/20 transition-transform duration-300 group-hover/still:scale-100 sm:h-20 sm:w-20 ${wm.color.className}`;
+  const playVisualClass = `absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 scale-90 items-center justify-center rounded-full text-white ring-1 ring-white/20 transition-transform duration-300 group-hover/still:scale-100 sm:h-24 sm:w-24 ${wm.color.className}`;
   const playStyle = { boxShadow: `0 12px 44px -8px ${wm.color.glow}` };
 
   return (
     <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/still:opacity-100">
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/70" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-black/40" />
 
       {/* Arriba: "Ver en" + wordmark (o nombre) */}
       <div className="absolute inset-x-0 top-0 flex -translate-y-2 items-center justify-center gap-2 px-4 pt-3 transition-transform duration-300 group-hover/still:translate-y-0">
-        <span className="text-sm font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-base">
+        <span className="text-base font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-lg">
           Ver en
         </span>
         {wm.wordmarkSrc ? (
           <OptimizedImage
             src={wm.wordmarkSrc}
             alt={wm.name}
-            className="h-4 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:h-5"
+            className="h-5 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:h-6"
           />
         ) : (
-          <span className="text-sm font-black uppercase tracking-wide text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-base">
+          <span className="text-base font-black uppercase tracking-wide text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-lg">
             {wm.name}
           </span>
         )}
@@ -102,7 +102,7 @@ export default function StreamingHoverOverlay({
 
       {/* Centro: botón play con el color de la plataforma */}
       <div className={playVisualClass} style={playStyle}>
-        <PlayIcon className="h-7 w-7 translate-x-0.5 fill-current sm:h-9 sm:w-9" />
+        <PlayIcon className="h-9 w-9 translate-x-0.5 fill-current sm:h-11 sm:w-11" />
       </div>
 
       {/* Abajo: "Visto" (solo si procede) */}

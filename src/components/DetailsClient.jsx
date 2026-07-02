@@ -222,6 +222,7 @@ import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 
 function getSoundtrackSourceBadge(source) {
   const key = String(source || "Spotify").toLowerCase();
@@ -8639,6 +8640,13 @@ export default function DetailsClient({
     return dedupeStreamingProviders(providers).slice(0, 6);
   }, [streamingProviders, plexAvailable, plexUrl]);
 
+  // Plataforma principal del overlay de la portada, según orden de prioridad
+  // (Netflix, Prime, Crunchyroll, HBO Max, Disney+, Movistar+).
+  const primaryStreamingProvider = useMemo(
+    () => pickPrimaryProvider(streamingProviders),
+    [streamingProviders],
+  );
+
   // Refs para gestion de carga de poster (los estados estan definidos al inicio)
   const prevDisplayPosterRef = useRef(null);
   const posterLoadTokenRef = useRef(0);
@@ -8969,21 +8977,15 @@ export default function DetailsClient({
       const now =
         t ??
         (typeof performance !== "undefined" ? performance.now() : Date.now());
-      // Animación 3D por defecto: al inclinar sigue al puntero y, en reposo,
-      // flota suavemente de forma continua. Los elementos clicables (botón play
-      // y flechas) van en la capa FIJA (fuera del marco), así que el marco puede
-      // moverse libremente sin romper el clic.
-      const idle = now - posterLastInputRef.current > IDLE_DELAY;
-      let target = posterTargetRef.current;
-
-      if (idle) {
-        const dt = now / 1000;
-        target = {
-          rx: Math.sin(dt * 1.05) * 5.5,
-          ry: Math.cos(dt * 0.9) * 8.5,
-          s: 1.03 + Math.sin(dt * 1.6) * 0.01,
-        };
-      }
+      // ÚNICA animación: flotación 3D continua. No se inclina siguiendo al
+      // puntero (eso dejaba la portada "clavada" en un ángulo fijo al parar el
+      // ratón). Los clics los recibe la capa FIJA (fuera del marco).
+      const dt = now / 1000;
+      const target = {
+        rx: Math.sin(dt * 1.05) * 5.5,
+        ry: Math.cos(dt * 0.9) * 8.5,
+        s: 1.03 + Math.sin(dt * 1.6) * 0.01,
+      };
 
       const cur = posterStateRef.current;
       const k = 0.14;
@@ -9323,11 +9325,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         con la inclinación y por tanto sí registra el clic. */}
                     <div className="pointer-events-none absolute inset-0 z-[15]">
                       <StreamingHoverOverlay
-                        provider={streamingProviders.find(
-                          (p) =>
-                            typeof p?.url === "string" &&
-                            p.url.startsWith("http"),
-                        )}
+                        provider={primaryStreamingProvider}
                         watched={trakt.watched}
                         mode="button"
                         part="visual"
@@ -9380,10 +9378,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     cambian el modo de imagen. */}
                 <div className="pointer-events-none absolute inset-0 z-40">
                   <StreamingHoverOverlay
-                    provider={streamingProviders.find(
-                      (p) =>
-                        typeof p?.url === "string" && p.url.startsWith("http"),
-                    )}
+                    provider={primaryStreamingProvider}
                     mode="button"
                     part="hit"
                   />

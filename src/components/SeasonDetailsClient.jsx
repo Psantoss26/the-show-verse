@@ -30,6 +30,7 @@ import {
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -283,13 +284,10 @@ export default function SeasonDetailsClient({
     return () => controller.abort();
   }, [showId, showName, show?.first_air_date, show?.imdb_id, showImdbId]);
 
+  // Plataforma principal del overlay, según orden de prioridad (Netflix, Prime,
+  // Crunchyroll, HBO Max, Disney+, Movistar+).
   const seasonPrimaryProvider = useMemo(
-    () =>
-      (Array.isArray(showProviders)
-        ? showProviders.find(
-            (p) => typeof p?.url === "string" && p.url.startsWith("http"),
-          )
-        : null) || null,
+    () => pickPrimaryProvider(showProviders),
     [showProviders],
   );
 
