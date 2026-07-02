@@ -8969,25 +8969,27 @@ export default function DetailsClient({
       const now =
         t ??
         (typeof performance !== "undefined" ? performance.now() : Date.now());
-      // En reposo volvemos a PLANO y quietos (en vez de flotar sin parar): el
-      // overlay/flechas van DENTRO del marco (se inclinan con la imagen =
-      // integrado), y si el marco no parase, se moverían cada frame y no se
-      // registraría el clic. Al pausar para pulsar, el marco está plano y quieto.
-      const idle = now - posterLastInputRef.current > 140;
-      const target = idle
-        ? { rx: 0, ry: 0, s: 1 }
-        : posterTargetRef.current;
+      // Animación 3D por defecto: al inclinar sigue al puntero y, en reposo,
+      // flota suavemente de forma continua. Los elementos clicables (botón play
+      // y flechas) van en la capa FIJA (fuera del marco), así que el marco puede
+      // moverse libremente sin romper el clic.
+      const idle = now - posterLastInputRef.current > IDLE_DELAY;
+      let target = posterTargetRef.current;
+
+      if (idle) {
+        const dt = now / 1000;
+        target = {
+          rx: Math.sin(dt * 1.05) * 5.5,
+          ry: Math.cos(dt * 0.9) * 8.5,
+          s: 1.03 + Math.sin(dt * 1.6) * 0.01,
+        };
+      }
 
       const cur = posterStateRef.current;
-      const k = 0.16;
+      const k = 0.14;
       cur.rx += (target.rx - cur.rx) * k;
       cur.ry += (target.ry - cur.ry) * k;
       cur.s += (target.s - cur.s) * k;
-      // Snap para que el transform DEJE de cambiar al llegar (si no, el asíntota
-      // deja el elemento "moviéndose" y el clic no se registra).
-      if (Math.abs(target.rx - cur.rx) < 0.02) cur.rx = target.rx;
-      if (Math.abs(target.ry - cur.ry) < 0.02) cur.ry = target.ry;
-      if (Math.abs(target.s - cur.s) < 0.0008) cur.s = target.s;
 
       el.style.transform =
         `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
@@ -9330,6 +9332,42 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         mode="button"
                         part="visual"
                       />
+
+                      {/* Visual de las flechas (degradado + chevron) DENTRO del
+                          marco: se inclina/flota con la imagen = integrado. El
+                          clic lo recibe la zona transparente de la capa fija. */}
+                      <AnimatePresence>
+                        {supportsHover &&
+                          isPosterHovered &&
+                          posterViewMode === "poster" && (
+                            <motion.div
+                              key="arrow-visual-right"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-1/3 items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4"
+                            >
+                              <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+                            </motion.div>
+                          )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {supportsHover &&
+                          isPosterHovered &&
+                          posterViewMode === "preview" && (
+                            <motion.div
+                              key="arrow-visual-left"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-1/3 items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4"
+                            >
+                              <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+                            </motion.div>
+                          )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
@@ -9350,57 +9388,42 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     part="hit"
                   />
 
-                  {/* Zona derecha: ver imagen de fondo (poster -> backdrop) */}
-                  <AnimatePresence>
-                    {supportsHover &&
-                      isPosterHovered &&
-                      posterViewMode === "poster" && (
-                        <motion.div
-                          role="button"
-                          tabIndex={0}
-                          aria-label="Ver imagen de fondo"
-                          title="Ver imagen de fondo"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCyclePoster();
-                          }}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2, ease: "easeInOut" }}
-                          className="pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-1/3 cursor-pointer items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4"
-                        >
-                          <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
-                        </motion.div>
-                      )}
-                  </AnimatePresence>
+                  {/* Zonas laterales CLICABLES (transparentes): la parte visible
+                      (degradado + chevron) va dentro del marco, integrada. Aquí
+                      solo está el área de clic, fija, para que siempre registre. */}
+                  {supportsHover &&
+                    isPosterHovered &&
+                    posterViewMode === "poster" && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Ver imagen de fondo"
+                        title="Ver imagen de fondo"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCyclePoster();
+                        }}
+                        className="pointer-events-auto absolute inset-y-0 right-0 z-20 w-1/3 cursor-pointer"
+                      />
+                    )}
 
-                  {/* Zona izquierda: ver póster (backdrop -> poster) */}
-                  <AnimatePresence>
-                    {supportsHover &&
-                      isPosterHovered &&
-                      posterViewMode === "preview" && (
-                        <motion.div
-                          role="button"
-                          tabIndex={0}
-                          aria-label="Ver póster"
-                          title="Ver póster"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCyclePoster();
-                          }}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2, ease: "easeInOut" }}
-                          className="pointer-events-auto absolute inset-y-0 left-0 z-20 flex w-1/3 cursor-pointer items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4"
-                        >
-                          <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
-                        </motion.div>
-                      )}
-                  </AnimatePresence>
+                  {supportsHover &&
+                    isPosterHovered &&
+                    posterViewMode === "preview" && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Ver póster"
+                        title="Ver póster"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCyclePoster();
+                        }}
+                        className="pointer-events-auto absolute inset-y-0 left-0 z-20 w-1/3 cursor-pointer"
+                      />
+                    )}
                 </div>
               </div>
             </motion.div>
