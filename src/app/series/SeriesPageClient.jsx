@@ -852,12 +852,21 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
       } else {
         try {
           let runtime = null;
+          let seasons = null;
           let overview = null;
           try {
             const details = await getDetails("tv", show.id, {
               language: "es-ES",
             });
             runtime = details?.episode_run_time?.[0] ?? null;
+            // Temporadas y episodios (mismo formato que FeaturedHero) para
+            // mostrar en la tarjeta spotlight en lugar de la duración del episodio.
+            if (details?.number_of_seasons) {
+              seasons = `${details.number_of_seasons} Temp.`;
+              if (details.number_of_episodes) {
+                seasons += ` · ${details.number_of_episodes} Eps.`;
+              }
+            }
             overview =
               (typeof details?.overview === "string" &&
                 details.overview.trim()) ||
@@ -891,13 +900,14 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
             }
           } catch {}
 
-          const next = { runtime, awards, imdbRating, overview };
+          const next = { runtime, seasons, awards, imdbRating, overview };
           tvExtrasCache.set(show.id, next);
           if (!abort) setExtras(next);
         } catch {
           if (!abort)
             setExtras({
               runtime: null,
+              seasons: null,
               awards: null,
               imdbRating: null,
               overview: null,
@@ -1158,7 +1168,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
           logoSrc={logoSrc}
           backdropSrc={bgSrc}
           year={yearOf(show)}
-          runtime={formatRuntime(extras?.runtime)}
+          runtime={extras?.seasons}
           genres={genres}
           tmdbRating={tmdbRating}
           imdbRating={extras?.imdbRating}

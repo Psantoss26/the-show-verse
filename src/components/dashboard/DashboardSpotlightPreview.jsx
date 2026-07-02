@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidButton from "@/components/LiquidButton";
+import { getSpotlightBadge } from "@/lib/dashboard/media";
 
 const spotlightActionClass =
   "!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6";
@@ -175,13 +176,14 @@ export default function DashboardSpotlightPreview({
   };
 
   const hasTmdbRating = Boolean(tmdbRating && tmdbRating !== "–");
+  const badge = getSpotlightBadge(item);
 
   return (
     <>
       <div className="absolute inset-0 z-10 flex h-full items-end p-5 md:p-6 xl:p-8">
         <div className="min-w-0 max-w-[88%] sm:max-w-[82%] md:max-w-[72%] xl:max-w-[68%]">
           {logoSrc ? (
-            <div className="mb-3 h-16 w-full max-w-[17rem] md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
+            <div className="mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
               <OptimizedImage
                 src={logoSrc}
                 alt={title}
@@ -191,7 +193,7 @@ export default function DashboardSpotlightPreview({
               />
             </div>
           ) : (
-            <h3 className="mb-3 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl">
+            <h3 className="mb-5 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl md:mb-6">
               {title}
             </h3>
           )}
@@ -273,14 +275,31 @@ export default function DashboardSpotlightPreview({
           )}
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.68rem] font-semibold text-zinc-200 sm:text-xs">
-            {Number(tmdbRating) >= 7.5 && (
-              <span className="rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-                Mejor valorado
+            {badge && (
+              <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                {badge}
               </span>
             )}
-            <span>{mediaType === "tv" ? "Serie" : "Película"}</span>
-            {year && <span>{year}</span>}
-            {runtime && <span>{runtime}</span>}
+            {(() => {
+              // Año y duración separados por "•" (mismo separador que FeaturedHero).
+              const parts = [];
+              if (year) parts.push(<span key="year">{year}</span>);
+              if (runtime) parts.push(<span key="runtime">{runtime}</span>);
+              return parts.reduce((acc, item, index) => {
+                if (index === 0) return [item];
+                return [
+                  ...acc,
+                  <span
+                    key={`sep-${index}`}
+                    className="select-none text-[0.8em] font-bold text-zinc-500/70"
+                    aria-hidden="true"
+                  >
+                    •
+                  </span>,
+                  item,
+                ];
+              }, []);
+            })()}
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:text-sm">

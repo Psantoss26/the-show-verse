@@ -12,6 +12,39 @@ export const ratingOf = (m) =>
     ? m.vote_average.toFixed(1)
     : "–";
 
+// Etiqueta contextual de la casilla destacada (antes fija "MEJOR VALORADO"),
+// compartida por el FeaturedHero y por las tarjetas spotlight de los 3 dashboards
+// (Inicio, Películas y Series) para que TODAS muestren lo mismo. Elige el dato
+// MÁS relevante de cada título usando solo campos disponibles al instante (nota
+// TMDb + fecha), así varía por título y no depende de datos que cargan tarde
+// (premios/IMDb) que provocarían parpadeo:
+//   1. "Estreno"        → recién estrenado o inminente (±45 días).
+//   2. "Mejor valorado" → nota TMDb ≥ 8,0 (excelente de verdad).
+//   3. "Destacado"      → nota TMDb ≥ 7,0.
+//   4. null             → sin etiqueta (no ocupa sitio).
+export const getSpotlightBadge = (item, now = Date.now()) => {
+  const dateStr = item?.release_date || item?.first_air_date || "";
+  if (dateStr) {
+    const released = new Date(dateStr);
+    if (!Number.isNaN(released.getTime())) {
+      // days > 0 → ya estrenado hace `days` días; days < 0 → se estrena dentro de
+      // `-days` días. La fila "Estrenos y novedades" del backend son en su mayoría
+      // PRÓXIMOS estrenos (hoy … +275 días para pelis; −30 … +275 para series),
+      // así que la ventana cubre los próximos estrenos hasta ~9 meses vista y los
+      // recién estrenados (últimos ~60 días). Antes era ±45 días y los próximos
+      // estrenos a más de 45 días se quedaban sin la etiqueta "Estreno".
+      const days = (now - released.getTime()) / 86400000;
+      if (days >= -285 && days <= 60) return "Estreno";
+    }
+  }
+  const rating = typeof item?.vote_average === "number" ? item.vote_average : NaN;
+  if (Number.isFinite(rating)) {
+    if (rating >= 8.0) return "Mejor valorado";
+    if (rating >= 7.0) return "Destacado";
+  }
+  return null;
+};
+
 export const formatRuntime = (mins) => {
   if (!mins || typeof mins !== "number") return null;
   const h = Math.floor(mins / 60);
