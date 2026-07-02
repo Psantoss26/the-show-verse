@@ -301,16 +301,6 @@ curl -sS http://localhost:3001/v1/history/shows/1396 \
 
 Debe devolver `watchedBySeason` con temporada `1` y episodio `1`.
 
-Para comprobar los enlaces exactos aprendidos por la extensión:
-
-```bash
-curl -sS http://localhost:3001/v1/history/streaming-links/1396/1/1 \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
-```
-
-Debe devolver `links` vacío o una entrada por plataforma sincronizada, siempre
-con una URL HTTPS del dominio oficial correspondiente.
-
 ### 7. Rating
 
 ```bash
@@ -375,7 +365,6 @@ Tablas esperadas:
 
 ```text
 connected_accounts
-episode_streaming_links
 favorites
 refresh_tokens
 subscriptions

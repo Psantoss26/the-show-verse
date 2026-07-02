@@ -4,6 +4,7 @@
 import { db } from '../db/client.js';
 import { watchHistory, favorites, watchlist, userRatings, tmdbCache } from '../db/schema.js';
 import { eq, and, gte, lte, count, sql, isNotNull, desc, inArray } from 'drizzle-orm';
+import { computeShowProgress } from '../lib/showProgress.js';
 
 const emptyStats = {
   movies: { watched: 0, plays: 0, minutes: 0, comments: 0, collected: 0 },
@@ -178,40 +179,6 @@ function buildSeasonEpisodeCounts(metadata) {
   return counts;
 }
 
-function findNextEpisode(watchedKeys, seasonEpisodeCounts) {
-  const seasons = Object.keys(seasonEpisodeCounts).map(Number).sort((a, b) => a - b);
-  for (const season of seasons) {
-    const maxEpisode = seasonEpisodeCounts[season];
-    for (let episode = 1; episode <= maxEpisode; episode += 1) {
-      if (!watchedKeys.has(`${season}-${episode}`)) {
-        return { season, number: episode, title: null };
-      }
-    }
-  }
-  return null;
-}
-
-function filterWatchedKeysByAvailableEpisodes(watchedKeys, seasonEpisodeCounts) {
-  const filtered = new Set();
-  for (const key of watchedKeys || []) {
-    const [seasonRaw, episodeRaw] = String(key).split('-');
-    const season = Number(seasonRaw);
-    const episode = Number(episodeRaw);
-    const maxEpisode = Number(seasonEpisodeCounts?.[season] || 0);
-    if (
-      Number.isInteger(season) &&
-      Number.isInteger(episode) &&
-      season > 0 &&
-      episode > 0 &&
-      maxEpisode > 0 &&
-      episode <= maxEpisode
-    ) {
-      filtered.add(`${season}-${episode}`);
-    }
-  }
-  return filtered;
-}
-
 function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = new Map()) {
   const byShow = new Map();
 
@@ -223,14 +190,16 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
       title: null,
       posterPath: null,
       lastWatchedAt: null,
-      watchedKeys: new Set(),
+      // "season-episode" -> nº de plays (rewatches = plays adicionales).
+      playCounts: new Map(),
       latestEpisode: null,
     };
 
     if (!current.title && row.title) current.title = row.title;
     if (!current.posterPath && row.posterPath) current.posterPath = row.posterPath;
     if (row.season != null && row.episode != null) {
-      current.watchedKeys.add(`${row.season}-${row.episode}`);
+      const epKey = `${row.season}-${row.episode}`;
+      current.playCounts.set(epKey, (current.playCounts.get(epKey) || 0) + 1);
       const watchedAt = row.watchedAt || null;
       if (!current.latestEpisode || new Date(watchedAt || 0) > new Date(current.latestEpisode.watchedAt || 0)) {
         current.latestEpisode = {
@@ -251,19 +220,8 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
     .map((show) => {
       const metadata = showMetadataFor(metadataByKey, show.tmdbId);
       const seasonEpisodeCounts = buildSeasonEpisodeCounts(metadata);
-      const aired = Object.values(seasonEpisodeCounts).reduce(
-        (sum, count) => sum + Number(count || 0),
-        0,
-      );
-      const hasKnownAired = aired > 0;
-      const validWatchedKeys = hasKnownAired
-        ? filterWatchedKeysByAvailableEpisodes(
-            show.watchedKeys,
-            seasonEpisodeCounts,
-          )
-        : show.watchedKeys;
-      const completed = validWatchedKeys.size;
-      const pct = hasKnownAired ? Math.min(100, Math.round((completed / aired) * 100)) : 0;
+      // Clasificación por capas de plays (soporta rewatch). Ver lib/showProgress.
+      const progress = computeShowProgress(show.playCounts, seasonEpisodeCounts);
       const firstAirDate = metadata?.first_air_date || null;
       const title = showTitleFromMetadata(metadata) || show.title || 'Sin título';
 
@@ -273,11 +231,19 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
         title,
         title_es: showTitleFromMetadata(metadata) || title,
         year: firstAirDate ? String(firstAirDate).slice(0, 4) : null,
-        aired,
-        hasKnownAired,
-        completed,
-        pct,
-        nextEpisode: findNextEpisode(validWatchedKeys, seasonEpisodeCounts),
+        aired: progress.aired,
+        hasKnownAired: progress.hasKnownAired,
+        // Progreso del RUN actual (primer visionado o rewatch): lo que se muestra
+        // en "Continuar viendo" / "En progreso".
+        completed: progress.runCompleted,
+        pct: progress.runPct,
+        nextEpisode: progress.runNextEpisode,
+        // Estado de visionado/rewatch para clasificar y para la UI.
+        distinctWatched: progress.distinctWatched,
+        baseComplete: progress.baseComplete,
+        runActive: progress.runActive,
+        completedRuns: progress.completedRuns,
+        isRewatch: progress.isRewatch,
         lastEpisode: show.latestEpisode
           ? {
               season: show.latestEpisode.season,
@@ -293,7 +259,7 @@ function buildShowProgressItems(rows = [], metadataByKey, userRatingByTmdbId = n
         vote_average: metadata?.vote_average ?? null,
         overview: metadata?.overview || null,
         number_of_seasons: metadata?.number_of_seasons || null,
-        total_episodes: aired || null,
+        total_episodes: progress.aired || null,
         genres: showGenreNames(metadata),
         tmdb_status: metadata?.status || null,
         networks: Array.isArray(metadata?.networks) ? metadata.networks : [],
@@ -679,7 +645,12 @@ export default async function statsRoutes(fastify) {
     ]);
     const userRatingByTmdbId = new Map(ratingRows.map((row) => [Number(row.tmdbId), row.rating]));
     const shows = buildShowProgressItems(rows, metadataByKey, userRatingByTmdbId)
-      .filter((item) => item.completed > 0 && (!item.hasKnownAired || item.completed < item.aired))
+      // "En progreso" = hay un RUN activo (primer visionado a medias O un rewatch
+      // en curso de una serie ya completada). Sin emitidos conocidos, heredado:
+      // en progreso si hay algún episodio visto.
+      .filter((item) =>
+        item.runActive || (!item.hasKnownAired && item.completed > 0),
+      )
       .slice(0, limit);
 
     return reply.send({ results: shows, limit });
@@ -718,7 +689,17 @@ export default async function statsRoutes(fastify) {
     ]);
     const userRatingByTmdbId = new Map(ratingRows.map((row) => [Number(row.tmdbId), row.rating]));
     const shows = buildShowProgressItems(rows, metadataByKey, userRatingByTmdbId)
-      .filter((item) => item.completed > 0 && item.hasKnownAired && item.completed >= item.aired)
+      // "Completadas" = el visionado base está completo (al menos una vez). Una
+      // serie con rewatch en curso SIGUE apareciendo aquí (además de en progreso).
+      .filter((item) => item.baseComplete)
+      // Se muestra como completada (100%); no el progreso del rewatch.
+      .map((item) => ({
+        ...item,
+        completed: item.aired,
+        pct: 100,
+        nextEpisode: null,
+        isRewatching: item.runActive, // rewatch en curso → para una etiqueta opcional
+      }))
       .slice(0, limit);
 
     return reply.send({ results: shows, limit });

@@ -3,10 +3,9 @@
 
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { episodeStreamingLinks, watchHistory } from '../db/schema.js';
+import { watchHistory } from '../db/schema.js';
 import { eq, and, desc, gte, lte, inArray, isNotNull } from 'drizzle-orm';
 import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
-import { STREAMING_PLATFORM_NAMES } from '../lib/streamingPlayback.js';
 
 const addHistorySchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -39,48 +38,6 @@ function buildWatchedBySeason(rows) {
 
 export default async function historyRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
-
-  // Enlaces exactos al reproductor capturados por la extensión del usuario.
-  fastify.get('/streaming-links/:tmdbId/:season/:episode', async (req, reply) => {
-    const params = z.object({
-      tmdbId: z.coerce.number().int().positive(),
-      season: z.coerce.number().int().positive(),
-      episode: z.coerce.number().int().positive(),
-    }).safeParse(req.params);
-
-    if (!params.success) {
-      return reply.status(400).send({
-        error: 'Invalid tmdbId, season, or episode',
-      });
-    }
-
-    const { tmdbId, season, episode } = params.data;
-    const rows = await db
-      .select({
-        platform: episodeStreamingLinks.platform,
-        playbackUrl: episodeStreamingLinks.playbackUrl,
-        updatedAt: episodeStreamingLinks.updatedAt,
-      })
-      .from(episodeStreamingLinks)
-      .where(
-        and(
-          eq(episodeStreamingLinks.userId, req.user.id),
-          eq(episodeStreamingLinks.tmdbId, tmdbId),
-          eq(episodeStreamingLinks.season, season),
-          eq(episodeStreamingLinks.episode, episode),
-        ),
-      )
-      .orderBy(desc(episodeStreamingLinks.updatedAt));
-
-    return reply.send({
-      links: rows.map((row) => ({
-        platform: row.platform,
-        providerName: STREAMING_PLATFORM_NAMES[row.platform] || row.platform,
-        url: row.playbackUrl,
-        updatedAt: row.updatedAt,
-      })),
-    });
-  });
 
   // ──────────────────────────────────────────────
   // GET /history — Historial paginado global

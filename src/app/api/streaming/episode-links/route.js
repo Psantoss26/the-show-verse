@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import {
-  backendFetchJson,
-  setBackendAuthCookies,
-} from "@/lib/backend/server";
+import { getEpisodeStreamingProviders } from "@/lib/api/justwatch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
+  const title = request.nextUrl.searchParams.get("title")?.trim();
   const tmdbId = Number(request.nextUrl.searchParams.get("tmdbId"));
+  const year = Number(request.nextUrl.searchParams.get("year")) || null;
   const season = Number(request.nextUrl.searchParams.get("season"));
   const episode = Number(request.nextUrl.searchParams.get("episode"));
 
   if (
+    !title ||
     !Number.isInteger(tmdbId) ||
     tmdbId <= 0 ||
     !Number.isInteger(season) ||
@@ -21,41 +21,31 @@ export async function GET(request) {
     episode <= 0
   ) {
     return NextResponse.json(
-      { error: "Missing or invalid tmdbId, season, or episode" },
+      { error: "Missing or invalid title, tmdbId, season, or episode" },
       { status: 400 },
     );
   }
 
-  let backend;
   try {
-    backend = await backendFetchJson(
-      request,
-      `/v1/history/streaming-links/${tmdbId}/${season}/${episode}`,
-    );
+    const result = await getEpisodeStreamingProviders({
+      title,
+      tmdbId,
+      year,
+      seasonNumber: season,
+      episodeNumber: episode,
+    });
+
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control":
+          "public, s-maxage=21600, stale-while-revalidate=86400",
+      },
+    });
   } catch (error) {
-    console.warn("Episode streaming links backend request failed:", error);
+    console.error("Episode streaming providers request failed:", error);
     return NextResponse.json(
       { error: "Unable to load episode streaming links" },
       { status: 502 },
     );
   }
-
-  if (backend.ok) {
-    const response = NextResponse.json({
-      links: Array.isArray(backend.json?.links) ? backend.json.links : [],
-    });
-    setBackendAuthCookies(response, backend, {
-      secure: request.nextUrl.protocol === "https:",
-    });
-    return response;
-  }
-
-  if (backend.skipped || backend.status === 401 || backend.status === 404) {
-    return NextResponse.json({ links: [] });
-  }
-
-  return NextResponse.json(
-    { error: backend.error || "Unable to load episode streaming links" },
-    { status: backend.status >= 400 ? backend.status : 502 },
-  );
 }

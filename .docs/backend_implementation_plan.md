@@ -175,23 +175,6 @@ CREATE INDEX idx_watch_history_tmdb ON watch_history(user_id, tmdb_id, media_typ
 CREATE INDEX idx_watch_history_watched_at ON watch_history(user_id, watched_at DESC);
 ```
 
-#### `episode_streaming_links`
-```sql
-CREATE TABLE episode_streaming_links (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  tmdb_id      INTEGER NOT NULL,
-  season       INTEGER NOT NULL,
-  episode      INTEGER NOT NULL,
-  platform     TEXT NOT NULL CHECK (platform IN ('netflix', 'prime', 'max', 'disney', 'plex')),
-  content_id   TEXT,
-  playback_url TEXT NOT NULL,
-  created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, tmdb_id, season, episode, platform)
-);
-```
-
 #### `favorites`
 ```sql
 CREATE TABLE favorites (
@@ -353,7 +336,6 @@ DELETE /history/bulk           — Eliminar múltiples entradas (body: { ids: [.
 GET    /history/shows/:tmdbId  — Episodios vistos de una serie (watchedBySeason)
 GET    /history/movies/:tmdbId — Visionados de una película (plays, lastWatchedAt)
 GET    /history/episodes/:tmdbId/:season/:episode — Visionados de un episodio
-GET    /history/streaming-links/:tmdbId/:season/:episode — Enlaces exactos al reproductor detectados por la extensión
 
 POST   /history/episodes       — Marcar episodio como visto/no visto
 POST   /history/seasons        — Marcar temporada completa como vista/no vista

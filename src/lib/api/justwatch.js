@@ -141,59 +141,204 @@ query GetTitleDetails(
 }
 `;
 
+const SHOW_SEASONS_QUERY = `
+query GetShowSeasons(
+  $nodeId: ID!
+  $country: Country!
+  $language: Language!
+) {
+  node(id: $nodeId) {
+    ... on Show {
+      seasons {
+        id
+        content(country: $country, language: $language) {
+          title
+        }
+      }
+    }
+  }
+}
+`;
+
+const SEASON_EPISODES_QUERY = `
+query GetSeasonEpisodes(
+  $nodeId: ID!
+  $country: Country!
+  $language: Language!
+  $platform: Platform!
+) {
+  node(id: $nodeId) {
+    ... on Season {
+      episodes {
+        id
+        content(country: $country, language: $language) {
+          title
+        }
+        offers(country: $country, platform: $platform) {
+          monetizationType
+          presentationType
+          standardWebURL
+          deeplinkURL(platform: $platform)
+          package {
+            packageId
+            clearName
+            shortName
+            technicalName
+          }
+        }
+      }
+    }
+  }
+}
+`;
+
+async function justWatchGraphql(query, variables) {
+  const response = await fetch(JUSTWATCH_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(8000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`JustWatch API error: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    throw new Error(payload.errors[0]?.message || "JustWatch GraphQL error");
+  }
+
+  return payload?.data || null;
+}
+
+function normalizeComparableTitle(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function selectJustWatchTitle(nodes, { tmdbId, title } = {}) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return null;
+
+  const requestedTmdbId = String(tmdbId || "").trim();
+  if (requestedTmdbId) {
+    const exactTmdb = nodes.find(
+      (node) =>
+        String(node?.content?.externalIds?.tmdbId || "") === requestedTmdbId,
+    );
+    if (exactTmdb) return exactTmdb;
+  }
+
+  const requestedTitle = normalizeComparableTitle(title);
+  if (requestedTitle) {
+    const exactTitle = nodes.find(
+      (node) =>
+        normalizeComparableTitle(node?.content?.title) === requestedTitle,
+    );
+    if (exactTitle) return exactTitle;
+  }
+
+  return nodes[0];
+}
+
+function extractNumberFromLabel(value) {
+  const match = String(value || "").match(
+    /(?:^|\b)(?:temporada|season|saison|staffel|episodio|episode|cap[ií]tulo|chapter|[tse])\s*\.?\s*(\d+)/i,
+  );
+  if (!match) return null;
+  const valueNumber = Number(match[1]);
+  return Number.isInteger(valueNumber) ? valueNumber : null;
+}
+
+export function selectNumberedJustWatchItem(items, number) {
+  if (!Array.isArray(items) || !Number.isInteger(number) || number <= 0) {
+    return null;
+  }
+
+  const labelled = items.find(
+    (item) => extractNumberFromLabel(item?.content?.title) === number,
+  );
+  return labelled || items[number - 1] || null;
+}
+
+function safeHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function mapEpisodeOffersToProviders(offers) {
+  const providersByUrl = new Map();
+
+  for (const offer of Array.isArray(offers) ? offers : []) {
+    if (offer?.monetizationType !== "FLATRATE" || !offer?.package) continue;
+
+    const directUrl = safeHttpsUrl(offer.deeplinkURL);
+    if (!directUrl || providersByUrl.has(directUrl)) continue;
+
+    const providerId = offer.package.packageId;
+    const logoPath = JUSTWATCH_TO_TMDB_PROVIDER[providerId]?.logo_path || null;
+    if (!logoPath) continue;
+
+    providersByUrl.set(directUrl, {
+      provider_id: providerId,
+      provider_name: offer.package.clearName,
+      logo_path: logoPath,
+      url: directUrl,
+      monetization_type: offer.monetizationType,
+      presentation_type: offer.presentationType,
+    });
+  }
+
+  return Array.from(providersByUrl.values()).slice(0, 10);
+}
+
+async function searchTitles(title, type = "movie", year = null) {
+  const searchFilter = {
+    searchQuery: title,
+  };
+
+  if (type === "movie") {
+    searchFilter.objectTypes = ["MOVIE"];
+  } else if (type === "tv") {
+    searchFilter.objectTypes = ["SHOW"];
+  }
+
+  if (year) {
+    searchFilter.releaseYear = {
+      min: year - 1,
+      max: year + 1,
+    };
+  }
+
+  const data = await justWatchGraphql(SEARCH_QUERY, {
+    first: 5,
+    searchTitlesFilter: searchFilter,
+    country: COUNTRY_CODE,
+    language: "es",
+  });
+
+  return (data?.popularTitles?.edges || [])
+    .map((edge) => edge?.node)
+    .filter(Boolean);
+}
+
 /**
  * Busca un título en JustWatch
  */
 async function searchTitle(title, type = "movie", year = null) {
   try {
-    const searchFilter = {
-      searchQuery: title,
-    };
-
-    // Filtrar por tipo de contenido
-    if (type === "movie") {
-      searchFilter.objectTypes = ["MOVIE"];
-    } else if (type === "tv") {
-      searchFilter.objectTypes = ["SHOW"];
-    }
-
-    // Agregar año si está disponible
-    if (year) {
-      searchFilter.releaseYear = {
-        min: year - 1,
-        max: year + 1,
-      };
-    }
-
-    const response = await fetch(JUSTWATCH_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: SEARCH_QUERY,
-        variables: {
-          first: 5,
-          searchTitlesFilter: searchFilter,
-          country: COUNTRY_CODE,
-          language: "es",
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`JustWatch API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const edges = data?.data?.popularTitles?.edges || [];
-
-    if (edges.length === 0) {
-      return null;
-    }
-
-    // Retornar el primer resultado (el más relevante)
-    return edges[0].node;
+    const nodes = await searchTitles(title, type, year);
+    return nodes[0] || null;
   } catch (error) {
     console.error("Error searching JustWatch:", error);
     return null;
@@ -318,6 +463,51 @@ export async function getStreamingProviders(
   }
 }
 
+export async function getEpisodeStreamingProviders({
+  title,
+  year = null,
+  tmdbId = null,
+  seasonNumber,
+  episodeNumber,
+}) {
+  try {
+    const nodes = await searchTitles(title, "tv", year);
+    const showNode = selectJustWatchTitle(nodes, { tmdbId, title });
+    if (!showNode?.id) return { providers: [] };
+
+    const seasonsData = await justWatchGraphql(SHOW_SEASONS_QUERY, {
+      nodeId: showNode.id,
+      country: COUNTRY_CODE,
+      language: "es",
+    });
+    const season = selectNumberedJustWatchItem(
+      seasonsData?.node?.seasons,
+      Number(seasonNumber),
+    );
+    if (!season?.id) return { providers: [] };
+
+    const episodesData = await justWatchGraphql(SEASON_EPISODES_QUERY, {
+      nodeId: season.id,
+      country: COUNTRY_CODE,
+      language: "es",
+      platform: "WEB",
+    });
+    const episode = selectNumberedJustWatchItem(
+      episodesData?.node?.episodes,
+      Number(episodeNumber),
+    );
+    if (!episode) return { providers: [] };
+
+    return {
+      providers: mapEpisodeOffersToProviders(episode.offers),
+      justwatchEpisodeId: episode.id,
+    };
+  } catch (error) {
+    console.error("Error getting JustWatch episode offers:", error);
+    return { providers: [] };
+  }
+}
+
 /**
  * Genera una URL de búsqueda para una plataforma específica
  */
@@ -351,6 +541,7 @@ export function getProviderLogoFromTMDB(providerId) {
 
 const justwatchClient = {
   getStreamingProviders,
+  getEpisodeStreamingProviders,
   searchTitle,
   getTitleDetails,
 };
