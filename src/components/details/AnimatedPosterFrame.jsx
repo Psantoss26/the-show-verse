@@ -15,6 +15,17 @@ export default function AnimatedPosterFrame({
   loading = "eager",
   fetchPriority = "high",
   fallbackClassName = "",
+  // Contenido opcional superpuesto DENTRO del marco (recortado por las esquinas
+  // redondeadas y con la misma inclinación 3D). El overlay controla su propia
+  // aparición con `group-hover/still:` (el wrapper expone el grupo `still`).
+  // Es SOLO visual (sin eventos): se inclina con la imagen para quedar integrado.
+  overlay = null,
+  // Capa clicable opcional, FIJA (fuera del marco 3D): no se mueve con la
+  // inclinación, por lo que el clic se registra siempre. Aquí van los enlaces /
+  // botones (un elemento que se mueve entre mousedown y mouseup no dispara
+  // `click`). El botón play va centrado = eje de giro, así coincide con el
+  // botón visible del `overlay`.
+  hitLayer = null,
 }) {
   const wrapRef = useRef(null);
   const tiltRef = useRef(null);
@@ -89,23 +100,25 @@ export default function AnimatedPosterFrame({
 
       const now =
         time ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
-      const idle = now - lastInputRef.current > 220;
-      let target = targetRef.current;
-
-      if (idle) {
-        const seconds = now / 1000;
-        target = {
-          rx: Math.sin(seconds * 1.05) * 4.8,
-          ry: Math.cos(seconds * 0.9) * 7.2,
-          s: 1.025 + Math.sin(seconds * 1.6) * 0.008,
-        };
-      }
+      // En reposo (sin mover el puntero) volvemos a PLANO y nos QUEDAMOS quietos,
+      // en vez de flotar sin parar. El overlay va DENTRO del marco (se inclina con
+      // la imagen = integrado); si el marco no parase, se movería cada frame y el
+      // clic sobre el botón no se registraría. Así, al pausar para pulsar, el
+      // marco está plano y quieto → clicable e integrado.
+      const idle = now - lastInputRef.current > 140;
+      const target = idle ? { rx: 0, ry: 0, s: 1 } : targetRef.current;
 
       const current = stateRef.current;
-      const easing = 0.14;
+      const easing = 0.16;
       current.rx += (target.rx - current.rx) * easing;
       current.ry += (target.ry - current.ry) * easing;
       current.s += (target.s - current.s) * easing;
+      // Snap: al acercarse al objetivo, fijar exactamente para que el transform
+      // DEJE de cambiar (el asíntota dejaría el elemento "moviéndose" y Playwright
+      // y el navegador no registrarían el clic).
+      if (Math.abs(target.rx - current.rx) < 0.02) current.rx = target.rx;
+      if (Math.abs(target.ry - current.ry) < 0.02) current.ry = target.ry;
+      if (Math.abs(target.s - current.s) < 0.0008) current.s = target.s;
 
       el.style.transform =
         `translateZ(0) rotateX(${current.rx.toFixed(3)}deg) rotateY(${current.ry.toFixed(3)}deg) ` +
@@ -136,25 +149,33 @@ export default function AnimatedPosterFrame({
         event.currentTarget.setPointerCapture?.(event.pointerId);
         setTargetFromPointer(event.clientX, event.clientY);
       }}
-      className={`relative ${className}`}
+      className={`group/still relative ${className}`}
       style={{
-        perspective: enabled ? 1100 : undefined,
-        transformStyle: "preserve-3d",
         touchAction: "none",
       }}
     >
+      {/* Contexto 3D acotado SOLO al marco: así el overlay (hermano de este
+          contenedor, fuera del preserve-3d) no entra en el orden 3D y no queda
+          tapado por la imagen inclinada. */}
       <div
-        ref={tiltRef}
-        className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 will-change-transform"
+        className="relative"
         style={{
+          perspective: enabled ? 1100 : undefined,
           transformStyle: "preserve-3d",
-          backfaceVisibility: "hidden",
-          WebkitBackfaceVisibility: "hidden",
-          outline: "1px solid transparent",
-          isolation: "isolate",
-          WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         }}
       >
+        <div
+          ref={tiltRef}
+          className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 will-change-transform"
+          style={{
+            transformStyle: "preserve-3d",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            outline: "1px solid transparent",
+            isolation: "isolate",
+            WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+          }}
+        >
         {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
         <div className={`relative bg-neutral-950 overflow-hidden ${aspectClass}`}>
@@ -175,8 +196,29 @@ export default function AnimatedPosterFrame({
               <ImageOff className="w-10 h-10 text-neutral-700" />
             </div>
           )}
+
+          {/* Overlay DENTRO del marco: se inclina con la imagen (integrado). El
+              contenedor no captura eventos (así el hover/tilt de la portada sigue
+              activo); solo el enlace/botón del overlay reciben clic al hover. El
+              marco queda plano y quieto en reposo, por lo que el clic se registra. */}
+          {overlay ? (
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {overlay}
+            </div>
+          ) : null}
         </div>
       </div>
+      </div>
+
+      {/* Capa clicable FIJA (hermana del contexto 3D, fuera del preserve-3d):
+          no se inclina ni se mueve, así el clic siempre se registra. El
+          contenedor no captura eventos; solo sus hijos (enlaces/botones) los
+          reciben, al hover, vía `group-hover/still:`. */}
+      {hitLayer ? (
+        <div className="pointer-events-none absolute inset-0 z-40">
+          {hitLayer}
+        </div>
+      ) : null}
     </div>
   );
 }

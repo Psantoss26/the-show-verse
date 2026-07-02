@@ -36,6 +36,7 @@ import {
 } from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
+import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -1448,6 +1449,19 @@ export default function EpisodeDetailsClient({
               }
               alt={epName}
               aspect="video"
+              overlay={
+                <StreamingHoverOverlay
+                  provider={episodeStreamingProviders[0]}
+                  watched={trakt.watched}
+                  part="visual"
+                />
+              }
+              hitLayer={
+                <StreamingHoverOverlay
+                  provider={episodeStreamingProviders[0]}
+                  part="hit"
+                />
+              }
             />
 
             {episodeStreamingProviders.length > 0 && (
