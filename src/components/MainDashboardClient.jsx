@@ -54,6 +54,7 @@ import { useEngineRows } from "@/components/dashboard/useEngineRows";
 import {
   yearOf,
   ratingOf,
+  getSpotlightBadge,
   formatRuntime,
   buildImg,
   PREVIEW_BACKDROP_SIZE,
@@ -795,11 +796,12 @@ function InlinePreviewCard({
                   (typeof details?.overview === "string" &&
                     details.overview.trim()) ||
                   null;
-                // Para series mostramos temporadas y episodios
+                // Para series mostramos temporadas y episodios (mismo formato
+                // que FeaturedHero).
                 if (details.number_of_seasons) {
                   runtime = `${details.number_of_seasons} Temp.`;
                   if (details.number_of_episodes) {
-                    runtime += ` / ${details.number_of_episodes} Eps.`;
+                    runtime += ` · ${details.number_of_episodes} Eps.`;
                   }
                 }
               }
@@ -1242,7 +1244,7 @@ function InlinePreviewCard({
           <div className="flex h-full items-end p-5 md:p-6 xl:p-8">
             <div className="min-w-0 max-w-[88%] sm:max-w-[82%] md:max-w-[72%] xl:max-w-[68%]">
               {logoSrc ? (
-                <div className="relative mb-3 h-16 w-full max-w-[17rem] md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
+                <div className="relative mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
                   <NextImage
                     src={logoSrc}
                     alt={movie.title || movie.name}
@@ -1253,7 +1255,7 @@ function InlinePreviewCard({
                   />
                 </div>
               ) : (
-                <h3 className="mb-3 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl">
+                <h3 className="mb-5 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl md:mb-6">
                   {movie.title || movie.name}
                 </h3>
               )}
@@ -1343,16 +1345,42 @@ function InlinePreviewCard({
               )}
 
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.68rem] font-semibold text-zinc-200 sm:text-xs">
-                {Number(tmdbRating) >= 7.5 && (
-                  <span className="rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-                    Mejor valorado
-                  </span>
-                )}
-                <span>{mediaType === "tv" ? "Serie" : "Película"}</span>
-                {yearOf(movie) && <span>{yearOf(movie)}</span>}
-                {extras?.runtime && (
-                  <span>{formatRuntime(extras.runtime)}</span>
-                )}
+                {(() => {
+                  const badge = getSpotlightBadge(movie);
+                  return badge ? (
+                    <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                      {badge}
+                    </span>
+                  ) : null;
+                })()}
+                {(() => {
+                  // Año y duración separados por "•" (mismo separador que FeaturedHero).
+                  const parts = [];
+                  if (yearOf(movie))
+                    parts.push(<span key="year">{yearOf(movie)}</span>);
+                  if (extras?.runtime)
+                    parts.push(
+                      <span key="runtime">
+                        {typeof extras.runtime === "number"
+                          ? formatRuntime(extras.runtime)
+                          : extras.runtime}
+                      </span>,
+                    );
+                  return parts.reduce((acc, item, index) => {
+                    if (index === 0) return [item];
+                    return [
+                      ...acc,
+                      <span
+                        key={`sep-${index}`}
+                        className="select-none text-[0.8em] font-bold text-zinc-500/70"
+                        aria-hidden="true"
+                      >
+                        •
+                      </span>,
+                      item,
+                    ];
+                  }, []);
+                })()}
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:text-sm">

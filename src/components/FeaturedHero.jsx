@@ -39,6 +39,7 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
+import { resolveFeaturedHeroPoster } from "@/lib/dashboard/featuredHeroMedia";
 
 import {
   buildImg,
@@ -52,6 +53,7 @@ import {
   getArtworkPreference,
   yearOf,
   ratingOf,
+  getSpotlightBadge,
   formatRuntime,
 } from "@/lib/dashboard/media";
 
@@ -958,6 +960,12 @@ function FeaturedSlide({
       .slice(0, limit);
   }, [movie, isMobile]);
 
+  // Etiqueta contextual de la casilla (antes fija "MEJOR VALORADO"). Misma lógica
+  // compartida que las tarjetas spotlight de los 3 dashboards (Estreno / Mejor
+  // valorado / Destacado), ver getSpotlightBadge. Varía por título y solo usa
+  // datos disponibles al instante, así que no parpadea ni reserva hueco de más.
+  const featuredBadge = useMemo(() => getSpotlightBadge(movie), [movie]);
+
   const posterSrc = posterPath
     ? buildImg(posterPath, HERO_POSTER_SIZE)
     : null;
@@ -1313,16 +1321,27 @@ function FeaturedSlide({
             </div>
 
             {/* Premios — mismo estilo que el spotlight (icono + texto esmeralda),
-                situado sobre los metadatos. */}
-            {extras.awards && (
-              <div
-                className="hero-reveal mb-2 flex items-center justify-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:mb-2.5 sm:justify-start sm:text-sm"
-                style={{ "--hero-delay": "140ms" }}
-              >
-                <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="line-clamp-1">{extras.awards}</span>
-              </div>
-            )}
+                situado sobre los metadatos. El hueco se RESERVA siempre con una
+                altura mínima fija: los premios llegan de OMDb con un pequeño
+                retraso y, como el bloque de contenido está anclado abajo, antes
+                empujaban el logo hacia arriba al aparecer. Con el hueco reservado
+                el logo no se desplaza (ni en escritorio ni en móvil), y el
+                contenido entra con la MISMA animación de entrada que el resto de
+                la información (hero-reveal) y en su misma posición de la cascada
+                (--hero-delay 140ms, entre los botones y los metadatos), para que
+                aparezca a la vez y al mismo ritmo, no antes ni más rápido. */}
+            <div className="mb-2 flex min-h-[1.25rem] items-center justify-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:mb-2.5 sm:min-h-[1.5rem] sm:justify-start sm:text-sm">
+              {extras.awards && (
+                <span
+                  key={extras.awards}
+                  className="hero-reveal flex min-w-0 items-center gap-2"
+                  style={{ "--hero-delay": "140ms" }}
+                >
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{extras.awards}</span>
+                </span>
+              )}
+            </div>
 
             {/* Metadatos — MISMO estilo que la sección de información de las
                 tarjetas ×1,6 (DashboardSpotlightPreview): fila 1 con badge
@@ -1334,9 +1353,9 @@ function FeaturedSlide({
               className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs font-semibold text-zinc-200 sm:mb-2.5 sm:justify-start sm:text-sm"
               style={{ "--hero-delay": "170ms" }}
             >
-              {Number(ratingOf(movie)) >= 7.5 && (
+              {featuredBadge && (
                 <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.72rem] font-black uppercase tracking-wide text-black sm:text-[0.8rem]">
-                  Mejor valorado
+                  {featuredBadge}
                 </span>
               )}
               {(() => {
@@ -1837,7 +1856,8 @@ export default function FeaturedHero({
   ]);
 
   const activeMovie = list[activeIndex] || list[0] || null;
-  const activeAssets = activeMovie ? assets[activeMovie.id] || {} : {};
+  const resolvedActiveAssets = activeMovie ? assets[activeMovie.id] : null;
+  const activeAssets = resolvedActiveAssets || {};
   const activeBackdropOptions = useMemo(() => {
     if (!activeMovie) return [];
 
@@ -1901,10 +1921,12 @@ export default function FeaturedHero({
 
   if (!list.length) return null;
 
-  // Fallback inmediato del póster (móvil) con el dato ya disponible del servidor
-  // para pintar al instante, mientras se resuelve en segundo plano el mejor.
-  const activePoster =
-    activeAssets.poster || activeMovie.poster_path || activeMovie.backdrop_path || null;
+  // En móvil esperamos a que termine la selección de assets. Así nunca se pinta
+  // primero el póster provisional del dashboard para sustituirlo después.
+  const activePoster = resolveFeaturedHeroPoster(
+    resolvedActiveAssets,
+    activeMovie,
+  );
 
   const handlePointerDown = (event) => {
     if (event.button !== 0 && event.pointerType === "mouse") return;
