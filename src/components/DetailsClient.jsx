@@ -9393,7 +9393,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         role="button"
                         tabIndex={0}
                         aria-label="Ver imagen de fondo"
-                        title="Ver imagen de fondo"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
