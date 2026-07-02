@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { backendFetchJson, getBackendBaseUrl } from "@/lib/backend/server";
+import {
+  resolveStreamingEntity,
+  searchTmdbCandidatesWithFallback,
+} from "@/lib/netflix/streamingResolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_API = "https://api.themoviedb.org/3";
 
 // Prefijo de plataforma que algunas pestañas anteponen al título.
 const PLATFORM_PREFIX_RE =
@@ -21,12 +26,56 @@ function cleanSearchTitle(raw) {
   return t.trim();
 }
 
+async function searchTmdbDirect(query, mediaType) {
+  if (!TMDB_API_KEY) return [];
+
+  const url = new URL(`${TMDB_API}/search/${mediaType}`);
+  url.searchParams.set("api_key", TMDB_API_KEY);
+  url.searchParams.set("language", "es-ES");
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("query", query);
+  url.searchParams.set("page", "1");
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) return [];
+
+  const json = await response.json().catch(() => null);
+  return Array.isArray(json?.results) ? json.results : [];
+}
+
+async function searchTmdbCandidates(request, query, mediaType) {
+  return searchTmdbCandidatesWithFallback({
+    mediaType,
+    backendSearch: async (type) => {
+      const result = await backendFetchJson(
+        request,
+        `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=${type}`,
+      );
+      if (!result.ok) {
+        console.warn("[Extension Sync] Backend TMDb search unavailable:", {
+          query,
+          mediaType: type,
+          status: result.status,
+          error: result.error,
+        });
+        return [];
+      }
+      return Array.isArray(result.json?.results) ? result.json.results : [];
+    },
+    directSearch: (type) => searchTmdbDirect(query, type),
+  });
+}
+
 export async function POST(request) {
   try {
     const {
       mainTitle,
       subTitle,
       videoId,
+      playbackUrl,
       platform = "netflix",
       season: seasonIn,
       episode: episodeIn,
@@ -94,54 +143,51 @@ export async function POST(request) {
     let resolvedTitle = "";
     let posterPath = "";
 
-    // 3. Search TMDb
-    if (isTv) {
-      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=tv`);
-      console.log("[Extension Sync] TV Search result:", { query, ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
-      if (searchRes.ok && searchRes.json?.results?.length > 0) {
-        const show = searchRes.json.results[0];
-        tmdbId = show.id;
-        resolvedTitle = show.name;
-        posterPath = show.poster_path;
+    // 3. Resolver contra el proxy backend y, si falla o no devuelve resultados,
+    // contra TMDb directamente. Cuando no hay números de episodio comparamos
+    // coincidencias exactas de película y serie para no confundir una serie con
+    // una película derivada que comparte el comienzo del título.
+    const resolution = await resolveStreamingEntity({
+      query,
+      expectedMediaType: isTv ? "tv" : null,
+      preferTv: Boolean(subTitle),
+      search: (type) => searchTmdbCandidates(request, query, type),
+    });
 
-        // Fetch episode name if possible
-        if (TMDB_API_KEY) {
-          try {
-            const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
-            const epRes = await fetch(epUrl);
-            if (epRes.ok) {
-              const epData = await epRes.json();
-              if (epData.name) {
-                resolvedTitle = `${show.name}: ${epData.name}`;
-              }
-            }
-          } catch (e) {
-            console.error("[Extension Sync] Failed to fetch episode name:", e);
+    if (resolution?.kind === "series_without_episode") {
+      console.log(
+        `[Extension Sync] Serie reconocida sin episodio identificable, omitida: "${query}"`,
+      );
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "series_without_episode",
+        title: query,
+      });
+    }
+
+    if (resolution?.kind === "resolved") {
+      const entity = resolution.entity;
+      tmdbId = entity.id;
+      mediaType = resolution.mediaType;
+      resolvedTitle =
+        resolution.mediaType === "tv" ? entity.name : entity.title;
+      posterPath = entity.poster_path;
+    }
+
+    // Fetch episode name if possible
+    if (isTv && tmdbId && TMDB_API_KEY) {
+      try {
+        const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
+        const epRes = await fetch(epUrl);
+        if (epRes.ok) {
+          const epData = await epRes.json();
+          if (epData.name) {
+            resolvedTitle = `${resolvedTitle || query}: ${epData.name}`;
           }
         }
-      }
-    } else {
-      const searchRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=movie`);
-      console.log("[Extension Sync] Movie Search result:", { query, ok: searchRes.ok, status: searchRes.status, count: searchRes.json?.results?.length });
-      if (searchRes.ok && searchRes.json?.results?.length > 0) {
-        const movie = searchRes.json.results[0];
-        tmdbId = movie.id;
-        resolvedTitle = movie.title;
-        posterPath = movie.poster_path;
-      } else {
-        // No es película: puede ser una serie detectada solo por título (sin
-        // temporada/episodio visibles, p. ej. en Plex). Si TMDb la conoce como
-        // serie, la omitimos limpiamente en vez de devolver un 404 de resolución.
-        const tvRes = await backendFetchJson(request, `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=tv`);
-        if (tvRes.ok && tvRes.json?.results?.length > 0) {
-          console.log(`[Extension Sync] Serie reconocida sin episodio identificable, omitida: "${query}"`);
-          return NextResponse.json({
-            success: true,
-            skipped: true,
-            reason: "series_without_episode",
-            title: query,
-          });
-        }
+      } catch (e) {
+        console.error("[Extension Sync] Failed to fetch episode name:", e);
       }
     }
 
@@ -189,6 +235,7 @@ export async function POST(request) {
           platform,
           netflixVideoId: videoId || undefined,
           netflixTitle: mainTitle,
+          playbackUrl: playbackUrl || undefined,
         }),
       });
       const json = await res.json().catch(() => ({}));

@@ -336,6 +336,7 @@
           platform: adapter.id,
           platformName: adapter.name,
           contentId: data.contentId || null,
+          playbackUrl: location.href,
           mainTitle: data.mainTitle,
           subTitle: data.subTitle || "",
           season: data.season || null,

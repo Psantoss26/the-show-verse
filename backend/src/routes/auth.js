@@ -5,7 +5,14 @@ import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { users, refreshTokens, userPreferences, connectedAccounts, watchHistory } from '../db/schema.js';
+import {
+  users,
+  refreshTokens,
+  userPreferences,
+  connectedAccounts,
+  watchHistory,
+  episodeStreamingLinks,
+} from '../db/schema.js';
 import {
   signAccessToken,
   signRefreshToken,
@@ -15,6 +22,7 @@ import {
 } from '../lib/jwt.js';
 import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
 import { eq, and, gt, lt } from 'drizzle-orm';
+import { resolveEpisodePlaybackLink } from '../lib/streamingPlayback.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -56,6 +64,9 @@ const netflixSyncSchema = z.object({
   netflixVideoId: z.string().max(80).optional(),
   netflixTitle: z.string().max(300).optional(),
   platform: z.string().max(40).optional(),
+  // El enlace es opcional: su validez y dominio se comprueban sin bloquear el
+  // registro principal del visionado.
+  playbackUrl: z.string().max(4000).optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -862,7 +873,16 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
     }
 
-    const { tmdbId, mediaType, season, episode, watchedAt, runtimeMins, title, posterPath } = parsed.data;
+    const {
+      tmdbId,
+      mediaType,
+      season,
+      episode,
+      watchedAt,
+      runtimeMins,
+      title,
+      posterPath,
+    } = parsed.data;
     if (mediaType === 'tv' && (!season || !episode)) {
       return reply.status(400).send({ error: 'season and episode are required for tv history entries' });
     }
@@ -903,6 +923,43 @@ export default async function authRoutes(fastify) {
         .returning();
     }
 
+    const playbackLink =
+      mediaType === 'tv'
+        ? resolveEpisodePlaybackLink({
+            platform: parsed.data.platform || 'netflix',
+            playbackUrl: parsed.data.playbackUrl,
+            contentId: parsed.data.netflixVideoId,
+          })
+        : null;
+
+    if (playbackLink) {
+      await db
+        .insert(episodeStreamingLinks)
+        .values({
+          userId: account.userId,
+          tmdbId,
+          season,
+          episode,
+          platform: playbackLink.platform,
+          contentId: playbackLink.contentId,
+          playbackUrl: playbackLink.playbackUrl,
+        })
+        .onConflictDoUpdate({
+          target: [
+            episodeStreamingLinks.userId,
+            episodeStreamingLinks.tmdbId,
+            episodeStreamingLinks.season,
+            episodeStreamingLinks.episode,
+            episodeStreamingLinks.platform,
+          ],
+          set: {
+            contentId: playbackLink.contentId,
+            playbackUrl: playbackLink.playbackUrl,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
     await db
       .update(connectedAccounts)
       .set({
@@ -910,7 +967,7 @@ export default async function authRoutes(fastify) {
           ...(account.metadata || {}),
           lastSyncedAt: new Date().toISOString(),
           lastNetflixVideoId: parsed.data.netflixVideoId || null,
-          lastPlatform: parsed.data.platform || 'netflix',
+          lastPlatform: playbackLink?.platform || parsed.data.platform || 'netflix',
         },
       })
       .where(eq(connectedAccounts.id, account.id));

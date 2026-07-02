@@ -97,6 +97,31 @@ export const watchHistory = pgTable('watch_history', {
 }));
 
 // ─────────────────────────────────────────────
+// EXACT EPISODE LINKS LEARNED FROM THE EXTENSION
+// ─────────────────────────────────────────────
+export const episodeStreamingLinks = pgTable('episode_streaming_links', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tmdbId: integer('tmdb_id').notNull(),
+  season: integer('season').notNull(),
+  episode: integer('episode').notNull(),
+  platform: text('platform').notNull(),
+  contentId: text('content_id'),
+  playbackUrl: text('playback_url').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  episodePlatformUnique: uniqueIndex('idx_episode_streaming_links_unique')
+    .on(t.userId, t.tmdbId, t.season, t.episode, t.platform),
+  episodeLookupIdx: index('idx_episode_streaming_links_lookup')
+    .on(t.userId, t.tmdbId, t.season, t.episode),
+  platformCheck: check(
+    'chk_episode_streaming_links_platform',
+    sql`platform IN ('netflix', 'prime', 'max', 'disney', 'plex')`,
+  ),
+}));
+
+// ─────────────────────────────────────────────
 // FAVORITES
 // ─────────────────────────────────────────────
 export const favorites = pgTable('favorites', {
