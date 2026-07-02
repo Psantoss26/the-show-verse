@@ -100,25 +100,27 @@ export default function AnimatedPosterFrame({
 
       const now =
         time ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
-      // En reposo (sin mover el puntero) volvemos a PLANO y nos QUEDAMOS quietos,
-      // en vez de flotar sin parar. El overlay va DENTRO del marco (se inclina con
-      // la imagen = integrado); si el marco no parase, se movería cada frame y el
-      // clic sobre el botón no se registraría. Así, al pausar para pulsar, el
-      // marco está plano y quieto → clicable e integrado.
-      const idle = now - lastInputRef.current > 140;
-      const target = idle ? { rx: 0, ry: 0, s: 1 } : targetRef.current;
+      // Animación 3D por defecto: al inclinar sigue al puntero y, en reposo,
+      // flota suavemente de forma continua. Los elementos clicables (enlace/
+      // flechas) van en la capa FIJA (`hitLayer`, fuera del marco), así que el
+      // marco puede moverse libremente sin romper el clic.
+      const idle = now - lastInputRef.current > 220;
+      let target = targetRef.current;
+
+      if (idle) {
+        const seconds = now / 1000;
+        target = {
+          rx: Math.sin(seconds * 1.05) * 4.8,
+          ry: Math.cos(seconds * 0.9) * 7.2,
+          s: 1.025 + Math.sin(seconds * 1.6) * 0.008,
+        };
+      }
 
       const current = stateRef.current;
-      const easing = 0.16;
+      const easing = 0.14;
       current.rx += (target.rx - current.rx) * easing;
       current.ry += (target.ry - current.ry) * easing;
       current.s += (target.s - current.s) * easing;
-      // Snap: al acercarse al objetivo, fijar exactamente para que el transform
-      // DEJE de cambiar (el asíntota dejaría el elemento "moviéndose" y Playwright
-      // y el navegador no registrarían el clic).
-      if (Math.abs(target.rx - current.rx) < 0.02) current.rx = target.rx;
-      if (Math.abs(target.ry - current.ry) < 0.02) current.ry = target.ry;
-      if (Math.abs(target.s - current.s) < 0.0008) current.s = target.s;
 
       el.style.transform =
         `translateZ(0) rotateX(${current.rx.toFixed(3)}deg) rotateY(${current.ry.toFixed(3)}deg) ` +

@@ -16,6 +16,8 @@ const WORDMARK_BY_KEY = {
   prime: "/amazonprimevideo-text.png",
   "hbo-max": "/hbomax-text.png",
   crunchyroll: "/crunchyroll-text.png",
+  movistar: "/movistar-text.png",
+  disney: "/disney-text.png",
 };
 
 // Color del botón de reproducir según la plataforma (clase de fondo Tailwind +
@@ -27,6 +29,7 @@ const COLOR_BY_KEY = {
   crunchyroll: { className: "bg-orange-500", glow: "rgba(249,115,22,0.9)" },
   "hbo-max": { className: "bg-violet-600", glow: "rgba(139,92,246,0.9)" },
   disney: { className: "bg-blue-900", glow: "rgba(30,58,138,0.95)" },
+  movistar: { className: "bg-sky-500", glow: "rgba(14,165,233,0.9)" },
 };
 const DEFAULT_COLOR = { className: "bg-violet-600", glow: "rgba(139,92,246,0.9)" };
 
