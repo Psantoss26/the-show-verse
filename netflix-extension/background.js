@@ -511,7 +511,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       platform,
       platformName,
       contentId,
-      playbackUrl,
       mainTitle,
       subTitle,
       season,
@@ -542,7 +541,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         body: JSON.stringify({
           platform: platform || "netflix",
           videoId: contentId || undefined,
-          playbackUrl: playbackUrl || undefined,
           mainTitle,
           subTitle,
           season: season || undefined,

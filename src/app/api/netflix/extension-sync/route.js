@@ -75,7 +75,6 @@ export async function POST(request) {
       mainTitle,
       subTitle,
       videoId,
-      playbackUrl,
       platform = "netflix",
       season: seasonIn,
       episode: episodeIn,
@@ -235,7 +234,6 @@ export async function POST(request) {
           platform,
           netflixVideoId: videoId || undefined,
           netflixTitle: mainTitle,
-          playbackUrl: playbackUrl || undefined,
         }),
       });
       const json = await res.json().catch(() => ({}));

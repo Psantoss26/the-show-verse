@@ -134,6 +134,9 @@ function mapInProgressItems(items) {
         nextEpisode: hasNextEpisode ? it.nextEpisode : null,
         lastEpisode: it.lastEpisode,
         lastWatchedAt: it.lastWatchedAt,
+        // La serie está en un rewatch (ya completada, viéndola de nuevo): el
+        // progreso mostrado es el del rewatch, no el del visionado original.
+        isRewatch: !!it.isRewatch,
       };
     });
 }
@@ -1401,8 +1404,15 @@ function ContinueWatchingPreviewCard({
           )}
         </div>
 
-        {/* Metadatos: episodio · progreso · año · temporadas (separadores "•") */}
+        {/* Metadatos: episodio · progreso · año · temporadas (separadores "•").
+            Si es un rewatch, se antepone una etiqueta que lo indica (el progreso
+            mostrado es el del rewatch, no el del visionado original). */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-zinc-200 sm:text-xs">
+          {show?.isRewatch && (
+            <span className="mr-1 inline-flex items-center rounded bg-emerald-500/90 px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+              Rewatch
+            </span>
+          )}
           {(() => {
             const parts = [];
             if (ep)
