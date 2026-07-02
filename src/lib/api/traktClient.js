@@ -5,6 +5,7 @@ import {
   cacheRemoveHistory,
   clearWatchDerivedCaches,
 } from "@/lib/userLists/optimisticListCache";
+import { normalizeHistoryEntryIds } from "@/lib/trakt/historyEntryIds";
 
 async function safeJson(res) {
   try {
@@ -662,9 +663,7 @@ export async function traktGetShowPlays({ tmdbId, startAt, endBefore } = {}) {
 }
 
 export async function traktRemoveHistoryEntries({ ids } = {}) {
-  const safeIds = Array.isArray(ids)
-    ? ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
-    : [];
+  const safeIds = normalizeHistoryEntryIds(ids);
 
   if (!safeIds.length) return { ok: true, data: { deleted: 0 } };
 

@@ -221,6 +221,7 @@ import SoundtrackModal from "@/components/details/SoundtrackModal";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 
 function getSoundtrackSourceBadge(source) {
   const key = String(source || "Spotify").toLowerCase();
@@ -8968,24 +8969,25 @@ export default function DetailsClient({
       const now =
         t ??
         (typeof performance !== "undefined" ? performance.now() : Date.now());
-      const idle = now - posterLastInputRef.current > IDLE_DELAY;
-
-      let target = posterTargetRef.current;
-
-      if (idle) {
-        const dt = now / 1000;
-        target = {
-          rx: Math.sin(dt * 1.05) * 5.5,
-          ry: Math.cos(dt * 0.9) * 8.5,
-          s: 1.03 + Math.sin(dt * 1.6) * 0.01,
-        };
-      }
+      // En reposo volvemos a PLANO y quietos (en vez de flotar sin parar): el
+      // overlay/flechas van DENTRO del marco (se inclinan con la imagen =
+      // integrado), y si el marco no parase, se moverían cada frame y no se
+      // registraría el clic. Al pausar para pulsar, el marco está plano y quieto.
+      const idle = now - posterLastInputRef.current > 140;
+      const target = idle
+        ? { rx: 0, ry: 0, s: 1 }
+        : posterTargetRef.current;
 
       const cur = posterStateRef.current;
-      const k = 0.14;
+      const k = 0.16;
       cur.rx += (target.rx - cur.rx) * k;
       cur.ry += (target.ry - cur.ry) * k;
       cur.s += (target.s - cur.s) * k;
+      // Snap para que el transform DEJE de cambiar al llegar (si no, el asíntota
+      // deja el elemento "moviéndose" y el clic no se registra).
+      if (Math.abs(target.rx - cur.rx) < 0.02) cur.rx = target.rx;
+      if (Math.abs(target.ry - cur.ry) < 0.02) cur.ry = target.ry;
+      if (Math.abs(target.s - cur.s) < 0.0008) cur.s = target.s;
 
       el.style.transform =
         `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +
@@ -9134,14 +9136,12 @@ export default function DetailsClient({
               }}
               className="relative"
             >
-              {/* Wrapper: solo perspectiva + captura puntero */}
+              {/* Wrapper: solo perspectiva + captura puntero. Ya NO cicla al
+                  pulsar en toda la portada: el cambio póster/backdrop se hace
+                  solo en las zonas laterales (flechas), y el botón play del
+                  overlay abre la plataforma. `group/still` habilita el overlay. */}
               <div
                 ref={posterWrapRef}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCyclePoster();
-                }}
                 onPointerMove={(e) =>
                   setPosterTargetFromPointer(e.clientX, e.clientY)
                 }
@@ -9155,13 +9155,22 @@ export default function DetailsClient({
                   e.currentTarget.setPointerCapture?.(e.pointerId);
                   setPosterTargetFromPointer(e.clientX, e.clientY);
                 }}
-                className="relative cursor-pointer"
+                className="group/still relative"
                 style={{
-                  perspective: poster3dEnabled ? 1100 : undefined,
-                  transformStyle: "preserve-3d",
                   touchAction: "pan-y",
                 }}
               >
+                {/* Contexto 3D acotado SOLO al marco: así la capa interactiva
+                    (hermana, fuera del preserve-3d) no entra en el orden 3D y no
+                    queda tapada por la imagen inclinada, y sus elementos son
+                    clicables y estables. */}
+                <div
+                  className="relative"
+                  style={{
+                    perspective: poster3dEnabled ? 1100 : undefined,
+                    transformStyle: "preserve-3d",
+                  }}
+                >
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
@@ -9306,40 +9315,92 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </div>
                     )}
 
-                    {/* Right arrow for poster -> backdrop */}
-                    <AnimatePresence>
-                      {supportsHover &&
-                        isPosterHovered &&
-                        posterViewMode === "poster" && (
-                          <motion.div
-                            initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="absolute inset-y-0 right-0 z-20 flex w-1/3 items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4 pointer-events-none"
-                          >
-                            <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
-                          </motion.div>
+                    {/* Overlay VISUAL DENTRO del marco: se inclina con la imagen
+                        (integrado). Sin eventos: los clics los recibe la capa
+                        FIJA de abajo (hermana del contexto 3D), que no se mueve
+                        con la inclinación y por tanto sí registra el clic. */}
+                    <div className="pointer-events-none absolute inset-0 z-[15]">
+                      <StreamingHoverOverlay
+                        provider={streamingProviders.find(
+                          (p) =>
+                            typeof p?.url === "string" &&
+                            p.url.startsWith("http"),
                         )}
-                    </AnimatePresence>
-
-                    {/* Left arrow for backdrop -> poster */}
-                    <AnimatePresence>
-                      {supportsHover &&
-                        isPosterHovered &&
-                        posterViewMode === "preview" && (
-                          <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -10 }}
-                            transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="absolute inset-y-0 left-0 z-20 flex w-1/3 items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4 pointer-events-none"
-                          >
-                            <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
-                          </motion.div>
-                        )}
-                    </AnimatePresence>
+                        watched={trakt.watched}
+                        mode="button"
+                        part="visual"
+                      />
+                    </div>
                   </div>
+                </div>
+                </div>
+
+                {/* Capa CLICABLE FIJA (hermana del contexto 3D, fuera del
+                    preserve-3d): no se inclina ni se mueve, así el clic siempre
+                    se registra. El botón play va centrado = eje de giro, por lo
+                    que coincide con el botón visible; las flechas laterales
+                    cambian el modo de imagen. */}
+                <div className="pointer-events-none absolute inset-0 z-40">
+                  <StreamingHoverOverlay
+                    provider={streamingProviders.find(
+                      (p) =>
+                        typeof p?.url === "string" && p.url.startsWith("http"),
+                    )}
+                    mode="button"
+                    part="hit"
+                  />
+
+                  {/* Zona derecha: ver imagen de fondo (poster -> backdrop) */}
+                  <AnimatePresence>
+                    {supportsHover &&
+                      isPosterHovered &&
+                      posterViewMode === "poster" && (
+                        <motion.div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Ver imagen de fondo"
+                          title="Ver imagen de fondo"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCyclePoster();
+                          }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2, ease: "easeInOut" }}
+                          className="pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-1/3 cursor-pointer items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4"
+                        >
+                          <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
+
+                  {/* Zona izquierda: ver póster (backdrop -> poster) */}
+                  <AnimatePresence>
+                    {supportsHover &&
+                      isPosterHovered &&
+                      posterViewMode === "preview" && (
+                        <motion.div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Ver póster"
+                          title="Ver póster"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCyclePoster();
+                          }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2, ease: "easeInOut" }}
+                          className="pointer-events-auto absolute inset-y-0 left-0 z-20 flex w-1/3 cursor-pointer items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4"
+                        >
+                          <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
                 </div>
               </div>
             </motion.div>

@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import {
   backendFetchJson,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
+import {
+  clearTraktCookies,
+  getValidTraktToken,
+  setTraktCookies,
+  traktRemoveHistoryEntries,
+} from "@/lib/trakt/server";
+import { classifyHistoryEntryIds } from "@/lib/trakt/historyEntryIds";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,10 +18,10 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/trakt/history/remove
  *
- * Body: { ids: string[] }  — UUIDs del historial propio (backend)
+ * Body: { ids: string[] }
  *
- * - 1 ID  → DELETE /v1/history/:id
- * - N IDs → DELETE /v1/history/bulk  con body { ids }
+ * - UUIDs propios → backend PostgreSQL
+ * - IDs numéricos → historial de Trakt (fallback legacy)
  */
 export async function POST(req) {
   let body;
@@ -23,16 +31,57 @@ export async function POST(req) {
     body = {};
   }
 
-  const ids = Array.isArray(body?.ids)
-    ? body.ids.map((x) => String(x)).filter(Boolean)
-    : [];
+  const classified = classifyHistoryEntryIds(body?.ids);
 
-  if (!ids.length) {
+  if (classified.kind === "empty") {
     return NextResponse.json(
       { error: "ids debe ser un array con al menos un history id" },
       { status: 400 },
     );
   }
+
+  if (classified.kind === "invalid") {
+    return NextResponse.json(
+      { error: "Todos los history ids deben ser UUIDs o IDs numéricos del mismo origen" },
+      { status: 400 },
+    );
+  }
+
+  if (classified.kind === "trakt") {
+    const cookieStore = await cookies();
+
+    try {
+      const { token, refreshedTokens, shouldClear } =
+        await getValidTraktToken(cookieStore);
+      if (!token) {
+        const res = NextResponse.json(
+          { error: "Trakt no está conectado" },
+          { status: 401 },
+        );
+        if (shouldClear) clearTraktCookies(res);
+        return res;
+      }
+
+      const trakt = await traktRemoveHistoryEntries(token, {
+        ids: classified.ids,
+      });
+      const res = NextResponse.json({
+        ok: true,
+        deleted: classified.ids,
+        source: "trakt",
+        trakt,
+      });
+      if (refreshedTokens) setTraktCookies(res, refreshedTokens);
+      return res;
+    } catch (error) {
+      return NextResponse.json(
+        { error: error?.message || "Error al eliminar del historial de Trakt" },
+        { status: error?.status || 500 },
+      );
+    }
+  }
+
+  const ids = classified.ids;
 
   // Usar el endpoint bulk si hay más de 1 ID; si no, DELETE individual
   const isBulk = ids.length > 1;

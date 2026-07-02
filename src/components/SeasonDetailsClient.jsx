@@ -29,6 +29,7 @@ import {
 } from "@/components/details/DetailAtoms";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
+import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import {
   formatDateEs,
@@ -252,6 +253,45 @@ export default function SeasonDetailsClient({
   );
   const hasInitialShowWatched = !!initialWatchedBySeason;
   const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${showId}`;
+
+  // Plataformas de streaming de la SERIE (una temporada no tiene plataforma
+  // propia): se usa la principal para el overlay "Ver en" de la portada.
+  const [showProviders, setShowProviders] = useState([]);
+  useEffect(() => {
+    if (!showId || !showName) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const params = new URLSearchParams({ title: showName, type: "tv" });
+        const year = String(show?.first_air_date || "").slice(0, 4);
+        if (year && Number(year) > 0) params.set("year", year);
+        const imdb = show?.imdb_id || show?.external_ids?.imdb_id || showImdbId;
+        if (imdb) params.set("imdbId", imdb);
+        params.set("tmdbId", String(showId));
+        const res = await fetch(`/api/streaming?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => null);
+        setShowProviders(Array.isArray(json?.providers) ? json.providers : []);
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.warn("No se pudieron cargar plataformas de la serie:", error);
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [showId, showName, show?.first_air_date, show?.imdb_id, showImdbId]);
+
+  const seasonPrimaryProvider = useMemo(
+    () =>
+      (Array.isArray(showProviders)
+        ? showProviders.find(
+            (p) => typeof p?.url === "string" && p.url.startsWith("http"),
+          )
+        : null) || null,
+    [showProviders],
+  );
 
   const airDate = season?.air_date ? formatDateEs(season.air_date) : null;
   const seasonVote =
@@ -1088,6 +1128,19 @@ export default function SeasonDetailsClient({
               }
               alt={seasonName}
               aspect="poster"
+              overlay={
+                <StreamingHoverOverlay
+                  provider={seasonPrimaryProvider}
+                  watched={trakt.watched}
+                  part="visual"
+                />
+              }
+              hitLayer={
+                <StreamingHoverOverlay
+                  provider={seasonPrimaryProvider}
+                  part="hit"
+                />
+              }
             />
           </motion.div>
 

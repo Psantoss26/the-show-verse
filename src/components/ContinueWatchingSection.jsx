@@ -711,9 +711,9 @@ function ContinueWatchingBaseCard({ show }) {
       {/* Overlay inferior: progreso + próximo episodio */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8">
         {ep && (
-          <div className="mb-1 truncate text-[11px] font-semibold text-white drop-shadow">
-            T{ep.season}:E{ep.number}
-            <span className="ml-1 font-normal text-neutral-300">· Próximo</span>
+          <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
+            <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
+            <span>T{ep.season}·E{ep.number}</span>
           </div>
         )}
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
@@ -1134,14 +1134,10 @@ function ContinueWatchingPreviewCard({
   const ep = show?.nextEpisode;
   const genres = genresText(show);
 
-  const progressLabel = (() => {
-    const parts = [];
-    if (Number.isFinite(show?.completed) && Number.isFinite(show?.aired)) {
-      parts.push(`${show.completed}/${show.aired} eps`);
-    }
-    if (pct) parts.push(`${pct}%`);
-    return parts.join(" · ");
-  })();
+  const progressLabel =
+    Number.isFinite(show?.completed) && Number.isFinite(show?.aired)
+      ? `${show.completed}/${show.aired} eps`
+      : "";
 
   // Determinar la alineación horizontal de la tarjeta absoluta
   const activeIdx = typeof activeIndex === "number" ? activeIndex : 0;
