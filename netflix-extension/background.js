@@ -507,7 +507,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 3b. Sincronización de reproducción multiplataforma (Prime, Max, Disney+, Plex, Netflix).
   if (message.action === "syncWatch") {
-    const { platform, platformName, contentId, mainTitle, subTitle, season, episode } = message;
+    const {
+      platform,
+      platformName,
+      contentId,
+      playbackUrl,
+      mainTitle,
+      subTitle,
+      season,
+      episode,
+    } = message;
     addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
 
     chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
@@ -533,6 +542,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         body: JSON.stringify({
           platform: platform || "netflix",
           videoId: contentId || undefined,
+          playbackUrl: playbackUrl || undefined,
           mainTitle,
           subTitle,
           season: season || undefined,

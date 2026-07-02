@@ -66,6 +66,14 @@ const episodeStatsInflight = new Map();
 const episodeImdbCache = new Map();
 const episodeImdbInflight = new Map();
 
+const EPISODE_STREAMING_BRANDS = Object.freeze({
+  netflix: { name: "Netflix", logo: "/netflix.png" },
+  prime: { name: "Prime Video", logo: "/amazonprimevideo.png" },
+  max: { name: "Max", logo: "/hbomax.png" },
+  disney: { name: "Disney+", logo: "/disney.png" },
+  plex: { name: "Plex", logo: "/logo-Plex.png" },
+});
+
 function normalizeWatchedBySeason(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
@@ -492,6 +500,7 @@ export default function EpisodeDetailsClient({
   // Tabs
   const [activeTab, setActiveTab] = useState("details");
   const [isMounted, setIsMounted] = useState(false);
+  const [episodeStreamingLinks, setEpisodeStreamingLinks] = useState([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -500,6 +509,44 @@ export default function EpisodeDetailsClient({
   useEffect(() => {
     setEpisodeCredits(episode?.credits || null);
   }, [episode, showId, seasonNumber, episodeNumber]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadEpisodeStreamingLinks() {
+      try {
+        const params = new URLSearchParams({
+          tmdbId: String(showId),
+          season: String(seasonNumber),
+          episode: String(episodeNumber),
+        });
+        const response = await fetch(`/api/streaming/episode-links?${params}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+
+        const payload = await response.json().catch(() => null);
+        const links = Array.isArray(payload?.links)
+          ? payload.links.filter(
+              (link) =>
+                EPISODE_STREAMING_BRANDS[link?.platform] &&
+                typeof link?.url === "string" &&
+                link.url.startsWith("https://"),
+            )
+          : [];
+        setEpisodeStreamingLinks(links);
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.warn("No se pudieron cargar los enlaces del episodio:", error);
+        }
+      }
+    }
+
+    setEpisodeStreamingLinks([]);
+    loadEpisodeStreamingLinks();
+    return () => controller.abort();
+  }, [showId, seasonNumber, episodeNumber]);
 
   const parseScoreboardData = useCallback((r) => {
     if (!r?.found) return null;
@@ -1439,6 +1486,46 @@ export default function EpisodeDetailsClient({
                   </>
                 ) : null}
               </div>
+
+              {episodeStreamingLinks.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5 lg:justify-start">
+                  <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                    Ver episodio
+                  </span>
+                  {episodeStreamingLinks.map((link) => {
+                    const brand = EPISODE_STREAMING_BRANDS[link.platform];
+                    const providerName = link.providerName || brand.name;
+
+                    return (
+                      <motion.a
+                        key={link.platform}
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Reproducir ${epName} en ${providerName}`}
+                        title={`Reproducir en ${providerName}`}
+                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.96 }}
+                        className="group relative inline-flex size-11 items-center justify-center rounded-xl bg-white/[0.07] shadow-lg ring-1 ring-white/10 transition-[filter,background-color] hover:bg-white/10 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+                      >
+                        <OptimizedImage
+                          src={brand.logo}
+                          alt=""
+                          className="size-9 rounded-[10px] object-contain"
+                        />
+                        <span className="absolute -bottom-1 -right-1 inline-flex size-4 items-center justify-center rounded-full bg-yellow-400 text-black ring-2 ring-[#101010]">
+                          <PlayIcon
+                            className="size-2.5 fill-current"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </motion.a>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* SCOREBOARD */}

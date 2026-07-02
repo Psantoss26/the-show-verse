@@ -7,15 +7,19 @@ import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import { useRouter } from "next/navigation";
-import { Heart, BookmarkPlus } from "lucide-react";
+import { Heart, BookmarkPlus, Play, Award } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
 import {
   getVideos,
+  getDetails,
   markAsFavorite,
   markInWatchlist,
 } from "@/lib/api/tmdb";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
+import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import {
   uniqBy,
@@ -32,6 +36,7 @@ import {
   getBackdropCacheKey,
   getPreviewBackdropFallback,
   preloadImage,
+  GENRES,
 } from "@/lib/dashboard/media";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
@@ -183,6 +188,10 @@ const previewTrailerVideosCache = new Map();
 const verifiedPreviewTrailerKeys = new Map();
 const continueWatchingBackdropPathMemory = new Map();
 const loadedContinueWatchingBackdropSrcs = new Set();
+// Extras del panel ampliado (nota TMDb, nota IMDb, premios, temporadas, año) que
+// no vienen en el item de "Continuar viendo": se cargan al hacer hover y se
+// cachean por serie (igual que el spotlight) para no repetir peticiones.
+const continueWatchingExtrasCache = new Map();
 
 const cwBackdropFadeStyle = {
   WebkitMaskImage:
@@ -737,6 +746,12 @@ function ContinueWatchingPreviewCard({
   const [watchlist, setWatchlist] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  // Extras del panel ampliado: nota TMDb, nota IMDb, premios, temporadas y año.
+  // Se pintan al instante desde caché si ya se cargaron; si no, se piden al hacer
+  // hover (que es cuando esta tarjeta se monta) y aparecen con un fundido suave.
+  const [extras, setExtras] = useState(
+    () => continueWatchingExtrasCache.get(show?.id) || null,
+  );
 
   // Resolvemos el trailer de forma SÍNCRONA desde la caché ya precalentada (la
   // fila precalienta los trailers visibles), de modo que el iframe esté presente
@@ -766,6 +781,86 @@ function ContinueWatchingPreviewCard({
     skippedTrailerKeysRef.current = new Set();
     setTrailer(cachedVideos[0] || null);
     setTrailerVisible(false);
+  }, [show?.id]);
+
+  // Carga de extras (nota, IMDb, premios, temporadas, año). Un único getDetails de
+  // TV ya trae vote_average, número de temporadas/episodios, first_air_date y
+  // external_ids.imdb_id; con el imdb_id pedimos premios (OMDb) y nota IMDb, igual
+  // que el spotlight. Cacheado por serie para no repetir peticiones entre hovers.
+  useEffect(() => {
+    const id = show?.id;
+    if (!id) return;
+    const cached = continueWatchingExtrasCache.get(id);
+    if (cached) {
+      setExtras(cached);
+      return;
+    }
+    let abort = false;
+    (async () => {
+      try {
+        const details = await getDetails("tv", id, { language: "es-ES" }).catch(
+          () => null,
+        );
+        const rating =
+          typeof details?.vote_average === "number" && details.vote_average > 0
+            ? details.vote_average
+            : null;
+        let seasons = null;
+        if (details?.number_of_seasons) {
+          seasons = `${details.number_of_seasons} Temp.`;
+          if (details.number_of_episodes) {
+            seasons += ` · ${details.number_of_episodes} Eps.`;
+          }
+        }
+        const year = details?.first_air_date
+          ? String(details.first_air_date).slice(0, 4)
+          : null;
+        // Géneros SIEMPRE en español. Pedimos los detalles con language es-ES,
+        // pero TMDb NO traduce algunos géneros combinados de TV ("Sci-Fi &
+        // Fantasy", "Action & Adventure", "War & Politics"…), que se quedan en
+        // inglés. Por eso mapeamos por ID con el diccionario GENRES (español para
+        // todos los IDs) y solo caemos al nombre de la API si faltara el ID.
+        const genresEs = Array.isArray(details?.genres)
+          ? details.genres
+              .map((g) => GENRES[g?.id] || g?.name)
+              .filter(Boolean)
+              .slice(0, 2)
+              .join(" • ")
+          : null;
+        const imdbId = details?.external_ids?.imdb_id || null;
+
+        let awards = null;
+        let imdbRating = null;
+        if (imdbId) {
+          const [omdb, ds] = await Promise.all([
+            fetchOmdbByImdb(imdbId).catch(() => null),
+            fetchImdbRatingByImdb(imdbId).catch(() => null),
+          ]);
+          if (typeof ds?.rating === "number") imdbRating = ds.rating;
+          const rawAwards = omdb?.Awards;
+          if (rawAwards && typeof rawAwards === "string" && rawAwards.trim()) {
+            awards = formatDashboardAwards(rawAwards);
+          }
+        }
+
+        const next = { rating, imdbRating, awards, seasons, year, genresEs };
+        continueWatchingExtrasCache.set(id, next);
+        if (!abort) setExtras(next);
+      } catch {
+        if (!abort)
+          setExtras({
+            rating: null,
+            imdbRating: null,
+            awards: null,
+            seasons: null,
+            year: null,
+            genresEs: null,
+          });
+      }
+    })();
+    return () => {
+      abort = true;
+    };
   }, [show?.id]);
 
   const prefetchHref = () => {
@@ -1063,25 +1158,27 @@ function ContinueWatchingPreviewCard({
     transformOrigin = "right center";
   }
 
+  // Vista previa ~1,6× la tarjeta base (como el spotlight): más ancha que antes
+  // para que el backdrop se vea más grande y quepa el panel de info ampliado.
   const previewWidthPercent =
     visibleCount <= 3
-      ? 158
+      ? 160
       : visibleCount === 4
-        ? 154
+        ? 158
         : visibleCount === 5
-          ? 148
-          : 144;
-  const previewScale = visibleCount >= 6 ? 1.07 : 1.09;
+          ? 156
+          : 154;
+  const previewScale = 1.04;
   const previewMaxWidth =
-    visibleCount >= 6 ? "min(144%, 470px)" : `${previewWidthPercent}%`;
+    visibleCount >= 6 ? "min(156%, 560px)" : `${previewWidthPercent}%`;
   const previewImageSizes =
     visibleCount <= 3
-      ? "(min-width:1280px) 560px, (min-width:768px) 500px, 420px"
+      ? "(min-width:1280px) 620px, (min-width:768px) 540px, 440px"
       : visibleCount === 4
-        ? "(min-width:1280px) 500px, (min-width:768px) 450px, 380px"
+        ? "(min-width:1280px) 560px, (min-width:768px) 500px, 420px"
         : visibleCount === 5
-          ? "(min-width:1536px) 480px, (min-width:1280px) 440px, 380px"
-          : "(min-width:1536px) 470px, (min-width:1280px) 430px, 380px";
+          ? "(min-width:1536px) 540px, (min-width:1280px) 500px, 420px"
+          : "(min-width:1536px) 560px, (min-width:1280px) 500px, 420px";
 
   return (
     <motion.div
@@ -1230,77 +1327,149 @@ function ContinueWatchingPreviewCard({
         </div>
       </div>
 
-      {/* Panel de info (debajo del backdrop) */}
+      {/* Panel de info ampliado (debajo del backdrop), en el lenguaje visual de
+          FeaturedHero/spotlight: acciones arriba, premios, metadatos (episodio ·
+          progreso · año · temporadas), géneros + notas y sinopsis. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
-        className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
+        className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-200 sm:text-xs">
-              {ep && (
-                <span className="font-semibold text-white">
-                  T{ep.season} · E{ep.number}
-                  {ep.title ? `: ${ep.title}` : ""}
-                </span>
-              )}
-              {progressLabel && (
-                <span className="text-neutral-300">• {progressLabel}</span>
-              )}
-            </div>
+        {/* Fila de acciones: píldora Reanudar + favorito + pendientes */}
+        <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
+          <button
+            type="button"
+            onClick={handleContinue}
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-4 sm:text-sm"
+          >
+            <Play className="h-4 w-4 fill-current" />
+            <span>{ep ? `Reanudar T${ep.season}·E${ep.number}` : "Reanudar"}</span>
+          </button>
 
-            {genres && (
-              <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-100/90 sm:text-xs">
-                {genres}
-              </div>
-            )}
+          {/* Botón de progreso de visionado (círculo con % y relleno). */}
+          <LiquidButton
+            onClick={handleContinue}
+            active
+            activeColor="green"
+            groupId="continue-watching-actions"
+            title={`Continuar viendo · ${pct}% visto`}
+            progressPercent={`${pct}%`}
+            fillPercentage={pct}
+            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_div>span:first-child]:!text-base sm:[&_div>span:first-child]:!text-lg [&_div>span:first-child]:!tracking-[-0.02em] [&_div>span:last-child]:!text-[9px] sm:[&_div>span:last-child]:!text-[10px] [&_span]:!text-white"
+          />
 
-            {error && (
-              <p className="mt-0.5 line-clamp-1 text-[11px] text-red-400">
-                {error}
-              </p>
-            )}
-          </div>
+          <LiquidButton
+            onClick={handleToggleFavorite}
+            loading={loadingStates || updating}
+            active={favorite}
+            activeColor="red"
+            groupId="continue-watching-actions"
+            title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
+          >
+            <Heart className={favorite ? "fill-current" : ""} />
+          </LiquidButton>
 
-          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-2.5">
-            <LiquidButton
-              onClick={handleContinue}
-              active
-              activeColor="green"
-              groupId="continue-watching-actions"
-              title={`Continuar viendo · ${pct}% visto`}
-              progressPercent={`${pct}%`}
-              fillPercentage={pct}
-              className="!h-9 !w-9 [&_div>span:first-child]:!text-base [&_div>span:first-child]:!tracking-[-0.02em] [&_div>span:last-child]:!text-[9px] [&_span]:!text-white"
-            />
-
-            <LiquidButton
-              onClick={handleToggleFavorite}
-              loading={loadingStates || updating}
-              active={favorite}
-              activeColor="red"
-              groupId="continue-watching-actions"
-              title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <Heart className={favorite ? "fill-current" : ""} />
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={handleToggleWatchlist}
-              loading={loadingStates || updating}
-              active={watchlist}
-              activeColor="blue"
-              groupId="continue-watching-actions"
-              title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-            </LiquidButton>
-          </div>
+          <LiquidButton
+            onClick={handleToggleWatchlist}
+            loading={loadingStates || updating}
+            active={watchlist}
+            activeColor="blue"
+            groupId="continue-watching-actions"
+            title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
+          >
+            <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+          </LiquidButton>
         </div>
+
+        {/* Premios — hueco reservado (min-height) para que la carga tardía de
+            OMDb no desplace el resto; aparece con un fundido suave. */}
+        <div className="mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+          {extras?.awards && (
+            <motion.span
+              key={extras.awards}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex min-w-0 items-center gap-1.5"
+            >
+              <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="line-clamp-1">{extras.awards}</span>
+            </motion.span>
+          )}
+        </div>
+
+        {/* Metadatos: episodio · progreso · año · temporadas (separadores "•") */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-zinc-200 sm:text-xs">
+          {(() => {
+            const parts = [];
+            if (ep)
+              parts.push(
+                <span key="ep" className="text-white">
+                  T{ep.season} · E{ep.number}
+                </span>,
+              );
+            if (progressLabel) parts.push(<span key="prog">{progressLabel}</span>);
+            if (extras?.year) parts.push(<span key="year">{extras.year}</span>);
+            if (extras?.seasons)
+              parts.push(<span key="seasons">{extras.seasons}</span>);
+            return parts.reduce((acc, item, index) => {
+              if (index === 0) return [item];
+              return [
+                ...acc,
+                <span
+                  key={`sep-${index}`}
+                  className="select-none text-[0.8em] font-bold text-zinc-500/70"
+                  aria-hidden="true"
+                >
+                  •
+                </span>,
+                item,
+              ];
+            }, []);
+          })()}
+        </div>
+
+        {/* Géneros (en español, de los detalles es-ES) + notas TMDb/IMDb */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-200 sm:text-xs">
+          {(extras?.genresEs || genres) && (
+            <span>{extras?.genresEs || genres}</span>
+          )}
+          {extras?.rating && (
+            <span className="inline-flex items-center gap-1.5">
+              <NextImage
+                src="/logo-TMDb.png"
+                alt="TMDb"
+                width={2560}
+                height={1846}
+                sizes="28px"
+                className="h-2.5 w-auto"
+                loading="lazy"
+              />
+              <span className="font-bold">{extras.rating.toFixed(1)}</span>
+            </span>
+          )}
+          {typeof extras?.imdbRating === "number" && (
+            <span className="inline-flex items-center gap-1.5">
+              <NextImage
+                src="/logo-IMDb.svg"
+                alt="IMDb"
+                width={575}
+                height={290}
+                sizes="34px"
+                className="h-3 w-auto"
+                loading="lazy"
+              />
+              <span className="font-bold">{extras.imdbRating.toFixed(1)}</span>
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -1640,7 +1809,14 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       ref={rowRef}
       {...revealProps}
       variants={fadeInUp}
-      className="relative group"
+      // Cuando hay una vista previa abierta elevamos TODA la fila por encima de
+      // TODO lo demás: su `z-[90]` interno solo vale dentro del contexto de
+      // apilado de esta fila. Sin un z alto en la fila, las filas vecinas —tanto
+      // la de abajo (posterior en el DOM) como la de arriba (p. ej. la fila
+      // spotlight de "Estrenos", que crea su propio contexto de apilado)— podían
+      // tapar la preview al desbordar sobre ellas. Con un z muy alto la preview
+      // queda siempre superpuesta a las demás filas.
+      className={`group relative ${hasActivePreview ? "z-[100]" : ""}`}
     >
       {Header}
 
@@ -1698,7 +1874,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
             // roba el hover/clic a las filas vecinas; las tarjetas reactivan los
             // eventos (pointer-events es heredado y el arrastre sigue funcionando
             // por propagación desde la tarjeta).
-            className={`group relative !py-14 sm:!py-16 md:!py-32 !-my-14 sm:!-my-16 md:!-my-32 ${
+            className={`group relative !py-14 sm:!py-16 md:!py-44 !-my-14 sm:!-my-16 md:!-my-44 ${
               isMobile ? "" : "pointer-events-none"
             }`}
             wrapperClass="flex items-center"
