@@ -515,6 +515,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       subTitle,
       season,
       episode,
+      // Señales enriquecidas (PlaybackSignal).
+      showName,
+      episodeName,
+      movieTitle,
+      seasonEpisodeText,
+      tabTitle,
+      artworkUrl,
+      durationSec,
+      positionSec,
     } = message;
     addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
 
@@ -541,10 +550,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         body: JSON.stringify({
           platform: platform || "netflix",
           videoId: contentId || undefined,
+          contentId: contentId || undefined,
           mainTitle,
           subTitle,
           season: season || undefined,
-          episode: episode || undefined
+          episode: episode || undefined,
+          // Señales enriquecidas para el resolutor del backend.
+          showName: showName || undefined,
+          episodeName: episodeName || undefined,
+          movieTitle: movieTitle || undefined,
+          seasonEpisodeText: seasonEpisodeText || undefined,
+          tabTitle: tabTitle || undefined,
+          artworkUrl: artworkUrl || undefined,
+          durationSec: durationSec || undefined,
+          positionSec: positionSec || undefined,
         }),
         credentials: "omit"
       })
