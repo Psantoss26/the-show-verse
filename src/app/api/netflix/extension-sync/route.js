@@ -3,6 +3,7 @@ import { backendFetchJson, getBackendBaseUrl } from "@/lib/backend/server";
 import {
   resolveStreamingEntity,
   searchTmdbCandidatesWithFallback,
+  matchEpisodeByName,
 } from "@/lib/netflix/streamingResolve";
 
 export const runtime = "nodejs";
@@ -75,29 +76,34 @@ export async function POST(request) {
       mainTitle,
       subTitle,
       videoId,
+      contentId,
       platform = "netflix",
       season: seasonIn,
       episode: episodeIn,
+      // Señales enriquecidas (PlaybackSignal) — opcionales, con retrocompat.
+      showName,
+      episodeName,
+      seasonEpisodeText,
     } = await request.json().catch(() => ({}));
+    const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
     const syncToken = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
       : "";
 
-    if (!mainTitle) {
+    if (!mainTitle && !showName) {
       return NextResponse.json({ error: "mainTitle is required" }, { status: 400 });
     }
 
-    console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${videoId})`);
+    console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${resolvedVideoId})`);
 
     // 1. Detectar temporada/episodio. La extensión puede enviarlos ya parseados;
     // si no, los inferimos del título completo (main + subtítulo) en varios
     // formatos: "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 Episode 1".
-    const combined = `${mainTitle} ${subTitle || ""}`;
+    const combined = `${mainTitle || showName || ""} ${subTitle || episodeName || ""} ${seasonEpisodeText || ""}`;
     let isTv = false;
     let season = null;
     let episode = null;
-    let seriesWithoutEpisode = false;
 
     if (Number.isInteger(episodeIn) && episodeIn > 0) {
       isTv = true;
@@ -112,35 +118,23 @@ export async function POST(request) {
         season = sMatch ? parseInt(sMatch[1], 10) : 1; // por defecto temporada 1
         episode = parseInt(eMatch[1], 10);
       } else if (sMatch) {
-        // Serie con temporada pero sin episodio identificable.
-        seriesWithoutEpisode = true;
+        // Temporada sin episodio identificable: no descartamos — se resolverá
+        // a nivel serie (o se intentará fijar el episodio por nombre más abajo).
         season = parseInt(sMatch[1], 10);
       }
     }
 
     // 2. Limpiar el título para la búsqueda en TMDb.
-    const query = cleanSearchTitle(mainTitle);
+    const query = cleanSearchTitle(showName || mainTitle);
     if (!query) {
       return NextResponse.json({ error: "Empty title after cleanup" }, { status: 422 });
-    }
-
-    // Sin episodio identificable no podemos fijar una entrada de historial de
-    // episodio fiable: omitimos en vez de registrar datos incorrectos.
-    if (seriesWithoutEpisode) {
-      console.log(`[Extension Sync] Serie sin episodio identificable, omitida: "${query}" (T${season})`);
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: "series_without_episode",
-        title: query,
-        season,
-      });
     }
 
     let tmdbId = null;
     let mediaType = isTv ? "tv" : "movie";
     let resolvedTitle = "";
     let posterPath = "";
+    let confidence = null;
 
     // 3. Resolver contra el proxy backend y, si falla o no devuelve resultados,
     // contra TMDb directamente. Cuando no hay números de episodio comparamos
@@ -149,21 +143,9 @@ export async function POST(request) {
     const resolution = await resolveStreamingEntity({
       query,
       expectedMediaType: isTv ? "tv" : null,
-      preferTv: Boolean(subTitle),
+      preferTv: Boolean(subTitle || episodeName || showName),
       search: (type) => searchTmdbCandidates(request, query, type),
     });
-
-    if (resolution?.kind === "series_without_episode") {
-      console.log(
-        `[Extension Sync] Serie reconocida sin episodio identificable, omitida: "${query}"`,
-      );
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: "series_without_episode",
-        title: query,
-      });
-    }
 
     if (resolution?.kind === "resolved") {
       const entity = resolution.entity;
@@ -172,10 +154,52 @@ export async function POST(request) {
       resolvedTitle =
         resolution.mediaType === "tv" ? entity.name : entity.title;
       posterPath = entity.poster_path;
+      confidence = resolution.confidence || "high";
+    } else if (resolution?.kind === "show_level") {
+      // Serie reconocida sin episodio fijado: en vez de descartar, registramos
+      // a nivel serie (confianza baja). Antes intentamos fijar el episodio por
+      // NOMBRE contra los episodios de TMDb de la temporada detectada.
+      const entity = resolution.entity;
+      tmdbId = entity.id;
+      mediaType = "tv";
+      isTv = true;
+      resolvedTitle = entity.name || entity.original_name || query;
+      posterPath = entity.poster_path;
+      episode = null;
+      confidence = "low";
+
+      if (episodeName && season && TMDB_API_KEY) {
+        try {
+          const seUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
+          const seRes = await fetch(seUrl, { signal: AbortSignal.timeout(8000) });
+          if (seRes.ok) {
+            const seData = await seRes.json();
+            const hit = matchEpisodeByName({
+              episodeName,
+              seasonEpisodes: seData?.episodes,
+            });
+            if (hit) {
+              season = hit.season;
+              episode = hit.episode;
+              confidence = "medium";
+              console.log(
+                `[Extension Sync] Episodio fijado por nombre: "${episodeName}" → T${season}E${episode}`,
+              );
+            }
+          }
+        } catch (e) {
+          console.warn("[Extension Sync] episode-by-name lookup failed:", e?.message);
+        }
+      }
+
+      if (episode == null) {
+        // Nivel serie puro: sin temporada/episodio concretos.
+        season = null;
+      }
     }
 
-    // Fetch episode name if possible
-    if (isTv && tmdbId && TMDB_API_KEY) {
+    // Fetch episode name if possible (solo con episodio concreto).
+    if (isTv && tmdbId && episode != null && season != null && TMDB_API_KEY) {
       try {
         const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
         const epRes = await fetch(epUrl);
@@ -206,10 +230,11 @@ export async function POST(request) {
     if (posterPath) body.posterPath = posterPath;
     if (isTv && season != null) body.season = season;
     if (isTv && episode != null) body.episode = episode;
+    if (confidence) body.confidence = confidence;
 
     console.log("[Extension Sync] Submitting Netflix sync body to backend:", JSON.stringify({
       ...body,
-      netflixVideoId: videoId || null,
+      netflixVideoId: resolvedVideoId || null,
     }));
 
     let historyRes;
@@ -232,8 +257,8 @@ export async function POST(request) {
         body: JSON.stringify({
           ...body,
           platform,
-          netflixVideoId: videoId || undefined,
-          netflixTitle: mainTitle,
+          netflixVideoId: resolvedVideoId || undefined,
+          netflixTitle: mainTitle || showName || resolvedTitle,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -271,6 +296,7 @@ export async function POST(request) {
         episode,
         title: resolvedTitle,
         posterPath,
+        confidence,
         duplicate: Boolean(historyRes.json?.duplicate),
       },
     });

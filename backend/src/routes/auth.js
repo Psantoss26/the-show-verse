@@ -20,6 +20,7 @@ import {
   refreshTokenExpiresAt,
 } from '../lib/jwt.js';
 import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
+import { syncDedupKey } from './netflixSyncDedup.js';
 import { eq, and, gt, lt } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
@@ -62,6 +63,7 @@ const netflixSyncSchema = z.object({
   netflixVideoId: z.string().max(80).optional(),
   netflixTitle: z.string().max(300).optional(),
   platform: z.string().max(40).optional(),
+  confidence: z.enum(['high', 'medium', 'low']).optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -877,28 +879,47 @@ export default async function authRoutes(fastify) {
       runtimeMins,
       title,
       posterPath,
+      confidence,
     } = parsed.data;
-    if (mediaType === 'tv' && (!season || !episode)) {
-      return reply.status(400).send({ error: 'season and episode are required for tv history entries' });
-    }
+    // Nota: un tv sin temporada/episodio es válido → fallback a nivel serie
+    // (episode = null, confidence 'low'). No se rechaza.
 
-    const recentCutoff = new Date(Date.now() - 12 * 60 * 60 * 1000);
-    const duplicateConditions = [
-      eq(watchHistory.userId, account.userId),
-      eq(watchHistory.tmdbId, tmdbId),
-      eq(watchHistory.mediaType, mediaType),
-      gt(watchHistory.watchedAt, recentCutoff),
-    ];
-    if (mediaType === 'tv') {
-      duplicateConditions.push(eq(watchHistory.season, season));
-      duplicateConditions.push(eq(watchHistory.episode, episode));
-    }
-
-    const [recentDuplicate] = await db
-      .select({ id: watchHistory.id })
+    const watchedDate = watchedAt ? new Date(watchedAt) : new Date();
+    // Dedup con la MISMA regla que syncDedupKey: episodio → 12 h; nivel serie
+    // (episode null) → por día. Traemos los visionados recientes de este título
+    // (últimas 24 h cubren ambas ventanas) y comparamos por clave.
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentRows = await db
+      .select({
+        season: watchHistory.season,
+        episode: watchHistory.episode,
+        watchedAt: watchHistory.watchedAt,
+      })
       .from(watchHistory)
-      .where(and(...duplicateConditions))
-      .limit(1);
+      .where(and(
+        eq(watchHistory.userId, account.userId),
+        eq(watchHistory.tmdbId, tmdbId),
+        eq(watchHistory.mediaType, mediaType),
+        gt(watchHistory.watchedAt, since),
+      ));
+
+    const incomingKey = syncDedupKey({
+      tmdbId,
+      mediaType,
+      season: mediaType === 'tv' ? season ?? null : null,
+      episode: mediaType === 'tv' ? episode ?? null : null,
+      watchedAt: watchedDate,
+    });
+    const recentDuplicate = recentRows.some(
+      (r) =>
+        syncDedupKey({
+          tmdbId,
+          mediaType,
+          season: r.season,
+          episode: r.episode,
+          watchedAt: r.watchedAt,
+        }) === incomingKey,
+    );
 
     let item = null;
     if (!recentDuplicate) {
@@ -908,12 +929,13 @@ export default async function authRoutes(fastify) {
           userId: account.userId,
           tmdbId,
           mediaType,
-          season: mediaType === 'tv' ? season : null,
-          episode: mediaType === 'tv' ? episode : null,
-          watchedAt: watchedAt ? new Date(watchedAt) : new Date(),
+          season: mediaType === 'tv' ? season ?? null : null,
+          episode: mediaType === 'tv' ? episode ?? null : null,
+          watchedAt: watchedDate,
           runtimeMins: runtimeMins || null,
           title: title || null,
           posterPath: posterPath || null,
+          confidence: confidence || 'high',
         })
         .returning();
     }

@@ -88,6 +88,9 @@ export const watchHistory = pgTable('watch_history', {
   // Metadatos cacheados para rendimiento sin join a TMDb:
   title: text('title'),
   posterPath: text('poster_path'),
+  // Confianza de la resolución del visionado sincronizado:
+  //   'high' | 'medium' | 'low'  ('low' = fallback a nivel serie sin episodio).
+  confidence: text('confidence').default('high'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   userIdIdx: index('idx_watch_history_user_id').on(t.userId),
