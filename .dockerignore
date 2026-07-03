@@ -8,3 +8,13 @@ backend/.env
 backend/.env.*
 npm-debug.log*
 *.log
+# No necesarios para construir la web (contexto = raíz del repo):
+backend
+android-companion
+deploy
+docs
+*.dump
+.playwright-mcp
+se-*.jpeg
+bigger-icons.jpeg
+disney-wordmark.jpeg

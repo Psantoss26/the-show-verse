@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Salida "standalone" para autoalojar en Docker (imagen mínima con server.js).
+  // Vercel la ignora sin problema, así que es seguro para ambos despliegues.
+  output: "standalone",
   images: {
     // Optimización de imágenes de Vercel DESACTIVADA a propósito.
     //
