@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">The Show Verse Sync</string>
+    <string name="grant_access">Conceder acceso a notificaciones</string>
+    <string name="pause_sync">Pausar sincronización</string>
+    <string name="apps_header">Apps a sincronizar</string>
+    <string name="apps_hint">Las apps de streaming conocidas están activadas. Activa cualquier otra app que aparezca aquí tras reproducir algo en ella.</string>
+    <string name="unpair">Desvincular este dispositivo</string>
+    <string name="paired_ok">Dispositivo vinculado con The Show Verse.</string>
+    <string name="paired_fail">Enlace de emparejamiento no válido.</string>
+    <string name="status_not_paired">No vinculado. Abre The Show Verse en este dispositivo y pulsa «Vincular app Android».</string>
+    <string name="status_no_access">Falta el acceso a notificaciones (necesario para leer lo que reproduces).</string>
+    <string name="status_active">Sincronización activa. Vinculado a %1$s.</string>
+    <string name="status_paused">Sincronización pausada.</string>
+</resources>
