@@ -586,6 +586,39 @@ function ProfileSettingsClient() {
   const [connectedEmail, setConnectedEmail] = useState("");
   // Esperando a que el usuario instale la extensión desde la Chrome Web Store.
   const [awaitingInstall, setAwaitingInstall] = useState(false);
+  // Emparejamiento de la app companion de Android (deep link theshowverse://pair).
+  const [androidPair, setAndroidPair] = useState({
+    loading: false,
+    link: "",
+    error: "",
+  });
+
+  const handlePairAndroid = useCallback(async () => {
+    setAndroidPair({ loading: true, link: "", error: "" });
+    try {
+      const res = await fetch("/api/netflix/pair-mobile", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.syncToken) {
+        throw new Error(json?.error || "No se pudo generar el emparejamiento.");
+      }
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const link = `theshowverse://pair?token=${encodeURIComponent(json.syncToken)}&origin=${encodeURIComponent(origin)}`;
+      setAndroidPair({ loading: false, link, error: "" });
+      // Abre la app companion (mismo dispositivo). Si no está instalada, el enlace
+      // no hará nada y el usuario puede copiarlo tras instalar el APK.
+      if (typeof window !== "undefined") window.location.href = link;
+    } catch (err) {
+      setAndroidPair({
+        loading: false,
+        link: "",
+        error: err?.message || "Error al emparejar.",
+      });
+    }
+  }, []);
 
   const fetchConnections = useCallback(async () => {
     if (!authenticated) return;
@@ -1224,6 +1257,72 @@ function ProfileSettingsClient() {
                       activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
                       className="pl-16"
                     />
+
+                    {/* App companion de Android: sincroniza desde las apps
+                        oficiales de streaming en el móvil (deep link de
+                        emparejamiento). */}
+                    <div className="mt-4 pl-0 sm:pl-16">
+                      <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-white">
+                              App de Android
+                            </h4>
+                            <p className="mt-0.5 text-xs text-zinc-400 leading-relaxed">
+                              Sincroniza automáticamente lo que ves en las apps
+                              oficiales de streaming del móvil. Instala la app
+                              companion y pulsa Vincular en este mismo dispositivo.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handlePairAndroid}
+                            disabled={androidPair.loading}
+                            className="min-h-10 px-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60"
+                          >
+                            {androidPair.loading ? "Generando…" : "Vincular app Android"}
+                          </button>
+                        </div>
+
+                        {androidPair.error && (
+                          <p className="mt-3 text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-2.5 rounded-xl">
+                            {androidPair.error}
+                          </p>
+                        )}
+
+                        {androidPair.link && (
+                          <div className="mt-3 space-y-2">
+                            <p className="text-xs text-emerald-300">
+                              Emparejamiento generado. Si la app no se abrió sola,
+                              usa el enlace:
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={androidPair.link}
+                                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-white transition flex items-center"
+                              >
+                                Abrir app
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (navigator?.clipboard) {
+                                    navigator.clipboard.writeText(androidPair.link);
+                                  }
+                                }}
+                                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"
+                              >
+                                Copiar enlace
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-zinc-500 leading-relaxed">
+                              El enlace contiene un token de sincronización propio
+                              del móvil; no afecta a la extensión del navegador.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Plex Connection */}
