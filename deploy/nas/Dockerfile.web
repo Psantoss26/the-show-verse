@@ -1,0 +1,32 @@
+# The Show Verse — Web (Next.js 16) para autoalojar en el NAS.
+# Contexto de build = raíz del repo.
+FROM node:22-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM node:22-slim AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# Variables NEXT_PUBLIC_* (se hornean en el build del cliente).
+ARG NEXT_PUBLIC_TMDB_API_KEY
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_TMDB_API_KEY=$NEXT_PUBLIC_TMDB_API_KEY
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=4096
+RUN npm run build
+
+FROM node:22-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+# Salida standalone: server.js + node_modules mínimo + estáticos + public.
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+EXPOSE 3000
+CMD ["node", "server.js"]

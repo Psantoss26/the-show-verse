@@ -1,0 +1,18 @@
+# The Show Verse — Backend (Fastify + Drizzle) para autoalojar en el NAS.
+# Contexto de build = ./backend
+FROM node:22-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:22-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOST=0.0.0.0
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+EXPOSE 3001
+# `npm start` = `node src/db/migrate.js && node src/server.js`
+# → aplica migraciones (incluida la columna confidence) y arranca el servidor.
+CMD ["npm", "start"]

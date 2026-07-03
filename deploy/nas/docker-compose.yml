@@ -1,0 +1,67 @@
+# The Show Verse — stack autoalojado en el NAS (UGREEN DXP 4800 Plus).
+# Solo la web (3000) se expone; backend/postgres/redis quedan en la red interna.
+# Ejecutar desde la raíz del repo en el NAS:
+#   docker compose -f deploy/nas/docker-compose.yml up -d --build
+name: theshowverse
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tsv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+      POSTGRES_DB: theshowverse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsv -d theshowverse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: ../deploy/nas/Dockerfile.backend
+    restart: unless-stopped
+    env_file:
+      - ./backend.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "3001"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: ./deploy/nas/Dockerfile.web
+      args:
+        NEXT_PUBLIC_TMDB_API_KEY: ${NEXT_PUBLIC_TMDB_API_KEY}
+        NEXT_PUBLIC_API_BASE_URL: http://backend:3001
+    restart: unless-stopped
+    env_file:
+      - ./web.env
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  redisdata:
