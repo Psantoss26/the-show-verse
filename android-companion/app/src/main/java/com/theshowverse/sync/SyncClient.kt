@@ -54,6 +54,12 @@ object SyncClient {
         val request = Request.Builder()
             .url(url)
             .addHeader("Authorization", "Bearer $token")
+            // UA de navegador: algunos firewalls/anti-bot rechazan el UA de OkHttp.
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+            )
+            .addHeader("Accept", "application/json")
             .post(json.toString().toRequestBody(JSON))
             .build()
 

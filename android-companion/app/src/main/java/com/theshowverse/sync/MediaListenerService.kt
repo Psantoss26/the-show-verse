@@ -159,8 +159,9 @@ class MediaListenerService : NotificationListenerService() {
                 if (ok) {
                     prefs.addLog("✓ Sincronizado: ${signal.mainTitle}")
                 } else {
+                    // NO reintentamos el mismo título: reenviar cada 3s satura el
+                    // endpoint y agrava el 429. Se enviará el próximo título nuevo.
                     prefs.addLog("✗ Fallo: $err")
-                    lastKeyByPackage.remove(pkg) // permite reintento
                 }
             }
         }
