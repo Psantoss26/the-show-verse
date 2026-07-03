@@ -10,6 +10,12 @@ import {
   BarChart3,
   Info,
 } from "lucide-react";
+import {
+  getDirectEpisodeTarget,
+  getVisualEpisodeNumber,
+  getVisualEpisodeOrdinal,
+} from "@/lib/details/episodeRatingsStructure";
+import { getSeriesGraphEpisodeCellData } from "@/lib/details/seriesGraphRatings";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -364,6 +370,7 @@ export default function EpisodeRatingsGrid({
   };
 
   const shouldFlatten = meta.forceSingleSeason === true;
+  const ratingsSource = meta.source || initialSource;
 
   // === Normalizar datos ===
   const { seasonsSorted, maxEpisodes, seasonAverages } = useMemo(() => {
@@ -383,17 +390,44 @@ export default function EpisodeRatingsGrid({
               : null;
         if (seasonNumber == null) return null;
 
-        const episodesArr = Array.isArray(s.episodes) ? s.episodes : [];
+        const episodesArr = Array.isArray(s.episodes)
+          ? [...s.episodes].sort((a, b) => {
+              const aNumber = Number(
+                a?.episode_number ?? a?.episodeNumber ?? 0,
+              );
+              const bNumber = Number(
+                b?.episode_number ?? b?.episodeNumber ?? 0,
+              );
+              return aNumber - bNumber;
+            })
+          : [];
 
         const episodes = episodesArr
-          .map((ep) => {
-            const episodeNumber =
+          .map((ep, episodeIndex) => {
+            const sourceEpisodeNumber =
               typeof ep.episode_number === "number"
                 ? ep.episode_number
                 : typeof ep.episodeNumber === "number"
                   ? ep.episodeNumber
                   : null;
+            const episodeNumber = getVisualEpisodeNumber({
+              source: ratingsSource,
+              episode: ep,
+              episodeIndex,
+            });
             if (episodeNumber == null) return null;
+
+            const routeSeriesGraphData =
+              ratingsSource === "seriesgraph"
+                ? getSeriesGraphEpisodeCellData({
+                    ratings,
+                    tmdbSeasons,
+                    seasonNumber,
+                    episodeNumber,
+                    sourceEpisode: ep,
+                    showId,
+                  })
+                : null;
 
             const airDateStr = ep.air_date || ep.airDate || null;
             let isUnaired = false;
@@ -404,7 +438,8 @@ export default function EpisodeRatingsGrid({
             }
 
             const seriesGraphRating = toRatingNumber(
-              ep.seriesGraphRating ??
+              routeSeriesGraphData?.rating ??
+                ep.seriesGraphRating ??
                 ep.seriesgraphRating ??
                 ep.series_graph_rating ??
                 ep.seriesGraph ??
@@ -431,7 +466,8 @@ export default function EpisodeRatingsGrid({
             }
 
             const seriesGraphVotes = toNumberSafe(
-              ep.seriesGraphVotes ??
+              routeSeriesGraphData?.votes ??
+                ep.seriesGraphVotes ??
                 ep.seriesgraphVotes ??
                 ep.series_graph_votes ??
                 ep.num_votes ??
@@ -450,6 +486,7 @@ export default function EpisodeRatingsGrid({
 
             return {
               episodeNumber,
+              sourceEpisodeNumber,
               name: ep.name || "",
               seriesGraphRating,
               tmdbRating,
@@ -549,10 +586,13 @@ export default function EpisodeRatingsGrid({
     };
   }, [
     ratings,
+    ratingsSource,
     shouldFlatten,
     fillMissingWithTmdb,
     fallbackSource,
     initialSource,
+    showId,
+    tmdbSeasons,
   ]);
 
   const singleSeasonView =
@@ -589,24 +629,13 @@ export default function EpisodeRatingsGrid({
   }, [tmdbSeasons]);
 
   const visualEpisodeOrdinal = useCallback(
-    (seasonNumber, episodeNumber) => {
-      let ordinal = Number(episodeNumber || 0);
-      if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
-
-      const currentSeasonNumber = Number(seasonNumber);
-      for (const season of seasonsSorted) {
-        if (Number(season?.season_number) >= currentSeasonNumber) break;
-
-        const maxEpisode = (season?.episodes || []).reduce((max, ep) => {
-          const epNumber = Number(ep?.episodeNumber || 0);
-          return Number.isFinite(epNumber) ? Math.max(max, epNumber) : max;
-        }, 0);
-
-        ordinal += maxEpisode || Number(season?.episodes?.length || 0);
-      }
-
-      return ordinal;
-    },
+    (seasonNumber, episodeNumber, sourceEpisodeNumber) =>
+      getVisualEpisodeOrdinal(
+        seasonsSorted,
+        seasonNumber,
+        episodeNumber,
+        sourceEpisodeNumber,
+      ),
     [seasonsSorted],
   );
 
@@ -642,18 +671,25 @@ export default function EpisodeRatingsGrid({
         return null;
       }
 
-      const directSeason = tmdbSeasonsSorted.find(
-        (season) => season.seasonNumber === visualSeason,
-      );
-      if (directSeason && visualEpisode <= directSeason.episodeCount) {
-        return {
-          seasonNumber: visualSeason,
-          episodeNumber: visualEpisode,
-          via: "direct",
-        };
+      if (!singleSeasonView) {
+        const directTarget = getDirectEpisodeTarget(
+          tmdbSeasonsSorted,
+          visualSeason,
+          visualEpisode,
+        );
+        if (directTarget) {
+          return {
+            ...directTarget,
+            via: "direct",
+          };
+        }
       }
 
-      const ordinal = visualEpisodeOrdinal(visualSeason, visualEpisode);
+      const ordinal = visualEpisodeOrdinal(
+        visualSeason,
+        visualEpisode,
+        ep?.sourceEpisodeNumber,
+      );
       const mapped = mapOrdinalToTmdbEpisode(ordinal);
       if (mapped) return { ...mapped, via: "ordinal" };
 
@@ -673,7 +709,12 @@ export default function EpisodeRatingsGrid({
         via: "visual",
       };
     },
-    [mapOrdinalToTmdbEpisode, tmdbSeasonsSorted, visualEpisodeOrdinal],
+    [
+      mapOrdinalToTmdbEpisode,
+      singleSeasonView,
+      tmdbSeasonsSorted,
+      visualEpisodeOrdinal,
+    ],
   );
 
   useEffect(() => {

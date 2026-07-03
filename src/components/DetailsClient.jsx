@@ -197,6 +197,7 @@ import {
   pickPreferredVideo,
 } from "@/lib/details/videos";
 import { getSeriesGraphSeasonAverages } from "@/lib/details/seriesGraphRatings";
+import { seasonStructuresAlign } from "@/lib/details/episodeRatingsStructure";
 
 // -- Componentes atomicos para la UI de detalle --
 import {
@@ -6810,33 +6811,6 @@ export default function DetailsClient({
 
   // Carga los ratings de episodios desde SeriesGraph para series TV.
   useEffect(() => {
-    const RATINGS_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 días
-    const cacheKey = `showverse:tv:${id}:episode-ratings:v4-seriesgraph`;
-
-    const readCache = () => {
-      if (typeof window === "undefined") return null;
-      try {
-        const raw = window.localStorage.getItem(cacheKey);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed?.ts || !parsed?.data) return null;
-        if (Date.now() - Number(parsed.ts) > RATINGS_CACHE_TTL_MS) return null;
-        return parsed.data;
-      } catch {
-        return null;
-      }
-    };
-
-    const writeCache = (data) => {
-      if (typeof window === "undefined" || !data) return;
-      try {
-        window.localStorage.setItem(
-          cacheKey,
-          JSON.stringify({ ts: Date.now(), data }),
-        );
-      } catch {}
-    };
-
     let ignore = false;
     async function load() {
       if (type !== "tv") {
@@ -6850,25 +6824,16 @@ export default function DetailsClient({
 
       if (!ignore) setRatingsError(null);
 
-      const cached = readCache();
-      if (cached) {
-        if (!ignore) {
-          setRatings(cached);
-          setRatingsLoading(false);
-        }
-        return;
-      }
-
       setRatingsLoading(true);
       try {
         const res = await fetch(
           `/api/seriesgraph/episode-ratings?tmdbId=${encodeURIComponent(id)}`,
+          { cache: "no-store" },
         );
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error);
         if (!ignore) {
           setRatings(json);
-          writeCache(json);
         }
       } catch (e) {
         if (!ignore) setRatingsError(e.message);
@@ -6904,10 +6869,9 @@ export default function DetailsClient({
   );
 
   const seriesGraphSeasonRatings = useMemo(() => {
-    // Reparte la media de SeriesGraph por temporada de TMDb. Necesita las
-    // temporadas de TMDb porque algunas series (anime tipo One Piece) traen una
-    // única temporada absoluta en SeriesGraph que TMDb divide en varias; sin
-    // esto las puntuaciones solo aparecerían en la temporada 1.
+    // Reparte la media de SeriesGraph por temporada de TMDb. Cubre tanto una
+    // temporada absoluta (One Piece) como varias agrupaciones incompatibles
+    // entre sí (Gintama: 8 temporadas en SeriesGraph y 11 en TMDb).
     const averages = getSeriesGraphSeasonAverages({
       ratings,
       tmdbSeasons: Array.isArray(data?.seasons) ? data.seasons : [],
@@ -6919,12 +6883,10 @@ export default function DetailsClient({
     return map;
   }, [ratings, data?.seasons]);
 
-  // Estructura "aplanada": SeriesGraph trae una sola temporada con numeración
-  // absoluta (anime tipo One Piece) que TMDb divide en varias. En ese caso la
-  // nota por temporada del dataset IMDb (/api/ratings/season) no es fiable —su
-  // numeración no coincide y devuelve la media global para la T1—, así que
-  // damos prioridad a la media por rango de SeriesGraph, que sí es consistente.
-  const seriesGraphIsFlattened = useMemo(() => {
+  // SeriesGraph e IMDb pueden agrupar un anime de forma distinta a TMDb
+  // (Gintama: 8 temporadas frente a 11). En ese caso un número de temporada
+  // idéntico no representa el mismo conjunto de episodios.
+  const seriesGraphStructuresMismatch = useMemo(() => {
     const sgSeasons = Array.isArray(ratings?.seasons) ? ratings.seasons : [];
     const airedTmdbSeasons = (
       Array.isArray(data?.seasons) ? data.seasons : []
@@ -6932,11 +6894,17 @@ export default function DetailsClient({
       (s) =>
         Number(s?.season_number) > 0 && Number(s?.episode_count) > 0,
     );
-    return sgSeasons.length === 1 && airedTmdbSeasons.length > 1;
+    if (!sgSeasons.length || !airedTmdbSeasons.length) return false;
+    return !seasonStructuresAlign(sgSeasons, airedTmdbSeasons);
   }, [ratings, data?.seasons]);
 
   useEffect(() => {
-    if (type !== "tv" || !resolvedImdbId || !visibleSeasonNumbers.length) {
+    if (
+      type !== "tv" ||
+      !resolvedImdbId ||
+      !visibleSeasonNumbers.length ||
+      seriesGraphStructuresMismatch
+    ) {
       setSeasonImdbRatings({});
       return;
     }
@@ -7027,7 +6995,14 @@ export default function DetailsClient({
       ignore = true;
       controller.abort();
     };
-  }, [type, id, resolvedImdbId, visibleSeasonNumbersKey, visibleSeasonNumbers]);
+  }, [
+    type,
+    id,
+    resolvedImdbId,
+    visibleSeasonNumbersKey,
+    visibleSeasonNumbers,
+    seriesGraphStructuresMismatch,
+  ]);
 
   // =====================================================================
   // HANDLERS DE SELECCION DE ARTWORK
@@ -12212,8 +12187,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               );
                               const seriesGraphRating =
                                 seriesGraphSeasonRatings.get(sn) ?? null;
-                              const rating = seriesGraphIsFlattened
-                                ? (seriesGraphRating ?? imdbRating)
+                              const rating = seriesGraphStructuresMismatch
+                                ? seriesGraphRating
                                 : (imdbRating ?? seriesGraphRating);
                               const imdbSeasonUrl = resolvedImdbId
                                 ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
