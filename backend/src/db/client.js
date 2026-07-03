@@ -20,7 +20,9 @@ function shouldUseSsl(connectionUrl) {
   try {
     const { hostname, searchParams } = new URL(connectionUrl);
     const sslMode = searchParams.get('sslmode');
-    if (sslMode && sslMode !== 'disable') return true;
+    // sslmode=disable siempre gana (p. ej. Postgres autoalojado sin TLS).
+    if (sslMode === 'disable') return false;
+    if (sslMode) return true;
     return !['localhost', '127.0.0.1', '::1'].includes(hostname);
   } catch {
     return process.env.NODE_ENV === 'production';
