@@ -1,0 +1,22 @@
+# Postgres para The Show Verse en el NAS (UGREEN DXP 4800 Plus / UGOS + Docker).
+# Base de datos de DESARROLLO (y stack local si Neon no está disponible).
+# NO expongas el puerto 5432 a Internet: úsalo solo en la red local.
+services:
+  postgres:
+    image: postgres:16
+    container_name: tsv-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tsv
+      # Define POSTGRES_PASSWORD en un fichero .env junto a este compose.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: theshowverse
+    ports:
+      - "5432:5432" # accesible SOLO desde la LAN (no hacer port-forward)
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsv -d theshowverse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
