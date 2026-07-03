@@ -4,19 +4,20 @@ import android.content.ComponentName
 import android.content.Context
 import android.media.MediaMetadata
 import android.media.session.MediaController
-import android.media.session.MediaSession
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.util.Log
 
 /**
- * Motor de sincronización: como NotificationListenerService, tiene permiso para
- * enumerar las MediaSession de OTRAS apps. Escucha cambios de sesión y de estado
- * de reproducción, construye un PlaybackSignal y lo envía al backend. Es la única
- * forma de detección automática en Android (una PWA no puede leer otras apps).
+ * Motor de sincronización: como NotificationListenerService, puede enumerar las
+ * MediaSession de OTRAS apps. Sondea las sesiones activas cada pocos segundos
+ * (como la extensión) y, cuando una app lleva ≥15s reproduciendo (por RELOJ, sin
+ * depender de la posición que reporte), construye un PlaybackSignal y lo envía al
+ * backend. Es la única forma de detección automática en Android.
  */
 class MediaListenerService : NotificationListenerService() {
 
@@ -24,15 +25,23 @@ class MediaListenerService : NotificationListenerService() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var prefs: Prefs
     private var msm: MediaSessionManager? = null
+    private var polling = false
 
-    private val controllers = HashMap<MediaSession.Token, MediaController>()
-    private val callbacks = HashMap<MediaSession.Token, MediaController.Callback>()
+    // Cuándo (reloj monotónico) vimos por primera vez cada app reproduciendo.
+    private val playingSince = HashMap<String, Long>()
     private val lastKeyByPackage = HashMap<String, String>()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
-            handleSessions(list ?: emptyList())
+            if ((list?.size ?: 0) > 0) startPolling() else stopPolling()
         }
+
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            pollOnce()
+            if (polling) handler.postDelayed(this, POLL_MS)
+        }
+    }
 
     override fun onListenerConnected() {
         prefs = Prefs(this)
@@ -40,65 +49,66 @@ class MediaListenerService : NotificationListenerService() {
         msm = manager
         try {
             manager.addOnActiveSessionsChangedListener(sessionsListener, component)
-            handleSessions(manager.getActiveSessions(component))
             Log.i(TAG, "Listener connected; media sessions observed.")
+            startPolling() // sondeamos ya por si hay algo reproduciéndose
         } catch (e: SecurityException) {
             Log.w(TAG, "Sin acceso a notificaciones todavía: ${e.message}")
         }
     }
 
     override fun onListenerDisconnected() {
+        stopPolling()
         msm?.removeOnActiveSessionsChangedListener(sessionsListener)
-        for ((token, controller) in controllers) {
-            callbacks[token]?.let { controller.unregisterCallback(it) }
-        }
-        controllers.clear()
-        callbacks.clear()
     }
 
-    private fun handleSessions(list: List<MediaController>) {
-        val active = list.map { it.sessionToken }.toSet()
-
-        // Quitar sesiones que ya no están.
-        val gone = controllers.keys - active
-        for (token in gone) {
-            controllers.remove(token)?.let { controller ->
-                callbacks.remove(token)?.let { controller.unregisterCallback(it) }
-            }
-        }
-
-        // Registrar callbacks en las nuevas.
-        for (controller in list) {
-            prefs.addSeen(controller.packageName)
-            val token = controller.sessionToken
-            if (controllers.containsKey(token)) continue
-
-            val cb = object : MediaController.Callback() {
-                override fun onMetadataChanged(metadata: MediaMetadata?) = evaluate(controller)
-                override fun onPlaybackStateChanged(state: PlaybackState?) = evaluate(controller)
-                override fun onSessionDestroyed() {
-                    controllers.remove(token)
-                    callbacks.remove(token)
-                }
-            }
-            controller.registerCallback(cb, handler)
-            controllers[token] = controller
-            callbacks[token] = cb
-            evaluate(controller)
-        }
+    private fun startPolling() {
+        if (polling) return
+        polling = true
+        handler.post(pollRunnable)
     }
 
-    private fun evaluate(controller: MediaController) {
+    private fun stopPolling() {
+        polling = false
+        handler.removeCallbacks(pollRunnable)
+    }
+
+    private fun pollOnce() {
+        val manager = msm ?: return
+        val sessions = try {
+            manager.getActiveSessions(component)
+        } catch (e: SecurityException) {
+            return
+        }
+
+        val playingNow = HashSet<String>()
+        for (controller in sessions) {
+            val pkg = controller.packageName
+            prefs.addSeen(pkg)
+            val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+            if (!playing) continue
+            playingNow.add(pkg)
+            evaluate(controller, pkg)
+        }
+
+        // Apps que ya no reproducen: reiniciamos su contador (al volver, cuentan de 0).
+        val stopped = playingSince.keys - playingNow
+        for (pkg in stopped) playingSince.remove(pkg)
+
+        // Sin nada reproduciéndose podemos dejar de sondear (el listener nos
+        // reactivará cuando aparezca una sesión).
+        if (sessions.isEmpty()) stopPolling()
+    }
+
+    private fun evaluate(controller: MediaController, pkg: String) {
         if (!prefs.isPaired() || prefs.paused) return
-        val pkg = controller.packageName
         if (!prefs.isEnabled(pkg)) return
 
-        val state = controller.playbackState ?: return
-        if (state.state != PlaybackState.STATE_PLAYING) return
-        val positionMs = state.position
-        if (positionMs < MIN_WATCH_MS) return // requiere posición conocida ≥ 15s
+        val now = SystemClock.elapsedRealtime()
+        val since = playingSince.getOrPut(pkg) { now }
+        if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
         val md = controller.metadata ?: return
+        val posMs = controller.playbackState?.position ?: 0
         val raw = RawMetadata(
             packageName = pkg,
             title = md.getString(MediaMetadata.METADATA_KEY_TITLE),
@@ -109,11 +119,14 @@ class MediaListenerService : NotificationListenerService() {
             artUri = md.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
             durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION),
-            positionMs = positionMs,
+            positionMs = if (posMs > 0) posMs else 0,
         )
 
         val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg))
-        if (signal.mainTitle.isNullOrBlank()) return
+        if (signal.mainTitle.isNullOrBlank()) {
+            Log.i(TAG, "Reproduciendo en $pkg pero sin título legible aún.")
+            return
+        }
 
         val key = signal.dedupKey
         if (lastKeyByPackage[pkg] == key) return
@@ -121,6 +134,7 @@ class MediaListenerService : NotificationListenerService() {
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
+        Log.i(TAG, "Enviando (${signal.platformName}): ${signal.mainTitle}")
         SyncClient.send(origin, token, signal) { ok, err ->
             handler.post {
                 if (ok) {
@@ -135,6 +149,7 @@ class MediaListenerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "TSVSync"
+        private const val POLL_MS = 3_000L
         private const val MIN_WATCH_MS = 15_000L
     }
 }
