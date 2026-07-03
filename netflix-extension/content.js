@@ -1,43 +1,48 @@
-// content.js — Observador de reproducción multiplataforma para The Show Verse.
-// Detecta lo que el usuario reproduce en Netflix, Prime Video, Max (HBO),
-// Disney+ y Plex, y lo envía al service worker para añadirlo al historial.
+// content.js — Observador de reproducción universal para The Show Verse.
 //
-// Fuentes de título por orden de fiabilidad: selectores del reproductor →
-// Media Session API (navigator.mediaSession.metadata, que casi todas las
-// plataformas rellenan) → título de la pestaña. La resolución a TMDb y la
-// deduplicación ocurren en el servidor.
-
+// Detección Media-Session-first (detection-core.js) + refinadores opcionales por
+// plataforma (platform-enhancers.js). Funciona en cualquier sitio donde se
+// inyecte (lista curada del manifest + sitios añadidos por el usuario). La
+// resolución a TMDb y la deduplicación ocurren en el servidor.
 (function () {
   const POLL_MS = 2000;
   const MIN_WATCH_SECONDS = 15; // umbral para contar como visionado real
   const DEBUG_THROTTLE_MS = 15000;
 
-  function clean(text) {
-    return (text || "").replace(/\s+/g, " ").trim();
+  const D = self.TSVDetection;
+  const E = self.TSVEnhancers;
+  if (!D) {
+    console.warn("[The Show Verse] detection-core.js no está cargado; sync inactivo.");
+    return;
   }
 
-  function firstText(selectors) {
-    for (const selector of selectors) {
-      let el = null;
-      try {
-        el = document.querySelector(selector);
-      } catch (e) {
-        el = null;
-      }
-      const text = el && clean(el.textContent);
-      if (text) return text;
+  // Nombre legible de la plataforma según el host (para logs/UI). Si no está en
+  // la lista, se usa el propio host (sitios añadidos por el usuario).
+  const PLATFORM_NAMES = {
+    "netflix.com": "Netflix",
+    "primevideo.com": "Prime Video",
+    amazon: "Prime Video",
+    "max.com": "Max",
+    "hbomax.com": "HBO Max",
+    "disneyplus.com": "Disney+",
+    "plex.tv": "Plex",
+    "crunchyroll.com": "Crunchyroll",
+    "movistarplus.es": "Movistar+",
+    "tv.apple.com": "Apple TV+",
+    "filmin.es": "Filmin",
+    "skyshowtime.com": "SkyShowtime",
+    "pluto.tv": "Pluto TV",
+    "rakuten.tv": "Rakuten TV",
+    "atresplayer.com": "Atresplayer",
+    "rtve.es": "RTVE",
+  };
+
+  function platformInfo(host) {
+    const h = String(host || "").replace(/^www\./, "");
+    for (const key in PLATFORM_NAMES) {
+      if (h.includes(key)) return { id: key.split(".")[0], name: PLATFORM_NAMES[key] };
     }
-    return "";
-  }
-
-  // Extrae temporada/episodio de varios formatos/idiomas:
-  // "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 · Episode 1", "Ep. 1".
-  function parseSeasonEpisode(text) {
-    if (!text) return {};
-    const s = text.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
-    const e = text.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
-    if (!e) return {};
-    return { season: s ? parseInt(s[1], 10) : 1, episode: parseInt(e[1], 10) };
+    return { id: h, name: h };
   }
 
   // Devuelve el <video> principal en reproducción (reproductor real grande).
@@ -53,211 +58,32 @@
         v.clientHeight >= 180,
     );
     if (!videos.length) return null;
-    videos.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
+    videos.sort(
+      (a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight,
+    );
     return videos[0];
   }
 
-  // Limpia el título de la pestaña quitando prefijo y sufijo de la plataforma.
-  function titleFromTab(suffixes) {
-    let title = clean(document.title);
-    if (!title) return "";
-    // Prefijo de plataforma, p. ej. "Prime Video: ", "Netflix - ".
-    title = title.replace(
-      /^\s*(prime video|amazon prime video|amazon|netflix|max|hbo max|hbo|disney\s*\+|disney plus|star\s*\+|plex)\s*[:\-|–·]\s*/i,
-      "",
-    );
-    for (const suffix of suffixes) {
-      const re = new RegExp("\\s*[-|·–]\\s*" + suffix + "\\s*$", "i");
-      title = title.replace(re, "");
-    }
-    title = title.replace(/^watch\s+/i, "").trim();
-    if (!title || /^(loading|cargando|prime video|max|disney\+|netflix|plex)$/i.test(title)) return "";
-    return title;
-  }
-
-  // Media Session API: navigator.mediaSession.metadata suele tener el título de
-  // lo que se reproduce (Prime, Disney+, Max, Netflix lo rellenan).
-  function mediaSessionMeta() {
+  // Metadatos crudos de Media Session (título/artista/álbum/carátulas).
+  function mediaSessionRaw() {
     try {
       const m = navigator.mediaSession && navigator.mediaSession.metadata;
       if (!m) return null;
-      const title = clean(m.title);
-      const artist = clean(m.artist);
-      const album = clean(m.album);
-      if (!title && !artist && !album) return null;
-      return { title, artist, album };
+      return {
+        title: m.title || "",
+        artist: m.artist || "",
+        album: m.album || "",
+        artwork: Array.isArray(m.artwork)
+          ? m.artwork.map((a) => ({ src: a.src, sizes: a.sizes }))
+          : [],
+      };
     } catch (e) {
       return null;
     }
   }
 
-  // Fallback agnóstico a selectores: busca en el DOM un elemento cuyo texto sea
-  // un distintivo de temporada+episodio ("T1 E1 El trato", "S1 E1", "T1:E1"…).
-  // Útil cuando los selectores de clase del reproductor cambian o no coinciden.
-  const SE_SEASON_RE = /^(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*\d{1,3}\b/i;
-  const SE_EPISODE_RE = /\b(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*\d{1,3}\b/i;
-
-  function findSeasonEpisodeBadge() {
-    let nodes;
-    try {
-      nodes = document.querySelectorAll("span, div, p, b, strong, li");
-    } catch (e) {
-      return "";
-    }
-    const max = Math.min(nodes.length, 5000);
-    for (let i = 0; i < max; i += 1) {
-      const el = nodes[i];
-      if (el.children.length > 2) continue; // solo elementos hoja-ish
-      const txt = clean(el.textContent);
-      if (!txt || txt.length > 80) continue;
-      if (SE_SEASON_RE.test(txt) && SE_EPISODE_RE.test(txt)) return txt;
-    }
-    return "";
-  }
-
-  // Resuelve { mainTitle, subTitle } combinando selectores, Media Session y pestaña.
-  function resolveTitle({ titleSel = [], subSel = [], tabSuffixes = [] }) {
-    let mainTitle = firstText(titleSel);
-    let subTitle = firstText(subSel);
-    if (!mainTitle) {
-      const ms = mediaSessionMeta();
-      if (ms) {
-        // En series, el nombre del programa suele venir en artist/album y el
-        // episodio en title.
-        mainTitle = ms.artist || ms.album || ms.title;
-        if ((ms.artist || ms.album) && !subTitle) subTitle = ms.title;
-      }
-    }
-    // Si el subtítulo todavía no contiene temporada + episodio, buscamos un
-    // distintivo ("T1 E2", "S1 · E2") en el DOM. En reproductores como Plex el
-    // subtítulo trae solo el nombre del episodio (vía Media Session) y los
-    // números aparecen aparte cuando los controles están visibles; al fusionarlo
-    // conseguimos fijar el episodio en lugar de quedarnos solo con la serie.
-    const subHasSE = subTitle && SE_SEASON_RE.test(subTitle) && SE_EPISODE_RE.test(subTitle);
-    if (!subHasSE) {
-      const badge = findSeasonEpisodeBadge();
-      if (badge) subTitle = subTitle ? `${subTitle} · ${badge}` : badge;
-    }
-    if (!mainTitle) mainTitle = titleFromTab(tabSuffixes);
-    return { mainTitle, subTitle };
-  }
-
-  // ── Adaptadores por plataforma ──
-  const ADAPTERS = [
-    {
-      id: "netflix",
-      name: "Netflix",
-      match: (h) => /(^|\.)netflix\.com$/.test(h),
-      contentId: () => (location.href.match(/\/watch\/(\d+)/) || [])[1] || null,
-      extract() {
-        const container =
-          document.querySelector('[data-uia="video-title"]') ||
-          document.querySelector(".video-title");
-        let mainTitle = "";
-        let subTitle = "";
-        if (container) {
-          const h4 = container.querySelector("h4") || container.children[0];
-          const spans = Array.from(container.querySelectorAll("span")).map((s) => clean(s.textContent));
-          mainTitle = h4 ? clean(h4.textContent) : clean(container.textContent);
-          subTitle = spans.filter(Boolean).join(": ");
-        }
-        if (!mainTitle) {
-          const r = resolveTitle({ tabSuffixes: ["Netflix"] });
-          mainTitle = r.mainTitle;
-          subTitle = subTitle || r.subTitle;
-        }
-        if (!mainTitle) return null;
-        return { mainTitle, subTitle, ...parseSeasonEpisode(subTitle), contentId: this.contentId() };
-      },
-    },
-    {
-      id: "prime",
-      name: "Prime Video",
-      match: (h) => /(^|\.)primevideo\.com$/.test(h) || /(^|\.)amazon\.[a-z.]+$/.test(h),
-      contentId: () =>
-        (location.href.match(/\/detail\/([A-Za-z0-9]+)/) || [])[1] ||
-        (location.href.match(/[?&]gti=([A-Za-z0-9.]+)/) || [])[1] ||
-        null,
-      extract() {
-        const { mainTitle, subTitle } = resolveTitle({
-          titleSel: [
-            ".atvwebplayersdk-title-text",
-            '[data-testid="player-title"]',
-            ".webPlayerSDKContainer .title",
-          ],
-          subSel: [".atvwebplayersdk-subtitle-text", '[data-testid="player-subtitle"]'],
-          tabSuffixes: ["Prime Video", "Amazon\\.[a-z.]+", "Amazon"],
-        });
-        if (!mainTitle) return null;
-        return { mainTitle, subTitle, ...parseSeasonEpisode(subTitle), contentId: this.contentId() };
-      },
-    },
-    {
-      id: "max",
-      name: "Max",
-      match: (h) => /(^|\.)max\.com$/.test(h) || /(^|\.)hbomax\.com$/.test(h),
-      contentId: () => (location.href.match(/\/(?:video\/watch|player)\/([\w-]+)/) || [])[1] || null,
-      extract() {
-        const { mainTitle, subTitle } = resolveTitle({
-          titleSel: [
-            '[data-testid="player-ux-asset-title"]',
-            '[class*="AssetTitle"]',
-          ],
-          subSel: ['[data-testid="player-ux-asset-subtitle"]', '[class*="AssetSubtitle"]'],
-          tabSuffixes: ["Max", "HBO Max"],
-        });
-        if (!mainTitle) return null;
-        return { mainTitle, subTitle, ...parseSeasonEpisode(subTitle), contentId: this.contentId() };
-      },
-    },
-    {
-      id: "disney",
-      name: "Disney+",
-      match: (h) => /(^|\.)disneyplus\.com$/.test(h),
-      contentId: () => (location.href.match(/\/video\/([\w-]+)/) || [])[1] || null,
-      extract() {
-        const { mainTitle, subTitle } = resolveTitle({
-          titleSel: [
-            '[data-testid="hero-title"]',
-            '[data-testid="player-title-content"]',
-            ".title-field",
-          ],
-          subSel: ['[data-testid="subtitle-field"]', ".subtitle-field"],
-          tabSuffixes: ["Disney\\+", "Disney Plus", "Star\\+"],
-        });
-        if (!mainTitle) return null;
-        return { mainTitle, subTitle, ...parseSeasonEpisode(subTitle), contentId: this.contentId() };
-      },
-    },
-    {
-      id: "plex",
-      name: "Plex",
-      match: (h) => /(^|\.)plex\.tv$/.test(h),
-      contentId: () => (location.href.match(/[?&]key=([^&]+)/) || [])[1] || null,
-      extract() {
-        const { mainTitle, subTitle } = resolveTitle({
-          titleSel: [
-            '[data-testid="metadataTitle"]',
-            '[class*="MetadataPosterTitle"]',
-            '[class*="PlayerControlsMetadata-title"]',
-          ],
-          subSel: [
-            '[data-testid="metadataSubtitle"]',
-            '[class*="PlayerControlsMetadata-subtitle"]',
-          ],
-          tabSuffixes: ["Plex"],
-        });
-        if (!mainTitle) return null;
-        return { mainTitle, subTitle, ...parseSeasonEpisode(subTitle), contentId: this.contentId() };
-      },
-    },
-  ];
-
-  const adapter = ADAPTERS.find((a) => a.match(location.hostname.replace(/^www\./, "")));
-  if (!adapter) return;
-
-  // Solo el frame que contiene el reproductor registra (con all_frames hay varios).
-  console.log(`[The Show Verse] Observador de ${adapter.name} activo.`);
+  const { id: platformId, name: platformName } = platformInfo(location.hostname);
+  console.log(`[The Show Verse] Observador universal activo (${platformName}).`);
 
   let lastKey = null;
   let lastDebug = 0;
@@ -266,10 +92,12 @@
 
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
-  // pasa a ser undefined: acceder a él lanza y rompía cada tick.
+  // pasa a ser undefined: acceder a él lanza y rompería cada tick.
   function extensionAlive() {
     try {
-      return Boolean(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id);
+      return Boolean(
+        typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id,
+      );
     } catch (e) {
       return false;
     }
@@ -288,41 +116,75 @@
     }
   }
 
+  // Construye el PlaybackSignal a partir de las señales de la página, o null si
+  // no hay reproducción real (sin vídeo grande o por debajo del umbral).
+  function buildSignal() {
+    const video = getMainVideo();
+    if (!video || video.currentTime < MIN_WATCH_SECONDS) return null;
+
+    let seasonEpisodeText = "";
+    try {
+      seasonEpisodeText = D.findSeasonEpisodeBadge(document);
+    } catch (e) {
+      seasonEpisodeText = "";
+    }
+
+    let signal = D.buildPlaybackSignal({
+      host: location.hostname,
+      url: location.href,
+      contentId: null,
+      mediaSession: mediaSessionRaw(),
+      tabTitle: document.title,
+      seasonEpisodeText,
+      durationSec: isFinite(video.duration) ? Math.round(video.duration) : undefined,
+      positionSec: Math.round(video.currentTime),
+    });
+
+    if (E) {
+      try {
+        signal = E.enhance(location.hostname, signal, document);
+      } catch (e) {
+        /* refinador falló: seguimos con la señal base */
+      }
+    }
+
+    // Último recurso: título desde la pestaña si Media Session no dio nombre.
+    if (!signal.showName && !signal.movieTitle) {
+      const fromTab = D.stripPlatformPrefix(document.title, [platformName]);
+      if (fromTab) signal.movieTitle = fromTab;
+    }
+
+    return signal;
+  }
+
   function tick() {
     if (!extensionAlive()) {
-      // Extensión recargada/actualizada: detenemos este script huérfano. La
+      // Extensión recargada/actualizada: paramos este script huérfano. La
       // pestaña recuperará la sincronización al recargarse.
       stop();
       return;
     }
-
     if (syncPaused) {
       stop();
       return;
     }
 
-    const video = getMainVideo();
-    if (!video || video.currentTime < MIN_WATCH_SECONDS) return;
+    const signal = buildSignal();
+    const mainTitle =
+      signal && (signal.showName || signal.movieTitle || signal.tabTitle);
 
-    let data;
-    try {
-      data = adapter.extract();
-    } catch (e) {
-      data = null;
-    }
-
-    if (!data || !data.mainTitle) {
+    if (!signal || !mainTitle) {
       const now = Date.now();
       if (now - lastDebug > DEBUG_THROTTLE_MS) {
         lastDebug = now;
         console.log(
-          `[The Show Verse] ${adapter.name}: reproducción detectada pero no se pudo leer el título.`,
+          `[The Show Verse] ${platformName}: reproducción detectada pero sin título legible.`,
         );
       }
       return;
     }
 
-    const key = `${adapter.id}:${data.contentId || `${data.mainTitle}|${data.subTitle || ""}`}`;
+    const key = `${platformId}:${signal.contentId || `${mainTitle}|${signal.episodeName || ""}`}`;
     if (key === lastKey) return;
 
     // Optimista: marcamos el contenido como intentado ANTES de enviar para no
@@ -333,13 +195,12 @@
       chrome.runtime.sendMessage(
         {
           action: "syncWatch",
-          platform: adapter.id,
-          platformName: adapter.name,
-          contentId: data.contentId || null,
-          mainTitle: data.mainTitle,
-          subTitle: data.subTitle || "",
-          season: data.season || null,
-          episode: data.episode || null,
+          platform: platformId,
+          platformName,
+          ...signal,
+          // Retrocompat con el backend/route: mainTitle/subTitle.
+          mainTitle,
+          subTitle: signal.episodeName || "",
         },
         (response) => {
           if (!extensionAlive()) return;
@@ -349,7 +210,9 @@
             return;
           }
           if (response && response.success) {
-            console.log(`[The Show Verse] Sincronizado (${adapter.name}): "${data.mainTitle}"`);
+            console.log(
+              `[The Show Verse] Sincronizado (${platformName}): "${mainTitle}"`,
+            );
           }
         },
       );
