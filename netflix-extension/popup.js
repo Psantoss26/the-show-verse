@@ -132,4 +132,110 @@ document.addEventListener("DOMContentLoaded", () => {
       },
     );
   });
+
+  // ── Añadir un sitio de streaming no incluido de serie ──
+  const currentSiteEl = document.getElementById("current-site");
+  const addSiteBtn = document.getElementById("add-site-btn");
+  const customSitesEl = document.getElementById("custom-sites");
+
+  // Hosts ya cubiertos por el manifest (evita ofrecer añadir lo ya soportado).
+  const BUILTIN_HOSTS = [
+    "netflix.com", "primevideo.com", "amazon.", "max.com", "hbomax.com",
+    "disneyplus.com", "plex.tv", "crunchyroll.com", "movistarplus.es",
+    "tv.apple.com", "filmin.es", "skyshowtime.com", "pluto.tv", "rakuten.tv",
+    "atresplayer.com", "rtve.es",
+  ];
+  const isBuiltin = (host) => BUILTIN_HOSTS.some((h) => host.includes(h));
+
+  function renderCustomSites(sites) {
+    customSitesEl.innerHTML = "";
+    (sites || []).forEach((origin) => {
+      const row = document.createElement("div");
+      row.className = "log-item";
+      const label = document.createElement("span");
+      label.className = "log-message";
+      try {
+        label.textContent = new URL(origin).hostname;
+      } catch (e) {
+        label.textContent = origin;
+      }
+      const rm = document.createElement("span");
+      rm.className = "log-time";
+      rm.textContent = "✕";
+      rm.style.cursor = "pointer";
+      rm.title = "Quitar";
+      rm.addEventListener("click", () => {
+        chrome.runtime.sendMessage({ action: "unregisterSite", origin }, () =>
+          refreshSites(),
+        );
+      });
+      row.appendChild(label);
+      row.appendChild(rm);
+      customSitesEl.appendChild(row);
+    });
+  }
+
+  function refreshSites() {
+    chrome.storage.local.get(["customSites"], (r) =>
+      renderCustomSites(r.customSites || []),
+    );
+  }
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs && tabs[0];
+    let origin = "";
+    let host = "";
+    try {
+      if (tab && tab.url) {
+        const u = new URL(tab.url);
+        origin = u.origin;
+        host = u.hostname;
+      }
+    } catch (e) {
+      origin = "";
+    }
+
+    if (!origin || !/^https?:/.test(origin)) {
+      currentSiteEl.textContent = "Abre una web de streaming para poder añadirla.";
+      return;
+    }
+    if (isBuiltin(host)) {
+      currentSiteEl.textContent = `${host} ya está soportado.`;
+      return;
+    }
+
+    chrome.storage.local.get(["customSites"], (r) => {
+      const sites = r.customSites || [];
+      if (sites.includes(origin)) {
+        currentSiteEl.textContent = `${host} ya está añadido.`;
+        return;
+      }
+      currentSiteEl.textContent = `¿Sincronizar ${host}?`;
+      addSiteBtn.style.display = "block";
+      addSiteBtn.addEventListener(
+        "click",
+        () => {
+          addSiteBtn.disabled = true;
+          // request() debe ejecutarse dentro del gesto del usuario (el clic).
+          chrome.permissions.request({ origins: [origin + "/*"] }, (granted) => {
+            if (!granted) {
+              addSiteBtn.disabled = false;
+              return;
+            }
+            chrome.runtime.sendMessage({ action: "registerSite", origin }, (resp) => {
+              addSiteBtn.disabled = false;
+              if (resp && resp.success) {
+                addSiteBtn.style.display = "none";
+                currentSiteEl.textContent = `${host} añadido. Recarga la pestaña.`;
+                refreshSites();
+              }
+            });
+          });
+        },
+        { once: true },
+      );
+    });
+  });
+
+  refreshSites();
 });

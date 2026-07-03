@@ -311,8 +311,71 @@ function ensureActivityAlarm() {
   });
 }
 
+// ── Sitios de streaming añadidos por el usuario (content scripts dinámicos) ──
+const CUSTOM_SITE_JS = ["detection-core.js", "platform-enhancers.js", "content.js"];
+
+function customSiteScriptId(origin) {
+  let host = origin;
+  try {
+    host = new URL(origin).hostname;
+  } catch (e) {
+    /* usamos el origin tal cual */
+  }
+  return "tsv-site-" + host.replace(/[^a-z0-9]/gi, "-");
+}
+
+function originPattern(origin) {
+  return origin.replace(/\/$/, "") + "/*";
+}
+
+async function registerCustomSite(origin) {
+  const id = customSiteScriptId(origin);
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [id] }).catch(() => {});
+    await chrome.scripting.registerContentScripts([
+      {
+        id,
+        matches: [originPattern(origin)],
+        js: CUSTOM_SITE_JS,
+        runAt: "document_idle",
+        allFrames: true,
+      },
+    ]);
+    return true;
+  } catch (e) {
+    console.error("[The Show Verse SW] registerCustomSite failed:", e);
+    return false;
+  }
+}
+
+async function unregisterCustomSite(origin) {
+  try {
+    await chrome.scripting.unregisterContentScripts({
+      ids: [customSiteScriptId(origin)],
+    });
+  } catch (e) {
+    /* ya no estaba registrado */
+  }
+}
+
+// Re-registra los sitios personalizados tras instalar/arrancar el SW (los
+// content scripts dinámicos no persisten entre reinicios del service worker).
+function reregisterCustomSites() {
+  chrome.storage.local.get(["customSites"], async (r) => {
+    const sites = r.customSites || [];
+    for (const origin of sites) {
+      const hasPerm = await chrome.permissions
+        .contains({ origins: [originPattern(origin)] })
+        .catch(() => false);
+      if (hasPerm) await registerCustomSite(origin);
+    }
+  });
+}
+
 chrome.runtime.onInstalled.addListener(ensureActivityAlarm);
 chrome.runtime.onStartup.addListener(ensureActivityAlarm);
+chrome.runtime.onInstalled.addListener(reregisterCustomSites);
+chrome.runtime.onStartup.addListener(reregisterCustomSites);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== ALARM_ACTIVITY_POLL) return;
@@ -327,6 +390,42 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 1. Dynamic host origin registration
+  if (message.action === "registerSite") {
+    const { origin } = message;
+    registerCustomSite(origin).then((ok) => {
+      if (!ok) {
+        sendResponse({ success: false, error: "No se pudo registrar el sitio" });
+        return;
+      }
+      chrome.storage.local.get(["customSites"], (r) => {
+        const sites = new Set(r.customSites || []);
+        sites.add(origin);
+        chrome.storage.local.set({ customSites: Array.from(sites) }, () => {
+          addLog(`Sitio de streaming añadido: ${origin}`, "success");
+          sendResponse({ success: true });
+        });
+      });
+    });
+    return true;
+  }
+
+  if (message.action === "unregisterSite") {
+    const { origin } = message;
+    unregisterCustomSite(origin).then(() => {
+      chrome.storage.local.get(["customSites"], (r) => {
+        const sites = (r.customSites || []).filter((s) => s !== origin);
+        chrome.storage.local.set({ customSites: sites }, () => {
+          chrome.permissions
+            .remove({ origins: [originPattern(origin)] })
+            .catch(() => {});
+          addLog(`Sitio de streaming quitado: ${origin}`, "info");
+          sendResponse({ success: true });
+        });
+      });
+    });
+    return true;
+  }
+
   if (message.action === "registerOrigin") {
     const { origin } = message;
     chrome.storage.local.set({ showVerseOrigin: origin }, () => {
