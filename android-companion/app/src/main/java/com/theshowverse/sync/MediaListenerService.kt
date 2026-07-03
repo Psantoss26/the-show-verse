@@ -14,10 +14,10 @@ import android.util.Log
 
 /**
  * Motor de sincronización: como NotificationListenerService, puede enumerar las
- * MediaSession de OTRAS apps. Sondea las sesiones activas cada pocos segundos
- * (como la extensión) y, cuando una app lleva ≥15s reproduciendo (por RELOJ, sin
- * depender de la posición que reporte), construye un PlaybackSignal y lo envía al
- * backend. Es la única forma de detección automática en Android.
+ * MediaSession de OTRAS apps. Sondea las sesiones activas cada 3s y, cuando una
+ * app lleva ≥15s reproduciendo (por RELOJ, sin depender de la posición que
+ * reporte), construye un PlaybackSignal y lo envía al backend. Registra cada
+ * paso en Prefs para poder diagnosticar desde la propia app.
  */
 class MediaListenerService : NotificationListenerService() {
 
@@ -27,9 +27,9 @@ class MediaListenerService : NotificationListenerService() {
     private var msm: MediaSessionManager? = null
     private var polling = false
 
-    // Cuándo (reloj monotónico) vimos por primera vez cada app reproduciendo.
     private val playingSince = HashMap<String, Long>()
     private val lastKeyByPackage = HashMap<String, String>()
+    private val loggedNotes = HashSet<String>() // para no repetir el mismo aviso
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
@@ -49,10 +49,12 @@ class MediaListenerService : NotificationListenerService() {
         msm = manager
         try {
             manager.addOnActiveSessionsChangedListener(sessionsListener, component)
-            Log.i(TAG, "Listener connected; media sessions observed.")
-            startPolling() // sondeamos ya por si hay algo reproduciéndose
+            Log.i(TAG, "Listener connected")
+            prefs.addLog("Servicio conectado (acceso a notificaciones OK)")
+            startPolling()
         } catch (e: SecurityException) {
-            Log.w(TAG, "Sin acceso a notificaciones todavía: ${e.message}")
+            prefs.addLog("ERROR: sin acceso a notificaciones")
+            Log.w(TAG, "Sin acceso a notificaciones: ${e.message}")
         }
     }
 
@@ -72,11 +74,16 @@ class MediaListenerService : NotificationListenerService() {
         handler.removeCallbacks(pollRunnable)
     }
 
+    private fun noteOnce(key: String, msg: String) {
+        if (loggedNotes.add(key)) prefs.addLog(msg)
+    }
+
     private fun pollOnce() {
         val manager = msm ?: return
         val sessions = try {
             manager.getActiveSessions(component)
         } catch (e: SecurityException) {
+            prefs.addLog("ERROR: getActiveSessions sin permiso")
             return
         }
 
@@ -87,27 +94,39 @@ class MediaListenerService : NotificationListenerService() {
             val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
             if (!playing) continue
             playingNow.add(pkg)
+            noteOnce("detected:$pkg", "Detectado reproduciendo: ${Platforms.nameFor(pkg)}")
             evaluate(controller, pkg)
         }
 
-        // Apps que ya no reproducen: reiniciamos su contador (al volver, cuentan de 0).
         val stopped = playingSince.keys - playingNow
-        for (pkg in stopped) playingSince.remove(pkg)
+        for (pkg in stopped) {
+            playingSince.remove(pkg)
+            loggedNotes.removeAll { it.endsWith(":$pkg") }
+        }
 
-        // Sin nada reproduciéndose podemos dejar de sondear (el listener nos
-        // reactivará cuando aparezca una sesión).
         if (sessions.isEmpty()) stopPolling()
     }
 
     private fun evaluate(controller: MediaController, pkg: String) {
-        if (!prefs.isPaired() || prefs.paused) return
-        if (!prefs.isEnabled(pkg)) return
+        if (!prefs.isPaired()) {
+            noteOnce("unpaired:$pkg", "No vinculado: abre la web y pulsa Vincular app Android")
+            return
+        }
+        if (prefs.paused) return
+        if (!prefs.isEnabled(pkg)) {
+            noteOnce("disabled:$pkg", "Ignorada (app desactivada): ${Platforms.nameFor(pkg)}")
+            return
+        }
 
         val now = SystemClock.elapsedRealtime()
         val since = playingSince.getOrPut(pkg) { now }
         if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
-        val md = controller.metadata ?: return
+        val md = controller.metadata
+        if (md == null) {
+            noteOnce("nometa:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin metadatos")
+            return
+        }
         val posMs = controller.playbackState?.position ?: 0
         val raw = RawMetadata(
             packageName = pkg,
@@ -124,23 +143,23 @@ class MediaListenerService : NotificationListenerService() {
 
         val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg))
         if (signal.mainTitle.isNullOrBlank()) {
-            Log.i(TAG, "Reproduciendo en $pkg pero sin título legible aún.")
+            noteOnce("notitle:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin título legible")
             return
         }
 
         val key = signal.dedupKey
         if (lastKeyByPackage[pkg] == key) return
-        lastKeyByPackage[pkg] = key // optimista: evita reenvíos en bucle
+        lastKeyByPackage[pkg] = key
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
-        Log.i(TAG, "Enviando (${signal.platformName}): ${signal.mainTitle}")
+        prefs.addLog("Enviando: ${signal.mainTitle}${signal.episodeName?.let { " — $it" } ?: ""}")
         SyncClient.send(origin, token, signal) { ok, err ->
             handler.post {
                 if (ok) {
-                    Log.i(TAG, "Sincronizado (${signal.platformName}): ${signal.mainTitle}")
+                    prefs.addLog("✓ Sincronizado: ${signal.mainTitle}")
                 } else {
-                    Log.w(TAG, "Fallo al sincronizar: $err")
+                    prefs.addLog("✗ Fallo: $err")
                     lastKeyByPackage.remove(pkg) // permite reintento
                 }
             }
