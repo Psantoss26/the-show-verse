@@ -68,7 +68,15 @@ object SyncClient {
                     if (it.isSuccessful) {
                         onResult(true, null)
                     } else {
-                        onResult(false, "HTTP ${it.code}")
+                        val body = try {
+                            it.body?.string()?.take(200)
+                        } catch (e: Exception) {
+                            null
+                        }
+                        onResult(
+                            false,
+                            "HTTP ${it.code}" + if (body.isNullOrBlank()) "" else ": $body",
+                        )
                     }
                 }
             }

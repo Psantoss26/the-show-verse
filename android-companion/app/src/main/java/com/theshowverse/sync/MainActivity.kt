@@ -34,6 +34,34 @@ class MainActivity : AppCompatActivity() {
             prefs.clearPairing()
             render()
         }
+        binding.refreshButton.setOnClickListener { render() }
+        binding.testButton.setOnClickListener { sendTest() }
+    }
+
+    /** Envía un visionado de prueba (película conocida) para verificar de punta a
+     * punta el token + origen + backend, sin depender de la detección. */
+    private fun sendTest() {
+        val token = prefs.token
+        val origin = prefs.origin
+        if (token.isNullOrBlank() || origin.isNullOrBlank()) {
+            prefs.addLog("Prueba: no vinculado (falta token/origen)")
+            render()
+            return
+        }
+        val test = PlaybackSignal(
+            host = "test",
+            platformId = "test",
+            platformName = "Prueba",
+            movieTitle = "Interstellar",
+            tabTitle = "Interstellar",
+        )
+        prefs.addLog("Prueba enviada a $origin")
+        SyncClient.send(origin, token, test) { ok, err ->
+            runOnUiThread {
+                prefs.addLog(if (ok) "Prueba: ✓ OK (mira el historial)" else "Prueba: ✗ $err")
+                render()
+            }
+        }
     }
 
     override fun onResume() {
@@ -54,6 +82,7 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.status_active, prefs.origin ?: "")
         }
         binding.grantButton.visibility = if (access) View.GONE else View.VISIBLE
+        binding.logText.text = prefs.logs().ifBlank { "—" }
         renderApps()
     }
 

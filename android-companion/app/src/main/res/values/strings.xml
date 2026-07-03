@@ -12,4 +12,7 @@
     <string name="status_no_access">Falta el acceso a notificaciones (necesario para leer lo que reproduces).</string>
     <string name="status_active">Sincronización activa. Vinculado a %1$s.</string>
     <string name="status_paused">Sincronización pausada.</string>
+    <string name="test_send">Enviar prueba de sincronización</string>
+    <string name="log_header">Registro</string>
+    <string name="refresh">Actualizar</string>
 </resources>

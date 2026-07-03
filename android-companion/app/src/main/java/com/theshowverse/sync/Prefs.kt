@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Almacenamiento cifrado del token/origen de emparejamiento y preferencias. */
 class Prefs(context: Context) {
@@ -64,11 +67,27 @@ class Prefs(context: Context) {
         prefs.edit().remove(KEY_TOKEN).remove(KEY_ORIGIN).apply()
     }
 
+    /** Registro de eventos visible en la app (para diagnosticar sin adb). */
+    fun addLog(line: String) {
+        val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val prev = prefs.getString(KEY_LOGS, "") ?: ""
+        val lines = ("$ts  $line\n$prev")
+            .split("\n")
+            .filter { it.isNotBlank() }
+            .take(40)
+        prefs.edit().putString(KEY_LOGS, lines.joinToString("\n")).apply()
+    }
+
+    fun logs(): String = prefs.getString(KEY_LOGS, "") ?: ""
+
+    fun clearLogs() = prefs.edit().remove(KEY_LOGS).apply()
+
     companion object {
         private const val KEY_TOKEN = "token"
         private const val KEY_ORIGIN = "origin"
         private const val KEY_PAUSED = "paused"
         private const val KEY_ENABLED = "enabled_packages"
         private const val KEY_SEEN = "seen_packages"
+        private const val KEY_LOGS = "event_logs"
     }
 }
