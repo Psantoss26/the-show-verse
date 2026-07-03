@@ -1,5 +1,9 @@
 // src/lib/details/seriesGraphRatings.js
-import { slugifyForSeriesGraph } from "@/lib/details/formatters";
+import { slugifyForSeriesGraph } from "./formatters.js";
+import {
+  mapRatingEpisodesByTmdbOrdinal,
+  seasonStructuresAlign,
+} from "./episodeRatingsStructure.js";
 
 const ratingsCache = new Map();
 const ratingsInflight = new Map();
@@ -252,9 +256,9 @@ export function getSeriesGraphSeasonAverages({ ratings, tmdbSeasons } = {}) {
   if (!seasons.length) return result;
 
   const tmdbSorted = getTmdbSeasonsSorted(tmdbSeasons);
-  const flattened = seasons.length === 1 && tmdbSorted.length > 1;
+  const structuresAlign = seasonStructuresAlign(seasons, tmdbSorted);
 
-  if (!flattened) {
+  if (structuresAlign) {
     seasons.forEach(({ seasonNumber, episodes }) => {
       const aggregate = aggregateEpisodeRatings(episodes);
       if (aggregate) result.set(seasonNumber, aggregate);
@@ -262,19 +266,40 @@ export function getSeriesGraphSeasonAverages({ ratings, tmdbSeasons } = {}) {
     return result;
   }
 
-  const allEpisodes = seasons[0].episodes;
-  for (const tmdbSeason of tmdbSorted) {
-    const range = getAbsoluteRangeForTmdbSeason(tmdbSorted, tmdbSeason.number);
-    if (!range) continue;
-    const inRange = allEpisodes.filter((episode) => {
-      const number = getEpisodeNumber(episode);
-      return (
-        Number.isFinite(number) &&
-        number >= range.start &&
-        number <= range.end
+  // Una sola temporada de SeriesGraph puede usar numeración absoluta
+  // (One Piece). Conservamos esa numeración para repartir por rangos TMDb.
+  if (seasons.length === 1) {
+    const allEpisodes = seasons[0].episodes;
+    for (const tmdbSeason of tmdbSorted) {
+      const range = getAbsoluteRangeForTmdbSeason(
+        tmdbSorted,
+        tmdbSeason.number,
       );
-    });
-    const aggregate = aggregateEpisodeRatings(inRange);
+      if (!range) continue;
+      const inRange = allEpisodes.filter((episode) => {
+        const number = getEpisodeNumber(episode);
+        return (
+          Number.isFinite(number) &&
+          number >= range.start &&
+          number <= range.end
+        );
+      });
+      const aggregate = aggregateEpisodeRatings(inRange);
+      if (aggregate) result.set(tmdbSeason.number, aggregate);
+    }
+    return result;
+  }
+
+  // Si ambas fuentes agrupan la serie en varias temporadas distintas
+  // (Gintama: 8 en SeriesGraph, 11 en TMDb), repartimos por orden acumulado.
+  const mappedByTmdbSeason = mapRatingEpisodesByTmdbOrdinal(
+    seasons,
+    tmdbSorted,
+  );
+  for (const tmdbSeason of tmdbSorted) {
+    const aggregate = aggregateEpisodeRatings(
+      mappedByTmdbSeason.get(tmdbSeason.number),
+    );
     if (aggregate) result.set(tmdbSeason.number, aggregate);
   }
   return result;
@@ -340,5 +365,44 @@ export function getSeriesGraphEpisodeRating({
     url: ratings?.meta?.providerUrl || buildSeriesGraphUrl(showId, title),
     seasonNumber: resolved?.seasonNumber ?? targetSeasonNumber,
     episodeNumber: resolved?.episodeNumber ?? targetEpisodeNumber,
+  };
+}
+
+export function getSeriesGraphEpisodeCellData({
+  ratings,
+  tmdbSeasons,
+  seasonNumber,
+  episodeNumber,
+  sourceEpisode,
+  showId,
+  title,
+} = {}) {
+  const isAbsoluteSingleSeason =
+    getNormalizedRatingSeasons(ratings).length === 1 &&
+    getTmdbSeasonsSorted(tmdbSeasons).length > 1;
+
+  if (!isAbsoluteSingleSeason) {
+    const resolved = getSeriesGraphEpisodeRating({
+      ratings,
+      tmdbSeasons,
+      seasonNumber,
+      episodeNumber,
+      showId,
+      title,
+    });
+    if (resolved?.rating != null) return resolved;
+  }
+
+  const rating = getSeriesGraphRating(sourceEpisode);
+  if (rating == null) return null;
+
+  return {
+    id: sourceEpisode?.tconst || null,
+    rating,
+    votes: getSeriesGraphVotes(sourceEpisode),
+    source: "seriesgraph",
+    url: ratings?.meta?.providerUrl || buildSeriesGraphUrl(showId, title),
+    seasonNumber: Number(seasonNumber),
+    episodeNumber: Number(episodeNumber),
   };
 }

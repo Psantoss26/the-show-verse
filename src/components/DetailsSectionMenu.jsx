@@ -135,7 +135,7 @@ export default function DetailsSectionMenu({
                           ? "w-full justify-between"
                           : "w-max justify-center",
                         "gap-1.5 sm:gap-2",
-                        "px-5 sm:px-7",
+                        "px-3 sm:px-4",
                       ].join(" ")}
                       style={{
                         transform: `scale(${scale})`,
@@ -184,7 +184,7 @@ export default function DetailsSectionMenu({
                                 <motion.div
                                   layoutId={`detailsMenuIndicatorBg-${colorScheme}`}
                                   aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg ${colors.activeBg}`}
+                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br ${colors.activeBg}`}
                                   initial={false}
                                   transition={{
                                     type: "spring",
