@@ -91,7 +91,7 @@ export default function StreamingHoverOverlay({
           <OptimizedImage
             src={wm.wordmarkSrc}
             alt={wm.name}
-            className="h-5 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:h-6"
+            className="h-8 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:h-9"
           />
         ) : (
           <span className="text-base font-black uppercase tracking-wide text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] sm:text-lg">
