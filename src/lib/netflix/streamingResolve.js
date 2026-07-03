@@ -21,6 +21,41 @@ export function pickTmdbResult(results, query, mediaType, { exactOnly = false } 
   return exact || (exactOnly ? null : candidates[0]);
 }
 
+function isExactTitle(entity, query, mediaType) {
+  if (!entity) return false;
+  const q = normalizeText(query);
+  return (
+    normalizeText(titleFor(entity, mediaType)) === q ||
+    normalizeText(entity?.original_title || entity?.original_name) === q
+  );
+}
+
+// Encuentra {season, episode} comparando el nombre del episodio detectado
+// (Media Session / selector) con la lista de episodios de TMDb (normalizada).
+// Pura y testeable: recibe los episodios ya obtenidos, sin red.
+export function matchEpisodeByName({ episodeName, seasonEpisodes }) {
+  if (!episodeName || !Array.isArray(seasonEpisodes)) return null;
+  const q = normalizeText(episodeName);
+  if (!q) return null;
+  const hit = seasonEpisodes.find((e) => normalizeText(e?.name) === q);
+  return hit
+    ? { season: hit.season_number, episode: hit.episode_number }
+    : null;
+}
+
+// Nivel de confianza de una resolución.
+//   - episodio por número/nombre + título exacto  → high
+//   - episodio por número/nombre sin título exacto → medium
+//   - episodio por heurística                      → medium
+//   - sin episodio (nivel serie)                   → low
+export function scoreConfidence({ exactTitle, episodeSource }) {
+  if (episodeSource === "number" || episodeSource === "name") {
+    return exactTitle ? "high" : "medium";
+  }
+  if (episodeSource === "heuristic") return "medium";
+  return "low";
+}
+
 export async function searchTmdbCandidatesWithFallback({
   mediaType,
   backendSearch,
@@ -41,10 +76,29 @@ export async function resolveStreamingEntity({
   preferTv = false,
   search,
 }) {
+  // Nivel serie (sin episodio conocido): confianza baja, pero SÍ se registra
+  // (fallback show-level) en vez de descartarse.
+  const showLevel = (entity) => ({
+    kind: "show_level",
+    mediaType: "tv",
+    entity,
+    confidence: "low",
+  });
+
   if (expectedMediaType === "tv") {
     const results = await search("tv");
     const entity = pickTmdbResult(results, query, "tv");
-    return entity ? { kind: "resolved", mediaType: "tv", entity } : null;
+    if (!entity) return null;
+    // El episodio viene por número (el llamador ya lo parseó) → alta si exacto.
+    return {
+      kind: "resolved",
+      mediaType: "tv",
+      entity,
+      confidence: scoreConfidence({
+        exactTitle: isExactTitle(entity, query, "tv"),
+        episodeSource: "number",
+      }),
+    };
   }
 
   const [movieResults, tvResults] = await Promise.all([
@@ -59,38 +113,36 @@ export async function resolveStreamingEntity({
   });
 
   if (preferTv && (exactShow || (!exactMovie && tvResults.length > 0))) {
-    return {
-      kind: "series_without_episode",
-      mediaType: "tv",
-      entity: exactShow || pickTmdbResult(tvResults, query, "tv"),
-    };
+    return showLevel(exactShow || pickTmdbResult(tvResults, query, "tv"));
   }
 
   if (exactShow && !exactMovie) {
-    return {
-      kind: "series_without_episode",
-      mediaType: "tv",
-      entity: exactShow,
-    };
+    return showLevel(exactShow);
   }
 
   if (exactMovie) {
-    return { kind: "resolved", mediaType: "movie", entity: exactMovie };
-  }
-
-  if (exactShow) {
     return {
-      kind: "series_without_episode",
-      mediaType: "tv",
-      entity: exactShow,
+      kind: "resolved",
+      mediaType: "movie",
+      entity: exactMovie,
+      confidence: "high",
     };
   }
 
+  if (exactShow) {
+    return showLevel(exactShow);
+  }
+
   const movie = pickTmdbResult(movieResults, query, "movie");
-  if (movie) return { kind: "resolved", mediaType: "movie", entity: movie };
+  if (movie) {
+    return {
+      kind: "resolved",
+      mediaType: "movie",
+      entity: movie,
+      confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
+    };
+  }
 
   const show = pickTmdbResult(tvResults, query, "tv");
-  return show
-    ? { kind: "series_without_episode", mediaType: "tv", entity: show }
-    : null;
+  return show ? showLevel(show) : null;
 }
