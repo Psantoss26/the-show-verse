@@ -843,6 +843,44 @@ export default async function authRoutes(fastify) {
   });
 
   // ──────────────────────────────────────────────
+  // POST /netflix/pair-mobile — Empareja la app companion de Android.
+  // Crea/actualiza una fila de dispositivo SEPARADA (providerUid propio) para no
+  // pisar el token de la extensión. Usa provider='netflix' para que el lookup de
+  // /netflix/sync (por hash de token) la encuentre. Devuelve el token en claro.
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/pair-mobile', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const syncToken = `tsv_netflix_${nanoid(48)}`;
+    const now = new Date();
+    const providerUid = `mobile:${req.user.id}`;
+    const metadata = {
+      profileName: 'Android',
+      connectedAt: now.toISOString(),
+      lastSyncedAt: null,
+      syncMode: 'android-app',
+    };
+
+    await db
+      .insert(connectedAccounts)
+      .values({
+        userId: req.user.id,
+        provider: 'netflix',
+        providerUid,
+        accessToken: hashToken(syncToken),
+        metadata,
+      })
+      .onConflictDoUpdate({
+        target: [connectedAccounts.provider, connectedAccounts.providerUid],
+        set: {
+          userId: req.user.id,
+          accessToken: hashToken(syncToken),
+          metadata,
+        },
+      });
+
+    return reply.send({ paired: true, syncToken });
+  });
+
+  // ──────────────────────────────────────────────
   // POST /netflix/sync — Recibe visionados desde la extension con token revocable
   // ──────────────────────────────────────────────
   fastify.post('/netflix/sync', async (req, reply) => {
