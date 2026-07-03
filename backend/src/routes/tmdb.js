@@ -79,18 +79,56 @@ async function setDbCache(cacheKey, data, ttlSeconds) {
     });
 }
 
+// Caché en MEMORIA (LRU + TTL) delante de Redis/Postgres. Los blobs de TMDb son
+// muy grandes (detalle con credits/videos/images/recommendations ≈ 100-300 KB) y
+// se leían de la BD en cada request cuando no hay Redis → mucho egress. Servir
+// los títulos más pedidos desde RAM lo elimina casi por completo.
+const TMDB_MEM_MAX = Number(process.env.TMDB_MEM_MAX ?? 200);
+const TMDB_MEM_TTL_MS = Number(process.env.TMDB_MEM_TTL_MS ?? 10 * 60 * 1000);
+const tmdbMemCache = new Map(); // cacheKey -> { value, expiresAt }
+
+function tmdbMemGet(cacheKey) {
+  const entry = tmdbMemCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    tmdbMemCache.delete(cacheKey);
+    return null;
+  }
+  // Refresca posición LRU.
+  tmdbMemCache.delete(cacheKey);
+  tmdbMemCache.set(cacheKey, entry);
+  return entry.value;
+}
+
+function tmdbMemSet(cacheKey, value, ttlSeconds) {
+  const ttlMs = Math.min(ttlSeconds * 1000, TMDB_MEM_TTL_MS);
+  tmdbMemCache.set(cacheKey, { value, expiresAt: Date.now() + ttlMs });
+  if (tmdbMemCache.size > TMDB_MEM_MAX) {
+    const oldest = tmdbMemCache.keys().next().value;
+    if (oldest !== undefined) tmdbMemCache.delete(oldest);
+  }
+}
+
 async function withPersistentTmdbCache(cacheKey, ttlSeconds, fetchFn) {
+  const memHit = tmdbMemGet(cacheKey);
+  if (memHit !== null) return memHit;
+
   const redisHit = await cacheGet(cacheKey);
-  if (redisHit !== null) return redisHit;
+  if (redisHit !== null) {
+    tmdbMemSet(cacheKey, redisHit, ttlSeconds);
+    return redisHit;
+  }
 
   const dbHit = await getDbCache(cacheKey).catch(() => null);
   if (dbHit !== null) {
+    tmdbMemSet(cacheKey, dbHit, ttlSeconds);
     await cacheSet(cacheKey, dbHit, ttlSeconds);
     return dbHit;
   }
 
   const value = await fetchFn();
   if (value !== null && value !== undefined) {
+    tmdbMemSet(cacheKey, value, ttlSeconds);
     await Promise.allSettled([
       cacheSet(cacheKey, value, ttlSeconds),
       setDbCache(cacheKey, value, ttlSeconds),

@@ -371,21 +371,59 @@ for (const year of DECADES) {
 // resto espera esa promesa. Evita trabajo duplicado y ráfagas a TMDB.
 const inFlightBuilds = new Map(); // defKey -> Promise<items>
 
+// Caché en MEMORIA de los items de cada pool. Los pools son grandes (jsonb de
+// decenas de KB) y cambian como mucho cada 12h-30d, pero se leían de Postgres en
+// CADA request (20-40 lecturas por carga de dashboard) → muchísimo egress. Con
+// una TTL corta en RAM servimos casi todo sin tocar la BD. Se invalida sola al
+// caducar y se refresca al reconstruir el pool.
+const POOL_MEM_TTL_MS = Number(
+  process.env.DASHBOARD_POOL_MEM_TTL_MS ?? 5 * 60 * 1000,
+);
+const poolMemCache = new Map(); // defKey -> { items, dbExpiresAt: Date, memExpiresAt: number }
+
+function poolMemGet(defKey) {
+  const entry = poolMemCache.get(defKey);
+  if (!entry) return null;
+  const now = Date.now();
+  // Inválido si venció la TTL de memoria o si el pool de BD ya caducó.
+  if (entry.memExpiresAt <= now || entry.dbExpiresAt.getTime() <= now) {
+    poolMemCache.delete(defKey);
+    return null;
+  }
+  return entry.items;
+}
+
+function poolMemSet(defKey, items, dbExpiresAt) {
+  poolMemCache.set(defKey, {
+    items,
+    dbExpiresAt,
+    memExpiresAt: Date.now() + POOL_MEM_TTL_MS,
+  });
+}
+
 export async function getPool(poolKey, mediaType) {
   const defKey = `${poolKey}:${mediaType}`;
   const def = POOL_DEFS.get(defKey);
   if (!def) return [];
 
-  // Try to read from DB
+  // 1) Caché en memoria (sin egress).
+  const cached = poolMemGet(defKey);
+  if (cached) return cached;
+
+  // 2) Leer de la BD SOLO las columnas necesarias (no todo el row).
   const [row] = await db
-    .select()
+    .select({ items: dashboardPools.items, expiresAt: dashboardPools.expiresAt })
     .from(dashboardPools)
     .where(and(eq(dashboardPools.poolKey, poolKey), eq(dashboardPools.mediaType, mediaType)))
     .limit(1);
 
   // Return cached if still fresh
   if (row && row.expiresAt > new Date()) {
-    return shouldRefineCachedPool(poolKey) ? refine(row.items, mediaType) : row.items;
+    const items = shouldRefineCachedPool(poolKey)
+      ? refine(row.items, mediaType)
+      : row.items;
+    poolMemSet(defKey, items, row.expiresAt);
+    return items;
   }
 
   // ¿Ya hay una reconstrucción en curso para este pool? Reutilízala.
@@ -406,6 +444,7 @@ export async function getPool(poolKey, mediaType) {
           set: { items, builtAt, expiresAt },
         });
 
+      poolMemSet(defKey, items, expiresAt); // cachea lo recién construido
       return items;
     } catch {
       // On error return stale data if available, else []
@@ -423,8 +462,15 @@ export async function getPool(poolKey, mediaType) {
 export async function refreshAllPools() {
   let built = 0;
 
-  // Fetch all current rows to check expiry
-  const rows = await db.select().from(dashboardPools);
+  // Solo necesitamos las claves y la caducidad para saber qué reconstruir; NO
+  // traemos la columna `items` (jsonb grande) de todas las filas.
+  const rows = await db
+    .select({
+      poolKey: dashboardPools.poolKey,
+      mediaType: dashboardPools.mediaType,
+      expiresAt: dashboardPools.expiresAt,
+    })
+    .from(dashboardPools);
   const rowMap = new Map();
   for (const row of rows) {
     rowMap.set(`${row.poolKey}:${row.mediaType}`, row);

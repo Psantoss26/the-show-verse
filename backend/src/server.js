@@ -264,10 +264,11 @@ const warmDashboardPools = () => {
     .catch((err) => fastify.log.warn({ err }, 'dashboard pool warming failed'));
 };
 
-// Calentar al arrancar (en segundo plano, no bloquea el listen).
-warmDashboardPools();
-
+// Con DASHBOARD_POOL_WARM_MS=0 se desactiva TODO el calentado (arranque incluido),
+// útil en local/dev para no gastar egress contra la BD de producción.
 if (Number.isFinite(POOL_WARM_INTERVAL_MS) && POOL_WARM_INTERVAL_MS > 0) {
+  // Calentar al arrancar (en segundo plano, no bloquea el listen).
+  warmDashboardPools();
   const warmTimer = setInterval(warmDashboardPools, POOL_WARM_INTERVAL_MS);
   warmTimer.unref?.(); // no impedir el cierre del proceso
 }

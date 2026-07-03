@@ -37,14 +37,54 @@ function refineRecommendationItems(items, mediaType) {
  * @param {{ lib: object, basisHash: string } | null} [preloaded=null] - Optional preloaded library to avoid re-loading.
  * @returns {Promise<Array>} recItem[]
  */
+// Caché en MEMORIA de las recomendaciones ya calculadas (jsonb de hasta 120
+// tarjetas). Se leían de Postgres en cada carga de dashboard; con una TTL corta
+// en RAM (validada contra el basisHash de la biblioteca) evitamos ese egress.
+const REC_MEM_TTL_MS = Number(
+  process.env.RECS_MEM_TTL_MS ?? 5 * 60 * 1000,
+);
+const recMemCache = new Map(); // `${userId}:${mediaType}` -> { items, dbExpiresAt, basisHash, memExpiresAt }
+
+function recMemGet(key, basisHash) {
+  const entry = recMemCache.get(key);
+  if (!entry) return null;
+  const now = Date.now();
+  if (
+    entry.memExpiresAt <= now ||
+    entry.dbExpiresAt.getTime() <= now ||
+    entry.basisHash !== basisHash
+  ) {
+    recMemCache.delete(key);
+    return null;
+  }
+  return entry.items;
+}
+
+function recMemSet(key, items, dbExpiresAt, basisHash) {
+  recMemCache.set(key, {
+    items,
+    dbExpiresAt,
+    basisHash,
+    memExpiresAt: Date.now() + REC_MEM_TTL_MS,
+  });
+}
+
 export async function getUserRecommendations(userId, mediaType, preloaded = null) {
   // ── 1. Load library + compute hash ──────────────────────────────────────
   const lib = preloaded?.lib || await loadLibrary(userId);
   const basisHash = preloaded?.basisHash || libraryBasisHash(lib);
 
-  // ── 2. Read cached row ───────────────────────────────────────────────────
+  const memKey = `${userId}:${mediaType}`;
+  const memHit = recMemGet(memKey, basisHash);
+  if (memHit) return memHit;
+
+  // ── 2. Read cached row (solo columnas necesarias, no el row entero) ──────
   const [row] = await db
-    .select()
+    .select({
+      items: userRecommendations.items,
+      expiresAt: userRecommendations.expiresAt,
+      basisHash: userRecommendations.basisHash,
+    })
     .from(userRecommendations)
     .where(
       and(
@@ -55,7 +95,9 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     .limit(1);
 
   if (row && row.expiresAt > new Date() && row.basisHash === basisHash) {
-    return refineRecommendationItems(row.items, mediaType);
+    const items = refineRecommendationItems(row.items, mediaType);
+    recMemSet(memKey, items, row.expiresAt, basisHash);
+    return items;
   }
 
   // ── 3. Rebuild ───────────────────────────────────────────────────────────
