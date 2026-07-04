@@ -10,6 +10,7 @@ import {
 import {
   clearGoogleOauthCookies,
   getGoogleRedirectUri,
+  getRequestOrigin,
   GOOGLE_OAUTH_NEXT_COOKIE,
   GOOGLE_OAUTH_STATE_COOKIE,
   sanitizeNextPath,
@@ -19,7 +20,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function redirectToLogin(request, next, reason) {
-  const url = new URL("/login", request.url);
+  const url = new URL("/login", getRequestOrigin(request));
   url.searchParams.set("next", sanitizeNextPath(next));
   if (reason) url.searchParams.set("google_error", reason);
   const response = NextResponse.redirect(url);
@@ -122,7 +123,7 @@ export async function GET(request) {
     );
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const response = NextResponse.redirect(new URL(next, getRequestOrigin(request)));
   clearGoogleOauthCookies(response, request);
   clearBackendAuthCookies(response, { secure: getCookieSecure(request) });
   setBackendTokenCookies(response, backend.json, {
