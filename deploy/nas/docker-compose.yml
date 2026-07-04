@@ -80,6 +80,39 @@ services:
     depends_on:
       - web
 
+  # Ollama — LLM local para las funciones de IA (reutiliza los modelos ya bajados).
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_NUM_PARALLEL: 1
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  # GitHub Actions self-hosted runner (CI/CD del repo). Mantiene el registro
+  # existente (volumen runner-data) y despliega en la carpeta NUEVA (/nas-deploy).
+  github-runner:
+    image: myoung34/github-runner:latest
+    restart: unless-stopped
+    env_file:
+      - ./runner.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner-data:/home/runner
+      - /volume4/docker/theshowverse:/nas-deploy
+
 volumes:
   pgdata:
   redisdata:
+  # Volúmenes existentes del stack antiguo, reutilizados como externos para no
+  # perder los modelos de Ollama ni el registro del runner.
+  ollama-data:
+    external: true
+    name: showverse-ollama-data
+  runner-data:
+    external: true
+    name: the-show-verse_runner-data
