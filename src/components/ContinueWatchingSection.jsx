@@ -1345,15 +1345,16 @@ function ContinueWatchingPreviewCard({
         {/* Estado de la tarjeta superpuesto al pie del backdrop */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-black/85" />
         {isCalendar ? (
-          <div className="absolute inset-x-3 bottom-2 flex items-center gap-2 text-xs font-bold text-white">
-            <CalendarDays className="h-3.5 w-3.5 text-white" aria-hidden="true" />
-            <span>{calendar?.countdown || "Próximamente"}</span>
-            {calendar?.isPremiere && (
+          // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
+          // abajo en los metadatos (junto a Temporada·Episodio y año). Aquí solo
+          // se conserva el badge "Estreno" para los estrenos (S1E1).
+          calendar?.isPremiere ? (
+            <div className="absolute inset-x-3 bottom-2">
               <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
                 Estreno
               </span>
-            )}
-          </div>
+            </div>
+          ) : null
         ) : (
           <div className="absolute inset-x-3 bottom-2">
             <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
