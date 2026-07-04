@@ -69,6 +69,63 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
 }
 
 /**
+ * Rankea películas de "Estrenos y novedades" por una puntuación compuesta que
+ * combina popularidad, presupuesto, recaudación y proximidad de estreno, para que
+ * los títulos más importantes (grandes producciones, éxitos de taquilla, estrenos
+ * inminentes o muy recientes) aparezcan primero.
+ *
+ * Requisitos de cada card: `popularity`, `releaseDate` ('YYYY-MM-DD'|null) y —para
+ * las enriquecidas— `budget` y `revenue` (USD). Las no enriquecidas cuentan como 0
+ * en esos términos (una peli sin estrenar tiene recaudación 0 de forma natural).
+ *
+ * Normalización relativa AL CONJUNTO recibido:
+ *   - popularidad: lineal (0..1) sobre el máximo del set.
+ *   - presupuesto/recaudación: escala log10 (colas muy largas) sobre el máximo.
+ *   - recencia: campana gaussiana centrada en HOY (premia por igual lo recién
+ *     estrenado y lo inminente; decae con la lejanía).
+ *
+ * Pesos iniciales (ajustables): 0.40 pop · 0.20 presupuesto · 0.20 recaudación ·
+ * 0.20 recencia.
+ *
+ * @param {Array}  cards
+ * @param {{ now?: Date|string|number, recencySigmaDays?: number }} [opts]
+ * @returns {Array} cards ordenadas desc con campo `newReleaseScore` añadido
+ */
+export function rankNewReleaseMovies(cards, { now, recencySigmaDays = 45 } = {}) {
+  if (!Array.isArray(cards) || cards.length === 0) return [];
+
+  const nowMs = now == null ? Date.now() : new Date(now).getTime();
+  const numeric = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+  const maxPop = Math.max(0, ...cards.map((c) => numeric(c.popularity)));
+  const maxLogBudget = Math.log10(1 + Math.max(0, ...cards.map((c) => numeric(c.budget))));
+  const maxLogRevenue = Math.log10(1 + Math.max(0, ...cards.map((c) => numeric(c.revenue))));
+
+  const norm = (v, max) => (max > 0 ? numeric(v) / max : 0);
+  const logNorm = (v, maxLog) =>
+    maxLog > 0 ? Math.log10(1 + Math.max(0, numeric(v))) / maxLog : 0;
+
+  const recency = (releaseDate) => {
+    if (!releaseDate) return 0;
+    const t = new Date(`${releaseDate}T00:00:00Z`).getTime();
+    if (!Number.isFinite(t)) return 0;
+    const days = (t - nowMs) / 86400000;
+    return Math.exp(-((days / recencySigmaDays) ** 2));
+  };
+
+  return cards
+    .map((card) => ({
+      ...card,
+      newReleaseScore:
+        0.4 * norm(card.popularity, maxPop) +
+        0.2 * logNorm(card.budget, maxLogBudget) +
+        0.2 * logNorm(card.revenue, maxLogRevenue) +
+        0.2 * recency(card.releaseDate),
+    }))
+    .sort((a, b) => b.newReleaseScore - a.newReleaseScore);
+}
+
+/**
  * Filter out items already in the user's library / seen set.
  *
  * @param {Array} recItems

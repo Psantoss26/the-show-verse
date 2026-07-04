@@ -36,6 +36,9 @@ export function toCard(raw, mediaType) {
     originalLanguage: raw.original_language || null,
     originCountry: Array.isArray(raw.origin_country) ? raw.origin_country : [],
     year,
+    // Fecha completa YYYY-MM-DD (no solo el año): la usan los estrenos para
+    // rankear por proximidad de estreno. Vacía → null.
+    releaseDate: dateStr || null,
     genreIds: Array.isArray(raw.genre_ids) ? raw.genre_ids : [],
     popularity: typeof raw.popularity === 'number' ? raw.popularity : 0,
   };
@@ -58,6 +61,18 @@ async function tmdbGet(path, params = {}) {
 export async function tmdbDiscover({ mediaType, params = {} }) {
   const json = await tmdbGet(`/discover/${mediaType}`, { include_adult: false, ...params });
   return (json?.results || []).map((r) => toCard(r, mediaType)).filter(Boolean);
+}
+
+// Detalles de un título (película o serie). Devuelve el JSON crudo de TMDB para
+// que quien llame lea los campos que necesite (budget/revenue en películas,
+// next_episode_to_air en series…). No cachea: lo cachea quien lo usa.
+export async function tmdbDetails(mediaType, id, params = {}) {
+  if (mediaType !== 'movie' && mediaType !== 'tv') return null;
+  try {
+    return await tmdbGet(`/${mediaType}/${id}`, params);
+  } catch {
+    return null;
+  }
 }
 
 export async function tmdbList({ path, mediaType, pages = 1 }) {

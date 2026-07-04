@@ -12,9 +12,14 @@ build/
 .vercel/
 
 # --- Entornos / secretos ---
+# OJO: git NO admite comentarios en línea en .gitignore (el texto tras el patrón
+# pasa a formar parte del propio patrón y lo rompe). Los comentarios van aparte.
+# Ignora .env, .env.local, .env.development…; deja la plantilla .env.example.
 .env
-.env.*        # .env.local, .env.development, etc.
-!.env.example # deja una plantilla con claves falsas
+.env.*
+!.env.example
+# Ficheros de entorno de los despliegues (NAS): contienen secretos.
+deploy/**/*.env
 
 # --- Logs / depuración ---
 npm-debug.log*

@@ -1,7 +1,7 @@
 // backend/src/dashboard/score.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateCandidates, excludeSeen } from './score.js';
+import { aggregateCandidates, excludeSeen, rankNewReleaseMovies } from './score.js';
 import { balanceSoftLimitedContent, softLimitedContentWeight } from './filters.js';
 
 const card = (id, extra = {}) => ({ tmdbId: id, mediaType: 'movie', title: `M${id}`, ...extra });
@@ -64,4 +64,40 @@ test('balanceSoftLimitedContent lowers weaker animation/documentary items withou
 
   const out = balanceSoftLimitedContent(items);
   assert.deepEqual(out.map((c) => c.tmdbId), [42, 41, 40]);
+});
+
+const NOW = '2026-07-04T00:00:00Z';
+
+test('rankNewReleaseMovies returns [] for empty input and sorts desc with a score', () => {
+  assert.deepEqual(rankNewReleaseMovies([]), []);
+  const out = rankNewReleaseMovies(
+    [card(1, { popularity: 10, releaseDate: '2026-07-04' })],
+    { now: NOW },
+  );
+  assert.equal(typeof out[0].newReleaseScore, 'number');
+});
+
+test('rankNewReleaseMovies ranks a big-budget box-office hit above a small one (same popularity and date)', () => {
+  const big = card(1, {
+    popularity: 100, releaseDate: '2026-06-20', budget: 200_000_000, revenue: 800_000_000,
+  });
+  const small = card(2, {
+    popularity: 100, releaseDate: '2026-06-20', budget: 1_000_000, revenue: 0,
+  });
+  const out = rankNewReleaseMovies([small, big], { now: NOW });
+  assert.equal(out[0].tmdbId, 1); // el taquillazo primero pese al mismo orden de entrada
+});
+
+test('rankNewReleaseMovies prefers an imminent/recent release over a far-future one (same popularity/budget/revenue)', () => {
+  const soon = card(1, { popularity: 50, releaseDate: '2026-07-10', budget: 0, revenue: 0 });
+  const far = card(2, { popularity: 50, releaseDate: '2027-01-01', budget: 0, revenue: 0 });
+  const out = rankNewReleaseMovies([far, soon], { now: NOW });
+  assert.equal(out[0].tmdbId, 1); // proximidad de estreno desempata
+});
+
+test('rankNewReleaseMovies treats missing budget/revenue as zero (unreleased film still ranks by popularity)', () => {
+  const popular = card(1, { popularity: 90, releaseDate: '2026-08-01' }); // sin budget/revenue
+  const niche = card(2, { popularity: 5, releaseDate: '2026-08-01', budget: 5_000_000, revenue: 0 });
+  const out = rankNewReleaseMovies([niche, popular], { now: NOW });
+  assert.equal(out[0].tmdbId, 1); // la popularidad (peso 0.40) domina sobre un presupuesto pequeño
 });
