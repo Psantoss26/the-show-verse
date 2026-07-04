@@ -6,14 +6,6 @@ import Redis from 'ioredis';
 
 let redis = null;
 
-// Redis es opcional para la aplicación. Si hay una caída temporal, mantenemos
-// los reintentos con backoff acotado para que el cliente pueda recuperarse
-// cuando vuelva el servicio. Devolver null aquí dejaría el cliente en estado
-// `end` permanentemente hasta reiniciar todo el backend.
-export function redisRetryDelay(times) {
-  return Math.min(Math.max(1, Number(times) || 1) * 100, 5000);
-}
-
 export function getRedis() {
   if (redis) return redis;
 
@@ -23,7 +15,10 @@ export function getRedis() {
   // Upstash usa rediss:// (con TLS). ioredis lo detecta automáticamente.
   redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
-    retryStrategy: redisRetryDelay,
+    retryStrategy(times) {
+      if (times > 5) return null; // deja de reintentar tras 5 intentos
+      return Math.min(times * 100, 2000);
+    },
     lazyConnect: true,
     // TLS habilitado automáticamente si la URL empieza por rediss://
     ...(redisUrl.startsWith('rediss://') && {
