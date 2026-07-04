@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 
 const ENGINE_ROWS_CACHE_TTL_MS = 5 * 60 * 1000;
-const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v2:";
+const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v3:";
 const memoryCache = new Map();
 const inFlight = new Map();
 
@@ -30,8 +30,8 @@ export function toTmdbShape(card) {
     vote_average: typeof card.voteAverage === "number" ? card.voteAverage : 0,
     genre_ids: Array.isArray(card.genreIds) ? card.genreIds : [],
     popularity: card.popularity || 0,
-    release_date: isTv ? undefined : dateStr,
-    first_air_date: isTv ? dateStr : undefined,
+    release_date: isTv ? undefined : card.releaseDate || dateStr,
+    first_air_date: isTv ? card.releaseDate || dateStr : undefined,
   };
 }
 

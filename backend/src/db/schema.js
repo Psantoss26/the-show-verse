@@ -235,7 +235,7 @@ export const subscriptions = pgTable('subscriptions', {
 // ─────────────────────────────────────────────
 export const dashboardPools = pgTable('dashboard_pools', {
   id: uuid('id').primaryKey().defaultRandom(),
-  poolKey: text('pool_key').notNull(),          // 'trending','popular','top_rated','acclaimed','blockbusters','hidden_gems','new_releases','region_top','genre:28','decade:1990'
+  poolKey: text('pool_key').notNull(),          // 'trending','popular','top_rated','acclaimed','blockbusters','hidden_gems','anticipated','new_releases','region_top','genre:28','decade:1990'
   mediaType: text('media_type').notNull(),       // 'movie' | 'tv'
   items: jsonb('items').notNull().default([]),    // card item array
   builtAt: timestamp('built_at', { withTimezone: true }).defaultNow().notNull(),

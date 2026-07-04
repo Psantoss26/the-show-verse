@@ -126,6 +126,77 @@ export function rankNewReleaseMovies(cards, { now, recencySigmaDays = 45 } = {})
 }
 
 /**
+ * Aproxima el criterio de "más esperadas" sin depender de Trakt. TMDB no expone
+ * el número de personas que esperan un estreno, así que combinamos sus mejores
+ * señales públicas equivalentes:
+ *   - popularidad actual (68%): búsquedas/interés que ya está generando;
+ *   - presupuesto (17%): escala e importancia industrial;
+ *   - pertenencia a una saga (10%): audiencia previa reconocible;
+ *   - cercanía del estreno (5%): desempata a favor de títulos accionables.
+ *
+ * Solo admite fechas POSTERIORES a hoy y limita el horizonte para evitar títulos
+ * anunciados sin una fecha suficientemente fiable. No usa votos/recaudación:
+ * antes del estreno suelen ser cero y favorecerían injustamente a las ya
+ * estrenadas.
+ */
+export function rankAnticipatedMovies(
+  cards,
+  { now, maxDaysAhead = 550 } = {},
+) {
+  if (!Array.isArray(cards) || cards.length === 0) return [];
+
+  const nowDate = now == null ? new Date() : new Date(now);
+  const todayMs = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth(),
+    nowDate.getUTCDate(),
+  );
+  const numeric = (value) =>
+    Number.isFinite(Number(value)) ? Number(value) : 0;
+
+  const future = cards.filter((card) => {
+    if (!card?.releaseDate) return false;
+    const releaseMs = new Date(`${card.releaseDate}T00:00:00Z`).getTime();
+    if (!Number.isFinite(releaseMs)) return false;
+    const daysAhead = (releaseMs - todayMs) / 86400000;
+    return daysAhead > 0 && daysAhead <= maxDaysAhead;
+  });
+  if (future.length === 0) return [];
+
+  const maxPopularity = Math.max(
+    0,
+    ...future.map((card) => numeric(card.popularity)),
+  );
+  const maxLogBudget = Math.log10(
+    1 + Math.max(0, ...future.map((card) => numeric(card.budget))),
+  );
+
+  return future
+    .map((card) => {
+      const releaseMs = new Date(`${card.releaseDate}T00:00:00Z`).getTime();
+      const daysAhead = Math.max(1, (releaseMs - todayMs) / 86400000);
+      const popularity =
+        maxPopularity > 0 ? numeric(card.popularity) / maxPopularity : 0;
+      const budget =
+        maxLogBudget > 0
+          ? Math.log10(1 + Math.max(0, numeric(card.budget))) / maxLogBudget
+          : 0;
+      const franchise = card.isFranchise ? 1 : 0;
+      const proximity = Math.exp(-daysAhead / 365);
+
+      return {
+        ...card,
+        anticipatedScore:
+          0.68 * popularity +
+          0.17 * budget +
+          0.1 * franchise +
+          0.05 * proximity,
+      };
+    })
+    .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
+}
+
+/**
  * Filter out items already in the user's library / seen set.
  *
  * @param {Array} recItems

@@ -9,7 +9,7 @@ Stack de **producción** en el NAS (UGREEN DXP 4800 Plus, UGOS + Docker), defini
 |---|---|---|---|
 | `web` | build `Dockerfile.web` | `3000` (host) + túnel | Next.js (único servicio público). |
 | `backend` | build `Dockerfile.backend` | interno `3001` | API Fastify. |
-| `postgres` | `postgres:16` | interno | Datos (usuario `tsv`, BBDD `theshowverse`). |
+| `postgres` | `postgres:18` | interno | Datos (usuario `tsv`, BBDD `theshowverse`). El volumen se monta en `/var/lib/postgresql` (layout PG18+). |
 | `redis` | `redis:7-alpine` | interno | Caché (persistencia ligera). |
 | `cloudflared` | `cloudflare/cloudflared` | saliente | Túnel a Cloudflare. |
 | `ollama` | `ollama/ollama` | `11434` | LLM local (IA). |

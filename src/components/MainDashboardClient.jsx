@@ -2396,6 +2396,10 @@ function Row({
   // Etiqueta superior representativa (centralizada). Respeta la que llega como
   // prop; si no, la deriva del título (todas las filas tienen etiqueta).
   labelText = deriveSectionLabel(title, labelText);
+  const resolvedSectionHref =
+    sectionHref === false
+      ? undefined
+      : sectionHref || EXPANDABLE_SECTION_HREFS[title];
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -2573,7 +2577,7 @@ function Row({
             )}
             <ExpandableSectionTitle
               title={title}
-              href={sectionHref || EXPANDABLE_SECTION_HREFS[title]}
+              href={resolvedSectionHref}
             />
           </div>
         )}
@@ -2665,7 +2669,7 @@ function Row({
           )}
           <ExpandableSectionTitle
             title={title}
-            href={sectionHref || EXPANDABLE_SECTION_HREFS[title]}
+            href={resolvedSectionHref}
           />
         </motion.div>
       )}
@@ -3806,20 +3810,13 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
     visibleEngineRowCount,
   );
 
-  // Una ÚNICA fila destacada (×1,6) en Inicio. Las filas de la engine son
-  // dinámicas, así que elegimos por prioridad la primera presente: Tendencias y,
-  // si no existe, Estrenos. Así nunca se destacan dos filas a la vez.
+  // Conserva el diseño y comportamiento que tenía "Estrenos y novedades":
+  // una única fila destacada ×1,6 con la preview normal del dashboard.
   const spotlightRowTitle = useMemo(() => {
-    // En Inicio la sección destacada es "Estrenos y novedades": las filas tipo
-    // tendencias/recomendaciones se deduplican entre sí y a veces no se pintan,
-    // mientras que Estrenos aparece de forma fiable. Solo se elige si tiene
-    // contenido (una fila vacía no se pinta). Una única destacada por dashboard.
     const titles = renderableEngineRows
       .filter((row) => Array.isArray(row.items) && row.items.length > 0)
       .map((row) => row.title);
-    return titles.includes("Estrenos y novedades")
-      ? "Estrenos y novedades"
-      : null;
+    return titles.includes("Más esperadas") ? "Más esperadas" : null;
   }, [renderableEngineRows]);
 
   const allMovieIds = useMemo(() => {
@@ -3962,14 +3959,18 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               componente Row (con vista previa al hover y flechas de desplazamiento).
               Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero.
               La sección "Calendario" (próximos episodios de series) se inserta justo
-              ANTES de la fila "Estrenos y novedades". */}
+              ANTES de la fila "Más esperadas". */}
           {(() => {
             const nodes = [];
             let calendarInserted = false;
             for (const row of visibleEngineRows) {
-              if (!calendarInserted && row.title === "Estrenos y novedades") {
+              if (!calendarInserted && row.key === "anticipated") {
                 nodes.push(
-                  <DashboardCalendarSection key="__calendar__" isMobile={isMobile} />,
+                  <DashboardCalendarSection
+                    key="__calendar__"
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                  />,
                 );
                 calendarInserted = true;
               }
@@ -3984,6 +3985,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                   posterOverrides={posterOverrides}
                   backdropOverrides={backdropOverrides}
                   overridesReady={overridesReady}
+                  sectionHref={row.key === "anticipated" ? false : undefined}
                   spotlight={
                     !!spotlightRowTitle && row.title === spotlightRowTitle
                   }
@@ -3993,7 +3995,11 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
             // Si no hubo fila de estrenos, el calendario abre las filas del engine.
             if (!calendarInserted) {
               nodes.unshift(
-                <DashboardCalendarSection key="__calendar__" isMobile={isMobile} />,
+                <DashboardCalendarSection
+                  key="__calendar__"
+                  isMobile={isMobile}
+                  hydrated={hydrated}
+                />,
               );
             }
             return nodes;
