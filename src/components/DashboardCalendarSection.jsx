@@ -95,6 +95,14 @@ function toLandscapeShow(item) {
 
   return {
     id,
+    // Identificador ÚNICO por episodio (una misma serie puede aparecer varias
+    // veces en el calendario). `id` se mantiene como tmdbId para navegación y
+    // acciones (favoritos/pendientes); `uid` es la key estable del carrusel.
+    uid:
+      item?.id ||
+      (Number.isFinite(season) && Number.isFinite(number)
+        ? `tv:${id}:${season}:${number}`
+        : `tv:${id}`),
     title: show.title || "Serie",
     backdrop_path: show.backdropPath || null,
     poster_path: show.posterPath || null,

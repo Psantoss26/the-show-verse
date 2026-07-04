@@ -75,6 +75,18 @@ export async function tmdbDetails(mediaType, id, params = {}) {
   }
 }
 
+// Detalles de una temporada (con su lista de episodios y air_date). Lo usa el
+// calendario para mostrar VARIOS próximos episodios de una misma serie, no solo
+// el next_episode_to_air. Devuelve null si falla.
+export async function tmdbSeason(tvId, seasonNumber, params = {}) {
+  if (!tvId || !Number.isFinite(Number(seasonNumber))) return null;
+  try {
+    return await tmdbGet(`/tv/${tvId}/season/${Number(seasonNumber)}`, params);
+  } catch {
+    return null;
+  }
+}
+
 export async function tmdbList({ path, mediaType, pages = 1 }) {
   // Páginas en paralelo (antes en serie).
   const pageJsons = await Promise.all(

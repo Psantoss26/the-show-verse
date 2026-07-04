@@ -10,8 +10,7 @@ import { and, eq, desc } from 'drizzle-orm';
 import {
   getPool,
   getCalendarShowDetails,
-  buildUpcomingEpisodeEntry,
-  withinCalendarWindow,
+  buildUpcomingEpisodeEntries,
   mapLimit,
 } from '../dashboard/pools.js';
 import { loadLibrary, libraryBasisHash } from '../dashboard/library.js';
@@ -24,6 +23,9 @@ const MAX_IN_PROGRESS = 60;
 // Series recomendadas (fuera de la base popular) a enriquecer con TMDB por
 // petición: acota el coste de llamadas al detalle de próximos episodios.
 const MAX_RECOMMENDED_ENRICH = 24;
+// Tope de series del usuario a enriquecer en fresco por petición (ordenadas por
+// prioridad de fuente). Cubre bibliotecas grandes sin disparar el coste a TMDB.
+const MAX_USER_ENRICH = 150;
 
 // Orden canónico de prioridad de las fuentes (para el badge del cliente).
 // "recommended" va tras las del usuario: relleno personalizado por delante de
@@ -32,6 +34,15 @@ const SOURCE_ORDER = ['in_progress', 'favorite', 'watchlist', 'recommended'];
 function orderSources(set) {
   if (!set) return [];
   return SOURCE_ORDER.filter((source) => set.has(source));
+}
+
+// Rango de una serie del usuario por su mejor fuente (in_progress < favorite <
+// watchlist), para priorizar el enriquecido cuando la biblioteca es grande.
+function sourceRank(set) {
+  for (let i = 0; i < SOURCE_ORDER.length; i += 1) {
+    if (set?.has(SOURCE_ORDER[i])) return i;
+  }
+  return SOURCE_ORDER.length;
 }
 
 const byAirDate = (a, b) =>
@@ -131,45 +142,35 @@ export default async function calendarRoutes(fastify) {
       }
       const recommendedSet = new Set(recommendedIds);
 
-      // Detecta (SIN mutar el pool compartido) qué entradas de la base son series
-      // del usuario.
-      const baseUserIds = new Set();
-      for (const entry of base) {
-        const id = Number(entry?.show?.tmdbId);
-        if (sourcesByShow.has(id)) baseUserIds.add(id);
-      }
-
-      // Series del usuario que NO están en la base: se enriquecen aparte.
-      const userOnlyIds = [...sourcesByShow.keys()].filter(
-        (id) => !baseUserIds.has(id),
-      );
-      const userOnlyEntries = (
-        await mapLimit(userOnlyIds, 8, async (tmdbId) => {
+      // TODAS las series del usuario se enriquecen SIEMPRE en fresco (varios
+      // episodios por serie), SIN depender del pool base cacheado —que puede
+      // traer datos antiguos de 1 solo episodio para una serie popular como
+      // "La casa del dragón"—. Se ordenan por prioridad de fuente y se acotan.
+      const userIds = [...sourcesByShow.entries()]
+        .sort(([, a], [, b]) => sourceRank(a) - sourceRank(b))
+        .map(([id]) => id)
+        .slice(0, MAX_USER_ENRICH);
+      const userEntries = (
+        await mapLimit(userIds, 8, async (tmdbId) => {
           const details = await getCalendarShowDetails(tmdbId);
-          if (!details || !withinCalendarWindow(details.nextEpisode?.air_date)) {
-            return null;
-          }
-          return buildUpcomingEpisodeEntry(
+          return buildUpcomingEpisodeEntries(
             details,
-            details.nextEpisode,
+            { tmdbId },
             orderSources(sourcesByShow.get(tmdbId)),
           );
         })
-      ).filter(Boolean);
+      ).flat();
 
-      // Base dividida en tres grupos, con COPIAS y `sources` correctas (nunca se
-      // muta el pool cacheado compartido; se normaliza el `sources` heredado).
-      const userBaseEntries = [];
+      // La base (pool popular cacheado) se usa SOLO para relleno: se excluyen las
+      // series del usuario (ya cubiertas en fresco) y se separan recomendadas y
+      // populares, con COPIAS (nunca se muta el pool compartido).
+      const userIdSet = new Set(userIds);
       const recommendedBaseEntries = [];
       const popularBaseEntries = [];
       for (const entry of base) {
         const id = Number(entry?.show?.tmdbId);
-        if (baseUserIds.has(id)) {
-          userBaseEntries.push({
-            ...entry,
-            sources: orderSources(sourcesByShow.get(id)),
-          });
-        } else if (recommendedSet.has(id)) {
+        if (userIdSet.has(id)) continue;
+        if (recommendedSet.has(id)) {
           recommendedBaseEntries.push({ ...entry, sources: ['recommended'] });
         } else {
           popularBaseEntries.push({ ...entry, sources: [] });
@@ -186,27 +187,28 @@ export default async function calendarRoutes(fastify) {
       const recOnlyEntries = (
         await mapLimit(recOnlyIds, 8, async (tmdbId) => {
           const details = await getCalendarShowDetails(tmdbId);
-          if (!details || !withinCalendarWindow(details.nextEpisode?.air_date)) {
-            return null;
-          }
-          return buildUpcomingEpisodeEntry(details, details.nextEpisode, [
-            'recommended',
-          ]);
+          return buildUpcomingEpisodeEntries(details, { tmdbId }, ['recommended']);
         })
-      ).filter(Boolean);
+      ).flat();
 
-      // Prioridad: (1) tus series (progreso/favoritos/pendientes),
-      // (2) recomendadas, (3) populares. Cada grupo ordenado por fecha de emisión.
-      const tracked = [...userOnlyEntries, ...userBaseEntries].sort(byAirDate);
-      const recommended = [...recOnlyEntries, ...recommendedBaseEntries].sort(
-        byAirDate,
-      );
-      const popular = popularBaseEntries.sort(byAirDate);
+      // Prioridad de INCLUSIÓN (para el corte a MAX_ITEMS): 0 = tus series
+      // (progreso/favoritos/pendientes), 1 = recomendadas, 2 = populares.
+      const withPriority = (entries, prio) =>
+        entries.map((e) => ({ ...e, _prio: prio }));
+      const candidates = dedupeById([
+        ...withPriority(userEntries, 0),
+        ...withPriority([...recOnlyEntries, ...recommendedBaseEntries], 1),
+        ...withPriority(popularBaseEntries, 2),
+      ]);
 
-      const items = dedupeById([...tracked, ...recommended, ...popular]).slice(
-        0,
-        MAX_ITEMS,
-      );
+      // Se eligen por prioridad (tus series entran primero si hay más candidatos
+      // que el límite) y luego se muestran en ORDEN CRONOLÓGICO GLOBAL por fecha.
+      const items = candidates
+        .sort((a, b) => a._prio - b._prio || byAirDate(a, b))
+        .slice(0, MAX_ITEMS)
+        .sort(byAirDate);
+      // Se quita el campo interno de prioridad antes de responder (son copias).
+      for (const entry of items) delete entry._prio;
 
       reply.header('Cache-Control', 'private, no-store');
       return { items };
