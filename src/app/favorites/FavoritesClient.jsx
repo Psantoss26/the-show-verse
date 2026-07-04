@@ -2241,11 +2241,20 @@ export default function FavoritesClient() {
     favorites: readFavoritesCache(),
     providers: readProvidersCache(),
   }));
-  const [loading, setLoading] = useState(() => !initialCache.favorites?.items);
+  // Solo se pinta al instante la caché si es RECIENTE (`fresh`, < TTL). Si es vieja
+  // (p. ej. añadiste favoritos en el ordenador y abres la lista en el móvil: su
+  // caché es de la última visita, sin lo nuevo) NO la pintamos: mostramos skeleton y
+  // el fetch trae la lista correcta de una vez, en vez de la vieja y luego los nuevos.
+  const hasFreshCache = !!(
+    initialCache.favorites?.fresh && initialCache.favorites?.items?.length
+  );
+  const [loading, setLoading] = useState(() => !hasFreshCache);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => initialCache.favorites?.items || []);
-  const [ratedItems, setRatedItems] = useState(
-    () => initialCache.favorites?.ratedItems || [],
+  const [items, setItems] = useState(() =>
+    hasFreshCache ? initialCache.favorites.items : [],
+  );
+  const [ratedItems, setRatedItems] = useState(() =>
+    hasFreshCache ? initialCache.favorites.ratedItems || [] : [],
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));

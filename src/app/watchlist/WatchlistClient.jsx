@@ -1941,9 +1941,18 @@ export default function WatchlistClient() {
     watchlist: readWatchlistCache(),
     providers: readProvidersCache(),
   }));
-  const [loading, setLoading] = useState(() => !initialCache.watchlist?.items);
+  // Solo se pinta al instante la caché si es RECIENTE (`fresh`, < TTL). Si es vieja
+  // (p. ej. añadiste títulos en el ordenador y abres la lista en el móvil: su caché
+  // es de la última visita, sin lo nuevo) NO la pintamos: mostramos skeleton y el
+  // fetch trae la lista correcta de una vez, en vez de la vieja y luego los nuevos.
+  const hasFreshCache = !!(
+    initialCache.watchlist?.fresh && initialCache.watchlist?.items?.length
+  );
+  const [loading, setLoading] = useState(() => !hasFreshCache);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() => initialCache.watchlist?.items || []);
+  const [items, setItems] = useState(() =>
+    hasFreshCache ? initialCache.watchlist.items : [],
+  );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
