@@ -1,0 +1,51 @@
+# The Show Verse — Servicios de DATOS para desarrollo LOCAL (Postgres + Redis).
+#
+# Solo levanta la base de datos y la caché; el backend y la web se ejecutan de
+# forma NATIVA (npm run dev) para tener recarga en caliente y depuración rápida.
+# Las imágenes coinciden con producción (postgres:16, redis:7) para máxima paridad.
+#
+# Uso:
+#   docker compose -f deploy/local/docker-compose.yml up -d      # arrancar
+#   docker compose -f deploy/local/docker-compose.yml down       # parar
+#   docker compose -f deploy/local/docker-compose.yml down -v    # parar + borrar datos
+#
+# Puertos publicados SOLO en 127.0.0.1 (no accesibles desde la LAN).
+name: theshowverse-local
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: tsv-local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tsv
+      POSTGRES_PASSWORD: tsv          # credenciales SOLO de desarrollo local
+      POSTGRES_DB: theshowverse
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsv -d theshowverse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tsv-local-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:

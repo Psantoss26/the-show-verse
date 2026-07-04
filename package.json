@@ -8,7 +8,14 @@
     "start": "next start",
     "lint": "eslint .",
     "mw:search": "modern-web-guidance search",
-    "mw:retrieve": "modern-web-guidance retrieve"
+    "mw:retrieve": "modern-web-guidance retrieve",
+    "db:up": "docker compose -f deploy/local/docker-compose.yml up -d",
+    "db:down": "docker compose -f deploy/local/docker-compose.yml down",
+    "db:reset": "docker compose -f deploy/local/docker-compose.yml down -v && docker compose -f deploy/local/docker-compose.yml up -d",
+    "db:logs": "docker compose -f deploy/local/docker-compose.yml logs -f",
+    "db:sync-prod": "bash scripts/sync-prod-db.sh",
+    "backend:migrate": "npm --prefix backend run db:migrate",
+    "backend:dev": "npm --prefix backend run dev"
   },
   "dependencies": {
     "@vercel/analytics": "^1.1.4",

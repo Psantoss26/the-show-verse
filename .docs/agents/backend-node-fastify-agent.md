@@ -22,9 +22,9 @@ Help implement, review, deploy, and debug the custom backend in `backend/`, with
 Before changing backend behavior, read the relevant files:
 
 ```sh
-.docs/backend_implementation_plan.md
-.docs/backend_functionality_coverage.md
-.docs/backend_manual_testing.md
+.docs/backend/backend_implementation_plan.md
+.docs/backend/backend_functionality_coverage.md
+.docs/backend/backend_manual_testing.md
 backend/src/server.js
 backend/src/db/schema.js
 backend/src/routes/*

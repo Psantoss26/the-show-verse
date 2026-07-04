@@ -2,7 +2,8 @@
 import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
-import { tmdbDiscover, tmdbList, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { tmdbDiscover, tmdbList, tmdbDetails, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { rankNewReleaseMovies } from './score.js';
 import {
   balanceSoftLimitedContent,
   excludeKidsReality,
@@ -81,8 +82,24 @@ function refine(cards, mediaType, floor) {
 
 function shouldRefineCachedPool(poolKey) {
   // Estrenos incluye próximos lanzamientos sin votos: no se debe filtrar por
-  // señal pública hasta que estén estrenados.
-  return poolKey !== 'new_releases';
+  // señal pública hasta que estén estrenados. `calendar_episodes` guarda
+  // ENTRADAS DE EPISODIO (no "cards"): refine() las descartaría.
+  return poolKey !== 'new_releases' && poolKey !== 'calendar_episodes';
+}
+
+// Ejecuta `mapper` sobre `items` con concurrencia acotada. Preserva el orden.
+export async function mapLimit(items, limit, mapper) {
+  const out = new Array(items.length);
+  let index = 0;
+  const workerCount = Math.max(1, Math.min(limit, items.length || 1));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (index < items.length) {
+      const current = index++;
+      out[current] = await mapper(items[current], current);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 // Parámetros de discover por tipo: en TV excluimos géneros no deseados
@@ -201,13 +218,39 @@ function upcomingContentRules(cards) {
     .sort((a, b) => b.weightedRank - a.weightedRank || a.index - b.index)
     .map(({ card }) => card);
 }
-addPool('new_releases', 'movie', TTL_24H, async () =>
-  upcomingContentRules(await discoverPages('movie', {
-    sort_by: 'popularity.desc',
-    'primary_release_date.gte': dateOffset(0),       // de hoy en adelante
-    'primary_release_date.lte': dateOffset(275),     // ~9 meses
-  }, 4))
-);
+// "Estrenos y novedades" (películas): ventana de recién estrenadas + próximas y
+// ranking compuesto (popularidad + presupuesto + recaudación + proximidad de
+// estreno) para que los títulos MÁS IMPORTANTES encabecen. Presupuesto/recaudación
+// no vienen en discover: se enriquecen los candidatos más populares con detalles
+// de TMDB. La fila no rota (NON_ROTATING_POOLS): se respeta este orden.
+const NEW_RELEASES_ENRICH_LIMIT = 50;
+
+async function enrichMoviesWithFinancials(cards, limit = NEW_RELEASES_ENRICH_LIMIT) {
+  const head = await mapLimit(cards.slice(0, limit), 8, async (card) => {
+    const details = await tmdbDetails('movie', card.tmdbId);
+    if (!details) return card;
+    return {
+      ...card,
+      budget: typeof details.budget === 'number' ? details.budget : 0,
+      revenue: typeof details.revenue === 'number' ? details.revenue : 0,
+      // La fecha del detalle (estreno principal) es más fiable que la regional.
+      releaseDate: details.release_date || card.releaseDate || null,
+    };
+  });
+  return [...head, ...cards.slice(limit)];
+}
+
+addPool('new_releases', 'movie', TTL_24H, async () => {
+  const cleaned = capAsian(excludeKidsReality(dedupeCards(
+    await discoverPages('movie', {
+      sort_by: 'popularity.desc',
+      'primary_release_date.gte': dateOffset(-60),    // recién estrenadas…
+      'primary_release_date.lte': dateOffset(120),    // …y próximas (~4 meses)
+    }, 4),
+  )));
+  const enriched = await enrichMoviesWithFinancials(cleaned);
+  return rankNewReleaseMovies(enriched);
+});
 addPool('new_releases', 'tv', TTL_24H, async () =>
   upcomingContentRules(await discoverPages('tv', discoverParams('tv', {
     sort_by: 'popularity.desc',
@@ -215,6 +258,107 @@ addPool('new_releases', 'tv', TTL_24H, async () =>
     'first_air_date.lte': dateOffset(275),
   }), 4))
 );
+
+// ─── Calendario: próximos episodios de series ─────────────────────────────────
+// Ventana de emisión del calendario: desde hace 2 días (recién emitidos) hasta
+// 21 días vista.
+export const CALENDAR_PAST_DAYS = 2;
+export const CALENDAR_AHEAD_DAYS = 21;
+
+export function withinCalendarWindow(airDate, now = Date.now()) {
+  if (!airDate) return false;
+  const t = new Date(`${airDate}T00:00:00Z`).getTime();
+  if (!Number.isFinite(t)) return false;
+  // Diferencia en DÍAS DE CALENDARIO (ambos a medianoche UTC): así los bordes son
+  // exactos e independientes de la hora del día de `now` (air_date es date-only).
+  const d = new Date(now);
+  const todayMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const days = Math.round((t - todayMidnight) / 86400000);
+  return days >= -CALENDAR_PAST_DAYS && days <= CALENDAR_AHEAD_DAYS;
+}
+
+// Detalles mínimos de una serie para el calendario (título, imágenes y su
+// next_episode_to_air), cacheados en memoria y COMPARTIDOS entre el build del pool
+// base y las peticiones de /calendar del usuario, para no repetir GET /tv/{id}.
+const CALENDAR_SHOW_TTL_MS = 60 * 60 * 1000; // 1h
+const calendarShowCache = new Map(); // tmdbId -> { ts, value }
+
+export async function getCalendarShowDetails(tmdbId) {
+  if (!tmdbId) return null;
+  const cached = calendarShowCache.get(tmdbId);
+  if (cached && Date.now() - cached.ts < CALENDAR_SHOW_TTL_MS) return cached.value;
+
+  const details = await tmdbDetails('tv', tmdbId);
+  const value = details
+    ? {
+        tmdbId: Number(tmdbId),
+        title: details.name || null,
+        posterPath: details.poster_path || null,
+        backdropPath: details.backdrop_path || null,
+        nextEpisode: details.next_episode_to_air || null,
+      }
+    : null;
+
+  calendarShowCache.set(tmdbId, { ts: Date.now(), value });
+  return value;
+}
+
+// Construye una entrada de episodio próximo (forma consumida por el cliente).
+export function buildUpcomingEpisodeEntry(show, nextEp, sources = []) {
+  if (!show?.tmdbId || !nextEp?.air_date) return null;
+  const season = Number(nextEp.season_number);
+  const number = Number(nextEp.episode_number);
+  if (!Number.isFinite(season) || !Number.isFinite(number)) return null;
+  return {
+    id: `tv:${show.tmdbId}:${season}:${number}`,
+    show: {
+      tmdbId: Number(show.tmdbId),
+      title: show.title || null,
+      posterPath: show.posterPath || null,
+      backdropPath: show.backdropPath || null,
+    },
+    episode: {
+      season,
+      number,
+      title: nextEp.name || null,
+      airDate: nextEp.air_date,
+    },
+    sources,
+  };
+}
+
+// calendar_episodes (12h) — base ANÓNIMA: próximos episodios de las series más
+// populares (popular ∪ trending ∪ top España), dentro de la ventana del calendario
+// y ordenados por fecha de emisión.
+addPool('calendar_episodes', 'tv', TTL_12H, async () => {
+  const [popular, trending, region] = await Promise.all([
+    getPool('popular', 'tv').catch(() => []),
+    getPool('trending', 'tv').catch(() => []),
+    getPool('region_top', 'tv').catch(() => []),
+  ]);
+
+  const shows = dedupeCards([...popular, ...trending, ...region])
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+    .slice(0, 40);
+
+  const entries = await mapLimit(shows, 8, async (show) => {
+    const details = await getCalendarShowDetails(show.tmdbId);
+    if (!details || !withinCalendarWindow(details.nextEpisode?.air_date)) return null;
+    return buildUpcomingEpisodeEntry(
+      {
+        tmdbId: show.tmdbId,
+        title: details.title || show.title,
+        posterPath: details.posterPath || show.posterPath,
+        backdropPath: details.backdropPath || show.backdropPath,
+      },
+      details.nextEpisode,
+    );
+  });
+
+  return entries
+    .filter(Boolean)
+    .sort((a, b) => (a.episode.airDate || '').localeCompare(b.episode.airDate || ''));
+});
 
 // region_top (24h) — "Top hoy en España": lo más popular AHORA en streaming en
 // España, RECIENTE (no histórico). Antes usaba popularidad GLOBAL con region=ES,

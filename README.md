@@ -648,7 +648,7 @@ the-show-verse/
 │   ├── 📄 favicon.ico
 │   └── 📂 images/
 │
-├── 📂 docs/                           # Documentación
+├── 📂 .docs/                           # Documentación
 │   ├── 📂 screenshots/                # Capturas de pantalla
 │   └── 📄 *.md                        # Documentos adicionales
 │

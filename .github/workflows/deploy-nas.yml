@@ -1,0 +1,60 @@
+# CI/CD → NAS autoalojado (UGREEN DXP 4800 Plus).
+# El runner self-hosted del propio NAS ejecuta este workflow: valida el backend y
+# despliega el stack de deploy/nas con Docker Compose. Los ficheros de entorno con
+# secretos (deploy/nas/.env, *.env) NO están en el repo: viven de forma persistente
+# en el NAS (carpeta montada en /nas-deploy) y se conservan entre despliegues.
+name: Deploy to NAS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Un despliegue a la vez; no cancelar uno en curso.
+concurrency:
+  group: deploy-nas
+  cancel-in-progress: false
+
+jobs:
+  # ── 1) Gate de calidad: tests del backend ──────────────────────────────────
+  test:
+    runs-on: [self-hosted, nas]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar dependencias del backend
+        run: npm --prefix backend ci
+      - name: Tests del backend
+        run: npm --prefix backend test
+
+  # ── 2) Build + despliegue del stack en el NAS ──────────────────────────────
+  deploy:
+    needs: test
+    runs-on: [self-hosted, nas]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sincronizar código a /nas-deploy (conserva los .env del NAS)
+        run: |
+          if ! command -v rsync >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y rsync
+          fi
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='deploy/nas/.env' \
+            --exclude='deploy/nas/*.env' \
+            ./ /nas-deploy/
+
+      - name: Build + levantar servicios de la app
+        working-directory: /nas-deploy/deploy/nas
+        run: |
+          # Se listan los servicios EXPLÍCITAMENTE para NO recrear el propio
+          # github-runner (que está ejecutando este job).
+          docker compose up -d --build \
+            postgres redis backend web cloudflared ollama
+
+      - name: Limpiar imágenes huérfanas
+        run: docker image prune -f

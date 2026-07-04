@@ -5,13 +5,13 @@ Esta guia explica como levantar The Show Verse con el backend propio, PostgreSQL
 Referencia completa de API:
 
 ```text
-.docs/backend_api_reference.md
+.docs/backend/backend_api_reference.md
 ```
 
 Configuracion de login con Google:
 
 ```text
-.docs/google_auth_setup.md
+.docs/backend/google_auth_setup.md
 ```
 
 Documentacion interactiva cuando el backend esta arrancado:

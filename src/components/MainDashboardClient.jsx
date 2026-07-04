@@ -49,6 +49,7 @@ import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
 import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
+import DashboardCalendarSection from "@/components/DashboardCalendarSection";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import {
@@ -3959,23 +3960,44 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
           {/* Filas de la engine: recomendaciones personalizadas + contenido
               genérico rotativo, deduplicado por el backend (sin Trakt). Se usa el
               componente Row (con vista previa al hover y flechas de desplazamiento).
-              Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero. */}
-          {visibleEngineRows.map((row) => (
-              <Row
-                key={row.key}
-                title={row.title}
-                items={row.items}
-                isMobile={isMobile}
-                hydrated={hydrated}
-                posterCacheRef={posterCacheRef}
-                posterOverrides={posterOverrides}
-                backdropOverrides={backdropOverrides}
-                overridesReady={overridesReady}
-                spotlight={
-                  !!spotlightRowTitle && row.title === spotlightRowTitle
-                }
-              />
-            ))}
+              Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero.
+              La sección "Calendario" (próximos episodios de series) se inserta justo
+              ANTES de la fila "Estrenos y novedades". */}
+          {(() => {
+            const nodes = [];
+            let calendarInserted = false;
+            for (const row of visibleEngineRows) {
+              if (!calendarInserted && row.title === "Estrenos y novedades") {
+                nodes.push(
+                  <DashboardCalendarSection key="__calendar__" isMobile={isMobile} />,
+                );
+                calendarInserted = true;
+              }
+              nodes.push(
+                <Row
+                  key={row.key}
+                  title={row.title}
+                  items={row.items}
+                  isMobile={isMobile}
+                  hydrated={hydrated}
+                  posterCacheRef={posterCacheRef}
+                  posterOverrides={posterOverrides}
+                  backdropOverrides={backdropOverrides}
+                  overridesReady={overridesReady}
+                  spotlight={
+                    !!spotlightRowTitle && row.title === spotlightRowTitle
+                  }
+                />,
+              );
+            }
+            // Si no hubo fila de estrenos, el calendario abre las filas del engine.
+            if (!calendarInserted) {
+              nodes.unshift(
+                <DashboardCalendarSection key="__calendar__" isMobile={isMobile} />,
+              );
+            }
+            return nodes;
+          })()}
           </motion.div>
         </div>
       </div>

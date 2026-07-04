@@ -10,7 +10,7 @@ test('toCard maps a TMDB movie result to the card shape', () => {
   }, 'movie');
   assert.deepEqual(card, {
     tmdbId: 27205, mediaType: 'movie', title: 'Inception', posterPath: '/p.jpg',
-    backdropPath: '/b.jpg', voteAverage: 8.4, voteCount: 35000, originalLanguage: 'en', originCountry: ['US'], year: 2010, genreIds: [28, 878], popularity: 50.1,
+    backdropPath: '/b.jpg', voteAverage: 8.4, voteCount: 35000, originalLanguage: 'en', originCountry: ['US'], year: 2010, releaseDate: '2010-07-15', genreIds: [28, 878], popularity: 50.1,
   });
 });
 
