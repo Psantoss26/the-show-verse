@@ -61,6 +61,12 @@ services:
       - backend
     ports:
       - "3000:3000"
+    networks:
+      default:
+        aliases:
+          # Alias para que la ruta del túnel `http://the-show-verse:3000`
+          # (config previa) resuelva a esta web sin cambiar el panel de Cloudflare.
+          - the-show-verse
 
   # Cloudflare Tunnel: expone la web a Internet (theshowverse.com) sin abrir
   # puertos, con TLS gestionado por Cloudflare. El hostname público se configura
