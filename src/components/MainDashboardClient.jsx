@@ -3958,22 +3958,52 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               genérico rotativo, deduplicado por el backend (sin Trakt). Se usa el
               componente Row (con vista previa al hover y flechas de desplazamiento).
               Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero.
-              La sección "Calendario" (próximos episodios de series) se inserta justo
-              ANTES de la fila "Más esperadas". */}
+              El bloque "Calendario" + "Más esperadas" se saca de su posición natural
+              y se coloca ARRIBA, justo tras la 1ª fila ("Recomendaciones de hoy para
+              ti"), para dar prioridad a los próximos episodios y estrenos. */}
           {(() => {
+            // Fila destacada "Más esperadas" (key `anticipated`) buscada en TODAS las
+            // filas (no solo las reveladas) para poder mostrarla siempre en el bloque.
+            const anticipatedRow = renderableEngineRows.find(
+              (row) =>
+                row.key === "anticipated" &&
+                Array.isArray(row.items) &&
+                row.items.length > 0,
+            );
+
+            // Bloque Calendario + Más esperadas que se inserta arriba.
+            const calendarBlock = [
+              <DashboardCalendarSection
+                key="__calendar__"
+                isMobile={isMobile}
+                hydrated={hydrated}
+              />,
+            ];
+            if (anticipatedRow) {
+              calendarBlock.push(
+                <Row
+                  key={anticipatedRow.key}
+                  title={anticipatedRow.title}
+                  items={anticipatedRow.items}
+                  isMobile={isMobile}
+                  hydrated={hydrated}
+                  posterCacheRef={posterCacheRef}
+                  posterOverrides={posterOverrides}
+                  backdropOverrides={backdropOverrides}
+                  overridesReady={overridesReady}
+                  spotlight={
+                    !!spotlightRowTitle &&
+                    anticipatedRow.title === spotlightRowTitle
+                  }
+                />,
+              );
+            }
+
             const nodes = [];
-            let calendarInserted = false;
+            let blockInserted = false;
             for (const row of visibleEngineRows) {
-              if (!calendarInserted && row.key === "anticipated") {
-                nodes.push(
-                  <DashboardCalendarSection
-                    key="__calendar__"
-                    isMobile={isMobile}
-                    hydrated={hydrated}
-                  />,
-                );
-                calendarInserted = true;
-              }
+              // "Más esperadas" se pinta en el bloque superior, no en su sitio.
+              if (row.key === "anticipated") continue;
               nodes.push(
                 <Row
                   key={row.key}
@@ -3985,23 +4015,19 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                   posterOverrides={posterOverrides}
                   backdropOverrides={backdropOverrides}
                   overridesReady={overridesReady}
-                  sectionHref={row.key === "anticipated" ? false : undefined}
                   spotlight={
                     !!spotlightRowTitle && row.title === spotlightRowTitle
                   }
                 />,
               );
+              // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el bloque.
+              if (!blockInserted) {
+                nodes.push(...calendarBlock);
+                blockInserted = true;
+              }
             }
-            // Si no hubo fila de estrenos, el calendario abre las filas del engine.
-            if (!calendarInserted) {
-              nodes.unshift(
-                <DashboardCalendarSection
-                  key="__calendar__"
-                  isMobile={isMobile}
-                  hydrated={hydrated}
-                />,
-              );
-            }
+            // Sin filas todavía: el bloque abre la lista.
+            if (!blockInserted) nodes.unshift(...calendarBlock);
             return nodes;
           })()}
           </motion.div>

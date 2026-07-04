@@ -288,9 +288,10 @@ addPool('anticipated', 'movie', TTL_24H, async () => {
 
 // ─── Calendario: próximos episodios de series ─────────────────────────────────
 // Ventana de emisión del calendario: desde hace 2 días (recién emitidos) hasta
-// 21 días vista.
+// 45 días vista. La ventana amplia capta también estrenos de nueva temporada a
+// 3-6 semanas (los "estrenos" que interesan), no solo los episodios inminentes.
 export const CALENDAR_PAST_DAYS = 2;
-export const CALENDAR_AHEAD_DAYS = 21;
+export const CALENDAR_AHEAD_DAYS = 45;
 
 export function withinCalendarWindow(airDate, now = Date.now()) {
   if (!airDate) return false;
