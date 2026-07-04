@@ -714,11 +714,11 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
       {/* Overlay inferior: progreso o fecha de emisión + próximo episodio */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8">
         {isCalendar && calendar?.countdown ? (
-          <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-bold text-amber-200 drop-shadow">
+          <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-semibold text-white drop-shadow">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{calendar.countdown}</span>
             {calendar.isPremiere && (
-              <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
+              <span className="rounded bg-white px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
                 Estreno
               </span>
             )}
@@ -730,7 +730,7 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
           </div>
         ) : null}
         {isCalendar ? (
-          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-zinc-200">
+          <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-white">
             {ep && <span className="shrink-0 text-white">T{ep.season}·E{ep.number}</span>}
             {ep?.title && (
               <>
@@ -1345,11 +1345,11 @@ function ContinueWatchingPreviewCard({
         {/* Estado de la tarjeta superpuesto al pie del backdrop */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-black/85" />
         {isCalendar ? (
-          <div className="absolute inset-x-3 bottom-2 flex items-center gap-2 text-xs font-bold text-amber-100">
-            <CalendarDays className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" />
+          <div className="absolute inset-x-3 bottom-2 flex items-center gap-2 text-xs font-bold text-white">
+            <CalendarDays className="h-3.5 w-3.5 text-white" aria-hidden="true" />
             <span>{calendar?.countdown || "Próximamente"}</span>
             {calendar?.isPremiere && (
-              <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
+              <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
                 Estreno
               </span>
             )}
@@ -1375,19 +1375,6 @@ function ContinueWatchingPreviewCard({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        {isCalendar && (
-          <div className="mb-3 min-w-0">
-            <h4 className="truncate text-base font-black text-white sm:text-lg">
-              {show?.title || "Serie"}
-            </h4>
-            {ep?.title && (
-              <p className="mt-0.5 truncate text-xs font-medium text-zinc-400">
-                {ep.title}
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Fila de acciones: acción principal + favorito + pendientes */}
         <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
           <button
@@ -1486,7 +1473,7 @@ function ContinueWatchingPreviewCard({
               );
             if (isCalendar && calendar?.countdown) {
               parts.push(
-                <span key="air" className="text-amber-200">
+                <span key="air" className="text-white">
                   {calendar.countdown}
                 </span>,
               );
@@ -1874,10 +1861,9 @@ function ContinueWatchingSection({
       {isCalendar ? (
         <Link
           href="/calendar"
-          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
+          className="inline-block bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
           aria-label="Ver el calendario completo"
         >
-          <CalendarDays className="h-5 w-5 text-amber-400 sm:h-6 sm:w-6" />
           Calendario<span className="text-amber-500">.</span>
         </Link>
       ) : (
@@ -1995,7 +1981,10 @@ function ContinueWatchingSection({
             breakpoints={breakpoints}
           >
             {displayShows.map((show, i) => {
-              const itemKey = `tv:${show.id}`;
+              // `uid` (único por episodio) permite que una misma serie aparezca
+              // varias veces en el Calendario sin colisión de keys; en el resto
+              // de modos no hay `uid` y se usa el tmdbId como hasta ahora.
+              const itemKey = show.uid || `tv:${show.id}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = animatingOutId === itemKey;
 

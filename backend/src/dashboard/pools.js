@@ -2,7 +2,7 @@
 import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
-import { tmdbDiscover, tmdbList, tmdbDetails, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
 import { rankAnticipatedMovies, rankNewReleaseMovies } from './score.js';
 import {
   balanceSoftLimitedContent,
@@ -311,21 +311,65 @@ export function withinCalendarWindow(airDate, now = Date.now()) {
 const CALENDAR_SHOW_TTL_MS = 60 * 60 * 1000; // 1h
 const calendarShowCache = new Map(); // tmdbId -> { ts, value }
 
+// Máximo de próximos episodios por serie: evita que una serie diaria (o con
+// muchos episodios programados) inunde el calendario. Se muestran los N más
+// cercanos por fecha.
+export const MAX_EPISODES_PER_SHOW = 4;
+
 export async function getCalendarShowDetails(tmdbId) {
   if (!tmdbId) return null;
   const cached = calendarShowCache.get(tmdbId);
   if (cached && Date.now() - cached.ts < CALENDAR_SHOW_TTL_MS) return cached.value;
 
   const details = await tmdbDetails('tv', tmdbId);
-  const value = details
-    ? {
-        tmdbId: Number(tmdbId),
-        title: details.name || null,
-        posterPath: details.poster_path || null,
-        backdropPath: details.backdrop_path || null,
-        nextEpisode: details.next_episode_to_air || null,
-      }
-    : null;
+  if (!details) {
+    calendarShowCache.set(tmdbId, { ts: Date.now(), value: null });
+    return null;
+  }
+
+  const nextEp = details.next_episode_to_air || null;
+
+  // Varios próximos episodios: se lee la temporada del next_episode_to_air y se
+  // filtran los que caen dentro de la ventana del calendario (ordenados por fecha
+  // y acotados por serie). Fallback al episodio suelto si la temporada no ayuda.
+  let upcomingEpisodes = [];
+  const seasonNum = Number(nextEp?.season_number);
+  if (nextEp?.air_date && Number.isFinite(seasonNum)) {
+    const season = await tmdbSeason(tmdbId, seasonNum);
+    const eps = Array.isArray(season?.episodes) ? season.episodes : [];
+    upcomingEpisodes = eps
+      .filter((e) => e?.air_date && withinCalendarWindow(e.air_date))
+      .map((e) => ({
+        season_number: Number.isFinite(Number(e.season_number))
+          ? Number(e.season_number)
+          : seasonNum,
+        episode_number: e.episode_number,
+        air_date: e.air_date,
+        name: e.name || null,
+      }))
+      .sort((a, b) => (a.air_date || '').localeCompare(b.air_date || ''))
+      .slice(0, MAX_EPISODES_PER_SHOW);
+
+    if (upcomingEpisodes.length === 0 && withinCalendarWindow(nextEp.air_date)) {
+      upcomingEpisodes = [
+        {
+          season_number: seasonNum,
+          episode_number: nextEp.episode_number,
+          air_date: nextEp.air_date,
+          name: nextEp.name || null,
+        },
+      ];
+    }
+  }
+
+  const value = {
+    tmdbId: Number(tmdbId),
+    title: details.name || null,
+    posterPath: details.poster_path || null,
+    backdropPath: details.backdrop_path || null,
+    nextEpisode: nextEp,
+    upcomingEpisodes,
+  };
 
   calendarShowCache.set(tmdbId, { ts: Date.now(), value });
   return value;
@@ -355,9 +399,31 @@ export function buildUpcomingEpisodeEntry(show, nextEp, sources = []) {
   };
 }
 
+// Construye TODAS las entradas de próximos episodios de una serie (varias por
+// serie) a partir de sus detalles de calendario (details.upcomingEpisodes).
+export function buildUpcomingEpisodeEntries(details, show = null, sources = []) {
+  if (!details?.upcomingEpisodes?.length) return [];
+  const showObj = {
+    tmdbId: details.tmdbId ?? show?.tmdbId,
+    title: details.title || show?.title || null,
+    posterPath: details.posterPath || show?.posterPath || null,
+    backdropPath: details.backdropPath || show?.backdropPath || null,
+  };
+  return details.upcomingEpisodes
+    .map((ep) => buildUpcomingEpisodeEntry(showObj, ep, sources))
+    .filter(Boolean);
+}
+
+// Tamaño máximo del pool base del calendario. Con varios episodios por serie hay
+// más entradas; se acota tras ordenar por fecha para no crecer sin límite.
+const CALENDAR_POOL_MAX = 80;
+
+const byEntryAirDate = (a, b) =>
+  (a?.episode?.airDate || '').localeCompare(b?.episode?.airDate || '');
+
 // calendar_episodes (12h) — base ANÓNIMA: próximos episodios de las series más
-// populares (popular ∪ trending ∪ top España), dentro de la ventana del calendario
-// y ordenados por fecha de emisión.
+// populares (popular ∪ trending ∪ top España), dentro de la ventana del calendario,
+// VARIOS por serie y ordenados por fecha de emisión.
 addPool('calendar_episodes', 'tv', TTL_12H, async () => {
   const [popular, trending, region] = await Promise.all([
     getPool('popular', 'tv').catch(() => []),
@@ -369,23 +435,14 @@ addPool('calendar_episodes', 'tv', TTL_12H, async () => {
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
     .slice(0, 40);
 
-  const entries = await mapLimit(shows, 8, async (show) => {
-    const details = await getCalendarShowDetails(show.tmdbId);
-    if (!details || !withinCalendarWindow(details.nextEpisode?.air_date)) return null;
-    return buildUpcomingEpisodeEntry(
-      {
-        tmdbId: show.tmdbId,
-        title: details.title || show.title,
-        posterPath: details.posterPath || show.posterPath,
-        backdropPath: details.backdropPath || show.backdropPath,
-      },
-      details.nextEpisode,
-    );
-  });
+  const entries = (
+    await mapLimit(shows, 8, async (show) => {
+      const details = await getCalendarShowDetails(show.tmdbId);
+      return buildUpcomingEpisodeEntries(details, show, []);
+    })
+  ).flat();
 
-  return entries
-    .filter(Boolean)
-    .sort((a, b) => (a.episode.airDate || '').localeCompare(b.episode.airDate || ''));
+  return entries.sort(byEntryAirDate).slice(0, CALENDAR_POOL_MAX);
 });
 
 // region_top (24h) — "Top hoy en España": lo más popular AHORA en streaming en
