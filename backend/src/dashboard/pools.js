@@ -435,8 +435,11 @@ addPool('calendar_episodes', 'tv', TTL_12H, async () => {
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
     .slice(0, 40);
 
+  // Concurrencia moderada (4): enriquecer ~40 series dispara 2 llamadas TMDB cada
+  // una (detalle + temporada); en ráfaga alta se rate-limita y el multi-episodio
+  // caía a 1. Con menos concurrencia + reintentos en tmdbGet, se obtienen varios.
   const entries = (
-    await mapLimit(shows, 8, async (show) => {
+    await mapLimit(shows, 4, async (show) => {
       const details = await getCalendarShowDetails(show.tmdbId);
       return buildUpcomingEpisodeEntries(details, show, []);
     })
