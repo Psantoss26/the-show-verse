@@ -37,13 +37,13 @@ export const SURFACES = {
         source: { kind: 'pool', poolKey: 'top_rated' },
       },
       {
-        // Solo películas: estrenos rankeados por popularidad + presupuesto +
-        // recaudación + proximidad de estreno (ver pool new_releases:movie). Las
-        // series tienen su hueco en la sección "Calendario" del home.
-        key: 'new_releases',
-        title: 'Estrenos y novedades',
+        // Solo películas aún no estrenadas, ordenadas por una aproximación
+        // propia a la anticipación (popularidad TMDB + escala + saga + cercanía).
+        // Las series tienen su hueco en la sección "Calendario" del home.
+        key: 'anticipated',
+        title: 'Más esperadas',
         mediaType: 'movie',
-        source: { kind: 'pool', poolKey: 'new_releases' },
+        source: { kind: 'pool', poolKey: 'anticipated' },
       },
       {
         key: 'acclaimed',

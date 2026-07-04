@@ -21,7 +21,7 @@ set -euo pipefail
 CONTAINER="tsv-local-db"
 LOCAL_USER="tsv"
 LOCAL_DB="theshowverse"
-PG_IMAGE="postgres:16"
+PG_IMAGE="postgres:18"   # prod (NAS) y Neon corren PG18; el cliente debe ser >= servidor
 DUMP="${1:-${PROD_DUMP_FILE:-theshowverse.dump}}"
 
 if ! command -v docker >/dev/null 2>&1; then

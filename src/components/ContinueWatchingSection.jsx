@@ -6,8 +6,9 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, BookmarkPlus, Play, Award } from "lucide-react";
+import { Heart, BookmarkPlus, Play, Award, CalendarDays } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
@@ -659,7 +660,7 @@ function useShowBackdrop(show) {
 /* ====================================================================
  * Tarjeta base (sin hover): backdrop + overlay de progreso
  * ==================================================================== */
-function ContinueWatchingBaseCard({ show }) {
+function ContinueWatchingBaseCard({ show, mode = "continue" }) {
   const { backdropPath } = useShowBackdrop(show);
   const bgSrc = backdropPath
     ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
@@ -678,6 +679,8 @@ function ContinueWatchingBaseCard({ show }) {
   };
   const pct = clampPct(show?.pct);
   const ep = show?.nextEpisode;
+  const isCalendar = mode === "calendar";
+  const calendar = show?.calendar || null;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-900">
@@ -708,20 +711,42 @@ function ContinueWatchingBaseCard({ show }) {
         />
       )}
 
-      {/* Overlay inferior: progreso + próximo episodio */}
+      {/* Overlay inferior: progreso o fecha de emisión + próximo episodio */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8">
-        {ep && (
+        {isCalendar && calendar?.countdown ? (
+          <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-bold text-amber-200 drop-shadow">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{calendar.countdown}</span>
+            {calendar.isPremiere && (
+              <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
+                Estreno
+              </span>
+            )}
+          </div>
+        ) : ep ? (
           <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
             <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
             <span>T{ep.season}·E{ep.number}</span>
           </div>
+        ) : null}
+        {isCalendar ? (
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-zinc-200">
+            {ep && <span className="shrink-0 text-white">T{ep.season}·E{ep.number}</span>}
+            {ep?.title && (
+              <>
+                <span className="text-white/35" aria-hidden="true">•</span>
+                <span className="truncate">{ep.title}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
+            <div
+              className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         )}
-        <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
-          <div
-            className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
       </div>
     </div>
   );
@@ -733,6 +758,7 @@ function ContinueWatchingBaseCard({ show }) {
  * ==================================================================== */
 function ContinueWatchingPreviewCard({
   show,
+  mode = "continue",
   index,
   totalCount,
   activeIndex,
@@ -1132,6 +1158,8 @@ function ContinueWatchingPreviewCard({
   const trailerSrc = buildPreviewTrailerSrc(trailer);
   const pct = clampPct(show?.pct);
   const ep = show?.nextEpisode;
+  const isCalendar = mode === "calendar";
+  const calendar = show?.calendar || null;
   const genres = genresText(show);
 
   const progressLabel =
@@ -1314,16 +1342,28 @@ function ContinueWatchingPreviewCard({
           </motion.div>
         )}
 
-        {/* Barra de progreso verde superpuesta al pie del backdrop */}
+        {/* Estado de la tarjeta superpuesto al pie del backdrop */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-black/85" />
-        <div className="absolute inset-x-3 bottom-2">
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
-            <div
-              className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
-              style={{ width: `${pct}%` }}
-            />
+        {isCalendar ? (
+          <div className="absolute inset-x-3 bottom-2 flex items-center gap-2 text-xs font-bold text-amber-100">
+            <CalendarDays className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" />
+            <span>{calendar?.countdown || "Próximamente"}</span>
+            {calendar?.isPremiere && (
+              <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
+                Estreno
+              </span>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="absolute inset-x-3 bottom-2">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Panel de info ampliado (debajo del backdrop), en el lenguaje visual de
@@ -1335,35 +1375,62 @@ function ContinueWatchingPreviewCard({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        {/* Fila de acciones: píldora Reanudar + favorito + pendientes */}
+        {isCalendar && (
+          <div className="mb-3 min-w-0">
+            <h4 className="truncate text-base font-black text-white sm:text-lg">
+              {show?.title || "Serie"}
+            </h4>
+            {ep?.title && (
+              <p className="mt-0.5 truncate text-xs font-medium text-zinc-400">
+                {ep.title}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Fila de acciones: acción principal + favorito + pendientes */}
         <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
           <button
             type="button"
             onClick={handleContinue}
             className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-4 sm:text-sm"
           >
-            <Play className="h-4 w-4 fill-current" />
-            <span>{ep ? `Reanudar T${ep.season}·E${ep.number}` : "Reanudar"}</span>
+            {isCalendar ? (
+              <CalendarDays className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4 fill-current" />
+            )}
+            <span>
+              {isCalendar
+                ? ep
+                  ? `Ver T${ep.season}·E${ep.number}`
+                  : "Ver serie"
+                : ep
+                  ? `Reanudar T${ep.season}·E${ep.number}`
+                  : "Reanudar"}
+            </span>
           </button>
 
           {/* Botón de progreso de visionado (círculo con % y relleno). */}
-          <LiquidButton
-            onClick={handleContinue}
-            active
-            activeColor="green"
-            groupId="continue-watching-actions"
-            title={`Continuar viendo · ${pct}% visto`}
-            progressPercent={`${pct}%`}
-            fillPercentage={pct}
-            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_div>span:first-child]:!text-base sm:[&_div>span:first-child]:!text-lg [&_div>span:first-child]:!tracking-[-0.02em] [&_div>span:last-child]:!text-[9px] sm:[&_div>span:last-child]:!text-[10px] [&_span]:!text-white"
-          />
+          {!isCalendar && (
+            <LiquidButton
+              onClick={handleContinue}
+              active
+              activeColor="green"
+              groupId="continue-watching-actions"
+              title={`Continuar viendo · ${pct}% visto`}
+              progressPercent={`${pct}%`}
+              fillPercentage={pct}
+              className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_div>span:first-child]:!text-base sm:[&_div>span:first-child]:!text-lg [&_div>span:last-child]:!text-[9px] sm:[&_div>span:last-child]:!text-[10px] [&_span]:!text-white"
+            />
+          )}
 
           <LiquidButton
             onClick={handleToggleFavorite}
             loading={loadingStates || updating}
             active={favorite}
             activeColor="red"
-            groupId="continue-watching-actions"
+            groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
             title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
             className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
           >
@@ -1375,7 +1442,7 @@ function ContinueWatchingPreviewCard({
             loading={loadingStates || updating}
             active={watchlist}
             activeColor="blue"
-            groupId="continue-watching-actions"
+            groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
             title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
             className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
           >
@@ -1417,6 +1484,13 @@ function ContinueWatchingPreviewCard({
                   T{ep.season} · E{ep.number}
                 </span>,
               );
+            if (isCalendar && calendar?.countdown) {
+              parts.push(
+                <span key="air" className="text-amber-200">
+                  {calendar.countdown}
+                </span>,
+              );
+            }
             if (progressLabel) parts.push(<span key="prog">{progressLabel}</span>);
             if (extras?.year) parts.push(<span key="year">{extras.year}</span>);
             if (extras?.seasons)
@@ -1519,9 +1593,16 @@ function ContinueWatchingSkeleton({ isMobile }) {
 }
 
 /* ====================================================================
- * Sección "Continuar viendo"
+ * Carrusel horizontal compartido por "Continuar viendo" y "Calendario".
+ * Calendario inyecta sus series ya cargadas para reutilizar exactamente la
+ * misma tarjeta, expansión, tráiler y navegación sin duplicar la interacción.
  * ==================================================================== */
-function ContinueWatchingSection({ isMobile, hydrated }) {
+function ContinueWatchingSection({
+  isMobile,
+  hydrated,
+  externalShows = null,
+  mode = "continue",
+}) {
   const { authenticated, hydrated: authReady } = useAuth();
   const router = useRouter();
   // Igual que las demás filas: oculta al cargar, se revela con animación al
@@ -1530,13 +1611,16 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
   // null = cargando, [] = vacío confirmado (sin sesión / sin series en curso)
   const [shows, setShows] = useState(null);
+  const hasExternalShows = Array.isArray(externalShows);
+  const displayShows = hasExternalShows ? externalShows : shows;
 
   // Pinta al instante lo último cacheado para que NO desaparezca al recargar
   // (se refrescará en segundo plano cuando el backend confirme).
   useEffect(() => {
+    if (hasExternalShows) return;
     const cached = readContinueWatchingCache();
     if (cached) setShows(cached);
-  }, []);
+  }, [hasExternalShows]);
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -1571,7 +1655,12 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   }, [hoveredId]);
 
   useEffect(() => {
-    if (isMobile || !hydrated || !Array.isArray(shows) || shows.length === 0) {
+    if (
+      isMobile ||
+      !hydrated ||
+      !Array.isArray(displayShows) ||
+      displayShows.length === 0
+    ) {
       return;
     }
 
@@ -1579,15 +1668,15 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       Number.isFinite(perView) && perView > 0 ? Math.ceil(perView) : 6;
     const start = Math.max(0, activeIndex);
     const end = Math.min(
-      shows.length,
+      displayShows.length,
       start + Math.max(6, visibleCount + PREVIEW_TRAILER_PREWARM_AHEAD),
     );
 
     loadYouTubeIframeApi().catch(() => {});
-    shows.slice(start, end).forEach((show) => {
+    displayShows.slice(start, end).forEach((show) => {
       prewarmPreviewTrailer(show?.id);
     });
-  }, [activeIndex, shows, isMobile, hydrated, perView]);
+  }, [activeIndex, displayShows, isMobile, hydrated, perView]);
 
   // Al desmontar la fila, libera cualquier embed caliente que quedara (p. ej.
   // si se navega mientras el cursor seguía dentro de la fila).
@@ -1622,14 +1711,20 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   };
 
   const prewarmVisibleTrailers = () => {
-    if (isMobile || !Array.isArray(shows) || shows.length === 0) return;
+    if (
+      isMobile ||
+      !Array.isArray(displayShows) ||
+      displayShows.length === 0
+    ) {
+      return;
+    }
     const visibleCount =
       Number.isFinite(perView) && perView > 0 ? Math.ceil(perView) : 6;
-    shows
+    displayShows
       .slice(
         activeIndex,
         Math.min(
-          shows.length,
+          displayShows.length,
           activeIndex + visibleCount + PREVIEW_TRAILER_PREWARM_AHEAD,
         ),
       )
@@ -1643,8 +1738,8 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
     // movimiento lateral del cursor), para que al expandir el trailer ya esté
     // casi listo. El pool LRU acotado evita descargar de más.
     warmPreviewTrailerEmbed(tvId);
-    if (typeof index === "number" && Array.isArray(shows)) {
-      const next = shows[index + 1];
+    if (typeof index === "number" && Array.isArray(displayShows)) {
+      const next = displayShows[index + 1];
       if (next?.id) warmPreviewTrailerEmbed(next.id);
     }
     clearHoverCloseTimer();
@@ -1663,6 +1758,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
 
 
   useEffect(() => {
+    if (hasExternalShows) return undefined;
     // Auth ya resuelto y sin sesión: vacío definitivo, limpiamos caché.
     if (authReady && !authenticated) {
       setShows(EMPTY_ARRAY);
@@ -1725,7 +1821,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
       abort = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [authenticated, authReady]);
+  }, [authenticated, authReady, hasExternalShows]);
 
   const updateNav = (swiper) => {
     if (!swiper) return;
@@ -1755,28 +1851,40 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
   };
 
   // No se renderiza si: auth resuelto y sin sesión, o vacío confirmado.
-  if (authReady && !authenticated) return null;
-  if (Array.isArray(shows) && shows.length === 0) return null;
+  if (!hasExternalShows && authReady && !authenticated) return null;
+  if (Array.isArray(displayShows) && displayShows.length === 0) return null;
 
-  const loading = shows === null;
+  const loading = displayShows === null;
   // Aún sin datos y sin sesión confirmada: no mostramos skeleton (evita flash
   // en usuarios sin sesión); esperamos a que llegue la caché o se autentique.
-  if (loading && !authenticated) return null;
+  if (!hasExternalShows && loading && !authenticated) return null;
   const hasActivePreview = !!hoveredId;
   const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
+  const isCalendar = mode === "calendar";
   const Header = (
     <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
       <div className="mb-1.5 flex items-center gap-2">
         <div className="h-px w-8 bg-amber-500" />
         <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
-          CONTINUAR
+          {isCalendar ? "PRÓXIMOS EPISODIOS" : "CONTINUAR"}
         </span>
       </div>
-      <h3 className="bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent sm:text-2xl md:text-3xl">
-        Continuar viendo<span className="text-amber-500">.</span>
-      </h3>
+      {isCalendar ? (
+        <Link
+          href="/calendar"
+          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
+          aria-label="Ver el calendario completo"
+        >
+          <CalendarDays className="h-5 w-5 text-amber-400 sm:h-6 sm:w-6" />
+          Calendario<span className="text-amber-500">.</span>
+        </Link>
+      ) : (
+        <h3 className="bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent sm:text-2xl md:text-3xl">
+          Continuar viendo<span className="text-amber-500">.</span>
+        </h3>
+      )}
     </motion.div>
   );
 
@@ -1808,7 +1916,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
         1536: { slidesPerView: 6, spaceBetween: 20 },
       };
 
-  const swiperKey = `continue-watching-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
 
   return (
     <motion.div
@@ -1833,7 +1941,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
           prewarmVisibleTrailers();
           // Calienta ya el embed de la primera tarjeta visible: cuando el cursor
           // llegue a ella (o a su vecina), el trailer arrancará casi al instante.
-          const firstVisible = shows?.[Math.max(0, activeIndex)];
+          const firstVisible = displayShows?.[Math.max(0, activeIndex)];
           if (firstVisible?.id) warmPreviewTrailerEmbed(firstVisible.id);
         }}
         onMouseLeave={() => {
@@ -1886,7 +1994,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >
-            {shows.map((show, i) => {
+            {displayShows.map((show, i) => {
               const itemKey = `tv:${show.id}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = animatingOutId === itemKey;
@@ -1932,8 +2040,9 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                         >
                           <ContinueWatchingPreviewCard
                             show={show}
+                            mode={mode}
                             index={i}
-                            totalCount={shows.length}
+                            totalCount={displayShows.length}
                             activeIndex={activeIndex}
                             perView={perView}
                             onPreviewMouseEnter={() => openPreview(itemKey)}
@@ -1955,7 +2064,7 @@ function ContinueWatchingSection({ isMobile, hydrated }) {
                           style={{ willChange: "transform, opacity" }}
                           onClick={() => router.push(nextEpisodeHref(show))}
                         >
-                          <ContinueWatchingBaseCard show={show} />
+                          <ContinueWatchingBaseCard show={show} mode={mode} />
                         </motion.div>
                       )}
                     </AnimatePresence>

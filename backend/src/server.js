@@ -107,6 +107,9 @@ await fastify.register(fastifyRateLimit, {
   max: 200,
   timeWindow: '1 minute',
   hook: 'preHandler',
+  // Redis acelera y comparte el rate limit, pero no debe derribar toda la API
+  // si se reinicia o pierde la conexión temporalmente.
+  skipOnError: true,
   allowList: (req) => req.user?.username === 'psantos26',
   redis: await (async () => {
     try {

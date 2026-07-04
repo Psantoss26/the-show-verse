@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import {
-  getTraktMoviesAnticipated,
   getTraktMoviesPopular,
   getTraktMoviesTrending,
   getTraktPopular,
   getTraktRecommended,
-  getTraktShowsAnticipated,
   getTraktShowsPopular,
   getTraktShowsTrending,
   getTraktTrending,
 } from "@/lib/api/traktHelpers";
+import { getBackendBaseUrl } from "@/lib/backend/server";
 import { getValidTraktToken } from "@/lib/trakt/server";
 
 export const runtime = "nodejs";
@@ -39,7 +38,8 @@ const SECTION_CONFIG = {
   "mas-esperadas": {
     title: "Más esperadas",
     eyebrow: "PRÓXIMAMENTE",
-    description: "Estrenos anticipados que más interés están generando.",
+    description:
+      "Películas aún no estrenadas que más interés están generando.",
   },
 };
 
@@ -152,6 +152,47 @@ async function loadTmdbPopular() {
   ].filter(Boolean);
 }
 
+async function loadBackendAnticipated() {
+  const baseUrl = getBackendBaseUrl();
+  if (!baseUrl) return [];
+
+  const response = await fetch(`${baseUrl}/v1/dashboard/home`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  }).catch(() => null);
+  if (!response?.ok) return [];
+
+  const json = await response.json().catch(() => null);
+  const row = Array.isArray(json?.rows)
+    ? json.rows.find((candidate) => candidate?.key === "anticipated")
+    : null;
+
+  return (Array.isArray(row?.items) ? row.items : [])
+    .map((card) =>
+      withMeta(
+        {
+          id: card.tmdbId,
+          title: card.title,
+          original_title: card.title,
+          poster_path: card.posterPath || null,
+          backdrop_path: card.backdropPath || null,
+          vote_average: card.voteAverage || 0,
+          vote_count: card.voteCount || 0,
+          popularity: card.popularity || 0,
+          genre_ids: Array.isArray(card.genreIds) ? card.genreIds : [],
+          release_date:
+            card.releaseDate || (card.year ? `${card.year}-01-01` : null),
+        },
+        {
+          source: "tmdb",
+          section: "mas-esperadas",
+          mediaType: "movie",
+        },
+      ),
+    )
+    .filter(Boolean);
+}
+
 async function loadTraktSection(section, { traktToken = null } = {}) {
   if (section === "tendencias") {
     const [mixed, movies, shows] = await Promise.all([
@@ -175,16 +216,6 @@ async function loadTraktSection(section, { traktToken = null } = {}) {
       .filter(Boolean);
   }
 
-  if (section === "mas-esperadas") {
-    const [movies, shows] = await Promise.all([
-      getTraktMoviesAnticipated(100).catch(() => []),
-      getTraktShowsAnticipated(100).catch(() => []),
-    ]);
-    return dedupe([...movies, ...shows])
-      .map((item) => withMeta(item, { source: "trakt", section }))
-      .filter(Boolean);
-  }
-
   if (section === "recomendados") {
     return dedupe(
       await getTraktRecommended(120, "weekly", {
@@ -199,6 +230,10 @@ async function loadTraktSection(section, { traktToken = null } = {}) {
 }
 
 async function loadSectionItems(section, options = {}) {
+  if (section === "mas-esperadas") {
+    return loadBackendAnticipated();
+  }
+
   if (section === "tendencias") {
     const [trakt, tmdbItems] = await Promise.all([
       loadTraktSection(section, options),

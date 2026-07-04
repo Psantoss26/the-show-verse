@@ -6,14 +6,16 @@ name: theshowverse
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: tsv
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
       POSTGRES_DB: theshowverse
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PG18+: la imagen guarda los datos en /var/lib/postgresql/<major>/docker,
+      # por lo que el volumen se monta en /var/lib/postgresql (no en .../data).
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tsv -d theshowverse"]
       interval: 10s

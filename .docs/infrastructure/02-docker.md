@@ -8,7 +8,7 @@ Imágenes, Dockerfiles y contextos de build del proyecto.
 |---|---|---|---|
 | `web` | Node 22 slim (multi-stage) | `deploy/nas/Dockerfile.web` | raíz del repo (`.`) |
 | `backend` | Node 22 slim (multi-stage) | `deploy/nas/Dockerfile.backend` | `backend/` |
-| `postgres` | `postgres:16` | — (oficial) | — |
+| `postgres` | `postgres:18` | — (oficial) | — |
 | `redis` | `redis:7-alpine` | — (oficial) | — |
 | `cloudflared` | `cloudflare/cloudflared:latest` | — (oficial) | — |
 | `ollama` | `ollama/ollama:latest` | — (oficial) | — |

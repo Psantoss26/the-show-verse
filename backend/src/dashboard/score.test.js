@@ -1,7 +1,12 @@
 // backend/src/dashboard/score.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateCandidates, excludeSeen, rankNewReleaseMovies } from './score.js';
+import {
+  aggregateCandidates,
+  excludeSeen,
+  rankAnticipatedMovies,
+  rankNewReleaseMovies,
+} from './score.js';
 import { balanceSoftLimitedContent, softLimitedContentWeight } from './filters.js';
 
 const card = (id, extra = {}) => ({ tmdbId: id, mediaType: 'movie', title: `M${id}`, ...extra });
@@ -100,4 +105,52 @@ test('rankNewReleaseMovies treats missing budget/revenue as zero (unreleased fil
   const niche = card(2, { popularity: 5, releaseDate: '2026-08-01', budget: 5_000_000, revenue: 0 });
   const out = rankNewReleaseMovies([niche, popular], { now: NOW });
   assert.equal(out[0].tmdbId, 1); // la popularidad (peso 0.40) domina sobre un presupuesto pequeño
+});
+
+test('rankAnticipatedMovies excludes releases from today/past and dates too far away', () => {
+  const out = rankAnticipatedMovies(
+    [
+      card(1, { releaseDate: '2026-07-03', popularity: 100 }),
+      card(2, { releaseDate: '2026-07-04', popularity: 100 }),
+      card(3, { releaseDate: '2026-07-05', popularity: 10 }),
+      card(4, { releaseDate: '2028-07-05', popularity: 500 }),
+    ],
+    { now: NOW },
+  );
+  assert.deepEqual(out.map((item) => item.tmdbId), [3]);
+});
+
+test('rankAnticipatedMovies uses TMDB popularity as its main anticipation signal', () => {
+  const popular = card(1, {
+    popularity: 100,
+    releaseDate: '2026-11-01',
+    budget: 0,
+    isFranchise: false,
+  });
+  const minor = card(2, {
+    popularity: 10,
+    releaseDate: '2026-07-10',
+    budget: 200_000_000,
+    isFranchise: true,
+  });
+  const out = rankAnticipatedMovies([minor, popular], { now: NOW });
+  assert.equal(out[0].tmdbId, 1);
+  assert.equal(typeof out[0].anticipatedScore, 'number');
+});
+
+test('rankAnticipatedMovies uses budget and franchise relevance to break close popularity', () => {
+  const standalone = card(1, {
+    popularity: 90,
+    releaseDate: '2026-09-01',
+    budget: 2_000_000,
+    isFranchise: false,
+  });
+  const eventMovie = card(2, {
+    popularity: 88,
+    releaseDate: '2026-09-01',
+    budget: 200_000_000,
+    isFranchise: true,
+  });
+  const out = rankAnticipatedMovies([standalone, eventMovie], { now: NOW });
+  assert.equal(out[0].tmdbId, 2);
 });

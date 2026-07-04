@@ -18,6 +18,20 @@ test('each surface defines media types and generic rows', () => {
   assert.deepEqual(SURFACES.series.mediaTypes, ['tv']);
 });
 
+test('home exposes a movie-only anticipated row backed by the own TMDB pool', () => {
+  const row = SURFACES.home.genericRows.find((candidate) => candidate.key === 'anticipated');
+  assert.deepEqual(row, {
+    key: 'anticipated',
+    title: 'Más esperadas',
+    mediaType: 'movie',
+    source: { kind: 'pool', poolKey: 'anticipated' },
+  });
+  assert.equal(
+    SURFACES.home.genericRows.some((candidate) => candidate.title === 'Estrenos y novedades'),
+    false,
+  );
+});
+
 test('personalizedRowDefs builds a rotating, seen-capped, mixed daily recommendations row on home', () => {
   const recs = Array.from({ length: 30 }, (_, i) => rec(i + 1, i % 2 ? 'tv' : 'movie', 30 - i));
   const rows = personalizedRowDefs(
