@@ -2076,7 +2076,10 @@ function ContinueWatchingSection({
                 e.stopPropagation();
                 moveSlides(-1);
               }}
-              className="absolute inset-y-0 left-0 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:flex group/nav"
+              // El inset vertical REPLICA el padding del Swiper (py-14/16/44) para
+              // que el degradado cubra solo la fila de tarjetas y no el hueco de la
+              // preview (si no, sobresale por arriba y por abajo de la sección).
+              className="absolute inset-y-14 left-0 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
             >
               <motion.span
                 className="ml-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
@@ -2100,7 +2103,9 @@ function ContinueWatchingSection({
                 e.stopPropagation();
                 moveSlides(1);
               }}
-              className="absolute inset-y-0 right-0 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:flex group/nav"
+              // El inset vertical REPLICA el padding del Swiper (py-14/16/44), igual
+              // que la flecha izquierda, para no sobresalir de la fila de tarjetas.
+              className="absolute inset-y-14 right-0 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
             >
               <motion.span
                 className="mr-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
