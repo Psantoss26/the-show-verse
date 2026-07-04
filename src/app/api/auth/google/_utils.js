@@ -18,6 +18,10 @@ export function createOauthState() {
 }
 
 export function getRequestOrigin(request) {
+  // Origen público forzado (autoalojado tras proxy/túnel, donde request.url usa
+  // el HOSTNAME interno). En Vercel no se define → cae a las cabeceras.
+  const forced = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (forced) return forced.replace(/\/+$/, "");
   const proto = request.headers.get("x-forwarded-proto") || request.nextUrl.protocol.replace(":", "");
   const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
   if (host) return `${proto || "https"}://${host}`;
