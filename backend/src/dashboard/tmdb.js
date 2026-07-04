@@ -44,6 +44,8 @@ export function toCard(raw, mediaType) {
   };
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function tmdbGet(path, params = {}) {
   if (!TMDB_API_KEY) throw new Error('TMDB_API_KEY not configured');
   const url = new URL(`${TMDB_BASE}${path}`);
@@ -53,9 +55,38 @@ async function tmdbGet(path, params = {}) {
     if (k === 'language' || v == null) continue;
     url.searchParams.set(k, String(v));
   }
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`TMDB ${path} -> ${res.status}`);
-  return res.json();
+
+  // Reintentos ante 429 (rate limit), 5xx y errores de red transitorios, con
+  // backoff exponencial y respeto a `Retry-After`. Sin esto, en ráfagas (el build
+  // del calendario enriquece decenas de series a la vez) alguna llamada de
+  // temporada fallaba y ESA serie caía a 1 episodio (y se cacheaba 12h). Con
+  // reintentos amplios la temporada casi siempre acaba resolviéndose.
+  const MAX_ATTEMPTS = 5;
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    let res;
+    try {
+      res = await fetch(url, { headers: { Accept: 'application/json' } });
+    } catch (err) {
+      lastErr = err;
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(400 * 2 ** (attempt - 1));
+        continue;
+      }
+      throw err;
+    }
+    if (res.ok) return res.json();
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
+      const retryAfter = Number(res.headers.get('retry-after'));
+      const wait = Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(retryAfter * 1000, 8000)
+        : 400 * 2 ** (attempt - 1);
+      await sleep(wait);
+      continue;
+    }
+    throw new Error(`TMDB ${path} -> ${res.status}`);
+  }
+  throw lastErr || new Error(`TMDB ${path} failed`);
 }
 
 export async function tmdbDiscover({ mediaType, params = {} }) {
