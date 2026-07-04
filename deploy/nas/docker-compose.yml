@@ -62,6 +62,18 @@ services:
     ports:
       - "3000:3000"
 
+  # Cloudflare Tunnel: expone la web a Internet (theshowverse.com) sin abrir
+  # puertos, con TLS gestionado por Cloudflare. El hostname público se configura
+  # en el panel de Cloudflare apuntando al servicio HTTP `web:3000`.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:?define CF_TUNNEL_TOKEN en .env}
+    depends_on:
+      - web
+
 volumes:
   pgdata:
   redisdata:
