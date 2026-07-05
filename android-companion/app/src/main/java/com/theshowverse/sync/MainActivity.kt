@@ -1,8 +1,13 @@
 package com.theshowverse.sync
 
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -10,6 +15,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.theshowverse.sync.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -35,8 +41,19 @@ class MainActivity : AppCompatActivity() {
             render()
         }
         binding.refreshButton.setOnClickListener { render() }
+        binding.clearLogsButton.setOnClickListener {
+            prefs.clearLogs()
+            render()
+        }
         binding.testButton.setOnClickListener { sendTest() }
     }
+
+    private fun dp(value: Int): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            value.toFloat(),
+            resources.displayMetrics,
+        ).toInt()
 
     /** Envía un visionado de prueba (película conocida) para verificar de punta a
      * punta el token + origen + backend, sin depender de la detección. */
@@ -82,8 +99,38 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.status_active, prefs.origin ?: "")
         }
         binding.grantButton.visibility = if (access) View.GONE else View.VISIBLE
-        binding.logText.text = prefs.logs().ifBlank { "—" }
+        renderLogs(prefs.logs())
         renderApps()
+    }
+
+    /** Pinta el registro con color por tipo: ✓ éxito (verde), ✗ error (rojo),
+     * resto atenuado. Mucho más legible que un bloque monocromo. */
+    private fun renderLogs(raw: String) {
+        if (raw.isBlank()) {
+            binding.logText.text = getString(R.string.log_empty)
+            return
+        }
+        val success = ContextCompat.getColor(this, R.color.tsv_success)
+        val error = ContextCompat.getColor(this, R.color.tsv_error)
+        val muted = ContextCompat.getColor(this, R.color.tsv_muted)
+        val sb = SpannableStringBuilder()
+        raw.split("\n").forEachIndexed { i, line ->
+            if (i > 0) sb.append("\n")
+            val start = sb.length
+            sb.append(line)
+            val color = when {
+                line.contains("✓") -> success
+                line.contains("✗") -> error
+                else -> muted
+            }
+            sb.setSpan(
+                ForegroundColorSpan(color),
+                start,
+                sb.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+        binding.logText.text = sb
     }
 
     private fun renderApps() {
@@ -94,16 +141,30 @@ class MainActivity : AppCompatActivity() {
             .sortedBy { Platforms.nameFor(it).lowercase() }
 
         for (pkg in packages) {
+            val enabled = prefs.isEnabled(pkg)
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(8))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                 )
             }
+            // Punto con el color de marca de la plataforma; atenuado si está apagada.
+            val dot = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(12), dp(12)).apply {
+                    marginEnd = dp(12)
+                }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Platforms.colorFor(pkg))
+                }
+                alpha = if (enabled) 1f else 0.3f
+            }
             val label = TextView(this).apply {
                 text = Platforms.nameFor(pkg)
+                alpha = if (enabled) 1f else 0.5f
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -111,9 +172,14 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             val toggle = SwitchCompat(this).apply {
-                isChecked = prefs.isEnabled(pkg)
-                setOnCheckedChangeListener { _, checked -> prefs.setEnabled(pkg, checked) }
+                isChecked = enabled
+                setOnCheckedChangeListener { _, checked ->
+                    prefs.setEnabled(pkg, checked)
+                    dot.alpha = if (checked) 1f else 0.3f
+                    label.alpha = if (checked) 1f else 0.5f
+                }
             }
+            row.addView(dot)
             row.addView(label)
             row.addView(toggle)
             container.addView(row)
