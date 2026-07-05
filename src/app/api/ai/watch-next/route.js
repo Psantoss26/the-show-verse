@@ -35,9 +35,33 @@ const GEMINI_MODEL =
   process.env.GEMINI_WATCH_NEXT_MODEL ||
   process.env.GEMINI_MODEL ||
   "gemini-2.5-flash";
+// IA LOCAL (Ollama del NAS): proveedor por DEFECTO cuando no hay claves cloud, para
+// recomendaciones privadas sin coste. En el compose del NAS el contenedor web
+// alcanza el servicio en `http://ollama:11434`; en dev local se apunta por LAN vía
+// .env.local (OLLAMA_BASE_URL=http://192.168.1.126:11434).
+const OLLAMA_BASE_URL = (
+  process.env.OLLAMA_BASE_URL || "http://ollama:11434"
+).replace(/\/+$/, "");
+const OLLAMA_MODEL =
+  process.env.OLLAMA_WATCH_NEXT_MODEL ||
+  process.env.OLLAMA_MODEL ||
+  "qwen2.5:1.5b";
+const OLLAMA_TIMEOUT_MS =
+  Number(process.env.OLLAMA_WATCH_NEXT_TIMEOUT_MS) || 45000;
+// El modelo local corre por CPU: menos candidatos = menos prefill = más rápido.
+// Solo se le muestran los N mejores; `normalizeAiSelection` valida contra la lista
+// completa igualmente.
+const OLLAMA_MAX_CANDIDATES =
+  Number(process.env.OLLAMA_WATCH_NEXT_MAX_CANDIDATES) || 14;
 const WATCH_NEXT_AI_PROVIDER =
   process.env.WATCH_NEXT_AI_PROVIDER ||
-  (GEMINI_API_KEY ? "gemini" : "openai");
+  (GEMINI_API_KEY ? "gemini" : OPENAI_API_KEY ? "openai" : "ollama");
+// Ollama no tiene "clave": se considera IA disponible si está en la lista de
+// proveedores (no depende de una key como openai/gemini).
+const OLLAMA_ENABLED = String(WATCH_NEXT_AI_PROVIDER)
+  .toLowerCase()
+  .split(",")
+  .some((p) => p.trim() === "ollama");
 
 const WATCH_NEXT_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -1201,15 +1225,112 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
   };
 }
 
+async function getOllamaRecommendation({ message, candidates, contextSummary }) {
+  // Se muestran al modelo solo los N mejores candidatos (menos prefill = más
+  // rápido en CPU). La selección se valida luego contra TODA la lista.
+  const aiCandidates = candidates.slice(0, OLLAMA_MAX_CANDIDATES);
+  if (!aiCandidates.length) return null;
+
+  // Structured output (esquema JSON): con `key` como enum el modelo pequeño NO
+  // puede inventar claves ni dejar 'recommendations' vacío (con `format:"json"`
+  // a secas lo dejaba). Es lo que hace fiable a qwen2.5:1.5b para esta tarea.
+  const format = {
+    type: "object",
+    properties: {
+      reply: { type: "string" },
+      recommendations: {
+        type: "array",
+        minItems: 4,
+        maxItems: 6,
+        items: {
+          type: "object",
+          properties: {
+            key: { type: "string", enum: aiCandidates.map((c) => itemKey(c)) },
+            reason: { type: "string" },
+            matchTags: { type: "array", items: { type: "string" } },
+          },
+          required: ["key", "reason", "matchTags"],
+        },
+      },
+    },
+    required: ["reply", "recommendations"],
+  };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        format,
+        keep_alive: "10m",
+        options: { temperature: 0.3, num_predict: 700 },
+        messages: [
+          { role: "system", content: buildAiSystemPrompt() },
+          {
+            role: "user",
+            content: buildAiUserPayload({
+              message,
+              candidates: aiCandidates,
+              contextSummary,
+            }),
+          },
+        ],
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch (err) {
+    console.warn("[watch-next] Ollama fallback:", {
+      error: err?.name === "AbortError" ? "timeout" : "network_error",
+    });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const json = await safeJson(res);
+  if (!res.ok) {
+    console.warn("[watch-next] Ollama fallback:", { status: res.status });
+    return null;
+  }
+
+  const parsed = parseJsonLoose(json?.message?.content);
+  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  if (!normalized) return null;
+
+  return {
+    reply:
+      normalized.reply ||
+      buildFallbackReply({
+        message,
+        ranked: normalized.recommendations,
+        contextSummary,
+      }),
+    recommendations: normalized.recommendations,
+    provider: "ollama",
+  };
+}
+
 async function getAiRecommendation({ message, candidates, contextSummary }) {
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
-    .filter((provider) => provider === "openai" || provider === "gemini");
+    .filter(
+      (provider) =>
+        provider === "openai" ||
+        provider === "gemini" ||
+        provider === "ollama",
+    );
 
   const orderedProviders = providers.length
     ? providers
-    : [GEMINI_API_KEY ? "gemini" : "openai"];
+    : [GEMINI_API_KEY ? "gemini" : OPENAI_API_KEY ? "openai" : "ollama"];
   for (const provider of orderedProviders) {
     let result = null;
     try {
@@ -1218,10 +1339,16 @@ async function getAiRecommendation({ message, candidates, contextSummary }) {
           ? await getOpenAiRecommendation({
               message,
               candidates,
+              contextSummary,
+            })
+          : provider === "gemini"
+            ? await getGeminiRecommendation({
+                message,
+                candidates,
                 contextSummary,
               })
-            : provider === "gemini"
-              ? await getGeminiRecommendation({
+            : provider === "ollama"
+              ? await getOllamaRecommendation({
                   message,
                   candidates,
                   contextSummary,
@@ -1343,10 +1470,11 @@ export async function POST(request) {
     favoritesCount: tmdbContext.favorites.length,
     watchlistCount: tmdbContext.watchlist.length,
     ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
-    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY),
+    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY || OLLAMA_ENABLED),
     aiProviders: {
       gemini: !!GEMINI_API_KEY,
       openai: !!OPENAI_API_KEY,
+      ollama: OLLAMA_ENABLED,
     },
     quickPick,
     recentKeysCount: recentKeys.length,
