@@ -15,4 +15,6 @@
     <string name="test_send">Enviar prueba de sincronización</string>
     <string name="log_header">Registro</string>
     <string name="refresh">Actualizar</string>
+    <string name="clear_logs">Limpiar</string>
+    <string name="log_empty">Sin actividad todavía.</string>
 </resources>

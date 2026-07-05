@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paleta de marca de The Show Verse (acento ámbar sobre fondo oscuro). -->
+    <color name="tsv_bg">#0B0B0F</color>
+    <color name="tsv_amber">#EAB308</color>
+    <color name="tsv_amber_dim">#66EAB308</color>
+    <color name="tsv_success">#34D399</color>
+    <color name="tsv_error">#F87171</color>
+    <color name="tsv_muted">#A1A1AA</color>
+    <color name="tsv_row">#14FFFFFF</color>
+    <color name="tsv_stroke">#1FFFFFFF</color>
+    <color name="ic_launcher_background">#0B0B0F</color>
+</resources>

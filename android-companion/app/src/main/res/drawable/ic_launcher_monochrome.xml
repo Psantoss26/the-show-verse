@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Silueta para iconos temáticos (Android 13+); el sistema aplica el tinte. -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="3.5"
+        android:fillColor="#00000000"
+        android:pathData="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M48,43 L48,65 L68,54 Z" />
+</vector>

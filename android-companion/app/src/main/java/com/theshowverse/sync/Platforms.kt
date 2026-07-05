@@ -40,4 +40,25 @@ object Platforms {
         KNOWN[pkg]?.let { return it.lowercase().replace(Regex("[^a-z0-9]+"), "") }
         return pkg
     }
+
+    /** Color de marca por plataforma (para el indicador de la lista de apps). */
+    private val COLORS: Map<String, Long> = mapOf(
+        "Netflix" to 0xFFE50914,
+        "Prime Video" to 0xFF00A8E1,
+        "Max" to 0xFF3B36E0,
+        "Disney+" to 0xFF1F80E0,
+        "Crunchyroll" to 0xFFF47521,
+        "Movistar+" to 0xFF0BA5EC,
+        "Apple TV+" to 0xFFB0B0B8,
+        "Filmin" to 0xFFE4322B,
+        "SkyShowtime" to 0xFF6E4AFF,
+        "Pluto TV" to 0xFFFFE000,
+        "Rakuten TV" to 0xFFE60012,
+        "Atresplayer" to 0xFFFF6A00,
+        "RTVE" to 0xFF00A0DF,
+        "Plex" to 0xFFE5A00D,
+    )
+
+    /** Color de marca (ARGB) o ámbar por defecto para apps añadidas por el usuario. */
+    fun colorFor(pkg: String): Int = (COLORS[nameFor(pkg)] ?: 0xFFEAB308).toInt()
 }
