@@ -28,6 +28,20 @@ import {
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
+import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
+
+// Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
+// es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
+const FUZZY_MIN_QUERY_LEN = 4;
+// Similitud mínima [0,1] para dar puntos fuzzy (~1-2 letras de diferencia).
+const FUZZY_MIN_SIMILARITY = 0.7;
+// Prefix-fallback: TMDB NO tolera erratas, pero SÍ busca por prefijo. Si una
+// consulta (≥ esta longitud) no devuelve nada, se reintenta con un prefijo
+// recortado (la errata suele ir al final) y el fuzzy re-rankea el resultado real.
+const SEARCH_FALLBACK_MIN_LEN = 5;
+// Relevancia mínima de título (fuzzy) para conservar un candidato del fallback,
+// y así no colar ruido del prefijo corto (que puede devolver cientos de títulos).
+const FALLBACK_TITLE_MIN_SIMILARITY = 0.6;
 
 function normalizeSearchText(value = "") {
   return String(value)
@@ -58,9 +72,23 @@ function scoreSearchResult(item, normalizedQuery) {
   if (title === normalizedQuery) score += 10000;
   else if (title.startsWith(normalizedQuery)) score += 7000;
   else if (title.includes(normalizedQuery)) score += 5000;
+  else if (normalizedQuery.length >= FUZZY_MIN_QUERY_LEN) {
+    // Sin coincidencia por substring: puntuación TOLERANTE A ERRATAS para que un
+    // título con 1-2 letras de diferencia siga apareciendo arriba (por debajo de
+    // un acierto por substring, por encima del ruido de "populares no afines").
+    const sim = fuzzySimilarity(normalizedQuery, title);
+    if (sim >= FUZZY_MIN_SIMILARITY) score += sim * 5000;
+  }
 
   const queryTokens = normalizedQuery.split(" ").filter(Boolean);
-  const matchedTokens = queryTokens.filter((token) => title.includes(token));
+  const titleTokens = title.split(" ").filter(Boolean);
+  // Tokens largos casan de forma fuzzy (cubre erratas en consultas multi-palabra);
+  // los muy cortos siguen exigiendo substring exacto para no meter ruido.
+  const matchedTokens = queryTokens.filter((token) =>
+    token.length >= FUZZY_MIN_QUERY_LEN
+      ? tokenFuzzyMatches(token, titleTokens)
+      : title.includes(token),
+  );
   if (queryTokens.length) {
     score += (matchedTokens.length / queryTokens.length) * 3000;
   }
@@ -155,88 +183,145 @@ function SearchBar({ onResultClick, isMobile = false }) {
 
     const searchTimer = setTimeout(async () => {
       try {
-        const buildSearchUrl = (path, page = 1) => {
-          const params = new URLSearchParams({
-            api_key: apiKey || "",
-            language: "es-ES",
-            query: trimmedQuery,
-            page: String(page),
-            include_adult: "false",
-          });
-          return `https://api.themoviedb.org/3${path}?${params.toString()}`;
+        // Motor de fetch+ensamblado, reutilizable para la consulta original y para
+        // el prefijo del fallback. El scoring es SIEMPRE contra la consulta original
+        // normalizada, así el fuzzy elige el título correcto aunque hayamos buscado
+        // por prefijo.
+        const fetchAndAssemble = async (searchQuery) => {
+          const buildSearchUrl = (path, page = 1) => {
+            const params = new URLSearchParams({
+              api_key: apiKey || "",
+              language: "es-ES",
+              query: searchQuery,
+              page: String(page),
+              include_adult: "false",
+            });
+            return `https://api.themoviedb.org/3${path}?${params.toString()}`;
+          };
+
+          const fetchJson = async (path, page = 1) => {
+            const res = await fetch(buildSearchUrl(path, page), {
+              signal: controller.signal,
+            });
+            if (!res.ok) return { results: [] };
+            return res.json();
+          };
+
+          const [
+            multiData,
+            moviePage1,
+            moviePage2,
+            tvPage1,
+            tvPage2,
+            personPage1,
+            personPage2,
+            collData,
+          ] = await Promise.all([
+            fetchJson("/search/multi"),
+            fetchJson("/search/movie"),
+            fetchJson("/search/movie", 2),
+            fetchJson("/search/tv"),
+            fetchJson("/search/tv", 2),
+            fetchJson("/search/person"),
+            fetchJson("/search/person", 2),
+            fetchJson("/search/collection"),
+          ]);
+
+          const multiResults = (multiData.results || [])
+            .map((item) => normalizeSearchResult(item))
+            .filter(Boolean);
+          const movieResults = [
+            ...(moviePage1.results || []),
+            ...(moviePage2.results || []),
+          ]
+            .map((item) => normalizeSearchResult(item, "movie"))
+            .filter(Boolean);
+          const tvResults = [
+            ...(tvPage1.results || []),
+            ...(tvPage2.results || []),
+          ]
+            .map((item) => normalizeSearchResult(item, "tv"))
+            .filter(Boolean);
+          const personResults = [
+            ...(personPage1.results || []),
+            ...(personPage2.results || []),
+          ]
+            .map((item) => normalizeSearchResult(item, "person"))
+            .filter(Boolean);
+
+          const items = dedupeSearchResults([
+            ...multiResults,
+            ...movieResults,
+            ...tvResults,
+            ...personResults,
+          ]).sort(
+            (a, b) =>
+              scoreSearchResult(b, normalizedQuery) -
+                scoreSearchResult(a, normalizedQuery) ||
+              (b.popularity || 0) - (a.popularity || 0),
+          );
+
+          const collResults = (collData.results || []).map((c) => ({
+            ...c,
+            media_type: "collection",
+            title: c.name,
+          }));
+
+          return { items, collResults };
         };
 
-        const fetchJson = async (path, page = 1) => {
-          const res = await fetch(buildSearchUrl(path, page), {
-            signal: controller.signal,
-          });
-          if (!res.ok) return { results: [] };
-          return res.json();
-        };
+        let { items, collResults } = await fetchAndAssemble(trimmedQuery);
 
-        const [
-          multiData,
-          moviePage1,
-          moviePage2,
-          tvPage1,
-          tvPage2,
-          personPage1,
-          personPage2,
-          collData,
-        ] = await Promise.all([
-          fetchJson("/search/multi"),
-          fetchJson("/search/movie"),
-          fetchJson("/search/movie", 2),
-          fetchJson("/search/tv"),
-          fetchJson("/search/tv", 2),
-          fetchJson("/search/person"),
-          fetchJson("/search/person", 2),
-          fetchJson("/search/collection"),
-        ]);
+        // Sin resultados y consulta con cuerpo: TMDB no tolera erratas pero SÍ busca
+        // por prefijo. Reintentamos con un prefijo recortado (la errata suele ir al
+        // final) y conservamos solo candidatos con relevancia fuzzy real respecto a
+        // la consulta ORIGINAL (para no colar el ruido de un prefijo corto).
+        if (
+          items.length === 0 &&
+          normalizedQuery.length >= SEARCH_FALLBACK_MIN_LEN
+        ) {
+          const prefix = trimmedQuery
+            .slice(0, Math.max(4, trimmedQuery.length - 2))
+            .trim();
+          if (prefix.length >= 4 && prefix !== trimmedQuery) {
+            const alt = await fetchAndAssemble(prefix);
+            const isRelevant = (it) => {
+              const t = normalizeSearchText(getSearchTitle(it));
+              if (!t) return false;
+              if (t.includes(normalizedQuery) || t.startsWith(normalizedQuery)) {
+                return true;
+              }
+              if (
+                fuzzySimilarity(normalizedQuery, t) >=
+                FALLBACK_TITLE_MIN_SIMILARITY
+              ) {
+                return true;
+              }
+              const titleTokens = t.split(" ").filter(Boolean);
+              return normalizedQuery
+                .split(" ")
+                .filter((tok) => tok.length >= FUZZY_MIN_QUERY_LEN)
+                .some((tok) => tokenFuzzyMatches(tok, titleTokens));
+            };
+            const filtered = alt.items.filter(isRelevant);
+            if (filtered.length) {
+              items = filtered;
+              collResults = alt.collResults;
+            }
+          }
+        }
 
-        const multiResults = (multiData.results || [])
-          .map((item) => normalizeSearchResult(item))
-          .filter(Boolean);
-        const movieResults = [
-          ...(moviePage1.results || []),
-          ...(moviePage2.results || []),
-        ]
-          .map((item) => normalizeSearchResult(item, "movie"))
-          .filter(Boolean);
-        const tvResults = [
-          ...(tvPage1.results || []),
-          ...(tvPage2.results || []),
-        ]
-          .map((item) => normalizeSearchResult(item, "tv"))
-          .filter(Boolean);
-        const personResults = [
-          ...(personPage1.results || []),
-          ...(personPage2.results || []),
-        ]
-          .map((item) => normalizeSearchResult(item, "person"))
-          .filter(Boolean);
+        // Precargar la MEJOR colección (fuzzy-aware) para mostrarla tras la pausa.
+        const bestColl = collResults
+          .slice()
+          .sort(
+            (a, b) =>
+              scoreSearchResult(b, normalizedQuery) -
+              scoreSearchResult(a, normalizedQuery),
+          )[0];
+        pendingCollectionRef.current = bestColl || null;
 
-        const multiResultsSorted = dedupeSearchResults([
-          ...multiResults,
-          ...movieResults,
-          ...tvResults,
-          ...personResults,
-        ]).sort(
-          (a, b) =>
-            scoreSearchResult(b, normalizedQuery) -
-              scoreSearchResult(a, normalizedQuery) ||
-            (b.popularity || 0) - (a.popularity || 0),
-        );
-
-        // Precargar colección en ref para mostrarla instantáneamente tras la pausa
-        const topColl = (collData.results || []).slice(0, 1).map((c) => ({
-          ...c,
-          media_type: "collection",
-          title: c.name,
-        }));
-        pendingCollectionRef.current = topColl.length > 0 ? topColl[0] : null;
-
-        setResults(multiResultsSorted);
+        setResults(items);
         setShowDropdown(true);
         setIsSearching(false);
       } catch (err) {
