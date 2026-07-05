@@ -2,11 +2,15 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import { AnimatePresence, motion } from 'framer-motion'
 import { ExternalLink, X } from 'lucide-react'
 
 export default function ExternalLinksModal({ open, onClose, links }) {
     const items = Array.isArray(links) ? links.filter((x) => x?.href) : []
+
+    // Bloquea el scroll de la página mientras el modal está abierto.
+    useBodyScrollLock(open)
 
     return (
         <AnimatePresence>
