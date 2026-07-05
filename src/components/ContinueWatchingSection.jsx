@@ -1543,43 +1543,6 @@ function ContinueWatchingPreviewCard({
   );
 }
 
-/* =================== SKELETON =================== */
-function ContinueWatchingSkeleton({ isMobile }) {
-  const count = isMobile ? 2 : 6;
-  // En escritorio ocultamos las tarjetas sobrantes por breakpoint para que el
-  // nº visible (y, vía flex-1, el ancho de cada una) coincida con el contenido
-  // real: 3 (md) · 4 (lg) · 5 (xl) · 6 (2xl).
-  const desktopVisibility = [
-    "flex",
-    "flex",
-    "flex",
-    "hidden lg:flex",
-    "hidden xl:flex",
-    "hidden 2xl:flex",
-  ];
-  return (
-    <div className="flex gap-4 overflow-hidden">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className={`relative overflow-hidden rounded-lg bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 ${
-            isMobile
-              ? `min-w-0 flex-1 ${ROW_HEIGHT}`
-              : `aspect-video min-w-0 flex-1 ${desktopVisibility[i] ?? "flex"}`
-          }`}
-        >
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-            variants={shimmer}
-            animate="animate"
-            style={{ backgroundSize: "200% 100%" }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ====================================================================
  * Carrusel horizontal compartido por "Continuar viendo" y "Calendario".
  * Calendario inyecta sus series ya cargadas para reutilizar exactamente la
@@ -1875,19 +1838,12 @@ function ContinueWatchingSection({
     </motion.div>
   );
 
-  if (loading) {
-    return (
-      <motion.div
-        ref={rowRef}
-        {...revealProps}
-        variants={fadeInUp}
-        className="relative"
-      >
-        {Header}
-        <ContinueWatchingSkeleton isMobile={isMobile} />
-      </motion.div>
-    );
-  }
+  // Mientras se resuelve el contenido ("Continuar viendo" sin caché todavía) NO se
+  // muestra nada: la sección aparece SOLO cuando hay contenido confirmado. Así no
+  // se ve un skeleton que puede acabar vacío (sin sesión o sin series en curso), que
+  // era el problema. En modo Calendario `displayShows` siempre es un array (nunca
+  // `loading`), así que esto solo afecta a "Continuar viendo".
+  if (loading) return null;
 
   // En escritorio el nº de tarjetas por fila escala con el ancho disponible
   // hasta un máximo de 6. En móvil se mantiene el ancho fijo con scroll.
