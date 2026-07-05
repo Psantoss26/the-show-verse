@@ -1251,12 +1251,12 @@ function FeaturedSlide({
                 onClick={handleToggleTrailer}
                 disabled={trailerLoading}
                 aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="featured-info-button inline-flex min-h-11 cursor-default items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:px-5 sm:text-base"
+                className="featured-info-button inline-flex min-h-10 cursor-default items-center justify-center gap-1.5 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:gap-2 sm:px-5 sm:text-base"
               >
                 {showTrailer ? (
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
                 ) : (
-                  <Play className="h-5 w-5 fill-current" />
+                  <Play className="h-4 w-4 fill-current sm:h-5 sm:w-5" />
                 )}
                 <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
               </button>
@@ -1276,7 +1276,9 @@ function FeaturedSlide({
                 title={
                   soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
                 }
-                className={`!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6 ${
+                className={`!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6 ${
+                  soundtrackVisible ? "!bg-white !text-black" : ""
+                } ${
                   soundtrackPreferenceReady ? "" : "invisible pointer-events-none"
                 }`}
               >
@@ -1308,6 +1310,23 @@ function FeaturedSlide({
                 />
               )}
 
+              {/* Valoración de episodios (solo series): mismo diseño (blanco) y
+                  posición (junto al soundtrack) que en DetailsClient. */}
+              {mediaType === "tv" && (
+                <LiquidButton
+                  onClick={openEpisodeRatings}
+                  active
+                  activeColor="yellow"
+                  groupId="featured-hero-actions"
+                  title="Valoración de episodios"
+                  aria-haspopup="dialog"
+                  aria-expanded={episodeRatingsOpen}
+                  className="!bg-white !text-black !h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
+                >
+                  <BarChart3 />
+                </LiquidButton>
+              )}
+
               <LiquidButton
                 onClick={handleToggleFavorite}
                 loading={updating === "favorite"}
@@ -1315,7 +1334,7 @@ function FeaturedSlide({
                 activeColor="red"
                 groupId="featured-hero-actions"
                 title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                className="!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
               >
                 <Heart className={favorite ? "fill-current" : ""} />
               </LiquidButton>
@@ -1327,25 +1346,10 @@ function FeaturedSlide({
                 activeColor="blue"
                 groupId="featured-hero-actions"
                 title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-                className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                className="!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </LiquidButton>
-
-              {mediaType === "tv" && (
-                <LiquidButton
-                  onClick={openEpisodeRatings}
-                  active={episodeRatingsOpen}
-                  activeColor="amber"
-                  groupId="featured-hero-actions"
-                  title="Valoración de episodios"
-                  aria-haspopup="dialog"
-                  aria-expanded={episodeRatingsOpen}
-                  className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
-                >
-                  <BarChart3 />
-                </LiquidButton>
-              )}
 
               {/* Indicador de visionado: solo informativo. No se puede accionar
                   desde aquí para evitar borrar el historial de visionado con un
@@ -1355,7 +1359,7 @@ function FeaturedSlide({
                 activeColor="green"
                 groupId="featured-hero-actions"
                 title={watched ? "Visto" : "No visto"}
-                className="pointer-events-none !h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                className="pointer-events-none !h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
               >
                 {watched ? <Eye /> : <EyeOff />}
               </LiquidButton>
