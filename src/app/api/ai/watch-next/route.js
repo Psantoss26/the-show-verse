@@ -48,11 +48,13 @@ const OLLAMA_MODEL =
   "qwen2.5:1.5b";
 const OLLAMA_TIMEOUT_MS =
   Number(process.env.OLLAMA_WATCH_NEXT_TIMEOUT_MS) || 45000;
-// El modelo local corre por CPU: menos candidatos = menos prefill = más rápido.
-// Solo se le muestran los N mejores; `normalizeAiSelection` valida contra la lista
-// completa igualmente.
+// El modelo local corre por CPU (~8 tok/s). Dos costes dominan la latencia:
+// (1) el prefill del prompt y (2) la generación. Por eso: pocos candidatos (menos
+// prefill) y una salida MÍNIMA — solo las `keys` elegidas; el reply, el motivo y
+// las etiquetas se generan localmente (buildSelectionReply/buildReason/tags de
+// origen), que además salen de mayor calidad que la prosa del modelo 1.5b.
 const OLLAMA_MAX_CANDIDATES =
-  Number(process.env.OLLAMA_WATCH_NEXT_MAX_CANDIDATES) || 14;
+  Number(process.env.OLLAMA_WATCH_NEXT_MAX_CANDIDATES) || 10;
 const WATCH_NEXT_AI_PROVIDER =
   process.env.WATCH_NEXT_AI_PROVIDER ||
   (GEMINI_API_KEY ? "gemini" : OPENAI_API_KEY ? "openai" : "ollama");
@@ -1015,10 +1017,13 @@ function normalizeAiSelection({ parsed, candidates, message }) {
         byTitle.get(titleKey) ||
         byBareTitle.get(String(rec?.title || "").trim().toLowerCase());
       if (!item) return null;
+      const aiTags = safeArray(rec.matchTags).slice(0, 4);
       return {
         ...item,
         reason: String(rec.reason || "").trim() || buildReason(item, message, "ai"),
-        matchTags: safeArray(rec.matchTags).slice(0, 4),
+        // Si el proveedor no aporta etiquetas (p. ej. el path keys-only de Ollama),
+        // se deja undefined para que serializeRecommendation derive las de origen.
+        matchTags: aiTags.length ? aiTags : undefined,
       };
     })
     .filter(Boolean)
@@ -1225,37 +1230,53 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
   };
 }
 
-async function getOllamaRecommendation({ message, candidates, contextSummary }) {
+// Prompt LEAN para Ollama: el modelo solo tiene que SELECCIONAR keys. Nada de
+// reglas de formato de reply/reason/matchTags (se generan en el server), así el
+// prompt es corto (menos prefill) y el foco del modelo es la relevancia.
+function buildOllamaMessages({ message, candidates }) {
+  const slim = candidates.map((item) => ({
+    key: itemKey(item),
+    title: item.title,
+    year: item.year || null,
+    type: item.mediaType === "tv" ? "serie" : "pelicula",
+  }));
+  const system = [
+    "Eres un recomendador de cine y series para The Show Verse.",
+    "Tu ÚNICA tarea: elegir ENTRE 4 Y 6 títulos de la lista 'candidates' que mejor encajen con la petición del usuario.",
+    "Devuelve solo sus 'key' EXACTAS (tal cual aparecen). No inventes claves ni títulos.",
+    "Prioriza lo que pide el usuario; ante igualdad, mezcla películas y series y favorece novedades y tendencias.",
+  ].join(" ");
+  const user = [
+    message
+      ? `Petición del usuario: "${message}".`
+      : "Sin petición concreta: elige una selección variada y actual.",
+    `candidates: ${JSON.stringify(slim)}`,
+  ].join(" ");
+  return { system, user };
+}
+
+async function getOllamaRecommendation({ message, candidates }) {
   // Se muestran al modelo solo los N mejores candidatos (menos prefill = más
   // rápido en CPU). La selección se valida luego contra TODA la lista.
   const aiCandidates = candidates.slice(0, OLLAMA_MAX_CANDIDATES);
-  if (!aiCandidates.length) return null;
+  if (aiCandidates.length < 4) return null;
 
-  // Structured output (esquema JSON): con `key` como enum el modelo pequeño NO
-  // puede inventar claves ni dejar 'recommendations' vacío (con `format:"json"`
-  // a secas lo dejaba). Es lo que hace fiable a qwen2.5:1.5b para esta tarea.
+  // Salida mínima: solo las keys elegidas, con `enum` para que el modelo pequeño
+  // no pueda inventar claves. Menos tokens de salida = mucho menos tiempo en CPU.
   const format = {
     type: "object",
     properties: {
-      reply: { type: "string" },
-      recommendations: {
+      keys: {
         type: "array",
         minItems: 4,
         maxItems: 6,
-        items: {
-          type: "object",
-          properties: {
-            key: { type: "string", enum: aiCandidates.map((c) => itemKey(c)) },
-            reason: { type: "string" },
-            matchTags: { type: "array", items: { type: "string" } },
-          },
-          required: ["key", "reason", "matchTags"],
-        },
+        items: { type: "string", enum: aiCandidates.map((c) => itemKey(c)) },
       },
     },
-    required: ["reply", "recommendations"],
+    required: ["keys"],
   };
 
+  const { system, user } = buildOllamaMessages({ message, candidates: aiCandidates });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
 
@@ -1268,18 +1289,13 @@ async function getOllamaRecommendation({ message, candidates, contextSummary }) 
         model: OLLAMA_MODEL,
         stream: false,
         format,
-        keep_alive: "10m",
-        options: { temperature: 0.3, num_predict: 700 },
+        // Mantener el modelo cargado (respeta el OLLAMA_KEEP_ALIVE del contenedor):
+        // así solo la primera petición paga la carga; las siguientes van ~13-16s.
+        keep_alive: "24h",
+        options: { temperature: 0.4, num_predict: 120 },
         messages: [
-          { role: "system", content: buildAiSystemPrompt() },
-          {
-            role: "user",
-            content: buildAiUserPayload({
-              message,
-              candidates: aiCandidates,
-              contextSummary,
-            }),
-          },
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
       }),
       cache: "no-store",
@@ -1294,24 +1310,29 @@ async function getOllamaRecommendation({ message, candidates, contextSummary }) 
     clearTimeout(timer);
   }
 
-  const json = await safeJson(res);
   if (!res.ok) {
     console.warn("[watch-next] Ollama fallback:", { status: res.status });
     return null;
   }
 
+  const json = await safeJson(res);
   const parsed = parseJsonLoose(json?.message?.content);
-  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  const keys = safeArray(parsed?.keys)
+    .map((k) => String(k || "").trim())
+    .filter(Boolean);
+  if (!keys.length) return null;
+
+  // La IA solo elige keys; reply, motivo y etiquetas se generan localmente aguas
+  // abajo (buildSelectionReply / serializeRecommendation) con mayor calidad.
+  const uniqueKeys = [...new Set(keys)];
+  const normalized = normalizeAiSelection({
+    parsed: { recommendations: uniqueKeys.map((key) => ({ key })) },
+    candidates,
+    message,
+  });
   if (!normalized) return null;
 
   return {
-    reply:
-      normalized.reply ||
-      buildFallbackReply({
-        message,
-        ranked: normalized.recommendations,
-        contextSummary,
-      }),
     recommendations: normalized.recommendations,
     provider: "ollama",
   };
