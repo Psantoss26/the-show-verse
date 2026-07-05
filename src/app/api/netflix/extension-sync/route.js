@@ -5,6 +5,7 @@ import {
   searchTmdbCandidatesWithFallback,
   matchEpisodeByName,
 } from "@/lib/netflix/streamingResolve";
+import { buildQueryVariants } from "@/lib/netflix/queryVariants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,27 +13,10 @@ export const dynamic = "force-dynamic";
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
 
-// Prefijo de plataforma que algunas pestañas anteponen al título.
-const PLATFORM_PREFIX_RE =
-  /^\s*(prime video|amazon prime video|amazon|netflix|max|hbo max|hbo|disney\s*\+|disney plus|star\s*\+|plex)\s*[:\-|–·]\s*/i;
-
-// Normaliza el título para buscar en TMDb: quita el prefijo de la plataforma y
-// los descriptores de temporada/episodio del final ("- Temporada 1", ": S2 E4").
-function cleanSearchTitle(raw) {
-  let t = String(raw || "").trim();
-  t = t.replace(PLATFORM_PREFIX_RE, "");
-  t = t.replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "");
-  t = t.replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "");
-  t = t.replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x]\s*E?\s*\d+.*$/i, "");
-  return t.trim();
-}
-
-async function searchTmdbDirect(query, mediaType) {
-  if (!TMDB_API_KEY) return [];
-
+async function searchTmdbDirectLang(query, mediaType, language) {
   const url = new URL(`${TMDB_API}/search/${mediaType}`);
   url.searchParams.set("api_key", TMDB_API_KEY);
-  url.searchParams.set("language", "es-ES");
+  url.searchParams.set("language", language);
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("query", query);
   url.searchParams.set("page", "1");
@@ -40,11 +24,28 @@ async function searchTmdbDirect(query, mediaType) {
   const response = await fetch(url, {
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) return [];
+  }).catch(() => null);
+  if (!response?.ok) return [];
 
   const json = await response.json().catch(() => null);
   return Array.isArray(json?.results) ? json.results : [];
+}
+
+// Busca en TMDb en español E inglés y fusiona (sin duplicados por id). Los
+// servicios de streaming suelen exponer el título ORIGINAL (a menudo en inglés)
+// en la Media Session, y la búsqueda es-ES de una cadena inglesa suele no
+// devolver nada: la causa nº1 del 404. Buscar también en en-US lo resuelve.
+async function searchTmdbDirect(query, mediaType) {
+  if (!TMDB_API_KEY) return [];
+  const [es, en] = await Promise.all([
+    searchTmdbDirectLang(query, mediaType, "es-ES"),
+    searchTmdbDirectLang(query, mediaType, "en-US"),
+  ]);
+  const byId = new Map();
+  for (const item of [...es, ...en]) {
+    if (item?.id && !byId.has(item.id)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
 }
 
 async function searchTmdbCandidates(request, query, mediaType) {
@@ -124,9 +125,11 @@ export async function POST(request) {
       }
     }
 
-    // 2. Limpiar el título para la búsqueda en TMDb.
-    const query = cleanSearchTitle(showName || mainTitle);
-    if (!query) {
+    // 2. Construir variantes de consulta (título de serie/principal, parte antes
+    // de ":" para "Serie: Episodio", y sin sufijos de edición) para maximizar la
+    // resolución y limpiarlas para TMDb.
+    const queryVariants = buildQueryVariants({ showName, mainTitle });
+    if (!queryVariants.length) {
       return NextResponse.json({ error: "Empty title after cleanup" }, { status: 422 });
     }
 
@@ -135,17 +138,26 @@ export async function POST(request) {
     let resolvedTitle = "";
     let posterPath = "";
     let confidence = null;
+    let query = queryVariants[0];
 
     // 3. Resolver contra el proxy backend y, si falla o no devuelve resultados,
-    // contra TMDb directamente. Cuando no hay números de episodio comparamos
-    // coincidencias exactas de película y serie para no confundir una serie con
-    // una película derivada que comparte el comienzo del título.
-    const resolution = await resolveStreamingEntity({
-      query,
-      expectedMediaType: isTv ? "tv" : null,
-      preferTv: Boolean(subTitle || episodeName || showName),
-      search: (type) => searchTmdbCandidates(request, query, type),
-    });
+    // contra TMDb directamente (es-ES + en-US). Cuando no hay números de episodio
+    // comparamos coincidencias exactas de película y serie para no confundir una
+    // serie con una película derivada. Se prueban EN ORDEN las variantes de
+    // consulta hasta que una resuelve, de la más específica a la más agresiva.
+    let resolution = null;
+    for (const variant of queryVariants) {
+      resolution = await resolveStreamingEntity({
+        query: variant,
+        expectedMediaType: isTv ? "tv" : null,
+        preferTv: Boolean(subTitle || episodeName || showName),
+        search: (type) => searchTmdbCandidates(request, variant, type),
+      });
+      if (resolution) {
+        query = variant;
+        break;
+      }
+    }
 
     if (resolution?.kind === "resolved") {
       const entity = resolution.entity;
