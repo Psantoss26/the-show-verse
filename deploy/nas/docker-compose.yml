@@ -82,6 +82,32 @@ services:
     depends_on:
       - web
 
+  # Visor web de SOLO LECTURA de la base de datos (pgweb). NO publica puertos: se
+  # accede desde Internet por el túnel de Cloudflare (p. ej. db.theshowverse.com)
+  # protegido por Cloudflare Access + basic-auth. Conecta con el rol pgweb_ro (solo
+  # SELECT) y además arranca en modo --readonly. Secretos en deploy/nas/.env
+  # (PGWEB_*), SIN ':?' para que una variable ausente jamás rompa el resto del stack.
+  # No está en la lista de servicios del workflow de deploy (para no tocar el resto);
+  # se arranca con `docker compose up -d pgweb` y sigue vivo entre despliegues por
+  # su política restart.
+  pgweb:
+    image: sosedoff/pgweb:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://pgweb_ro:${PGWEB_DB_PASSWORD}@postgres:5432/theshowverse?sslmode=disable"
+    command:
+      - "--bind=0.0.0.0"
+      - "--listen=8081"
+      - "--readonly"
+      - "--lock-session"
+      - "--auth-user=${PGWEB_AUTH_USER}"
+      - "--auth-pass=${PGWEB_AUTH_PASS}"
+    expose:
+      - "8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Ollama — LLM local para las funciones de IA (reutiliza los modelos ya bajados).
   ollama:
     image: ollama/ollama:latest
