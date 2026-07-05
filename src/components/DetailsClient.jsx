@@ -33,6 +33,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { saveArtworkOverride } from "@/lib/artworkApi";
 import Link from "next/link";
 
@@ -91,6 +92,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   SlidersHorizontal,
+  BarChart3,
 } from "lucide-react";
 
 // Boton con efecto liquido para acciones principales
@@ -1881,6 +1883,7 @@ export default function DetailsClient({
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
   const [soundtrackModalOpen, setSoundtrackModalOpen] = useState(false);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [episodeRatingsModalOpen, setEpisodeRatingsModalOpen] = useState(false);
   const [activeSoundtrackId, setActiveSoundtrackId] = useState(null);
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
@@ -2082,6 +2085,7 @@ export default function DetailsClient({
     setActiveVideo(null);
     setSoundtrackModalOpen(false);
     setCommentModalOpen(false);
+    setEpisodeRatingsModalOpen(false);
     setActiveSoundtrackId(null);
     setSoundtrackTracks([]);
     setSoundtrackLoading(false);
@@ -8024,7 +8028,7 @@ export default function DetailsClient({
       items.push({
         id: "episodes",
         label: "Episodios",
-        icon: TrendingUp,
+        icon: BarChart3,
         // si no tienes "ratings.length", puedes dejar count undefined
         count: Array.isArray(ratings) ? ratings.length : undefined,
       });
@@ -9704,7 +9708,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <Music2 />
                 </LiquidButton>
 
-                {/* Separador vertical entre el botón de tráiler y los controles de Trakt */}
+                {/* Acceso rápido a la tabla de valoraciones, solo para series. */}
+                {type === "tv" && (
+                  <LiquidButton
+                    onClick={() => setEpisodeRatingsModalOpen(true)}
+                    active
+                    activeColor="yellow"
+                    groupId="details-actions"
+                    className="!bg-white !text-black"
+                    title="Valoración de episodios"
+                    aria-label="Abrir valoración de episodios"
+                    aria-haspopup="dialog"
+                    aria-expanded={episodeRatingsModalOpen}
+                  >
+                    <BarChart3 />
+                  </LiquidButton>
+                )}
+
+                {/* Separador vertical entre los controles multimedia y Trakt */}
                 <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
 
                 {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
@@ -12331,7 +12352,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <section className="mb-10 group/section">
                           <SectionTitle
                             title="Valoración de Episodios"
-                            icon={TrendingUp}
+                            icon={BarChart3}
                           />
                           <div className="p-0">
                             {ratingsError && (
@@ -12743,6 +12764,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
       />
+
+      {type === "tv" && (
+        <EpisodeRatingsModal
+          open={episodeRatingsModalOpen}
+          onClose={() => setEpisodeRatingsModalOpen(false)}
+          showId={Number(id)}
+          title={title}
+          initialRatings={ratings}
+          initialTmdbSeasons={data?.seasons || []}
+        />
+      )}
 
       <TraktCommentModal
         open={commentModalOpen}

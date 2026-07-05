@@ -24,9 +24,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  BarChart3,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 import HeroSoundtrackPlayer from "@/components/dashboard/HeroSoundtrackPlayer";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -424,6 +426,7 @@ function FeaturedSlide({
   isMobile,
   shouldLoadMedia,
   onTrailerVisibilityChange,
+  onEpisodeRatingsVisibilityChange,
   onSoundtrackInteractionChange,
   soundtrackVisible,
   soundtrackPreferenceReady,
@@ -449,6 +452,7 @@ function FeaturedSlide({
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
 
@@ -532,14 +536,26 @@ function FeaturedSlide({
   useEffect(() => {
     if (isActive) return;
     setShowTrailer(false);
+    setEpisodeRatingsOpen(false);
     onTrailerVisibilityChange?.(false);
-  }, [isActive, onTrailerVisibilityChange]);
+    onEpisodeRatingsVisibilityChange?.(false);
+  }, [
+    isActive,
+    onEpisodeRatingsVisibilityChange,
+    onTrailerVisibilityChange,
+  ]);
 
   useEffect(() => {
     setShowTrailer(false);
     setTrailer(null);
+    setEpisodeRatingsOpen(false);
     onTrailerVisibilityChange?.(false);
-  }, [movie?.id, onTrailerVisibilityChange]);
+    onEpisodeRatingsVisibilityChange?.(false);
+  }, [
+    movie?.id,
+    onEpisodeRatingsVisibilityChange,
+    onTrailerVisibilityChange,
+  ]);
 
   // Carga la mejor pista del soundtrack (preview) del título activo.
   useEffect(() => {
@@ -901,6 +917,17 @@ function FeaturedSlide({
     }
   };
 
+  const openEpisodeRatings = (event) => {
+    event.stopPropagation();
+    setEpisodeRatingsOpen(true);
+    onEpisodeRatingsVisibilityChange?.(true);
+  };
+
+  const closeEpisodeRatings = () => {
+    setEpisodeRatingsOpen(false);
+    onEpisodeRatingsVisibilityChange?.(false);
+  };
+
   const handleToggleFavorite = async (e) => {
     e.stopPropagation();
     if (requireLogin() || updating) return;
@@ -1000,7 +1027,13 @@ function FeaturedSlide({
       onClick={navigateToDetails}
     >
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
-      <div className="relative w-full aspect-[2/3] sm:absolute sm:inset-0 sm:aspect-auto sm:h-full">
+      <div
+        className={`w-full ${
+          showTrailer
+            ? "absolute inset-0 h-full aspect-auto"
+            : "relative aspect-[2/3]"
+        } sm:absolute sm:inset-0 sm:h-full sm:aspect-auto`}
+      >
         {!showTrailer && shouldLoadMedia && bgSrc && (
           <div
             key={bgSrc}
@@ -1067,12 +1100,12 @@ function FeaturedSlide({
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-y-0 right-0 aspect-video h-full max-w-full overflow-hidden">
+              <div className="hero-trailer-reveal absolute inset-0 overflow-hidden">
+                <div className="hero-trailer-viewport absolute inset-0 overflow-hidden">
                   <iframe
                     key={trailer.key}
                     ref={trailerIframeRef}
-                    className="pointer-events-none absolute left-1/2 top-1/2 h-[116%] w-[116%] -translate-x-1/2 -translate-y-1/2"
+                    className="hero-trailer-iframe pointer-events-none absolute left-1/2 top-1/2 max-h-none max-w-none -translate-x-1/2 -translate-y-1/2 border-0"
                     src={trailerSrc}
                     title={`Trailer - ${title}`}
                     width="3840"
@@ -1116,29 +1149,21 @@ function FeaturedSlide({
       {/* Difuminado lateral izquierdo (solo escritorio): oscurece la zona de
           logo/información/botones, fundiéndose hacia el centro-derecha. */}
       <div
-        className="pointer-events-none absolute inset-0 hidden sm:block transition-opacity duration-500"
+        className={`hero-side-shade pointer-events-none absolute inset-0 hidden sm:block ${
+          showTrailer ? "opacity-[0.24]" : "opacity-100"
+        }`}
         style={{
-          background: showTrailer
-            ? // Al reproducir el trailer el difuminado lateral se recoge para
-              // mostrar más parte del vídeo (termina antes, ~62%).
-              "linear-gradient(to right," +
-              " #000 0%," +
-              " rgba(0,0,0,0.9) 12%," +
-              " rgba(0,0,0,0.62) 24%," +
-              " rgba(0,0,0,0.36) 34%," +
-              " rgba(0,0,0,0.18) 44%," +
-              " rgba(0,0,0,0.06) 54%," +
-              " transparent 62%)"
-            : "linear-gradient(to right," +
-              " #000 0%," +
-              " rgba(0,0,0,0.93) 16%," +
-              " rgba(0,0,0,0.74) 30%," +
-              " rgba(0,0,0,0.52) 42%," +
-              " rgba(0,0,0,0.32) 52%," +
-              " rgba(0,0,0,0.17) 62%," +
-              " rgba(0,0,0,0.07) 70%," +
-              " rgba(0,0,0,0.02) 78%," +
-              " transparent 86%)",
+          background:
+            "linear-gradient(to right," +
+            " #000 0%," +
+            " rgba(0,0,0,0.93) 16%," +
+            " rgba(0,0,0,0.74) 30%," +
+            " rgba(0,0,0,0.52) 42%," +
+            " rgba(0,0,0,0.32) 52%," +
+            " rgba(0,0,0,0.17) 62%," +
+            " rgba(0,0,0,0.07) 70%," +
+            " rgba(0,0,0,0.02) 78%," +
+            " transparent 86%)",
         }}
       />
 
@@ -1150,7 +1175,9 @@ function FeaturedSlide({
           imagen, escalando con el ancho de la ventana para que el borde
           izquierdo del backdrop no sea visible nunca. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 hidden sm:block"
+        className={`hero-side-shade hero-backdrop-gap-shade pointer-events-none absolute inset-y-0 left-0 hidden sm:block ${
+          showTrailer ? "opacity-0" : "opacity-100"
+        }`}
         style={{
           width:
             "calc(100% - var(--hero-desktop-max-height, 88dvh) * 16 / 9 + 42rem)",
@@ -1304,6 +1331,21 @@ function FeaturedSlide({
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </LiquidButton>
+
+              {mediaType === "tv" && (
+                <LiquidButton
+                  onClick={openEpisodeRatings}
+                  active={episodeRatingsOpen}
+                  activeColor="amber"
+                  groupId="featured-hero-actions"
+                  title="Valoración de episodios"
+                  aria-haspopup="dialog"
+                  aria-expanded={episodeRatingsOpen}
+                  className="!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                >
+                  <BarChart3 />
+                </LiquidButton>
+              )}
 
               {/* Indicador de visionado: solo informativo. No se puede accionar
                   desde aquí para evitar borrar el historial de visionado con un
@@ -1485,7 +1527,52 @@ function FeaturedSlide({
           />
         )}
 
+      {mediaType === "tv" && (
+        <EpisodeRatingsModal
+          open={episodeRatingsOpen}
+          onClose={closeEpisodeRatings}
+          showId={movie.id}
+          title={title}
+        />
+      )}
+
       <style jsx>{`
+        .hero-side-shade {
+          transition: opacity 680ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: opacity;
+        }
+
+        .hero-trailer-reveal {
+          animation: heroTrailerReveal 520ms cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+        }
+
+        /* El hero puede ser mucho más ancho que 16:9 en pantallas panorámicas.
+           El contenedor anterior calculaba el ancho solo desde la altura y
+           dejaba una franja vacía a la izquierda. Estas unidades relativas al
+           propio contenedor mantienen el iframe en 16:9 y aplican un "cover"
+           real en cualquier proporción, con un pequeño overscan para ocultar
+           por completo el chrome y los bordes internos de YouTube. */
+        .hero-trailer-viewport {
+          container-type: size;
+        }
+
+        .hero-trailer-iframe {
+          width: max(108cqw, calc(108cqh * 16 / 9));
+          height: max(108cqh, calc(108cqw * 9 / 16));
+        }
+
+        @keyframes heroTrailerReveal {
+          from {
+            opacity: 0;
+            transform: scale(1.015);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
         .hero-backdrop-reveal {
           opacity: 0;
           transform: translate3d(0, 0, 0);
@@ -1550,6 +1637,15 @@ function FeaturedSlide({
         }
 
         @media (prefers-reduced-motion: reduce) {
+          .hero-side-shade {
+            transition-duration: 100ms;
+            will-change: auto;
+          }
+
+          .hero-trailer-reveal {
+            animation: none;
+          }
+
           .hero-eq-bar {
             animation: none;
             height: 70%;
@@ -1658,6 +1754,7 @@ export default function FeaturedHero({
   const [isInteracting, setIsInteracting] = useState(false);
   const [soundtrackInteracting, setSoundtrackInteracting] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
   const [scrollCueVisible, setScrollCueVisible] = useState(true);
   const [soundtrackVisible, toggleSoundtrackVisible] = useSoundtrackVisible();
   const [soundtrackPreferenceReady, setSoundtrackPreferenceReady] =
@@ -1823,7 +1920,8 @@ export default function FeaturedHero({
       list.length <= 1 ||
       isInteracting ||
       soundtrackInteracting ||
-      trailerOpen
+      trailerOpen ||
+      episodeRatingsOpen
     )
       return;
 
@@ -1853,6 +1951,7 @@ export default function FeaturedHero({
     list.length,
     soundtrackInteracting,
     trailerOpen,
+    episodeRatingsOpen,
   ]);
 
   const activeMovie = list[activeIndex] || list[0] || null;
@@ -2089,6 +2188,7 @@ export default function FeaturedHero({
           isMobile={isMobile}
           shouldLoadMedia
           onTrailerVisibilityChange={setTrailerOpen}
+          onEpisodeRatingsVisibilityChange={setEpisodeRatingsOpen}
           onSoundtrackInteractionChange={setSoundtrackInteracting}
           soundtrackVisible={soundtrackVisible}
           soundtrackPreferenceReady={soundtrackPreferenceReady}
