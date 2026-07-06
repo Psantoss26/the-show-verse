@@ -1376,25 +1376,27 @@ export default function EpisodeRatingsGrid({
     <>
       <div ref={inViewRef} className="space-y-3">
         {/* Controles */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <ViewModeControl value={layoutMode} onChange={setLayoutModeSafe} />
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 w-full">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <ViewModeControl value={layoutMode} onChange={setLayoutModeSafe} />
 
-          <IconToggle
-            icon={ArrowUpDown}
-            label="Invertida"
-            checked={inverted}
-            disabled={layoutMode === "wrapped"}
-            onChange={(v) => {
-              if (layoutMode === "grid") setInverted(v);
-            }}
-          />
+            <IconToggle
+              icon={ArrowUpDown}
+              label="Invertida"
+              checked={inverted}
+              disabled={layoutMode === "wrapped"}
+              onChange={(v) => {
+                if (layoutMode === "grid") setInverted(v);
+              }}
+            />
 
-          <IconToggle
-            icon={BarChart3}
-            label="Media"
-            checked={showSeasonAvg}
-            onChange={setShowSeasonAvg}
-          />
+            <IconToggle
+              icon={BarChart3}
+              label="Media"
+              checked={showSeasonAvg}
+              onChange={setShowSeasonAvg}
+            />
+          </div>
 
           <LegendPopover open={legendOpen} setOpen={setLegendOpen} />
         </div>
@@ -1448,7 +1450,7 @@ function ViewModeControl({ value, onChange }) {
   ];
 
   return (
-    <div className="inline-flex h-9 items-center rounded-full border border-white/10 bg-black/35 p-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
+    <div className="inline-flex h-9 items-center rounded-full border border-white/5 p-0.5 gap-0 bg-gradient-to-br from-white/5 via-transparent to-black/35 backdrop-blur-md shadow-inner">
       {options.map((opt) => {
         const active = opt.id === value;
         const Icon = opt.icon;
@@ -1460,13 +1462,17 @@ function ViewModeControl({ value, onChange }) {
             onClick={() => onChange(opt.id)}
             aria-pressed={active}
             className={`
-              h-7 rounded-full px-2.5 text-[11px] font-semibold
-              inline-flex items-center gap-1.5 transition-all duration-150
-              ${active ? "bg-white text-black shadow-sm" : "text-zinc-300 hover:bg-white/10 hover:text-white"}
+              h-7 rounded-full px-3 text-[11px] font-bold uppercase tracking-wider
+              inline-flex items-center gap-1.5 transition-all duration-200 focus:outline-none
+              ${
+                active
+                  ? "bg-gradient-to-br from-white/15 to-white/5 text-white font-extrabold border border-white/10 shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+              }
             `}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span>{opt.label}</span>
+            <span className="hidden sm:inline">{opt.label}</span>
           </button>
         );
       })}
@@ -1478,26 +1484,24 @@ function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
   return (
     <div
       className={`
-        inline-flex h-9 items-center gap-2 rounded-full border border-white/10
-        bg-black/30 px-2.5 text-[11px] font-semibold text-zinc-300
-        shadow-[0_10px_30px_rgba(0,0,0,0.28)] backdrop-blur-md
-        ${disabled ? "opacity-45" : ""}
+        inline-flex h-9 items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400
+        ${disabled ? "opacity-35 pointer-events-none" : ""}
       `}
     >
-      <Icon className="h-3.5 w-3.5 text-zinc-300" />
-      <span className="hidden sm:inline">{label}</span>
+      <Icon className={`h-3.5 w-3.5 transition-colors duration-200 ${checked ? "text-emerald-400" : "text-zinc-400"}`} />
+      <span className="hidden sm:inline transition-colors duration-200">{label}</span>
       <button
         type="button"
         disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
         className={`
-          relative h-5 w-9 rounded-full border transition-colors duration-150
+          relative h-5 w-9 rounded-full transition-all duration-200 focus:outline-none backdrop-blur-sm
           ${
             disabled
-              ? "cursor-not-allowed border-white/10 bg-black/40"
+              ? "cursor-not-allowed border-white/5 bg-zinc-950"
               : checked
-                ? "border-emerald-400 bg-emerald-500"
-                : "border-white/15 bg-black/50"
+                ? "border-emerald-500/35 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                : "border-white/10 bg-white/5"
           }
         `}
         aria-label={label}
@@ -1505,9 +1509,13 @@ function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
       >
         <span
           className={`
-            absolute left-[3px] top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow
-            transition-transform duration-150
-            ${checked ? "translate-x-4" : "translate-x-0"}
+            absolute left-[3px] top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full shadow-sm
+            transition-all duration-200
+            ${
+              checked
+                ? "translate-x-4 bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                : "translate-x-0 bg-white"
+            }
           `}
         />
       </button>
@@ -1534,16 +1542,19 @@ function LegendPopover({ open, setOpen }) {
         aria-label="Ver leyenda de colores"
         className={`
           inline-flex h-9 w-9 items-center justify-center rounded-full
-          border border-white/10 bg-black/35 text-zinc-200
-          shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md
-          transition-colors hover:bg-white/10 hover:text-white
+          transition-all duration-250 focus:outline-none
+          ${
+            open
+              ? "bg-gradient-to-br from-white/10 to-white/5 text-white border border-white/10 shadow-[0_0_12px_rgba(255,255,255,0.08)] backdrop-blur-md scale-105"
+              : "bg-transparent text-zinc-400 border border-transparent hover:bg-gradient-to-br hover:from-white/8 hover:to-white/2 hover:text-white hover:border-white/5 hover:scale-105"
+          }
         `}
       >
-        <Info className="h-4 w-4" />
+        <Info className="h-4.5 w-4.5" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-[min(78vw,260px)] rounded-xl border border-white/10 bg-[#111214]/95 p-3 shadow-2xl backdrop-blur-xl sm:w-[300px]">
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(78vw,260px)] rounded-xl border border-white/10 bg-[#111214]/95 p-3 shadow-2xl backdrop-blur-xl sm:w-[300px]">
           <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">
             Leyenda
           </div>
