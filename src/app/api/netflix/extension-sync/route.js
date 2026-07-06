@@ -71,6 +71,62 @@ async function searchTmdbCandidates(request, query, mediaType) {
   });
 }
 
+// Limpia el nombre del episodio quitando marcadores del principio ("E5", "T4:E5",
+// "Episodio 5:", "Capítulo 5 -") para poder casarlo con el título en TMDb.
+function cleanEpisodeName(name) {
+  return String(name || "")
+    .replace(
+      /^\s*(?:T\s*\d+\s*[:x]?\s*)?(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\.?\s*\d+\s*[:.\-–·]?\s*/i,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function tmdbJson(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    return res.ok ? await res.json() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Localiza la temporada buscando el episodio por NOMBRE en TODAS las temporadas de
+// la serie. Necesario para Netflix web, cuyo reproductor muestra el episodio pero
+// NO la temporada. Devuelve {season, episode} o null.
+async function findSeasonByEpisodeName(tmdbId, episodeName) {
+  if (!tmdbId || !TMDB_API_KEY) return null;
+  const clean = cleanEpisodeName(episodeName);
+  if (!clean || clean.length < 2) return null;
+
+  const showData = await tmdbJson(
+    `${TMDB_API}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`,
+  );
+  const seasonNums = (Array.isArray(showData?.seasons) ? showData.seasons : [])
+    .map((s) => Number(s.season_number))
+    .filter((n) => n > 0)
+    .sort((a, b) => a - b)
+    .slice(0, 30); // cota de seguridad para series con muchas temporadas
+  if (!seasonNums.length) return null;
+
+  const perSeason = await Promise.all(
+    seasonNums.map(async (n) => {
+      const [es, en] = await Promise.all([
+        tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=es-ES`),
+        tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=en-US`),
+      ]);
+      const episodes = [
+        ...(Array.isArray(es?.episodes) ? es.episodes : []),
+        ...(Array.isArray(en?.episodes) ? en.episodes : []),
+      ];
+      return matchEpisodeByName({ episodeName: clean, seasonEpisodes: episodes });
+    }),
+  );
+  // Primera temporada (ascendente) con coincidencia.
+  return perSeason.find(Boolean) || null;
+}
+
 export async function POST(request) {
   try {
     const {
@@ -237,24 +293,33 @@ export async function POST(request) {
       }
     }
 
-    // Serie con episodio pero SIN temporada conocida: NO inventamos T1 (antes se
-    // registraba T1E5 al ver T4E5). Si la serie tiene UNA sola temporada, usamos
-    // esa; si tiene varias y no sabemos cuál, registramos a nivel serie.
+    // Serie con episodio pero SIN temporada conocida (típico de Netflix web, que
+    // muestra el episodio pero no la temporada). NO inventamos T1:
     if (isTv && tmdbId && episode != null && season == null && TMDB_API_KEY) {
-      try {
-        const showUrl = `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`;
-        const showRes = await fetch(showUrl, { signal: AbortSignal.timeout(8000) });
-        if (showRes.ok) {
-          const showData = await showRes.json();
-          const realSeasons = (Array.isArray(showData?.seasons) ? showData.seasons : [])
-            .filter((s) => s && Number(s.season_number) > 0);
-          if (realSeasons.length === 1) {
-            season = Number(realSeasons[0].season_number) || 1;
-          }
-        }
-      } catch (e) {
-        console.warn("[Extension Sync] season lookup failed:", e?.message);
+      // 1. Serie de una sola temporada → esa.
+      const showData = await tmdbJson(
+        `${TMDB_API}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`,
+      );
+      const realSeasons = (Array.isArray(showData?.seasons) ? showData.seasons : [])
+        .filter((s) => s && Number(s.season_number) > 0);
+      if (realSeasons.length === 1) {
+        season = Number(realSeasons[0].season_number) || 1;
       }
+
+      // 2. Varias temporadas: localizar la temporada por el NOMBRE del episodio.
+      if (season == null && episodeName) {
+        const hit = await findSeasonByEpisodeName(tmdbId, episodeName);
+        if (hit) {
+          season = hit.season;
+          episode = hit.episode;
+          confidence = "medium";
+          console.log(
+            `[Extension Sync] Temporada fijada por nombre de episodio: "${episodeName}" → T${season}E${episode}`,
+          );
+        }
+      }
+
+      // 3. Sin suerte: nivel serie (no inventamos temporada).
       if (season == null) {
         console.warn(
           `[Extension Sync] Temporada desconocida para "${resolvedTitle || query}"; se registra a nivel serie.`,

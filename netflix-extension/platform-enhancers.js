@@ -145,21 +145,41 @@
       /* ignoramos */
     }
 
-    try {
-      if (!out.episodeName) {
-        const subTxt = firstText(doc, r.subSel);
-        if (subTxt) out.episodeName = subTxt;
-      }
-    } catch (e) {
-      /* ignoramos */
-    }
-
+    // Nombre de la serie (h4 del título del reproductor).
     try {
       if (!out.showName && !out.movieTitle) {
         const t = firstText(doc, r.titleSel);
         if (t) {
           if (out.episode != null || out.episodeName) out.showName = t;
           else out.movieTitle = t;
+        }
+      }
+    } catch (e) {
+      /* ignoramos */
+    }
+
+    // Nombre del EPISODIO: título completo del reproductor menos el nombre de la
+    // serie y el marcador "E5"/"T4:E5". Es lo que permite al servidor localizar la
+    // temporada (Netflix web muestra el episodio pero NO la temporada).
+    try {
+      if (!out.episodeName) {
+        const full = firstText(doc, r.seSel || r.subSel) || "";
+        const showTxt = out.showName || firstText(doc, r.titleSel) || "";
+        let epName = full;
+        if (showTxt && epName.toLowerCase().indexOf(showTxt.toLowerCase()) === 0) {
+          epName = epName.slice(showTxt.length).trim();
+        }
+        epName = epName
+          .replace(
+            /^\s*(?:T\s*\d+\s*[:x]?\s*)?(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\.?\s*\d+\s*[:.\-–·]?\s*/i,
+            "",
+          )
+          .replace(/\s+/g, " ")
+          .trim();
+        if (epName && epName.length > 1) out.episodeName = epName;
+        else {
+          const subTxt = firstText(doc, r.subSel);
+          if (subTxt) out.episodeName = subTxt;
         }
       }
     } catch (e) {
