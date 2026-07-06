@@ -34,7 +34,6 @@ import {
   traktGetCompleted,
   traktDisconnect,
 } from "@/lib/api/traktClient";
-import { getLocalInProgress } from "@/lib/api/progressClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import { translateGenre } from "@/lib/details/formatters";
@@ -70,103 +69,7 @@ function formatEpCode(season, number) {
   return `S${String(season).padStart(2, "0")}E${String(number).padStart(2, "0")}`;
 }
 
-// Tipo de medio del item ("movie" | "tv"), tolerante a varias formas de venir.
-function itemMediaType(item) {
-  return item?.type === "movie" ||
-    item?.media_type === "movie" ||
-    item?.detailsHref?.includes("/movie/")
-    ? "movie"
-    : "tv";
-}
-
-// Clave única por item (evita colisión si una peli y una serie comparten tmdbId).
-function itemKeyOf(item) {
-  return `${itemMediaType(item)}:${item?.tmdbId ?? item?.id}`;
-}
-
-function clampPct100(value) {
-  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
-}
-
-// Convierte filas de progreso local (streaming: películas y episodios) al formato
-// de item de esta página.
-function mapLocalToInProgress(rows) {
-  return (Array.isArray(rows) ? rows : [])
-    .filter((r) => r && Number(r.tmdbId) > 0)
-    .map((r) => {
-      const isTv = r.mediaType === "tv";
-      const season = Number(r.season);
-      const number = Number(r.episode);
-      const hasEp = isTv && season > 0 && number > 0;
-      const ep = hasEp ? { season, number } : null;
-      return {
-        tmdbId: Number(r.tmdbId),
-        type: isTv ? "tv" : "movie",
-        media_type: isTv ? "tv" : "movie",
-        title: r.title || "",
-        title_es: r.title || "",
-        poster_path: r.posterPath || null,
-        backdrop_path: null,
-        pct: clampPct100((Number(r.percent) || 0) * 100),
-        completed: 0,
-        aired: 0,
-        hasKnownAired: false,
-        nextEpisode: ep,
-        lastEpisode: ep,
-        lastWatchedAt: r.updatedAt || null,
-        _local: true,
-        platform: r.platform || null,
-      };
-    });
-}
-
-// Fusiona el progreso de Trakt/backend (series por nº de episodios) con el
-// progreso local de streaming (películas + episodios). El de Trakt tiene
-// prioridad ante el mismo título (datos de episodios más ricos); las películas y
-// las series solo-locales se añaden.
-function mergeProgressItems(traktItems, localItems) {
-  const seen = new Set();
-  const out = [];
-  for (const it of [...(traktItems || []), ...(localItems || [])]) {
-    if (!it || it.tmdbId == null) continue;
-    const key = itemKeyOf(it);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(it);
-  }
-  return out;
-}
-
 function getEpisodeProgress(item) {
-  // Películas: no hay episodios; el progreso es el % visto (posición real).
-  if (itemMediaType(item) === "movie") {
-    const pct = clampPct100(item?.pct);
-    return {
-      completed: 0,
-      aired: 0,
-      hasKnownAired: false,
-      remaining: null,
-      label: `${pct}% vista`,
-      longLabel: `${pct}% vista`,
-      isMovie: true,
-    };
-  }
-  // Serie solo-local (streaming, sin recuento de episodios de Trakt): mostramos el
-  // episodio en curso y su % en vez de "0 episodios".
-  if (item?._local) {
-    const pct = clampPct100(item?.pct);
-    const ep = item?.nextEpisode;
-    const code = ep ? `T${ep.season}·E${ep.number}` : "Serie";
-    return {
-      completed: 0,
-      aired: 0,
-      hasKnownAired: false,
-      remaining: null,
-      label: `${code} · ${pct}%`,
-      longLabel: `${code} · ${pct}% del episodio`,
-      isLocal: true,
-    };
-  }
   const completed = Math.max(0, Number(item?.completed || 0));
   const aired = Math.max(0, Number(item?.aired || item?.total_episodes || 0));
   const hasKnownAired = item?.hasKnownAired !== false && aired > 0;
@@ -486,7 +389,7 @@ function clearSessionCache(key) {
 // SMART POSTER COMPONENT
 // ----------------------------
 function SmartPoster({ item, title }) {
-  const type = itemMediaType(item);
+  const type = "tv"; // In Progress is always TV
   const id = item.tmdbId;
 
   const [src, setSrc] = useState(null);
@@ -558,7 +461,7 @@ function SmartPoster({ item, title }) {
 // SMART BACKDROP COMPONENT
 // ----------------------------
 function SmartBackdrop({ item, title, imgClassName = "" }) {
-  const type = itemMediaType(item);
+  const type = "tv";
   const id = item.tmdbId;
 
   const [src, setSrc] = useState(null);
@@ -1282,10 +1185,6 @@ export default function InProgressClient({
     readStoredInProgressValue("showverse:inprogress:groupBy", "none"),
   );
   const [q, setQ] = useState("");
-  // Filtro por tipo: "all" | "movie" | "tv".
-  const [typeFilter, setTypeFilter] = useState(() =>
-    readStoredInProgressValue("showverse:inprogress:typeFilter", "all"),
-  );
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [uiReady, setUiReady] = useState(false);
@@ -1307,10 +1206,6 @@ export default function InProgressClient({
     if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:groupBy", groupBy);
   }, [groupBy, uiReady]);
-  useEffect(() => {
-    if (!uiReady) return;
-    window.localStorage.setItem("showverse:inprogress:typeFilter", typeFilter);
-  }, [typeFilter, uiReady]);
 
   // Update document title when tab changes
   useEffect(() => {
@@ -1331,39 +1226,20 @@ export default function InProgressClient({
   const loadData = useCallback(async ({ background = false, fallbackCache = null } = {}) => {
     if (!background) setLoading(true);
     try {
-      // Progreso de Trakt/backend (series por episodios) + progreso local de
-      // streaming (posición real de películas y episodios).
-      const [json, localRows] = await Promise.all([
-        traktGetInProgress(),
-        getLocalInProgress().catch(() => []),
-      ]);
+      const json = await traktGetInProgress();
       const connected = json?.connected !== false;
 
       setAuth({ loading: false, connected });
 
-      const localItems = mapLocalToInProgress(localRows);
-
       if (!connected) {
-        // Sin Trakt: aún así mostramos el progreso local (películas + episodios).
         clearSessionCache(IN_PROGRESS_CACHE_KEY);
-        if (localItems.length > 0) {
-          setAuth({ loading: false, connected: true });
-          setItems(localItems);
-          setStats(null);
-          setDataLoaded(true);
-          writeSessionCache(IN_PROGRESS_CACHE_KEY, {
-            items: localItems,
-            stats: null,
-          });
-        } else {
-          setItems([]);
-          setStats(null);
-          setDataLoaded(true);
-        }
+        setItems([]);
+        setStats(null);
+        setDataLoaded(true);
         return;
       }
 
-      const nextItems = mergeProgressItems(json?.items || [], localItems);
+      const nextItems = json?.items || [];
       const nextStats = json?.stats || null;
 
       setItems(nextItems);
@@ -1560,11 +1436,6 @@ export default function InProgressClient({
   const filtered = useMemo(() => {
     let list = [...currentItems];
 
-    // Filtro por tipo (película / serie)
-    if (typeFilter !== "all") {
-      list = list.filter((x) => itemMediaType(x) === typeFilter);
-    }
-
     // Search
     if (q.trim()) {
       const query = q.trim().toLowerCase();
@@ -1620,7 +1491,7 @@ export default function InProgressClient({
     }
 
     return list;
-  }, [currentItems, q, sortBy, typeFilter]);
+  }, [currentItems, q, sortBy]);
 
   const allSortLabels = {
     recent: "Recientes",
@@ -1649,12 +1520,6 @@ export default function InProgressClient({
     status: "Por estado",
     remaining: "Por episodios restantes",
     last_watched: "Por última vez visto",
-  };
-
-  const typeLabels = {
-    all: "Todo",
-    movie: "Películas",
-    tv: "Series",
   };
 
   // Grouping logic
@@ -1980,7 +1845,7 @@ export default function InProgressClient({
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 {activeTab === "completed"
                   ? "Series que ya has terminado de ver."
-                  : "Películas y series que estás viendo actualmente con su progreso."}
+                  : "Series que estás viendo actualmente con su progreso."}
               </p>
             </div>
 
@@ -1998,7 +1863,7 @@ export default function InProgressClient({
                 transition={{ duration: 0.4, delay: 0.5 }}
               >
                 <StatCard
-                  label={activeTab === "completed" ? "Series" : "Títulos"}
+                  label="Series"
                   value={displayStats?.total ?? 0}
                   loading={!currentDataLoaded}
                   icon={Tv}
@@ -2215,34 +2080,6 @@ export default function InProgressClient({
                       </button>
                     </div>
                   </div>
-
-                  {/* Fila 3: Tipo (solo en "Viendo") */}
-                  {activeTab === "inprogress" && (
-                    <div className="flex-1 min-w-0">
-                      <InlineDropdown
-                        label="Tipo"
-                        valueLabel={typeLabels[typeFilter]}
-                        icon={Film}
-                      >
-                        {({ close }) => (
-                          <>
-                            {Object.entries(typeLabels).map(([key, label]) => (
-                              <DropdownItem
-                                key={key}
-                                active={typeFilter === key}
-                                onClick={() => {
-                                  setTypeFilter(key);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))}
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -2351,32 +2188,6 @@ export default function InProgressClient({
               )}
             </InlineDropdown>
 
-            {/* Type filter (solo en la pestaña "Viendo") */}
-            {activeTab === "inprogress" && (
-              <InlineDropdown
-                label="Tipo"
-                valueLabel={typeLabels[typeFilter]}
-                icon={Film}
-              >
-                {({ close }) => (
-                  <>
-                    {Object.entries(typeLabels).map(([key, label]) => (
-                      <DropdownItem
-                        key={key}
-                        active={typeFilter === key}
-                        onClick={() => {
-                          setTypeFilter(key);
-                          close();
-                        }}
-                      >
-                        {label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </InlineDropdown>
-            )}
-
             {/* View mode */}
             <div className="flex gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
@@ -2434,18 +2245,14 @@ export default function InProgressClient({
                 ? "Sin resultados"
                 : activeTab === "completed"
                   ? "No tienes series completadas"
-                  : typeFilter === "movie"
-                    ? "No tienes películas en progreso"
-                    : typeFilter === "tv"
-                      ? "No tienes series en progreso"
-                      : "No tienes nada en progreso"}
+                  : "No tienes series en progreso"}
             </h3>
             <p className="text-sm text-zinc-600 max-w-sm">
               {q
-                ? `No se encontraron títulos que coincidan con "${q}"`
+                ? `No se encontraron series que coincidan con "${q}"`
                 : activeTab === "completed"
                   ? "Completa una serie en Trakt para verla aquí."
-                  : "Reproduce algo en una plataforma de streaming (con la extensión o la app) y aparecerá aquí con su progreso."}
+                  : "Empieza a ver una serie y márcala en Trakt para verla aquí."}
             </p>
           </motion.div>
         )}
@@ -2469,7 +2276,7 @@ export default function InProgressClient({
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                         {group.items.map((item, idx) => (
                           <InProgressCard
-                            key={itemKeyOf(item)}
+                            key={item.tmdbId}
                             item={item}
                             index={idx}
                             viewMode="cards"
@@ -2481,7 +2288,7 @@ export default function InProgressClient({
                       <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
                         {group.items.map((item, idx) => (
                           <InProgressCard
-                            key={itemKeyOf(item)}
+                            key={item.tmdbId}
                             item={item}
                             index={idx}
                             viewMode="poster"
@@ -2493,7 +2300,7 @@ export default function InProgressClient({
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         {group.items.map((item, idx) => (
                           <InProgressCard
-                            key={itemKeyOf(item)}
+                            key={item.tmdbId}
                             item={item}
                             index={idx}
                             viewMode="compact"

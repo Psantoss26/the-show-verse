@@ -594,6 +594,9 @@
   let currentSynced = null;
   let currentSyncedKey = null;
   let lastProgressPingAt = 0;
+  // Vídeo al que ya hemos enganchado los listeners de pausa/fin (para guardar el
+  // punto exacto al salir sin duplicar listeners).
+  let listenedVideo = null;
 
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
@@ -730,6 +733,33 @@
     }
   }
 
+  // Envío INMEDIATO del progreso (ignora la cadencia): al pausar, terminar,
+  // cambiar de pestaña o cerrar. Así se guarda el punto EXACTO de reproducción
+  // al salir, sin esperar al siguiente ciclo de 30 s.
+  function flushProgress() {
+    if (syncPaused || !currentSynced || !currentSyncedKey) return;
+    const video = getMainVideo();
+    if (!video) return;
+    const dur = isFinite(video.duration) ? Math.round(video.duration) : 0;
+    const pos = Math.round(video.currentTime || 0);
+    if (dur <= 0 || pos < 0) return;
+    lastProgressPingAt = 0; // salta el throttle
+    maybeSendProgress({ durationSec: dur, positionSec: pos }, currentSyncedKey);
+  }
+
+  // Engancha (una sola vez por elemento) los listeners de pausa/fin del vídeo
+  // para volcar la posición justo al pausar o terminar.
+  function ensureVideoListeners(video) {
+    if (!video || video === listenedVideo) return;
+    listenedVideo = video;
+    try {
+      video.addEventListener("pause", flushProgress);
+      video.addEventListener("ended", flushProgress);
+    } catch (e) {
+      /* elemento no válido: se reintentará con el siguiente vídeo */
+    }
+  }
+
   function tick() {
     if (!extensionAlive()) {
       // Extensión recargada/actualizada: paramos este script huérfano. La
@@ -774,6 +804,8 @@
     // Ya resolvimos este contenido: enviamos progreso (Continuar viendo + visto
     // al 90%). Va ANTES del corte por dedup para que siga latiendo cada ciclo.
     maybeSendProgress(signal, key);
+    // Engancha pausa/fin del vídeo para volcar el punto exacto al salir.
+    ensureVideoListeners(getMainVideo());
 
     if (key === lastKey) return;
 
@@ -869,5 +901,17 @@
     });
   } catch (e) {
     start();
+  }
+
+  // Guardado del punto de reproducción al SALIR: al ocultar la pestaña
+  // (cambiar de pestaña/minimizar) y al descargar la página (cerrar/navegar).
+  // visibilitychange es fiable; pagehide es el último recurso (best-effort).
+  try {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flushProgress();
+    });
+    window.addEventListener("pagehide", flushProgress);
+  } catch (e) {
+    /* entorno sin document/window: ignoramos */
   }
 })();
