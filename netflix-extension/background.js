@@ -692,6 +692,74 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  // 3c. Progreso de reproducción (posición/duración) del contenido ya resuelto.
+  // Alimenta "Continuar viendo"; al 90% el servidor lo marca como visto.
+  if (message.action === "syncProgress") {
+    const {
+      tmdbId,
+      mediaType,
+      season,
+      episode,
+      title,
+      posterPath,
+      platform,
+      positionSeconds,
+      runtimeSeconds,
+    } = message;
+
+    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
+      const origin = result.showVerseOrigin || "http://localhost:3000";
+      const syncToken = result.netflixSyncToken || "";
+      if (result[SYNC_PAUSED_KEY]) {
+        sendResponse({ success: false, paused: true });
+        return;
+      }
+      if (!syncToken) {
+        sendResponse({ success: false, error: "Sin token de sincronización." });
+        return;
+      }
+
+      fetch(`${origin}/api/netflix/extension-progress`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${syncToken}`,
+        },
+        body: JSON.stringify({
+          tmdbId,
+          mediaType,
+          season: season || undefined,
+          episode: episode || undefined,
+          title: title || undefined,
+          posterPath: posterPath || undefined,
+          platform: platform || undefined,
+          positionSeconds,
+          runtimeSeconds,
+        }),
+        credentials: "omit",
+      })
+        .then(async (res) => {
+          const json = await res.json().catch(() => ({}));
+          if (res.ok) {
+            if (json.completed) {
+              addLog(`Marcado como visto al completar: "${title || tmdbId}"`, "success");
+            }
+            sendResponse({
+              success: true,
+              completed: Boolean(json.completed),
+              percent: json.percent,
+            });
+          } else {
+            sendResponse({ success: false, error: json.error || `HTTP ${res.status}` });
+          }
+        })
+        .catch((err) => {
+          sendResponse({ success: false, error: err.message });
+        });
+    });
+    return true;
+  }
 });
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {

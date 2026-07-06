@@ -100,6 +100,33 @@ export const watchHistory = pgTable('watch_history', {
 }));
 
 // ─────────────────────────────────────────────
+// WATCH PROGRESS (reanudación / "Continuar viendo" desde streaming)
+// ─────────────────────────────────────────────
+// Estado ACTUAL de reproducción por título/episodio (upsert). Distinto de
+// watch_history (eventos de "visto"). season/episode = 0 para películas o cuando
+// no hay episodio concreto, para que el índice único funcione con el upsert.
+export const watchProgress = pgTable('watch_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),                // 'movie' | 'tv'
+  season: integer('season').default(0).notNull(),
+  episode: integer('episode').default(0).notNull(),
+  positionSeconds: integer('position_seconds').default(0).notNull(),
+  runtimeSeconds: integer('runtime_seconds').default(0).notNull(),
+  percent: real('percent').default(0).notNull(),          // 0..1
+  platform: text('platform'),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  itemUnique: uniqueIndex('idx_watch_progress_item').on(t.userId, t.tmdbId, t.mediaType, t.season, t.episode),
+  userUpdatedIdx: index('idx_watch_progress_user_updated').on(t.userId, t.updatedAt),
+  mediaTypeCheck: check('chk_watch_progress_media_type', sql`media_type IN ('movie', 'tv')`),
+}));
+
+// ─────────────────────────────────────────────
 // FAVORITES
 // ─────────────────────────────────────────────
 export const favorites = pgTable('favorites', {

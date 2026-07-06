@@ -11,6 +11,7 @@ import {
   userPreferences,
   connectedAccounts,
   watchHistory,
+  watchProgress,
 } from '../db/schema.js';
 import {
   signAccessToken,
@@ -64,6 +65,20 @@ const netflixSyncSchema = z.object({
   netflixTitle: z.string().max(300).optional(),
   platform: z.string().max(40).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
+});
+
+// Progreso de reproducción en curso (position/duration) desde la extensión o la
+// app Android. season/episode 0 = película o sin episodio concreto.
+const netflixProgressSchema = z.object({
+  tmdbId: z.number().int().positive(),
+  mediaType: z.enum(['movie', 'tv']),
+  season: z.number().int().min(0).optional(),
+  episode: z.number().int().min(0).optional(),
+  positionSeconds: z.number().int().min(0),
+  runtimeSeconds: z.number().int().min(0),
+  platform: z.string().max(40).optional(),
+  title: z.string().max(300).optional(),
+  posterPath: z.string().max(300).nullable().optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -995,6 +1010,154 @@ export default async function authRoutes(fastify) {
       duplicate: Boolean(recentDuplicate),
       item,
     });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /netflix/progress — Progreso de reproducción (extensión + Android).
+  // Cada ~30 s el cliente envía posición/duración del contenido YA resuelto
+  // (tmdbId/mediaType/temporada/episodio cacheados). Mientras se ve, se hace
+  // upsert en watch_progress ("Continuar viendo"). Al llegar al 90% se marca
+  // como visto en el historial (con dedup) y se elimina de "Continuar viendo".
+  // ──────────────────────────────────────────────
+  fastify.post('/netflix/progress', async (req, reply) => {
+    const auth = req.headers.authorization || '';
+    const syncToken = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
+    if (!syncToken) {
+      return reply.status(401).send({ error: 'Netflix sync token is required' });
+    }
+
+    const parsed = netflixProgressSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    const [account] = await db
+      .select()
+      .from(connectedAccounts)
+      .where(and(
+        eq(connectedAccounts.provider, 'netflix'),
+        eq(connectedAccounts.accessToken, hashToken(syncToken))
+      ))
+      .limit(1);
+
+    if (!account) {
+      return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
+    }
+
+    const { tmdbId, mediaType, positionSeconds, runtimeSeconds, platform, title, posterPath } = parsed.data;
+    const isTv = mediaType === 'tv';
+    // Clave del índice único: 0 para película o episodio desconocido.
+    const season = isTv ? (parsed.data.season ?? 0) : 0;
+    const episode = isTv ? (parsed.data.episode ?? 0) : 0;
+    const percent = runtimeSeconds > 0 ? Math.min(1, positionSeconds / runtimeSeconds) : 0;
+    const COMPLETE_AT = 0.9;
+    const userId = account.userId;
+
+    // ── Completado (≥90% y con duración conocida): marcar visto + quitar de "Continuar viendo".
+    if (runtimeSeconds > 0 && percent >= COMPLETE_AT) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentRows = await db
+        .select({
+          season: watchHistory.season,
+          episode: watchHistory.episode,
+          watchedAt: watchHistory.watchedAt,
+        })
+        .from(watchHistory)
+        .where(and(
+          eq(watchHistory.userId, userId),
+          eq(watchHistory.tmdbId, tmdbId),
+          eq(watchHistory.mediaType, mediaType),
+          gt(watchHistory.watchedAt, since),
+        ));
+
+      const now = new Date();
+      const incomingKey = syncDedupKey({
+        tmdbId,
+        mediaType,
+        season: isTv ? (season || null) : null,
+        episode: isTv ? (episode || null) : null,
+        watchedAt: now,
+      });
+      const duplicate = recentRows.some(
+        (r) => syncDedupKey({
+          tmdbId,
+          mediaType,
+          season: r.season,
+          episode: r.episode,
+          watchedAt: r.watchedAt,
+        }) === incomingKey,
+      );
+
+      let item = null;
+      if (!duplicate) {
+        [item] = await db
+          .insert(watchHistory)
+          .values({
+            userId,
+            tmdbId,
+            mediaType,
+            season: isTv ? (season || null) : null,
+            episode: isTv ? (episode || null) : null,
+            watchedAt: now,
+            runtimeMins: runtimeSeconds ? Math.round(runtimeSeconds / 60) : null,
+            title: title || null,
+            posterPath: posterPath || null,
+            confidence: 'high',
+          })
+          .returning();
+      }
+
+      // Idempotente: borra la fila de progreso aunque no existiera.
+      await db
+        .delete(watchProgress)
+        .where(and(
+          eq(watchProgress.userId, userId),
+          eq(watchProgress.tmdbId, tmdbId),
+          eq(watchProgress.mediaType, mediaType),
+          eq(watchProgress.season, season),
+          eq(watchProgress.episode, episode),
+        ));
+
+      return reply.send({ ok: true, completed: true, duplicate, percent: 1, item });
+    }
+
+    // ── En curso: upsert del progreso.
+    await db
+      .insert(watchProgress)
+      .values({
+        userId,
+        tmdbId,
+        mediaType,
+        season,
+        episode,
+        positionSeconds,
+        runtimeSeconds,
+        percent,
+        platform: platform || null,
+        title: title || null,
+        posterPath: posterPath || null,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [
+          watchProgress.userId,
+          watchProgress.tmdbId,
+          watchProgress.mediaType,
+          watchProgress.season,
+          watchProgress.episode,
+        ],
+        set: {
+          positionSeconds,
+          runtimeSeconds,
+          percent,
+          platform: platform || null,
+          title: title || null,
+          posterPath: posterPath || null,
+          updatedAt: new Date(),
+        },
+      });
+
+    return reply.send({ ok: true, completed: false, percent });
   });
 
   // ──────────────────────────────────────────────

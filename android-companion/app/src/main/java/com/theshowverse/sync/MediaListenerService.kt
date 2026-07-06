@@ -39,6 +39,10 @@ class MediaListenerService : NotificationListenerService() {
     private val playingSince = HashMap<String, Long>()
     private val lastKeyByPackage = HashMap<String, String>()
     private val loggedNotes = HashSet<String>() // para no repetir el mismo aviso
+    // Progreso: entidad resuelta por paquete (para enviar posición sin re-resolver)
+    // y control de cadencia de los pings.
+    private val syncedByPackage = HashMap<String, SyncedInfo>()
+    private val lastProgressAtByPackage = HashMap<String, Long>()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
@@ -183,6 +187,11 @@ class MediaListenerService : NotificationListenerService() {
         for (pkg in stopped) {
             playingSince.remove(pkg)
             loggedNotes.removeAll { it.endsWith(":$pkg") }
+            // Al parar, olvidamos la resolución y la clave: si se reanuda el mismo
+            // título, se vuelve a resolver y a retomar el seguimiento de progreso.
+            syncedByPackage.remove(pkg)
+            lastProgressAtByPackage.remove(pkg)
+            lastKeyByPackage.remove(pkg)
         }
 
         if (sessions.isEmpty()) stopPolling()
@@ -254,19 +263,34 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
 
+        // Progreso: si ya resolvimos este contenido, enviamos posición/duración
+        // (Continuar viendo + visto al 90%). Va ANTES del corte por dedup para que
+        // siga latiendo mientras se reproduce el mismo título.
+        maybeSendProgress(pkg, signal)
+
         val key = signal.dedupKey
         if (lastKeyByPackage[pkg] == key) return
         lastKeyByPackage[pkg] = key
+        // Contenido nuevo: reiniciamos el estado de progreso de este paquete.
+        syncedByPackage.remove(pkg)
+        lastProgressAtByPackage.remove(pkg)
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         prefs.addLog("Enviando: ${signal.mainTitle}${signal.episodeName?.let { " — $it" } ?: ""}")
-        SyncClient.send(origin, token, signal) { ok, err, synced ->
+        // resolveOnly: solo RESOLVEMOS el título (para "Continuar viendo" y el
+        // indicador). El "visto" ya no se marca al detectar, sino al 90% vía pings.
+        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, err, synced ->
             handler.post {
                 if (ok) {
-                    prefs.addLog("✓ Sincronizado: ${signal.mainTitle}")
+                    prefs.addLog("✓ Detectado: ${signal.mainTitle}")
                     // Acceso rápido: notificación con enlace a la ficha en The Show Verse.
                     showQuickAccessNotification(synced)
+                    if (synced != null) {
+                        syncedByPackage[pkg] = synced
+                        lastProgressAtByPackage.remove(pkg) // fuerza un ping inmediato
+                        maybeSendProgress(pkg, signal)
+                    }
                 } else {
                     // NO reintentamos el mismo título: reenviar cada 3s satura el
                     // endpoint y agrava el 429. Se enviará el próximo título nuevo.
@@ -276,10 +300,38 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
+    // Envía el progreso del contenido ya resuelto, como mucho una vez cada
+    // PROGRESS_PING_MS. Si el servidor responde completed=true (≥90%), deja de
+    // sondear ese paquete (ya está marcado como visto).
+    private fun maybeSendProgress(pkg: String, signal: PlaybackSignal) {
+        val synced = syncedByPackage[pkg] ?: return
+        val durationSec = signal.durationSec ?: return
+        val positionSec = signal.positionSec ?: return
+        if (durationSec <= 0 || positionSec < 0) return
+        val now = SystemClock.elapsedRealtime()
+        val last = lastProgressAtByPackage[pkg] ?: 0L
+        if (now - last < PROGRESS_PING_MS) return
+        lastProgressAtByPackage[pkg] = now
+
+        val token = prefs.token ?: return
+        val origin = prefs.origin ?: return
+        SyncClient.sendProgress(
+            origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
+        ) { ok, completed ->
+            handler.post {
+                if (ok && completed) {
+                    prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
+                    syncedByPackage.remove(pkg)
+                }
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "TSVSync"
         private const val POLL_MS = 3_000L
         private const val MIN_WATCH_MS = 15_000L
+        private const val PROGRESS_PING_MS = 30_000L
         private const val QUICK_CHANNEL_ID = "tsv_quick_access"
         private const val QUICK_NOTIF_ID = 1001
     }

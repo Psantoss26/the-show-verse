@@ -10,6 +10,9 @@
   // acceso rápido ya NO depende de esto: sale en la ficha del título vía resolveOnly.
   const MIN_WATCH_SECONDS = 15;
   const DEBUG_THROTTLE_MS = 15000;
+  // Cada cuánto se envía el progreso de reproducción (posición/duración) para
+  // "Continuar viendo". Al 90% el servidor lo marca como visto automáticamente.
+  const PROGRESS_PING_MS = 30000;
 
   const D = self.TSVDetection;
   const E = self.TSVEnhancers;
@@ -586,6 +589,11 @@
   let lastDebug = 0;
   let pollTimer = null;
   let syncPaused = false;
+  // Progreso: entidad resuelta del contenido en curso (para enviar posición sin
+  // volver a resolver) + control de cadencia de los pings.
+  let currentSynced = null;
+  let currentSyncedKey = null;
+  let lastProgressPingAt = 0;
 
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
@@ -677,6 +685,51 @@
     return signal;
   }
 
+  // Envía el progreso (posición/duración) del contenido ya resuelto, como mucho
+  // una vez cada PROGRESS_PING_MS. El servidor hace upsert de "Continuar viendo"
+  // y, al 90%, lo marca como visto y responde completed:true (dejamos de sondear).
+  function maybeSendProgress(signal, key) {
+    if (!currentSynced || currentSyncedKey !== key) return;
+    const dur = Number(signal.durationSec);
+    const pos = Number(signal.positionSec);
+    if (!isFinite(dur) || dur <= 0 || !isFinite(pos) || pos < 0) return;
+    const now = Date.now();
+    if (now - lastProgressPingAt < PROGRESS_PING_MS) return;
+    lastProgressPingAt = now;
+    const synced = currentSynced;
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: "syncProgress",
+          tmdbId: synced.tmdbId,
+          mediaType: synced.mediaType,
+          season: synced.season,
+          episode: synced.episode,
+          title: synced.title,
+          posterPath: synced.posterPath,
+          platform: platformId,
+          positionSeconds: Math.round(pos),
+          runtimeSeconds: Math.round(dur),
+        },
+        (resp) => {
+          if (!extensionAlive()) return;
+          if (chrome.runtime.lastError) {
+            // Service worker no respondió: reintentamos en el próximo ciclo.
+            lastProgressPingAt = 0;
+            return;
+          }
+          if (resp && resp.completed) {
+            // Ya marcado como visto (≥90%): dejamos de sondear este contenido.
+            currentSynced = null;
+            currentSyncedKey = null;
+          }
+        },
+      );
+    } catch (e) {
+      lastProgressPingAt = 0;
+    }
+  }
+
   function tick() {
     if (!extensionAlive()) {
       // Extensión recargada/actualizada: paramos este script huérfano. La
@@ -717,11 +770,20 @@
     }
 
     const key = `${platformId}:${signal.contentId || `${mainTitle}|${signal.episodeName || ""}`}`;
+
+    // Ya resolvimos este contenido: enviamos progreso (Continuar viendo + visto
+    // al 90%). Va ANTES del corte por dedup para que siga latiendo cada ciclo.
+    maybeSendProgress(signal, key);
+
     if (key === lastKey) return;
 
     // Optimista: marcamos el contenido como intentado ANTES de enviar para no
     // reintentar en bucle títulos que no resuelvan (el servidor deduplica igual).
     lastKey = key;
+    // Contenido nuevo: reiniciamos el estado de progreso.
+    currentSynced = null;
+    currentSyncedKey = null;
+    lastProgressPingAt = 0;
 
     try {
       chrome.runtime.sendMessage(
@@ -733,6 +795,10 @@
           // Retrocompat con el backend/route: mainTitle/subTitle.
           mainTitle,
           subTitle: signal.episodeName || "",
+          // Reproducción real: solo RESOLVEMOS el título (para "Continuar viendo"
+          // y el indicador). El "visto" ya no se marca al detectar, sino al 90%
+          // mediante los pings de progreso.
+          resolveOnly: true,
         },
         (response) => {
           if (!extensionAlive()) return;
@@ -742,20 +808,24 @@
             return;
           }
           if (response && response.success) {
-            console.log(
-              `[The Show Verse] Sincronizado (${platformName}): "${mainTitle}"`,
-            );
             // Acceso rápido: si el título se resolvió, mostramos el indicador con
-            // enlace directo a su página de detalles en The Show Verse.
+            // enlace directo a su página de detalles en The Show Verse y
+            // empezamos a enviar el progreso de reproducción.
             const synced = response.synced;
-            if (synced && synced.tmdbId && response.origin) {
-              const url = D.buildDetailsUrl(response.origin, synced);
-              if (url) {
-                showIndicator({
-                  url,
-                  title: synced.title || mainTitle,
-                  posterPath: synced.posterPath,
-                });
+            if (synced && synced.tmdbId) {
+              currentSynced = synced;
+              currentSyncedKey = key;
+              lastProgressPingAt = 0;
+              maybeSendProgress(signal, key); // crea la entrada de Continuar viendo ya
+              if (response.origin) {
+                const url = D.buildDetailsUrl(response.origin, synced);
+                if (url) {
+                  showIndicator({
+                    url,
+                    title: synced.title || mainTitle,
+                    posterPath: synced.posterPath,
+                  });
+                }
               }
             }
           }
