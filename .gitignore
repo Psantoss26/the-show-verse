@@ -50,3 +50,6 @@ specs/
 
 # Capturas/volcados de Playwright MCP (solo locales)
 .playwright-mcp/
+
+# Obsidian (configuración local del editor, no versionar)
+.obsidian/
