@@ -283,7 +283,7 @@
 
     const shadow = host.attachShadow({ mode: "open" });
 
-    // CSS para el popup "Liquid Glass" Premium (Vertical y Minimalista)
+    // CSS para el popup "Liquid Glass" Premium (Integración perfecta de portada + cierre interno)
     const style = document.createElement("style");
     style.textContent = `
       .tsv-wrap {
@@ -299,16 +299,18 @@
         transform: translateY(0);
       }
       .tsv-card {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 12px;
         width: 170px;
         max-width: 80vw;
-        padding: 12px;
+        padding: 0 0 14px 0;
         background: rgba(10, 10, 15, 0.65);
         border: 1.5px solid rgba(255, 255, 255, 0.12);
         border-radius: 24px;
+        overflow: hidden;
         box-shadow: 
           inset 0 1px 1.5px rgba(255, 255, 255, 0.22),
           0 16px 40px -8px rgba(0, 0, 0, 0.8),
@@ -334,10 +336,8 @@
         width: 100%;
         aspect-ratio: 2/3;
         overflow: hidden;
-        border-radius: 16px;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.1);
         background: rgba(255, 255, 255, 0.05);
+        border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
       }
       .tsv-poster {
         width: 100%;
@@ -347,11 +347,13 @@
       }
       .tsv-content {
         width: 100%;
+        padding: 0 12px;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 6px;
         text-align: center;
+        box-sizing: border-box;
       }
       .tsv-title {
         font-size: 13px;
@@ -387,28 +389,29 @@
       }
       .tsv-close-btn {
         position: absolute;
-        top: -6px;
-        right: -6px;
-        width: 20px;
-        height: 20px;
+        top: 8px;
+        right: 8px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
-        background: rgba(20, 20, 25, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        color: rgba(255, 255, 255, 0.6);
+        background: rgba(10, 10, 15, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: rgba(255, 255, 255, 0.8);
         font-size: 13px;
+        font-weight: bold;
         cursor: pointer;
-        pointer-events: auto;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+        z-index: 10;
         display: flex;
         align-items: center;
         justify-content: center;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
       }
       .tsv-close-btn:hover {
-        background-color: rgba(30, 30, 40, 0.95);
-        border-color: rgba(255, 255, 255, 0.3);
+        background-color: rgba(10, 10, 15, 0.85);
+        border-color: rgba(255, 255, 255, 0.45);
         color: #fff;
         transform: scale(1.1);
       }
@@ -416,8 +419,18 @@
         .tsv-card {
           width: 140px;
           gap: 10px;
-          padding: 10px;
+          padding: 0 0 10px 0;
           border-radius: 20px;
+        }
+        .tsv-close-btn {
+          top: 6px;
+          right: 6px;
+          width: 18px;
+          height: 18px;
+          font-size: 11px;
+        }
+        .tsv-content {
+          padding: 0 10px;
         }
         .tsv-title {
           font-size: 12px;
@@ -454,8 +467,8 @@
             <span style="font-size: 9px; margin-left: 2px;">↗</span>
           </div>
         </div>
+        <div class="tsv-close-btn" title="Ocultar">×</div>
       </div>
-      <div class="tsv-close-btn" title="Ocultar">×</div>
     `;
 
     const cardNode = wrap.querySelector(".tsv-card");

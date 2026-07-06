@@ -48,3 +48,18 @@ test("individual and full removal update persisted history", () => {
   assert.deepEqual(clearSearchHistory(storage), []);
   assert.deepEqual(readSearchHistory(storage), []);
 });
+
+test("session history survives when browser storage rejects writes", () => {
+  const storage = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error("storage disabled");
+    },
+    removeItem: () => {
+      throw new Error("storage disabled");
+    },
+  };
+
+  assert.deepEqual(addSearchHistory("Arrival", storage), ["Arrival"]);
+  assert.deepEqual(readSearchHistory(storage), ["Arrival"]);
+});

@@ -372,8 +372,9 @@ function SearchBar({ onResultClick, isMobile = false }) {
     });
   }, [showCollection]);
 
-  const handleResultClick = () => {
-    setSearchHistory(addSearchHistory(query));
+  const handleResultClick = (item) => {
+    const selectedTitle = getSearchTitle(item) || query;
+    setSearchHistory(addSearchHistory(selectedTitle));
     setShowDropdown(false);
     setQuery("");
     setResults([]);
@@ -625,7 +626,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
                       <Link
                         key={`${item.media_type}-${item.id}`}
                         href={href}
-                        onClick={handleResultClick}
+                        onClick={() => handleResultClick(item)}
                       >
                         <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
                           <div className="relative flex-shrink-0">
