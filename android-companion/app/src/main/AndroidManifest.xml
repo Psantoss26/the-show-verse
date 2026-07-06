@@ -49,5 +49,21 @@
             </intent-filter>
         </service>
 
+        <!-- Servicio de accesibilidad: detecta el título de la FICHA en apps de
+             streaming sin reproducir. El usuario lo activa en Ajustes → Accesibilidad.
+             Restringido a apps de streaming en accessibility_service_config.xml. -->
+        <service
+            android:name=".AccessibilityStreamingService"
+            android:exported="true"
+            android:label="@string/a11y_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
     </application>
 </manifest>

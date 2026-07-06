@@ -45,6 +45,29 @@
             android:layout_marginTop="12dp"
             android:text="@string/indicator_toggle" />
 
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/a11ySwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/a11y_toggle" />
+
+        <TextView
+            android:id="@+id/a11yStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="12sp"
+            android:alpha="0.7"
+            android:text="@string/a11y_status_off" />
+
+        <Button
+            android:id="@+id/a11yButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/a11y_open_settings" />
+
         <TextView
             android:id="@+id/appsHeader"
             android:layout_width="wrap_content"

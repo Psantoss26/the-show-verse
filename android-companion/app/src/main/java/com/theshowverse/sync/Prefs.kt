@@ -43,6 +43,12 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_INDICATOR, true)
         set(value) = prefs.edit().putBoolean(KEY_INDICATOR, value).apply()
 
+    /** Detección por accesibilidad de la ficha en apps de streaming (sin reproducir).
+     * Requiere además que el usuario active el servicio en Ajustes de Accesibilidad. */
+    var a11yEnabled: Boolean
+        get() = prefs.getBoolean(KEY_A11Y, true)
+        set(value) = prefs.edit().putBoolean(KEY_A11Y, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -92,6 +98,7 @@ class Prefs(context: Context) {
         private const val KEY_ORIGIN = "origin"
         private const val KEY_PAUSED = "paused"
         private const val KEY_INDICATOR = "indicator_enabled"
+        private const val KEY_A11Y = "a11y_enabled"
         private const val KEY_ENABLED = "enabled_packages"
         private const val KEY_SEEN = "seen_packages"
         private const val KEY_LOGS = "event_logs"
