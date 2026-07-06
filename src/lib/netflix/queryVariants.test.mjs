@@ -7,7 +7,27 @@ import {
   beforeColon,
   buildQueryVariants,
   showNameFromTab,
+  isBarePlatformName,
 } from "./queryVariants.js";
+
+test("isBarePlatformName detecta nombres de plataforma sueltos", () => {
+  assert.equal(isBarePlatformName("Netflix"), true);
+  assert.equal(isBarePlatformName("netflix"), true);
+  assert.equal(isBarePlatformName("Disney+"), true);
+  assert.equal(isBarePlatformName("Prime Video"), true);
+  assert.equal(isBarePlatformName("Stranger Things"), false);
+  assert.equal(isBarePlatformName("Interstellar"), false);
+});
+
+test("buildQueryVariants descarta 'Netflix' (no genera consulta basura)", () => {
+  // Caso real: la extensión cayó al título de pestaña 'Netflix'.
+  assert.deepEqual(buildQueryVariants({ mainTitle: "Netflix", tabTitle: "Netflix" }), []);
+});
+
+test("buildQueryVariants descarta el nombre de plataforma pero conserva el título real", () => {
+  const v = buildQueryVariants({ showName: "Stranger Things", mainTitle: "Netflix" });
+  assert.deepEqual(v, ["Stranger Things"]);
+});
 
 test("showNameFromTab extrae el nombre de la serie del título de la pestaña", () => {
   assert.equal(showNameFromTab("Stranger Things - Netflix"), "Stranger Things");

@@ -26,6 +26,31 @@ const PLATFORM_SUFFIX_RE = new RegExp(
 // Verbo inicial habitual en los títulos de pestaña ("Watch …", "Ver …").
 const WATCH_PREFIX_RE = /^\s*(watch|ver|reproducir|mira|play)\s+/i;
 
+// Nombres de plataforma "a secas": cuando la captura falla, el cliente a veces
+// cae al título de la pestaña, que es solo "Netflix"/"Max"/… Buscar eso en TMDb
+// devuelve una película basura ("Netflix Tudum 2025", etc.). Estos candidatos se
+// DESCARTAN: es mucho mejor no sincronizar que sincronizar algo sin relación.
+function normalizePlatformName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+const PLATFORM_NAME_SET = new Set(
+  [
+    "netflix", "prime video", "amazon prime video", "amazon", "max", "hbo max",
+    "hbo", "disney", "disney plus", "star", "star plus", "paramount",
+    "paramount plus", "apple tv", "apple tv plus", "movistar", "movistar plus",
+    "filmin", "skyshowtime", "pluto", "pluto tv", "rakuten", "rakuten tv",
+    "atresplayer", "rtve", "rtve play", "crunchyroll", "plex",
+  ].map(normalizePlatformName),
+);
+
+// ¿La cadena es solo el nombre de una plataforma (no un título real)?
+export function isBarePlatformName(value) {
+  return PLATFORM_NAME_SET.has(normalizePlatformName(value));
+}
+
 // Quita sufijos de edición / formato / año que hacen fallar la búsqueda en TMDb
 // ("(2021)", "[4K]", "- Edición extendida", ": Director's Cut", "– VOSE").
 export function stripEditionSuffix(value) {
@@ -108,7 +133,9 @@ export function buildQueryVariants({
   const variants = [];
   const add = (value) => {
     const c = cleanSearchTitle(value);
-    if (c && c.length >= 2 && !variants.includes(c)) variants.push(c);
+    if (c && c.length >= 2 && !isBarePlatformName(c) && !variants.includes(c)) {
+      variants.push(c);
+    }
   };
   bases.forEach(add);
   bases.map(beforeColon).filter(Boolean).forEach(add);
