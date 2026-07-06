@@ -623,8 +623,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       artworkUrl,
       durationSec,
       positionSec,
+      resolveOnly,
     } = message;
-    addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
+    if (!resolveOnly) {
+      addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
+    }
 
     chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
       const origin = result.showVerseOrigin || "http://localhost:3000";
@@ -663,13 +666,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           artworkUrl: artworkUrl || undefined,
           durationSec: durationSec || undefined,
           positionSec: positionSec || undefined,
+          resolveOnly: resolveOnly || undefined,
         }),
         credentials: "omit"
       })
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
         if (res.ok) {
-          addLog(`Sincronizado (${platformName || platform}): "${mainTitle}"`, "success");
+          if (!resolveOnly) {
+            addLog(`Sincronizado (${platformName || platform}): "${mainTitle}"`, "success");
+          }
           // `origin` para que el content-script pueda montar la URL de detalles
           // (indicador de acceso rápido a The Show Verse).
           sendResponse({ success: true, synced: json.synced, origin });

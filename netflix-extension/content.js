@@ -6,9 +6,9 @@
 // resolución a TMDb y la deduplicación ocurren en el servidor.
 (function () {
   const POLL_MS = 2000;
-  // Umbral de reproducción antes de sincronizar/mostrar el indicador. Bajo (5s)
-  // para que el acceso rápido aparezca lo antes posible tras abrir el título.
-  const MIN_WATCH_SECONDS = 5;
+  // Umbral para contar como visionado real (añadir al historial). El indicador de
+  // acceso rápido ya NO depende de esto: sale en la ficha del título vía resolveOnly.
+  const MIN_WATCH_SECONDS = 15;
   const DEBUG_THROTTLE_MS = 15000;
 
   const D = self.TSVDetection;
@@ -74,6 +74,89 @@
   let indicatorEnabled = true; // se lee de storage al iniciar
   let indicatorDismissedUrl = null; // URL ocultada por el usuario (no re-mostrar)
   let indicatorCurrentUrl = null; // URL visible ahora (evita reconstruir en bucle)
+  let lastBrowseKey = null; // dedup del indicador de FICHA (resolveOnly)
+
+  // Páginas genéricas del catálogo (no son la ficha de un título): no resolver.
+  const GENERIC_TITLES = new Set(
+    [
+      "inicio", "home", "browse", "explorar", "explora", "mi lista", "my list",
+      "películas", "peliculas", "movies", "series", "tv shows", "programas de tv",
+      "novedades", "new", "buscar", "search", "mi netflix", "próximamente",
+      "proximamente", "descargas", "downloads", "categorías", "categorias",
+      "originales", "populares", "tendencias", "trending", "watch", "ver",
+      "prime video", "index",
+    ].map((s) => s.toLowerCase()),
+  );
+
+  // Título de la FICHA que se está viendo (navegando, SIN reproducir). Fuente
+  // universal: el título de la pestaña (que los SPA actualizan al navegar) o el
+  // og:title, sin el nombre de la plataforma. Descarta páginas genéricas.
+  function detectBrowsingTitle() {
+    let t = "";
+    try {
+      t = D.stripPlatformPrefix(document.title, [platformName]);
+      if (!t || GENERIC_TITLES.has(t.toLowerCase())) {
+        const og = document.querySelector('meta[property="og:title"]');
+        const ogVal = (og && og.getAttribute("content")) || "";
+        const ot = D.stripPlatformPrefix(ogVal, [platformName]);
+        if (ot && !GENERIC_TITLES.has(ot.toLowerCase())) t = ot;
+      }
+    } catch (e) {
+      t = "";
+    }
+    if (!t || t.length < 2) return "";
+    if (isBarePlatformName(t) || GENERIC_TITLES.has(t.toLowerCase())) return "";
+    return t;
+  }
+
+  // Muestra el indicador de acceso rápido para la FICHA actual, resolviendo el
+  // título contra TMDb en modo resolveOnly (NO añade nada al historial).
+  function maybeShowBrowsingIndicator() {
+    if (!indicatorEnabled || syncPaused) return;
+    const title = detectBrowsingTitle();
+    if (!title) return;
+    const key = `${platformId}:browse:${title}`;
+    if (key === lastBrowseKey) return; // ya resuelto para esta ficha
+    lastBrowseKey = key;
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: "syncWatch",
+          platform: platformId,
+          platformName,
+          mainTitle: title,
+          subTitle: "",
+          tabTitle: document.title,
+          resolveOnly: true,
+        },
+        (response) => {
+          if (!extensionAlive()) return;
+          if (chrome.runtime.lastError) {
+            lastBrowseKey = null; // transitorio: permitir reintento
+            return;
+          }
+          if (
+            response &&
+            response.success &&
+            response.synced &&
+            response.synced.tmdbId &&
+            response.origin
+          ) {
+            const url = D.buildDetailsUrl(response.origin, response.synced);
+            if (url) {
+              showIndicator({
+                url,
+                title: response.synced.title || title,
+                posterPath: response.synced.posterPath,
+              });
+            }
+          }
+        },
+      );
+    } catch (e) {
+      lastBrowseKey = null;
+    }
+  }
 
   function el(tag, styles, props) {
     const node = document.createElement(tag);
@@ -424,13 +507,20 @@
     }
 
     const signal = buildSignal();
+    if (!signal) {
+      // No hay reproducción real (estamos navegando por la FICHA del título):
+      // mostramos el indicador de acceso rápido resolviendo el título en modo
+      // resolveOnly, SIN añadir nada al historial.
+      maybeShowBrowsingIndicator();
+      return;
+    }
     const rawMain =
       signal && (signal.showName || signal.movieTitle || signal.tabTitle);
     // Nunca sincronizar un nombre de plataforma suelto ("Netflix"): es señal de
     // que no se ha capturado un título real; mejor esperar al siguiente ciclo.
     const mainTitle = rawMain && !isBarePlatformName(rawMain) ? rawMain : null;
 
-    if (!signal || !mainTitle) {
+    if (!mainTitle) {
       const now = Date.now();
       if (now - lastDebug > DEBUG_THROTTLE_MS) {
         lastDebug = now;
@@ -438,6 +528,8 @@
           `[The Show Verse] ${platformName}: reproducción detectada pero sin título legible.`,
         );
       }
+      // Aun sin título de reproducción legible, probamos el indicador de ficha.
+      maybeShowBrowsingIndicator();
       return;
     }
 
