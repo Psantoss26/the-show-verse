@@ -1450,7 +1450,7 @@ function ViewModeControl({ value, onChange }) {
   ];
 
   return (
-    <div className="inline-flex h-9 items-center rounded-full border border-white/5 p-0.5 gap-0 bg-gradient-to-br from-white/5 via-transparent to-black/35 backdrop-blur-md shadow-inner">
+    <div className="inline-flex h-9 items-center rounded-full border border-white/5 p-0.5 gap-0 bg-gradient-to-br from-white/5 via-transparent to-black/35 backdrop-blur-md shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.08)]">
       {options.map((opt) => {
         const active = opt.id === value;
         const Icon = opt.icon;
@@ -1466,7 +1466,7 @@ function ViewModeControl({ value, onChange }) {
               inline-flex items-center gap-1.5 transition-all duration-200 focus:outline-none
               ${
                 active
-                  ? "bg-gradient-to-br from-white/15 to-white/5 text-white font-extrabold border border-white/10 shadow-sm"
+                  ? "bg-gradient-to-br from-white/15 to-white/5 text-white font-extrabold border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.2)]"
                   : "text-zinc-400 hover:text-zinc-200 border border-transparent"
               }
             `}
@@ -1500,8 +1500,8 @@ function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
             disabled
               ? "cursor-not-allowed border-white/5 bg-zinc-950"
               : checked
-                ? "border-emerald-500/35 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
-                : "border-white/10 bg-white/5"
+                ? "border-emerald-500/30 bg-emerald-500/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(16,185,129,0.15)]"
+                : "border-white/10 bg-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
           }
         `}
         aria-label={label}
@@ -1545,7 +1545,7 @@ function LegendPopover({ open, setOpen }) {
           transition-all duration-250 focus:outline-none
           ${
             open
-              ? "bg-gradient-to-br from-white/10 to-white/5 text-white border border-white/10 shadow-[0_0_12px_rgba(255,255,255,0.08)] backdrop-blur-md scale-105"
+              ? "bg-gradient-to-br from-white/10 to-white/5 text-white border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(255,255,255,0.08)] backdrop-blur-md scale-105"
               : "bg-transparent text-zinc-400 border border-transparent hover:bg-gradient-to-br hover:from-white/8 hover:to-white/2 hover:text-white hover:border-white/5 hover:scale-105"
           }
         `}

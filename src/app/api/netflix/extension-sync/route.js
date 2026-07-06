@@ -85,6 +85,9 @@ export async function POST(request) {
       showName,
       episodeName,
       seasonEpisodeText,
+      // Título de la pestaña/app (p. ej. "Stranger Things - Netflix"): fuente más
+      // fiable del nombre de la SERIE cuando la plataforma no expone artist/album.
+      tabTitle,
     } = await request.json().catch(() => ({}));
     const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
@@ -125,10 +128,18 @@ export async function POST(request) {
       }
     }
 
-    // 2. Construir variantes de consulta (título de serie/principal, parte antes
-    // de ":" para "Serie: Episodio", y sin sufijos de edición) para maximizar la
-    // resolución y limpiarlas para TMDb.
-    const queryVariants = buildQueryVariants({ showName, mainTitle });
+    // 2. Construir variantes de consulta (nombre de serie/principal, nombre de la
+    // serie extraído del título de la pestaña, parte antes de ":" para "Serie:
+    // Episodio", y sin sufijos de edición) para maximizar la resolución. En series
+    // se prioriza el nombre de la SERIE (no el del episodio) — clave para que los
+    // episodios no fallen cuando la plataforma no expone artist/album.
+    const isSeries = isTv || Boolean(episodeName) || Number.isInteger(seasonIn);
+    const queryVariants = buildQueryVariants({
+      showName,
+      mainTitle,
+      tabTitle,
+      isSeries,
+    });
     if (!queryVariants.length) {
       return NextResponse.json({ error: "Empty title after cleanup" }, { status: 422 });
     }
