@@ -116,12 +116,15 @@ export function buildQueryVariants({
   tabTitle,
   queueTitle,
   albumArtist,
+  showCandidates,
   isSeries,
 } = {}) {
   const showFromTab = showNameFromTab(tabTitle);
-  // queueTitle (título de la cola de reproducción) y albumArtist son, en muchas
-  // apps de Android, donde vive el nombre de la SERIE cuando `title` es el episodio.
-  const showSources = [showName, queueTitle, albumArtist, showFromTab];
+  // Fuentes del nombre de la SERIE cuando `title` es el episodio: queueTitle,
+  // albumArtist y una lista abierta `showCandidates` (p. ej. los extras de la
+  // notificación de Android). Así, venga la serie del campo que venga, se prueba.
+  const extra = Array.isArray(showCandidates) ? showCandidates : [];
+  const showSources = [showName, queueTitle, albumArtist, ...extra, showFromTab];
   // Los clientes solo rellenan `showName` en SERIES, así que su presencia ya
   // implica serie aunque no venga la marca isSeries.
   const seriesLike = Boolean(isSeries) || Boolean(String(showName || "").trim());

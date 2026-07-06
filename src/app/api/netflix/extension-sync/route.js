@@ -89,10 +89,14 @@ export async function POST(request) {
       // fiable del nombre de la SERIE cuando la plataforma no expone artist/album.
       tabTitle,
       // Fuentes adicionales del nombre de la SERIE en Android: el título de la cola
-      // de reproducción y el "album artist" (ahí guardan algunas apps la serie
-      // cuando `title` es el episodio).
+      // de reproducción, el "album artist" y los EXTRAS de la notificación (algunas
+      // apps —Netflix— no exponen la serie en la MediaSession pero sí en su
+      // notificación) cuando `title` es el episodio.
       queueTitle,
       albumArtist,
+      notifTitle,
+      notifText,
+      notifSubText,
     } = await request.json().catch(() => ({}));
     const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
@@ -145,6 +149,7 @@ export async function POST(request) {
       tabTitle,
       queueTitle,
       albumArtist,
+      showCandidates: [notifTitle, notifText, notifSubText],
       isSeries,
     });
     if (!queryVariants.length) {

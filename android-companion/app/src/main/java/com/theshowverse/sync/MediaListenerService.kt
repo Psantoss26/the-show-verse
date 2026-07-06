@@ -1,5 +1,6 @@
 package com.theshowverse.sync
 
+import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
 import android.media.MediaMetadata
@@ -78,6 +79,21 @@ class MediaListenerService : NotificationListenerService() {
         if (loggedNotes.add(key)) prefs.addLog(msg)
     }
 
+    /** Extras de la notificación de la app (título/texto/subtexto). Algunas apps
+     * (Netflix) NO exponen la serie en la MediaSession pero sí en su notificación. */
+    private fun notifExtrasFor(pkg: String): Triple<String?, String?, String?> = try {
+        val ex = activeNotifications
+            ?.firstOrNull { it.packageName == pkg }
+            ?.notification?.extras
+        Triple(
+            ex?.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+            ex?.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+            ex?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
+        )
+    } catch (e: Exception) {
+        Triple(null, null, null)
+    }
+
     private fun pollOnce() {
         val manager = msm ?: return
         val sessions = try {
@@ -128,6 +144,7 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
         val posMs = controller.playbackState?.position ?: 0
+        val notif = notifExtrasFor(pkg)
         val raw = RawMetadata(
             packageName = pkg,
             title = md.getString(MediaMetadata.METADATA_KEY_TITLE),
@@ -138,6 +155,9 @@ class MediaListenerService : NotificationListenerService() {
             displaySubtitle = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
             displayDescription = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
             queueTitle = controller.queueTitle?.toString(),
+            notifTitle = notif.first,
+            notifText = notif.second,
+            notifSubText = notif.third,
             artUri = md.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
             durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION),
@@ -156,6 +176,9 @@ class MediaListenerService : NotificationListenerService() {
             "dSub" to raw.displaySubtitle,
             "dDesc" to raw.displayDescription,
             "queue" to raw.queueTitle,
+            "nTitle" to raw.notifTitle,
+            "nText" to raw.notifText,
+            "nSub" to raw.notifSubText,
         ).filter { !it.second.isNullOrBlank() }
             .joinToString(" ") { "${it.first}=«${it.second}»" }
         noteOnce("meta:$pkg:${raw.title}", "Metadatos ${Platforms.nameFor(pkg)} → $metaDump")
