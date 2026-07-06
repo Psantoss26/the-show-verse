@@ -1870,10 +1870,14 @@ function ContinueWatchingSection({
 
   const isCalendar = mode === "calendar";
   const Header = (
-    // Sin z-index: la cabecera NO se superpone a las tarjetas ni a las vistas
-    // previas (que van por encima). El clic del título llega igual porque el hueco
-    // del Swiper que la solapa es `pointer-events-none`.
-    <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+    // `relative z-20` eleva la cabecera por encima del envoltorio del Swiper (cuyo
+    // padding con margen negativo la solapa y se comía el clic). Pero la cabecera
+    // es `pointer-events-none`: así NO intercepta tarjetas ni hovers (no se
+    // "superpone" en interacción); SOLO el enlace del título reactiva el clic.
+    <motion.div
+      variants={scaleIn}
+      className="relative z-20 mb-5 px-1 sm:px-0 pointer-events-none"
+    >
       <div className="mb-1.5 flex items-center gap-2">
         <div className="h-px w-8 bg-amber-500" />
         <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
@@ -1881,10 +1885,11 @@ function ContinueWatchingSection({
         </span>
       </div>
       {/* Mismo indicador de título que el resto de secciones del dashboard
-          (ExpandableSectionTitle): flecha que aparece al pasar el cursor. */}
+          (ExpandableSectionTitle): flecha que aparece al pasar el cursor. El
+          `pointer-events-auto` lo hace clicable aunque la cabecera no lo sea. */}
       <Link
         href={isCalendar ? "/calendar" : "/continue-watching"}
-        className="group/title inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
+        className="group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
         aria-label={isCalendar ? "Ver el calendario completo" : "Ver todo lo que tienes a medias"}
       >
         <span>{isCalendar ? "Calendario" : "Continuar viendo"}</span>
@@ -1987,11 +1992,9 @@ function ContinueWatchingSection({
             // roba el hover/clic a las filas vecinas; las tarjetas reactivan los
             // eventos (pointer-events es heredado y el arrastre sigue funcionando
             // por propagación desde la tarjeta).
-            // El padding (transparente) del Swiper desborda sobre la cabecera por
-            // el margen negativo. `pointer-events-none` SIEMPRE (móvil y escritorio)
-            // hace que ese hueco vacío no capture el clic del título; las tarjetas
-            // reactivan los eventos (pointer-events-auto), así el desliz sigue igual.
-            className="group relative !py-14 sm:!py-16 md:!py-44 !-my-14 sm:!-my-16 md:!-my-44 pointer-events-none"
+            className={`group relative !py-14 sm:!py-16 md:!py-44 !-my-14 sm:!-my-16 md:!-my-44 ${
+              isMobile ? "" : "pointer-events-none"
+            }`}
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >
@@ -2016,7 +2019,7 @@ function ContinueWatchingSection({
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={`select-none pointer-events-auto ${
+                  className={`${isMobile ? "select-none" : "select-none pointer-events-auto"} ${
                     isActive ? "!relative !z-[100] !overflow-visible" : isAnimatingOut ? "!relative !z-[50] !overflow-visible" : "!relative !z-10"
                   }`}
                 >
