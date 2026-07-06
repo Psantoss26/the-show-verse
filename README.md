@@ -136,7 +136,7 @@ _Vista principal con hero dinámico y secciones curadas_
       📸 AÑADIR AQUÍ: Captura de detalles de película
       Muestra header, información principal y acciones
       -->
-      <img src=".docs/screenshots/movie-details.png" alt="Detalles Película">
+      <img src="docs/screenshots/movie-details.png" alt="Detalles Película">
       <p align="center"><em>Detalles completos de película</em></p>
     </td>
     <td width="50%">
@@ -144,7 +144,7 @@ _Vista principal con hero dinámico y secciones curadas_
       📸 AÑADIR AQUÍ: Captura de detalles de serie
       Muestra temporadas y episodios
       -->
-      <img src=".docs/screenshots/series-details.png" alt="Detalles Serie">
+      <img src="docs/screenshots/series-details.png" alt="Detalles Serie">
       <p align="center"><em>Gestión de temporadas y episodios</em></p>
     </td>
   </tr>
@@ -648,7 +648,8 @@ the-show-verse/
 │   ├── 📄 favicon.ico
 │   └── 📂 images/
 │
-├── 📂 .docs/                           # Documentación
+├── 📂 docs/                            # Documentación (vault de Obsidian)
+│   ├── 📄 Home.md                     # Mapa central de la documentación
 │   ├── 📂 screenshots/                # Capturas de pantalla
 │   └── 📄 *.md                        # Documentos adicionales
 │

@@ -1,0 +1,15 @@
+{
+  "alwaysUpdateLinks": true,
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false,
+  "showUnsupportedFiles": false,
+  "showFrontmatter": true,
+  "readableLineLength": true,
+  "userIgnoreFilters": [
+    "node_modules",
+    ".next",
+    "coverage",
+    ".playwright-mcp",
+    "public/images"
+  ]
+}

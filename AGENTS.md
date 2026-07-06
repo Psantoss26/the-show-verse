@@ -21,14 +21,14 @@ Use modern platform features when they meet this target. For newer or limited-av
 For Next.js web development assistance, use the local agent profile at:
 
 ```sh
-.docs/agents/nextjs-web-agent.md
+docs/agents/nextjs-web-agent.md
 ```
 
 For backend Node.js, Fastify, PostgreSQL/Neon, Redis, Drizzle, Railway deployment,
 and frontend-backend integration work, use the local agent profile at:
 
 ```sh
-.docs/agents/backend-node-fastify-agent.md
+docs/agents/backend-node-fastify-agent.md
 ```
 
 <!-- SPECKIT START -->
