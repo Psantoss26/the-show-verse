@@ -9015,7 +9015,7 @@ export default function DetailsClient({
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
-        {useBackdrop && artworkInitialized && heroBackgroundPath ? (
+        {useBackdrop && heroBackgroundPath ? (
           <>
             {/* Imagen anterior (fade out) */}
             {isTransitioning && prevBackgroundPath && (
@@ -9092,10 +9092,10 @@ export default function DetailsClient({
             HEADER HERO SECTION (Diseño Final Solicitado)
            ================================================================= */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start transform-gpu"
+          className="flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
@@ -9859,9 +9859,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
-            <ScaleIn delay={0.18} className={isBackdropPoster ? "" : "mb-6"}>
               <div
-                className={`relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] transform-gpu ${
+                className={`relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[4px] ${
                   isBackdropPoster ? "" : "mb-6"
                 }`}
               >
@@ -10145,7 +10144,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </div>
                 )}
               </div>
-            </ScaleIn>
 
             {/* =================================================================
                 CONTENEDOR DE TABS Y CONTENIDO - Información detallada

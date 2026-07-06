@@ -29,6 +29,7 @@ export default async function TvDetailsPage({ params }) {
   const data = await getDetails("tv", id, {
     appendToResponse: DETAILS_APPEND_TO_RESPONSE,
     language: "es-ES",
+    include_video_language: "en,es,null",
   });
 
   if (!data) {

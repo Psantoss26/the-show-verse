@@ -37,7 +37,6 @@ export function AnimatedSection({
       initial={hidden}
       animate={isInView || shouldReduceMotion ? { opacity: 1, y: 0 } : hidden}
       transition={baseTransition(delay, 0.46, shouldReduceMotion)}
-      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}
@@ -101,7 +100,6 @@ export function ScaleIn({ children, className = "", delay = 0 }) {
           : initial
       }
       transition={baseTransition(delay, 0.38, shouldReduceMotion)}
-      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}
@@ -184,7 +182,6 @@ export function SlideInFromSide({
       initial={initial}
       animate={isInView || shouldReduceMotion ? { opacity: 1, x: 0 } : initial}
       transition={baseTransition(delay, 0.46, shouldReduceMotion)}
-      style={{ willChange: shouldReduceMotion ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}

@@ -33,6 +33,7 @@ export default async function DetailsPage({ params }) {
   const data = await getDetails(type, id, {
     appendToResponse: DETAILS_APPEND_TO_RESPONSE,
     language: "es-ES",
+    include_video_language: "en,es,null",
   });
 
   if (!data) {

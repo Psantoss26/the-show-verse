@@ -1046,19 +1046,21 @@ export default function SeasonDetailsClient({
   return (
     <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
       {/* Background */}
-      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a]">
+      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {heroBackgroundStyle ? (
           <>
+            {/* Capa base: siempre cubre (evita marcos laterales) */}
             <div
-              className="absolute inset-0 bg-cover bg-center"
+              className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
               style={{
                 ...heroBackgroundStyle,
                 transform: "scale(1)",
-                filter: "blur(14px) brightness(0.65) saturate(1.05)",
+                filter: "brightness(0.75) saturate(1.03)",
               }}
             />
+            {/* Capa detalle: posicionamiento superior */}
             <div
-              className="absolute inset-0 bg-cover transition-opacity duration-1000"
+              className="absolute inset-0 bg-cover transition-opacity duration-500"
               style={{
                 ...heroBackgroundStyle,
                 backgroundPosition: "center top",
@@ -1074,7 +1076,7 @@ export default function SeasonDetailsClient({
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
       </div>
 
@@ -1144,8 +1146,8 @@ export default function SeasonDetailsClient({
 
           {/* Right info + SCOREBOARD + TABS */}
           <motion.div
-            initial={{ opacity: 0, x: 18 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{
               duration: 0.46,
               delay: 0.04,
@@ -1186,7 +1188,7 @@ export default function SeasonDetailsClient({
             </div>
 
             {/* SCOREBOARD */}
-            <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[28px] mb-6">
+            <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[4px] mb-6">
               <div
                 className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
                 style={{

@@ -49,12 +49,12 @@ export const rankVideo = (v) => {
         'Behind the Scenes': 4
     }
     const lang = (v?.iso_639_1 || '').toLowerCase()
-    const langRank = lang === 'es' ? 0 : lang === 'en' ? 1 : 2
+    const langRank = lang === 'en' ? 0 : !lang ? 1 : lang === 'es' ? 3 : 2
     const siteRank = v?.site === 'YouTube' ? 0 : v?.site === 'Vimeo' ? 1 : 2
     const tRank = typeRank[v?.type] ?? 9
     const officialRank = v?.official ? 0 : 1
 
-    return officialRank * 1000 + tRank * 100 + siteRank * 10 + langRank
+    return tRank * 1000 + langRank * 100 + officialRank * 10 + siteRank
 }
 
 export const pickPreferredVideo = (videos) => {
