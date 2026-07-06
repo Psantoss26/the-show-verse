@@ -12,6 +12,7 @@ import { Heart, BookmarkPlus, Play, Award, CalendarDays } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { traktGetInProgress } from "@/lib/api/traktClient";
+import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getVideos,
   getDetails,
@@ -124,6 +125,7 @@ function mapInProgressItems(items) {
 
       return {
         id: it.tmdbId,
+        media_type: "tv",
         title: it.title,
         backdrop_path: it.backdrop_path || null,
         poster_path: it.poster_path || null,
@@ -140,6 +142,66 @@ function mapInProgressItems(items) {
         isRewatch: !!it.isRewatch,
       };
     });
+}
+
+// Convierte las filas de progreso local (streaming: películas y episodios) al
+// mismo formato de tarjeta que usa "Continuar viendo". El % viene de la posición
+// real de reproducción (0..1 → 0..100).
+function mapLocalProgressItems(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && Number(r.tmdbId) > 0)
+    .map((r) => {
+      const isTv = r.mediaType === "tv";
+      const season = Number(r.season);
+      const number = Number(r.episode);
+      const hasEpisode =
+        isTv &&
+        Number.isFinite(season) &&
+        season > 0 &&
+        Number.isFinite(number) &&
+        number > 0;
+      const pct = Math.max(
+        0,
+        Math.min(100, Math.round((Number(r.percent) || 0) * 100)),
+      );
+      return {
+        id: Number(r.tmdbId),
+        media_type: isTv ? "tv" : "movie",
+        title: r.title || "",
+        backdrop_path: null,
+        poster_path: r.posterPath || null,
+        overview: null,
+        genres: EMPTY_ARRAY,
+        pct,
+        completed: null,
+        aired: null,
+        nextEpisode: hasEpisode ? { season, number } : null,
+        lastEpisode: null,
+        lastWatchedAt: r.updatedAt || null,
+        isRewatch: false,
+      };
+    });
+}
+
+// Fusiona el progreso local (streaming, más inmediato) con el de Trakt. El local
+// tiene prioridad ante el mismo título; se deduplica por media_type:id y se ordena
+// por lo más reciente.
+function mergeInProgress(localItems, traktItems) {
+  const seen = new Set();
+  const out = [];
+  for (const it of [...localItems, ...traktItems]) {
+    if (!it || it.id == null) continue;
+    const key = `${it.media_type || "tv"}:${it.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  out.sort((a, b) => {
+    const ta = a?.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
+    const tb = b?.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
+    return tb - ta;
+  });
+  return out.slice(0, MAX_ITEMS);
 }
 
 /* =================== ANIMATION VARIANTS =================== */
@@ -547,7 +609,16 @@ function clampPct(value) {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+// Tipo de medio de la tarjeta ("tv" por defecto; "movie" para películas en
+// progreso capturadas desde streaming).
+function mediaTypeOf(show) {
+  return show?.media_type === "movie" ? "movie" : "tv";
+}
+
 function nextEpisodeHref(show) {
+  if (mediaTypeOf(show) === "movie") {
+    return `/details/movie/${show.id}`;
+  }
   const ep = show?.nextEpisode;
   if (ep && Number.isFinite(ep.season) && Number.isFinite(ep.number)) {
     return `/details/tv/${show.id}/season/${ep.season}/episode/${ep.number}`;
@@ -573,14 +644,15 @@ function useShowBackdrop(show) {
       return undefined;
     }
 
+    const type = mediaTypeOf(show);
     const movie = {
       id: show.id,
-      media_type: "tv",
+      media_type: type,
       backdrop_path: show.backdrop_path,
       poster_path: show.poster_path,
     };
-    const cacheKey = `${getBackdropCacheKey(movie, "tv")}:continue-next`;
-    const memoryKey = `tv:${show.id}`;
+    const cacheKey = `${getBackdropCacheKey(movie, type)}:continue-next`;
+    const memoryKey = `${type}:${show.id}`;
 
     let canceled = false;
 
@@ -605,18 +677,18 @@ function useShowBackdrop(show) {
 
       try {
         const localized =
-          (await fetchBestBackdrop(show.id, "tv", {
+          (await fetchBestBackdrop(show.id, type, {
             offset: 1,
             includeNoLanguage: false,
           })) ||
-          (await fetchBestBackdrop(show.id, "tv", {
+          (await fetchBestBackdrop(show.id, type, {
             includeNoLanguage: false,
           }));
 
         const fallback =
           localized ||
           cached ||
-          (await fetchBestBackdrop(show.id, "tv", {
+          (await fetchBestBackdrop(show.id, type, {
             offset: 1,
             includeNoLanguage: true,
           })) ||
@@ -767,6 +839,7 @@ function ContinueWatchingPreviewCard({
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const mediaType = mediaTypeOf(show);
   const { backdropPath, ready } = useShowBackdrop(show);
 
   const [loadingStates, setLoadingStates] = useState(false);
@@ -826,22 +899,25 @@ function ContinueWatchingPreviewCard({
     let abort = false;
     (async () => {
       try {
-        const details = await getDetails("tv", id, { language: "es-ES" }).catch(
+        const details = await getDetails(mediaType, id, { language: "es-ES" }).catch(
           () => null,
         );
         const rating =
           typeof details?.vote_average === "number" && details.vote_average > 0
             ? details.vote_average
             : null;
+        // Solo series: nº de temporadas/episodios. Las películas usan la duración.
         let seasons = null;
-        if (details?.number_of_seasons) {
+        if (mediaType === "tv" && details?.number_of_seasons) {
           seasons = `${details.number_of_seasons} Temp.`;
           if (details.number_of_episodes) {
             seasons += ` · ${details.number_of_episodes} Eps.`;
           }
+        } else if (mediaType === "movie" && details?.runtime) {
+          seasons = `${details.runtime} min`;
         }
-        const year = details?.first_air_date
-          ? String(details.first_air_date).slice(0, 4)
+        const year = (details?.first_air_date || details?.release_date)
+          ? String(details.first_air_date || details.release_date).slice(0, 4)
           : null;
         // Géneros SIEMPRE en español. Pedimos los detalles con language es-ES,
         // pero TMDb NO traduce algunos géneros combinados de TV ("Sci-Fi &
@@ -889,7 +965,7 @@ function ContinueWatchingPreviewCard({
     return () => {
       abort = true;
     };
-  }, [show?.id]);
+  }, [show?.id, mediaType]);
 
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
@@ -910,7 +986,7 @@ function ContinueWatchingPreviewCard({
       }
       try {
         setLoadingStates(true);
-        const st = await getBackendItemStatus({ type: "tv", tmdbId: show.id });
+        const st = await getBackendItemStatus({ type: mediaType, tmdbId: show.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
@@ -925,7 +1001,7 @@ function ContinueWatchingPreviewCard({
     return () => {
       cancel = true;
     };
-  }, [show, session, account]);
+  }, [show, session, account, mediaType]);
 
   // Solo si el trailer NO estaba resuelto lo esperamos desde la misma promesa
   // de precalentamiento. Así un hover temprano no dispara una segunda ruta lenta.
@@ -1112,7 +1188,7 @@ function ContinueWatchingPreviewCard({
       await markAsFavorite({
         accountId: account.id,
         sessionId: session,
-        type: "tv",
+        type: mediaType,
         mediaId: show.id,
         favorite: next,
         title: show.title,
@@ -1137,7 +1213,7 @@ function ContinueWatchingPreviewCard({
       await markInWatchlist({
         accountId: account.id,
         sessionId: session,
-        type: "tv",
+        type: mediaType,
         mediaId: show.id,
         watchlist: next,
         title: show.title,
@@ -1734,8 +1810,16 @@ function ContinueWatchingSection({
 
     const load = async () => {
       try {
-        const res = await traktGetInProgress({ fast: true, limit: MAX_ITEMS });
-        const mapped = mapInProgressItems(res?.items);
+        // Progreso de Trakt (series por nº de episodios) + progreso local de
+        // streaming (posición real, películas y episodios). El local prevalece.
+        const [traktRes, localRows] = await Promise.all([
+          traktGetInProgress({ fast: true, limit: MAX_ITEMS }).catch(() => null),
+          getLocalInProgress(),
+        ]);
+        const mapped = mergeInProgress(
+          mapLocalProgressItems(localRows),
+          mapInProgressItems(traktRes?.items),
+        );
         if (abort) return;
 
         if (mapped.length > 0) {
@@ -1953,7 +2037,7 @@ function ContinueWatchingSection({
               // `uid` (único por episodio) permite que una misma serie aparezca
               // varias veces en el Calendario sin colisión de keys; en el resto
               // de modos no hay `uid` y se usa el tmdbId como hasta ahora.
-              const itemKey = show.uid || `tv:${show.id}`;
+              const itemKey = show.uid || `${mediaTypeOf(show)}:${show.id}`;
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = animatingOutId === itemKey;
 

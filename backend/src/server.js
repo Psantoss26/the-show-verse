@@ -19,6 +19,7 @@ import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
 import watchlistRoutes from './routes/watchlist.js';
 import historyRoutes from './routes/history.js';
+import progressRoutes from './routes/progress.js';
 import ratingsRoutes from './routes/ratings.js';
 import listsRoutes from './routes/lists.js';
 import itemsRoutes from './routes/items.js';
@@ -191,6 +192,7 @@ const apiV1 = async (app) => {
   app.register(favoritesRoutes, { prefix: '/favorites' });
   app.register(watchlistRoutes, { prefix: '/watchlist' });
   app.register(historyRoutes, { prefix: '/history' });
+  app.register(progressRoutes, { prefix: '/progress' });
   app.register(ratingsRoutes, { prefix: '/ratings' });
   app.register(listsRoutes, { prefix: '/lists' });
   app.register(itemsRoutes, { prefix: '/items' });

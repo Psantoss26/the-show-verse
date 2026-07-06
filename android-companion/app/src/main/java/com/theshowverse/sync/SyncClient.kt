@@ -31,6 +31,7 @@ object SyncClient {
         origin: String,
         token: String,
         signal: PlaybackSignal,
+        resolveOnly: Boolean = false,
         onResult: (Boolean, String?, SyncedInfo?) -> Unit,
     ) {
         val json = JSONObject().apply {
@@ -53,6 +54,7 @@ object SyncClient {
             putOpt("artworkUrl", signal.artworkUrl)
             signal.durationSec?.let { put("durationSec", it) }
             signal.positionSec?.let { put("positionSec", it) }
+            if (resolveOnly) put("resolveOnly", true)
         }
 
         val url = origin.trimEnd('/') + "/api/netflix/extension-sync"
@@ -90,6 +92,72 @@ object SyncClient {
                             "HTTP ${it.code}" + if (snippet.isNullOrBlank()) "" else ": $snippet",
                             null,
                         )
+                    }
+                }
+            }
+        })
+    }
+
+    /**
+     * Envía el progreso de reproducción (posición/duración) del contenido ya
+     * resuelto a POST {origin}/api/netflix/extension-progress. El servidor hace
+     * upsert de "Continuar viendo" y, al 90%, lo marca como visto (completed=true).
+     */
+    fun sendProgress(
+        origin: String,
+        token: String,
+        synced: SyncedInfo,
+        positionSeconds: Long,
+        runtimeSeconds: Long,
+        platform: String?,
+        onResult: (Boolean, Boolean) -> Unit,
+    ) {
+        val json = JSONObject().apply {
+            put("tmdbId", synced.tmdbId)
+            put("mediaType", synced.mediaType ?: "movie")
+            synced.season?.let { put("season", it) }
+            synced.episode?.let { put("episode", it) }
+            put("positionSeconds", positionSeconds)
+            put("runtimeSeconds", runtimeSeconds)
+            putOpt("platform", platform)
+            putOpt("title", synced.title)
+            putOpt("posterPath", synced.posterPath)
+        }
+
+        val url = origin.trimEnd('/') + "/api/netflix/extension-progress"
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $token")
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+            )
+            .addHeader("Accept", "application/json")
+            .post(json.toString().toRequestBody(JSON))
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.w(TAG, "Progress failed: ${e.message}")
+                onResult(false, false)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    val body = try {
+                        it.body?.string()
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (it.isSuccessful) {
+                        val completed = try {
+                            JSONObject(body ?: "{}").optBoolean("completed", false)
+                        } catch (e: Exception) {
+                            false
+                        }
+                        onResult(true, completed)
+                    } else {
+                        onResult(false, false)
                     }
                 }
             }
