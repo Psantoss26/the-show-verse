@@ -1,5 +1,6 @@
 const SEARCH_HISTORY_STORAGE_KEY = "showverse:navbar:search-history:v1";
 export const SEARCH_HISTORY_LIMIT = 8;
+const inMemoryHistoryByStorage = new WeakMap();
 
 function getStorage(storage) {
   if (storage) return storage;
@@ -42,6 +43,8 @@ function writeSearchHistory(entries, storage) {
   const normalized = normalizeHistory(entries);
   if (!target) return normalized;
 
+  inMemoryHistoryByStorage.set(target, normalized);
+
   try {
     if (normalized.length) {
       target.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(normalized));
@@ -59,10 +62,14 @@ export function readSearchHistory(storage) {
   const target = getStorage(storage);
   if (!target) return [];
 
+  const inMemoryHistory = inMemoryHistoryByStorage.get(target);
+  if (inMemoryHistory) return [...inMemoryHistory];
+
   try {
     const raw = target.getItem(SEARCH_HISTORY_STORAGE_KEY);
-    if (!raw) return [];
-    return normalizeHistory(JSON.parse(raw));
+    const persisted = raw ? normalizeHistory(JSON.parse(raw)) : [];
+    inMemoryHistoryByStorage.set(target, persisted);
+    return [...persisted];
   } catch {
     return [];
   }
