@@ -55,6 +55,10 @@
         '[data-uia="video-title"]',
         ".video-title",
       ],
+      // Elemento completo del título del reproductor: su texto contiene la
+      // temporada Y el episodio ("Stranger Things T4:E5 …") aunque estén en spans
+      // distintos. De aquí sacamos T/E de forma fiable (evita el T1 por defecto).
+      seSel: ['[data-uia="video-title"]', ".video-title"],
     },
     {
       id: "prime",
@@ -124,14 +128,27 @@
     }
 
     try {
-      if (out.episode == null) {
-        const subTxt = firstText(doc, r.subSel);
-        const se = parseSE(subTxt);
-        if (se && se.episode) {
-          out.season = se.season;
-          out.episode = se.episode;
+      // Temporada/episodio desde el texto que contiene AMBOS (badge o el título
+      // completo del reproductor). La temporada solo se fija si aparece de verdad.
+      const seText = firstText(doc, r.seSel || r.subSel);
+      if (seText) {
+        const se = parseSE(seText);
+        if (se && se.episode != null && out.episode == null) out.episode = se.episode;
+        if (se && se.season != null && out.season == null) out.season = se.season;
+        // Enviamos el texto completo como seasonEpisodeText: el servidor también
+        // reparsea la temporada de aquí, por si el cliente no la fijó.
+        if (se && se.episode != null && !out.seasonEpisodeText) {
+          out.seasonEpisodeText = seText;
         }
-        if (subTxt && !out.episodeName) out.episodeName = subTxt;
+      }
+    } catch (e) {
+      /* ignoramos */
+    }
+
+    try {
+      if (!out.episodeName) {
+        const subTxt = firstText(doc, r.subSel);
+        if (subTxt) out.episodeName = subTxt;
       }
     } catch (e) {
       /* ignoramos */

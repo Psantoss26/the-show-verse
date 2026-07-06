@@ -118,23 +118,24 @@ export async function POST(request) {
     let season = null;
     let episode = null;
 
+    const sMatch = combined.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
+    const eMatch = combined.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
+    const seasonFromText = sMatch ? parseInt(sMatch[1], 10) : null;
+
     if (Number.isInteger(episodeIn) && episodeIn > 0) {
       isTv = true;
       episode = episodeIn;
-      season = Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : 1;
-    } else {
-      const sMatch = combined.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
-      const eMatch = combined.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
-
-      if (eMatch) {
-        isTv = true;
-        season = sMatch ? parseInt(sMatch[1], 10) : 1; // por defecto temporada 1
-        episode = parseInt(eMatch[1], 10);
-      } else if (sMatch) {
-        // Temporada sin episodio identificable: no descartamos — se resolverá
-        // a nivel serie (o se intentará fijar el episodio por nombre más abajo).
-        season = parseInt(sMatch[1], 10);
-      }
+      // La temporada NUNCA se asume 1 (antes se registraba T1 al ver la T4): usa
+      // la enviada por el cliente o la del texto; si no hay, queda null y más
+      // abajo se decide (T1 solo si la serie tiene 1 temporada, o nivel serie).
+      season = Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : seasonFromText;
+    } else if (eMatch) {
+      isTv = true;
+      episode = parseInt(eMatch[1], 10);
+      season = seasonFromText;
+    } else if (sMatch) {
+      // Temporada sin episodio identificable: se resolverá a nivel serie.
+      season = seasonFromText;
     }
 
     // 2. Construir variantes de consulta (nombre de serie/principal, nombre de la
@@ -230,6 +231,33 @@ export async function POST(request) {
       if (episode == null) {
         // Nivel serie puro: sin temporada/episodio concretos.
         season = null;
+      }
+    }
+
+    // Serie con episodio pero SIN temporada conocida: NO inventamos T1 (antes se
+    // registraba T1E5 al ver T4E5). Si la serie tiene UNA sola temporada, usamos
+    // esa; si tiene varias y no sabemos cuál, registramos a nivel serie.
+    if (isTv && tmdbId && episode != null && season == null && TMDB_API_KEY) {
+      try {
+        const showUrl = `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+        const showRes = await fetch(showUrl, { signal: AbortSignal.timeout(8000) });
+        if (showRes.ok) {
+          const showData = await showRes.json();
+          const realSeasons = (Array.isArray(showData?.seasons) ? showData.seasons : [])
+            .filter((s) => s && Number(s.season_number) > 0);
+          if (realSeasons.length === 1) {
+            season = Number(realSeasons[0].season_number) || 1;
+          }
+        }
+      } catch (e) {
+        console.warn("[Extension Sync] season lookup failed:", e?.message);
+      }
+      if (season == null) {
+        console.warn(
+          `[Extension Sync] Temporada desconocida para "${resolvedTitle || query}"; se registra a nivel serie.`,
+        );
+        episode = null;
+        confidence = "low";
       }
     }
 

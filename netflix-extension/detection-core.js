@@ -25,7 +25,9 @@
       /(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i,
     );
     if (!e) return {};
-    return { season: s ? parseInt(s[1], 10) : 1, episode: parseInt(e[1], 10) };
+    // La temporada NO se asume 1: si no aparece, se deja null (antes se ponía 1,
+    // lo que registraba T1 al ver, p. ej., la T4). Quien resuelva decide qué hacer.
+    return { season: s ? parseInt(s[1], 10) : null, episode: parseInt(e[1], 10) };
   }
 
   // Limpia el título de la pestaña quitando prefijo y sufijos de la plataforma.
@@ -66,13 +68,23 @@
       return "";
     }
     const max = Math.min(nodes.length, 5000);
+    // La temporada y el episodio pueden estar en nodos SEPARADOS (Netflix a veces
+    // muestra "T4" y "E5"/"Capítulo cinco" aparte). Recogemos ambos: si un nodo
+    // trae los dos, lo devolvemos; si no, combinamos el mejor de cada uno.
+    let seasonTxt = "";
+    let episodeTxt = "";
     for (let i = 0; i < max; i += 1) {
       const el = nodes[i];
       if (el.children && el.children.length > 2) continue; // solo hojas-ish
       const txt = clean(el.textContent);
       if (!txt || txt.length > 80) continue;
-      if (SE_SEASON_RE.test(txt) && SE_EPISODE_RE.test(txt)) return txt;
+      const hasS = SE_SEASON_RE.test(txt);
+      const hasE = SE_EPISODE_RE.test(txt);
+      if (hasS && hasE) return txt;
+      if (hasS && !seasonTxt) seasonTxt = txt;
+      if (hasE && !episodeTxt) episodeTxt = txt;
     }
+    if (seasonTxt && episodeTxt) return `${seasonTxt} ${episodeTxt}`;
     return "";
   }
 
