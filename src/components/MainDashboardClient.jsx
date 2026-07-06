@@ -2817,8 +2817,8 @@ function Row({
                   : null;
 
               const slideZIndexClass = previewKind === "anticipated"
-                ? (isActive ? "!z-[90] !overflow-visible" : isAnimatingOut ? "!z-[80] !overflow-visible" : "!z-10")
-                : (isActive ? "!z-20 !overflow-visible" : "!z-10");
+                ? (isActive ? "!relative !z-[100] !overflow-visible" : isAnimatingOut ? "!relative !z-[50] !overflow-visible" : "!relative !z-10")
+                : (isActive ? "!relative !z-20 !overflow-visible" : "!relative !z-10");
 
               return (
                 <SwiperSlide

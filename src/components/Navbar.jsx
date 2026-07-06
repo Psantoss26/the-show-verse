@@ -2,7 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import "@/app/globals.css";
@@ -25,10 +25,18 @@ import {
   Play,
   Eye,
   FolderKanban,
+  History,
+  Trash2,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
+import {
+  addSearchHistory,
+  clearSearchHistory,
+  readSearchHistory,
+  removeSearchHistory,
+} from "@/lib/search/history";
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
@@ -131,8 +139,10 @@ function SearchBar({ onResultClick, isMobile = false }) {
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
   const searchRef = useRef(null);
   const inputRef = useRef(null);
+  const dropdownId = useId();
   const [showCollection, setShowCollection] = useState(false);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
 
@@ -163,11 +173,21 @@ function SearchBar({ onResultClick, isMobile = false }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const openSearchHistory = () => {
+    const history = readSearchHistory();
+    setSearchHistory(history);
+    setShowDropdown(true);
+  };
+
   // Búsqueda multi y colección en paralelo
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
-      setShowDropdown(false);
+      if (inputRef.current === document.activeElement) {
+        openSearchHistory();
+      } else {
+        setShowDropdown(false);
+      }
       setIsSearching(false);
       pendingCollectionRef.current = null;
       return;
@@ -353,10 +373,33 @@ function SearchBar({ onResultClick, isMobile = false }) {
   }, [showCollection]);
 
   const handleResultClick = () => {
+    setSearchHistory(addSearchHistory(query));
     setShowDropdown(false);
     setQuery("");
     setResults([]);
+    inputRef.current?.blur();
     if (onResultClick) onResultClick();
+  };
+
+  const handleHistoryClick = (historyQuery) => {
+    setQuery(historyQuery);
+    setShowDropdown(true);
+    inputRef.current?.focus();
+  };
+
+  const handleHistoryRemove = (event, historyQuery) => {
+    event.stopPropagation();
+    const nextHistory = removeSearchHistory(historyQuery);
+    setSearchHistory(nextHistory);
+    setShowDropdown(nextHistory.length > 0);
+    inputRef.current?.focus();
+  };
+
+  const handleHistoryClear = () => {
+    clearSearchHistory();
+    setSearchHistory([]);
+    setShowDropdown(false);
+    inputRef.current?.focus();
   };
 
   const getBadgeConfig = (mediaType) => {
@@ -411,6 +454,11 @@ function SearchBar({ onResultClick, isMobile = false }) {
     >
       <form onSubmit={(e) => e.preventDefault()} className="relative w-full">
         <div
+          onClick={(event) => {
+            if (event.target.closest("button")) return;
+            inputRef.current?.focus();
+            if (!query.trim()) openSearchHistory();
+          }}
           className={`
             relative flex items-center w-full transition-all duration-300 ease-out
             rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group
@@ -428,12 +476,35 @@ function SearchBar({ onResultClick, isMobile = false }) {
           <input
             ref={inputRef}
             type="text"
+            autoComplete="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => query.trim() && setShowDropdown(true)}
-              placeholder={
-                  isMobile ? t("search_mobile_placeholder", "Buscar...") : t("search_placeholder", "Buscar películas, series, actores o colecciones...")
-                }
+            onFocus={() => {
+              if (query.trim()) {
+                setShowDropdown(true);
+              } else {
+                openSearchHistory();
+              }
+            }}
+            onClick={() => {
+              if (!query.trim()) openSearchHistory();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setShowDropdown(false);
+                inputRef.current?.blur();
+              }
+            }}
+            aria-label={t("search_input_label", "Buscar en The Show Verse")}
+            aria-controls={showDropdown ? dropdownId : undefined}
+            placeholder={
+              isMobile
+                ? t("search_mobile_placeholder", "Buscar...")
+                : t(
+                    "search_placeholder",
+                    "Buscar películas, series, actores o colecciones...",
+                  )
+            }
             className={`
               flex-1 w-full bg-transparent border-none focus:ring-0 shadow-none outline-none
               text-white placeholder-neutral-400 text-sm font-medium ml-3 h-full
@@ -451,8 +522,9 @@ function SearchBar({ onResultClick, isMobile = false }) {
                 onClick={() => {
                   setQuery("");
                   setResults([]);
-                  setShowDropdown(false);
+                  openSearchHistory();
                 }}
+                aria-label={t("search_clear_input", "Borrar búsqueda")}
                 className="p-1 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
               >
                 <XIcon className="w-4 h-4" />
@@ -463,8 +535,10 @@ function SearchBar({ onResultClick, isMobile = false }) {
       </form>
 
       <AnimatePresence>
-        {showDropdown && results.length > 0 && (
+        {showDropdown &&
+          (results.length > 0 || !query.trim()) && (
           <motion.div
+            id={dropdownId}
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
@@ -472,72 +546,151 @@ function SearchBar({ onResultClick, isMobile = false }) {
             className={`absolute top-full left-0 w-full text-white ${isMobile ? "mt-3" : "mt-2"} z-[99999] max-h-[70vh] overflow-y-auto no-scrollbar
               rounded-2xl bg-black/95 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-[100px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
           >
-            <div className="p-2">
-              {results.slice(0, 8).map((item) => {
-                const isCollection = item.media_type === "collection";
-                const href = isCollection
-                  ? `/lists/collection/${item.id}`
-                  : `/details/${item.media_type}/${item.id}`;
-                return (
-                <Link
-                  key={`${item.media_type}-${item.id}`}
-                  href={href}
-                  onClick={handleResultClick}
-                >
-                  <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
-                    <div className="relative flex-shrink-0">
-                      <OptimizedImage
-                        src={
-                          item.poster_path || item.profile_path
-                            ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                            : "/default-poster.png"
-                        }
-                        alt={item.title || item.name || "Resultado"}
-                        width={48}
-                        height={64}
-                        className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-base line-clamp-1 text-white group-hover:text-blue-300 transition-colors">
-                        {item.title || item.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${getBadgeConfig(item.media_type).textClass}`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${getBadgeConfig(item.media_type).dotClass}`}
-                          />
-                          {getMediaTypeLabel(item.media_type)}
-                        </span>
-                        {item.release_date && (
-                          <>
-                            <span className="text-zinc-600 text-[10px]">●</span>
-                            <span className="text-xs font-semibold text-zinc-400">
-                              {new Date(item.release_date).getFullYear()}
-                            </span>
-                          </>
-                        )}
-                        {item.first_air_date && (
-                          <>
-                            <span className="text-zinc-600 text-[10px]">●</span>
-                            <span className="text-xs font-semibold text-zinc-400">
-                              {new Date(item.first_air_date).getFullYear()}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
+            {!query.trim() ? (
+              <div className="p-2">
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
+                    <History className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" />
+                    <span>{t("search_history_title", "Búsquedas recientes")}</span>
                   </div>
-                </Link>
-                );
-              })}
-            </div>
-            {results.length > 8 && (
-              <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
-                Mostrando 8 de {results.length} resultados
+                  {searchHistory.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleHistoryClear}
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t("search_history_clear_all", "Borrar todo")}
+                    </button>
+                  )}
+                </div>
+                {searchHistory.length > 0 ? (
+                  <ul className="space-y-1" role="list">
+                    {searchHistory.map((historyQuery) => (
+                      <li
+                        key={historyQuery}
+                        className="group flex min-h-11 items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleHistoryClick(historyQuery)}
+                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                        >
+                          <History
+                            className="h-4 w-4 shrink-0 text-white/35 transition-colors group-hover:text-amber-300"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{historyQuery}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            handleHistoryRemove(event, historyQuery)
+                          }
+                          aria-label={`${t(
+                            "search_history_remove",
+                            "Eliminar del historial",
+                          )}: ${historyQuery}`}
+                          className="mr-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                        >
+                          <XIcon className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-xl px-3 py-4 text-sm text-white/45">
+                    <SearchIcon
+                      className="h-4 w-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span>
+                      {t(
+                        "search_history_empty",
+                        "Aún no hay búsquedas recientes.",
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                <div className="p-2">
+                  {results.slice(0, 8).map((item) => {
+                    const isCollection = item.media_type === "collection";
+                    const href = isCollection
+                      ? `/lists/collection/${item.id}`
+                      : `/details/${item.media_type}/${item.id}`;
+                    return (
+                      <Link
+                        key={`${item.media_type}-${item.id}`}
+                        href={href}
+                        onClick={handleResultClick}
+                      >
+                        <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
+                          <div className="relative flex-shrink-0">
+                            <OptimizedImage
+                              src={
+                                item.poster_path || item.profile_path
+                                  ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
+                                  : "/default-poster.png"
+                              }
+                              alt={item.title || item.name || "Resultado"}
+                              width={48}
+                              height={64}
+                              className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-base line-clamp-1 text-white group-hover:text-blue-300 transition-colors">
+                              {item.title || item.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${getBadgeConfig(item.media_type).textClass}`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${getBadgeConfig(item.media_type).dotClass}`}
+                                />
+                                {getMediaTypeLabel(item.media_type)}
+                              </span>
+                              {item.release_date && (
+                                <>
+                                  <span className="text-zinc-600 text-[10px]">
+                                    ●
+                                  </span>
+                                  <span className="text-xs font-semibold text-zinc-400">
+                                    {new Date(
+                                      item.release_date,
+                                    ).getFullYear()}
+                                  </span>
+                                </>
+                              )}
+                              {item.first_air_date && (
+                                <>
+                                  <span className="text-zinc-600 text-[10px]">
+                                    ●
+                                  </span>
+                                  <span className="text-xs font-semibold text-zinc-400">
+                                    {new Date(
+                                      item.first_air_date,
+                                    ).getFullYear()}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                {results.length > 8 && (
+                  <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
+                    Mostrando 8 de {results.length} resultados
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         )}
