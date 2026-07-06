@@ -6,7 +6,50 @@ import {
   stripEditionSuffix,
   beforeColon,
   buildQueryVariants,
+  showNameFromTab,
 } from "./queryVariants.js";
+
+test("showNameFromTab extrae el nombre de la serie del título de la pestaña", () => {
+  assert.equal(showNameFromTab("Stranger Things - Netflix"), "Stranger Things");
+  assert.equal(showNameFromTab("Watch The Bear | Max"), "The Bear");
+  assert.equal(showNameFromTab("The Mandalorian | Disney+"), "The Mandalorian");
+  assert.equal(showNameFromTab("Ver La Casa de Papel · Netflix"), "La Casa de Papel");
+  assert.equal(showNameFromTab("The Boys - Prime Video"), "The Boys");
+  assert.equal(showNameFromTab(""), "");
+});
+
+test("buildQueryVariants usa el tabTitle como nombre de serie cuando mainTitle es el episodio", () => {
+  // Caso real (S2): plataforma sin artist/album -> mainTitle es el EPISODIO,
+  // la serie solo aparece en el título de la pestaña.
+  const v = buildQueryVariants({
+    showName: "",
+    mainTitle: "The Vanishing of Will Byers",
+    tabTitle: "Stranger Things - Netflix",
+    isSeries: true,
+  });
+  assert.equal(v[0], "Stranger Things"); // la serie se prueba PRIMERO
+  assert.ok(v.includes("The Vanishing of Will Byers")); // el episodio sigue como respaldo
+});
+
+test("buildQueryVariants NO regresiona películas (mainTitle primero)", () => {
+  const v = buildQueryVariants({
+    mainTitle: "Interstellar",
+    tabTitle: "Interstellar - Netflix",
+    isSeries: false,
+  });
+  assert.equal(v[0], "Interstellar");
+});
+
+test("buildQueryVariants prioriza showName sobre tab y mainTitle en series", () => {
+  const v = buildQueryVariants({
+    showName: "The Boys",
+    mainTitle: "The Boys",
+    tabTitle: "The Boys - Prime Video",
+    episodeName: "Episode 1",
+    isSeries: true,
+  });
+  assert.equal(v[0], "The Boys");
+});
 
 test("cleanSearchTitle quita prefijos de plataforma (incl. los nuevos)", () => {
   assert.equal(cleanSearchTitle("Netflix - Stranger Things"), "Stranger Things");
