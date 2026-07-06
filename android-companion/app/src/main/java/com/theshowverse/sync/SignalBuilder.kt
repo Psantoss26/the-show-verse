@@ -62,6 +62,9 @@ object SignalBuilder {
             // `title` es el episodio (el servidor las prueba como candidatas).
             queueTitle = raw.queueTitle.clean(),
             albumArtist = raw.albumArtist.clean(),
+            notifTitle = raw.notifTitle.clean(),
+            notifText = raw.notifText.clean(),
+            notifSubText = raw.notifSubText.clean(),
             artworkUrl = raw.artUri.clean(),
             durationSec = if (raw.durationMs > 0) raw.durationMs / 1000 else null,
             positionSec = if (raw.positionMs > 0) raw.positionMs / 1000 else null,

@@ -16,9 +16,13 @@ data class PlaybackSignal(
     val seasonEpisodeText: String? = null,
     val tabTitle: String? = null,
     // Fuentes adicionales del nombre de la SERIE (algunas apps ponen ahí la serie
-    // cuando `title` es el episodio): título de la cola y "album artist".
+    // cuando `title` es el episodio): título de la cola, "album artist" y los
+    // extras de la notificación de la app (Netflix no da la serie en la MediaSession).
     val queueTitle: String? = null,
     val albumArtist: String? = null,
+    val notifTitle: String? = null,
+    val notifText: String? = null,
+    val notifSubText: String? = null,
     val artworkUrl: String? = null,
     val durationSec: Long? = null,
     val positionSec: Long? = null,
@@ -46,6 +50,9 @@ data class RawMetadata(
     val displaySubtitle: String? = null,
     val displayDescription: String? = null,
     val queueTitle: String? = null,
+    val notifTitle: String? = null,
+    val notifText: String? = null,
+    val notifSubText: String? = null,
     val artUri: String? = null,
     val durationMs: Long = 0,
     val positionMs: Long = 0,

@@ -47,6 +47,9 @@ object SyncClient {
             putOpt("tabTitle", signal.tabTitle)
             putOpt("queueTitle", signal.queueTitle)
             putOpt("albumArtist", signal.albumArtist)
+            putOpt("notifTitle", signal.notifTitle)
+            putOpt("notifText", signal.notifText)
+            putOpt("notifSubText", signal.notifSubText)
             putOpt("artworkUrl", signal.artworkUrl)
             signal.durationSec?.let { put("durationSec", it) }
             signal.positionSec?.let { put("positionSec", it) }
