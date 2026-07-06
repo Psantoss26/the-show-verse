@@ -133,12 +133,36 @@ class MediaListenerService : NotificationListenerService() {
             title = md.getString(MediaMetadata.METADATA_KEY_TITLE),
             artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST),
             album = md.getString(MediaMetadata.METADATA_KEY_ALBUM),
+            albumArtist = md.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
             displayTitle = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
             displaySubtitle = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
+            displayDescription = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
+            queueTitle = controller.queueTitle?.toString(),
             artUri = md.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
             durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION),
             positionMs = if (posMs > 0) posMs else 0,
+        )
+
+        // Diagnóstico: vuelca (una vez por título) los metadatos crudos NO vacíos,
+        // para saber en qué campo esconde cada app el nombre de la serie cuando el
+        // episodio no resuelve. Visible en la pantalla "Registro" de la app.
+        noteOnce(
+            "meta:$pkg:${raw.title}",
+            buildString {
+                append("Metadatos ${Platforms.nameFor(pkg)} →")
+                fun f(k: String, v: String?) {
+                    if (!v.isNullOrBlank()) append(" $k=«$v»")
+                }
+                f("title", raw.title)
+                f("artist", raw.artist)
+                f("album", raw.album)
+                f("albumArtist", raw.albumArtist)
+                f("dTitle", raw.displayTitle)
+                f("dSub", raw.displaySubtitle)
+                f("dDesc", raw.displayDescription)
+                f("queue", raw.queueTitle)
+            },
         )
 
         val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg))

@@ -31,6 +31,34 @@ test("buildQueryVariants usa el tabTitle como nombre de serie cuando mainTitle e
   assert.ok(v.includes("The Vanishing of Will Byers")); // el episodio sigue como respaldo
 });
 
+test("buildQueryVariants usa queueTitle/albumArtist como nombre de serie (caso Android Netflix)", () => {
+  // Netflix Android: title = EPISODIO, la serie está en queueTitle. Debe incluir
+  // 'Stranger Things' como candidato de consulta.
+  const v = buildQueryVariants({
+    mainTitle: "Capítulo cuatro: Querido Billy",
+    queueTitle: "Stranger Things",
+    isSeries: false, // Android no manda season/episode aquí (no hay dígitos)
+  });
+  assert.ok(
+    v.includes("Stranger Things"),
+    `esperaba 'Stranger Things' en ${JSON.stringify(v)}`,
+  );
+  // El nombre de serie se prueba ANTES que el troceo del episodio ('Capítulo cuatro').
+  assert.ok(
+    v.indexOf("Stranger Things") < v.indexOf("Capítulo cuatro"),
+    `'Stranger Things' debe ir antes que 'Capítulo cuatro' en ${JSON.stringify(v)}`,
+  );
+});
+
+test("buildQueryVariants usa albumArtist cuando falta queueTitle", () => {
+  const v = buildQueryVariants({
+    mainTitle: "Dear Billy",
+    albumArtist: "Stranger Things",
+    isSeries: true,
+  });
+  assert.equal(v[0], "Stranger Things");
+});
+
 test("buildQueryVariants NO regresiona películas (mainTitle primero)", () => {
   const v = buildQueryVariants({
     mainTitle: "Interstellar",

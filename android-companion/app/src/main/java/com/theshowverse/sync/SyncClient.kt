@@ -45,6 +45,8 @@ object SyncClient {
             signal.episode?.let { put("episode", it) }
             putOpt("seasonEpisodeText", signal.seasonEpisodeText)
             putOpt("tabTitle", signal.tabTitle)
+            putOpt("queueTitle", signal.queueTitle)
+            putOpt("albumArtist", signal.albumArtist)
             putOpt("artworkUrl", signal.artworkUrl)
             signal.durationSec?.let { put("durationSec", it) }
             signal.positionSec?.let { put("positionSec", it) }
