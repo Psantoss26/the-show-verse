@@ -43,6 +43,9 @@ class MediaListenerService : NotificationListenerService() {
     // y control de cadencia de los pings.
     private val syncedByPackage = HashMap<String, SyncedInfo>()
     private val lastProgressAtByPackage = HashMap<String, Long>()
+    // Última posición/duración conocida por paquete (segundos): sirve para volcar
+    // el punto EXACTO al salir cuando la sesión ya no puede leerse.
+    private val lastPosByPackage = HashMap<String, Pair<Long, Long>>()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
@@ -185,12 +188,17 @@ class MediaListenerService : NotificationListenerService() {
 
         val stopped = playingSince.keys - playingNow
         for (pkg in stopped) {
+            // Volcado del punto EXACTO al salir (pausa/stop) ANTES de olvidar la
+            // resolución: usa la posición viva de la sesión (si sigue, pausada) o
+            // la última conocida.
+            flushProgressOnStop(pkg, sessions)
             playingSince.remove(pkg)
             loggedNotes.removeAll { it.endsWith(":$pkg") }
             // Al parar, olvidamos la resolución y la clave: si se reanuda el mismo
             // título, se vuelve a resolver y a retomar el seguimiento de progreso.
             syncedByPackage.remove(pkg)
             lastProgressAtByPackage.remove(pkg)
+            lastPosByPackage.remove(pkg)
             lastKeyByPackage.remove(pkg)
         }
 
@@ -263,6 +271,13 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
 
+        // Cachea la última posición/duración conocida (para el volcado al salir).
+        val dSec = signal.durationSec
+        val pSec = signal.positionSec
+        if (dSec != null && dSec > 0 && pSec != null && pSec >= 0) {
+            lastPosByPackage[pkg] = pSec to dSec
+        }
+
         // Progreso: si ya resolvimos este contenido, enviamos posición/duración
         // (Continuar viendo + visto al 90%). Va ANTES del corte por dedup para que
         // siga latiendo mientras se reproduce el mismo título.
@@ -322,6 +337,32 @@ class MediaListenerService : NotificationListenerService() {
                 if (ok && completed) {
                     prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
                     syncedByPackage.remove(pkg)
+                }
+            }
+        }
+    }
+
+    // Volcado inmediato al SALIR (pausa/stop): guarda el punto exacto usando la
+    // posición viva de la sesión (si sigue activa aunque pausada) o la última
+    // conocida. Ignora la cadencia de PROGRESS_PING_MS.
+    private fun flushProgressOnStop(pkg: String, sessions: List<MediaController>) {
+        val synced = syncedByPackage[pkg] ?: return
+        val controller = sessions.firstOrNull { it.packageName == pkg }
+        val md = controller?.metadata
+        val liveDur = md?.getLong(MediaMetadata.METADATA_KEY_DURATION)
+            ?.let { if (it > 0) it / 1000 else null }
+        val livePos = controller?.playbackState?.position
+            ?.let { if (it > 0) it / 1000 else null }
+        val cached = lastPosByPackage[pkg]
+        val pos = livePos ?: cached?.first ?: return
+        val dur = liveDur ?: cached?.second ?: return
+        if (dur <= 0 || pos < 0) return
+        val token = prefs.token ?: return
+        val origin = prefs.origin ?: return
+        SyncClient.sendProgress(origin, token, synced, pos, dur, Platforms.idFor(pkg)) { ok, completed ->
+            handler.post {
+                if (ok && completed) {
+                    prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
                 }
             }
         }

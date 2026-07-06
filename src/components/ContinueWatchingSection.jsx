@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { Heart, BookmarkPlus, Play, Award, CalendarDays } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
-import { traktGetInProgress } from "@/lib/api/traktClient";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getVideos,
@@ -108,45 +107,9 @@ function writeContinueWatchingCache(shows) {
   }
 }
 
-function mapInProgressItems(items) {
-  // Deduplicar por tmdbId (una misma serie puede tener varios episodios en curso):
-  // solo mostramos una tarjeta por serie y evitamos keys `tv:<id>` repetidas.
-  // Se conserva la primera aparición (la fuente viene ordenada por más reciente).
-  return dedupeByKey(items, (it) => it?.tmdbId)
-    .slice(0, MAX_ITEMS)
-    .map((it) => {
-      const season = Number(it?.nextEpisode?.season);
-      const number = Number(it?.nextEpisode?.number);
-      const hasNextEpisode =
-        Number.isFinite(season) &&
-        season > 0 &&
-        Number.isFinite(number) &&
-        number > 0;
-
-      return {
-        id: it.tmdbId,
-        media_type: "tv",
-        title: it.title,
-        backdrop_path: it.backdrop_path || null,
-        poster_path: it.poster_path || null,
-        overview: it.overview || null,
-        genres: Array.isArray(it.genres) ? it.genres : EMPTY_ARRAY,
-        pct: it.pct,
-        completed: it.completed,
-        aired: it.aired,
-        nextEpisode: hasNextEpisode ? it.nextEpisode : null,
-        lastEpisode: it.lastEpisode,
-        lastWatchedAt: it.lastWatchedAt,
-        // La serie está en un rewatch (ya completada, viéndola de nuevo): el
-        // progreso mostrado es el del rewatch, no el del visionado original.
-        isRewatch: !!it.isRewatch,
-      };
-    });
-}
-
-// Convierte las filas de progreso local (streaming: películas y episodios) al
-// mismo formato de tarjeta que usa "Continuar viendo". El % viene de la posición
-// real de reproducción (0..1 → 0..100).
+// Convierte las filas de progreso local (streaming: películas y episodios) a las
+// tarjetas de "Continuar viendo". El % es la POSICIÓN real de reproducción
+// (0..1 → 0..100), no el progreso por episodios de la serie.
 function mapLocalProgressItems(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter((r) => r && Number(r.tmdbId) > 0)
@@ -183,13 +146,12 @@ function mapLocalProgressItems(rows) {
     });
 }
 
-// Fusiona el progreso local (streaming, más inmediato) con el de Trakt. El local
-// tiene prioridad ante el mismo título; se deduplica por media_type:id y se ordena
-// por lo más reciente.
-function mergeInProgress(localItems, traktItems) {
+// Una tarjeta por título: deduplica por media_type:id (conserva el más reciente)
+// y ordena por lo último reproducido.
+function dedupeLocalByTitle(items) {
   const seen = new Set();
   const out = [];
-  for (const it of [...localItems, ...traktItems]) {
+  for (const it of Array.isArray(items) ? items : []) {
     if (!it || it.id == null) continue;
     const key = `${it.media_type || "tv"}:${it.id}`;
     if (seen.has(key)) continue;
@@ -1810,16 +1772,11 @@ function ContinueWatchingSection({
 
     const load = async () => {
       try {
-        // Progreso de Trakt (series por nº de episodios) + progreso local de
-        // streaming (posición real, películas y episodios). El local prevalece.
-        const [traktRes, localRows] = await Promise.all([
-          traktGetInProgress({ fast: true, limit: MAX_ITEMS }).catch(() => null),
-          getLocalInProgress(),
-        ]);
-        const mapped = mergeInProgress(
-          mapLocalProgressItems(localRows),
-          mapInProgressItems(traktRes?.items),
-        );
+        // SOLO progreso local de streaming: posición real de reproducción de
+        // películas y episodios en curso (una tarjeta por título). NO usa el
+        // progreso por episodios de Trakt (eso vive en la página "En progreso").
+        const localRows = await getLocalInProgress();
+        const mapped = dedupeLocalByTitle(mapLocalProgressItems(localRows));
         if (abort) return;
 
         if (mapped.length > 0) {
