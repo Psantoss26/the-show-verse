@@ -36,8 +36,17 @@ function isExactTitle(entity, query, mediaType) {
 export function matchEpisodeByName({ episodeName, seasonEpisodes }) {
   if (!episodeName || !Array.isArray(seasonEpisodes)) return null;
   const q = normalizeText(episodeName);
-  if (!q) return null;
-  const hit = seasonEpisodes.find((e) => normalizeText(e?.name) === q);
+  if (!q || q.length < 2) return null;
+  // 1. Coincidencia exacta del nombre normalizado.
+  let hit = seasonEpisodes.find((e) => normalizeText(e?.name) === q);
+  // 2. Uno contiene al otro: cubre títulos parciales o con prefijo distinto
+  //    ("El proyecto Nina" ⊂ "Capítulo cinco: El proyecto Nina").
+  if (!hit) {
+    hit = seasonEpisodes.find((e) => {
+      const n = normalizeText(e?.name);
+      return n && n.length >= 4 && (n.includes(q) || q.includes(n));
+    });
+  }
   return hit
     ? { season: hit.season_number, episode: hit.episode_number }
     : null;
