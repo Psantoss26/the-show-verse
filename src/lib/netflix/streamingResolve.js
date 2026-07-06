@@ -116,6 +116,17 @@ export async function resolveStreamingEntity({
     return showLevel(exactShow || pickTmdbResult(tvResults, query, "tv"));
   }
 
+  // Coincidencia EXACTA como serie Y como película (p. ej. "Stranger Things"
+  // existe de ambas): elegimos la más POPULAR, que es casi siempre la buscada.
+  // Clave para el modo resolveOnly (ficha), donde no hay pista de tipo.
+  if (exactShow && exactMovie) {
+    const showPop = Number(exactShow.popularity) || 0;
+    const moviePop = Number(exactMovie.popularity) || 0;
+    return showPop >= moviePop
+      ? showLevel(exactShow)
+      : { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high" };
+  }
+
   if (exactShow && !exactMovie) {
     return showLevel(exactShow);
   }

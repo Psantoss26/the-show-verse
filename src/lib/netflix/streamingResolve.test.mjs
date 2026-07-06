@@ -73,6 +73,31 @@ test("does not replace an exact movie with a fuzzy TV result", async () => {
   assert.equal(result?.entity?.id, 426426);
 });
 
+test("con doble coincidencia exacta (serie y película) elige la más popular: serie", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Stranger Things",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 66732, name: "Stranger Things", popularity: 300 }]
+        : [{ id: 182026, title: "Stranger Things", popularity: 2 }],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 66732);
+});
+
+test("con doble coincidencia exacta elige la más popular: película", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Titanic",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 1, name: "Titanic", popularity: 3 }]
+        : [{ id: 597, title: "Titanic", popularity: 80 }],
+  });
+  assert.equal(result?.kind, "resolved");
+  assert.equal(result?.mediaType, "movie");
+  assert.equal(result?.entity?.id, 597);
+});
+
 test("matchEpisodeByName finds S/E by normalized episode title", () => {
   const eps = [
     { season_number: 1, episode_number: 1, name: "Piloto" },
