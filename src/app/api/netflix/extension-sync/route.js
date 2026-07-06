@@ -97,6 +97,9 @@ export async function POST(request) {
       notifTitle,
       notifText,
       notifSubText,
+      // Modo "solo resolver": para el indicador en la FICHA del título (navegando,
+      // sin reproducir). Resuelve el título pero NO lo inserta en el historial.
+      resolveOnly,
     } = await request.json().catch(() => ({}));
     const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
@@ -280,6 +283,23 @@ export async function POST(request) {
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
       return NextResponse.json({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
+    }
+
+    // Modo "solo resolver" (indicador en la ficha, sin reproducir): devolvemos la
+    // entidad resuelta SIN insertar nada en el historial.
+    if (resolveOnly) {
+      return NextResponse.json({
+        success: true,
+        resolveOnly: true,
+        synced: {
+          tmdbId,
+          mediaType,
+          season: isTv ? season : null,
+          episode: isTv ? episode : null,
+          title: resolvedTitle,
+          posterPath,
+        },
+      });
     }
 
     // 3. Insert into history
