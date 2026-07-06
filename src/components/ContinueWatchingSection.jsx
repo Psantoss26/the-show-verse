@@ -46,7 +46,9 @@ const MAX_ITEMS = 20;
 
 // Caché local para que la sección NO desaparezca al recargar: se pinta al
 // instante lo último conocido mientras se refresca en segundo plano.
-const CONTINUE_WATCHING_CACHE_KEY = "showverse:dashboard:continue-watching:v1";
+// v2: al pasar "Continuar viendo" a SOLO progreso local (posición), se invalida
+// la caché v1 que aún guardaba las series por episodios de Trakt.
+const CONTINUE_WATCHING_CACHE_KEY = "showverse:dashboard:continue-watching:v2";
 const CONTINUE_WATCHING_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 h
 // Tras recargar, el token/cookies del backend pueden no estar listos y el
 // endpoint devuelve vacío momentáneamente: reintentamos antes de ocultar.
