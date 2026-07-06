@@ -6,7 +6,9 @@
 // resolución a TMDb y la deduplicación ocurren en el servidor.
 (function () {
   const POLL_MS = 2000;
-  const MIN_WATCH_SECONDS = 15; // umbral para contar como visionado real
+  // Umbral de reproducción antes de sincronizar/mostrar el indicador. Bajo (5s)
+  // para que el acceso rápido aparezca lo antes posible tras abrir el título.
+  const MIN_WATCH_SECONDS = 5;
   const DEBUG_THROTTLE_MS = 15000;
 
   const D = self.TSVDetection;
@@ -86,6 +88,26 @@
     indicatorCurrentUrl = null;
   }
 
+  // Logo de la app como SVG inline (a prueba de CSP; sin recursos externos).
+  function appLogo(size) {
+    const box = el("div", {
+      width: size + "px",
+      height: size + "px",
+      flex: "0 0 auto",
+      lineHeight: "0",
+    });
+    box.innerHTML =
+      '<svg width="' +
+      size +
+      '" height="' +
+      size +
+      '" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" fill="none" stroke="#EAB308" stroke-width="6"/>' +
+      '<path d="M48,42 L48,66 L69,54 Z" fill="#EAB308"/>' +
+      "</svg>";
+    return box;
+  }
+
   function showIndicator({ url, title, posterPath }) {
     if (!indicatorEnabled || !url) return;
     if (url === indicatorDismissedUrl) return; // el usuario lo ocultó para este título
@@ -94,33 +116,45 @@
     const prev = document.getElementById(INDICATOR_HOST_ID);
     if (prev) prev.remove();
 
+    // Esquina superior derecha, superpuesto a todo (z-index máximo).
     const host = el("div", {
       position: "fixed",
-      top: "50%",
-      right: "14px",
-      transform: "translateY(-50%)",
+      top: "18px",
+      right: "18px",
       zIndex: "2147483647",
       pointerEvents: "none",
     });
     host.id = INDICATOR_HOST_ID;
     const shadow = host.attachShadow({ mode: "open" });
 
+    // Contenedor animado (entrada con fade + deslizamiento).
     const wrap = el("div", {
       position: "relative",
       pointerEvents: "auto",
       fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+      opacity: "0",
+      transform: "translateY(-12px)",
+      transition: "opacity .25s ease, transform .25s cubic-bezier(.2,.8,.2,1)",
     });
 
+    // Tarjeta "liquid glass" (como la app): cristal oscuro translúcido con
+    // desenfoque, degradado superior, borde con brillo interior y sombra amplia.
     const card = el("div", {
       display: "flex",
       alignItems: "center",
-      gap: "10px",
-      maxWidth: "250px",
-      padding: "8px 12px 8px 8px",
-      background: "rgba(10,10,15,0.92)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      borderRadius: "14px",
-      boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
+      gap: "14px",
+      width: "320px",
+      maxWidth: "82vw",
+      padding: "12px 16px 12px 12px",
+      backgroundColor: "rgba(10,10,15,0.55)",
+      backgroundImage:
+        "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03))",
+      border: "1px solid rgba(255,255,255,0.14)",
+      borderRadius: "22px",
+      boxShadow:
+        "inset 0 1.5px 2px rgba(255,255,255,0.18), 0 24px 50px -12px rgba(0,0,0,0.85)",
+      backdropFilter: "blur(30px)",
+      WebkitBackdropFilter: "blur(30px)",
       color: "#fff",
       cursor: "pointer",
       transition: "transform .15s ease",
@@ -150,15 +184,16 @@
       const img = el(
         "img",
         {
-          width: "40px",
-          height: "60px",
-          borderRadius: "8px",
+          width: "58px",
+          height: "87px",
+          borderRadius: "12px",
           objectFit: "cover",
-          background: "#222",
+          background: "rgba(255,255,255,0.06)",
           flex: "0 0 auto",
           display: "block",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.5)",
         },
-        { src: `https://image.tmdb.org/t/p/w92${posterPath}`, alt: "" },
+        { src: `https://image.tmdb.org/t/p/w154${posterPath}`, alt: "" },
       );
       // Si la CSP del sitio bloquea la imagen, la ocultamos y seguimos.
       img.onerror = () => {
@@ -167,27 +202,21 @@
       card.appendChild(img);
     }
 
-    const txt = el("div", { minWidth: "0", lineHeight: "1.25" });
+    const txt = el("div", {
+      minWidth: "0",
+      display: "flex",
+      flexDirection: "column",
+      gap: "5px",
+    });
+    // El logo de la app sustituye al texto "The Show Verse".
+    txt.appendChild(appLogo(26));
     txt.appendChild(
       el(
         "div",
         {
-          fontSize: "10px",
-          letterSpacing: ".4px",
-          color: "#EAB308",
+          fontSize: "16px",
           fontWeight: "800",
-          textTransform: "uppercase",
-        },
-        { textContent: "The Show Verse" },
-      ),
-    );
-    txt.appendChild(
-      el(
-        "div",
-        {
-          fontSize: "13px",
-          fontWeight: "700",
-          marginTop: "2px",
+          lineHeight: "1.2",
           display: "-webkit-box",
           webkitLineClamp: "2",
           webkitBoxOrient: "vertical",
@@ -199,7 +228,7 @@
     txt.appendChild(
       el(
         "div",
-        { fontSize: "11px", color: "#a1a1aa", marginTop: "3px" },
+        { fontSize: "12.5px", fontWeight: "600", color: "#EAB308" },
         { textContent: "Ver detalles ↗" },
       ),
     );
@@ -209,19 +238,21 @@
       "div",
       {
         position: "absolute",
-        top: "-8px",
-        right: "-8px",
-        width: "20px",
-        height: "20px",
+        top: "-9px",
+        right: "-9px",
+        width: "24px",
+        height: "24px",
         borderRadius: "50%",
-        background: "#18181b",
-        border: "1px solid rgba(255,255,255,0.18)",
-        color: "#d4d4d8",
-        fontSize: "13px",
-        lineHeight: "18px",
+        backgroundColor: "rgba(24,24,27,0.9)",
+        border: "1px solid rgba(255,255,255,0.2)",
+        color: "#e4e4e7",
+        fontSize: "15px",
+        lineHeight: "22px",
         textAlign: "center",
         cursor: "pointer",
         pointerEvents: "auto",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
       },
       { textContent: "×" },
     );
@@ -237,6 +268,12 @@
     shadow.appendChild(wrap);
     (document.documentElement || document.body).appendChild(host);
     indicatorCurrentUrl = url;
+
+    // Dispara la animación de entrada en el siguiente frame.
+    requestAnimationFrame(() => {
+      wrap.style.opacity = "1";
+      wrap.style.transform = "translateY(0)";
+    });
   }
 
   // Devuelve el <video> principal en reproducción (reproductor real grande).
