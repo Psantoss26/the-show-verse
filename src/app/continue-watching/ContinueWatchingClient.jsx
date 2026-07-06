@@ -64,7 +64,7 @@ function epCode(item) {
   const s = Number(item?.season);
   const e = Number(item?.episode);
   if (!Number.isFinite(s) || s <= 0 || !Number.isFinite(e) || e <= 0) return null;
-  return `T${s}·E${e}`;
+  return `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
 }
 
 function detailsHref(item) {
@@ -121,18 +121,19 @@ function mapRows(rows) {
     }));
 }
 
+// Paleta por % IGUAL que la de "En progreso" (bar/text/bg/border/stroke/trail…).
 function getProgressColor(pct) {
   if (pct >= 90)
-    return { bar: "from-emerald-400 to-green-300", text: "text-emerald-400", stroke: "#34d399", trail: "rgba(52,211,153,0.15)", accent: "52,211,153" };
+    return { bar: "from-emerald-400 to-green-300", text: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/30", glow: "shadow-emerald-500/25", stroke: "#34d399", trail: "rgba(52,211,153,0.15)", label: "Casi completa", accent: "52,211,153" };
   if (pct >= 70)
-    return { bar: "from-violet-500 to-purple-400", text: "text-violet-400", stroke: "#a78bfa", trail: "rgba(167,139,250,0.15)", accent: "167,139,250" };
+    return { bar: "from-violet-500 to-purple-400", text: "text-violet-400", bg: "bg-violet-500/15", border: "border-violet-500/30", glow: "shadow-violet-500/25", stroke: "#a78bfa", trail: "rgba(167,139,250,0.15)", label: "Avanzada", accent: "167,139,250" };
   if (pct >= 50)
-    return { bar: "from-sky-500 to-cyan-400", text: "text-sky-400", stroke: "#38bdf8", trail: "rgba(56,189,248,0.15)", accent: "56,189,248" };
+    return { bar: "from-sky-500 to-cyan-400", text: "text-sky-400", bg: "bg-sky-500/15", border: "border-sky-500/30", glow: "shadow-sky-500/25", stroke: "#38bdf8", trail: "rgba(56,189,248,0.15)", label: "Media", accent: "56,189,248" };
   if (pct >= 30)
-    return { bar: "from-amber-500 to-yellow-400", text: "text-amber-400", stroke: "#fbbf24", trail: "rgba(251,191,36,0.15)", accent: "251,191,36" };
+    return { bar: "from-amber-500 to-yellow-400", text: "text-amber-400", bg: "bg-amber-500/15", border: "border-amber-500/30", glow: "shadow-amber-500/25", stroke: "#fbbf24", trail: "rgba(251,191,36,0.15)", label: "Parcial", accent: "251,191,36" };
   if (pct >= 10)
-    return { bar: "from-orange-500 to-orange-400", text: "text-orange-400", stroke: "#fb923c", trail: "rgba(251,146,60,0.15)", accent: "251,146,60" };
-  return { bar: "from-rose-500 to-pink-400", text: "text-rose-400", stroke: "#fb7185", trail: "rgba(251,113,133,0.15)", accent: "251,113,133" };
+    return { bar: "from-orange-500 to-orange-400", text: "text-orange-400", bg: "bg-orange-500/15", border: "border-orange-500/30", glow: "shadow-orange-500/25", stroke: "#fb923c", trail: "rgba(251,146,60,0.15)", label: "Inicial", accent: "251,146,60" };
+  return { bar: "from-rose-500 to-pink-400", text: "text-rose-400", bg: "bg-rose-500/15", border: "border-rose-500/30", glow: "shadow-rose-500/25", stroke: "#fb7185", trail: "rgba(251,113,133,0.15)", label: "Recién empezada", accent: "251,113,133" };
 }
 
 // ----------------------------
@@ -376,17 +377,32 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors">{title}</h4>
               <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
-                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] bg-white/5 ${colors.text}`}>{pct}%</span>
+                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}>{pct}%</span>
                 {code && (
-                  <span className="flex items-center gap-1">
-                    <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
-                    <span className="text-zinc-300 font-semibold">{code}</span>
-                  </span>
+                  <>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
+                      <span className="text-zinc-300 font-semibold">{code}</span>
+                    </span>
+                  </>
                 )}
-                {platform && <span className="text-zinc-400">{platform}</span>}
+                {platform && (
+                  <>
+                    <span>•</span>
+                    <span className="text-zinc-400">{platform}</span>
+                  </>
+                )}
               </div>
               <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden relative">
-                <motion.div className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: animDelay + 0.2, ease: "easeOut" }} />
+                <motion.div
+                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.8, delay: animDelay + 0.2, ease: "easeOut" }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: `${animDelay}s` }} />
+                </motion.div>
               </div>
               <div className="text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
                 <Clock className="w-3 h-3" /> {lastWatched}
@@ -402,13 +418,13 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} className="block">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md transition-all">
+          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-emerald-900/20 transition-all">
             <SmartImage item={item} kind="poster" alt={title} />
-            <div className="absolute inset-x-0 bottom-0 h-1.5 bg-zinc-800/80">
-              <div className={`h-full bg-gradient-to-r ${colors.bar}`} style={{ width: `${pct}%` }} />
-            </div>
+
+            {/* Overlay con gradientes - desktop hover (igual que En progreso) */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-end">
+              <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                <div />
                 <div className="flex items-center gap-1">
                   <span className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}>{pct}</span>
                   <span className={`text-sm font-bold ${colors.text} opacity-80`}>%</span>
@@ -416,16 +432,21 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
               </div>
               <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">{title}</h3>
-                {code && (
-                  <p className="text-emerald-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
-                    <Play className="w-2.5 h-2.5" fill="currentColor" />
-                    {code}
+                <div className="space-y-0.5">
+                  {code && (
+                    <p className="text-emerald-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
+                      <Play className="w-2.5 h-2.5" fill="currentColor" />
+                      {code}
+                    </p>
+                  )}
+                  {platform && (
+                    <p className="text-sky-400 text-xs font-bold drop-shadow-md">{platform}</p>
+                  )}
+                  <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    {lastWatched}
                   </p>
-                )}
-                <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
-                  <Clock className="w-2.5 h-2.5" />
-                  {lastWatched}
-                </p>
+                </div>
               </div>
             </div>
           </div>
@@ -473,7 +494,15 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
                 <span className="text-[11px] text-zinc-500">{pct}% visto</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-zinc-800/80 overflow-hidden relative">
-                <motion.div className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, delay: animDelay + 0.3, ease: "easeOut" }} style={{ boxShadow: `0 0 8px ${colors.stroke}40` }} />
+                <motion.div
+                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 1, delay: animDelay + 0.3, ease: "easeOut" }}
+                  style={{ boxShadow: `0 0 8px ${colors.stroke}40` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: `${animDelay}s` }} />
+                </motion.div>
               </div>
             </div>
             <div className="flex items-center justify-between">
