@@ -48,6 +48,13 @@ class MainActivity : AppCompatActivity() {
             prefs.indicatorEnabled = checked
             if (checked) requestNotifPermissionIfNeeded()
         }
+        binding.a11ySwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.a11yEnabled = checked
+            render()
+        }
+        binding.a11yButton.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
         binding.unpairButton.setOnClickListener {
             prefs.clearPairing()
             render()
@@ -122,8 +129,29 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.status_active, prefs.origin ?: "")
         }
         binding.grantButton.visibility = if (access) View.GONE else View.VISIBLE
+
+        // Detección de ficha por accesibilidad: activa solo si el servicio está
+        // concedido en Ajustes Y el toggle de la app está encendido.
+        binding.a11ySwitch.isChecked = prefs.a11yEnabled
+        val a11yGranted = isAccessibilityServiceEnabled()
+        binding.a11yStatus.text = getString(
+            if (a11yGranted && prefs.a11yEnabled) R.string.a11y_status_on
+            else R.string.a11y_status_off,
+        )
+        binding.a11yButton.visibility = if (a11yGranted) View.GONE else View.VISIBLE
+
         renderLogs(prefs.logs())
         renderApps()
+    }
+
+    /** ¿Está concedido nuestro servicio de accesibilidad en Ajustes del sistema? */
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = "$packageName/${AccessibilityStreamingService::class.java.name}"
+        val enabled = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     /** Pinta el registro con color por tipo: ✓ éxito (verde), ✗ error (rojo),

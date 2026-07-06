@@ -19,7 +19,16 @@
     <string name="log_empty">Sin actividad todavía.</string>
     <string name="indicator_toggle">Acceso rápido a la ficha en The Show Verse</string>
     <string name="notif_watching">Estás viendo: %1$s</string>
+    <string name="notif_watched">Añadido a tu historial: %1$s</string>
+    <string name="notif_browsing">En The Show Verse: %1$s</string>
     <string name="notif_open_details">Ver en The Show Verse</string>
     <string name="notif_channel_name">Acceso rápido a la ficha</string>
     <string name="notif_channel_desc">Notificación con enlace a la página de detalles del título que estás viendo.</string>
+    <!-- Servicio de accesibilidad (detección de ficha sin reproducir) -->
+    <string name="a11y_service_label">Detección de fichas de streaming</string>
+    <string name="a11y_service_desc">Permite a The Show Verse Sync detectar el título de la ficha que abres en tus apps de streaming (Netflix, Prime Video, Disney+, Max…) sin necesidad de reproducirlo, para mostrarte un acceso rápido a su página en The Show Verse. Solo lee esas apps y no guarda ni comparte el contenido de la pantalla.</string>
+    <string name="a11y_toggle">Detectar fichas sin reproducir (accesibilidad)</string>
+    <string name="a11y_open_settings">Activar detección de fichas (Accesibilidad)</string>
+    <string name="a11y_status_on">Detección de fichas activa.</string>
+    <string name="a11y_status_off">Detección de fichas desactivada. Actívala en Ajustes → Accesibilidad → The Show Verse.</string>
 </resources>

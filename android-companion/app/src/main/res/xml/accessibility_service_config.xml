@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Servicio de accesibilidad restringido A LAS APPS DE STREAMING conocidas
+     (privacidad): solo recibe eventos de esos paquetes, para leer el título de la
+     ficha y mostrar el acceso rápido a The Show Verse. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/a11y_service_desc"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="300"
+    android:packageNames="com.netflix.mediaclient,com.amazon.avod.thirdpartyclient,com.amazon.amazonvideo.livingroom,com.wbd.stream,com.hbo.hbonow,com.disney.disneyplus,com.crunchyroll.crunchyroid,com.telefonica.gvp,es.plus.yomvi,com.apple.atve.androidtv.appletv,com.filmin,com.skyshowtime.skyshowtime,tv.pluto.android,com.rakuten.tv,com.atresmedia.atresplayer,es.rtve.rtvePlay,app.plex.android,com.plexapp.android" />
