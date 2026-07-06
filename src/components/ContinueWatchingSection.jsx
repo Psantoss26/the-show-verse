@@ -173,9 +173,9 @@ const shimmer = {
 const ROW_HEIGHT = "h-[126px] sm:h-[146px] md:h-[168px] xl:h-[190px]";
 const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
 const CONTINUE_WATCHING_IMAGE_QUALITY = 92;
-const CONTINUE_WATCHING_TRAILER_LANGUAGES = ["es-ES", "en-US"];
+const CONTINUE_WATCHING_TRAILER_LANGUAGE_FILTER = "en,es,null";
 const CONTINUE_WATCHING_TRAILER_CACHE_PREFIX =
-  "showverse:dashboard:continue-watching:trailer-videos:v1:";
+  "showverse:dashboard:continue-watching:trailer-videos:v2:";
 const CONTINUE_WATCHING_TRAILER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PREVIEW_TRAILER_PREWARM_AHEAD = 4;
 const PREVIEW_TRAILER_REVEAL_DELAY_MS = 80;
@@ -306,21 +306,20 @@ async function fetchPreviewTrailerVideos(tvId) {
     return stored;
   }
 
-  const request = Promise.all(
-    CONTINUE_WATCHING_TRAILER_LANGUAGES.map((language) =>
-      getVideos("tv", tvId, language).catch(() => ({ results: EMPTY_ARRAY })),
-    ),
-  ).then((responses) =>
-    normalizePreviewVideos(
-      responses.flatMap((data) =>
+  const request = getVideos("tv", tvId, "en-US", {
+    includeVideoLanguage: CONTINUE_WATCHING_TRAILER_LANGUAGE_FILTER,
+  })
+    .catch(() => ({ results: EMPTY_ARRAY }))
+    .then((data) =>
+      normalizePreviewVideos(
         Array.isArray(data?.results) ? data.results : EMPTY_ARRAY,
       ),
-    ),
-  ).then((videos) => {
-    previewTrailerVideosCache.set(cacheKey, videos);
-    writeStoredPreviewTrailerVideos(tvId, videos);
-    return videos;
-  });
+    )
+    .then((videos) => {
+      previewTrailerVideosCache.set(cacheKey, videos);
+      writeStoredPreviewTrailerVideos(tvId, videos);
+      return videos;
+    });
 
   previewTrailerVideosCache.set(cacheKey, request);
   return request;
@@ -1579,6 +1578,7 @@ function ContinueWatchingSection({
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const [animatingOutId, setAnimatingOutId] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
   // Tarjetas visibles por fila (lo fija el breakpoint activo de Swiper). Se usa
@@ -1647,11 +1647,19 @@ function ContinueWatchingSection({
     }
   };
 
-  const openPreview = (itemKey) => {
+  const openPreview = (itemKey, index) => {
     clearHoverCloseTimer();
+    const prev = hoveredIdRef.current;
+    if (prev && prev !== itemKey) {
+      setAnimatingOutId(prev);
+    } else {
+      setAnimatingOutId((prevOut) => (prevOut === itemKey ? null : prevOut));
+    }
     hoveredIdRef.current = itemKey;
-    setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
     setHoveredId(itemKey);
+    if (typeof index === "number") {
+      setHoveredIndex(index);
+    }
   };
 
   const closePreview = (itemKey) => {
@@ -1659,6 +1667,7 @@ function ContinueWatchingSection({
     hoveredIdRef.current = null;
     setAnimatingOutId(itemKey);
     setHoveredId(null);
+    setHoveredIndex(null);
   };
 
   const prewarmVisibleTrailers = () => {
@@ -1695,7 +1704,7 @@ function ContinueWatchingSection({
     }
     clearHoverCloseTimer();
     clearHoverOpenTimer();
-    openPreview(itemKey);
+    openPreview(itemKey, index);
   };
 
   const handleMouseLeaveItem = (itemKey) => {
@@ -1810,8 +1819,11 @@ function ContinueWatchingSection({
   // en usuarios sin sesión); esperamos a que llegue la caché o se autentique.
   if (!hasExternalShows && loading && !authenticated) return null;
   const hasActivePreview = !!hoveredId;
-  const showPrev = (isHoveredRow || hasActivePreview) && canPrev;
-  const showNext = (isHoveredRow || hasActivePreview) && canNext;
+  const isHoveringFirstVisible = hoveredIndex !== null && hoveredIndex <= activeIndex;
+  const isHoveringLastVisible = hoveredIndex !== null && hoveredIndex >= activeIndex + Math.floor(perView) - 1;
+
+  const showPrev = (isHoveredRow || hasActivePreview) && canPrev && !isHoveringFirstVisible;
+  const showNext = (isHoveredRow || hasActivePreview) && canNext && !isHoveringLastVisible;
 
   const isCalendar = mode === "calendar";
   const Header = (
@@ -1959,7 +1971,7 @@ function ContinueWatchingSection({
                 <SwiperSlide
                   key={itemKey}
                   className={`${isMobile ? "select-none" : "select-none pointer-events-auto"} ${
-                    isActive ? "!z-[90] !overflow-visible" : isAnimatingOut ? "!z-[80] !overflow-visible" : "!z-10"
+                    isActive ? "!relative !z-[100] !overflow-visible" : isAnimatingOut ? "!relative !z-[50] !overflow-visible" : "!relative !z-10"
                   }`}
                 >
                   <div
@@ -1982,7 +1994,7 @@ function ContinueWatchingSection({
                         <div
                           key="preview"
                           className="hidden sm:block"
-                          onMouseEnter={() => openPreview(itemKey)}
+                          onMouseEnter={() => openPreview(itemKey, i)}
                         >
                           <ContinueWatchingPreviewCard
                             show={show}
@@ -1991,7 +2003,7 @@ function ContinueWatchingSection({
                             totalCount={displayShows.length}
                             activeIndex={activeIndex}
                             perView={perView}
-                            onPreviewMouseEnter={() => openPreview(itemKey)}
+                            onPreviewMouseEnter={() => openPreview(itemKey, i)}
                             onPreviewMouseLeave={() => closePreview(itemKey)}
                           />
                         </div>

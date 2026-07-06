@@ -447,11 +447,19 @@ export async function getImages(
   };
 }
 
-export async function getVideos(type, id, language = "es-ES") {
+export async function getVideos(
+  type,
+  id,
+  language = "es-ES",
+  { includeVideoLanguage } = {},
+) {
   if (!type || !id) return { results: [] };
   const data = await tmdb(
     `/${type}/${id}/videos`,
-    { language },
+    {
+      language,
+      include_video_language: includeVideoLanguage,
+    },
     { retries: 2 },
   );
   return {
