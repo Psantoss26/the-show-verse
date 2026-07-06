@@ -316,7 +316,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-amber-500" />}
+          {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
           <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">{label}:</span>
           <span className="min-w-0 truncate font-semibold text-white">{valueLabel}</span>
         </div>
@@ -347,7 +347,7 @@ function DropdownItem({ active, onClick, children }) {
       className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between ${active ? "bg-white/10 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"}`}
     >
       <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-4 h-4 text-amber-500" />}
+      {active && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
     </button>
   );
 }
@@ -368,18 +368,18 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
   if (viewMode === "compact") {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-amber-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
+        <Link href={href} prefetch={false} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-              <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-amber-300 transition-colors">{title}</h4>
+              <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors">{title}</h4>
               <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
                 <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] bg-white/5 ${colors.text}`}>{pct}%</span>
                 {code && (
                   <span className="flex items-center gap-1">
-                    <Play className="w-3 h-3 text-amber-400" fill="currentColor" />
+                    <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
                     <span className="text-zinc-300 font-semibold">{code}</span>
                   </span>
                 )}
@@ -417,7 +417,7 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
               <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">{title}</h3>
                 {code && (
-                  <p className="text-amber-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
+                  <p className="text-emerald-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
                     <Play className="w-2.5 h-2.5" fill="currentColor" />
                     {code}
                   </p>
@@ -457,12 +457,12 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
             </div>
             {code && (
               <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                <Play className="w-3 h-3 text-amber-400" fill="currentColor" />
+                <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
                 <span className="text-[11px] font-bold text-white">{code}</span>
               </div>
             )}
             <div className="absolute bottom-0 left-0 right-0 p-4">
-              <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-amber-200 transition-colors">{title}</h3>
+              <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">{title}</h3>
               {platform && <span className="text-xs text-zinc-300">{platform}</span>}
             </div>
           </div>
@@ -638,7 +638,7 @@ export default function ContinueWatchingClient() {
               <button
                 type="button"
                 onClick={() => window.location.assign("/login?next=/continue-watching")}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 hover:from-amber-400 hover:via-orange-400 hover:to-amber-300 text-black font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98]"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98]"
               >
                 Iniciar sesión
               </button>
@@ -660,15 +660,15 @@ export default function ContinueWatchingClient() {
           {/* Móvil */}
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 z-10 pointer-events-none" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
               {q && (
                 <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md">
                   <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
-            <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen ? "text-amber-400" : "text-zinc-200"}`}>
+            <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen ? "text-emerald-400" : "text-zinc-200"}`}>
               <SlidersHorizontal className="w-4 h-4" />
             </button>
           </div>
@@ -691,8 +691,8 @@ export default function ContinueWatchingClient() {
           {/* Escritorio */}
           <div className="hidden lg:flex gap-3 relative z-10">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 z-10 pointer-events-none" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por título..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por título..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
               {q && (
                 <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md">
                   <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
@@ -750,9 +750,9 @@ export default function ContinueWatchingClient() {
 function Blobs() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-orange-700/15 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-amber-800/20 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
     </div>
   );
 }
@@ -763,12 +763,12 @@ function Header({ stats, loading, onRefresh, refreshing }) {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-px w-12 bg-amber-500" />
-            <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">SEGUIMIENTO</span>
+            <div className="h-px w-12 bg-emerald-500" />
+            <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">SEGUIMIENTO</span>
           </div>
           <div className="flex items-center gap-6">
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Continuar viendo<span className="text-amber-500">.</span>
+              Continuar viendo<span className="text-emerald-500">.</span>
             </h1>
             {onRefresh && (
               <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
@@ -783,7 +783,7 @@ function Header({ stats, loading, onRefresh, refreshing }) {
           </p>
         </div>
         <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
-          <StatCard label="Títulos" value={stats.total} loading={loading} icon={Play} colorClass="text-amber-400" />
+          <StatCard label="Títulos" value={stats.total} loading={loading} icon={Play} colorClass="text-emerald-400" />
           <StatCard label="Progreso Medio" value={`${stats.avg}%`} loading={loading} icon={TrendingUp} colorClass="text-purple-400" />
           <StatCard label="Películas" value={stats.movies} loading={loading} icon={Film} colorClass="text-sky-400" />
           <StatCard label="Series" value={stats.series} loading={loading} icon={Tv} colorClass="text-emerald-400" />
@@ -797,7 +797,7 @@ function ViewToggle({ viewMode, setViewMode }) {
   const btn = (mode, Icon) => (
     <button
       onClick={() => setViewMode(mode)}
-      className={`flex-1 lg:flex-none px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === mode ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+      className={`flex-1 lg:flex-none px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${viewMode === mode ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
     >
       <Icon className="w-4 h-4" />
     </button>
