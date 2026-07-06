@@ -1886,9 +1886,13 @@ function ContinueWatchingSection({
           Calendario<span className="text-amber-500">.</span>
         </Link>
       ) : (
-        <h3 className="bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent sm:text-2xl md:text-3xl">
+        <Link
+          href="/continue-watching"
+          className="inline-block bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
+          aria-label="Ver todo lo que tienes a medias"
+        >
           Continuar viendo<span className="text-amber-500">.</span>
-        </h3>
+        </Link>
       )}
     </motion.div>
   );
