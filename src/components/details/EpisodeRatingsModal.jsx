@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Loader2, RotateCw, X } from "lucide-react";
 
@@ -27,7 +27,6 @@ export default function EpisodeRatingsModal({
   initialRatings = null,
   initialTmdbSeasons = EMPTY_ARRAY,
 }) {
-  const dialogRef = useRef(null);
   const [mounted, setMounted] = useState(false);
   const [ratings, setRatings] = useState(null);
   const [tmdbSeasons, setTmdbSeasons] = useState([]);
@@ -40,27 +39,34 @@ export default function EpisodeRatingsModal({
 
   useEffect(() => setMounted(true), []);
 
+  // Bloqueo de scroll e impedir salto de barra de scroll
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevPadding = document.body.style.paddingRight;
+    const scrollBarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
 
-    if (open && !dialog.open) {
-      dialog.showModal();
-      return;
+    document.body.style.overflow = "hidden";
+    if (scrollBarWidth > 0) {
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
     }
 
-    if (!open && dialog.open) dialog.close();
-  }, [mounted, open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPadding;
     };
   }, [open]);
+
+  // Cerrar con ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open || !showId) return undefined;
@@ -133,29 +139,24 @@ export default function EpisodeRatingsModal({
     showId,
   ]);
 
-  if (!mounted) return null;
+  if (!mounted || !open) return null;
 
   return createPortal(
-    <dialog
-      ref={dialogRef}
-      closedby="any"
-      className="episode-ratings-dialog m-auto w-full max-h-none max-w-none overflow-visible bg-transparent p-0 text-white backdrop:bg-black/60 backdrop:backdrop-blur-lg"
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose?.();
-      }}
-      onMouseDown={(event) => {
-        if (event.target === dialogRef.current) onClose?.();
-      }}
-      onClose={() => {
-        if (open) onClose?.();
-      }}
-      onClick={(event) => event.stopPropagation()}
-    >
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+      {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
-        className="episode-ratings-panel relative isolate mx-auto flex h-fit max-h-[calc(100dvh-2rem)] w-fit min-w-[min(20rem,calc(100%_-_2rem))] max-w-[min(78rem,calc(100%_-_2rem))] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-black/45 bg-gradient-to-br from-white/10 via-white/[0.035] to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* MODAL CONTAINER: Liquid Glass */}
+      <div
+        className="relative flex h-fit max-h-[calc(100dvh-2rem)] w-fit min-w-[min(20rem,calc(100%_-_2rem))] max-w-[min(78rem,calc(100%_-_2rem))] flex-col overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div
@@ -163,7 +164,7 @@ export default function EpisodeRatingsModal({
           aria-hidden="true"
         />
 
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-white/[0.025] px-4 py-4 backdrop-blur-xl sm:px-7 sm:py-5">
+        <header className="flex shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-200 shadow-[0_0_24px_-10px_rgba(251,191,36,0.8)] sm:h-12 sm:w-12 sm:rounded-2xl">
               <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
@@ -190,7 +191,7 @@ export default function EpisodeRatingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:h-11 sm:w-11"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
             aria-label="Cerrar valoraciones de episodios"
             title="Cerrar (Esc)"
           >
@@ -199,7 +200,7 @@ export default function EpisodeRatingsModal({
         </header>
 
         <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-7 sm:py-6"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6"
           aria-busy={loading}
         >
           {loading && (
@@ -252,46 +253,7 @@ export default function EpisodeRatingsModal({
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        .episode-ratings-panel {
-          animation: featuredRatingsModalIn 360ms
-            cubic-bezier(0.22, 1, 0.36, 1) both;
-        }
-
-        .episode-ratings-dialog::backdrop {
-          animation: featuredRatingsBackdropIn 240ms ease-out both;
-        }
-
-        @keyframes featuredRatingsModalIn {
-          from {
-            opacity: 0;
-            transform: translate3d(0, 22px, 0) scale(0.965);
-          }
-          to {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
-          }
-        }
-
-        @keyframes featuredRatingsBackdropIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .episode-ratings-panel,
-          .episode-ratings-dialog::backdrop {
-            animation-duration: 100ms;
-            transform: none;
-          }
-        }
-      `}</style>
-    </dialog>,
+    </div>,
     document.body,
   );
 }
