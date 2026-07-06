@@ -44,8 +44,17 @@
       id: "netflix",
       match: /(^|\.)netflix\.com$/,
       contentId: (url) => (url.match(/\/watch\/(\d+)/) || [])[1] || null,
-      subSel: [],
-      titleSel: ['[data-uia="video-title"]', ".video-title"],
+      // El título de Netflix va en [data-uia="video-title"]: <h4>Serie</h4> + spans
+      // con "T4:E5 / Capítulo cinco…". Leemos el h4 como serie y los spans como
+      // episodio. El overlay se oculta durante la reproducción (Netflix retira el
+      // elemento del DOM); content.js cachea el último título bueno de este vídeo
+      // para que sobreviva a que desaparezca.
+      subSel: ['[data-uia="video-title"] span', ".video-title span"],
+      titleSel: [
+        '[data-uia="video-title"] h4',
+        '[data-uia="video-title"]',
+        ".video-title",
+      ],
     },
     {
       id: "prime",

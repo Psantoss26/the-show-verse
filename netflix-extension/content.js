@@ -45,6 +45,25 @@
     return { id: h, name: h };
   }
 
+  // Nombres de plataforma "a secas" — nunca deben usarse como título: buscar
+  // "Netflix" en TMDb devuelve una película basura ("Netflix Tudum 2025"…).
+  const PLATFORM_NAME_SET = new Set(
+    Object.values(PLATFORM_NAMES)
+      .concat(["HBO", "Star+", "Paramount+", "Amazon", "Disney", "Pluto", "Rakuten"])
+      .map((s) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
+  );
+  function isBarePlatformName(t) {
+    return PLATFORM_NAME_SET.has(
+      String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
+    );
+  }
+
+  // Último título BUENO por vídeo. El overlay de título de Netflix (y otros) se
+  // oculta durante la reproducción y el elemento desaparece del DOM; sin esto
+  // caeríamos al título de la pestaña (a menudo solo "Netflix"). Se cachea cuando
+  // el overlay está visible y se reutiliza mientras se ve el mismo vídeo.
+  let lastGood = null;
+
   // Devuelve el <video> principal en reproducción (reproductor real grande).
   // Con all_frames evitamos miniaturas/anuncios de frames laterales exigiendo
   // un tamaño mínimo de reproductor.
@@ -148,10 +167,33 @@
       }
     }
 
-    // Último recurso: título desde la pestaña si Media Session no dio nombre.
+    // Cache del último título bueno para ESTE vídeo: si ahora tenemos serie/peli
+    // (overlay visible) lo guardamos; si no (overlay oculto, elemento fuera del
+    // DOM) lo recuperamos, evitando caer al título de la pestaña ("Netflix").
+    const cid = signal.contentId;
+    if (cid && (signal.showName || signal.movieTitle)) {
+      lastGood = {
+        contentId: cid,
+        showName: signal.showName,
+        movieTitle: signal.movieTitle,
+        episodeName: signal.episodeName,
+        season: signal.season,
+        episode: signal.episode,
+      };
+    } else if (cid && lastGood && lastGood.contentId === cid) {
+      signal.showName = signal.showName || lastGood.showName;
+      signal.movieTitle = signal.movieTitle || lastGood.movieTitle;
+      signal.episodeName = signal.episodeName || lastGood.episodeName;
+      if (signal.season == null) signal.season = lastGood.season;
+      if (signal.episode == null) signal.episode = lastGood.episode;
+    }
+
+    // Último recurso: título desde la pestaña si Media Session no dio nombre —
+    // pero NUNCA un nombre de plataforma suelto ("Netflix"), que resolvería a una
+    // película sin relación.
     if (!signal.showName && !signal.movieTitle) {
       const fromTab = D.stripPlatformPrefix(document.title, [platformName]);
-      if (fromTab) signal.movieTitle = fromTab;
+      if (fromTab && !isBarePlatformName(fromTab)) signal.movieTitle = fromTab;
     }
 
     return signal;
@@ -170,8 +212,11 @@
     }
 
     const signal = buildSignal();
-    const mainTitle =
+    const rawMain =
       signal && (signal.showName || signal.movieTitle || signal.tabTitle);
+    // Nunca sincronizar un nombre de plataforma suelto ("Netflix"): es señal de
+    // que no se ha capturado un título real; mejor esperar al siguiente ciclo.
+    const mainTitle = rawMain && !isBarePlatformName(rawMain) ? rawMain : null;
 
     if (!signal || !mainTitle) {
       const now = Date.now();
