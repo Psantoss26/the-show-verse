@@ -145,15 +145,22 @@ export async function resolveStreamingEntity({
   }
 
   const movie = pickTmdbResult(movieResults, query, "movie");
-  if (movie) {
-    return {
-      kind: "resolved",
-      mediaType: "movie",
-      entity: movie,
-      confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
-    };
-  }
-
   const show = pickTmdbResult(tvResults, query, "tv");
+  const asMovie = () => ({
+    kind: "resolved",
+    mediaType: "movie",
+    entity: movie,
+    confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
+  });
+
+  // Sin coincidencia exacta: si hay candidato de película Y de serie, elegir por
+  // POPULARIDAD (evita coger una peli irrelevante en vez de una serie muy popular,
+  // p. ej. "Hunter x Hunter" → la película "Hunter X" en vez del anime).
+  if (movie && show) {
+    const showPop = Number(show.popularity) || 0;
+    const moviePop = Number(movie.popularity) || 0;
+    return showPop > moviePop ? showLevel(show) : asMovie();
+  }
+  if (movie) return asMovie();
   return show ? showLevel(show) : null;
 }

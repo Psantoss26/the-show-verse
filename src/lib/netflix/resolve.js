@@ -12,6 +12,9 @@ export function normalizeText(value) {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
+    // La "×" (signo de multiplicación) se usa como "x" en títulos ("Hunter ×
+    // Hunter"); sin esto se perdía al quitar no-alfanuméricos y no casaba con la x.
+    .replace(/[×✕⨯╳]/g, "x")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }

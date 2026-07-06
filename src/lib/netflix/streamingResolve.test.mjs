@@ -142,3 +142,27 @@ test("resolveStreamingEntity attaches high confidence to exact resolved tv", asy
   assert.equal(result.kind, "resolved");
   assert.equal(result.confidence, "high");
 });
+
+test("normaliza × como x: 'Hunter x Hunter' casa la serie 'Hunter × Hunter'", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Hunter x Hunter",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 11827, name: "Hunter × Hunter", popularity: 200 }]
+        : [{ id: 981011, title: "Hunter X", popularity: 5 }],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 11827);
+});
+
+test("sin exacta, elige por popularidad (serie popular sobre película irrelevante)", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Algo Ambiguo",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 100, name: "Algo Ambiguo XYZ", popularity: 150 }]
+        : [{ id: 200, title: "Algo Ambiguo (peli)", popularity: 3 }],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 100);
+});

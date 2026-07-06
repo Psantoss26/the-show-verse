@@ -164,7 +164,9 @@ export default function NetflixSyncListener() {
                   </h4>
                   <p className="mt-0.5 text-xs text-zinc-400 font-medium">
                     {isShow
-                      ? `Temporada ${item.season} • Episodio ${item.episode}`
+                      ? item.season != null && item.episode != null
+                        ? `Temporada ${item.season} • Episodio ${item.episode}`
+                        : "Serie"
                       : "Película"}
                   </p>
                 </div>
