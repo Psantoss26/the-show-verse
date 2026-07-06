@@ -1870,7 +1870,11 @@ function ContinueWatchingSection({
 
   const isCalendar = mode === "calendar";
   const Header = (
-    <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+    // `relative z-20`: la cabecera (y su enlace de título) queda POR ENCIMA del
+    // Swiper de abajo, cuyo enorme padding con margen negativo (-my-44) se solapa
+    // sobre ella; en móvil ese padding es interactivo y, sin esto, robaba el clic
+    // al título ("Continuar viendo" / "Calendario").
+    <motion.div variants={scaleIn} className="relative z-20 mb-5 px-1 sm:px-0">
       <div className="mb-1.5 flex items-center gap-2">
         <div className="h-px w-8 bg-amber-500" />
         <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
