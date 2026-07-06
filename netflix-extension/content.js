@@ -126,9 +126,8 @@
     max: [
       '[data-testid="dragonfly-title"]',
       '[data-testid="detail-page-title"]',
-      '[class*="TitleText"]',
     ],
-    hbomax: ['[data-testid="dragonfly-title"]', '[class*="TitleText"]'],
+    hbomax: ['[data-testid="dragonfly-title"]'],
     disney: ['[data-testid="hero-title"]', ".title-field"],
     disneyplus: ['[data-testid="hero-title"]', ".title-field"],
     crunchyroll: ["h1.erc-series-title", "h1.title", ".hero-heading"],
@@ -154,14 +153,54 @@
     return txt;
   }
 
+  // Encabezado más prominente y VISIBLE cerca de la parte superior. Agnóstico a la
+  // plataforma: cubre HBO Max y cualquier web sin selector propio. Elige el
+  // candidato válido con mayor tamaño de fuente y más arriba (el título de la ficha).
+  function detectTitleFromHeadings() {
+    let best = "";
+    let bestScore = -1;
+    let nodes;
+    try {
+      nodes = document.querySelectorAll(
+        'h1, h2, [data-testid*="title" i], [class*="title" i]',
+      );
+    } catch (e) {
+      return "";
+    }
+    const limit = Math.min(nodes.length, 500);
+    const vh = self.innerHeight || 1080;
+    for (let i = 0; i < limit; i += 1) {
+      const node = nodes[i];
+      if (node.getClientRects().length === 0) continue; // no renderizado/oculto
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 40 || rect.height < 14) continue;
+      if (rect.top > vh * 0.9 || rect.top < -200) continue; // fuera de zona útil
+      const t = cleanTitleCandidate(textOrAlt(node));
+      if (!isValidBrowseTitle(t)) continue;
+      let fontSize = 0;
+      try {
+        fontSize = parseFloat(getComputedStyle(node).fontSize) || 0;
+      } catch (e) {
+        fontSize = 0;
+      }
+      const score = fontSize * 2 - rect.top / 60;
+      if (score > bestScore) {
+        bestScore = score;
+        best = t;
+      }
+    }
+    return best;
+  }
+
   // Título de la FICHA que se está viendo (navegando, SIN reproducir). Criterio
-  // sólido: solo en URLs de ficha, leyendo el título del DOM visible (selectores
-  // por plataforma + <h1>), con el título de la pestaña como último recurso.
+  // sólido: solo en URLs de ficha; (1) selector propio de la plataforma, (2)
+  // encabezado más prominente del DOM, (3) título de pestaña. Nunca og:title.
   function detectBrowsingTitle() {
     const urlRe = DETAILS_URL_RE[platformId];
     if (urlRe && !urlRe.test(location.href)) return "";
 
-    const selectors = (DETAILS_TITLE_SELECTORS[platformId] || []).concat(["h1"]);
+    // 1. Selectores específicos de la plataforma (precisos cuando existen).
+    const selectors = DETAILS_TITLE_SELECTORS[platformId] || [];
     for (const sel of selectors) {
       let nodes;
       try {
@@ -175,7 +214,11 @@
       }
     }
 
-    // Último recurso: título de la pestaña (NUNCA og:title: queda obsoleto).
+    // 2. Encabezado más prominente (universal; robusto para HBO Max y otros).
+    const heading = detectTitleFromHeadings();
+    if (heading) return heading;
+
+    // 3. Último recurso: título de la pestaña (NUNCA og:title: queda obsoleto).
     const fromTab = cleanTitleCandidate(document.title);
     return isValidBrowseTitle(fromTab) ? fromTab : "";
   }
@@ -283,7 +326,7 @@
 
     const shadow = host.attachShadow({ mode: "open" });
 
-    // CSS para el popup "Liquid Glass" Premium (Integración perfecta de portada + cierre interno)
+    // CSS para el popup "Liquid Glass" Premium (Portada completa + Auto-dismiss)
     const style = document.createElement("style");
     style.textContent = `
       .tsv-wrap {
@@ -387,47 +430,12 @@
         background-color: rgba(234, 179, 8, 0.15);
         border-color: rgba(234, 179, 8, 0.3);
       }
-      .tsv-close-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: rgba(10, 10, 15, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 13px;
-        font-weight: bold;
-        cursor: pointer;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      }
-      .tsv-close-btn:hover {
-        background-color: rgba(10, 10, 15, 0.85);
-        border-color: rgba(255, 255, 255, 0.45);
-        color: #fff;
-        transform: scale(1.1);
-      }
       @media (max-width: 480px) {
         .tsv-card {
           width: 140px;
           gap: 10px;
           padding: 0 0 10px 0;
           border-radius: 20px;
-        }
-        .tsv-close-btn {
-          top: 6px;
-          right: 6px;
-          width: 18px;
-          height: 18px;
-          font-size: 11px;
         }
         .tsv-content {
           padding: 0 10px;
@@ -467,12 +475,10 @@
             <span style="font-size: 9px; margin-left: 2px;">↗</span>
           </div>
         </div>
-        <div class="tsv-close-btn" title="Ocultar">×</div>
       </div>
     `;
 
     const cardNode = wrap.querySelector(".tsv-card");
-    const closeNode = wrap.querySelector(".tsv-close-btn");
 
     const open = () => {
       try {
@@ -480,6 +486,9 @@
       } catch (e) {
         /* noop */
       }
+      clearDismissTimer();
+      wrap.classList.remove("show");
+      hideIndicator();
     };
 
     cardNode.onclick = open;
@@ -487,10 +496,29 @@
       if (e.key === "Enter") open();
     };
 
-    closeNode.onclick = (e) => {
-      e.stopPropagation();
-      indicatorDismissedUrl = url;
-      hideIndicator();
+    // Temporizador de auto-cierre con pausa al hacer hover (5 segundos)
+    let autoDismissTimer = null;
+    const startDismissTimer = () => {
+      if (autoDismissTimer) clearTimeout(autoDismissTimer);
+      autoDismissTimer = setTimeout(() => {
+        wrap.classList.remove("show");
+        setTimeout(hideIndicator, 350); // espera a que termine la animación de salida
+      }, 5000); // 5 segundos
+    };
+
+    const clearDismissTimer = () => {
+      if (autoDismissTimer) {
+        clearTimeout(autoDismissTimer);
+        autoDismissTimer = null;
+      }
+    };
+
+    cardNode.onmouseenter = () => {
+      clearDismissTimer();
+    };
+
+    cardNode.onmouseleave = () => {
+      startDismissTimer();
     };
 
     const imgNode = wrap.querySelector(".tsv-poster");
@@ -509,6 +537,9 @@
     requestAnimationFrame(() => {
       wrap.classList.add("show");
     });
+
+    // Iniciar temporizador inicial
+    startDismissTimer();
   }
 
   // Devuelve el <video> principal en reproducción (reproductor real grande).
