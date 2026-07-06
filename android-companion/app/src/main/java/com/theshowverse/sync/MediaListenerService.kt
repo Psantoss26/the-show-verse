@@ -147,23 +147,18 @@ class MediaListenerService : NotificationListenerService() {
         // Diagnóstico: vuelca (una vez por título) los metadatos crudos NO vacíos,
         // para saber en qué campo esconde cada app el nombre de la serie cuando el
         // episodio no resuelve. Visible en la pantalla "Registro" de la app.
-        noteOnce(
-            "meta:$pkg:${raw.title}",
-            buildString {
-                append("Metadatos ${Platforms.nameFor(pkg)} →")
-                fun f(k: String, v: String?) {
-                    if (!v.isNullOrBlank()) append(" $k=«$v»")
-                }
-                f("title", raw.title)
-                f("artist", raw.artist)
-                f("album", raw.album)
-                f("albumArtist", raw.albumArtist)
-                f("dTitle", raw.displayTitle)
-                f("dSub", raw.displaySubtitle)
-                f("dDesc", raw.displayDescription)
-                f("queue", raw.queueTitle)
-            },
-        )
+        val metaDump = listOf(
+            "title" to raw.title,
+            "artist" to raw.artist,
+            "album" to raw.album,
+            "albumArtist" to raw.albumArtist,
+            "dTitle" to raw.displayTitle,
+            "dSub" to raw.displaySubtitle,
+            "dDesc" to raw.displayDescription,
+            "queue" to raw.queueTitle,
+        ).filter { !it.second.isNullOrBlank() }
+            .joinToString(" ") { "${it.first}=«${it.second}»" }
+        noteOnce("meta:$pkg:${raw.title}", "Metadatos ${Platforms.nameFor(pkg)} → $metaDump")
 
         val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg))
         if (signal.mainTitle.isNullOrBlank()) {
