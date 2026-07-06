@@ -1,17 +1,25 @@
 package com.theshowverse.sync
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 
 /**
  * Motor de sincronización: como NotificationListenerService, puede enumerar las
@@ -73,6 +81,8 @@ class MediaListenerService : NotificationListenerService() {
     private fun stopPolling() {
         polling = false
         handler.removeCallbacks(pollRunnable)
+        // Al dejar de reproducir, retiramos la notificación de acceso rápido.
+        cancelQuickAccessNotification()
     }
 
     private fun noteOnce(key: String, msg: String) {
@@ -92,6 +102,61 @@ class MediaListenerService : NotificationListenerService() {
         )
     } catch (e: Exception) {
         Triple(null, null, null)
+    }
+
+    /** Publica/actualiza la notificación de acceso rápido a la ficha en The Show
+     * Verse (id fijo: se reemplaza por título y se retira al parar la reproducción). */
+    private fun showQuickAccessNotification(synced: SyncedInfo?) {
+        if (!prefs.indicatorEnabled) return
+        val url = DetailsUrl.build(prefs.origin, synced) ?: return
+        val title = synced?.title ?: return
+        ensureQuickAccessChannel()
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val pi = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notif = NotificationCompat.Builder(this, QUICK_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_tsv)
+            .setContentTitle(getString(R.string.notif_watching, title))
+            .setContentText(getString(R.string.notif_open_details))
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .addAction(0, getString(R.string.notif_open_details), pi)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        try {
+            NotificationManagerCompat.from(this).notify(QUICK_NOTIF_ID, notif)
+        } catch (e: SecurityException) {
+            // Sin permiso POST_NOTIFICATIONS (Android 13+): se ignora.
+        }
+    }
+
+    private fun cancelQuickAccessNotification() {
+        try {
+            NotificationManagerCompat.from(this).cancel(QUICK_NOTIF_ID)
+        } catch (e: Exception) {
+            /* noop */
+        }
+    }
+
+    private fun ensureQuickAccessChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val mgr = getSystemService(NotificationManager::class.java)
+            if (mgr != null && mgr.getNotificationChannel(QUICK_CHANNEL_ID) == null) {
+                val ch = NotificationChannel(
+                    QUICK_CHANNEL_ID,
+                    getString(R.string.notif_channel_name),
+                    NotificationManager.IMPORTANCE_LOW,
+                )
+                ch.description = getString(R.string.notif_channel_desc)
+                mgr.createNotificationChannel(ch)
+            }
+        }
     }
 
     private fun pollOnce() {
@@ -196,10 +261,12 @@ class MediaListenerService : NotificationListenerService() {
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         prefs.addLog("Enviando: ${signal.mainTitle}${signal.episodeName?.let { " — $it" } ?: ""}")
-        SyncClient.send(origin, token, signal) { ok, err ->
+        SyncClient.send(origin, token, signal) { ok, err, synced ->
             handler.post {
                 if (ok) {
                     prefs.addLog("✓ Sincronizado: ${signal.mainTitle}")
+                    // Acceso rápido: notificación con enlace a la ficha en The Show Verse.
+                    showQuickAccessNotification(synced)
                 } else {
                     // NO reintentamos el mismo título: reenviar cada 3s satura el
                     // endpoint y agrava el 429. Se enviará el próximo título nuevo.
@@ -213,5 +280,7 @@ class MediaListenerService : NotificationListenerService() {
         private const val TAG = "TSVSync"
         private const val POLL_MS = 3_000L
         private const val MIN_WATCH_MS = 15_000L
+        private const val QUICK_CHANNEL_ID = "tsv_quick_access"
+        private const val QUICK_NOTIF_ID = 1001
     }
 }

@@ -670,7 +670,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const json = await res.json().catch(() => ({}));
         if (res.ok) {
           addLog(`Sincronizado (${platformName || platform}): "${mainTitle}"`, "success");
-          sendResponse({ success: true, synced: json.synced });
+          // `origin` para que el content-script pueda montar la URL de detalles
+          // (indicador de acceso rápido a The Show Verse).
+          sendResponse({ success: true, synced: json.synced, origin });
         } else {
           const errorMsg = json.error || `HTTP ${res.status}`;
           addLog(`Fallo al sincronizar: ${errorMsg}`, "error");

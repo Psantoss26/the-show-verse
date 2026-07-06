@@ -17,4 +17,9 @@
     <string name="refresh">Actualizar</string>
     <string name="clear_logs">Limpiar</string>
     <string name="log_empty">Sin actividad todavía.</string>
+    <string name="indicator_toggle">Acceso rápido a la ficha en The Show Verse</string>
+    <string name="notif_watching">Estás viendo: %1$s</string>
+    <string name="notif_open_details">Ver en The Show Verse</string>
+    <string name="notif_channel_name">Acceso rápido a la ficha</string>
+    <string name="notif_channel_desc">Notificación con enlace a la página de detalles del título que estás viendo.</string>
 </resources>

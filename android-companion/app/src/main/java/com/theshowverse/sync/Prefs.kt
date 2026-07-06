@@ -38,6 +38,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_PAUSED, false)
         set(value) = prefs.edit().putBoolean(KEY_PAUSED, value).apply()
 
+    /** Indicador de acceso rápido a la ficha (notificación). Activado por defecto. */
+    var indicatorEnabled: Boolean
+        get() = prefs.getBoolean(KEY_INDICATOR, true)
+        set(value) = prefs.edit().putBoolean(KEY_INDICATOR, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -86,6 +91,7 @@ class Prefs(context: Context) {
         private const val KEY_TOKEN = "token"
         private const val KEY_ORIGIN = "origin"
         private const val KEY_PAUSED = "paused"
+        private const val KEY_INDICATOR = "indicator_enabled"
         private const val KEY_ENABLED = "enabled_packages"
         private const val KEY_SEEN = "seen_packages"
         private const val KEY_LOGS = "event_logs"

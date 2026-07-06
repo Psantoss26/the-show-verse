@@ -140,6 +140,26 @@
     };
   }
 
+  // Construye la URL de la página de detalles de The Show Verse a partir de lo que
+  // devuelve el sync ({tmdbId, mediaType, season, episode}). Serie con episodio →
+  // página del episodio; serie sin episodio → página de la serie; película → su
+  // página. Devuelve "" si no hay id resuelto.
+  function buildDetailsUrl(origin, synced) {
+    if (!origin || !synced || !synced.tmdbId) return "";
+    const base = String(origin).replace(/\/+$/, "");
+    const type = synced.mediaType === "tv" ? "tv" : "movie";
+    const id = Number(synced.tmdbId);
+    if (!id) return "";
+    if (
+      type === "tv" &&
+      synced.season != null &&
+      synced.episode != null
+    ) {
+      return `${base}/details/tv/${id}/season/${synced.season}/episode/${synced.episode}`;
+    }
+    return `${base}/details/${type}/${id}`;
+  }
+
   return {
     clean,
     parseSeasonEpisode,
@@ -147,6 +167,7 @@
     findSeasonEpisodeBadge,
     largestArtwork,
     buildPlaybackSignal,
+    buildDetailsUrl,
     SE_SEASON_RE,
     SE_EPISODE_RE,
   };

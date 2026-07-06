@@ -31,7 +31,7 @@ object SyncClient {
         origin: String,
         token: String,
         signal: PlaybackSignal,
-        onResult: (Boolean, String?) -> Unit,
+        onResult: (Boolean, String?, SyncedInfo?) -> Unit,
     ) {
         val json = JSONObject().apply {
             put("platform", signal.platformId)
@@ -71,26 +71,48 @@ object SyncClient {
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.w(TAG, "Sync failed: ${e.message}")
-                onResult(false, e.message)
+                onResult(false, e.message, null)
             }
 
             override fun onResponse(call: Call, response: Response) {
                 response.use {
+                    val body = try {
+                        it.body?.string()
+                    } catch (e: Exception) {
+                        null
+                    }
                     if (it.isSuccessful) {
-                        onResult(true, null)
+                        onResult(true, null, parseSynced(body))
                     } else {
-                        val body = try {
-                            it.body?.string()?.take(200)
-                        } catch (e: Exception) {
-                            null
-                        }
+                        val snippet = body?.take(200)
                         onResult(
                             false,
-                            "HTTP ${it.code}" + if (body.isNullOrBlank()) "" else ": $body",
+                            "HTTP ${it.code}" + if (snippet.isNullOrBlank()) "" else ": $snippet",
+                            null,
                         )
                     }
                 }
             }
         })
+    }
+
+    /** Extrae el objeto `synced` de la respuesta del endpoint (o null). */
+    private fun parseSynced(body: String?): SyncedInfo? {
+        if (body.isNullOrBlank()) return null
+        return try {
+            val synced = JSONObject(body).optJSONObject("synced") ?: return null
+            val id = synced.optInt("tmdbId", 0)
+            if (id <= 0) return null
+            SyncedInfo(
+                tmdbId = id,
+                mediaType = synced.optString("mediaType").ifBlank { null },
+                season = if (synced.has("season") && !synced.isNull("season")) synced.optInt("season") else null,
+                episode = if (synced.has("episode") && !synced.isNull("episode")) synced.optInt("episode") else null,
+                title = synced.optString("title").ifBlank { null },
+                posterPath = synced.optString("posterPath").ifBlank { null },
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 }

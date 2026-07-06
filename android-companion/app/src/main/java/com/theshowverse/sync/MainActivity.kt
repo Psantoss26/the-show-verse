@@ -1,9 +1,13 @@
 package com.theshowverse.sync
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import androidx.activity.result.contract.ActivityResultContracts
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -23,11 +27,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: Prefs
 
+    private val notifPermLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = Prefs(this)
+        requestNotifPermissionIfNeeded()
 
         binding.grantButton.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -35,6 +43,10 @@ class MainActivity : AppCompatActivity() {
         binding.pauseSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.paused = checked
             render()
+        }
+        binding.indicatorSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.indicatorEnabled = checked
+            if (checked) requestNotifPermissionIfNeeded()
         }
         binding.unpairButton.setOnClickListener {
             prefs.clearPairing()
@@ -46,6 +58,16 @@ class MainActivity : AppCompatActivity() {
             render()
         }
         binding.testButton.setOnClickListener { sendTest() }
+    }
+
+    /** Android 13+ requiere permiso en runtime para publicar la notificación. */
+    private fun requestNotifPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     private fun dp(value: Int): Int =
@@ -73,7 +95,7 @@ class MainActivity : AppCompatActivity() {
             tabTitle = "Interstellar",
         )
         prefs.addLog("Prueba enviada a $origin")
-        SyncClient.send(origin, token, test) { ok, err ->
+        SyncClient.send(origin, token, test) { ok, err, _ ->
             runOnUiThread {
                 prefs.addLog(if (ok) "Prueba: ✓ OK (mira el historial)" else "Prueba: ✗ $err")
                 render()
@@ -92,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     private fun render() {
         val access = hasNotificationAccess()
         binding.pauseSwitch.isChecked = prefs.paused
+        binding.indicatorSwitch.isChecked = prefs.indicatorEnabled
         binding.statusText.text = when {
             !prefs.isPaired() -> getString(R.string.status_not_paired)
             !access -> getString(R.string.status_no_access)
