@@ -88,25 +88,96 @@
     ].map((s) => s.toLowerCase()),
   );
 
-  // Título de la FICHA que se está viendo (navegando, SIN reproducir). Fuente
-  // universal: el título de la pestaña (que los SPA actualizan al navegar) o el
-  // og:title, sin el nombre de la plataforma. Descarta páginas genéricas.
-  function detectBrowsingTitle() {
-    let t = "";
-    try {
-      t = D.stripPlatformPrefix(document.title, [platformName]);
-      if (!t || GENERIC_TITLES.has(t.toLowerCase())) {
-        const og = document.querySelector('meta[property="og:title"]');
-        const ogVal = (og && og.getAttribute("content")) || "";
-        const ot = D.stripPlatformPrefix(ogVal, [platformName]);
-        if (ot && !GENERIC_TITLES.has(ot.toLowerCase())) t = ot;
-      }
-    } catch (e) {
-      t = "";
+  // Patrones de URL que indican que estás en la FICHA de un título (no en el home
+  // ni buscando). Evita falsos positivos con títulos destacados del catálogo. Si
+  // no hay patrón para la plataforma, no se filtra por URL.
+  const DETAILS_URL_RE = {
+    netflix: /\/title\/\d+|[?&#]jbv=\d+/i,
+    primevideo: /\/detail\//i,
+    amazon: /\/detail\//i,
+    max: /\/(show|movie|series|video|episode|feature)\//i,
+    hbomax: /\/(show|movie|series|video|episode|feature)\//i,
+    disney: /\/(movies|series|browse\/entity|play)\//i,
+    crunchyroll: /\/series\/|\/watch\//i,
+    disneyplus: /\/(movies|series|browse\/entity|play)\//i,
+  };
+
+  // Selectores del título en la FICHA por plataforma. Se lee del DOM VISIBLE (que
+  // refleja el título ACTUAL), no de og:title (que queda obsoleto en los SPA y
+  // provocaba resultados sin relación, p. ej. "PFL Europa 1"). Se lee el texto o
+  // el alt de una imagen-logo. Se añade <h1> como respaldo universal.
+  const DETAILS_TITLE_SELECTORS = {
+    netflix: [
+      '[data-uia="previewModal--player-titleTreatment-logo"]',
+      '[data-uia="title-card-title"]',
+      ".title-info-metadata-item--title",
+      ".previewModal--section-header strong",
+    ],
+    primevideo: [
+      'h1[data-automation-id="title"]',
+      '[data-automation-id="title"]',
+      ".dv-node-dp-title",
+    ],
+    amazon: [
+      'h1[data-automation-id="title"]',
+      '[data-automation-id="title"]',
+      ".dv-node-dp-title",
+    ],
+    max: [
+      '[data-testid="dragonfly-title"]',
+      '[data-testid="detail-page-title"]',
+      '[class*="TitleText"]',
+    ],
+    hbomax: ['[data-testid="dragonfly-title"]', '[class*="TitleText"]'],
+    disney: ['[data-testid="hero-title"]', ".title-field"],
+    disneyplus: ['[data-testid="hero-title"]', ".title-field"],
+    crunchyroll: ["h1.erc-series-title", "h1.title", ".hero-heading"],
+  };
+
+  function cleanTitleCandidate(t) {
+    return D.stripPlatformPrefix(t || "", [platformName]);
+  }
+  function isValidBrowseTitle(t) {
+    if (!t || t.length < 2 || t.length > 120) return false;
+    if (isBarePlatformName(t)) return false;
+    if (GENERIC_TITLES.has(t.toLowerCase())) return false;
+    return true;
+  }
+  // Texto del nodo o, si es un logo, el alt de la imagen (el propio nodo o hija).
+  function textOrAlt(node) {
+    let txt = (node.textContent || "").replace(/\s+/g, " ").trim();
+    if (!txt && node.getAttribute) txt = (node.getAttribute("alt") || "").trim();
+    if (!txt && node.querySelector) {
+      const img = node.querySelector("img[alt]");
+      if (img) txt = (img.getAttribute("alt") || "").trim();
     }
-    if (!t || t.length < 2) return "";
-    if (isBarePlatformName(t) || GENERIC_TITLES.has(t.toLowerCase())) return "";
-    return t;
+    return txt;
+  }
+
+  // Título de la FICHA que se está viendo (navegando, SIN reproducir). Criterio
+  // sólido: solo en URLs de ficha, leyendo el título del DOM visible (selectores
+  // por plataforma + <h1>), con el título de la pestaña como último recurso.
+  function detectBrowsingTitle() {
+    const urlRe = DETAILS_URL_RE[platformId];
+    if (urlRe && !urlRe.test(location.href)) return "";
+
+    const selectors = (DETAILS_TITLE_SELECTORS[platformId] || []).concat(["h1"]);
+    for (const sel of selectors) {
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(sel);
+      } catch (e) {
+        continue;
+      }
+      for (const node of nodes) {
+        const t = cleanTitleCandidate(textOrAlt(node));
+        if (isValidBrowseTitle(t)) return t;
+      }
+    }
+
+    // Último recurso: título de la pestaña (NUNCA og:title: queda obsoleto).
+    const fromTab = cleanTitleCandidate(document.title);
+    return isValidBrowseTitle(fromTab) ? fromTab : "";
   }
 
   // Muestra el indicador de acceso rápido para la FICHA actual, resolviendo el
@@ -200,57 +271,196 @@
     if (prev) prev.remove();
 
     // Esquina superior derecha, superpuesto a todo (z-index máximo).
-    const host = el("div", {
+    const host = document.createElement("div");
+    host.id = INDICATOR_HOST_ID;
+    Object.assign(host.style, {
       position: "fixed",
       top: "18px",
       right: "18px",
       zIndex: "2147483647",
       pointerEvents: "none",
     });
-    host.id = INDICATOR_HOST_ID;
+
     const shadow = host.attachShadow({ mode: "open" });
 
-    // Contenedor animado (entrada con fade + deslizamiento).
-    const wrap = el("div", {
-      position: "relative",
-      pointerEvents: "auto",
-      fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
-      opacity: "0",
-      transform: "translateY(-12px)",
-      transition: "opacity .25s ease, transform .25s cubic-bezier(.2,.8,.2,1)",
-    });
+    // CSS para el popup "Liquid Glass" Premium (Vertical y Minimalista)
+    const style = document.createElement("style");
+    style.textContent = `
+      .tsv-wrap {
+        position: relative;
+        pointer-events: auto;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        opacity: 0;
+        transform: translateY(-16px);
+        transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .tsv-wrap.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .tsv-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 170px;
+        max-width: 80vw;
+        padding: 12px;
+        background: rgba(10, 10, 15, 0.65);
+        border: 1.5px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        box-shadow: 
+          inset 0 1px 1.5px rgba(255, 255, 255, 0.22),
+          0 16px 40px -8px rgba(0, 0, 0, 0.8),
+          0 4px 12px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(32px) saturate(1.2);
+        -webkit-backdrop-filter: blur(32px) saturate(1.2);
+        color: #fff;
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s, border-color 0.25s, box-shadow 0.25s;
+      }
+      .tsv-card:hover {
+        transform: translateY(-2px) scale(1.02);
+        background-color: rgba(15, 15, 22, 0.8);
+        border-color: rgba(255, 255, 255, 0.22);
+        box-shadow: 
+          inset 0 1px 1.5px rgba(255, 255, 255, 0.28),
+          0 24px 48px -6px rgba(0, 0, 0, 0.85),
+          0 6px 16px rgba(0, 0, 0, 0.5);
+      }
+      .tsv-poster-wrapper {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 2/3;
+        overflow: hidden;
+        border-radius: 16px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .tsv-poster {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .tsv-content {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        text-align: center;
+      }
+      .tsv-title {
+        font-size: 13px;
+        font-weight: 750;
+        line-height: 1.3;
+        color: #ffffff;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+        letter-spacing: -0.01em;
+      }
+      .tsv-link-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 9.5px;
+        font-weight: 800;
+        color: #eab308;
+        background: rgba(234, 179, 8, 0.06);
+        border: 1px solid rgba(234, 179, 8, 0.16);
+        padding: 4px 12px;
+        border-radius: 100px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        transition: background-color 0.2s, border-color 0.2s;
+        margin-top: 2px;
+      }
+      .tsv-card:hover .tsv-link-pill {
+        background-color: rgba(234, 179, 8, 0.15);
+        border-color: rgba(234, 179, 8, 0.3);
+      }
+      .tsv-close-btn {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: rgba(20, 20, 25, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 13px;
+        cursor: pointer;
+        pointer-events: auto;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+      .tsv-close-btn:hover {
+        background-color: rgba(30, 30, 40, 0.95);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #fff;
+        transform: scale(1.1);
+      }
+      @media (max-width: 480px) {
+        .tsv-card {
+          width: 140px;
+          gap: 10px;
+          padding: 10px;
+          border-radius: 20px;
+        }
+        .tsv-title {
+          font-size: 12px;
+        }
+        .tsv-link-pill {
+          font-size: 8.5px;
+          padding: 3px 10px;
+        }
+      }
+    `;
+    shadow.appendChild(style);
 
-    // Tarjeta "liquid glass" (como la app): cristal oscuro translúcido con
-    // desenfoque, degradado superior, borde con brillo interior y sombra amplia.
-    const card = el("div", {
-      display: "flex",
-      alignItems: "center",
-      gap: "14px",
-      width: "320px",
-      maxWidth: "82vw",
-      padding: "12px 16px 12px 12px",
-      backgroundColor: "rgba(10,10,15,0.55)",
-      backgroundImage:
-        "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03))",
-      border: "1px solid rgba(255,255,255,0.14)",
-      borderRadius: "22px",
-      boxShadow:
-        "inset 0 1.5px 2px rgba(255,255,255,0.18), 0 24px 50px -12px rgba(0,0,0,0.85)",
-      backdropFilter: "blur(30px)",
-      WebkitBackdropFilter: "blur(30px)",
-      color: "#fff",
-      cursor: "pointer",
-      transition: "transform .15s ease",
-    });
-    card.setAttribute("role", "link");
-    card.tabIndex = 0;
-    card.title = "Ver en The Show Verse";
-    card.onmouseenter = () => {
-      card.style.transform = "scale(1.03)";
-    };
-    card.onmouseleave = () => {
-      card.style.transform = "scale(1)";
-    };
+    const wrap = document.createElement("div");
+    wrap.className = "tsv-wrap";
+
+    const posterImgHtml = posterPath 
+      ? `<div class="tsv-poster-wrapper">
+           <img class="tsv-poster" src="https://image.tmdb.org/t/p/w154${posterPath}" alt="" />
+         </div>`
+      : `<div class="tsv-poster-wrapper" style="display:flex; align-items:center; justify-content:center;">
+           <svg style="width:30px; height:30px; opacity:0.3;" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
+             <path d="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" fill="none" stroke="#FFF" stroke-width="6"/>
+             <path d="M48,42 L48,66 L69,54 Z" fill="#FFF"/>
+           </svg>
+         </div>`;
+
+    wrap.innerHTML = `
+      <div class="tsv-card" role="link" tabindex="0" title="Ver en The Show Verse">
+        ${posterImgHtml}
+        <div class="tsv-content">
+          <div class="tsv-title">${title || "Ver detalles"}</div>
+          <div class="tsv-link-pill">
+            <span>Ver detalles</span>
+            <span style="font-size: 9px; margin-left: 2px;">↗</span>
+          </div>
+        </div>
+      </div>
+      <div class="tsv-close-btn" title="Ocultar">×</div>
+    `;
+
+    const cardNode = wrap.querySelector(".tsv-card");
+    const closeNode = wrap.querySelector(".tsv-close-btn");
+
     const open = () => {
       try {
         window.open(url, "_blank", "noopener,noreferrer");
@@ -258,104 +468,33 @@
         /* noop */
       }
     };
-    card.onclick = open;
-    card.onkeydown = (e) => {
+
+    cardNode.onclick = open;
+    cardNode.onkeydown = (e) => {
       if (e.key === "Enter") open();
     };
 
-    if (posterPath) {
-      const img = el(
-        "img",
-        {
-          width: "58px",
-          height: "87px",
-          borderRadius: "12px",
-          objectFit: "cover",
-          background: "rgba(255,255,255,0.06)",
-          flex: "0 0 auto",
-          display: "block",
-          boxShadow: "0 6px 16px rgba(0,0,0,0.5)",
-        },
-        { src: `https://image.tmdb.org/t/p/w154${posterPath}`, alt: "" },
-      );
-      // Si la CSP del sitio bloquea la imagen, la ocultamos y seguimos.
-      img.onerror = () => {
-        img.style.display = "none";
-      };
-      card.appendChild(img);
-    }
-
-    const txt = el("div", {
-      minWidth: "0",
-      display: "flex",
-      flexDirection: "column",
-      gap: "5px",
-    });
-    // El logo de la app sustituye al texto "The Show Verse".
-    txt.appendChild(appLogo(26));
-    txt.appendChild(
-      el(
-        "div",
-        {
-          fontSize: "16px",
-          fontWeight: "800",
-          lineHeight: "1.2",
-          display: "-webkit-box",
-          webkitLineClamp: "2",
-          webkitBoxOrient: "vertical",
-          overflow: "hidden",
-        },
-        { textContent: title || "Ver detalles" },
-      ),
-    );
-    txt.appendChild(
-      el(
-        "div",
-        { fontSize: "12.5px", fontWeight: "600", color: "#EAB308" },
-        { textContent: "Ver detalles ↗" },
-      ),
-    );
-    card.appendChild(txt);
-
-    const close = el(
-      "div",
-      {
-        position: "absolute",
-        top: "-9px",
-        right: "-9px",
-        width: "24px",
-        height: "24px",
-        borderRadius: "50%",
-        backgroundColor: "rgba(24,24,27,0.9)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        color: "#e4e4e7",
-        fontSize: "15px",
-        lineHeight: "22px",
-        textAlign: "center",
-        cursor: "pointer",
-        pointerEvents: "auto",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-      },
-      { textContent: "×" },
-    );
-    close.title = "Ocultar";
-    close.onclick = (e) => {
+    closeNode.onclick = (e) => {
       e.stopPropagation();
       indicatorDismissedUrl = url;
       hideIndicator();
     };
 
-    wrap.appendChild(card);
-    wrap.appendChild(close);
+    const imgNode = wrap.querySelector(".tsv-poster");
+    if (imgNode) {
+      imgNode.onerror = () => {
+        const wrapNode = wrap.querySelector(".tsv-poster-wrapper");
+        if (wrapNode) wrapNode.style.display = "none";
+      };
+    }
+
     shadow.appendChild(wrap);
     (document.documentElement || document.body).appendChild(host);
     indicatorCurrentUrl = url;
 
     // Dispara la animación de entrada en el siguiente frame.
     requestAnimationFrame(() => {
-      wrap.style.opacity = "1";
-      wrap.style.transform = "translateY(0)";
+      wrap.classList.add("show");
     });
   }
 

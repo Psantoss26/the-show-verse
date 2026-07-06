@@ -141,6 +141,6 @@ GET  /v1/import/trakt/status
 
 ## Documentacion operativa
 
-- [Cobertura funcional del backend](../.docs/backend/backend_functionality_coverage.md): que cubre ya el backend propio y que falta para sustituir todas las rutas actuales.
-- [Arranque y pruebas manuales](../.docs/backend/backend_manual_testing.md): comandos para levantar backend, base de datos, Redis, frontend y validar los endpoints principales.
-- [Despliegue del backend](../.docs/backend/backend_deployment.md): variables, Railway/Render/Docker y comprobaciones antes y despues del deploy.
+- [Cobertura funcional del backend](../docs/backend/backend_functionality_coverage.md): que cubre ya el backend propio y que falta para sustituir todas las rutas actuales.
+- [Arranque y pruebas manuales](../docs/backend/backend_manual_testing.md): comandos para levantar backend, base de datos, Redis, frontend y validar los endpoints principales.
+- [Despliegue del backend](../docs/backend/backend_deployment.md): variables, Railway/Render/Docker y comprobaciones antes y despues del deploy.

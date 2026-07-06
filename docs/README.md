@@ -3,6 +3,10 @@
 Índice general de la documentación del proyecto. Todo vive bajo `docs/`
 (antes repartido entre `.docs/` y `docs/`; unificado aquí).
 
+> 🧠 **¿Usas Obsidian?** Abre este proyecto como vault y navega desde
+> [`Home.md`](Home.md) (mapa central) con su vista de grafo. Cómo abrirlo y ver la
+> "vista neuronal": [`OBSIDIAN.md`](OBSIDIAN.md).
+
 ## 🚀 Empezar
 
 - **[Arranque local (guía exacta)](./infrastructure/ARRANQUE-LOCAL.md)** — levantar el proyecto completo en tu máquina.
