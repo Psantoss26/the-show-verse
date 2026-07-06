@@ -15,6 +15,10 @@ data class PlaybackSignal(
     val episode: Int? = null,
     val seasonEpisodeText: String? = null,
     val tabTitle: String? = null,
+    // Fuentes adicionales del nombre de la SERIE (algunas apps ponen ahí la serie
+    // cuando `title` es el episodio): título de la cola y "album artist".
+    val queueTitle: String? = null,
+    val albumArtist: String? = null,
     val artworkUrl: String? = null,
     val durationSec: Long? = null,
     val positionSec: Long? = null,
@@ -37,8 +41,11 @@ data class RawMetadata(
     val title: String? = null,
     val artist: String? = null,
     val album: String? = null,
+    val albumArtist: String? = null,
     val displayTitle: String? = null,
     val displaySubtitle: String? = null,
+    val displayDescription: String? = null,
+    val queueTitle: String? = null,
     val artUri: String? = null,
     val durationMs: Long = 0,
     val positionMs: Long = 0,

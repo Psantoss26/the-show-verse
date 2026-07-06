@@ -88,6 +88,11 @@ export async function POST(request) {
       // Título de la pestaña/app (p. ej. "Stranger Things - Netflix"): fuente más
       // fiable del nombre de la SERIE cuando la plataforma no expone artist/album.
       tabTitle,
+      // Fuentes adicionales del nombre de la SERIE en Android: el título de la cola
+      // de reproducción y el "album artist" (ahí guardan algunas apps la serie
+      // cuando `title` es el episodio).
+      queueTitle,
+      albumArtist,
     } = await request.json().catch(() => ({}));
     const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
@@ -138,6 +143,8 @@ export async function POST(request) {
       showName,
       mainTitle,
       tabTitle,
+      queueTitle,
+      albumArtist,
       isSeries,
     });
     if (!queryVariants.length) {

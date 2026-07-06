@@ -58,6 +58,10 @@ object SignalBuilder {
             episode = se?.second,
             seasonEpisodeText = seText ?: subtitle,
             tabTitle = raw.displayTitle.clean() ?: title,
+            // Fuentes extra del nombre de la SERIE cuando no hay artist/album y el
+            // `title` es el episodio (el servidor las prueba como candidatas).
+            queueTitle = raw.queueTitle.clean(),
+            albumArtist = raw.albumArtist.clean(),
             artworkUrl = raw.artUri.clean(),
             durationSec = if (raw.durationMs > 0) raw.durationMs / 1000 else null,
             positionSec = if (raw.positionMs > 0) raw.positionMs / 1000 else null,

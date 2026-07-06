@@ -85,9 +85,18 @@ export function showNameFromTab(tabTitle) {
 // mainTitle; en películas al revés. En ambos casos se incluyen TODAS las fuentes
 // como respaldo, para no fallar aunque la clasificación serie/película sea errónea.
 // Además, por cada base: la parte antes de ":" y la versión sin sufijos de edición.
-export function buildQueryVariants({ showName, mainTitle, tabTitle, isSeries } = {}) {
+export function buildQueryVariants({
+  showName,
+  mainTitle,
+  tabTitle,
+  queueTitle,
+  albumArtist,
+  isSeries,
+} = {}) {
   const showFromTab = showNameFromTab(tabTitle);
-  const showSources = [showName, showFromTab];
+  // queueTitle (título de la cola de reproducción) y albumArtist son, en muchas
+  // apps de Android, donde vive el nombre de la SERIE cuando `title` es el episodio.
+  const showSources = [showName, queueTitle, albumArtist, showFromTab];
   // Los clientes solo rellenan `showName` en SERIES, así que su presencia ya
   // implica serie aunque no venga la marca isSeries.
   const seriesLike = Boolean(isSeries) || Boolean(String(showName || "").trim());
