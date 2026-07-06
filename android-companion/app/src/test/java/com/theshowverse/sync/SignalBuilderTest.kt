@@ -11,7 +11,8 @@ class SignalBuilderTest {
         assertEquals(4 to 1, SignalBuilder.parseSeasonEpisode("Temporada 4: Episodio 1"))
         assertEquals(2 to 10, SignalBuilder.parseSeasonEpisode("S2 E10"))
         assertEquals(1 to 2, SignalBuilder.parseSeasonEpisode("T1:E2"))
-        assertEquals(1 to 5, SignalBuilder.parseSeasonEpisode("Capítulo 5"))
+        // Episodio sin temporada: NO se asume 1 (queda null; el servidor decide).
+        assertEquals(null to 5, SignalBuilder.parseSeasonEpisode("Capítulo 5"))
         assertNull(SignalBuilder.parseSeasonEpisode("sin numeros"))
         assertNull(SignalBuilder.parseSeasonEpisode(""))
     }

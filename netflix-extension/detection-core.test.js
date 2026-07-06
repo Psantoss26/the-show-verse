@@ -6,7 +6,8 @@ test("parseSeasonEpisode handles multiple languages/formats", () => {
   assert.deepEqual(D.parseSeasonEpisode("Temporada 4: Episodio 1"), { season: 4, episode: 1 });
   assert.deepEqual(D.parseSeasonEpisode("S2 E10"), { season: 2, episode: 10 });
   assert.deepEqual(D.parseSeasonEpisode("T1:E2"), { season: 1, episode: 2 });
-  assert.deepEqual(D.parseSeasonEpisode("Capítulo 5"), { season: 1, episode: 5 });
+  // Episodio sin temporada: NO se asume 1 (queda null; el servidor decide).
+  assert.deepEqual(D.parseSeasonEpisode("Capítulo 5"), { season: null, episode: 5 });
   assert.deepEqual(D.parseSeasonEpisode("no numbers here"), {});
 });
 
@@ -62,4 +63,19 @@ test("findSeasonEpisodeBadge scans a doc-like object", () => {
     ],
   };
   assert.equal(D.findSeasonEpisodeBadge(fakeDoc), "T1 E4 · El trato");
+});
+
+test("findSeasonEpisodeBadge combina temporada y episodio en nodos separados", () => {
+  // Netflix a veces muestra la temporada y el episodio en elementos distintos.
+  const fakeDoc = {
+    querySelectorAll: () => [
+      { children: [], textContent: "Stranger Things" },
+      { children: [], textContent: "T4" },
+      { children: [], textContent: "Capítulo cinco: El proyecto Nina" },
+      { children: [], textContent: "E5" },
+    ],
+  };
+  const badge = D.findSeasonEpisodeBadge(fakeDoc);
+  assert.match(badge, /T4/);
+  assert.match(badge, /E5/);
 });

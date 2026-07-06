@@ -18,11 +18,13 @@ object SignalBuilder {
     )
 
     /** Devuelve (season, episode) o null si no hay episodio identificable. */
-    fun parseSeasonEpisode(text: String?): Pair<Int, Int>? {
+    fun parseSeasonEpisode(text: String?): Pair<Int?, Int>? {
         if (text.isNullOrBlank()) return null
         val e = EPISODE_RE.find(text) ?: return null
         val episode = e.groupValues[1].toIntOrNull() ?: return null
-        val season = SEASON_RE.find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        // La temporada NO se asume 1: si no aparece queda null (el servidor decide;
+        // antes se registraba T1 al ver, p. ej., la T4).
+        val season = SEASON_RE.find(text)?.groupValues?.get(1)?.toIntOrNull()
         return season to episode
     }
 
@@ -35,17 +37,27 @@ object SignalBuilder {
         val subtitle = raw.displaySubtitle.clean()
         val hasSeries = artist != null || album != null
 
-        // Temporada/episodio: probamos subtítulo, álbum, título, displayTitle.
-        var se: Pair<Int, Int>? = null
+        // Temporada/episodio: probamos subtítulo, álbum, título, displayTitle. El
+        // EPISODIO se toma del primer texto que lo tenga; la TEMPORADA se busca en
+        // CUALQUIERA de los textos (puede venir en otro campo) y nunca se asume 1.
+        val candidates = listOf(subtitle, album, title, raw.displayTitle.clean())
+        var se: Pair<Int?, Int>? = null
         var seText: String? = null
-        for (candidate in listOf(subtitle, album, title, raw.displayTitle.clean())) {
-            val parsed = parseSeasonEpisode(candidate)
-            if (parsed != null) {
-                se = parsed
-                seText = candidate
-                break
+        var seasonAny: Int? = null
+        for (candidate in candidates) {
+            if (candidate.isNullOrBlank()) continue
+            if (se == null) {
+                val parsed = parseSeasonEpisode(candidate)
+                if (parsed != null) {
+                    se = parsed
+                    seText = candidate
+                }
+            }
+            if (seasonAny == null) {
+                seasonAny = SEASON_RE.find(candidate)?.groupValues?.get(1)?.toIntOrNull()
             }
         }
+        val resolvedSeason = se?.first ?: seasonAny
 
         return PlaybackSignal(
             host = raw.packageName,
@@ -54,7 +66,7 @@ object SignalBuilder {
             showName = if (hasSeries) (artist ?: album) else null,
             episodeName = if (hasSeries) (title ?: subtitle) else null,
             movieTitle = if (hasSeries) null else title,
-            season = se?.first,
+            season = resolvedSeason,
             episode = se?.second,
             seasonEpisodeText = seText ?: subtitle,
             tabTitle = raw.displayTitle.clean() ?: title,
