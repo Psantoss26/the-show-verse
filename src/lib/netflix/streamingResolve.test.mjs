@@ -166,3 +166,17 @@ test("sin exacta, elige por popularidad (serie popular sobre película irrelevan
   assert.equal(result?.kind, "show_level");
   assert.equal(result?.entity?.id, 100);
 });
+
+test("matchEpisodeByName casa por substring (título parcial o con prefijo)", () => {
+  const eps = [
+    { season_number: 4, episode_number: 5, name: "Capítulo cinco: El proyecto Nina" },
+  ];
+  assert.deepEqual(
+    matchEpisodeByName({ episodeName: "El proyecto Nina", seasonEpisodes: eps }),
+    { season: 4, episode: 5 },
+  );
+  assert.deepEqual(
+    matchEpisodeByName({ episodeName: "Capítulo cinco: El proyecto Nina", seasonEpisodes: eps }),
+    { season: 4, episode: 5 },
+  );
+});
