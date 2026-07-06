@@ -64,6 +64,181 @@
   // el overlay está visible y se reutiliza mientras se ve el mismo vídeo.
   let lastGood = null;
 
+  // ---- Indicador de acceso rápido a la página de detalles de The Show Verse ----
+  // Widget flotante en el lateral que aparece cuando el título se resuelve, con un
+  // enlace directo a su página de detalles. Se construye por DOM+estilos JS dentro
+  // de un Shadow DOM: aislado del CSS del sitio y sin chocar con su CSP.
+  const INDICATOR_HOST_ID = "tsv-quick-access-host";
+  let indicatorEnabled = true; // se lee de storage al iniciar
+  let indicatorDismissedUrl = null; // URL ocultada por el usuario (no re-mostrar)
+  let indicatorCurrentUrl = null; // URL visible ahora (evita reconstruir en bucle)
+
+  function el(tag, styles, props) {
+    const node = document.createElement(tag);
+    if (styles) Object.assign(node.style, styles);
+    if (props) Object.assign(node, props);
+    return node;
+  }
+
+  function hideIndicator() {
+    const host = document.getElementById(INDICATOR_HOST_ID);
+    if (host) host.remove();
+    indicatorCurrentUrl = null;
+  }
+
+  function showIndicator({ url, title, posterPath }) {
+    if (!indicatorEnabled || !url) return;
+    if (url === indicatorDismissedUrl) return; // el usuario lo ocultó para este título
+    if (url === indicatorCurrentUrl && document.getElementById(INDICATOR_HOST_ID)) return;
+
+    const prev = document.getElementById(INDICATOR_HOST_ID);
+    if (prev) prev.remove();
+
+    const host = el("div", {
+      position: "fixed",
+      top: "50%",
+      right: "14px",
+      transform: "translateY(-50%)",
+      zIndex: "2147483647",
+      pointerEvents: "none",
+    });
+    host.id = INDICATOR_HOST_ID;
+    const shadow = host.attachShadow({ mode: "open" });
+
+    const wrap = el("div", {
+      position: "relative",
+      pointerEvents: "auto",
+      fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+    });
+
+    const card = el("div", {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      maxWidth: "250px",
+      padding: "8px 12px 8px 8px",
+      background: "rgba(10,10,15,0.92)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: "14px",
+      boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
+      color: "#fff",
+      cursor: "pointer",
+      transition: "transform .15s ease",
+    });
+    card.setAttribute("role", "link");
+    card.tabIndex = 0;
+    card.title = "Ver en The Show Verse";
+    card.onmouseenter = () => {
+      card.style.transform = "scale(1.03)";
+    };
+    card.onmouseleave = () => {
+      card.style.transform = "scale(1)";
+    };
+    const open = () => {
+      try {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (e) {
+        /* noop */
+      }
+    };
+    card.onclick = open;
+    card.onkeydown = (e) => {
+      if (e.key === "Enter") open();
+    };
+
+    if (posterPath) {
+      const img = el(
+        "img",
+        {
+          width: "40px",
+          height: "60px",
+          borderRadius: "8px",
+          objectFit: "cover",
+          background: "#222",
+          flex: "0 0 auto",
+          display: "block",
+        },
+        { src: `https://image.tmdb.org/t/p/w92${posterPath}`, alt: "" },
+      );
+      // Si la CSP del sitio bloquea la imagen, la ocultamos y seguimos.
+      img.onerror = () => {
+        img.style.display = "none";
+      };
+      card.appendChild(img);
+    }
+
+    const txt = el("div", { minWidth: "0", lineHeight: "1.25" });
+    txt.appendChild(
+      el(
+        "div",
+        {
+          fontSize: "10px",
+          letterSpacing: ".4px",
+          color: "#EAB308",
+          fontWeight: "800",
+          textTransform: "uppercase",
+        },
+        { textContent: "The Show Verse" },
+      ),
+    );
+    txt.appendChild(
+      el(
+        "div",
+        {
+          fontSize: "13px",
+          fontWeight: "700",
+          marginTop: "2px",
+          display: "-webkit-box",
+          webkitLineClamp: "2",
+          webkitBoxOrient: "vertical",
+          overflow: "hidden",
+        },
+        { textContent: title || "Ver detalles" },
+      ),
+    );
+    txt.appendChild(
+      el(
+        "div",
+        { fontSize: "11px", color: "#a1a1aa", marginTop: "3px" },
+        { textContent: "Ver detalles ↗" },
+      ),
+    );
+    card.appendChild(txt);
+
+    const close = el(
+      "div",
+      {
+        position: "absolute",
+        top: "-8px",
+        right: "-8px",
+        width: "20px",
+        height: "20px",
+        borderRadius: "50%",
+        background: "#18181b",
+        border: "1px solid rgba(255,255,255,0.18)",
+        color: "#d4d4d8",
+        fontSize: "13px",
+        lineHeight: "18px",
+        textAlign: "center",
+        cursor: "pointer",
+        pointerEvents: "auto",
+      },
+      { textContent: "×" },
+    );
+    close.title = "Ocultar";
+    close.onclick = (e) => {
+      e.stopPropagation();
+      indicatorDismissedUrl = url;
+      hideIndicator();
+    };
+
+    wrap.appendChild(card);
+    wrap.appendChild(close);
+    shadow.appendChild(wrap);
+    (document.documentElement || document.body).appendChild(host);
+    indicatorCurrentUrl = url;
+  }
+
   // Devuelve el <video> principal en reproducción (reproductor real grande).
   // Con all_frames evitamos miniaturas/anuncios de frames laterales exigiendo
   // un tamaño mínimo de reproductor.
@@ -258,6 +433,19 @@
             console.log(
               `[The Show Verse] Sincronizado (${platformName}): "${mainTitle}"`,
             );
+            // Acceso rápido: si el título se resolvió, mostramos el indicador con
+            // enlace directo a su página de detalles en The Show Verse.
+            const synced = response.synced;
+            if (synced && synced.tmdbId && response.origin) {
+              const url = D.buildDetailsUrl(response.origin, synced);
+              if (url) {
+                showIndicator({
+                  url,
+                  title: synced.title || mainTitle,
+                  posterPath: synced.posterPath,
+                });
+              }
+            }
           }
         },
       );
@@ -279,13 +467,23 @@
   }
 
   try {
-    chrome.storage.local.get(["streamingSyncPaused"], (result) => {
-      applyPausedState(result.streamingSyncPaused);
-    });
+    chrome.storage.local.get(
+      ["streamingSyncPaused", "indicatorEnabled"],
+      (result) => {
+        indicatorEnabled = result.indicatorEnabled !== false; // por defecto true
+        applyPausedState(result.streamingSyncPaused);
+      },
+    );
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes.streamingSyncPaused) return;
-      applyPausedState(changes.streamingSyncPaused.newValue);
+      if (areaName !== "local") return;
+      if (changes.streamingSyncPaused) {
+        applyPausedState(changes.streamingSyncPaused.newValue);
+      }
+      if (changes.indicatorEnabled) {
+        indicatorEnabled = changes.indicatorEnabled.newValue !== false;
+        if (!indicatorEnabled) hideIndicator();
+      }
     });
   } catch (e) {
     start();

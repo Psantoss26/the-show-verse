@@ -8,7 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const actionBtn = document.getElementById("action-btn");
   const pauseBtn = document.getElementById("pause-btn");
   const logsList = document.getElementById("logs-list");
+  const indicatorToggle = document.getElementById("indicator-toggle");
   let syncPaused = false;
+
+  // Interruptor del indicador de acceso rápido (por defecto activado).
+  indicatorToggle.addEventListener("change", () => {
+    chrome.storage.local.set({ indicatorEnabled: indicatorToggle.checked });
+  });
 
   function renderPauseButton(paused) {
     syncPaused = Boolean(paused);
@@ -24,10 +30,12 @@ document.addEventListener("DOMContentLoaded", () => {
     "netflixSyncToken",
     "netflixAccountEmail",
     "netflixProfileName",
-    "streamingSyncPaused"
+    "streamingSyncPaused",
+    "indicatorEnabled"
   ], (result) => {
     const origin = result.showVerseOrigin || "http://localhost:3000";
     console.log("[The Show Verse Popup] Querying auth status from:", origin);
+    indicatorToggle.checked = result.indicatorEnabled !== false; // por defecto true
 
     // Render logs
     const logs = result.logs || [];

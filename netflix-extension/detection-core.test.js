@@ -65,6 +65,30 @@ test("findSeasonEpisodeBadge scans a doc-like object", () => {
   assert.equal(D.findSeasonEpisodeBadge(fakeDoc), "T1 E4 · El trato");
 });
 
+test("buildDetailsUrl arma la URL de detalles según el tipo", () => {
+  const o = "https://theshowverse.com";
+  assert.equal(
+    D.buildDetailsUrl(o, { tmdbId: 157336, mediaType: "movie" }),
+    "https://theshowverse.com/details/movie/157336",
+  );
+  assert.equal(
+    D.buildDetailsUrl(o, { tmdbId: 66732, mediaType: "tv", season: 4, episode: 5 }),
+    "https://theshowverse.com/details/tv/66732/season/4/episode/5",
+  );
+  assert.equal(
+    D.buildDetailsUrl(o, { tmdbId: 66732, mediaType: "tv" }),
+    "https://theshowverse.com/details/tv/66732",
+  );
+  // Sin id resuelto → sin URL.
+  assert.equal(D.buildDetailsUrl(o, { mediaType: "tv" }), "");
+  assert.equal(D.buildDetailsUrl("", { tmdbId: 1, mediaType: "movie" }), "");
+  // Quita barra final del origin.
+  assert.equal(
+    D.buildDetailsUrl("https://theshowverse.com/", { tmdbId: 1, mediaType: "movie" }),
+    "https://theshowverse.com/details/movie/1",
+  );
+});
+
 test("findSeasonEpisodeBadge combina temporada y episodio en nodos separados", () => {
   // Netflix a veces muestra la temporada y el episodio en elementos distintos.
   const fakeDoc = {
