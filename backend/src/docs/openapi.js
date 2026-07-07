@@ -11,8 +11,8 @@ export const openApiDocument = {
   },
   servers: [
     {
-      url: 'https://the-show-verse-production.up.railway.app',
-      description: 'Production Railway backend',
+      url: 'http://backend:3001',
+      description: 'Backend autoalojado (NAS) — red interna del stack',
     },
     {
       url: 'http://localhost:3001',
@@ -288,7 +288,7 @@ export const openApiDocument = {
       get: {
         tags: ['System'],
         summary: 'Readiness check',
-        description: 'Checks PostgreSQL and Redis availability. Railway uses this endpoint as healthcheck.',
+        description: 'Checks PostgreSQL and Redis availability. Used as the container healthcheck.',
         responses: {
           200: { description: 'Service is ready.' },
           503: { description: 'At least one required dependency is unavailable.' },
@@ -352,7 +352,7 @@ export const openApiDocument = {
       post: {
         tags: ['Auth'],
         summary: 'Create or recover backend session from a valid TMDb session',
-        description: 'Used by the Vercel TMDb OAuth callback to bootstrap a backend JWT session and persist user data in Neon.',
+        description: 'Used by the TMDb OAuth callback to bootstrap a backend JWT session and persist user data in the self-hosted PostgreSQL.',
         requestBody: {
           required: true,
           content: {

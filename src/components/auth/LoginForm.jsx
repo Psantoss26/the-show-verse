@@ -49,10 +49,10 @@ function getGoogleErrorMessage(value) {
     return "Show Verse no encuentra la ruta de login en el backend. Revisa BACKEND_API_BASE_URL.";
   }
   if (value === "backend_cors_origin") {
-    return "El backend no permite este dominio. Añade la URL actual a FRONTEND_URLS en Railway.";
+    return "El backend no permite este dominio. Añade la URL actual a FRONTEND_URLS en el backend (deploy/nas/backend.env).";
   }
   if (value === "backend_google_config") {
-    return "Falta GOOGLE_CLIENT_ID en el backend. Añádelo en backend/.env o Railway y reinicia el backend.";
+    return "Falta GOOGLE_CLIENT_ID en el backend. Añádelo en deploy/nas/backend.env y reinicia el backend.";
   }
   if (value === "backend_missing_config") {
     return "El frontend no encuentra BACKEND_API_BASE_URL para completar el login.";
@@ -64,10 +64,10 @@ function getGoogleErrorMessage(value) {
     return "El GOOGLE_CLIENT_ID del backend no coincide con el cliente OAuth usado por el frontend.";
   }
   if (value === "google_token_rejected") {
-    return "El backend rechazó el token de Google. Revisa que Netlify y Railway usen el mismo GOOGLE_CLIENT_ID.";
+    return "El backend rechazó el token de Google. Revisa que el frontend y el backend usen el mismo GOOGLE_CLIENT_ID.";
   }
   if (value === "backend_server_error") {
-    return "El backend falló al crear la sesión. Revisa los logs de Railway para /v1/auth/google.";
+    return "El backend falló al crear la sesión. Revisa los logs del backend para /v1/auth/google.";
   }
   if (value === "google_email_not_verified") {
     return "Tu cuenta de Google no tiene el email verificado.";

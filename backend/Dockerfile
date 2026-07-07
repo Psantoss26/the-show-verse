@@ -1,8 +1,8 @@
 FROM node:20-alpine AS base
 ENV NODE_ENV=production
 
-# Railway can build this Dockerfile with either the repository root or backend/
-# as the Docker build context. Normalize both shapes into /app.
+# This Dockerfile can be built with either the repository root or backend/ as the
+# Docker build context. Normalize both shapes into /app.
 WORKDIR /workspace
 COPY . ./
 

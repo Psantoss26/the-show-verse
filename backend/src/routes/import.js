@@ -19,8 +19,8 @@ const USER_AGENT = process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (Fastify; T
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_IMPORT_PAGES = 500;
 
-// Cache en memoria del progreso de importacion por userId. Railway mantiene el
-// proceso vivo durante la importacion; si se reinicia, el estado vuelve a idle.
+// Cache en memoria del progreso de importacion por userId. El proceso del backend
+// se mantiene vivo durante la importacion; si se reinicia, el estado vuelve a idle.
 const importProgress = new Map();
 
 function progressKey(userId, provider = 'trakt') {
