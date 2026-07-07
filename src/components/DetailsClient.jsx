@@ -100,6 +100,7 @@ import LiquidButton from "@/components/LiquidButton";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
+import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getImages,
   getVideos,
@@ -1451,6 +1452,36 @@ export default function DetailsClient({
   const [posterImgError, setPosterImgError] = useState(false); // Error al cargar poster
   const [posterTransitioning, setPosterTransitioning] = useState(false); // Transicion entre posters
   const [prevPosterPath, setPrevPosterPath] = useState(null); // Poster anterior (para crossfade)
+
+  // -- Progreso de reproduccion local ("Continuar viendo") de ESTE titulo --
+  // Si hay una fila en watch_progress (mismo tmdbId y tipo), guardamos su % para
+  // pintar una barra de progreso sobre el poster. null = no esta en curso.
+  const [inProgressPct, setInProgressPct] = useState(null);
+
+  useEffect(() => {
+    if (!authenticated || !id) {
+      setInProgressPct(null);
+      return;
+    }
+    let abort = false;
+    (async () => {
+      const rows = await getLocalInProgress();
+      if (abort) return;
+      // getLocalInProgress viene ordenado por updatedAt desc: el primer match es
+      // la reproduccion mas reciente de este titulo (para series, el ultimo ep.).
+      const match = (Array.isArray(rows) ? rows : []).find(
+        (r) => Number(r.tmdbId) === Number(id) && r.mediaType === endpointType,
+      );
+      const pct =
+        match && typeof match.percent === "number"
+          ? Math.round(Math.min(1, Math.max(0, match.percent)) * 100)
+          : 0;
+      setInProgressPct(pct >= 1 && pct < 100 ? pct : null);
+    })();
+    return () => {
+      abort = true;
+    };
+  }, [authenticated, id, endpointType]);
 
   // -- Estados de carga progresiva del backdrop (misma logica que poster) --
   const [backdropResolved, setBackdropResolved] = useState(false);
@@ -9346,6 +9377,31 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                       </AnimatePresence>
                     </div>
+
+                    {/* Barra de progreso de "Continuar viendo": SIEMPRE visible
+                        (no depende del hover), integrada en el poster. % + barra
+                        verde para los titulos que se estan reproduciendo. */}
+                    {inProgressPct != null && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+                        <div className="bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-2.5 pt-9 sm:px-4 sm:pb-3">
+                          <div className="mb-1.5 flex items-end justify-between gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
+                              <Play className="h-2.5 w-2.5 fill-current" /> Viendo
+                            </span>
+                            <span className="text-lg font-black leading-none text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)] sm:text-xl">
+                              {inProgressPct}
+                              <span className="ml-0.5 text-xs font-bold text-emerald-300">%</span>
+                            </span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-white/25 backdrop-blur-sm">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.9)]"
+                              style={{ width: `${inProgressPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 </div>
