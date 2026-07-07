@@ -19,9 +19,11 @@ import {
   RotateCcw,
   LayoutList,
   LayoutGrid,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
-import { getLocalInProgress } from "@/lib/api/progressClient";
+import { getLocalInProgress, dismissLocalProgress } from "@/lib/api/progressClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
@@ -108,6 +110,9 @@ function mapRows(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter((r) => r && Number(r.tmdbId) > 0)
     .map((r) => ({
+      // id de la fila watch_progress: es la clave que necesita el borrado
+      // (DELETE /api/progress?id=…). Distinto del tmdbId.
+      progressId: r.id != null ? String(r.id) : null,
       id: Number(r.tmdbId),
       media_type: r.mediaType === "tv" ? "tv" : "movie",
       title: r.title || "",
@@ -356,7 +361,65 @@ function DropdownItem({ active, onClick, children }) {
 // ----------------------------
 // TARJETA (posición de reproducción)
 // ----------------------------
-const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "cards" }) {
+// Botón rojo de papelera que aparece en "modo borrar" (mismo gesto que el
+// Historial). Se posiciona con `className` según la vista.
+function DeleteTrigger({ onClick, className = "" }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Quitar de Continuar viendo"
+      aria-label="Quitar de Continuar viendo"
+      className={`flex items-center justify-center rounded-full bg-black/50 text-red-400 shadow-lg backdrop-blur-md border border-white/10 hover:bg-red-500/30 hover:text-red-200 transition-colors ${className}`}
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  );
+}
+
+// Overlay de confirmación "¿Quitar?" que cubre la tarjeta (igual UX que el
+// borrado del Historial). `rounded` iguala el radio de la tarjeta de cada vista.
+function DeleteConfirm({ busy, onCancel, onConfirm, rounded = "rounded-2xl" }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`absolute inset-0 z-40 flex items-center justify-center gap-2 px-3 bg-black/95 ${rounded}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      <span className="text-red-200 text-[10px] sm:text-xs font-bold tracking-wide">
+        ¿Quitar?
+      </span>
+      <button
+        onClick={onCancel}
+        className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+        aria-label="Cancelar"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      <button
+        onClick={onConfirm}
+        className="p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+        aria-label="Quitar"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+      </button>
+    </motion.div>
+  );
+}
+
+const ProgressCard = memo(function ProgressCard({
+  item,
+  index = 0,
+  viewMode = "cards",
+  editMode = false,
+  busy = false,
+  onRemove,
+}) {
   const title = item.title || "Sin título";
   const href = detailsHref(item);
   const pct = clampPct(item.pct);
@@ -366,11 +429,33 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
   const lastWatched = formatLastWatched(item.lastWatchedAt);
   const animDelay = Math.min(index * 0.05, 0.4);
 
+  // Estado de confirmación por tarjeta. Al salir del modo borrar se resetea.
+  const [confirmDel, setConfirmDel] = useState(false);
+  useEffect(() => {
+    if (!editMode) setConfirmDel(false);
+  }, [editMode]);
+  const canDelete = editMode && Boolean(item.progressId);
+  const handleTrash = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDel(true);
+  };
+  const handleCancel = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDel(false);
+  };
+  const handleConfirm = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove?.(item.progressId);
+  };
+
   if (viewMode === "compact") {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
-          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
+          <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
             </div>
@@ -408,6 +493,22 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
                 <Clock className="w-3 h-3" /> {lastWatched}
               </div>
             </div>
+            {canDelete && (
+              <DeleteTrigger
+                onClick={handleTrash}
+                className="absolute top-1/2 right-2 sm:right-3 -translate-y-1/2 z-30 h-9 w-9"
+              />
+            )}
+            <AnimatePresence>
+              {confirmDel && (
+                <DeleteConfirm
+                  busy={busy}
+                  onCancel={handleCancel}
+                  onConfirm={handleConfirm}
+                  rounded="rounded-xl"
+                />
+              )}
+            </AnimatePresence>
           </div>
         </Link>
       </motion.div>
@@ -449,6 +550,22 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
                 </div>
               </div>
             </div>
+            {canDelete && (
+              <DeleteTrigger
+                onClick={handleTrash}
+                className="absolute top-2 right-2 z-30 h-9 w-9"
+              />
+            )}
+            <AnimatePresence>
+              {confirmDel && (
+                <DeleteConfirm
+                  busy={busy}
+                  onCancel={handleCancel}
+                  onConfirm={handleConfirm}
+                  rounded="rounded-xl"
+                />
+              )}
+            </AnimatePresence>
           </div>
         </Link>
       </motion.div>
@@ -472,9 +589,13 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
             <SmartImage item={item} kind="backdrop" alt={title} imgClassName="transition-transform duration-500 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
             <div className="absolute top-3 right-3">
-              <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                <CircularProgress pct={pct} colors={colors} size={40} />
-              </div>
+              {canDelete ? (
+                <DeleteTrigger onClick={handleTrash} className="h-10 w-10" />
+              ) : (
+                <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
+                  <CircularProgress pct={pct} colors={colors} size={40} />
+                </div>
+              )}
             </div>
             {code && (
               <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
@@ -516,6 +637,16 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
               </span>
             </div>
           </div>
+          <AnimatePresence>
+            {confirmDel && (
+              <DeleteConfirm
+                busy={busy}
+                onCancel={handleCancel}
+                onConfirm={handleConfirm}
+                rounded="rounded-2xl"
+              />
+            )}
+          </AnimatePresence>
         </div>
       </Link>
     </motion.div>
@@ -525,7 +656,7 @@ const ProgressCard = memo(function ProgressCard({ item, index = 0, viewMode = "c
 // ----------------------------
 // CACHÉ LOCAL (pintado instantáneo)
 // ----------------------------
-const CACHE_KEY = "showverse:continue-watching:page:v1";
+const CACHE_KEY = "showverse:continue-watching:page:v2";
 function readCache() {
   if (typeof window === "undefined") return null;
   try {
@@ -563,6 +694,8 @@ export default function ContinueWatchingClient() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState("cards");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
   useEffect(() => {
     document.title = formatPageTitle("Continuar viendo");
@@ -588,6 +721,25 @@ export default function ContinueWatchingClient() {
     setItems(mapped);
     writeCache(mapped);
     setLoading(false);
+  }, []);
+
+  // Quita una entrada de "Continuar viendo": borra en el backend
+  // (DELETE /api/progress?id=) y, si va bien, la elimina del estado y la caché.
+  // Mismo gesto/UX que el borrado del Historial.
+  const handleRemove = useCallback(async (progressId) => {
+    if (!progressId) return;
+    setBusyId(progressId);
+    const ok = await dismissLocalProgress(progressId);
+    if (ok) {
+      setItems((cur) => {
+        const next = (Array.isArray(cur) ? cur : []).filter(
+          (x) => x.progressId !== progressId,
+        );
+        writeCache(next);
+        return next;
+      });
+    }
+    setBusyId(null);
   }, []);
 
   useEffect(() => {
@@ -737,6 +889,20 @@ export default function ContinueWatchingClient() {
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditMode((v) => !v)}
+              title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
+              aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
+              aria-pressed={editMode}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                editMode
+                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
+              }`}
+            >
+              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
             </button>
           </div>
 
@@ -1003,6 +1169,22 @@ export default function ContinueWatchingClient() {
                 <LayoutList className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Modo borrar (mismo gesto que el Historial): revela una papelera en
+                cada tarjeta con confirmación antes de quitarla. */}
+            <button
+              onClick={() => setEditMode((v) => !v)}
+              title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
+              aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
+              aria-pressed={editMode}
+              className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                editMode
+                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
+              }`}
+            >
+              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+            </button>
           </div>
         </motion.div>
 
@@ -1029,15 +1211,15 @@ export default function ContinueWatchingClient() {
           <AnimatePresence mode="popLayout">
             {viewMode === "cards" ? (
               <motion.div key="cards" layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {filtered.map((item, i) => <ProgressCard key={`${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="cards" />)}
+                {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="cards" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
               </motion.div>
             ) : viewMode === "poster" ? (
               <motion.div key="poster" layout className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
-                {filtered.map((item, i) => <ProgressCard key={`${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="poster" />)}
+                {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="poster" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
               </motion.div>
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {filtered.map((item, i) => <ProgressCard key={`${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="compact" />)}
+                {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="compact" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
               </div>
             )}
           </AnimatePresence>
