@@ -1928,8 +1928,9 @@ export default function InProgressClient({
         </motion.header>
 
         {/* Navegación entre secciones hermanas: En progreso · Completadas ·
-            Continuar viendo (resalta la ruta activa). */}
-        <div className="mb-6">
+            Continuar viendo. En escritorio va DENTRO de la barra de herramientas
+            (misma línea); en móvil, fila propia sobre los filtros. */}
+        <div className="mb-6 lg:hidden">
           <WatchingSectionNav />
         </div>
 
@@ -2077,6 +2078,7 @@ export default function InProgressClient({
 
           {/* Desktop: Single row */}
           <div className="hidden lg:flex gap-3 relative z-10">
+            <WatchingSectionNav className="shrink-0" />
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
