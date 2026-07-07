@@ -36,6 +36,7 @@ import {
 } from "@/lib/api/traktClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
+import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
 
@@ -1152,6 +1153,10 @@ function SkeletonCard({ viewMode = "cards" }) {
 // ----------------------------
 export default function InProgressClient({
   initialAuth = { loading: true, connected: false },
+  // Sección activa según la RUTA: /in-progress → "inprogress", /completed →
+  // "completed". Antes era un tab interno; ahora cada sección es su propia ruta
+  // y la navegación entre ellas la hace <WatchingSectionNav />.
+  mode = "inprogress",
 }) {
   const { session, account, hydrated } = useAuth();
   const initialAuthLoading = !!initialAuth?.loading;
@@ -1163,8 +1168,8 @@ export default function InProgressClient({
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
-  // Tab: "inprogress" | "completed"
-  const [activeTab, setActiveTab] = useState("inprogress");
+  // Sección activa fijada por la ruta (ver prop `mode`): "inprogress" | "completed".
+  const activeTab = mode === "completed" ? "completed" : "inprogress";
   const [completedItems, setCompletedItems] = useState([]);
   const [completedStats, setCompletedStats] = useState(null);
   const [completedLoading, setCompletedLoading] = useState(false);
@@ -1724,12 +1729,18 @@ export default function InProgressClient({
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              En Progreso<span className="text-emerald-500">.</span>
+              {activeTab === "completed" ? "Completadas" : "En Progreso"}<span className="text-emerald-500">.</span>
             </h1>
             <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Series que estás viendo actualmente con su progreso.
+              {activeTab === "completed"
+                ? "Series que ya has terminado de ver."
+                : "Series que estás viendo actualmente con su progreso."}
             </p>
           </motion.header>
+
+          <div className="mb-8">
+            <WatchingSectionNav />
+          </div>
 
           <div className="flex items-center justify-center py-12 lg:py-24">
             <motion.div
@@ -1754,7 +1765,7 @@ export default function InProgressClient({
                 type="button"
                 onClick={() =>
                   window.location.assign(
-                    "/login?next=/in-progress",
+                    `/login?next=${activeTab === "completed" ? "/completed" : "/in-progress"}`,
                   )
                 }
                 className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
@@ -1916,6 +1927,12 @@ export default function InProgressClient({
           </div>
         </motion.header>
 
+        {/* Navegación entre secciones hermanas: En progreso · Completadas ·
+            Continuar viendo (resalta la ruta activa). */}
+        <div className="mb-6">
+          <WatchingSectionNav />
+        </div>
+
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
           className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
@@ -1966,7 +1983,7 @@ export default function InProgressClient({
                 className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Fila 1: Ordenar + tabs Viendo/Completadas (solo icono) */}
+                  {/* Fila 1: Ordenar */}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 min-w-0">
                       <InlineDropdown
@@ -1991,33 +2008,6 @@ export default function InProgressClient({
                           </>
                         )}
                       </InlineDropdown>
-                    </div>
-                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <button
-                        onClick={() => setActiveTab("inprogress")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          activeTab === "inprogress"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Play
-                          className="w-4 h-4"
-                          fill={
-                            activeTab === "inprogress" ? "currentColor" : "none"
-                          }
-                        />
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("completed")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          activeTab === "completed"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
 
@@ -2087,43 +2077,6 @@ export default function InProgressClient({
 
           {/* Desktop: Single row */}
           <div className="hidden lg:flex gap-3 relative z-10">
-            {/* Section tabs */}
-            <div className="flex gap-1 rounded-xl p-1 shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-              <button
-                onClick={() => setActiveTab("inprogress")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === "inprogress"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <Play
-                  className="w-3.5 h-3.5"
-                  fill={activeTab === "inprogress" ? "currentColor" : "none"}
-                />
-                Viendo
-                {dataLoaded && (
-                  <span className="text-xs opacity-70">({items.length})</span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("completed")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === "completed"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Completadas
-                {completedLoaded && (
-                  <span className="text-xs opacity-70">
-                    ({completedItems.length})
-                  </span>
-                )}
-              </button>
-            </div>
-
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
