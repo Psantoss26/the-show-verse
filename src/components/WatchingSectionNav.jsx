@@ -6,8 +6,10 @@
 // resalta la activa según la URL. Mismo estilo de "pastilla" que los antiguos
 // tabs internos, para que la navegación se sienta igual en las tres páginas.
 //
-// Compacto: SOLO la ruta activa muestra su etiqueta (icono + texto); las otras
-// dos quedan como icono suelto (estilo de la vista móvil), en cualquier tamaño.
+// Compacto: en escritorio SOLO la ruta activa muestra su etiqueta (icono + texto)
+// y las otras dos quedan como icono suelto. En móvil las tres son solo icono
+// (incluida la activa), como el diseño anterior, para que quepan en la misma fila
+// que el selector de "Ordenar".
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -48,7 +50,7 @@ export default function WatchingSectionNav({ className = "" }) {
               className="h-4 w-4 shrink-0"
               fill={active && fillWhenActive ? "currentColor" : "none"}
             />
-            {active && <span>{label}</span>}
+            {active && <span className="hidden lg:inline">{label}</span>}
           </Link>
         );
       })}

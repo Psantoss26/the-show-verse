@@ -850,13 +850,6 @@ export default function ContinueWatchingClient() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} />
 
-        {/* Navegación entre secciones hermanas: En progreso · Completadas ·
-            Continuar viendo. En escritorio va DENTRO de la barra de herramientas
-            (misma línea); en móvil, fila propia sobre los filtros. */}
-        <div className="mb-6 lg:hidden">
-          <WatchingSectionNav />
-        </div>
-
         {/* Filtros */}
         <motion.div
           className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
@@ -920,7 +913,8 @@ export default function ContinueWatchingClient() {
                 className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Fila 1: Ordenar */}
+                  {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
+                      altura que Ordenar) — diseño móvil de siempre. */}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 min-w-0">
                       <InlineDropdown
@@ -946,6 +940,7 @@ export default function ContinueWatchingClient() {
                         )}
                       </InlineDropdown>
                     </div>
+                    <WatchingSectionNav className="h-11 shrink-0" />
                   </div>
 
                   {/* Fila 2: Tipo + botones de vista */}

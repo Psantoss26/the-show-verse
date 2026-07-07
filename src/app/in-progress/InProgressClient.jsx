@@ -1927,13 +1927,6 @@ export default function InProgressClient({
           </div>
         </motion.header>
 
-        {/* Navegación entre secciones hermanas: En progreso · Completadas ·
-            Continuar viendo. En escritorio va DENTRO de la barra de herramientas
-            (misma línea); en móvil, fila propia sobre los filtros. */}
-        <div className="mb-6 lg:hidden">
-          <WatchingSectionNav />
-        </div>
-
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
           className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
@@ -1984,7 +1977,8 @@ export default function InProgressClient({
                 className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Fila 1: Ordenar */}
+                  {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
+                      altura que Ordenar) — diseño móvil de siempre. */}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 min-w-0">
                       <InlineDropdown
@@ -2010,6 +2004,7 @@ export default function InProgressClient({
                         )}
                       </InlineDropdown>
                     </div>
+                    <WatchingSectionNav className="h-11 shrink-0" />
                   </div>
 
                   {/* Fila 2: Agrupar + botones de vista */}
