@@ -527,10 +527,14 @@ const ProgressCard = memo(function ProgressCard({
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                 <div />
-                <div className="flex items-center gap-1">
-                  <span className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}>{pct}</span>
-                  <span className={`text-sm font-bold ${colors.text} opacity-80`}>%</span>
-                </div>
+                {/* En modo borrar, el hueco superior derecho lo ocupa la papelera:
+                    ocultamos el porcentaje para que no se solapen. */}
+                {!canDelete && (
+                  <div className="flex items-center gap-1">
+                    <span className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}>{pct}</span>
+                    <span className={`text-sm font-bold ${colors.text} opacity-80`}>%</span>
+                  </div>
+                )}
               </div>
               <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">{title}</h3>
