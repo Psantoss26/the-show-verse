@@ -5,6 +5,9 @@
 // (/continue-watching). Son rutas hermanas; este control navega entre ellas y
 // resalta la activa según la URL. Mismo estilo de "pastilla" que los antiguos
 // tabs internos, para que la navegación se sienta igual en las tres páginas.
+//
+// Compacto: SOLO la ruta activa muestra su etiqueta (icono + texto); las otras
+// dos quedan como icono suelto (estilo de la vista móvil), en cualquier tamaño.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,7 +34,11 @@ export default function WatchingSectionNav({ className = "" }) {
             href={href}
             prefetch={false}
             aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
+            aria-label={label}
+            title={label}
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg py-2 text-sm font-bold transition-all ${
+              active ? "px-2.5 lg:px-3.5" : "px-2.5"
+            } ${
               active
                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -41,7 +48,7 @@ export default function WatchingSectionNav({ className = "" }) {
               className="h-4 w-4 shrink-0"
               fill={active && fillWhenActive ? "currentColor" : "none"}
             />
-            <span className="hidden sm:inline">{label}</span>
+            {active && <span>{label}</span>}
           </Link>
         );
       })}
