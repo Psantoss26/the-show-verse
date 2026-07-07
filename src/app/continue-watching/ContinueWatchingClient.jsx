@@ -687,7 +687,6 @@ const VIEW_MODES = new Set(["cards", "poster", "compact"]);
 export default function ContinueWatchingClient() {
   const { authenticated, hydrated } = useAuth();
   const [items, setItems] = useState(null); // null = cargando
-  const [activeTab, setActiveTab] = useState("inprogress");
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [sortBy, setSortBy] = useState("recent");
@@ -755,20 +754,10 @@ export default function ContinueWatchingClient() {
 
   const dataLoaded = Array.isArray(items);
 
-  const inProgressCount = useMemo(() => {
-    return dataLoaded ? items.filter((x) => x.pct < 100).length : 0;
-  }, [items, dataLoaded]);
-
-  const completedCount = useMemo(() => {
-    return dataLoaded ? items.filter((x) => x.pct === 100).length : 0;
-  }, [items, dataLoaded]);
-
-  const currentItems = useMemo(() => {
-    const list = dataLoaded ? items : [];
-    return activeTab === "completed"
-      ? list.filter((x) => x.pct === 100)
-      : list.filter((x) => x.pct < 100);
-  }, [items, dataLoaded, activeTab]);
+  // Todo lo que hay aquí está "en curso": el backend elimina la fila de
+  // watch_progress al llegar al 90% (pasa al historial). No hay estado
+  // "completado", así que no hay selector de pestañas.
+  const currentItems = useMemo(() => (dataLoaded ? items : []), [items, dataLoaded]);
 
   const filtered = useMemo(() => {
     let list = Array.isArray(currentItems) ? [...currentItems] : [];
@@ -825,7 +814,7 @@ export default function ContinueWatchingClient() {
       <div className="min-h-screen bg-black text-zinc-100 font-sans">
         <Blobs />
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <Header stats={stats} loading activeTab={activeTab} />
+          <Header stats={stats} loading />
           <div className="flex items-center justify-center py-16 lg:py-24">
             <div className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-2xl backdrop-blur-3xl">
               <img src="/logo-TSV-sinFondo.png" alt="The Show Verse" className="h-20 w-auto object-contain mb-4 scale-[1.4]" />
@@ -851,7 +840,7 @@ export default function ContinueWatchingClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans">
       <Blobs />
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} activeTab={activeTab} />
+        <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} />
 
         {/* Filtros */}
         <motion.div
@@ -916,7 +905,7 @@ export default function ContinueWatchingClient() {
                 className="relative z-10 lg:hidden overflow-visible"
               >
                 <div className="space-y-3 pt-1">
-                  {/* Fila 1: Ordenar + tabs Viendo/Completadas (solo icono) */}
+                  {/* Fila 1: Ordenar */}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 min-w-0">
                       <InlineDropdown
@@ -941,33 +930,6 @@ export default function ContinueWatchingClient() {
                           </>
                         )}
                       </InlineDropdown>
-                    </div>
-                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <button
-                        onClick={() => setActiveTab("inprogress")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          activeTab === "inprogress"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Play
-                          className="w-4 h-4"
-                          fill={
-                            activeTab === "inprogress" ? "currentColor" : "none"
-                          }
-                        />
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("completed")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          activeTab === "completed"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
 
@@ -1037,41 +999,6 @@ export default function ContinueWatchingClient() {
 
           {/* Escritorio: Fila única */}
           <div className="hidden lg:flex gap-3 relative z-10">
-            {/* Pestañas de sección */}
-            <div className="flex gap-1 rounded-xl p-1 shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-              <button
-                onClick={() => setActiveTab("inprogress")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === "inprogress"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <Play
-                  className="w-3.5 h-3.5"
-                  fill={activeTab === "inprogress" ? "currentColor" : "none"}
-                />
-                Viendo
-                {dataLoaded && (
-                  <span className="text-xs opacity-70">({inProgressCount})</span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("completed")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === "completed"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Completadas
-                {dataLoaded && (
-                  <span className="text-xs opacity-70">({completedCount})</span>
-                )}
-              </button>
-            </div>
-
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
@@ -1192,17 +1119,13 @@ export default function ContinueWatchingClient() {
         {!loading && filtered.length === 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-              {activeTab === "completed" ? (
-                <CheckCircle2 className="w-8 h-8 text-zinc-600" />
-              ) : (
-                <Play className="w-8 h-8 text-zinc-600" fill="currentColor" />
-              )}
+              <Play className="w-8 h-8 text-zinc-600" fill="currentColor" />
             </div>
             <h3 className="text-lg font-bold text-zinc-400 mb-2">
-              {q ? "Sin resultados" : activeTab === "completed" ? "No tienes completadas" : "No tienes nada a medias"}
+              {q ? "Sin resultados" : "No tienes nada a medias"}
             </h3>
             <p className="text-sm text-zinc-600 max-w-sm">
-              {q ? `No se encontraron títulos que coincidan con "${q}"` : activeTab === "completed" ? "Completa una película o episodio para verlo aquí." : "Reproduce algo en una plataforma de streaming (con la extensión o la app) y aparecerá aquí con su porcentaje."}
+              {q ? `No se encontraron títulos que coincidan con "${q}"` : "Reproduce algo en una plataforma de streaming (con la extensión o la app) y aparecerá aquí con su porcentaje."}
             </p>
           </motion.div>
         )}
@@ -1240,7 +1163,7 @@ function Blobs() {
   );
 }
 
-function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
+function Header({ stats, loading, onRefresh, refreshing }) {
   return (
     <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
       <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
@@ -1251,7 +1174,7 @@ function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
           </div>
           <div className="flex items-center gap-6">
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              {activeTab === "completed" ? "Completadas" : "Continuar viendo"}<span className="text-emerald-500">.</span>
+              Continuar viendo<span className="text-emerald-500">.</span>
             </h1>
             {onRefresh && (
               <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
@@ -1262,7 +1185,7 @@ function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
             )}
           </div>
           <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-            {activeTab === "completed" ? "Películas y series que ya has terminado de ver." : "Películas y episodios a medias, con el porcentaje que llevas reproducido."}
+            Películas y episodios a medias, con el porcentaje que llevas reproducido.
           </p>
         </div>
         <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
