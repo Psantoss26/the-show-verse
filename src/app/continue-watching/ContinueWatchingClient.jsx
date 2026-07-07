@@ -281,7 +281,7 @@ function CircularProgress({ pct, colors, size = 40 }) {
 // ----------------------------
 function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading = false }) {
   return (
-    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+    <div className="relative overflow-hidden w-full lg:w-[132px] h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
       <div className={`relative z-10 mb-1 ${colorClass}`}>
         <Icon className="w-6 h-6 md:w-7 md:h-7" />
       </div>
