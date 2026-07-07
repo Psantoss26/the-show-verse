@@ -106,8 +106,21 @@
       id: "crunchyroll",
       match: /(^|\.)crunchyroll\.com$/,
       contentId: (url) => (url.match(/\/watch\/([A-Za-z0-9]+)/) || [])[1] || null,
-      subSel: ['h4[class*="title"]', '[class*="episode-title"]'],
-      titleSel: ['h1[class*="title"]', '[class*="show-title"]'],
+      subSel: [
+        '[class*="current-media-info"] h4',
+        'h4[class*="title"]',
+        '[class*="episode-title"]',
+      ],
+      // El nombre de la SERIE: lo más fiable es el enlace a /series/. Se prueban
+      // varios candidatos por si cambia el DOM (el primero que encaje gana).
+      titleSel: [
+        'a[href*="/series/"]',
+        '[class*="show-title-link"]',
+        '[class*="current-media-info"] a[class*="title"]',
+        'h1[class*="title"]',
+        '[class*="show-title"]',
+        '[class*="series-title"]',
+      ],
     },
   ];
 
@@ -180,6 +193,31 @@
         else {
           const subTxt = firstText(doc, r.subSel);
           if (subTxt) out.episodeName = subTxt;
+        }
+      }
+    } catch (e) {
+      /* ignoramos */
+    }
+
+    // Serie SIN nombre de serie pero con evidencia de episodio: caso típico de
+    // Crunchyroll/anime, donde la Media Session da el EPISODIO como título (y no
+    // expone la serie en artist/album). Promovemos el título del reproductor
+    // (r.titleSel = nombre de la SERIE, p. ej. el enlace a /series/) a showName y
+    // pasamos el título de la Media Session a episodeName. Solo actúa si HAY un
+    // título de serie en el DOM y difiere del que teníamos, así no regresiona las
+    // plataformas que ya rellenan showName (Netflix/Prime/…) ni las películas.
+    try {
+      const seriesEvidence =
+        out.season != null || out.episode != null || Boolean(out.episodeName);
+      if (seriesEvidence && !out.showName && out.movieTitle) {
+        const domShow = firstText(doc, r.titleSel);
+        if (
+          domShow &&
+          clean(domShow).toLowerCase() !== clean(out.movieTitle).toLowerCase()
+        ) {
+          out.episodeName = out.episodeName || out.movieTitle;
+          out.showName = domShow;
+          out.movieTitle = undefined;
         }
       }
     } catch (e) {

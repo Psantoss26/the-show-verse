@@ -115,6 +115,36 @@ test("cleanSearchTitle quita descriptores de temporada/episodio y año final", (
   assert.equal(cleanSearchTitle("Blade Runner 2049"), "Blade Runner 2049");
 });
 
+test("cleanSearchTitle limpia la basura de Crunchyroll (caso real del 404)", () => {
+  // Caso reportado: episodio de anime en Crunchyroll.
+  assert.equal(
+    cleanSearchTitle("Temporada 1 Libre y sin ataduras - Ver en Crunchyroll en castellano"),
+    "Libre y sin ataduras",
+  );
+  assert.equal(
+    cleanSearchTitle("One Piece - Ver en Crunchyroll en castellano"),
+    "One Piece",
+  );
+  assert.equal(cleanSearchTitle("Attack on Titan en castellano"), "Attack on Titan");
+  assert.equal(cleanSearchTitle("Naruto (Sub)"), "Naruto");
+  assert.equal(cleanSearchTitle("Watch One Piece on Crunchyroll"), "Watch One Piece");
+});
+
+test("cleanSearchTitle quita prefijos de temporada/episodio al principio", () => {
+  assert.equal(cleanSearchTitle("Temporada 1 The Bear"), "The Bear");
+  assert.equal(cleanSearchTitle("Episodio 5: Fishes"), "Fishes");
+  assert.equal(cleanSearchTitle("Temporada 2 Episodio 5 - The Bear"), "The Bear");
+  // No debe tocar una serie cuyo nombre EMPIEZA por una palabra parecida sin número.
+  assert.equal(cleanSearchTitle("Temporada de caza"), "Temporada de caza");
+});
+
+test("cleanSearchTitle NO regresiona los casos previos", () => {
+  assert.equal(cleanSearchTitle("The Bear - Temporada 2"), "The Bear");
+  assert.equal(cleanSearchTitle("Dune (2021)"), "Dune");
+  assert.equal(cleanSearchTitle("Blade Runner 2049"), "Blade Runner 2049");
+  assert.equal(cleanSearchTitle("Crunchyroll: One Piece"), "One Piece");
+});
+
 test("stripEditionSuffix elimina ediciones/formatos/paréntesis finales", () => {
   assert.equal(stripEditionSuffix("Avatar (2009)"), "Avatar");
   assert.equal(stripEditionSuffix("Blade Runner [4K]"), "Blade Runner");
