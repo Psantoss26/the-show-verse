@@ -26,6 +26,7 @@ import {
 import { getLocalInProgress, dismissLocalProgress } from "@/lib/api/progressClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
+import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
 
 // ----------------------------
@@ -815,6 +816,9 @@ export default function ContinueWatchingClient() {
         <Blobs />
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <Header stats={stats} loading />
+          <div className="mb-8">
+            <WatchingSectionNav />
+          </div>
           <div className="flex items-center justify-center py-16 lg:py-24">
             <div className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-2xl backdrop-blur-3xl">
               <img src="/logo-TSV-sinFondo.png" alt="The Show Verse" className="h-20 w-auto object-contain mb-4 scale-[1.4]" />
@@ -841,6 +845,12 @@ export default function ContinueWatchingClient() {
       <Blobs />
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} />
+
+        {/* Navegación entre secciones hermanas: En progreso · Completadas ·
+            Continuar viendo (resalta la ruta activa). */}
+        <div className="mb-6">
+          <WatchingSectionNav />
+        </div>
 
         {/* Filtros */}
         <motion.div
