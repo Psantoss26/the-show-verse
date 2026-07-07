@@ -362,7 +362,7 @@ function ExpandableSectionTitle({ title, href, className = "" }) {
   return (
     <Link
       href={href}
-      className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 ${className}`}
+      className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 ${className}`}
       aria-label={`Ver todos los títulos de ${title}`}
     >
       {content}
