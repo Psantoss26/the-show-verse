@@ -1574,8 +1574,12 @@ function ContinueWatchingPreviewCard({
           })()}
         </div>
 
-        {/* Géneros (en español, de los detalles es-ES) + notas TMDb/IMDb */}
-        <div className="mt-1.5 flex flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
+        {/* Géneros (en español, de los detalles es-ES) + notas TMDb/IMDb.
+            Hueco reservado (min-height) igual que la fila de premios: los géneros
+            y las notas llegan con `extras` (tarde), así que sin reservar altura la
+            fila crecía de 0 a una línea y, al estar la tarjeta centrada, daba el
+            saltito. Con el hueco, el tamaño del hover ya es el final desde el inicio. */}
+        <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
           {(extras?.genresEs || genres) && (
             <span className="truncate">{extras?.genresEs || genres}</span>
           )}
