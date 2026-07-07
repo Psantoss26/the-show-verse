@@ -1889,7 +1889,7 @@ function ContinueWatchingSection({
           `pointer-events-auto` lo hace clicable aunque la cabecera no lo sea. */}
       <Link
         href={isCalendar ? "/calendar" : "/continue-watching"}
-        className="group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition hover:from-amber-100 hover:via-white hover:to-amber-200 sm:text-2xl md:text-3xl"
+        className="group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 sm:text-2xl md:text-3xl"
         aria-label={isCalendar ? "Ver el calendario completo" : "Ver todo lo que tienes a medias"}
       >
         <span>{isCalendar ? "Calendario" : "Continuar viendo"}</span>
