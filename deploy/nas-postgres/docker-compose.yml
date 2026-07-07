@@ -1,5 +1,5 @@
 # Postgres para The Show Verse en el NAS (UGREEN DXP 4800 Plus / UGOS + Docker).
-# Base de datos de DESARROLLO (y stack local si Neon no está disponible).
+# Base de datos de DESARROLLO / stack local autoalojado.
 # NO expongas el puerto 5432 a Internet: úsalo solo en la red local.
 services:
   postgres:

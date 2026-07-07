@@ -3,11 +3,12 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema.js';
 
-// Neon provee dos URLs:
-// DATABASE_URL       → Pooled (PgBouncer) — para queries normales, más eficiente
-// DATABASE_URL_UNPOOLED → Conexión directa — obligatoria para migraciones
+// Dos URLs de conexión al PostgreSQL propio (NAS):
+// DATABASE_URL          → normal (a través de un pooler/PgBouncer si lo hubiera)
+// DATABASE_URL_UNPOOLED → conexión directa — obligatoria para migraciones
 //
-// En local (dev), ambas variables pueden apuntar a la misma BD.
+// Autoalojado: ambas apuntan al mismo Postgres (postgres:5432). Solo difieren si
+// se pone un pooler delante.
 
 const pooledUrl = process.env.DATABASE_URL;
 const directUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
@@ -33,13 +34,14 @@ function sslConfig(connectionUrl) {
   return shouldUseSsl(connectionUrl) ? { rejectUnauthorized: false } : false;
 }
 
-// ─── Queries normales (usa el pool de Neon/PgBouncer) ───────────────────────
+// ─── Queries normales ────────────────────────────────────────────────────────
 const queryClient = postgres(pooledUrl, {
-  max: 10,             // Neon free tier: máx 10 conexiones simultáneas
+  max: 10,             // tope de conexiones simultáneas del pool de la app
   idle_timeout: 30,
   connect_timeout: 10,
   ssl: sslConfig(pooledUrl),
-  // Neon requiere esto con PgBouncer para evitar prepared statement conflicts:
+  // prepare:false evita conflictos de prepared statements si hay un PgBouncer
+  // (transaction pooling) delante; inofensivo con conexión directa.
   prepare: false,
 });
 

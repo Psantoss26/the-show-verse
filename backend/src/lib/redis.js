@@ -1,6 +1,6 @@
 // src/lib/redis.js
 // Cliente Redis compartido para caché y rate limiting
-// Compatible con Redis local, Railway Redis y Upstash (rediss://)
+// Compatible con Redis local (redis://) y remoto con TLS (rediss://).
 
 import Redis from 'ioredis';
 
@@ -12,7 +12,7 @@ export function getRedis() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) return null;
 
-  // Upstash usa rediss:// (con TLS). ioredis lo detecta automáticamente.
+  // Una URL rediss:// (TLS) la detecta ioredis automáticamente. Autoalojado: redis://.
   redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {

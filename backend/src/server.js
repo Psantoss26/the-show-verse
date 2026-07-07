@@ -279,10 +279,10 @@ if (Number.isFinite(POOL_WARM_INTERVAL_MS) && POOL_WARM_INTERVAL_MS > 0) {
 
 // ────────────────────────────────────────────
 // Keepalive de BD/Redis
-// Evita el arranque en frío "primera vez del día": los proveedores serverless
-// (Neon Postgres, Upstash Redis) suspenden la conexión tras unos minutos de
-// inactividad y la primera consulta tarda varios segundos en despertarlos.
-// Mientras el proceso esté vivo, un ping ligero periódico los mantiene calientes.
+// Un ping ligero periódico mantiene vivas las conexiones a Postgres/Redis. Con
+// el stack autoalojado (contenedores en el NAS) no se suspenden, pero el
+// keepalive evita reconexiones tras periodos de inactividad y sirve igual si
+// algún día se pusiera una BD/caché remota delante.
 // Ajustable con DB_KEEPALIVE_MS (0 para desactivar).
 // ────────────────────────────────────────────
 const KEEPALIVE_INTERVAL_MS =
