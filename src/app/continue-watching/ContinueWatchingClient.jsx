@@ -281,11 +281,11 @@ function CircularProgress({ pct, colors, size = 40 }) {
 // ----------------------------
 function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading = false }) {
   return (
-    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] xl:min-h-[120px] xl:flex-none xl:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
       <div className={`relative z-10 mb-1 ${colorClass}`}>
         <Icon className="w-6 h-6 md:w-7 md:h-7" />
       </div>
-      <div className="relative z-10 text-sm sm:text-xl md:text-2xl xl:text-3xl font-black text-white tracking-tight drop-shadow-md">
+      <div className="relative z-10 text-sm sm:text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
         {loading ? <span className="inline-block h-4 w-8 sm:h-6 sm:w-10 md:h-8 md:w-14 rounded-lg bg-white/10 animate-pulse" /> : value}
       </div>
       <div className="relative z-10 text-[8px] sm:text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wide text-center leading-tight">
@@ -1060,9 +1060,9 @@ function Blobs() {
 
 function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
   return (
-    <motion.header className="mb-6 xl:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
-        <div>
+    <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+      <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
+        <div className="shrink-0 min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <div className="h-px w-12 bg-emerald-500" />
             <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">SEGUIMIENTO</span>
@@ -1083,7 +1083,7 @@ function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
             {activeTab === "completed" ? "Películas y series que ya has terminado de ver." : "Películas y episodios a medias, con el porcentaje que llevas reproducido."}
           </p>
         </div>
-        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full xl:w-auto xl:flex xl:justify-end" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
           <StatCard label="Títulos" value={stats.total} loading={loading} icon={Play} colorClass="text-emerald-400" />
           <StatCard label="Progreso Medio" value={`${stats.avg}%`} loading={loading} icon={TrendingUp} colorClass="text-purple-400" />
           <StatCard label="Películas" value={stats.movies} loading={loading} icon={Film} colorClass="text-sky-400" />
