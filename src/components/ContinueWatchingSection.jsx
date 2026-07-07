@@ -855,7 +855,11 @@ function ContinueWatchingPreviewCard({
   useEffect(() => {
     const id = show?.id;
     if (!id) return;
-    const cached = continueWatchingExtrasCache.get(id);
+    const ep = show?.nextEpisode;
+    // La clave incluye el episodio: el nombre del episodio es específico de T·E.
+    const cacheKey =
+      mediaType === "tv" && ep ? `${id}:${ep.season}:${ep.number}` : String(id);
+    const cached = continueWatchingExtrasCache.get(cacheKey);
     if (cached) {
       setExtras(cached);
       return;
@@ -863,9 +867,20 @@ function ContinueWatchingPreviewCard({
     let abort = false;
     (async () => {
       try {
-        const details = await getDetails(mediaType, id, { language: "es-ES" }).catch(
-          () => null,
-        );
+        const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+        // Detalles y nombre del episodio EN PARALELO, para que todos los extras
+        // (incluido el episodio) aparezcan a la vez y no haya un salto extra.
+        const [details, epData] = await Promise.all([
+          getDetails(mediaType, id, { language: "es-ES" }).catch(() => null),
+          mediaType === "tv" && ep && apiKey
+            ? fetch(
+                `https://api.themoviedb.org/3/tv/${id}/season/${ep.season}/episode/${ep.number}?api_key=${apiKey}&language=es-ES`,
+              )
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        const episodeName = epData?.name || null;
         const rating =
           typeof details?.vote_average === "number" && details.vote_average > 0
             ? details.vote_average
@@ -911,8 +926,8 @@ function ContinueWatchingPreviewCard({
           }
         }
 
-        const next = { rating, imdbRating, awards, seasons, year, genresEs };
-        continueWatchingExtrasCache.set(id, next);
+        const next = { rating, imdbRating, awards, seasons, year, genresEs, episodeName };
+        continueWatchingExtrasCache.set(cacheKey, next);
         if (!abort) setExtras(next);
       } catch {
         if (!abort)
@@ -923,13 +938,14 @@ function ContinueWatchingPreviewCard({
             seasons: null,
             year: null,
             genresEs: null,
+            episodeName: null,
           });
       }
     })();
     return () => {
       abort = true;
     };
-  }, [show?.id, mediaType]);
+  }, [show?.id, mediaType, show?.nextEpisode?.season, show?.nextEpisode?.number]);
 
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
@@ -1415,6 +1431,25 @@ function ContinueWatchingPreviewCard({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
+        {/* Título (serie/película) y, si es serie, el episodio (T·E · nombre),
+            ENCIMA de los botones. Una línea cada uno (truncan) para que el panel
+            no cambie de alto cuando llega el nombre del episodio. */}
+        <div className="mb-2.5 min-w-0">
+          <h3 className="truncate text-base font-black leading-tight text-white sm:text-lg">
+            {show?.title || "Sin título"}
+          </h3>
+          {ep && (
+            <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-300 sm:text-xs">
+              <span className="text-amber-300">
+                T{ep.season}·E{ep.number}
+              </span>
+              {ep.title || extras?.episodeName
+                ? ` · ${ep.title || extras.episodeName}`
+                : ""}
+            </p>
+          )}
+        </div>
+
         {/* Fila de acciones: acción principal + favorito + pendientes */}
         <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
           <button
@@ -1497,7 +1532,7 @@ function ContinueWatchingPreviewCard({
         {/* Metadatos: episodio · progreso · año · temporadas (separadores "•").
             Si es un rewatch, se antepone una etiqueta que lo indica (el progreso
             mostrado es el del rewatch, no el del visionado original). */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-zinc-200 sm:text-xs">
+        <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
           {show?.isRewatch && (
             <span className="mr-1 inline-flex items-center rounded bg-emerald-500/90 px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
               Rewatch
@@ -1540,12 +1575,12 @@ function ContinueWatchingPreviewCard({
         </div>
 
         {/* Géneros (en español, de los detalles es-ES) + notas TMDb/IMDb */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-200 sm:text-xs">
+        <div className="mt-1.5 flex flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
           {(extras?.genresEs || genres) && (
-            <span>{extras?.genresEs || genres}</span>
+            <span className="truncate">{extras?.genresEs || genres}</span>
           )}
           {extras?.rating && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex shrink-0 items-center gap-1.5">
               <NextImage
                 src="/logo-TMDb.png"
                 alt="TMDb"
@@ -1559,7 +1594,7 @@ function ContinueWatchingPreviewCard({
             </span>
           )}
           {typeof extras?.imdbRating === "number" && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex shrink-0 items-center gap-1.5">
               <NextImage
                 src="/logo-IMDb.svg"
                 alt="IMDb"
@@ -1939,7 +1974,11 @@ function ContinueWatchingSection({
       {Header}
 
       <div
-        className="relative"
+        // Al abrir una vista previa, el carrusel sube por ENCIMA de la cabecera
+        // (que va en z-20 para ser clicable): así el hover NO queda tapado por el
+        // título. Sin preview activa el carrusel vuelve a z-auto y el título es
+        // clicable (su hueco vacío es pointer-events-none).
+        className={`relative ${hasActivePreview ? "z-30" : ""}`}
         onMouseEnter={() => {
           setIsHoveredRow(true);
           prewarmVisibleTrailers();
