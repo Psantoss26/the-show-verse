@@ -26,6 +26,33 @@ const PLATFORM_SUFFIX_RE = new RegExp(
 // Verbo inicial habitual en los títulos de pestaña ("Watch …", "Ver …").
 const WATCH_PREFIX_RE = /^\s*(watch|ver|reproducir|mira|play)\s+/i;
 
+// Etiquetas de idioma / pista de audio que las plataformas (sobre todo anime:
+// Crunchyroll) cuelgan del título: "en castellano", "subtitulado", "VOSE"…
+const LANG_TOKENS =
+  "castellano|espa[nñ]ol|espanol|latino|latinoam[eé]rica|ingl[eé]s|ingles|japon[eé]s|japones|coreano|subtitulad[oa]s?|subt[ií]tulos?|sub|vose?|dual|dub|doblaj[eo]|audio\\s+[a-zñ]+";
+
+// Prefijo de temporada/episodio AL PRINCIPIO del título ("Temporada 1 Título",
+// "Episodio 5: Nombre", "Capítulo 3 - X"). El nombre de la serie/episodio queda
+// detrás. Se aplica en bucle (cubre "Temporada 1 Episodio 5 X").
+const LEADING_SEASON_EPISODE_RE =
+  /^\s*(?:temporada|season|saison|staffel|episodio|episode|cap[ií]tulo|chapter|folge)\s*\.?\s*\d+\s*[:\-–·,.]?\s+/i;
+
+// Sufijo "…(Ver|Watch)? (en|on)? PLATAFORMA (en idioma)?" — el patrón de las
+// pestañas de Crunchyroll: "… - Ver en Crunchyroll en castellano". Tolera texto
+// de idioma DESPUÉS de la plataforma (por eso PLATFORM_SUFFIX_RE no bastaba).
+const PLATFORM_WATCH_SUFFIX_RE = new RegExp(
+  `\\s*[-–—·|:]?\\s*(?:ver|watch|mira|reproducir|stream)?\\s*(?:en|on)?\\s+(?:${PLATFORMS})(?:\\s+(?:en\\s+)?(?:${LANG_TOKENS}))*\\s*$`,
+  "i",
+);
+
+// Sufijo de idioma suelto (sin plataforma), exigiendo separador / paréntesis /
+// "en " delante para no comerse palabras legítimas: "- castellano", "(VOSE)",
+// "en español", "audio latino".
+const LANGUAGE_SUFFIX_RE = new RegExp(
+  `\\s*(?:[-–—·|:]\\s*|[([]\\s*|\\ben\\s+)(?:${LANG_TOKENS})\\s*[)\\]]?\\s*$`,
+  "i",
+);
+
 // Nombres de plataforma "a secas": cuando la captura falla, el cliente a veces
 // cae al título de la pestaña, que es solo "Netflix"/"Max"/… Buscar eso en TMDb
 // devuelve una película basura ("Netflix Tudum 2025", etc.). Estos candidatos se
@@ -75,12 +102,24 @@ export function beforeColon(value) {
 // descriptores de temporada/episodio del final y un año entre paréntesis final.
 export function cleanSearchTitle(raw) {
   let t = String(raw || "").trim();
-  t = t.replace(PLATFORM_PREFIX_RE, "");
-  t = t.replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "");
-  t = t.replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "");
-  t = t.replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x\s]\s*E?\s*\d+.*$/i, "");
-  t = t.replace(/\s*[([{]\s*\d{4}\s*[)\]}]\s*$/, ""); // año entre paréntesis al final
-  return t.trim();
+  // Bucle hasta estabilizar: un mismo título puede tener VARIAS capas de basura
+  // ("Temporada 1 <episodio> - Ver en Crunchyroll en castellano").
+  let prev = null;
+  let guard = 0;
+  while (t && t !== prev && guard++ < 8) {
+    prev = t;
+    t = t
+      .replace(PLATFORM_PREFIX_RE, "")                       // "Netflix - X"
+      .replace(LEADING_SEASON_EPISODE_RE, "")               // "Temporada 1 X"
+      .replace(PLATFORM_WATCH_SUFFIX_RE, "")                // "X - Ver en Crunchyroll en castellano"
+      .replace(LANGUAGE_SUFFIX_RE, "")                      // "X en castellano" / "X (VOSE)"
+      .replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "") // "X - Temporada 2"
+      .replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "")
+      .replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x\s]\s*E?\s*\d+.*$/i, "")
+      .replace(/\s*[([{]\s*\d{4}\s*[)\]}]\s*$/, "")          // "(2021)" al final
+      .trim();
+  }
+  return t;
 }
 
 // Extrae el nombre de la SERIE del título de la pestaña / app ("Stranger Things -
