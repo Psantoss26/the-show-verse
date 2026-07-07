@@ -281,11 +281,11 @@ function CircularProgress({ pct, colors, size = 40 }) {
 // ----------------------------
 function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading = false }) {
   return (
-    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] lg:min-h-[120px] lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
+    <div className="relative overflow-hidden w-full h-full min-h-[96px] sm:min-h-[112px] xl:min-h-[120px] xl:flex-none xl:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
       <div className={`relative z-10 mb-1 ${colorClass}`}>
         <Icon className="w-6 h-6 md:w-7 md:h-7" />
       </div>
-      <div className="relative z-10 text-sm sm:text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
+      <div className="relative z-10 text-sm sm:text-xl md:text-2xl xl:text-3xl font-black text-white tracking-tight drop-shadow-md">
         {loading ? <span className="inline-block h-4 w-8 sm:h-6 sm:w-10 md:h-8 md:w-14 rounded-lg bg-white/10 animate-pulse" /> : value}
       </div>
       <div className="relative z-10 text-[8px] sm:text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wide text-center leading-tight">
@@ -556,6 +556,7 @@ const VIEW_MODES = new Set(["cards", "poster", "compact"]);
 export default function ContinueWatchingClient() {
   const { authenticated, hydrated } = useAuth();
   const [items, setItems] = useState(null); // null = cargando
+  const [activeTab, setActiveTab] = useState("inprogress");
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [sortBy, setSortBy] = useState("recent");
@@ -600,8 +601,25 @@ export default function ContinueWatchingClient() {
     load();
   }, [authenticated, hydrated, load]);
 
+  const dataLoaded = Array.isArray(items);
+
+  const inProgressCount = useMemo(() => {
+    return dataLoaded ? items.filter((x) => x.pct < 100).length : 0;
+  }, [items, dataLoaded]);
+
+  const completedCount = useMemo(() => {
+    return dataLoaded ? items.filter((x) => x.pct === 100).length : 0;
+  }, [items, dataLoaded]);
+
+  const currentItems = useMemo(() => {
+    const list = dataLoaded ? items : [];
+    return activeTab === "completed"
+      ? list.filter((x) => x.pct === 100)
+      : list.filter((x) => x.pct < 100);
+  }, [items, dataLoaded, activeTab]);
+
   const filtered = useMemo(() => {
-    let list = Array.isArray(items) ? [...items] : [];
+    let list = Array.isArray(currentItems) ? [...currentItems] : [];
     if (typeFilter !== "all") list = list.filter((x) => mediaTypeOf(x) === typeFilter);
     if (q.trim()) {
       const query = q.trim().toLowerCase();
@@ -627,15 +645,15 @@ export default function ContinueWatchingClient() {
         break;
     }
     return list;
-  }, [items, q, sortBy, typeFilter]);
+  }, [currentItems, q, sortBy, typeFilter]);
 
   const stats = useMemo(() => {
-    const list = Array.isArray(items) ? items : [];
+    const list = Array.isArray(currentItems) ? currentItems : [];
     const movies = list.filter((x) => mediaTypeOf(x) === "movie").length;
     const series = list.filter((x) => mediaTypeOf(x) === "tv").length;
     const avg = list.length ? Math.round(list.reduce((s, x) => s + clampPct(x.pct), 0) / list.length) : 0;
     return { total: list.length, movies, series, avg };
-  }, [items]);
+  }, [currentItems]);
 
   const sortLabels = {
     recent: "Recientes",
@@ -648,7 +666,6 @@ export default function ContinueWatchingClient() {
 
   if (!hydrated) return <div className="min-h-screen bg-black" />;
 
-  const dataLoaded = Array.isArray(items);
   const showLoginPrompt = hydrated && !authenticated;
 
   if (showLoginPrompt) {
@@ -656,7 +673,7 @@ export default function ContinueWatchingClient() {
       <div className="min-h-screen bg-black text-zinc-100 font-sans">
         <Blobs />
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <Header stats={stats} loading />
+          <Header stats={stats} loading activeTab={activeTab} />
           <div className="flex items-center justify-center py-16 lg:py-24">
             <div className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-2xl backdrop-blur-3xl">
               <img src="/logo-TSV-sinFondo.png" alt="The Show Verse" className="h-20 w-auto object-contain mb-4 scale-[1.4]" />
@@ -682,59 +699,310 @@ export default function ContinueWatchingClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans">
       <Blobs />
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} />
+        <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} activeTab={activeTab} />
 
         {/* Filtros */}
-        <motion.div className="sticky top-20 z-[70] space-y-3 mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }}>
+        <motion.div
+          className="sticky top-20 z-[70] space-y-3 mb-6 transition-all duration-300"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
           {/* Móvil */}
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+              />
               {q && (
-                <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md">
+                <button
+                  onClick={() => setQ("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+                >
                   <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
-            <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen ? "text-emerald-400" : "text-zinc-200"}`}>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                mobileFiltersOpen
+                  ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
+              }`}
+            >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
           </div>
+
           <AnimatePresence>
             {mobileFiltersOpen && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="relative z-10 lg:hidden overflow-visible">
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="relative z-10 lg:hidden overflow-visible"
+              >
                 <div className="space-y-3 pt-1">
-                  <InlineDropdown label="Ordenar" valueLabel={sortLabels[sortBy]} icon={ArrowUpDown}>
-                    {({ close }) => Object.entries(sortLabels).map(([k, l]) => <DropdownItem key={k} active={sortBy === k} onClick={() => { setSortBy(k); close(); }}>{l}</DropdownItem>)}
-                  </InlineDropdown>
-                  <InlineDropdown label="Tipo" valueLabel={typeLabels[typeFilter]} icon={Film}>
-                    {({ close }) => Object.entries(typeLabels).map(([k, l]) => <DropdownItem key={k} active={typeFilter === k} onClick={() => { setTypeFilter(k); close(); }}>{l}</DropdownItem>)}
-                  </InlineDropdown>
-                  <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+                  {/* Fila 1: Ordenar + tabs Viendo/Completadas (solo icono) */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 min-w-0">
+                      <InlineDropdown
+                        label="Ordenar"
+                        valueLabel={sortLabels[sortBy]}
+                        icon={ArrowUpDown}
+                      >
+                        {({ close }) => (
+                          <>
+                            {Object.entries(sortLabels).map(([key, label]) => (
+                              <DropdownItem
+                                key={key}
+                                active={sortBy === key}
+                                onClick={() => {
+                                  setSortBy(key);
+                                  close();
+                                }}
+                              >
+                                {label}
+                              </DropdownItem>
+                            ))}
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <button
+                        onClick={() => setActiveTab("inprogress")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          activeTab === "inprogress"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <Play
+                          className="w-4 h-4"
+                          fill={
+                            activeTab === "inprogress" ? "currentColor" : "none"
+                          }
+                        />
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("completed")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          activeTab === "completed"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fila 2: Tipo + botones de vista */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 min-w-0">
+                      <InlineDropdown
+                        label="Tipo"
+                        valueLabel={typeLabels[typeFilter]}
+                        icon={Film}
+                      >
+                        {({ close }) => (
+                          <>
+                            {Object.entries(typeLabels).map(([key, label]) => (
+                              <DropdownItem
+                                key={key}
+                                active={typeFilter === key}
+                                onClick={() => {
+                                  setTypeFilter(key);
+                                  close();
+                                }}
+                              >
+                                {label}
+                              </DropdownItem>
+                            ))}
+                          </>
+                        )}
+                      </InlineDropdown>
+                    </div>
+                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <button
+                        onClick={() => setViewMode("cards")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "cards"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <Film className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("poster")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "poster"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("compact")}
+                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                          viewMode === "compact"
+                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <LayoutList className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Escritorio */}
+          {/* Escritorio: Fila única */}
           <div className="hidden lg:flex gap-3 relative z-10">
+            {/* Pestañas de sección */}
+            <div className="flex gap-1 rounded-xl p-1 shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+              <button
+                onClick={() => setActiveTab("inprogress")}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === "inprogress"
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Play
+                  className="w-3.5 h-3.5"
+                  fill={activeTab === "inprogress" ? "currentColor" : "none"}
+                />
+                Viendo
+                {dataLoaded && (
+                  <span className="text-xs opacity-70">({inProgressCount})</span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("completed")}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === "completed"
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Completadas
+                {dataLoaded && (
+                  <span className="text-xs opacity-70">({completedCount})</span>
+                )}
+              </button>
+            </div>
+
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por título..." className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar por título..."
+                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+              />
               {q && (
-                <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md">
+                <button
+                  onClick={() => setQ("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+                >
                   <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
                 </button>
               )}
             </div>
-            <InlineDropdown label="Ordenar" valueLabel={sortLabels[sortBy]} icon={ArrowUpDown}>
-              {({ close }) => Object.entries(sortLabels).map(([k, l]) => <DropdownItem key={k} active={sortBy === k} onClick={() => { setSortBy(k); close(); }}>{l}</DropdownItem>)}
+
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={sortLabels[sortBy]}
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  {Object.entries(sortLabels).map(([key, label]) => (
+                    <DropdownItem
+                      key={key}
+                      active={sortBy === key}
+                      onClick={() => {
+                        setSortBy(key);
+                        close();
+                      }}
+                    >
+                      {label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
             </InlineDropdown>
-            <InlineDropdown label="Tipo" valueLabel={typeLabels[typeFilter]} icon={Film}>
-              {({ close }) => Object.entries(typeLabels).map(([k, l]) => <DropdownItem key={k} active={typeFilter === k} onClick={() => { setTypeFilter(k); close(); }}>{l}</DropdownItem>)}
+
+            <InlineDropdown
+              label="Tipo"
+              valueLabel={typeLabels[typeFilter]}
+              icon={Film}
+            >
+              {({ close }) => (
+                <>
+                  {Object.entries(typeLabels).map(([key, label]) => (
+                    <DropdownItem
+                      key={key}
+                      active={typeFilter === key}
+                      onClick={() => {
+                        setTypeFilter(key);
+                        close();
+                      }}
+                    >
+                      {label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
             </InlineDropdown>
-            <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+
+            {/* Modo de visualización */}
+            <div className="flex gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+              <button
+                onClick={() => setViewMode("cards")}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "cards"
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Film className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("poster")}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "poster"
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("compact")}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewMode === "compact"
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </motion.div>
 
@@ -742,13 +1010,17 @@ export default function ContinueWatchingClient() {
         {!loading && filtered.length === 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 mb-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-              <Play className="w-8 h-8 text-zinc-600" fill="currentColor" />
+              {activeTab === "completed" ? (
+                <CheckCircle2 className="w-8 h-8 text-zinc-600" />
+              ) : (
+                <Play className="w-8 h-8 text-zinc-600" fill="currentColor" />
+              )}
             </div>
             <h3 className="text-lg font-bold text-zinc-400 mb-2">
-              {q ? "Sin resultados" : "No tienes nada a medias"}
+              {q ? "Sin resultados" : activeTab === "completed" ? "No tienes completadas" : "No tienes nada a medias"}
             </h3>
             <p className="text-sm text-zinc-600 max-w-sm">
-              {q ? `No se encontraron títulos que coincidan con "${q}"` : "Reproduce algo en una plataforma de streaming (con la extensión o la app) y aparecerá aquí con su porcentaje."}
+              {q ? `No se encontraron títulos que coincidan con "${q}"` : activeTab === "completed" ? "Completa una película o episodio para verlo aquí." : "Reproduce algo en una plataforma de streaming (con la extensión o la app) y aparecerá aquí con su porcentaje."}
             </p>
           </motion.div>
         )}
@@ -786,10 +1058,10 @@ function Blobs() {
   );
 }
 
-function Header({ stats, loading, onRefresh, refreshing }) {
+function Header({ stats, loading, onRefresh, refreshing, activeTab }) {
   return (
-    <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+    <motion.header className="mb-6 xl:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <div className="h-px w-12 bg-emerald-500" />
@@ -797,7 +1069,7 @@ function Header({ stats, loading, onRefresh, refreshing }) {
           </div>
           <div className="flex items-center gap-6">
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Continuar viendo<span className="text-emerald-500">.</span>
+              {activeTab === "completed" ? "Completadas" : "Continuar viendo"}<span className="text-emerald-500">.</span>
             </h1>
             {onRefresh && (
               <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
@@ -808,10 +1080,10 @@ function Header({ stats, loading, onRefresh, refreshing }) {
             )}
           </div>
           <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-            Películas y episodios a medias, con el porcentaje que llevas reproducido.
+            {activeTab === "completed" ? "Películas y series que ya has terminado de ver." : "Películas y episodios a medias, con el porcentaje que llevas reproducido."}
           </p>
         </div>
-        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full xl:w-auto xl:flex xl:justify-end" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
           <StatCard label="Títulos" value={stats.total} loading={loading} icon={Play} colorClass="text-emerald-400" />
           <StatCard label="Progreso Medio" value={`${stats.avg}%`} loading={loading} icon={TrendingUp} colorClass="text-purple-400" />
           <StatCard label="Películas" value={stats.movies} loading={loading} icon={Film} colorClass="text-sky-400" />
