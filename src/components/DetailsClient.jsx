@@ -12741,12 +12741,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 user?.username || user?.name || null;
                               const listId = list?.id || null;
 
-                              // Ruta interna: la pagina de detalle de listas
-                              // ahora busca por el uuid interno de comunidad
-                              // (no por slug/trakt id).
-                              const ownerUsername = user?.username || "c";
+                              // Ruta interna: el detalle de listas de la comunidad
+                              // se sirve por el uuid interno desde nuestra BBDD.
                               const internalUrl = listId
-                                ? `/lists/trakt/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(String(listId))}`
+                                ? `/lists/community/${encodeURIComponent(String(listId))}`
                                 : null;
 
                               const avatar =

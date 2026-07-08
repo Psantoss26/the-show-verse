@@ -91,7 +91,7 @@ export async function runSeed({ tmdbId, mediaType }) {
     // fail the whole seed — comments/sentiment already succeeded by this point). Slower than
     // the rest (fetches list items + hydrates preview posters), so it runs last before ready.
     try {
-      const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 3 });
+      const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 6 });
       for (const raw of listItems) {
         const listRow = normalizeTraktList(raw);
         if (!listRow) continue;

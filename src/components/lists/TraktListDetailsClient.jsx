@@ -247,14 +247,6 @@ export default function TraktListDetailsClient({ username, listId }) {
     const items = Array.isArray(state.items) ? state.items : []
     const creatorUsername = list?.user?.username || username || 'Usuario'
 
-    const slugOrId = list?.ids?.slug || list?.ids?.trakt || listId
-    const traktUrl =
-        username && slugOrId
-            ? (username === 'official'
-                ? `https://trakt.tv/lists/${slugOrId}`
-                : `https://trakt.tv/users/${username}/lists/${slugOrId}`)
-            : null
-
     const firstPoster = items.find((item) => item?.posterPath)?.posterPath
     const firstBackdrop = firstPoster
 
@@ -280,7 +272,7 @@ export default function TraktListDetailsClient({ username, listId }) {
 
     if (state.error && !list && items.length === 0) {
         return (
-            <UnifiedListDetailsLayout title="Lista" sourceLabel="Trakt" backHref="/lists">
+            <UnifiedListDetailsLayout title="Lista" sourceLabel="Comunidad" backHref="/lists">
                 <div className="rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-6 text-zinc-300 shadow-none backdrop-blur-[28px]">
                     <p className="font-bold text-red-300">Error</p>
                     <p className="mt-2 text-sm text-zinc-400">{state.error}</p>
@@ -293,7 +285,7 @@ export default function TraktListDetailsClient({ username, listId }) {
         <UnifiedListDetailsLayout
             title={list?.name || 'Lista'}
             description={list?.description || ''}
-            sourceLabel="Lista de Trakt"
+            sourceLabel="Lista de la comunidad"
             posterImage={tmdbImg(firstPoster)}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
             badges={[]}
@@ -301,22 +293,9 @@ export default function TraktListDetailsClient({ username, listId }) {
                 { label: 'Elementos', value: Number(list?.item_count || items.length) },
                 { label: 'Usuario', value: `@${creatorUsername}`, icon: UserRound, tone: 'emerald' },
                 { label: 'Likes', value: Number(list?.likes || 0) },
-                { label: 'Fuente', value: 'Trakt' },
+                { label: 'Fuente', value: 'Comunidad' },
             ]}
             backHref="/lists"
-            rightActions={
-                traktUrl ? (
-                    <a
-                        href={traktUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 transition"
-                        title="Ver en Trakt"
-                    >
-                        <ExternalLink className="w-5 h-5" />
-                    </a>
-                ) : null
-            }
         >
             {items.length > 0 || !state.loading ? (
                 <FilterableListItems

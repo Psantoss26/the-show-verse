@@ -203,5 +203,6 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50 }) {
     .where(eq(communityListItems.listId, id))
     .orderBy(asc(communityListItems.position)).limit(safeLimit).offset(offset);
   const hydrated = await hydrateListItemPosters(items);
-  return { list: listRowToApi(list).list, items: hydrated };
+  const api = listRowToApi(list);
+  return { list: { ...api.list, user: api.user }, items: hydrated };
 }
