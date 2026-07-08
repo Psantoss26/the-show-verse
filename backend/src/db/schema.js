@@ -8,6 +8,7 @@ import {
   boolean,
   smallint,
   integer,
+  bigint,
   timestamp,
   jsonb,
   inet,
@@ -286,4 +287,103 @@ export const userRecommendations = pgTable('user_recommendations', {
 }, (t) => ({
   userTypeUq: unique('uq_user_rec_user_type').on(t.userId, t.mediaType),
   userIdx: index('idx_user_rec_user').on(t.userId),
+}));
+
+// ─────────────────────────────────────────────
+// COMMUNITY CONTENT (seeded from Trakt, then owned by us)
+// ─────────────────────────────────────────────
+export const titleCommunityState = pgTable('title_community_state', {
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),            // 'movie' | 'tv'
+  traktId: integer('trakt_id'),
+  status: text('status').default('pending').notNull(),// pending|seeding|ready|failed
+  commentCount: integer('comment_count').default(0).notNull(),
+  seededAt: timestamp('seeded_at', { withTimezone: true }),
+  sentimentBuiltAt: timestamp('sentiment_built_at', { withTimezone: true }),
+  sentimentProvider: text('sentiment_provider'),      // heuristic|ollama|openai|gemini
+  attempts: integer('attempts').default(0).notNull(),
+  nextRetryAt: timestamp('next_retry_at', { withTimezone: true }),
+  error: text('error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: uniqueIndex('idx_title_state_pk').on(t.tmdbId, t.mediaType),
+  statusIdx: index('idx_title_state_status').on(t.status, t.nextRetryAt),
+  mediaTypeCheck: check('chk_title_state_media_type', sql`media_type IN ('movie','tv')`),
+}));
+
+export const titleComments = pgTable('title_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),
+  source: text('source').notNull(),                   // 'trakt' | 'native'
+  externalId: bigint('external_id', { mode: 'number' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  authorName: text('author_name'),
+  authorUsername: text('author_username'),
+  authorAvatarUrl: text('author_avatar_url'),
+  authorIsVip: boolean('author_is_vip').default(false),
+  body: text('body').notNull(),
+  likes: integer('likes').default(0).notNull(),
+  spoiler: boolean('spoiler').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  externalUnique: uniqueIndex('idx_title_comments_external').on(t.externalId).where(sql`external_id IS NOT NULL`),
+  likesIdx: index('idx_title_comments_likes').on(t.tmdbId, t.mediaType, t.likes),
+  createdIdx: index('idx_title_comments_created').on(t.tmdbId, t.mediaType, t.createdAt),
+  sourceCheck: check('chk_title_comments_source', sql`source IN ('trakt','native')`),
+}));
+
+export const titleSentiment = pgTable('title_sentiment', {
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),
+  good: jsonb('good').default([]).notNull(),          // [{ text_es }]
+  bad: jsonb('bad').default([]).notNull(),
+  provider: text('provider'),
+  model: text('model'),
+  sourceCommentCount: integer('source_comment_count').default(0).notNull(),
+  isProvisional: boolean('is_provisional').default(false).notNull(),
+  builtAt: timestamp('built_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: uniqueIndex('idx_title_sentiment_pk').on(t.tmdbId, t.mediaType),
+}));
+
+export const communityLists = pgTable('community_lists', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  source: text('source').notNull(),                   // 'trakt' | 'user'
+  externalId: bigint('external_id', { mode: 'number' }),
+  userListId: uuid('user_list_id').references(() => userLists.id, { onDelete: 'cascade' }),
+  slug: text('slug'),
+  name: text('name').notNull(),
+  description: text('description'),
+  ownerName: text('owner_name'),
+  ownerUsername: text('owner_username'),
+  ownerAvatarUrl: text('owner_avatar_url'),
+  itemCount: integer('item_count').default(0).notNull(),
+  copiedItemCount: integer('copied_item_count').default(0).notNull(),
+  likes: integer('likes').default(0).notNull(),
+  privacy: text('privacy'),
+  traktUrl: text('trakt_url'),
+  previewPosters: jsonb('preview_posters').default([]).notNull(),
+  importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  externalUnique: uniqueIndex('idx_community_lists_external').on(t.externalId).where(sql`source = 'trakt' AND external_id IS NOT NULL`),
+  likesIdx: index('idx_community_lists_likes').on(t.likes),
+  itemsIdx: index('idx_community_lists_items').on(t.itemCount),
+}));
+
+export const communityListItems = pgTable('community_list_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listId: uuid('list_id').notNull().references(() => communityLists.id, { onDelete: 'cascade' }),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  position: integer('position').default(0),
+  addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueItem: uniqueIndex('idx_community_list_items_unique').on(t.listId, t.tmdbId, t.mediaType),
+  byTitleIdx: index('idx_community_list_items_title').on(t.tmdbId, t.mediaType),
+  byListIdx: index('idx_community_list_items_list').on(t.listId, t.position),
 }));
