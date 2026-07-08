@@ -7,6 +7,7 @@ import { resolveTraktId, getComments, getListsContaining, getUserListItems } fro
 import { normalizeTraktComment, normalizeTraktList, posterUrl } from './normalize.js';
 import { buildHeuristicSentiment, generateSentiment } from './sentiment.js';
 import { upsertSentiment, upsertCommunityList, insertListMemberships } from './store.js';
+import { tmdbDetails } from '../dashboard/tmdb.js';
 
 export async function getState({ tmdbId, mediaType }) {
   const [row] = await db
@@ -94,8 +95,18 @@ export async function runSeed({ tmdbId, mediaType }) {
             const m = it.movie || it.show; const isTv = !!it.show;
             const itemTmdbId = m?.ids?.tmdb; if (!itemTmdbId) return null;
             return { tmdbId: itemTmdbId, mediaType: isTv ? 'tv' : 'movie', title: m?.title || null,
-              posterPath: null }; // TMDb poster hydrated lazily by the frontend
+              posterPath: null }; // hydrated below for the first 5 (preview posters); rest stay null
           }).filter(Boolean).slice(0, 150);
+        }
+        // Hidrata el poster de los primeros 5 miembros vía TMDb (coste acotado);
+        // el resto se queda con posterPath:null (hidratación completa es mejora futura).
+        for (const m of members.slice(0, 5)) {
+          try {
+            const d = await tmdbDetails(m.mediaType === 'tv' ? 'tv' : 'movie', m.tmdbId);
+            m.posterPath = d?.poster_path || null;
+          } catch {
+            // best-effort: deja posterPath en null si TMDb falla
+          }
         }
         const previews = members.slice(0, 5).map((m) => posterUrl(m.posterPath)).filter(Boolean);
         const listId = await upsertCommunityList({ ...listRow, copiedItemCount: members.length, previewPosters: previews });
