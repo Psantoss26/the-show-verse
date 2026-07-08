@@ -2,7 +2,8 @@
 import { z } from 'zod';
 import { ensureSeeded } from '../community/seed.js';
 import {
-  getCommentsPage, getSentiment, insertNativeComment, updateNativeComment, deleteNativeComment,
+  getCommentsPage, getSentiment, getListsForTitle, discoverLists, getCommunityListWithItems,
+  insertNativeComment, updateNativeComment, deleteNativeComment,
 } from '../community/store.js';
 
 const TYPES = new Set(['movie', 'tv']);
@@ -69,5 +70,31 @@ export default async function communityRoutes(fastify) {
     const ok = await deleteNativeComment({ id: req.params.id, userId: req.user.id });
     if (!ok) return reply.status(404).send({ error: 'Comment not found' });
     return reply.send({ ok: true });
+  });
+
+  // Surface B: lists containing this title.
+  fastify.get('/:type/:tmdbId/lists', async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
+    const items = await getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: req.query?.limit || 6 });
+    reply.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
+    return { items, state: seed.status };
+  });
+
+  // Surface A: discover.
+  fastify.get('/lists/discover', async (req, reply) => {
+    const { sort = 'items_desc', page = '1', limit = '30' } = req.query || {};
+    const results = await discoverLists({ sort, page, limit });
+    reply.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
+    return { results };
+  });
+
+  // List detail.
+  fastify.get('/lists/:id', async (req, reply) => {
+    const { page = '1', limit = '50' } = req.query || {};
+    const data = await getCommunityListWithItems({ id: req.params.id, page, limit });
+    if (!data) return reply.status(404).send({ error: 'List not found' });
+    reply.header('Cache-Control', 'public, s-maxage=300');
+    return data;
   });
 }
