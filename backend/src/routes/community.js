@@ -1,6 +1,6 @@
 // backend/src/routes/community.js
 import { z } from 'zod';
-import { ensureSeeded, getState } from '../community/seed.js';
+import { ensureSeeded } from '../community/seed.js';
 import {
   getCommentsPage, insertNativeComment, updateNativeComment, deleteNativeComment,
 } from '../community/store.js';
@@ -48,7 +48,7 @@ export default async function communityRoutes(fastify) {
     if (!parsed.success) return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     const item = await updateNativeComment({
       id: req.params.id, userId: req.user.id,
-      body: parsed.data.comment, spoiler: parsed.data.spoiler ?? false,
+      body: parsed.data.comment, spoiler: parsed.data.spoiler,
     });
     if (!item) return reply.status(404).send({ error: 'Comment not found' });
     return reply.send({ comment: item });
