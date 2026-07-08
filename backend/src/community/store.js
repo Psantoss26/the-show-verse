@@ -146,7 +146,7 @@ const SORTS = {
 };
 
 export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30 }) {
-  const orderBy = SORTS[sort] || SORTS.items_desc;
+  const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
   const rows = await db.select().from(communityLists).orderBy(...orderBy).limit(safeLimit).offset(offset);
