@@ -3,9 +3,10 @@ import { db } from '../db/client.js';
 import { titleCommunityState, titleComments, titleSentiment } from '../db/schema.js';
 import { and, eq, sql } from 'drizzle-orm';
 import { seedDecision, nextRetryDate } from './state.js';
-import { resolveTraktId, getComments, getListsContaining, getUserListItems } from './trakt.js';
+import { resolveTraktId, getComments, getListsContaining, getUserListItems, getSentiments } from './trakt.js';
 import { normalizeTraktComment, normalizeTraktList, posterUrl } from './normalize.js';
-import { buildHeuristicSentiment, generateSentiment } from './sentiment.js';
+import { buildHeuristicSentiment } from './sentiment.js';
+import { translateManyToEs } from './translate.js';
 import { upsertSentiment, upsertCommunityList, insertListMemberships } from './store.js';
 import { tmdbDetails } from '../dashboard/tmdb.js';
 
@@ -54,9 +55,41 @@ export async function runSeed({ tmdbId, mediaType }) {
         .onConflictDoNothing();
     }
 
+    // Sentiment: copia el sentimiento OFICIAL de Trakt (calidad "como Trakt": temas que
+    // Trakt precomputa a partir de los comentarios), traducido a español. Es rápido (1-2
+    // llamadas HTTP) y va ANTES de las listas (más lentas) para que aparezca cuanto antes.
+    // Fallback al heurístico sobre los comentarios copiados si Trakt no tiene sentimiento.
+    let sentimentDone = false;
+    if (resolved.traktId) {
+      const ts = await getSentiments({ type: mediaType, traktId: resolved.traktId }).catch(() => null);
+      if (ts && (ts.good.length || ts.bad.length)) {
+        const [goodEs, badEs] = await Promise.all([
+          translateManyToEs(ts.good.map((x) => x.sentiment).filter(Boolean)),
+          translateManyToEs(ts.bad.map((x) => x.sentiment).filter(Boolean)),
+        ]);
+        const good = goodEs.map((t) => String(t || '').trim()).filter(Boolean).slice(0, 8).map((text_es) => ({ text_es }));
+        const bad = badEs.map((t) => String(t || '').trim()).filter(Boolean).slice(0, 8).map((text_es) => ({ text_es }));
+        if (good.length || bad.length) {
+          await upsertSentiment({
+            tmdbId: numId, mediaType, good, bad,
+            provider: 'trakt', model: null,
+            sourceCommentCount: ts.commentCount || rows.length, isProvisional: false,
+          });
+          sentimentDone = true;
+        }
+      }
+    }
+    if (!sentimentDone && rows.length) {
+      const heur = buildHeuristicSentiment(rows.map((r) => ({ body: r.body })));
+      await upsertSentiment({
+        tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
+        provider: 'heuristic', model: null, sourceCommentCount: rows.length, isProvisional: false,
+      });
+    }
+
     // Copy up to 3 lists that contain this title (best-effort: a list-copy failure must not
-    // fail the whole seed — comments already succeeded by this point). Runs in the fast phase,
-    // before the (slower) sentiment build below, so lists are available as soon as possible.
+    // fail the whole seed — comments/sentiment already succeeded by this point). Slower than
+    // the rest (fetches list items + hydrates preview posters), so it runs last before ready.
     try {
       const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 3 });
       for (const raw of listItems) {
@@ -100,46 +133,8 @@ export async function runSeed({ tmdbId, mediaType }) {
       console.error(`[community/seed] list copy failed for ${mediaType}:${numId}:`, listErr?.message || listErr);
     }
 
-    // Sentiment input: up to 50 top-liked comments (analysis only, not stored beyond 10).
-    let analysisComments = rows.map((r) => ({ body: r.body }));
-    if (resolved.traktId) {
-      const more = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 50 });
-      if (more.ok) {
-        const moreBodies = more.items
-          .map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType }))
-          .filter(Boolean).map((r) => ({ body: r.body }));
-        if (moreBodies.length) analysisComments = moreBodies;
-      }
-      // If the extra fetch fails, fall back to the already-copied 10 rows as analysis input.
-    }
-    const title = ''; // TMDb title optional; prompt tolerates empty
-    if (analysisComments.length) {
-      // Provisional heuristic sentiment immediately (fast, always available).
-      const heur = buildHeuristicSentiment(analysisComments);
-      await upsertSentiment({ tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
-        provider: 'heuristic', model: null, sourceCommentCount: analysisComments.length, isProvisional: true });
-    }
-
-    // The title is READY now: comments + lists + heuristic sentiment are all persisted.
-    // Marking ready BEFORE the LLM keeps page load fast and the state machine unblocked
-    // regardless of how slow the local model is.
+    // Title is READY: comments + lists + sentiment all persisted.
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
-
-    // IA sentiment upgrade — DETACHED (fire-and-forget): replaces the heuristic once the local
-    // model finishes. Never blocks readiness/load; a failure just leaves the heuristic in place.
-    if (analysisComments.length) {
-      generateSentiment({ comments: analysisComments, title })
-        .then((ai) => {
-          if (!ai) return null;
-          return upsertSentiment({
-            tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
-            provider: ai.provider, model: ai.model,
-            sourceCommentCount: analysisComments.length, isProvisional: false,
-          });
-        })
-        .catch((e) =>
-          console.error(`[community/seed] sentiment upgrade failed for ${mediaType}:${numId}:`, e?.message || e));
-    }
   } catch (err) {
     await markFailed({ tmdbId: numId, mediaType, error: String(err?.message || err).slice(0, 300) });
   }

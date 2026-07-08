@@ -88,3 +88,18 @@ export async function getUserListItems({ username, listSlug, page = 1, limit = 5
   );
   return ok && Array.isArray(json) ? json : [];
 }
+
+// Sentimiento OFICIAL de Trakt (temas positivos/negativos que Trakt precomputa a
+// partir de los comentarios). Se copia una vez en el sembrado (como comentarios y
+// listas) y se sirve desde Postgres. Devuelve { good:[{sentiment,comment_ids}], bad },
+// o null si Trakt no tiene sentimiento para el título.
+export async function getSentiments({ type, traktId }) {
+  const { ok, json } = await traktGet(`/${traktBase(type)}/${traktId}/sentiments`);
+  if (!ok || !json || typeof json !== 'object' || Array.isArray(json)) return null;
+  return {
+    good: Array.isArray(json.good) ? json.good : [],
+    bad: Array.isArray(json.bad) ? json.bad : [],
+    analyzedAt: json.analyzed_at || null,
+    commentCount: Number(json.comment_count) || 0,
+  };
+}
