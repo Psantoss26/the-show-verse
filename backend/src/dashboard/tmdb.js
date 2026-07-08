@@ -46,7 +46,7 @@ export function toCard(raw, mediaType) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function tmdbGet(path, params = {}) {
+export async function tmdbGet(path, params = {}) {
   if (!TMDB_API_KEY) throw new Error('TMDB_API_KEY not configured');
   const url = new URL(`${TMDB_BASE}${path}`);
   url.searchParams.set('api_key', TMDB_API_KEY);
