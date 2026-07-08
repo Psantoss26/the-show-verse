@@ -51,18 +51,18 @@ const traktBase = (type) => (type === 'tv' ? 'shows' : 'movies');
 
 export async function resolveTraktId({ type, tmdbId }) {
   const { ok, json } = await traktGet(`/search/tmdb/${tmdbId}?type=${traktType(type)}`);
-  if (!ok || !Array.isArray(json) || !json.length) return null;
+  if (!ok) return { ok: false, traktId: null, slug: null };            // hard failure (network/HTTP/429)
+  if (!Array.isArray(json) || !json.length) return { ok: true, traktId: null, slug: null }; // confirmed no match
   const item = json[0]?.[traktType(type)] || null;
   const traktId = item?.ids?.trakt || null;
-  if (!traktId) return null;
-  return { traktId, slug: item?.ids?.slug || null };
+  return { ok: true, traktId, slug: item?.ids?.slug || null };
 }
 
 export async function getComments({ type, traktId, sort = 'likes', page = 1, limit = 10 }) {
   const { ok, json, pagination } = await traktGet(
     `/${traktBase(type)}/${traktId}/comments/${sort}?page=${page}&limit=${limit}`,
   );
-  return { items: ok && Array.isArray(json) ? json : [], pagination };
+  return { ok, items: ok && Array.isArray(json) ? json : [], pagination };
 }
 
 export async function getListsContaining({ type, traktId, tab = 'popular', page = 1, limit = 3 }) {
