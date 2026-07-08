@@ -140,6 +140,87 @@
     };
   }
 
+  // Extrae señal de título de los DATOS ESTRUCTURADOS JSON-LD (schema.org) que
+  // Prime Video, Max/HBO y muchas plataformas incluyen en la FICHA. A diferencia de
+  // los selectores CSS (frágiles y por plataforma), esto es un estándar estable y,
+  // para un episodio, da el nombre de la SERIE (partOfSeries) + temporada/episodio
+  // — justo lo que falta para resolver episodios en Prime/Max (causa nº1 del 404).
+  // `doc` se inyecta para poder testear. Devuelve un objeto normalizado o null.
+  function detectFromJsonLd(doc) {
+    let nodes;
+    try {
+      nodes = doc.querySelectorAll('script[type="application/ld+json"]');
+    } catch (e) {
+      return null;
+    }
+    const flatten = (data) => {
+      if (!data) return [];
+      if (Array.isArray(data)) return data.flatMap(flatten);
+      if (Array.isArray(data["@graph"])) return data["@graph"].flatMap(flatten);
+      return [data];
+    };
+    for (const node of nodes) {
+      let data;
+      try {
+        data = JSON.parse(node.textContent || node.innerText || "");
+      } catch (e) {
+        continue;
+      }
+      for (const it of flatten(data)) {
+        if (!it || typeof it !== "object") continue;
+        const type = String(it["@type"] || "").toLowerCase();
+        const name = clean(it.name);
+        if (type.includes("tvepisode")) {
+          const series =
+            clean(it.partOfSeries && it.partOfSeries.name) ||
+            clean(
+              it.partOfSeason &&
+                it.partOfSeason.partOfSeries &&
+                it.partOfSeason.partOfSeries.name,
+            );
+          const seasonNum = Number(
+            (it.partOfSeason && it.partOfSeason.seasonNumber) ??
+              it.seasonNumber,
+          );
+          const episodeNum = Number(it.episodeNumber);
+          if (!series && !name) continue;
+          return {
+            mediaType: "tv",
+            showName: series || undefined,
+            episodeName: name || undefined,
+            season: Number.isFinite(seasonNum) ? seasonNum : null,
+            episode: Number.isFinite(episodeNum) ? episodeNum : null,
+          };
+        }
+        if ((type.includes("tvseries") || type.includes("tvseason")) && name) {
+          return { mediaType: "tv", showName: name };
+        }
+        if ((type.includes("movie") || type === "videoobject") && name) {
+          return { mediaType: "movie", movieTitle: name };
+        }
+      }
+    }
+    return null;
+  }
+
+  // og:title / twitter:title de la ficha. Último recurso (puede quedar algo
+  // obsoleto en SPAs), pero mejor que el título crudo de la pestaña para Prime/Max
+  // cuando los selectores propios fallan. `doc` inyectable para testear.
+  function detectFromMeta(doc) {
+    try {
+      const node =
+        doc.querySelector('meta[property="og:title"]') ||
+        doc.querySelector('meta[name="twitter:title"]');
+      if (!node) return "";
+      const content = node.getAttribute
+        ? node.getAttribute("content")
+        : node.content;
+      return clean(content);
+    } catch (e) {
+      return "";
+    }
+  }
+
   // Construye la URL de la página de detalles de The Show Verse a partir de lo que
   // devuelve el sync ({tmdbId, mediaType, season, episode}). Serie con episodio →
   // página del episodio; serie sin episodio → página de la serie; película → su
@@ -168,6 +249,8 @@
     largestArtwork,
     buildPlaybackSignal,
     buildDetailsUrl,
+    detectFromJsonLd,
+    detectFromMeta,
     SE_SEASON_RE,
     SE_EPISODE_RE,
   };

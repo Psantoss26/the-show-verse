@@ -22,6 +22,7 @@ class AccessibilityStreamingService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastText: String? = null
     private var lastAt = 0L
+    private var lastDiagText: String? = null
     private var pendingPkg: String? = null
     private val resolveRunnable = Runnable { processCurrent() }
 
@@ -57,9 +58,22 @@ class AccessibilityStreamingService : AccessibilityService() {
         val root = rootInActiveWindow ?: return
 
         val analysis = analyzeScreen(root)
-        // Solo actuamos si la pantalla PARECE una ficha (hay botón de reproducir):
-        // así evitamos disparar en la home/búsqueda/rejilla de títulos.
-        if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) return
+        // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
+        // reconocido O suficientes señales de detalle) y hay algún candidato.
+        if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
+            // Diagnóstico: si había candidatos pero no se clasificó como ficha, se
+            // registra (una vez por texto) para poder afinar la detección por
+            // plataforma (p. ej. si Prime/Max no exponen las señales esperadas).
+            val top = analysis.candidates.firstOrNull()
+            if (top != null && !top.equals(lastDiagText, ignoreCase = true)) {
+                lastDiagText = top
+                p.addLog(
+                    "Ficha no reconocida (${Platforms.nameFor(pkg)}): play=${analysis.sawPlay} " +
+                        "señales=${analysis.detailSignals} · \"$top\"",
+                )
+            }
+            return
+        }
 
         val primary = analysis.candidates.first()
         val now = SystemClock.elapsedRealtime()
@@ -90,16 +104,24 @@ class AccessibilityStreamingService : AccessibilityService() {
         }
     }
 
-    private data class ScreenAnalysis(val candidates: List<String>, val looksLikeDetail: Boolean)
+    private data class ScreenAnalysis(
+        val candidates: List<String>,
+        val looksLikeDetail: Boolean,
+        val sawPlay: Boolean,
+        val detailSignals: Int,
+    )
 
     // Recorre el árbol (acotado): recoge candidatos de título (encabezados primero,
-    // luego textos prominentes, filtrando ruido de UI) y detecta si hay un botón de
-    // reproducir, señal fiable de que estamos en una ficha.
+    // luego textos prominentes), detecta el botón de reproducir y CUENTA señales de
+    // ficha (añadir a lista, descargar, tráiler, temporada, duración…). Con eso
+    // decide si es una ficha aunque el botón no se reconozca (clave en Prime/Max).
     private fun analyzeScreen(root: AccessibilityNodeInfo): ScreenAnalysis {
         val headings = ArrayList<String>()
         val texts = ArrayList<String>()
         val seen = HashSet<String>()
         var sawPlay = false
+        var detailSignals = 0
+        val detailSeen = HashSet<String>()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         var visited = 0
@@ -108,8 +130,11 @@ class AccessibilityStreamingService : AccessibilityService() {
             visited++
             val raw = (node.text ?: node.contentDescription)?.toString()?.trim()
             if (!raw.isNullOrBlank()) {
-                if (!sawPlay && isPlayLabel(raw)) sawPlay = true
-                if (isLikelyTitle(raw) && seen.add(raw.lowercase())) {
+                if (!sawPlay && ScreenHeuristics.isPlayLabel(raw)) sawPlay = true
+                if (ScreenHeuristics.isDetailSignal(raw) && detailSeen.add(raw.lowercase())) {
+                    detailSignals++
+                }
+                if (ScreenHeuristics.isLikelyTitle(raw) && seen.add(raw.lowercase())) {
                     val isHeading =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && node.isHeading
                     if (isHeading) headings.add(raw) else texts.add(raw)
@@ -121,42 +146,18 @@ class AccessibilityStreamingService : AccessibilityService() {
             }
         }
         val ordered = (headings + texts).take(MAX_CANDIDATES)
-        return ScreenAnalysis(ordered, sawPlay)
-    }
-
-    private fun isPlayLabel(t: String): Boolean {
-        val l = t.lowercase()
-        return l == "reproducir" || l == "play" || l == "ver ahora" ||
-            l.startsWith("reproducir") || l.startsWith("ver t") // "Ver T1:E1"
-    }
-
-    private fun isLikelyTitle(t: String): Boolean {
-        if (t.length < 2 || t.length > 80) return false
-        val l = t.lowercase()
-        if (STOP_WORDS.contains(l)) return false
-        if (STOP_PREFIXES.any { l.startsWith(it) }) return false
-        if (t.split(WHITESPACE).size > 10) return false // parece sinopsis
-        if (!t.any { it.isLetter() }) return false
-        return true
+        return ScreenAnalysis(
+            candidates = ordered,
+            looksLikeDetail = ScreenHeuristics.looksLikeDetail(sawPlay, detailSignals),
+            sawPlay = sawPlay,
+            detailSignals = detailSignals,
+        )
     }
 
     companion object {
         private const val DEBOUNCE_MS = 700L
         private const val DEDUP_MS = 60_000L
-        private const val MAX_NODES = 500
+        private const val MAX_NODES = 900
         private const val MAX_CANDIDATES = 4
-        private val WHITESPACE = Regex("\\s+")
-        private val STOP_WORDS = setOf(
-            "reproducir", "play", "descargar", "download", "mi lista", "buscar",
-            "inicio", "novedades", "series", "películas", "peliculas", "más",
-            "mas", "episodios", "episodes", "reparto", "tráiler", "trailer",
-            "detalles", "resumen", "similares", "similar", "compartir",
-            "continuar viendo", "añadir a mi lista", "quitar de mi lista",
-            "ver más", "ver mas", "valorar", "me gusta", "no me gusta", "atrás",
-        )
-        private val STOP_PREFIXES = setOf(
-            "temporada", "season", "episodio", "episode", "capítulo", "capitulo",
-            "año ", "duración", "duracion", "clasificación",
-        )
     }
 }

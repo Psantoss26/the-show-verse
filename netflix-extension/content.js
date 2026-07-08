@@ -226,13 +226,47 @@
     return isValidBrowseTitle(fromTab) ? fromTab : "";
   }
 
+  // Señal RICA de la ficha: además del título, intenta obtener el nombre de la
+  // SERIE + temporada/episodio de los datos estructurados JSON-LD (Prime/Max los
+  // exponen), lo que permite resolver el EPISODIO correcto (no solo la serie) sin
+  // reproducir. Cae al título por selector/encabezado/pestaña y, en último recurso,
+  // a og:title. Solo actúa en URLs de ficha (evita falsos positivos en la home).
+  function detectBrowsingSignal() {
+    const urlRe = DETAILS_URL_RE[platformId];
+    if (urlRe && !urlRe.test(location.href)) return null;
+
+    // 1. JSON-LD (schema.org): fiable y estructurado (serie + T/E).
+    const ld = D.detectFromJsonLd(document);
+    if (ld) {
+      const main = cleanTitleCandidate(ld.showName || ld.movieTitle || ld.episodeName);
+      if (isValidBrowseTitle(main)) {
+        return {
+          mainTitle: main,
+          showName: ld.showName ? cleanTitleCandidate(ld.showName) : "",
+          episodeName: ld.episodeName || "",
+          season: ld.season != null ? ld.season : undefined,
+          episode: ld.episode != null ? ld.episode : undefined,
+        };
+      }
+    }
+
+    // 2. Título por selector propio / encabezado / pestaña (lógica existente).
+    const title = detectBrowsingTitle();
+    if (title) return { mainTitle: title };
+
+    // 3. Último recurso: og:title (mejor que nada para Prime/Max si todo lo demás falla).
+    const og = cleanTitleCandidate(D.detectFromMeta(document));
+    return isValidBrowseTitle(og) ? { mainTitle: og } : null;
+  }
+
   // Muestra el indicador de acceso rápido para la FICHA actual, resolviendo el
   // título contra TMDb en modo resolveOnly (NO añade nada al historial).
   function maybeShowBrowsingIndicator() {
     if (!indicatorEnabled || syncPaused) return;
-    const title = detectBrowsingTitle();
-    if (!title) return;
-    const key = `${platformId}:browse:${title}`;
+    const sig = detectBrowsingSignal();
+    if (!sig || !sig.mainTitle) return;
+    const title = sig.mainTitle;
+    const key = `${platformId}:browse:${sig.showName || title}:${sig.season ?? ""}:${sig.episode ?? ""}`;
     if (key === lastBrowseKey) return; // ya resuelto para esta ficha
     lastBrowseKey = key;
     try {
@@ -242,6 +276,10 @@
           platform: platformId,
           platformName,
           mainTitle: title,
+          showName: sig.showName || "",
+          episodeName: sig.episodeName || "",
+          season: sig.season,
+          episode: sig.episode,
           subTitle: "",
           tabTitle: document.title,
           resolveOnly: true,
@@ -675,6 +713,29 @@
       signal.episodeName = signal.episodeName || lastGood.episodeName;
       if (signal.season == null) signal.season = lastGood.season;
       if (signal.episode == null) signal.episode = lastGood.episode;
+    }
+
+    // Respaldo JSON-LD: Prime Video y Max no exponen artist/album en la Media
+    // Session, así que el nombre de la SERIE se pierde y el "title" (episodio) se
+    // toma por película → el episodio no resuelve (404). Los datos estructurados de
+    // la ficha/reproductor sí traen la serie + temporada/episodio: los usamos para
+    // completar y, si el episodio se había tomado por película, reclasificarlo.
+    if (!signal.showName) {
+      const ld = D.detectFromJsonLd(document);
+      if (ld) {
+        if (ld.showName) {
+          signal.showName = ld.showName;
+          if (signal.movieTitle && !signal.episodeName) {
+            signal.episodeName = signal.movieTitle;
+            signal.movieTitle = undefined;
+          }
+        } else if (ld.movieTitle && !signal.movieTitle) {
+          signal.movieTitle = ld.movieTitle;
+        }
+        if (!signal.episodeName && ld.episodeName) signal.episodeName = ld.episodeName;
+        if (signal.season == null && ld.season != null) signal.season = ld.season;
+        if (signal.episode == null && ld.episode != null) signal.episode = ld.episode;
+      }
     }
 
     // Último recurso: título desde la pestaña si Media Session no dio nombre —
