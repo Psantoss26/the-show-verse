@@ -35,7 +35,23 @@ object SignalBuilder {
         val artist = raw.artist.clean()
         val album = raw.album.clean()
         val subtitle = raw.displaySubtitle.clean()
-        val hasSeries = artist != null || album != null
+        val hasArtistAlbum = artist != null || album != null
+
+        // Algunas apps (HBO Max) NO exponen artist/album en la MediaSession: ponen
+        // el nombre del EPISODIO en `title` y el de la SERIE en `displaySubtitle`.
+        // Sin tratar este caso, el episodio se enviaba como película y TMDb no lo
+        // resolvía → 404 ("Could not resolve TMDb entity for: <episodio>"). Si hay
+        // un subtítulo distinto del título, lo tratamos como serie:
+        // serie = subtítulo, episodio = título.
+        val seriesFromSubtitle = !hasArtistAlbum &&
+            !subtitle.isNullOrBlank() &&
+            !title.isNullOrBlank() &&
+            !subtitle.equals(title, ignoreCase = true)
+        val hasSeries = hasArtistAlbum || seriesFromSubtitle
+
+        // Nombre de la serie y del episodio según de dónde salga la señal de serie.
+        val showTitle = if (hasArtistAlbum) (artist ?: album) else subtitle
+        val episodeTitle = if (hasArtistAlbum) (title ?: subtitle) else title
 
         // Temporada/episodio: probamos subtítulo, álbum, título, displayTitle. El
         // EPISODIO se toma del primer texto que lo tenga; la TEMPORADA se busca en
@@ -63,8 +79,8 @@ object SignalBuilder {
             host = raw.packageName,
             platformId = raw.packageName,
             platformName = platformName,
-            showName = if (hasSeries) (artist ?: album) else null,
-            episodeName = if (hasSeries) (title ?: subtitle) else null,
+            showName = if (hasSeries) showTitle else null,
+            episodeName = if (hasSeries) episodeTitle else null,
             movieTitle = if (hasSeries) null else title,
             season = resolvedSeason,
             episode = se?.second,

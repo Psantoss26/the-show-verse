@@ -67,9 +67,15 @@ class AccessibilityStreamingService : AccessibilityService() {
             val top = analysis.candidates.firstOrNull()
             if (top != null && !top.equals(lastDiagText, ignoreCase = true)) {
                 lastDiagText = top
+                val titles = analysis.candidates.take(3).joinToString(" · ") { "\"$it\"" }
+                // Muestra también las etiquetas de UI cortas de la pantalla (botones,
+                // estados): así, cuando una ficha da señales=0, el registro revela
+                // qué etiquetas usa la plataforma para poder reconocerlas (Prime).
+                val labels = if (analysis.uiLabels.isNotEmpty())
+                    " · ui=[" + analysis.uiLabels.joinToString(", ") + "]" else ""
                 p.addLog(
                     "Ficha no reconocida (${Platforms.nameFor(pkg)}): play=${analysis.sawPlay} " +
-                        "señales=${analysis.detailSignals} · \"$top\"",
+                        "señales=${analysis.detailSignals} · $titles$labels",
                 )
             }
             return
@@ -109,6 +115,9 @@ class AccessibilityStreamingService : AccessibilityService() {
         val looksLikeDetail: Boolean,
         val sawPlay: Boolean,
         val detailSignals: Int,
+        // Etiquetas de UI cortas (no-título) de la pantalla: solo para diagnóstico,
+        // para descubrir qué botones/estados expone cada plataforma en su ficha.
+        val uiLabels: List<String> = emptyList(),
     )
 
     // Recorre el árbol (acotado): recoge candidatos de título (encabezados primero,
@@ -118,7 +127,9 @@ class AccessibilityStreamingService : AccessibilityService() {
     private fun analyzeScreen(root: AccessibilityNodeInfo): ScreenAnalysis {
         val headings = ArrayList<String>()
         val texts = ArrayList<String>()
+        val labels = ArrayList<String>()
         val seen = HashSet<String>()
+        val labelSeen = HashSet<String>()
         var sawPlay = false
         var detailSignals = 0
         val detailSeen = HashSet<String>()
@@ -138,6 +149,13 @@ class AccessibilityStreamingService : AccessibilityService() {
                     val isHeading =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && node.isHeading
                     if (isHeading) headings.add(raw) else texts.add(raw)
+                } else if (raw.length in 2..28 && raw.split(' ').size <= 4 &&
+                    raw.any { it.isLetter() } && labels.size < MAX_LABELS &&
+                    labelSeen.add(raw.lowercase())
+                ) {
+                    // Texto corto que NO es título (botón/estado): candidato a señal
+                    // de ficha aún no reconocida. Solo para diagnóstico.
+                    labels.add(raw)
                 }
             }
             val count = node.childCount
@@ -151,6 +169,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             looksLikeDetail = ScreenHeuristics.looksLikeDetail(sawPlay, detailSignals),
             sawPlay = sawPlay,
             detailSignals = detailSignals,
+            uiLabels = labels,
         )
     }
 
@@ -159,5 +178,6 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val DEDUP_MS = 60_000L
         private const val MAX_NODES = 900
         private const val MAX_CANDIDATES = 4
+        private const val MAX_LABELS = 8
     }
 }
