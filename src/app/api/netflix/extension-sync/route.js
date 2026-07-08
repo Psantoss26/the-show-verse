@@ -209,7 +209,11 @@ export async function POST(request) {
       tabTitle,
       queueTitle,
       albumArtist,
-      showCandidates: [notifTitle, notifText, notifSubText],
+      // subTitle y seasonEpisodeText como candidatos de respaldo del nombre de la
+      // SERIE: algunas apps (HBO Max) esconden ahí el nombre de la serie cuando el
+      // `title` es el episodio. Van al final (baja prioridad) para no pisar las
+      // fuentes fiables cuando existen.
+      showCandidates: [notifTitle, notifText, notifSubText, subTitle, seasonEpisodeText],
       isSeries,
     });
     if (!queryVariants.length) {
@@ -284,6 +288,21 @@ export async function POST(request) {
           }
         } catch (e) {
           console.warn("[Extension Sync] episode-by-name lookup failed:", e?.message);
+        }
+      }
+
+      // Serie reconocida por el subtítulo (HBO Max: serie en dSub, episodio en
+      // title, SIN número de temporada). Con el nombre del episodio pero sin
+      // temporada, lo localizamos por NOMBRE en TODAS las temporadas para fijar T/E.
+      if (episode == null && episodeName && TMDB_API_KEY) {
+        const hit = await findSeasonByEpisodeName(tmdbId, episodeName);
+        if (hit) {
+          season = hit.season;
+          episode = hit.episode;
+          confidence = "medium";
+          console.log(
+            `[Extension Sync] T/E fijado por nombre de episodio (show_level): "${episodeName}" → T${season}E${episode}`,
+          );
         }
       }
 

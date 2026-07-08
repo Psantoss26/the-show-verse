@@ -20,6 +20,44 @@ object ScreenHeuristics {
     private val RATING_RE =
         Regex("^(?:\\+?\\d{1,2}\\+?|tv-?(?:ma|14|pg|g|y7?)|nr|ur|apta|todos los p[uú]blicos)$")
 
+    /** Normaliza para comparar: minúsculas, sin puntos/puntos suspensivos finales
+     *  ("Cargando…" → "cargando") ni espacios de más. */
+    private fun norm(text: String): String =
+        text.trim().trimEnd('.', '…', '·', ' ').replace(WHITESPACE, " ").lowercase().trim()
+
+    // Cromo de navegación/sistema que el árbol de accesibilidad expone como texto o
+    // contentDescription y que NO es un título: botones de barra, estados de carga,
+    // el reproductor… Prime Video, sobre todo, los emitía como candidatos ("Back",
+    // "Cargando…", "Reproductor de vídeo") y acababan resolviéndose por error.
+    private val UI_CHROME = setOf(
+        "back", "atrás", "atras", "volver", "cerrar", "close", "cancelar", "cancel",
+        "aceptar", "ok", "listo", "done", "buscar", "search", "inicio", "home",
+        "menú", "menu", "más opciones", "mas opciones", "opciones", "options",
+        "siguiente", "next", "anterior", "previous", "saltar", "skip",
+        "saltar intro", "saltar introducción", "skip intro", "saltar créditos",
+        "skip credits", "reproducir/pausa", "pausa", "pause", "reproducir siguiente",
+        "cargando", "loading", "cargando contenido", "buffering",
+        "reproductor de vídeo", "reproductor de video", "video player",
+        "reproduciendo vídeo", "reproduciendo video", "reproduciendo",
+        "now playing", "en directo", "en vivo", "live", "directo",
+        "perfil", "profile", "mi cuenta", "cuenta", "account", "ajustes",
+        "settings", "configuración", "configuracion", "descargas", "downloads",
+        "novedades", "explorar", "browse", "categorías", "categorias", "canales",
+        "guía", "guia", "tienda", "store", "ver todo", "ver todos", "see all",
+    )
+
+    // Nombres de plataforma "a secas": nunca son un título de contenido (buscarlos
+    // en TMDb devolvería basura tipo "Netflix Tudum"). Mismo criterio que el backend
+    // (queryVariants.isBarePlatformName), replicado aquí para descartarlos antes.
+    private val PLATFORM_NAMES = setOf(
+        "netflix", "prime video", "amazon prime video", "amazon", "max", "hbo max",
+        "hbo", "disney+", "disney plus", "disney", "star+", "star plus", "star",
+        "paramount+", "paramount plus", "paramount", "apple tv+", "apple tv",
+        "movistar+", "movistar plus", "movistar", "filmin", "skyshowtime",
+        "pluto tv", "pluto", "rakuten tv", "rakuten", "atresplayer", "rtve",
+        "rtve play", "crunchyroll", "plex",
+    )
+
     private val PLAY_EXACT = setOf(
         "reproducir", "play", "ver ahora", "reproducir ahora", "play now",
         "reanudar", "resume", "continuar", "continuar viendo", "continue watching",
@@ -51,6 +89,14 @@ object ScreenHeuristics {
         "compartir", "share", "valorar", "rate", "me gusta", "no me gusta",
         "quitar de mi lista", "remove from my list", "extras", "ver tráileres",
         "audio y subtítulos", "audio and subtitles", "próximos episodios",
+        // Señales típicas de la FICHA de Prime Video (usa etiquetas propias que no
+        // casaban con las de Netflix/Max, por eso su ficha daba señales=0).
+        "watchlist", "añadir a la watchlist", "agregar a la watchlist",
+        "quitar de la watchlist", "incluido con prime", "incluido en prime",
+        "ver con prime", "incluido", "comprar", "alquilar", "comprar o alquilar",
+        "buy", "rent", "rent or buy", "x-ray", "rayos x", "descripción",
+        "descripcion", "description", "idiomas", "audio e idiomas",
+        "más como esto", "mas como esto", "más títulos como este",
     )
     private val DETAIL_PREFIXES = setOf(
         "temporada", "season", "episodio", "episode", "capítulo", "capitulo",
@@ -87,7 +133,10 @@ object ScreenHeuristics {
         val t = text?.trim() ?: return false
         if (t.length < 2 || t.length > 80) return false
         val l = t.lowercase()
+        val n = norm(t)
         if (STOP_WORDS.contains(l)) return false
+        if (UI_CHROME.contains(n)) return false        // "Back", "Cargando…", "Reproductor de vídeo"
+        if (PLATFORM_NAMES.contains(n)) return false   // "Amazon Prime Video", "Max"…
         if (STOP_PREFIXES.any { l.startsWith(it) }) return false
         if (t.split(WHITESPACE).size > 10) return false // parece sinopsis
         if (!t.any { it.isLetter() }) return false

@@ -32,8 +32,31 @@ class ScreenHeuristicsTest {
         assertTrue(ScreenHeuristics.isDetailSignal("45 min"))
         assertTrue(ScreenHeuristics.isDetailSignal("16+"))
         assertTrue(ScreenHeuristics.isDetailSignal("TV-MA"))
+        // Etiquetas propias de la ficha de Prime Video.
+        assertTrue(ScreenHeuristics.isDetailSignal("Watchlist"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Incluido con Prime"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Comprar"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Alquilar"))
+        assertTrue(ScreenHeuristics.isDetailSignal("X-Ray"))
         assertFalse(ScreenHeuristics.isDetailSignal("The Boys"))
         assertFalse(ScreenHeuristics.isDetailSignal(""))
+    }
+
+    @Test
+    fun rejectsNavigationAndPlatformChromeAsTitles() {
+        // Cromo de navegación/sistema que Prime Video emitía como candidatos.
+        assertFalse(ScreenHeuristics.isLikelyTitle("Back"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Atrás"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Cargando…"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Reproductor de vídeo"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Reproduciendo vídeo"))
+        // Nombres de plataforma a secas.
+        assertFalse(ScreenHeuristics.isLikelyTitle("Amazon Prime Video"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Max"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Netflix"))
+        // Títulos reales que se parecen pero SÍ deben pasar.
+        assertTrue(ScreenHeuristics.isLikelyTitle("Off Campus"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("Secretos compartidos"))
     }
 
     @Test
