@@ -517,20 +517,14 @@ export async function traktGetLists({
   limit = 10,
   countOnly = false,
 }) {
-  const qs = new URLSearchParams({
-    type: String(type),
-    tmdbId: String(tmdbId),
-    tab: String(tab),
-    page: String(page),
-    limit: String(limit),
-    countOnly: String(countOnly),
-  });
-  const res = await fetch(`/api/trakt/community/lists?${qs.toString()}`, {
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/lists?limit=${limit}`, {
     cache: "no-store",
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error cargando listas");
-  return json;
+  // Contract preserved: return json.items (each { list, user, previewPosters }).
+  return countOnly ? { pagination: { itemCount: json.items?.length || 0 } } : json;
 }
 
 export async function traktGetShowSeasons({ tmdbId, extended = "full" }) {

@@ -61,54 +61,16 @@ function Poster({ posterPath, alt }) {
     )
 }
 
-function keyForItem(it, fallbackIdx) {
-    const t = it?.type || 'item'
-    const m = it?.movie?.ids?.trakt
-    const s = it?.show?.ids?.trakt
-    const p = it?.person?.ids?.trakt
-    const e = it?.episode?.ids?.trakt
-    const se = it?.season?.ids?.trakt
-    const showRef = it?.show?.ids?.trakt || it?.show?.ids?.slug || null
-    const seasonNumber = it?.season?.number ?? it?.episode?.season ?? null
-    const episodeNumber = it?.episode?.number ?? null
-    const listedAt = it?.listed_at || null
-    const id = m || s || p || e || se || 'item'
-
-    return [
-        t,
-        id,
-        showRef,
-        seasonNumber,
-        episodeNumber,
-        listedAt,
-        fallbackIdx,
-    ]
-        .filter((value) => value !== null && value !== undefined && value !== '')
-        .join('-')
-}
-
-function identityForItem(it) {
-    const type = it?.type || 'item'
-    const movieId = it?.movie?.ids?.trakt || it?.movie?.ids?.tmdb || it?.movie?.ids?.imdb
-    const showId = it?.show?.ids?.trakt || it?.show?.ids?.tmdb || it?.show?.ids?.imdb || it?.show?.ids?.slug
-    const personId = it?.person?.ids?.trakt || it?.person?.ids?.tmdb || it?.person?.ids?.imdb
-
-    if ((type === 'episode' || type === 'season' || it?.episode || it?.season) && showId) {
-        return `show:${showId}`
-    }
-    if (movieId) return `movie:${movieId}`
-    if (type === 'show' && showId) return `show:${showId}`
-    if (personId) return `person:${personId}`
-
-    return keyForItem(it, 0)
-}
-
+// Items ahora vienen tal cual de community_list_items (fila de la tabla, ya
+// deduplicada en BD por (listId, tmdbId, mediaType)): { tmdbId, mediaType,
+// title, posterPath, position, addedAt }. Ya no son objetos Trakt con
+// .movie/.show/.episode/.season/._tmdb.
 function dedupeItems(items) {
     const seen = new Set()
     const out = []
 
     for (const item of Array.isArray(items) ? items : []) {
-        const key = identityForItem(item)
+        const key = `${item?.mediaType || 'item'}:${item?.tmdbId ?? ''}`
         if (seen.has(key)) continue
         seen.add(key)
         out.push(item)
@@ -117,18 +79,9 @@ function dedupeItems(items) {
     return out
 }
 
-function buildItemTitle(it) {
-    if (it?.episode || it?.season) return it?.show?.title || 'Serie'
-
-    return it?.movie?.title || it?.show?.title || it?.person?.name || 'Elemento'
-}
-
-function buildItemHref(it, mediaType, tmdbId) {
-    if (!tmdbId) return null
-
-    if ((it?.episode || it?.season) && it?.show?.ids?.tmdb) return `/details/tv/${it.show.ids.tmdb}`
-
-    return mediaType ? `/details/${mediaType}/${tmdbId}` : null
+function computeHasMore(list, loadedCount) {
+    const total = Number(list?.item_count || 0)
+    return total > 0 && Number(loadedCount || 0) < total
 }
 
 const tmdbImg = (path, size = 'w500') => path ? `https://image.tmdb.org/t/p/${size}${path}` : null
@@ -152,10 +105,14 @@ export default function TraktListDetailsClient({ username, listId }) {
         stateRef.current = state
     }, [state])
 
+    // `listId` ahora es el uuid interno de community_lists (lo llevan las
+    // tarjetas de discover vía list.id — ver useTraktLists.js). `username` ya
+    // no participa en la ruta del backend; se conserva como prop solo para
+    // fallback de visualización (creatorUsername) y para el enlace "Ver en Trakt".
     const baseApiUrl = useMemo(() => {
-        if (!username || !listId) return null
-        return `/api/trakt/lists/${encodeURIComponent(username)}/${encodeURIComponent(listId)}`
-    }, [username, listId])
+        if (!listId) return null
+        return `/api/community/lists/${encodeURIComponent(listId)}`
+    }, [listId])
 
     useEffect(() => {
         document.title = formatPageTitle(state.list?.name || 'Lista')
@@ -192,14 +149,17 @@ export default function TraktListDetailsClient({ username, listId }) {
                 try {
                     const json = await fetchPage(1)
                     if (cancelled) return
+                    const items = dedupeItems(json?.items)
                     const nextState = {
                         loading: false,
                         loadingMore: false,
                         error: null,
                         list: json?.list || null,
-                        items: dedupeItems(json?.items),
-                        page: json?.page || 1,
-                        hasMore: !!json?.hasMore,
+                        items,
+                        page: 1,
+                        // El endpoint {list, items} no trae paginación: la
+                        // derivamos de list.item_count vs. lo ya cargado.
+                        hasMore: computeHasMore(json?.list, items.length),
                     }
 
                     writeDetailsCache(username, listId, nextState)
@@ -242,14 +202,15 @@ export default function TraktListDetailsClient({ username, listId }) {
             const json = await fetchPage(nextPage)
 
             setState((p) => {
+                const items = dedupeItems([...(p.items || []), ...(Array.isArray(json?.items) ? json.items : [])])
                 const nextState = {
                     ...p,
                     loadingMore: false,
                     error: null,
-                    // list: lo dejamos como el que ya tenemos
-                    items: dedupeItems([...(p.items || []), ...(Array.isArray(json?.items) ? json.items : [])]),
-                    page: json?.page || nextPage,
-                    hasMore: !!json?.hasMore,
+                    list: json?.list || p.list,
+                    items,
+                    page: nextPage,
+                    hasMore: computeHasMore(json?.list || p.list, items.length),
                 }
                 writeDetailsCache(username, listId, nextState)
                 return nextState
@@ -294,22 +255,22 @@ export default function TraktListDetailsClient({ username, listId }) {
                 : `https://trakt.tv/users/${username}/lists/${slugOrId}`)
             : null
 
-    const firstPoster = items.find((item) => item?._tmdb?.poster_path)?._tmdb?.poster_path
-    const firstBackdrop = items.find((item) => item?._tmdb?.backdrop_path)?._tmdb?.backdrop_path || firstPoster
+    const firstPoster = items.find((item) => item?.posterPath)?.posterPath
+    const firstBackdrop = firstPoster
 
+    // Item shape nuevo (community_list_items): { tmdbId, mediaType, title, posterPath, addedAt }.
     const getTraktMeta = useCallback((it, index) => {
-        const tmdb = it?._tmdb || null
-        const mediaType = tmdb?.media_type || (it?.movie ? 'movie' : it?.show ? 'tv' : null)
-        const tmdbId = tmdb?.id || it?.movie?.ids?.tmdb || it?.show?.ids?.tmdb || null
+        const tmdbId = it?.tmdbId ?? null
+        const mediaType = it?.mediaType || null
         return {
             id: tmdbId || index,
-            title: buildItemTitle(it),
+            title: it?.title || 'Elemento',
             mediaType,
-            year: String(it?.movie?.year || it?.show?.year || ''),
-            posterPath: tmdb?.poster_path || tmdb?.backdrop_path || null,
-            href: buildItemHref(it, mediaType, tmdbId),
-            voteAverage: tmdb?.vote_average || null,
-            addedAt: it?.listed_at || '',
+            year: '',
+            posterPath: it?.posterPath || null,
+            href: tmdbId && mediaType ? `/details/${mediaType}/${tmdbId}` : null,
+            voteAverage: null,
+            addedAt: it?.addedAt || '',
         }
     }, [])
 
