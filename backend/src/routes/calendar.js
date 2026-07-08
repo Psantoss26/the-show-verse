@@ -12,9 +12,11 @@ import {
   getCalendarShowDetails,
   buildUpcomingEpisodeEntries,
   mapLimit,
+  getShowEpisodesInRange,
 } from '../dashboard/pools.js';
 import { loadLibrary, libraryBasisHash } from '../dashboard/library.js';
 import { getUserRecommendations } from '../dashboard/recommendations.js';
+import { parseCalendarRange } from '../dashboard/calendarRange.js';
 
 const MAX_ITEMS = 30;
 // Series "en progreso" a considerar: las más recientes del historial. Evita
@@ -106,6 +108,58 @@ export default async function calendarRoutes(fastify) {
   // GET /v1/calendar/episodes
   fastify.get('/episodes', async (req, reply) => {
     const userId = req.user?.id || null;
+
+    // Rango explícito (`start`/`days`): usado por el Calendario dedicado para
+    // navegar semanas/meses. Devuelve pronto, sin caer en la lógica de pool
+    // fijo (45 días) usada por el carrusel del home cuando no hay parámetros.
+    const hasRange = req.query?.start != null || req.query?.days != null;
+    if (hasRange) {
+      try {
+        const { startMs, endMs } = parseCalendarRange({
+          start: req.query.start,
+          days: req.query.days,
+        });
+
+        // Anónimo: series de la base popular (pool cacheado) dentro del rango.
+        if (!userId) {
+          const base = await getPool('calendar_episodes', 'tv').catch(() => []);
+          const baseIds = [
+            ...new Set(base.map((e) => Number(e?.show?.tmdbId)).filter(Boolean)),
+          ].slice(0, 40);
+          const items = (
+            await mapLimit(baseIds, 6, (id) => getShowEpisodesInRange(id, { startMs, endMs }))
+          )
+            .flat()
+            .sort(byAirDate)
+            .slice(0, MAX_ITEMS);
+          reply.header('Cache-Control', 'public, max-age=300');
+          return { items };
+        }
+
+        // Autenticado: las series del usuario dentro del rango, priorizadas por fuente.
+        const sourcesByShow = await loadUserShowSources(userId);
+        const userIds = [...sourcesByShow.entries()]
+          .sort(([, a], [, b]) => sourceRank(a) - sourceRank(b))
+          .map(([id]) => id)
+          .slice(0, MAX_USER_ENRICH);
+        const items = dedupeById(
+          (
+            await mapLimit(userIds, 8, async (id) => {
+              const eps = await getShowEpisodesInRange(id, { startMs, endMs });
+              const src = orderSources(sourcesByShow.get(id));
+              return eps.map((e) => ({ ...e, sources: src }));
+            })
+          ).flat(),
+        )
+          .sort(byAirDate)
+          .slice(0, MAX_ITEMS);
+        reply.header('Cache-Control', 'private, no-store');
+        return { items };
+      } catch (err) {
+        req.log?.warn?.({ err }, 'calendar episodes range failed');
+        return { items: [] };
+      }
+    }
 
     try {
       const base = await getPool('calendar_episodes', 'tv').catch(() => []);
