@@ -28,6 +28,13 @@ import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
+import {
+  buildImg,
+  fetchBestWatchingBackdrop,
+  fetchBestWatchingPoster,
+  getArtworkPreference,
+  preloadImage,
+} from "@/lib/dashboard/media";
 
 // ----------------------------
 // HELPERS
@@ -145,47 +152,10 @@ function getProgressColor(pct) {
 // ----------------------------
 // IMÁGENES (mismo criterio que Historial/En progreso)
 // ----------------------------
-const buildImg = (path, size = "w500") =>
-  path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
-
 const posterChoiceCache = new Map();
 const posterInFlight = new Map();
 const backdropChoiceCache = new Map();
 const backdropInFlight = new Map();
-
-function preloadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) return resolve(false);
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = src;
-  });
-}
-
-function pickBestByVotes(list) {
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const maxVotes = list.reduce((m, p) => ((p.vote_count || 0) > m ? p.vote_count || 0 : m), 0);
-  const top = list.filter((p) => (p.vote_count || 0) === maxVotes);
-  const en = top.filter((p) => p.iso_639_1 === "en" || p.iso_639_1 === "en-US");
-  const nul = top.filter((p) => p.iso_639_1 === null);
-  const pool = en.length ? en : nul.length ? nul : top;
-  return [...pool].sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.width || 0) - (a.width || 0))[0] || null;
-}
-
-async function fetchImages(type, id, kind) {
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey || !type || !id) return null;
-  try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return pickBestByVotes(kind === "poster" ? j?.posters : j?.backdrops)?.file_path || null;
-  } catch {
-    return null;
-  }
-}
 
 function cachedImage(type, id, kind) {
   const cache = kind === "poster" ? posterChoiceCache : backdropChoiceCache;
@@ -194,7 +164,10 @@ function cachedImage(type, id, kind) {
   if (cache.has(key)) return cache.get(key);
   if (inflight.has(key)) return inflight.get(key);
   const p = (async () => {
-    const chosen = await fetchImages(type, id, kind);
+    const chosen =
+      kind === "poster"
+        ? await fetchBestWatchingPoster(id, type)
+        : await fetchBestWatchingBackdrop(id, type);
     cache.set(key, chosen || null);
     inflight.delete(key);
     return chosen || null;
@@ -206,6 +179,8 @@ function cachedImage(type, id, kind) {
 function SmartImage({ item, kind, alt, imgClassName = "" }) {
   const type = mediaTypeOf(item);
   const id = item.id;
+  const itemPosterPath = item.poster_path || null;
+  const itemBackdropPath = item.backdrop_path || null;
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
 
@@ -216,9 +191,17 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     (async () => {
       const key = `${type}:${id}`;
       const cache = kind === "poster" ? posterChoiceCache : backdropChoiceCache;
+      const preference = getArtworkPreference(id, type);
+      const preferredPath =
+        kind === "poster" ? preference.poster : preference.backdrop;
+      const fallbackPath =
+        kind === "poster"
+          ? itemPosterPath || itemBackdropPath || null
+          : itemBackdropPath || itemPosterPath || null;
       let finalPath;
-      if (cache.has(key)) finalPath = cache.get(key) || item.poster_path || item.backdrop_path || null;
-      else finalPath = (await cachedImage(type, id, kind)) || item.poster_path || item.backdrop_path || null;
+      if (preferredPath) finalPath = preferredPath;
+      else if (cache.has(key)) finalPath = cache.get(key) || fallbackPath;
+      else finalPath = (await cachedImage(type, id, kind)) || fallbackPath;
       if (!finalPath || abort) return;
       const url = buildImg(finalPath, kind === "poster" ? "w500" : "w1280");
       await preloadImage(url);
@@ -230,7 +213,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, kind]);
+  }, [type, id, kind, itemPosterPath, itemBackdropPath]);
 
   const Fallback = kind === "poster" ? Film : Tv;
   return (

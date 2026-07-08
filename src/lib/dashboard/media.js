@@ -132,12 +132,13 @@ export const movieBackdropCache = new Map();
 export const movieImagesCache = new Map();
 
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
-export function getArtworkPreference(movieId) {
+export function getArtworkPreference(movieId, mediaType = "movie") {
   if (typeof window === "undefined") {
     return { poster: null, backdrop: null };
   }
-  const posterKey = `showverse:movie:${movieId}:poster`;
-  const backdropKey = `showverse:movie:${movieId}:backdrop`;
+  const type = mediaType === "tv" ? "tv" : "movie";
+  const posterKey = `showverse:${type}:${movieId}:poster`;
+  const backdropKey = `showverse:${type}:${movieId}:backdrop`;
   const poster = window.localStorage.getItem(posterKey);
   const backdrop = window.localStorage.getItem(backdropKey);
   return {
@@ -365,6 +366,141 @@ export async function fetchBestPoster(itemId, mediaType = "movie") {
   });
 
   return best?.file_path || null;
+}
+
+/* ========== Artwork para secciones de visionado (En progreso/Completadas) ========== */
+const watchingPosterChoiceCache = new Map();
+const watchingPosterInFlight = new Map();
+const watchingBackdropChoiceCache = new Map();
+const watchingBackdropInFlight = new Map();
+
+function pickBestWatchingPoster(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) return null;
+
+  const maxVotes = posters.reduce(
+    (max, p) => ((p?.vote_count || 0) > max ? p.vote_count || 0 : max),
+    0,
+  );
+  const withMaxVotes = posters.filter((p) => (p?.vote_count || 0) === maxVotes);
+  if (!withMaxVotes.length) return null;
+
+  const preferredLangs = new Set(["en", "en-US"]);
+  const enGroup = withMaxVotes.filter(
+    (p) => p?.iso_639_1 && preferredLangs.has(p.iso_639_1),
+  );
+  const nullLang = withMaxVotes.filter((p) => p?.iso_639_1 === null);
+  const candidates = enGroup.length
+    ? enGroup
+    : nullLang.length
+      ? nullLang
+      : withMaxVotes;
+
+  return (
+    [...candidates].sort((a, b) => {
+      const va = (b?.vote_average || 0) - (a?.vote_average || 0);
+      if (va !== 0) return va;
+      return (b?.width || 0) - (a?.width || 0);
+    })[0] || null
+  );
+}
+
+function pickBestWatchingBackdrop(list, opts = {}) {
+  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
+  if (!Array.isArray(list) || list.length === 0) return null;
+
+  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
+  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
+  const isPreferredLang = (img) => {
+    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
+    return preferSet.has(norm(img?.iso_639_1));
+  };
+
+  const pool0 =
+    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
+  const pool = pool0.length ? pool0 : list;
+
+  const top3en = [];
+  for (const b of pool) {
+    if (isPreferredLang(b)) top3en.push(b);
+    if (top3en.length === 3) break;
+  }
+  if (!top3en.length) return null;
+
+  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
+  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
+  if (b1080) return b1080;
+  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
+  if (b1440) return b1440;
+  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
+  if (b4k) return b4k;
+  const b720 = top3en.find((b) => isRes(b, 1280, 720));
+  if (b720) return b720;
+  return top3en[0];
+}
+
+async function fetchWatchingImages(itemId, mediaType = "movie") {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (!apiKey || !itemId) return { posters: [], backdrops: [] };
+
+  try {
+    const type = mediaType === "tv" ? "tv" : "movie";
+    const url =
+      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
+      `?api_key=${apiKey}&include_image_language=en,en-US,null`;
+    const r = await fetch(url, { cache: "force-cache" });
+    if (!r.ok) return { posters: [], backdrops: [] };
+    const j = await r.json();
+    return {
+      posters: Array.isArray(j?.posters) ? j.posters : [],
+      backdrops: Array.isArray(j?.backdrops) ? j.backdrops : [],
+    };
+  } catch {
+    return { posters: [], backdrops: [] };
+  }
+}
+
+export async function fetchBestWatchingPoster(itemId, mediaType = "movie") {
+  const type = mediaType === "tv" ? "tv" : "movie";
+  const key = `${type}:${itemId}`;
+  if (watchingPosterChoiceCache.has(key)) {
+    return watchingPosterChoiceCache.get(key);
+  }
+  if (watchingPosterInFlight.has(key)) return watchingPosterInFlight.get(key);
+
+  const promise = (async () => {
+    const { posters } = await fetchWatchingImages(itemId, type);
+    const chosen = pickBestWatchingPoster(posters)?.file_path || null;
+    watchingPosterChoiceCache.set(key, chosen);
+    watchingPosterInFlight.delete(key);
+    return chosen;
+  })();
+
+  watchingPosterInFlight.set(key, promise);
+  return promise;
+}
+
+export async function fetchBestWatchingBackdrop(itemId, mediaType = "movie") {
+  const type = mediaType === "tv" ? "tv" : "movie";
+  const key = `${type}:${itemId}`;
+  if (watchingBackdropChoiceCache.has(key)) {
+    return watchingBackdropChoiceCache.get(key);
+  }
+  if (watchingBackdropInFlight.has(key)) return watchingBackdropInFlight.get(key);
+
+  const promise = (async () => {
+    const { backdrops } = await fetchWatchingImages(itemId, type);
+    const chosen =
+      pickBestWatchingBackdrop(backdrops, {
+        preferLangs: ["en", "en-US"],
+        minWidth: 1200,
+      })?.file_path || null;
+    watchingBackdropChoiceCache.set(key, chosen);
+    watchingBackdropInFlight.delete(key);
+    return chosen;
+  })();
+
+  watchingBackdropInFlight.set(key, promise);
+  return promise;
 }
 
 // Selecciona el mejor cartel SIN idioma (textless). Si no hay textless, cae al
