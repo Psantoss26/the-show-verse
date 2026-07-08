@@ -7,8 +7,18 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 const cache = new Map();             // key -> { ts, value }
 let rateLockedUntil = 0;
 
+// Cloudflare (delante de api.trakt.tv) rechaza con 403 las peticiones SIN cabecera
+// User-Agent (el fetch de Node no envía ninguna por defecto). Cualquier UA descriptiva
+// pasa el bot-check; se deja configurable por si Trakt pidiera una concreta.
+const USER_AGENT = process.env.TRAKT_USER_AGENT || 'TheShowVerse/1.0 (+https://theshowverse.app)';
+
 function headers() {
-  return { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': CLIENT_ID };
+  return {
+    'Content-Type': 'application/json',
+    'User-Agent': USER_AGENT,
+    'trakt-api-version': '2',
+    'trakt-api-key': CLIENT_ID,
+  };
 }
 
 async function traktGet(path, { retries = 2 } = {}) {
