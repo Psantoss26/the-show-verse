@@ -485,7 +485,6 @@ export default function CalendarPage() {
   const [trackedEpisodes, setTrackedEpisodes] = useState([]);
   const [moviesLoading, setMoviesLoading] = useState(true);
   const [episodesLoading, setEpisodesLoading] = useState(true);
-  const [traktConnected, setTraktConnected] = useState(null);
   const [episodeError, setEpisodeError] = useState(null);
   const [error, setError] = useState(null);
 
@@ -529,6 +528,19 @@ export default function CalendarPage() {
     }
   }, [selectedDate, viewMode]);
 
+  // Nº de días del rango para la llamada de episodios (Día=1, Semana=7, Mes=días del mes).
+  const episodeDays = useMemo(() => {
+    switch (viewMode) {
+      case "week":
+        return 7;
+      case "month":
+        return endOfMonth(selectedDate).getDate();
+      case "day":
+      default:
+        return 1;
+    }
+  }, [viewMode, selectedDate]);
+
   useEffect(() => {
     const fetchMovies = async () => {
       try {
@@ -563,23 +575,22 @@ export default function CalendarPage() {
 
         const data = await getTrackedEpisodesByDateRange(
           dateRange.start,
-          dateRange.end,
+          episodeDays,
         );
 
-        setTraktConnected(data?.connected === true);
         setTrackedEpisodes(Array.isArray(data?.items) ? data.items : []);
         if (data?.error) setEpisodeError(data.error);
       } catch (err) {
-        console.error("Error al cargar episodios Trakt:", err);
+        console.error("Error al cargar episodios:", err);
         setTrackedEpisodes([]);
-        setEpisodeError("No se han podido cargar tus episodios de Trakt.");
+        setEpisodeError("No se han podido cargar los episodios de tus series.");
       } finally {
         setEpisodesLoading(false);
       }
     };
 
     fetchTrackedEpisodes();
-  }, [dateRange.start, dateRange.end]);
+  }, [dateRange.start, episodeDays]);
 
   const isTodaySelected = isToday(selectedDate);
 
@@ -795,14 +806,6 @@ export default function CalendarPage() {
               </span>
               .
             </p>
-            {traktConnected === false && (
-              <Link
-                href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
-                className="mt-6 rounded-xl px-4 py-2 text-sm font-bold transition bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-purple-300 hover:text-white hover:from-white/15 hover:to-white/10"
-              >
-                Conectar Trakt
-              </Link>
-            )}
           </div>
         ) : (
           <>
@@ -825,75 +828,52 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {(episodesLoading ||
-              hasEpisodes ||
-              traktConnected === false ||
-              episodeError) && (
-              <section className="mb-10 px-2 sm:px-0">
-                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <div className="mb-1 flex items-center gap-2 text-purple-300">
-                      <Tv2 className="h-4 w-4" />
-                      <h2 className="text-lg font-black tracking-tight text-white sm:text-2xl">
-                        Episodios de tus series
-                      </h2>
-                    </div>
+            <section className="mb-10 px-2 sm:px-0">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="mb-1 flex items-center gap-2 text-purple-300">
+                    <Tv2 className="h-4 w-4" />
+                    <h2 className="text-lg font-black tracking-tight text-white sm:text-2xl">
+                      Episodios de tus series
+                    </h2>
                   </div>
-                  {hasEpisodes && (
-                    <span className="w-fit rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-300 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      {sortedTrackedEpisodes.length} episodios
-                    </span>
-                  )}
                 </div>
-
-                {episodesLoading ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="aspect-[16/9] animate-pulse rounded-xl border border-white/5 bg-zinc-900"
-                      />
-                    ))}
-                  </div>
-                ) : traktConnected === false ? (
-                  <div className="flex flex-col items-start gap-3 rounded-[2rem] p-5 sm:flex-row sm:items-center sm:justify-between bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                    <div>
-                      <h3 className="font-bold text-purple-100">
-                        Conecta Trakt para ver tus episodios
-                      </h3>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        El calendario podrá cruzar tus pendientes y favoritas
-                        con los próximos estrenos.
-                      </p>
-                    </div>
-                    <Link
-                      href={`/api/trakt/auth/start?next=${encodeURIComponent("/calendar")}`}
-                      className="rounded-xl px-4 py-2 text-sm font-bold transition bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-purple-300 hover:text-white hover:from-white/15 hover:to-white/10"
-                    >
-                      Conectar
-                    </Link>
-                  </div>
-                ) : hasEpisodes ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {sortedTrackedEpisodes.map((item) => (
-                      <EpisodeCard
-                        key={item.id}
-                        item={item}
-                        viewMode={viewMode}
-                      />
-                    ))}
-                  </div>
-                ) : episodeError ? (
-                  <div className="rounded-[2rem] p-4 text-sm text-red-200 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
-                    {episodeError}
-                  </div>
-                ) : (
-                  <div className="rounded-[2rem] p-5 text-sm text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
-                    No hay episodios de tus series para este periodo.
-                  </div>
+                {hasEpisodes && (
+                  <span className="w-fit rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-300 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    {sortedTrackedEpisodes.length} episodios
+                  </span>
                 )}
-              </section>
-            )}
+              </div>
+
+              {episodesLoading ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="aspect-[16/9] animate-pulse rounded-xl border border-white/5 bg-zinc-900"
+                    />
+                  ))}
+                </div>
+              ) : hasEpisodes ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {sortedTrackedEpisodes.map((item) => (
+                    <EpisodeCard
+                      key={item.id}
+                      item={item}
+                      viewMode={viewMode}
+                    />
+                  ))}
+                </div>
+              ) : episodeError ? (
+                <div className="rounded-[2rem] p-4 text-sm text-red-200 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
+                  {episodeError}
+                </div>
+              ) : (
+                <div className="rounded-[2rem] p-5 text-sm text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-center">
+                  No hay episodios en este rango.
+                </div>
+              )}
+            </section>
 
             {hasMovies && (
               <section className="px-2 sm:px-0">

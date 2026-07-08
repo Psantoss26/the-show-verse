@@ -45,21 +45,37 @@ export async function getMoviesByDateRange(startDate, endDate) {
   return movies;
 }
 
-export async function getTrackedEpisodesByDateRange(startDate, endDate) {
+export async function getTrackedEpisodesByDateRange(startDate, days) {
   const formattedStart = startDate.toISOString().split("T")[0];
-  const formattedEnd = endDate.toISOString().split("T")[0];
   const params = new URLSearchParams({
     start: formattedStart,
-    end: formattedEnd,
+    days: String(days),
   });
 
-  const res = await fetch(`/api/trakt/calendar/episodes?${params.toString()}`, {
+  const res = await fetch(`/api/calendar/episodes-range?${params.toString()}`, {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    throw new Error(`Trakt calendar failed (${res.status})`);
-  }
+  if (!res.ok) return { connected: true, items: [] };
 
-  return res.json();
+  const json = await res.json();
+  const items = (json.items || []).map((e) => ({
+    id: e.id,
+    type: "episode",
+    source: e.sources || [],
+    first_aired: e.episode?.airDate || null,
+    show: {
+      tmdbId: e.show?.tmdbId,
+      title: e.show?.title,
+      poster_path: e.show?.posterPath,
+      backdrop_path: e.show?.backdropPath,
+    },
+    episode: {
+      season: e.episode?.season,
+      number: e.episode?.number,
+      title: e.episode?.title,
+    },
+  }));
+
+  return { connected: true, items };
 }
