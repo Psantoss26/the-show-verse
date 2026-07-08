@@ -89,6 +89,61 @@ test("buildDetailsUrl arma la URL de detalles según el tipo", () => {
   );
 });
 
+test("detectFromJsonLd extrae serie + temporada/episodio de un TVEpisode", () => {
+  const doc = {
+    querySelectorAll: (sel) =>
+      String(sel).includes("ld+json")
+        ? [
+            {
+              textContent: JSON.stringify({
+                "@type": "TVEpisode",
+                name: "El proyecto Nina",
+                episodeNumber: 5,
+                partOfSeason: {
+                  seasonNumber: 4,
+                  partOfSeries: { name: "Stranger Things" },
+                },
+              }),
+            },
+          ]
+        : [],
+  };
+  const r = D.detectFromJsonLd(doc);
+  assert.equal(r.mediaType, "tv");
+  assert.equal(r.showName, "Stranger Things");
+  assert.equal(r.episodeName, "El proyecto Nina");
+  assert.equal(r.season, 4);
+  assert.equal(r.episode, 5);
+});
+
+test("detectFromJsonLd soporta @graph, TVSeries y Movie", () => {
+  const series = {
+    querySelectorAll: () => [
+      { textContent: JSON.stringify({ "@graph": [{ "@type": "TVSeries", name: "The Boys" }] }) },
+    ],
+  };
+  assert.deepEqual(D.detectFromJsonLd(series), { mediaType: "tv", showName: "The Boys" });
+  const movie = {
+    querySelectorAll: () => [
+      { textContent: JSON.stringify([{ "@type": "Movie", name: "Napoleón" }]) },
+    ],
+  };
+  assert.deepEqual(D.detectFromJsonLd(movie), { mediaType: "movie", movieTitle: "Napoleón" });
+});
+
+test("detectFromJsonLd es tolerante (null sin datos / JSON inválido)", () => {
+  assert.equal(D.detectFromJsonLd({ querySelectorAll: () => [{ textContent: "no json {" }] }), null);
+  assert.equal(D.detectFromJsonLd({ querySelectorAll: () => [] }), null);
+});
+
+test("detectFromMeta lee og:title / twitter:title", () => {
+  const doc = {
+    querySelector: (sel) => (String(sel).includes("og:title") ? { getAttribute: () => "  The Bear  " } : null),
+  };
+  assert.equal(D.detectFromMeta(doc), "The Bear");
+  assert.equal(D.detectFromMeta({ querySelector: () => null }), "");
+});
+
 test("findSeasonEpisodeBadge combina temporada y episodio en nodos separados", () => {
   // Netflix a veces muestra la temporada y el episodio en elementos distintos.
   const fakeDoc = {
