@@ -1663,18 +1663,29 @@ export default function ListsPage() {
         }
 
         if (src === "trakt") {
-          // Comunidad: ya NO golpeamos /api/trakt/lists/[username]/[listId] —
-          // ese endpoint espera identificadores reales de Trakt, y aquí solo
-          // tenemos username+uuid internos (siempre fallaba → backdrop en
-          // blanco). El backend ya manda previewPosters en el propio objeto
-          // de lista (mapDiscoverResult), y GridListCard lo consume
-          // directamente desde `list.previewPosters` sin pasar por este mapa.
-          // Las vistas de fila/lista sí necesitan items individuales con
-          // id/media_type (para el link a /details/...), que previewPosters
-          // no trae, así que aquí solo resolvemos a "vacío" (sin red) para
-          // que muestren su placeholder existente.
-          writeSessionJsonCache(previewCacheKey, []);
-          setItemsMap((prev) => ({ ...prev, [cacheKey]: [] }));
+          // Comunidad: traemos una muestra de items de la lista desde nuestro
+          // backend (que hidrata los posters bajo demanda) y los mapeamos a la
+          // forma TMDb que consumen las tarjetas de fila/lista ({id, media_type,
+          // poster_path, title}). GridListCard sigue usando list.previewPosters.
+          const res = await fetch(
+            `/api/community/lists/${encodeURIComponent(listId)}?limit=12`,
+            { signal: ctrl.signal, cache: "no-store" },
+          );
+          const j = await res.json().catch(() => ({}));
+          const items = dedupePreviewItems(
+            (Array.isArray(j?.items) ? j.items : [])
+              .filter((it) => it?.tmdbId)
+              .map((it) => ({
+                id: it.tmdbId,
+                media_type: it.mediaType === "tv" ? "tv" : "movie",
+                poster_path: it.posterPath || null,
+                backdrop_path: null,
+                title: it.title || null,
+                name: it.title || null,
+              })),
+          );
+          writeSessionJsonCache(previewCacheKey, items);
+          setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
 
