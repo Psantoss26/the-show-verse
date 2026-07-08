@@ -1319,6 +1319,9 @@ export default function DetailsClient({
   initialScoreboard,
   initialTraktStatus,
   initialShowWatched,
+  initialSentiment,
+  initialComments,
+  initialLists,
 }) {
   const router = useRouter();
   const prefetchSeasonDetails = useCallback(
@@ -3983,24 +3986,52 @@ export default function DetailsClient({
   // =====================================================================
 
   // -- Analisis de sentimiento: pros y contras extraidos de comentarios --
-  const [tSentiment, setTSentiment] = useState({
-    loading: false,
-    error: "",
-    pros: [],
-    cons: [],
-    sourceCount: 0,
-  });
+  // Semilla desde `initialSentiment` (SSR) para pintar al instante; el efecto
+  // de carga sigue ejecutandose para refrescar/completar en 2º plano.
+  const initialSentimentState = useMemo(() => {
+    if (!initialSentiment) {
+      return { loading: false, error: "", pros: [], cons: [], sourceCount: 0 };
+    }
+    return {
+      loading: false,
+      error: "",
+      pros: formatTraktSentimentList(initialSentiment.good, 4),
+      cons: formatTraktSentimentList(initialSentiment.bad, 4),
+      sourceCount: Number(initialSentiment.comment_count || 0) || 0,
+    };
+  }, [initialSentiment]);
+  const [tSentiment, setTSentiment] = useState(() => initialSentimentState);
 
   // -- Comentarios de Trakt con paginacion y pestanas --
   const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
-  const [tComments, setTComments] = useState({
-    loading: false,
-    error: "",
-    items: [],
-    page: 1,
-    hasMore: false,
-    total: 0,
-  });
+  // Semilla desde `initialComments` (SSR: { items, pagination }).
+  const initialCommentsState = useMemo(() => {
+    if (!initialComments) {
+      return {
+        loading: false,
+        error: "",
+        items: [],
+        page: 1,
+        hasMore: false,
+        total: 0,
+      };
+    }
+    const items = Array.isArray(initialComments.items)
+      ? initialComments.items
+      : [];
+    const pagination = initialComments.pagination || {};
+    return {
+      loading: false,
+      error: "",
+      items,
+      page: 1,
+      hasMore: !!(
+        pagination.pageCount && pagination.page < pagination.pageCount
+      ),
+      total: Number(pagination.itemCount || 0),
+    };
+  }, [initialComments]);
+  const [tComments, setTComments] = useState(() => initialCommentsState);
   const COMMENTS_SECTION_LIMIT = 5;
   const myComments = useMemo(() => {
     return (tComments.items || []).filter(
@@ -4046,6 +4077,8 @@ export default function DetailsClient({
       commentId,
       comment,
       spoiler,
+      type: traktType,
+      tmdbId: id,
     });
 
     // Actualizar localmente el comentario editado
@@ -4069,7 +4102,7 @@ export default function DetailsClient({
   };
 
   const handleCommentDelete = async ({ commentId }) => {
-    await traktDeleteComment({ commentId });
+    await traktDeleteComment({ commentId, type: traktType, tmdbId: id });
 
     // Eliminar localmente del feed
     setTComments((prev) => {
@@ -4092,14 +4125,19 @@ export default function DetailsClient({
 
   // -- Listas de Trakt con paginacion (popular/trending) --
   const [tListsTab, setTListsTab] = useState("popular"); // "popular" | "trending"
-  const [tLists, setTLists] = useState({
-    loading: false,
-    error: "",
-    items: [],
-    page: 1,
-    hasMore: false,
-    total: 0,
-  });
+  // Semilla desde `initialLists` (SSR: array de { list, user, previewPosters }).
+  const initialListsState = useMemo(() => {
+    const items = Array.isArray(initialLists) ? initialLists : [];
+    return {
+      loading: false,
+      error: "",
+      items,
+      page: 1,
+      hasMore: false,
+      total: items.length,
+    };
+  }, [initialLists]);
+  const [tLists, setTLists] = useState(() => initialListsState);
 
   useEffect(() => {
     setTScoreboard(initialScoreboardState);
@@ -4134,35 +4172,23 @@ export default function DetailsClient({
     return () => window.clearTimeout(safetyTimer);
   }, [id, traktType, traktDeferredReady, data, type, title]);
 
-  // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido
+  // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido.
+  // Reseed desde los props `initial*` (en vez de a vacio) para que, si el
+  // servidor ya trajo datos para el nuevo id, sigan pintados sin flash vacio.
   useEffect(() => {
-    setTSentiment({
-      loading: false,
-      error: "",
-      pros: [],
-      cons: [],
-      sourceCount: 0,
-    });
-    setTComments({
-      loading: false,
-      error: "",
-      items: [],
-      page: 1,
-      hasMore: false,
-      total: 0,
-    });
+    setTSentiment(initialSentimentState);
+    setTComments(initialCommentsState);
     setTCommentsTab("recent");
     setTSeasons({ loading: false, error: "", items: [] });
-    setTLists({
-      loading: false,
-      error: "",
-      items: [],
-      page: 1,
-      hasMore: false,
-      total: 0,
-    });
+    setTLists(initialListsState);
     setTListsTab("popular");
-  }, [id, traktType]);
+  }, [
+    id,
+    traktType,
+    initialSentimentState,
+    initialCommentsState,
+    initialListsState,
+  ]);
 
   // Carga los comentarios de Trakt segun la pestana activa.
   // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
@@ -4170,6 +4196,11 @@ export default function DetailsClient({
     if (!traktDeferredReady) return;
 
     let ignore = false;
+    // Poll corto mientras el backend siembra contenido en la primera visita
+    // (state === "seeding"): reintenta a los ~3s y ~8s, una sola vez, sin
+    // bloquear con spinner. Se limpia al desmontar o si cambian id/tipo.
+    let seedTimers = [];
+    let scheduledPoll = false;
 
     const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${tCommentsTab}`;
 
@@ -4262,6 +4293,20 @@ export default function DetailsClient({
             );
           } catch {}
         }
+
+        // Primera visita: el backend aun esta sembrando datos desde Trakt.
+        // Reintentamos un par de veces sin mostrar spinner bloqueante.
+        if (r?.state === "seeding" && !scheduledPoll) {
+          scheduledPoll = true;
+          seedTimers.push(
+            window.setTimeout(() => {
+              if (!ignore) load();
+            }, 3000),
+            window.setTimeout(() => {
+              if (!ignore) load();
+            }, 8000),
+          );
+        }
       } catch (e) {
         if (!ignore)
           setTComments((p) => ({
@@ -4276,6 +4321,7 @@ export default function DetailsClient({
     load();
     return () => {
       ignore = true;
+      seedTimers.forEach((t) => window.clearTimeout(t));
     };
   }, [
     id,
@@ -4292,15 +4338,16 @@ export default function DetailsClient({
     if (!traktDeferredReady) return;
 
     let ignore = false;
+    // Poll corto mientras el backend siembra contenido en la primera visita
+    // (state === "seeding"): reintenta a los ~3s y ~8s, una sola vez, sin
+    // bloquear con spinner. Se limpia al desmontar o si cambian id/tipo.
+    let seedTimers = [];
+    let scheduledPoll = false;
 
     const loadSentiment = async () => {
-      setTSentiment({
-        loading: true,
-        error: "",
-        pros: [],
-        cons: [],
-        sourceCount: 0,
-      });
+      // Preservamos pros/cons ya pintados (semilla SSR o carga previa)
+      // mientras revalidamos, en vez de vaciar la seccion.
+      setTSentiment((p) => ({ ...p, loading: true, error: "" }));
 
       try {
         const r = await withTimeout(
@@ -4323,15 +4370,27 @@ export default function DetailsClient({
           cons,
           sourceCount: Number(r?.comment_count || 0) || 0,
         });
+
+        // Primera visita: el backend aun esta sembrando datos desde Trakt.
+        // Reintentamos un par de veces sin mostrar spinner bloqueante.
+        if (r?.state === "seeding" && !scheduledPoll) {
+          scheduledPoll = true;
+          seedTimers.push(
+            window.setTimeout(() => {
+              if (!ignore) loadSentiment();
+            }, 3000),
+            window.setTimeout(() => {
+              if (!ignore) loadSentiment();
+            }, 8000),
+          );
+        }
       } catch (e) {
         if (ignore) return;
-        setTSentiment({
+        setTSentiment((p) => ({
+          ...p,
           loading: false,
           error: e?.message || "Error",
-          pros: [],
-          cons: [],
-          sourceCount: 0,
-        });
+        }));
       }
     };
 
@@ -4339,6 +4398,7 @@ export default function DetailsClient({
 
     return () => {
       ignore = true;
+      seedTimers.forEach((t) => window.clearTimeout(t));
     };
   }, [id, traktType, traktDeferredReady]);
 
@@ -12619,18 +12679,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
                                         <ThumbsUp className="h-3 w-3" /> {likes}
                                       </div>
-                                      <a
-                                        href={
-                                          trakt?.traktUrl
-                                            ? `${trakt.traktUrl}/comments`
-                                            : undefined
-                                        }
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="ml-auto text-xs font-semibold text-zinc-500 hover:text-white transition-colors"
-                                      >
-                                        Responder en Trakt →
-                                      </a>
                                     </div>
                                   </div>
                                 </div>
@@ -12671,20 +12719,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               const likes = Number(list?.likes || 0);
                               const username =
                                 user?.username || user?.name || null;
-                              const slug = list?.ids?.slug || null;
-                              const traktId = list?.ids?.trakt || null;
+                              const listId = list?.id || null;
 
-                              // Ruta interna (slug si existe; si no, traktId)
-                              const internalUrl =
-                                username && (slug || traktId)
-                                  ? `/lists/trakt/${encodeURIComponent(username)}/${encodeURIComponent(String(slug || traktId))}`
-                                  : null;
-
-                              // (opcional) enlace externo a Trakt, pero ya NO es el click principal
-                              const traktUrl =
-                                username && (slug || traktId)
-                                  ? `https://trakt.tv/users/${username}/lists/${slug || traktId}`
-                                  : null;
+                              // Ruta interna: la pagina de detalle de listas
+                              // ahora busca por el uuid interno de comunidad
+                              // (no por slug/trakt id).
+                              const ownerUsername = user?.username || "c";
+                              const internalUrl = listId
+                                ? `/lists/trakt/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(String(listId))}`
+                                : null;
 
                               const avatar =
                                 user?.images?.avatar?.full ||
@@ -12695,7 +12738,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               return (
                                 <Link
                                   key={String(
-                                    traktId || `${username}-${slug}` || name,
+                                    listId || `${username}-${name}` || name,
                                   )}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
