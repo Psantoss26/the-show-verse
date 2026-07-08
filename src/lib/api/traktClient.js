@@ -490,16 +490,12 @@ export async function traktGetComments({
   page = 1,
   limit = 20,
 }) {
-  const qs = new URLSearchParams({
-    type: String(type),
-    tmdbId: String(tmdbId),
-    sort: String(sort),
-    page: String(page),
-    limit: String(limit),
-  });
-  const res = await fetch(`/api/trakt/community/comments?${qs.toString()}`, {
-    cache: "no-store",
-  });
+  const tab = sort === "newest" ? "recent" : sort === "likes30" ? "top30" : "top";
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(
+    `/api/community/${t}/${tmdbId}/comments?tab=${tab}&page=${page}&limit=${limit}`,
+    { cache: "no-store" },
+  );
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error cargando comentarios");
   return json;
@@ -787,29 +783,38 @@ export async function traktAddEpisodePlay({
 }
 
 export async function traktAddComment({ type, tmdbId, comment, spoiler }) {
-  const res = await fetch("/api/trakt/community/comments", {
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type, tmdbId, comment, spoiler }),
+    body: JSON.stringify({ comment, spoiler: !!spoiler }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error al publicar comentario");
   return json;
 }
 
-export async function traktUpdateComment({ commentId, comment, spoiler }) {
-  const res = await fetch("/api/trakt/community/comments", {
-    method: "PUT",
+export async function traktUpdateComment({
+  commentId,
+  comment,
+  spoiler,
+  type = "movie",
+  tmdbId = 0,
+}) {
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/comments?id=${encodeURIComponent(commentId)}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ commentId, comment, spoiler }),
+    body: JSON.stringify({ comment, spoiler: !!spoiler }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error al actualizar comentario");
   return json;
 }
 
-export async function traktDeleteComment({ commentId }) {
-  const res = await fetch(`/api/trakt/community/comments?commentId=${encodeURIComponent(commentId)}`, {
+export async function traktDeleteComment({ commentId, type = "movie", tmdbId = 0 }) {
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/comments?id=${encodeURIComponent(commentId)}`, {
     method: "DELETE",
   });
   const json = await res.json();
