@@ -29,6 +29,7 @@ import statsRoutes from './routes/stats.js';
 import usersRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import calendarRoutes from './routes/calendar.js';
+import communityRoutes from './routes/community.js';
 import { refreshAllPools } from './dashboard/pools.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
@@ -202,6 +203,7 @@ const apiV1 = async (app) => {
   app.register(usersRoutes, { prefix: '/users' });
   app.register(dashboardRoutes, { prefix: '/dashboard' });
   app.register(calendarRoutes, { prefix: '/calendar' });
+  app.register(communityRoutes, { prefix: '/community' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });
