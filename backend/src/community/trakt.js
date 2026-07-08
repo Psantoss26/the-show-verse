@@ -1,0 +1,80 @@
+// backend/src/community/trakt.js
+// Cliente Trakt mínimo: SOLO client-id (endpoints públicos). Usado únicamente por el
+// sembrado (una vez por título). Caché en memoria + backoff para no gatillar 429.
+const TRAKT_BASE = 'https://api.trakt.tv';
+const CLIENT_ID = process.env.TRAKT_CLIENT_ID || '';
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1h
+const cache = new Map();             // key -> { ts, value }
+let rateLockedUntil = 0;
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'trakt-api-version': '2', 'trakt-api-key': CLIENT_ID };
+}
+
+async function traktGet(path, { retries = 2 } = {}) {
+  if (!CLIENT_ID) return { ok: false, json: null, pagination: null };
+  const key = path;
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.value;
+  if (Date.now() < rateLockedUntil) return { ok: false, json: null, pagination: null };
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    let res;
+    try {
+      res = await fetch(`${TRAKT_BASE}${path}`, { headers: headers(), cache: 'no-store' });
+    } catch {
+      if (attempt === retries) return { ok: false, json: null, pagination: null };
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      continue;
+    }
+    if (res.status === 429) {
+      rateLockedUntil = Date.now() + 60_000;
+      return { ok: false, json: null, pagination: null };
+    }
+    if (!res.ok) return { ok: false, json: null, pagination: null };
+    const json = await res.json().catch(() => null);
+    const pagination = {
+      itemCount: Number(res.headers.get('x-pagination-item-count')) || 0,
+      pageCount: Number(res.headers.get('x-pagination-page-count')) || 0,
+      page: Number(res.headers.get('x-pagination-page')) || 1,
+      limit: Number(res.headers.get('x-pagination-limit')) || 0,
+    };
+    const value = { ok: true, json, pagination };
+    cache.set(key, { ts: Date.now(), value });
+    return value;
+  }
+  return { ok: false, json: null, pagination: null };
+}
+
+const traktType = (type) => (type === 'tv' ? 'show' : 'movie');
+const traktBase = (type) => (type === 'tv' ? 'shows' : 'movies');
+
+export async function resolveTraktId({ type, tmdbId }) {
+  const { ok, json } = await traktGet(`/search/tmdb/${tmdbId}?type=${traktType(type)}`);
+  if (!ok || !Array.isArray(json) || !json.length) return null;
+  const item = json[0]?.[traktType(type)] || null;
+  const traktId = item?.ids?.trakt || null;
+  if (!traktId) return null;
+  return { traktId, slug: item?.ids?.slug || null };
+}
+
+export async function getComments({ type, traktId, sort = 'likes', page = 1, limit = 10 }) {
+  const { ok, json, pagination } = await traktGet(
+    `/${traktBase(type)}/${traktId}/comments/${sort}?page=${page}&limit=${limit}`,
+  );
+  return { items: ok && Array.isArray(json) ? json : [], pagination };
+}
+
+export async function getListsContaining({ type, traktId, tab = 'popular', page = 1, limit = 3 }) {
+  const { ok, json, pagination } = await traktGet(
+    `/${traktBase(type)}/${traktId}/lists/${tab}?page=${page}&limit=${limit}`,
+  );
+  return { items: ok && Array.isArray(json) ? json : [], pagination };
+}
+
+export async function getUserListItems({ username, listSlug, page = 1, limit = 50 }) {
+  const { ok, json } = await traktGet(
+    `/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(listSlug)}/items?extended=full&page=${page}&limit=${limit}`,
+  );
+  return ok && Array.isArray(json) ? json : [];
+}
