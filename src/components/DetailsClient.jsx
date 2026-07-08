@@ -181,13 +181,16 @@ import {
   translateGenre,
 } from "@/lib/details/formatters";
 
-// -- Gestion de listas de usuario en TMDb (CRUD) --
+// -- Gestion de listas de usuario en el backend propio (CRUD) --
+// Migrado desde TMDb v3: "Mis Listas" ahora vive en nuestro backend/BBDD, igual
+// que la página /lists. La auth va por cookie de sesión del backend (no TMDb),
+// por eso ya no se pasan apiKey/sessionId.
 import {
-  tmdbFetchAllUserLists,
-  tmdbListItemStatus,
-  tmdbAddMovieToList,
-  tmdbCreateList,
-} from "@/lib/details/tmdbListsClient";
+  fetchUserLists as backendFetchUserLists,
+  createUserList as backendCreateUserList,
+  addMovieToList as backendAddMovieToList,
+  getListDetails as backendGetListDetails,
+} from "@/lib/api/backendLists";
 
 // -- Utilidades de video: filtrado, ranking, URLs de embed/thumbnail --
 import {
@@ -1678,7 +1681,7 @@ export default function DetailsClient({
   };
 
   /**
-   * Carga las listas del usuario desde TMDb si aun no se han cargado.
+   * Carga las listas del usuario desde el backend propio si aun no se han cargado.
    * Usa un abortRef para cancelar si el componente se desmonta.
    */
   const loadListsIfNeeded = async ({ abortRef } = {}) => {
@@ -1686,12 +1689,8 @@ export default function DetailsClient({
     if (!canUseLists) return [];
     if (Array.isArray(userLists) && userLists.length > 0) return userLists;
 
-    const lists = await tmdbFetchAllUserLists({
-      apiKey: TMDB_API_KEY,
-      accountId: account.id,
-      sessionId: session,
-      language: "es-ES",
-    });
+    const json = await backendFetchUserLists();
+    const lists = Array.isArray(json?.results) ? json.results : [];
 
     if (abortRef?.current) return [];
     setUserLists(lists);
@@ -1731,20 +1730,23 @@ export default function DetailsClient({
       let idx = 0;
       const nextMap = {};
 
+      // Presencia por lista: el backend no tiene un endpoint item_status, así que
+      // pedimos los items de cada lista y comprobamos si el tmdbId está dentro.
       const worker = async () => {
         while (!abortRef?.current && idx < ids.length) {
           const listId = ids[idx++];
+          const lid = String(listId);
           try {
-            const lid = String(listId);
-            const present = await tmdbListItemStatus({
-              apiKey: TMDB_API_KEY,
-              listId: lid,
-              movieId,
-              sessionId: session,
-            });
+            const details = await backendGetListDetails({ listId: lid });
+            const items = Array.isArray(details?.items) ? details.items : [];
+            const present = items.some(
+              (it) =>
+                String(it?.id) === String(movieId) &&
+                (it?.media_type || "movie") === "movie",
+            );
             nextMap[lid] = !!present;
           } catch {
-            nextMap[listId] = false;
+            nextMap[lid] = false;
           }
         }
       };
@@ -1820,23 +1822,22 @@ export default function DetailsClient({
     setListsError("");
 
     try {
-      const res = await tmdbAddMovieToList({
-        apiKey: TMDB_API_KEY,
+      await backendAddMovieToList({
         listId: lid,
         movieId,
-        sessionId: session,
+        mediaType: "movie",
+        title: title || undefined,
+        posterPath: data?.poster_path || undefined,
       });
 
-      // Actualizacion optimista: marca como presente antes de confirmar
+      // Actualizacion optimista: marca como presente antes de confirmar. Solo se
+      // llega aquí cuando NO estaba presente (guard arriba), así que +1 item.
       setMembershipMap((prev) => ({ ...(prev || {}), [lid]: true }));
       setUserLists((prev) =>
         (prev || []).map((l) => {
           const id = getListId(l);
           return id === lid
-            ? {
-                ...l,
-                item_count: (l.item_count || 0) + (res?.duplicate ? 0 : 1),
-              }
+            ? { ...l, item_count: (l.item_count || 0) + 1 }
             : l;
         }),
       );
@@ -1847,7 +1848,7 @@ export default function DetailsClient({
     }
   };
 
-  // Crea una nueva lista en TMDb y agrega la pelicula actual
+  // Crea una nueva lista en el backend y agrega la pelicula actual
   const handleCreateListAndAdd = async () => {
     if (!session || !account?.id || !movieId) return;
     if (!canUseLists) return;
@@ -1859,31 +1860,25 @@ export default function DetailsClient({
     setListsError("");
 
     try {
-      const newIdRaw = await tmdbCreateList({
-        apiKey: TMDB_API_KEY,
+      const created = await backendCreateUserList({
         name: n,
         description: newListDesc.trim(),
-        sessionId: session,
-        language: "es-ES",
       });
 
-      const newListId = getListId(newIdRaw);
+      const newListId = getListId(created?.list_id);
       if (!newListId) throw new Error("No se pudo crear la lista");
 
-      await tmdbAddMovieToList({
-        apiKey: TMDB_API_KEY,
+      await backendAddMovieToList({
         listId: newListId,
         movieId,
-        sessionId: session,
+        mediaType: "movie",
+        title: title || undefined,
+        posterPath: data?.poster_path || undefined,
       });
 
       // Refresca todas las listas del usuario para reflejar la nueva lista
-      const lists = await tmdbFetchAllUserLists({
-        apiKey: TMDB_API_KEY,
-        accountId: account.id,
-        sessionId: session,
-        language: "es-ES",
-      });
+      const json = await backendFetchUserLists();
+      const lists = Array.isArray(json?.results) ? json.results : [];
       setUserLists(lists);
 
       // Marca la pelicula como presente en la nueva lista
