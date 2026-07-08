@@ -502,14 +502,9 @@ export async function traktGetComments({
 }
 
 export async function traktGetSentiments({ type, tmdbId }) {
-  const qs = new URLSearchParams({
-    type: String(type),
-    tmdbId: String(tmdbId),
-  });
-  const res = await fetch(`/api/trakt/community/sentiments?${qs.toString()}`, {
-    cache: "no-store",
-  });
-  const json = await res.json();
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/sentiment`, { cache: "no-store" });
+  const json = await res.json().catch(() => ({ good: [], bad: [], comment_count: 0 }));
   if (!res.ok) throw new Error(json?.error || "Error cargando sentimientos");
   return json;
 }
