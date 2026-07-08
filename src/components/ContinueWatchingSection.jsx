@@ -31,7 +31,8 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import {
   buildImg,
-  fetchBestBackdrop,
+  fetchBestWatchingBackdrop,
+  fetchBestWatchingPoster,
   getArtworkPreference,
   movieBackdropCache,
   getBackdropCacheKey,
@@ -595,8 +596,7 @@ function genresText(show) {
   return names.slice(0, 2).join(" • ");
 }
 
-// Carga una variante del backdrop EN de la serie, separada del criterio normal
-// del dashboard para que Continuar viendo no repita siempre la misma imagen.
+// Carga el backdrop con el mismo criterio visual de En progreso/Completadas.
 function useShowBackdrop(show) {
   const [backdropPath, setBackdropPath] = useState(null);
   const [ready, setReady] = useState(false);
@@ -623,7 +623,7 @@ function useShowBackdrop(show) {
     // Resolución inmediata solo con rutas ya decididas: preferencia del usuario
     // o caché. El fallback del item se reserva para el último caso, tras intentar
     // obtener una imagen con idioma desde TMDb.
-    const { backdrop: userBackdrop } = getArtworkPreference(show.id);
+    const { backdrop: userBackdrop } = getArtworkPreference(show.id, type);
     const cached = movieBackdropCache.get(cacheKey);
     const remembered = continueWatchingBackdropPathMemory.get(memoryKey);
     const initial =
@@ -640,22 +640,9 @@ function useShowBackdrop(show) {
       }
 
       try {
-        const localized =
-          (await fetchBestBackdrop(show.id, type, {
-            offset: 1,
-            includeNoLanguage: false,
-          })) ||
-          (await fetchBestBackdrop(show.id, type, {
-            includeNoLanguage: false,
-          }));
-
         const fallback =
-          localized ||
+          (await fetchBestWatchingBackdrop(show.id, type)) ||
           cached ||
-          (await fetchBestBackdrop(show.id, type, {
-            offset: 1,
-            includeNoLanguage: true,
-          })) ||
           getPreviewBackdropFallback(movie) ||
           null;
 
@@ -690,6 +677,43 @@ function useShowBackdrop(show) {
   }, [show]);
 
   return { backdropPath, ready };
+}
+
+function useShowPoster(show) {
+  const [posterPath, setPosterPath] = useState(null);
+
+  useEffect(() => {
+    if (!show?.id) {
+      setPosterPath(null);
+      return undefined;
+    }
+
+    const type = mediaTypeOf(show);
+    let canceled = false;
+    const { poster: userPoster } = getArtworkPreference(show.id, type);
+    setPosterPath(userPoster || show.poster_path || null);
+
+    const resolvePoster = async () => {
+      if (userPoster) return;
+
+      const chosen =
+        (await fetchBestWatchingPoster(show.id, type)) ||
+        show.poster_path ||
+        show.backdrop_path ||
+        null;
+
+      if (chosen) await preloadImage(buildImg(chosen, "w500"));
+      if (!canceled) setPosterPath(chosen);
+    };
+
+    resolvePoster();
+
+    return () => {
+      canceled = true;
+    };
+  }, [show]);
+
+  return posterPath;
 }
 
 /* ====================================================================
@@ -805,6 +829,7 @@ function ContinueWatchingPreviewCard({
   const router = useRouter();
   const mediaType = mediaTypeOf(show);
   const { backdropPath, ready } = useShowBackdrop(show);
+  const posterPath = useShowPoster(show);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -1172,7 +1197,7 @@ function ContinueWatchingPreviewCard({
         mediaId: show.id,
         favorite: next,
         title: show.title,
-        posterPath: show.poster_path || show.backdrop_path || null,
+        posterPath: posterPath || show.poster_path || show.backdrop_path || null,
       });
     } catch {
       setFavorite((v) => !v);
@@ -1197,7 +1222,7 @@ function ContinueWatchingPreviewCard({
         mediaId: show.id,
         watchlist: next,
         title: show.title,
-        posterPath: show.poster_path || show.backdrop_path || null,
+        posterPath: posterPath || show.poster_path || show.backdrop_path || null,
       });
     } catch {
       setWatchlist((v) => !v);
