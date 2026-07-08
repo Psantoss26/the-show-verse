@@ -103,6 +103,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced ->
             handler.post {
                 if (ok && synced != null) {
+                    // Recuerda la serie de esta ficha: si el usuario reproduce a
+                    // continuación y la app no expone la serie en la MediaSession
+                    // (Netflix), MediaListenerService la usará como nombre de serie.
+                    RecentDetail.remember(pkg, synced)
                     QuickAccessNotifier.show(this, p, synced, R.string.notif_browsing)
                     p.addLog("Ficha detectada: ${synced.title ?: primary}")
                 }
