@@ -60,11 +60,15 @@ export async function insertNativeComment({ tmdbId, mediaType, userId, author, b
 }
 
 export async function updateNativeComment({ id, userId, body, spoiler }) {
-  const [row] = await db
-    .update(titleComments)
-    .set({ body, spoiler: !!spoiler })
-    .where(and(eq(titleComments.id, id), eq(titleComments.userId, userId), eq(titleComments.source, 'native')))
-    .returning();
+  const set = {};
+  if (body !== undefined) set.body = body;
+  if (spoiler !== undefined) set.spoiler = !!spoiler;
+  const owner = and(eq(titleComments.id, id), eq(titleComments.userId, userId), eq(titleComments.source, 'native'));
+  if (Object.keys(set).length === 0) {
+    const [row] = await db.select().from(titleComments).where(owner).limit(1);
+    return row ? commentRowToApi(row) : null;
+  }
+  const [row] = await db.update(titleComments).set(set).where(owner).returning();
   return row ? commentRowToApi(row) : null;
 }
 
