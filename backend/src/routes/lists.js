@@ -4,7 +4,8 @@
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { userLists, userListItems } from '../db/schema.js';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc, sql } from 'drizzle-orm';
+import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 
 const listSchema = z.object({
   name: z.string().min(1).max(100),
@@ -24,10 +25,19 @@ const listItemSchema = z.object({
 export default async function listsRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
-  // GET /lists — Listas del usuario
+  // GET /lists — Listas del usuario (con item_count para las tarjetas)
   fastify.get('/', async (req, reply) => {
     const lists = await db
-      .select()
+      .select({
+        id: userLists.id,
+        name: userLists.name,
+        description: userLists.description,
+        isPublic: userLists.isPublic,
+        sortBy: userLists.sortBy,
+        createdAt: userLists.createdAt,
+        updatedAt: userLists.updatedAt,
+        itemCount: sql`(select count(*)::int from user_list_items i where i.list_id = "user_lists"."id")`,
+      })
       .from(userLists)
       .where(eq(userLists.userId, req.user.id))
       .orderBy(desc(userLists.updatedAt));
@@ -109,7 +119,20 @@ export default async function listsRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { tmdbId, mediaType, title, posterPath, position = 0 } = parsed.data;
+    let { tmdbId, mediaType, title, posterPath, position = 0 } = parsed.data;
+
+    // Enriquecer título/poster desde TMDb (cacheado) si el cliente no los aportó,
+    // para que la tarjeta muestre portada aunque solo se pase el tmdbId.
+    if (!title || !posterPath) {
+      const meta = await getMediaMetadataMap([{ tmdbId, mediaType }]).catch(() => new Map());
+      const m = metadataFor(meta, mediaType, tmdbId);
+      if (m) {
+        title = title
+          || (mediaType === 'movie' ? m.title || m.original_title : m.name || m.original_name)
+          || null;
+        posterPath = posterPath || m.poster_path || null;
+      }
+    }
 
     const [item] = await db
       .insert(userListItems)
@@ -124,6 +147,21 @@ export default async function listsRoutes(fastify) {
     await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, list.id));
 
     return reply.status(201).send({ item });
+  });
+
+  // DELETE /lists/:id/items — Vaciar la lista (quitar todos los items)
+  fastify.delete('/:id/items', async (req, reply) => {
+    const [list] = await db
+      .select({ id: userLists.id })
+      .from(userLists)
+      .where(and(eq(userLists.id, req.params.id), eq(userLists.userId, req.user.id)))
+      .limit(1);
+
+    if (!list) return reply.status(404).send({ error: 'List not found' });
+
+    await db.delete(userListItems).where(eq(userListItems.listId, list.id));
+    await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, list.id));
+    return reply.send({ ok: true });
   });
 
   // DELETE /lists/:id/items/:tmdbId/:mediaType — Quitar item de lista

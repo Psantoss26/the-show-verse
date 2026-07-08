@@ -1959,7 +1959,7 @@ export default function ListsPage() {
                         label="Fuente"
                         valueLabel={
                           source === "tmdb"
-                            ? "TMDb"
+                            ? "Mis listas"
                             : source === "trakt"
                               ? "Trakt"
                               : "Colecciones"
@@ -1975,7 +1975,7 @@ export default function ListsPage() {
                                 close();
                               }}
                             >
-                              TMDb
+                              Mis listas
                             </DropdownItem>
                             <DropdownItem
                               active={source === "trakt"}
@@ -2214,7 +2214,7 @@ export default function ListsPage() {
               label="Fuente"
               valueLabel={
                 source === "tmdb"
-                  ? "TMDb"
+                  ? "Mis listas"
                   : source === "trakt"
                     ? "Trakt"
                     : "Colecciones"
@@ -2230,7 +2230,7 @@ export default function ListsPage() {
                       close();
                     }}
                   >
-                    TMDb
+                    Mis listas
                   </DropdownItem>
                   <DropdownItem
                     active={source === "trakt"}
