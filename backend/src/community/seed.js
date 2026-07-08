@@ -1,10 +1,12 @@
 // backend/src/community/seed.js
 import { db } from '../db/client.js';
-import { titleCommunityState, titleComments } from '../db/schema.js';
+import { titleCommunityState, titleComments, titleSentiment } from '../db/schema.js';
 import { and, eq, sql } from 'drizzle-orm';
 import { seedDecision, nextRetryDate } from './state.js';
 import { resolveTraktId, getComments } from './trakt.js';
 import { normalizeTraktComment } from './normalize.js';
+import { buildHeuristicSentiment, generateSentiment } from './sentiment.js';
+import { upsertSentiment } from './store.js';
 
 export async function getState({ tmdbId, mediaType }) {
   const [row] = await db
@@ -50,7 +52,34 @@ export async function runSeed({ tmdbId, mediaType }) {
       await db.insert(titleComments).values(rows)
         .onConflictDoNothing();
     }
-    // (Task 13 will insert lists here; Task 10 will build sentiment here.)
+    // (Task 13 will insert lists here.)
+
+    // Sentiment input: up to 50 top-liked comments (analysis only, not stored beyond 10).
+    let analysisComments = rows.map((r) => ({ body: r.body }));
+    if (resolved.traktId) {
+      const more = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 50 });
+      if (more.ok) {
+        const moreBodies = more.items
+          .map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType }))
+          .filter(Boolean).map((r) => ({ body: r.body }));
+        if (moreBodies.length) analysisComments = moreBodies;
+      }
+      // If the extra fetch fails, fall back to the already-copied 10 rows as analysis input.
+    }
+    const title = ''; // TMDb title optional; prompt tolerates empty
+    if (analysisComments.length) {
+      // 1) Provisional heuristic immediately.
+      const heur = buildHeuristicSentiment(analysisComments);
+      await upsertSentiment({ tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
+        provider: 'heuristic', model: null, sourceCommentCount: analysisComments.length, isProvisional: true });
+      // 2) Ollama upgrade (best-effort) replaces it.
+      const ai = await generateSentiment({ comments: analysisComments, title }).catch(() => null);
+      if (ai) {
+        await upsertSentiment({ tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
+          provider: ai.provider, model: ai.model, sourceCommentCount: analysisComments.length, isProvisional: false });
+      }
+    }
+
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
   } catch (err) {
     await markFailed({ tmdbId: numId, mediaType, error: String(err?.message || err).slice(0, 300) });
