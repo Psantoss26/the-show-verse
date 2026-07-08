@@ -283,9 +283,16 @@ function TmdbImg({ filePath, size = "w780", alt, className = "" }) {
     );
   }
 
+  // previewPosters (comunidad) llegan como URL absoluta ya construida por el
+  // backend (ver posterUrl() en backend/src/community/normalize.js); el resto
+  // de fuentes pasan un path fragment ("/xxxx.jpg") que hay que prefijar.
+  const src = /^https?:\/\//i.test(filePath)
+    ? filePath
+    : `https://image.tmdb.org/t/p/${size}${filePath}`;
+
   return (
     <OptimizedImage
-      src={`https://image.tmdb.org/t/p/${size}${filePath}`}
+      src={src}
       alt={alt}
       className={className}
       loading="lazy"
@@ -879,46 +886,6 @@ function dedupePreviewItems(items) {
   return out;
 }
 
-function normalizeTraktItemsToCards(items) {
-  // Convierte items de Trakt (con _tmdb) al shape que usan tus previews (ListItemCard)
-  if (!Array.isArray(items)) return [];
-
-  const normalized = items
-    .map((it) => {
-      const t = it?._tmdb;
-      if (!t?.id || !t?.media_type) return null;
-
-      const title =
-        it?.movie?.title ||
-        it?.show?.title ||
-        it?.person?.name ||
-        it?.episode?.title ||
-        it?.season?.title ||
-        "Elemento";
-
-      const traktYear = it?.movie?.year || it?.show?.year || null;
-
-      return {
-        id: t.id,
-        media_type: t.media_type,
-        title: t.media_type === "movie" ? title : undefined,
-        name: t.media_type !== "movie" ? title : undefined,
-        poster_path: t.poster_path || null,
-        backdrop_path: t.backdrop_path || null,
-        vote_average: t.vote_average || null,
-        release_date:
-          t.release_date ||
-          (t.media_type === "movie" && traktYear ? `${traktYear}-01-01` : null),
-        first_air_date:
-          t.first_air_date ||
-          (t.media_type === "tv" && traktYear ? `${traktYear}-01-01` : null),
-      };
-    })
-    .filter(Boolean);
-
-  return dedupePreviewItems(normalized);
-}
-
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
 function ListItemsRow({ items, isMobile, accent = "trakt" }) {
   const swiperRef = useRef(null);
@@ -1135,7 +1102,17 @@ const GridListCard = memo(function GridListCard({
       <ListNavWrapper list={list} className="group block h-full">
         <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden md:hover:border-white/10 md:hover:bg-zinc-900/60 transition-all flex flex-col relative">
           <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden md:group-hover:opacity-90 transition-opacity">
-            {isLoading ? (
+            {list?.source === "trakt" ? (
+              // Comunidad: portada viene ya resuelta en list.previewPosters
+              // (URLs absolutas), no depende de ensureListItems/itemsState.
+              <ListCoverBackdropCollage
+                items={(Array.isArray(list?.previewPosters)
+                  ? list.previewPosters
+                  : []
+                ).map((url) => ({ backdrop_path: url }))}
+                alt={list.name}
+              />
+            ) : isLoading ? (
               <div className="w-full h-full animate-pulse bg-zinc-900/40" />
             ) : (
               <ListCoverBackdropCollage items={items} alt={list.name} />
@@ -1686,18 +1663,18 @@ export default function ListsPage() {
         }
 
         if (src === "trakt") {
-          const username = getTraktUsername(listObj);
-          const listKey = getTraktListKey(listObj);
-
-          const res = await fetch(
-            `/api/trakt/lists/${encodeURIComponent(username)}/${encodeURIComponent(String(listKey))}?page=1&limit=12`,
-            { signal: ctrl.signal, cache: "no-store" },
-          );
-          const j = await res.json().catch(() => ({}));
-
-          const normalized = normalizeTraktItemsToCards(j?.items);
-          writeSessionJsonCache(previewCacheKey, normalized);
-          setItemsMap((prev) => ({ ...prev, [cacheKey]: normalized }));
+          // Comunidad: ya NO golpeamos /api/trakt/lists/[username]/[listId] —
+          // ese endpoint espera identificadores reales de Trakt, y aquí solo
+          // tenemos username+uuid internos (siempre fallaba → backdrop en
+          // blanco). El backend ya manda previewPosters en el propio objeto
+          // de lista (mapDiscoverResult), y GridListCard lo consume
+          // directamente desde `list.previewPosters` sin pasar por este mapa.
+          // Las vistas de fila/lista sí necesitan items individuales con
+          // id/media_type (para el link a /details/...), que previewPosters
+          // no trae, así que aquí solo resolvemos a "vacío" (sin red) para
+          // que muestren su placeholder existente.
+          writeSessionJsonCache(previewCacheKey, []);
+          setItemsMap((prev) => ({ ...prev, [cacheKey]: [] }));
           return;
         }
 
