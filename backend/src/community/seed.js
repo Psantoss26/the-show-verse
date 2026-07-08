@@ -25,8 +25,8 @@ async function claimSeedLock({ tmdbId, mediaType }) {
     UPDATE title_community_state
        SET status = 'seeding', updated_at = now()
      WHERE tmdb_id = ${Number(tmdbId)} AND media_type = ${mediaType}
-       AND status IN ('pending','failed')
-       AND (next_retry_at IS NULL OR next_retry_at < now())
+       AND ( (status IN ('pending','failed') AND (next_retry_at IS NULL OR next_retry_at < now()))
+             OR (status = 'seeding' AND updated_at < now() - interval '3 minutes') )
     RETURNING tmdb_id`);
   return (claimed?.rows?.length || claimed?.length || 0) > 0;
 }
@@ -35,13 +35,16 @@ export async function runSeed({ tmdbId, mediaType }) {
   const numId = Number(tmdbId);
   try {
     const resolved = await resolveTraktId({ type: mediaType, tmdbId: numId });
-    // Title not on Trakt → ready but empty (works with natives going forward).
-    if (!resolved?.traktId) {
+    if (!resolved.ok) throw new Error('trakt resolve failed');
+    // Title confirmed not on Trakt → ready but empty (works with natives going forward).
+    if (!resolved.traktId) {
       await markReady({ tmdbId: numId, mediaType, traktId: null, commentCount: 0 });
       return;
     }
     // Copy top-10 comments by likes.
-    const { items } = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 10 });
+    const commentsRes = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 10 });
+    if (!commentsRes.ok) throw new Error('trakt comments failed');
+    const items = commentsRes.items;
     const rows = items.map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType })).filter(Boolean);
     if (rows.length) {
       await db.insert(titleComments).values(rows)

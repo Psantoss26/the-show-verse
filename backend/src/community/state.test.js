@@ -14,7 +14,10 @@ test('ready → serve', () => {
   assert.equal(seedDecision({ status: 'ready' }, now), 'serve');
 });
 test('seeding → wait', () => {
-  assert.equal(seedDecision({ status: 'seeding' }, now), 'wait');
+  assert.equal(seedDecision({ status: 'seeding', updatedAt: new Date(now) }, now), 'wait');
+});
+test('stale seeding → seed', () => {
+  assert.equal(seedDecision({ status: 'seeding', updatedAt: new Date(now - 4 * 60 * 1000) }, now), 'seed');
 });
 test('failed within backoff → serve', () => {
   const nextRetryAt = new Date(now + 60_000);
