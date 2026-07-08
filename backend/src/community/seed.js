@@ -45,7 +45,7 @@ export async function runSeed({ tmdbId, mediaType }) {
     const rows = items.map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType })).filter(Boolean);
     if (rows.length) {
       await db.insert(titleComments).values(rows)
-        .onConflictDoNothing({ target: titleComments.externalId });
+        .onConflictDoNothing();
     }
     // (Task 13 will insert lists here; Task 10 will build sentiment here.)
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
