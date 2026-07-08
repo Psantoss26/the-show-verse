@@ -6,6 +6,8 @@ import {
   insertNativeComment, updateNativeComment, deleteNativeComment,
 } from '../community/store.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const TYPES = new Set(['movie', 'tv']);
 function parseTarget(req, reply) {
   const type = String(req.params.type || '').toLowerCase();
@@ -53,6 +55,7 @@ export default async function communityRoutes(fastify) {
 
   // PATCH native comment (owner only).
   fastify.patch('/:type/:tmdbId/comments/:id', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    if (!UUID_RE.test(req.params.id)) return reply.status(404).send({ error: 'Comment not found' });
     const t = parseTarget(req, reply); if (!t) return;
     const parsed = commentBody.partial().safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
@@ -66,6 +69,7 @@ export default async function communityRoutes(fastify) {
 
   // DELETE native comment (owner only).
   fastify.delete('/:type/:tmdbId/comments/:id', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    if (!UUID_RE.test(req.params.id)) return reply.status(404).send({ error: 'Comment not found' });
     const t = parseTarget(req, reply); if (!t) return;
     const ok = await deleteNativeComment({ id: req.params.id, userId: req.user.id });
     if (!ok) return reply.status(404).send({ error: 'Comment not found' });
@@ -104,6 +108,7 @@ export default async function communityRoutes(fastify) {
 
   // List detail.
   fastify.get('/lists/:id', async (req, reply) => {
+    if (!UUID_RE.test(req.params.id)) return reply.status(404).send({ error: 'List not found' });
     const { page = '1', limit = '50' } = req.query || {};
     const data = await getCommunityListWithItems({ id: req.params.id, page, limit });
     if (!data) return reply.status(404).send({ error: 'List not found' });

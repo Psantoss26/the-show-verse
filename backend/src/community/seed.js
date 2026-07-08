@@ -54,34 +54,9 @@ export async function runSeed({ tmdbId, mediaType }) {
         .onConflictDoNothing();
     }
 
-    // Sentiment input: up to 50 top-liked comments (analysis only, not stored beyond 10).
-    let analysisComments = rows.map((r) => ({ body: r.body }));
-    if (resolved.traktId) {
-      const more = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 50 });
-      if (more.ok) {
-        const moreBodies = more.items
-          .map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType }))
-          .filter(Boolean).map((r) => ({ body: r.body }));
-        if (moreBodies.length) analysisComments = moreBodies;
-      }
-      // If the extra fetch fails, fall back to the already-copied 10 rows as analysis input.
-    }
-    const title = ''; // TMDb title optional; prompt tolerates empty
-    if (analysisComments.length) {
-      // 1) Provisional heuristic immediately.
-      const heur = buildHeuristicSentiment(analysisComments);
-      await upsertSentiment({ tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
-        provider: 'heuristic', model: null, sourceCommentCount: analysisComments.length, isProvisional: true });
-      // 2) Ollama upgrade (best-effort) replaces it.
-      const ai = await generateSentiment({ comments: analysisComments, title }).catch(() => null);
-      if (ai) {
-        await upsertSentiment({ tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
-          provider: ai.provider, model: ai.model, sourceCommentCount: analysisComments.length, isProvisional: false });
-      }
-    }
-
     // Copy up to 3 lists that contain this title (best-effort: a list-copy failure must not
-    // fail the whole seed — comments + sentiment already succeeded by this point).
+    // fail the whole seed — comments already succeeded by this point). Runs in the fast phase,
+    // before the (slower) sentiment build below, so lists are available as soon as possible.
     try {
       const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 3 });
       for (const raw of listItems) {
@@ -110,13 +85,45 @@ export async function runSeed({ tmdbId, mediaType }) {
         }
         const previews = members.slice(0, 5).map((m) => posterUrl(m.posterPath)).filter(Boolean);
         const listId = await upsertCommunityList({ ...listRow, copiedItemCount: members.length, previewPosters: previews });
-        // Always record the seeding title's membership even if the full item fetch failed.
-        const membershipItems = members.length ? members : [{ tmdbId: numId, mediaType, position: 0 }];
+        // Always record the seeding title's own membership in the copied list, even when it
+        // isn't among the (possibly truncated to 150) fetched members — otherwise a title that
+        // sits beyond position 150 in a large list would never show up in getListsForTitle for
+        // that list, permanently, since ready titles are frozen.
+        const membershipItems = [...members];
+        if (!membershipItems.some((m) => Number(m.tmdbId) === numId && m.mediaType === mediaType)) {
+          membershipItems.push({ tmdbId: numId, mediaType, position: members.length });
+        }
         await insertListMemberships(listId, membershipItems);
       }
     } catch (listErr) {
       // Swallow: list-copy is a bonus feature, not core to community seeding.
       console.error(`[community/seed] list copy failed for ${mediaType}:${numId}:`, listErr?.message || listErr);
+    }
+
+    // Sentiment input: up to 50 top-liked comments (analysis only, not stored beyond 10).
+    let analysisComments = rows.map((r) => ({ body: r.body }));
+    if (resolved.traktId) {
+      const more = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 50 });
+      if (more.ok) {
+        const moreBodies = more.items
+          .map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType }))
+          .filter(Boolean).map((r) => ({ body: r.body }));
+        if (moreBodies.length) analysisComments = moreBodies;
+      }
+      // If the extra fetch fails, fall back to the already-copied 10 rows as analysis input.
+    }
+    const title = ''; // TMDb title optional; prompt tolerates empty
+    if (analysisComments.length) {
+      // 1) Provisional heuristic immediately.
+      const heur = buildHeuristicSentiment(analysisComments);
+      await upsertSentiment({ tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
+        provider: 'heuristic', model: null, sourceCommentCount: analysisComments.length, isProvisional: true });
+      // 2) Ollama upgrade (best-effort) replaces it.
+      const ai = await generateSentiment({ comments: analysisComments, title }).catch(() => null);
+      if (ai) {
+        await upsertSentiment({ tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
+          provider: ai.provider, model: ai.model, sourceCommentCount: analysisComments.length, isProvisional: false });
+      }
     }
 
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
