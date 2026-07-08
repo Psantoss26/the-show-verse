@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { ensureSeeded } from '../community/seed.js';
 import {
-  getCommentsPage, insertNativeComment, updateNativeComment, deleteNativeComment,
+  getCommentsPage, getSentiment, insertNativeComment, updateNativeComment, deleteNativeComment,
 } from '../community/store.js';
 
 const TYPES = new Set(['movie', 'tv']);
@@ -26,6 +26,15 @@ export default async function communityRoutes(fastify) {
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
     const data = await getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab, page, limit });
     reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    return { ...data, state: seed.status };
+  });
+
+  // GET sentiment — public; triggers seed.
+  fastify.get('/:type/:tmdbId/sentiment', async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
+    const data = await getSentiment({ tmdbId: t.tmdbId, mediaType: t.type });
+    reply.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
     return { ...data, state: seed.status };
   });
 

@@ -1,9 +1,10 @@
 // backend/src/community/store.js
 import { db } from '../db/client.js';
-import { titleComments } from '../db/schema.js';
+import { titleComments, titleSentiment } from '../db/schema.js';
 import { and, eq, desc, asc, sql, gt } from 'drizzle-orm';
 import { resolveCommentTab } from './tabs.js';
 import { commentRowToApi } from './normalize.js';
+import { sentimentRowToApi } from './sentiment.js';
 
 export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5 }) {
   const { order, sinceDays } = resolveCommentTab(tab);
@@ -78,4 +79,21 @@ export async function deleteNativeComment({ id, userId }) {
     .where(and(eq(titleComments.id, id), eq(titleComments.userId, userId), eq(titleComments.source, 'native')))
     .returning({ id: titleComments.id });
   return rows.length > 0;
+}
+
+export async function getSentiment({ tmdbId, mediaType }) {
+  const [row] = await db.select().from(titleSentiment)
+    .where(and(eq(titleSentiment.tmdbId, Number(tmdbId)), eq(titleSentiment.mediaType, mediaType))).limit(1);
+  const count = await getCommentCount({ tmdbId, mediaType });
+  if (!row) return { good: [], bad: [], comment_count: count };
+  return sentimentRowToApi(row, count);
+}
+
+export async function upsertSentiment({ tmdbId, mediaType, good, bad, provider, model, sourceCommentCount, isProvisional }) {
+  await db.insert(titleSentiment)
+    .values({ tmdbId: Number(tmdbId), mediaType, good, bad, provider, model, sourceCommentCount, isProvisional, builtAt: new Date() })
+    .onConflictDoUpdate({
+      target: [titleSentiment.tmdbId, titleSentiment.mediaType],
+      set: { good, bad, provider, model, sourceCommentCount, isProvisional, builtAt: new Date() },
+    });
 }
