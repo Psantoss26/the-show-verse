@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import { getDetails } from "@/lib/api/tmdb";
+import { fetchCommunitySummary } from "@/lib/community/server";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -50,6 +51,11 @@ export default async function DetailsPage({ params }) {
     ? data.recommendations.results
     : [];
 
+  // Tolerant: a null/slow community summary must never break the page render.
+  const community = await fetchCommunitySummary({ type, id }).catch(
+    () => null,
+  );
+
   return (
     <DetailsPageLoader
       type={type}
@@ -58,6 +64,9 @@ export default async function DetailsPage({ params }) {
       initialCastData={initialCastData}
       initialReviews={initialReviews}
       initialRecommendations={initialRecommendations}
+      initialSentiment={community?.sentiment || null}
+      initialComments={community?.comments || null}
+      initialLists={community?.lists?.items || null}
     />
   );
 }

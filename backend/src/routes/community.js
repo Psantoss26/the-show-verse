@@ -72,6 +72,19 @@ export default async function communityRoutes(fastify) {
     return reply.send({ ok: true });
   });
 
+  // Combined summary for SSR (one round-trip).
+  fastify.get('/:type/:tmdbId/summary', async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
+    const [sentiment, comments, lists] = await Promise.all([
+      getSentiment({ tmdbId: t.tmdbId, mediaType: t.type }),
+      getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab: 'top', page: 1, limit: 5 }),
+      getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 6 }),
+    ]);
+    reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    return { sentiment, comments, lists: { items: lists }, state: seed.status };
+  });
+
   // Surface B: lists containing this title.
   fastify.get('/:type/:tmdbId/lists', async (req, reply) => {
     const t = parseTarget(req, reply); if (!t) return;

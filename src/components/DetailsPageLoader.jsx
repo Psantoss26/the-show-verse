@@ -32,6 +32,9 @@ export default function DetailsPageLoader(props) {
     initialScoreboard = null,
     initialTraktStatus = null,
     initialShowWatched = null,
+    initialSentiment = null,
+    initialComments = null,
+    initialLists = null,
   } = props;
 
   const [deferredData, setDeferredData] = useState(EMPTY_DEFERRED);
@@ -191,6 +194,9 @@ export default function DetailsPageLoader(props) {
           ? deferredData.recommendations
           : initialRecommendations
       }
+      initialSentiment={initialSentiment}
+      initialComments={initialComments}
+      initialLists={initialLists}
     />
   );
 }
