@@ -22,7 +22,7 @@ import {
     addMovieToList,
     searchMovies,
     fetchMovieCatalogList
-} from '@/lib/api/tmdbLists'
+} from '@/lib/api/backendLists'
 
 import {
     Loader2,
@@ -367,7 +367,14 @@ export default function ListDetailsPage() {
         setBusyId(movie.id)
         setErr('')
         try {
-            await addMovieToList({ listId, sessionId: session, movieId: movie.id })
+            await addMovieToList({
+                listId,
+                sessionId: session,
+                movieId: movie.id,
+                mediaType: movie.media_type === 'tv' ? 'tv' : 'movie',
+                title: movie.title || movie.name || null,
+                posterPath: movie.poster_path || null,
+            })
             setData((prev) => {
                 if (!prev) return prev
                 const nextItems = [{ ...movie, media_type: 'movie' }, ...(prev.items || [])]

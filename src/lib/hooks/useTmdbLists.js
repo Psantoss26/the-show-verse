@@ -6,7 +6,7 @@ import {
     fetchUserLists,
     createUserList,
     deleteUserList,
-} from '@/lib/api/tmdbLists'
+} from '@/lib/api/backendLists'
 
 function uniqById(arr) {
     const map = new Map()
