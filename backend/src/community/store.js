@@ -5,6 +5,47 @@ import { and, eq, desc, asc, sql, gt } from 'drizzle-orm';
 import { resolveCommentTab } from './tabs.js';
 import { commentRowToApi, listRowToApi } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
+import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
+
+// Rellena posterPath (y título si falta) de items de lista comunitaria cuya columna
+// posterPath es null (el sembrado solo hidrata 5 por lista). Usa el caché Postgres
+// (tmdb_cache) vía getMediaMetadataMap, así en visitas repetidas es barato; además
+// persiste lo hidratado en community_list_items para que la próxima lectura no toque
+// TMDb. Best-effort: si algo falla, devuelve los items tal cual.
+async function hydrateListItemPosters(items) {
+  const pending = items.filter((it) => !it.posterPath && it.tmdbId);
+  if (!pending.length) return items;
+  const meta = await getMediaMetadataMap(pending, {
+    getMediaType: (r) => r.mediaType,
+    getTmdbId: (r) => r.tmdbId,
+  }).catch(() => new Map());
+
+  const persist = [];
+  for (const it of items) {
+    if (it.posterPath || !it.tmdbId) continue;
+    const m = metadataFor(meta, it.mediaType, it.tmdbId);
+    if (!m) continue;
+    const poster = m.poster_path || null;
+    const title = it.title
+      || (it.mediaType === 'movie' ? m.title || m.original_title : m.name || m.original_name)
+      || null;
+    if (poster || (title && title !== it.title)) {
+      it.posterPath = poster || it.posterPath;
+      if (title) it.title = title;
+      persist.push({ id: it.id, posterPath: it.posterPath, title: it.title });
+    }
+  }
+  // Persistencia en segundo plano (no bloquea la respuesta).
+  if (persist.length) {
+    Promise.all(persist.map((u) =>
+      db.update(communityListItems)
+        .set({ posterPath: u.posterPath, title: u.title })
+        .where(eq(communityListItems.id, u.id))
+        .catch(() => {}),
+    )).catch(() => {});
+  }
+  return items;
+}
 
 export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5 }) {
   const { order, sinceDays } = resolveCommentTab(tab);
@@ -161,5 +202,6 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50 }) {
   const items = await db.select().from(communityListItems)
     .where(eq(communityListItems.listId, id))
     .orderBy(asc(communityListItems.position)).limit(safeLimit).offset(offset);
-  return { list: listRowToApi(list).list, items };
+  const hydrated = await hydrateListItemPosters(items);
+  return { list: listRowToApi(list).list, items: hydrated };
 }
