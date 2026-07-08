@@ -72,6 +72,59 @@ class SignalBuilderTest {
     }
 
     @Test
+    fun usesAccessibilityHintAsSeriesWhenMediaSessionLacksIt() {
+        // Netflix (Ataque a los Titanes): la MediaSession no expone la serie; title
+        // es el episodio y el subtítulo es "T1:E1 - <episodio>". La ficha abierta
+        // antes dio la serie ("Ataque a los Titanes") → se usa como nombre de serie.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+            displayTitle = "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+            displaySubtitle = "T1:E1 - A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+        )
+        val sig = SignalBuilder.build(raw, "Netflix", hintShowName = "Ataque a los Titanes")
+        assertEquals("Ataque a los Titanes", sig.showName)
+        assertEquals(
+            "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+            sig.episodeName,
+        )
+        assertNull(sig.movieTitle)
+        assertEquals(1, sig.season)
+        assertEquals(1, sig.episode)
+        assertEquals("Ataque a los Titanes", sig.mainTitle)
+    }
+
+    @Test
+    fun doesNotUseEpisodeMarkerSubtitleAsSeries() {
+        // Sin pista de accesibilidad, un subtítulo "T1:E1 - <mismo episodio>" NO debe
+        // enviarse como nombre de serie (antes producía una notificación sin relación).
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+            displaySubtitle = "T1:E1 - A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+        )
+        val sig = SignalBuilder.build(raw, "Netflix")
+        assertNull(sig.showName)
+        assertEquals(
+            "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
+            sig.movieTitle,
+        )
+        assertEquals(1, sig.season)
+        assertEquals(1, sig.episode)
+    }
+
+    @Test
+    fun ignoresHintForMovieWithoutEpisodeNumber() {
+        // Una pista de serie no debe convertir una película (sin nº de episodio) en
+        // episodio.
+        val raw = RawMetadata(packageName = "com.netflix.mediaclient", title = "Alguna Película")
+        val sig = SignalBuilder.build(raw, "Netflix", hintShowName = "Ataque a los Titanes")
+        assertEquals("Alguna Película", sig.movieTitle)
+        assertNull(sig.showName)
+        assertNull(sig.episode)
+    }
+
+    @Test
     fun keepsMovieWhenSubtitleEqualsTitleOrAbsent() {
         // Película con subtítulo idéntico al título (o inexistente) → sigue siendo
         // película, NO se inventa una serie.

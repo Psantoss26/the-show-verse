@@ -30,32 +30,37 @@ object SignalBuilder {
 
     private fun String?.clean(): String? = this?.replace(Regex("\\s+"), " ")?.trim()?.ifEmpty { null }
 
-    fun build(raw: RawMetadata, platformName: String): PlaybackSignal {
+    // Marcador de temporada/episodio AL PRINCIPIO ("T1:E1 - ", "S1 E1 ·",
+    // "Temporada 1 Episodio 1:", "Episodio 5 -"). Sirve para decidir si un subtítulo
+    // es realmente el nombre de la SERIE o solo el episodio con su marcador delante.
+    private val LEADING_SE_MARKER = Regex(
+        "^\\s*(?:T|S|Temporada|Season|Saison|Staffel)\\s*\\.?\\s*\\d{1,3}" +
+            "(?:\\s*[:x]?\\s*(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)?\\s*\\.?\\s*\\d{1,3})?" +
+            "\\s*[-–—·:.]*\\s*",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** Quita un marcador "T1:E1 -"/"Episodio 1:" del principio; null si queda vacío. */
+    private fun withoutEpisodeMarker(s: String?): String? =
+        s?.let { LEADING_SE_MARKER.replace(it, "").trim().ifEmpty { null } }
+
+    fun build(
+        raw: RawMetadata,
+        platformName: String,
+        hintShowName: String? = null,
+    ): PlaybackSignal {
         val title = raw.title.clean() ?: raw.displayTitle.clean()
         val artist = raw.artist.clean()
         val album = raw.album.clean()
         val subtitle = raw.displaySubtitle.clean()
+        val hint = hintShowName.clean()
         val hasArtistAlbum = artist != null || album != null
-
-        // Algunas apps (HBO Max) NO exponen artist/album en la MediaSession: ponen
-        // el nombre del EPISODIO en `title` y el de la SERIE en `displaySubtitle`.
-        // Sin tratar este caso, el episodio se enviaba como película y TMDb no lo
-        // resolvía → 404 ("Could not resolve TMDb entity for: <episodio>"). Si hay
-        // un subtítulo distinto del título, lo tratamos como serie:
-        // serie = subtítulo, episodio = título.
-        val seriesFromSubtitle = !hasArtistAlbum &&
-            !subtitle.isNullOrBlank() &&
-            !title.isNullOrBlank() &&
-            !subtitle.equals(title, ignoreCase = true)
-        val hasSeries = hasArtistAlbum || seriesFromSubtitle
-
-        // Nombre de la serie y del episodio según de dónde salga la señal de serie.
-        val showTitle = if (hasArtistAlbum) (artist ?: album) else subtitle
-        val episodeTitle = if (hasArtistAlbum) (title ?: subtitle) else title
 
         // Temporada/episodio: probamos subtítulo, álbum, título, displayTitle. El
         // EPISODIO se toma del primer texto que lo tenga; la TEMPORADA se busca en
         // CUALQUIERA de los textos (puede venir en otro campo) y nunca se asume 1.
+        // Se calcula ANTES de decidir la serie: saber si hay nº de episodio decide
+        // si aplicar la pista de la ficha (hint).
         val candidates = listOf(subtitle, album, title, raw.displayTitle.clean())
         var se: Pair<Int?, Int>? = null
         var seText: String? = null
@@ -74,6 +79,37 @@ object SignalBuilder {
             }
         }
         val resolvedSeason = se?.first ?: seasonAny
+        val hasEpisodeNumber = se != null
+
+        // ¿El subtítulo aporta el nombre de la SERIE? Solo si, tras quitarle un
+        // posible marcador ("T1:E1 -", "Episodio 1:"), lo que queda es DISTINTO del
+        // título (el episodio). Así:
+        //   - HBO Max: dSub = "La Casa del Dragón" (serie) ≠ título → sí es serie.
+        //   - Netflix: dSub = "T1:E1 - <mismo episodio>" → al quitar "T1:E1 -" queda
+        //     el propio episodio → NO es serie (antes se mandaba esa basura como
+        //     nombre de serie y TMDb resolvía un título sin relación).
+        val subtitleCore = withoutEpisodeMarker(subtitle)
+        val subtitleIsSeries = !hasArtistAlbum &&
+            !subtitle.isNullOrBlank() &&
+            !title.isNullOrBlank() &&
+            !subtitle.equals(title, ignoreCase = true) &&
+            subtitleCore != null &&
+            !subtitleCore.equals(title, ignoreCase = true)
+
+        // Nombre de la SERIE, por prioridad:
+        //   1) artist/album de la MediaSession (lo más fiable cuando existe),
+        //   2) la pista de la FICHA de accesibilidad (hint) —solo si hay nº de
+        //      episodio, señal fuerte de que es un episodio—, para cubrir Netflix y
+        //      demás apps que no exponen la serie en la MediaSession,
+        //   3) el subtítulo cuando es un nombre de serie válido.
+        val showTitle: String? = when {
+            hasArtistAlbum -> artist ?: album
+            hint != null && hasEpisodeNumber -> hint
+            subtitleIsSeries -> subtitle
+            else -> null
+        }
+        val hasSeries = showTitle != null
+        val episodeTitle = if (hasArtistAlbum) (title ?: subtitle) else title
 
         return PlaybackSignal(
             host = raw.packageName,

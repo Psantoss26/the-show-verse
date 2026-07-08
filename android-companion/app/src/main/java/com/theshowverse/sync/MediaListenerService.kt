@@ -203,7 +203,11 @@ class MediaListenerService : NotificationListenerService() {
             .joinToString(" ") { "${it.first}=«${it.second}»" }
         noteOnce("meta:$pkg:${raw.title}", "Metadatos ${Platforms.nameFor(pkg)} → $metaDump")
 
-        val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg))
+        // Pista de la serie desde la última ficha abierta (misma app, reciente):
+        // cubre apps que no exponen la serie en la MediaSession (Netflix), donde
+        // `title` es solo el episodio.
+        val hintShowName = RecentDetail.showNameFor(pkg)
+        val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
         if (signal.mainTitle.isNullOrBlank()) {
             noteOnce("notitle:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin título legible")
             return
@@ -258,6 +262,10 @@ class MediaListenerService : NotificationListenerService() {
     // sondear ese paquete (ya está marcado como visto).
     private fun maybeSendProgress(pkg: String, signal: PlaybackSignal) {
         val synced = syncedByPackage[pkg] ?: return
+        // Mantiene viva la pista de la serie durante la reproducción (y la actualiza
+        // a lo realmente resuelto): así el episodio que auto-reproduce a continuación
+        // sigue resolviéndose con la serie correcta aunque la MediaSession no la dé.
+        RecentDetail.remember(pkg, synced)
         val durationSec = signal.durationSec ?: return
         val positionSec = signal.positionSec ?: return
         if (durationSec <= 0 || positionSec < 0) return
