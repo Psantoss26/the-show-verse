@@ -4458,6 +4458,11 @@ export default function DetailsClient({
 
     let ignore = false;
     let timeoutId = null;
+    // Poll corto mientras el backend siembra contenido en la primera visita
+    // (state === "seeding"): reintenta a los ~3s y ~8s, una sola vez, sin
+    // bloquear con spinner. Se limpia al desmontar o si cambian id/tipo.
+    let seedTimers = [];
+    let scheduledPoll = false;
 
     const listsCacheKey = `showverse:trakt:lists:${traktType}:${id}:${tListsTab}`;
     // SWR: pintamos la caché al instante (sin spinner); el fetch revalida en 2º
@@ -4542,6 +4547,20 @@ export default function DetailsClient({
               );
             } catch {}
           }
+
+          // Primera visita: el backend aun esta sembrando datos desde Trakt.
+          // Reintentamos un par de veces sin mostrar spinner bloqueante.
+          if (r?.state === "seeding" && !scheduledPoll) {
+            scheduledPoll = true;
+            seedTimers.push(
+              window.setTimeout(() => {
+                if (!ignore) load();
+              }, 3000),
+              window.setTimeout(() => {
+                if (!ignore) load();
+              }, 8000),
+            );
+          }
           return;
         } catch (e) {
           if (ignore) return;
@@ -4583,6 +4602,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
       if (timeoutId) clearTimeout(timeoutId);
+      seedTimers.forEach((t) => window.clearTimeout(t));
     };
   }, [id, traktType, tListsTab, tLists.page, traktDeferredReady]);
 

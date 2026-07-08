@@ -39,7 +39,7 @@ async function authWrite(request, params, method) {
   const p = await params;
   const body = method === "DELETE" ? undefined : JSON.stringify(await request.json().catch(() => ({})));
   const idPart = new URL(request.url).searchParams.get("id");
-  const path = `/v1/community/${p.type}/${p.tmdbId}/comments${idPart ? `/${idPart}` : ""}`;
+  const path = `/v1/community/${p.type}/${p.tmdbId}/comments${idPart ? `/${encodeURIComponent(idPart)}` : ""}`;
   const backend = await backendFetchJson(request, path, {
     method, ...(body ? { body, headers: { "Content-Type": "application/json" } } : {}),
   });
