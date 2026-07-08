@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { withinRange } from './calendarRange.js';
 import { rankAnticipatedMovies, rankNewReleaseMovies } from './score.js';
 import {
   balanceSoftLimitedContent,
@@ -373,6 +374,43 @@ export async function getCalendarShowDetails(tmdbId) {
 
   calendarShowCache.set(tmdbId, { ts: Date.now(), value });
   return value;
+}
+
+// Próximos episodios de una serie DENTRO de un rango arbitrario (para /calendar,
+// vistas Día/Semana/Mes). No usa el caché de ventana fija de getCalendarShowDetails
+// porque el rango es variable; sí reutiliza tmdbDetails/tmdbSeason.
+export async function getShowEpisodesInRange(tmdbId, { startMs, endMs, max = 6 }) {
+  const details = await tmdbDetails('tv', tmdbId);
+  if (!details) return [];
+  const show = {
+    tmdbId: Number(tmdbId),
+    title: details.name || null,
+    posterPath: details.poster_path || null,
+    backdropPath: details.backdrop_path || null,
+  };
+  const nextEp = details.next_episode_to_air || null;
+  const seasonNum = Number(nextEp?.season_number);
+  const out = [];
+  if (Number.isFinite(seasonNum)) {
+    const season = await tmdbSeason(tmdbId, seasonNum);
+    const eps = Array.isArray(season?.episodes) ? season.episodes : [];
+    for (const e of eps) {
+      if (!e?.air_date || !withinRange(e.air_date, startMs, endMs)) continue;
+      const entry = buildUpcomingEpisodeEntry(show, {
+        season_number: Number.isFinite(Number(e.season_number)) ? Number(e.season_number) : seasonNum,
+        episode_number: e.episode_number, air_date: e.air_date, name: e.name || null,
+      }, []);
+      if (entry) out.push(entry);
+    }
+  }
+  // Fallback: the lone next_episode_to_air if the season yielded nothing but it fits.
+  if (out.length === 0 && nextEp?.air_date && withinRange(nextEp.air_date, startMs, endMs)) {
+    const entry = buildUpcomingEpisodeEntry(show, nextEp, []);
+    if (entry) out.push(entry);
+  }
+  return out
+    .sort((a, b) => (a.episode.airDate || '').localeCompare(b.episode.airDate || ''))
+    .slice(0, max);
 }
 
 // Construye una entrada de episodio próximo (forma consumida por el cliente).
