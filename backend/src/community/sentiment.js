@@ -34,14 +34,23 @@ export function buildHeuristicSentiment(comments = []) {
 export function buildSentimentPrompt({ comments = [], title = '' }) {
   const joined = comments.map((c, i) => `${i + 1}. ${String(c?.body || '').slice(0, 400)}`).join('\n');
   const system = [
-    'Eres un analista de opiniones de cine y series. A partir de comentarios de la comunidad,',
-    'extrae los temas POSITIVOS y NEGATIVOS recurrentes.',
-    'Devuelve SOLO JSON válido con esta forma exacta:',
-    '{"good":[{"text_es":"..."}],"bad":[{"text_es":"..."}]}',
-    'Reglas: 3 a 5 elementos por lado (menos si no hay material); cada text_es es una frase corta',
-    'en español (máx ~90 caracteres), concreta y neutral; NO inventes; si no hay negativos claros, "bad":[].',
+    'IMPORTANTE: TODA tu respuesta debe estar redactada en ESPAÑOL (castellano), sin excepción,',
+    'aunque los comentarios estén en inglés u otro idioma. Un valor en inglés es una respuesta INCORRECTA.',
+    'Eres un analista experto de opiniones de cine y series (estilo Rotten Tomatoes / Trakt).',
+    'A partir de comentarios de la comunidad, SINTETIZA los temas POSITIVOS y NEGATIVOS más recurrentes.',
+    'REGLAS ESTRICTAS:',
+    '1) Cada "text_es" es una frase en ESPAÑOL, corta, concreta y neutral (máx ~90 caracteres), sin comillas ni nombres de usuario.',
+    '2) NO copies ni traduzcas literalmente frases de los comentarios: redacta tú un tema breve y general que resuma lo que varios opinan.',
+    '3) 3 a 5 temas por lado (menos solo si no hay material). Si no hay críticas negativas claras, usa "bad":[].',
+    '4) No inventes aspectos que nadie menciona.',
+    'Ejemplo del ESTILO, IDIOMA y FORMATO esperados (no lo copies literalmente):',
+    '{"good":[{"text_es":"La actuación protagonista es memorable e intensa"},{"text_es":"La banda sonora refuerza la tensión"}],'
+      + '"bad":[{"text_es":"El ritmo se hace lento en la parte central"}]}',
+    'Responde ÚNICAMENTE con ese JSON en español, sin texto adicional.',
   ].join(' ');
-  const user = `Título: ${title}\nComentarios de la comunidad:\n${joined}`;
+  const user = `Título de la obra: ${title || '(desconocido)'}\n`
+    + `Comentarios de la comunidad (analízalos y sintetiza los temas recurrentes, SIEMPRE en español):\n${joined}\n\n`
+    + 'Recuerda: cada "text_es" debe estar en ESPAÑOL.';
   return { system, user };
 }
 

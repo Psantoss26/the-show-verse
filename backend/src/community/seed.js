@@ -114,19 +114,32 @@ export async function runSeed({ tmdbId, mediaType }) {
     }
     const title = ''; // TMDb title optional; prompt tolerates empty
     if (analysisComments.length) {
-      // 1) Provisional heuristic immediately.
+      // Provisional heuristic sentiment immediately (fast, always available).
       const heur = buildHeuristicSentiment(analysisComments);
       await upsertSentiment({ tmdbId: numId, mediaType, good: heur.good, bad: heur.bad,
         provider: 'heuristic', model: null, sourceCommentCount: analysisComments.length, isProvisional: true });
-      // 2) Ollama upgrade (best-effort) replaces it.
-      const ai = await generateSentiment({ comments: analysisComments, title }).catch(() => null);
-      if (ai) {
-        await upsertSentiment({ tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
-          provider: ai.provider, model: ai.model, sourceCommentCount: analysisComments.length, isProvisional: false });
-      }
     }
 
+    // The title is READY now: comments + lists + heuristic sentiment are all persisted.
+    // Marking ready BEFORE the LLM keeps page load fast and the state machine unblocked
+    // regardless of how slow the local model is.
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
+
+    // IA sentiment upgrade — DETACHED (fire-and-forget): replaces the heuristic once the local
+    // model finishes. Never blocks readiness/load; a failure just leaves the heuristic in place.
+    if (analysisComments.length) {
+      generateSentiment({ comments: analysisComments, title })
+        .then((ai) => {
+          if (!ai) return null;
+          return upsertSentiment({
+            tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
+            provider: ai.provider, model: ai.model,
+            sourceCommentCount: analysisComments.length, isProvisional: false,
+          });
+        })
+        .catch((e) =>
+          console.error(`[community/seed] sentiment upgrade failed for ${mediaType}:${numId}:`, e?.message || e));
+    }
   } catch (err) {
     await markFailed({ tmdbId: numId, mediaType, error: String(err?.message || err).slice(0, 300) });
   }
