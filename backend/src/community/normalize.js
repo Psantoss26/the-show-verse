@@ -50,3 +50,51 @@ export function commentRowToApi(row) {
     source: row.source,
   };
 }
+
+const TMDB_IMG = 'https://image.tmdb.org/t/p';
+export function posterUrl(path, size = 'w342') {
+  if (!path) return null;
+  return `${TMDB_IMG}/${size}${path}`;
+}
+
+export function normalizeTraktList(raw) {
+  const list = raw?.list || raw; // Trakt "lists containing" rows nest under .list sometimes
+  const externalId = Number(list?.ids?.trakt) || null;
+  const name = list?.name || null;
+  if (!externalId || !name) return null;
+  const user = list?.user || raw?.user || {};
+  return {
+    source: 'trakt',
+    externalId,
+    slug: list?.ids?.slug || null,
+    name,
+    description: list?.description || null,
+    ownerName: user?.name || user?.username || null,
+    ownerUsername: user?.username || null,
+    ownerAvatarUrl: user?.images?.avatar?.full || null,
+    itemCount: Number(list?.item_count) || 0,
+    likes: Number(list?.likes) || 0,
+    privacy: list?.privacy || 'public',
+    traktUrl: user?.username && list?.ids?.slug
+      ? `https://trakt.tv/users/${user.username}/lists/${list.ids.slug}` : null,
+  };
+}
+
+export function listRowToApi(row) {
+  return {
+    list: {
+      id: row.id,
+      name: row.name,
+      description: row.description || '',
+      item_count: Number(row.itemCount) || 0,
+      likes: Number(row.likes) || 0,
+      ids: { slug: row.slug || null, trakt: row.externalId || null },
+    },
+    user: {
+      username: row.ownerUsername || null,
+      name: row.ownerName || row.ownerUsername || null,
+      images: { avatar: { full: row.ownerAvatarUrl || null } },
+    },
+    previewPosters: Array.isArray(row.previewPosters) ? row.previewPosters : [],
+  };
+}

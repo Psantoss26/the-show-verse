@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stripHtml, normalizeTraktComment, commentRowToApi } from './normalize.js';
+import { stripHtml, normalizeTraktComment, commentRowToApi, normalizeTraktList, listRowToApi, posterUrl } from './normalize.js';
 
 test('stripHtml removes tags and decodes basic entities', () => {
   assert.equal(stripHtml('<b>Great</b> &amp; fun'), 'Great & fun');
@@ -45,4 +45,42 @@ test('commentRowToApi produces the UI contract shape', () => {
   assert.equal(api.user.vip, false);
   assert.equal(api.user.images.avatar.full, 'http://a/b.png');
   assert.equal(api.created_at, '2020-05-01T00:00:00.000Z');
+});
+
+test('normalizeTraktList maps a Trakt "list containing" row', () => {
+  const raw = {
+    name: 'Cult Classics', description: 'Weird & wonderful', item_count: 693, likes: 43,
+    privacy: 'public', ids: { trakt: 99, slug: 'cult-classics' },
+    user: { username: 'madmapper', name: 'MadMapper', images: { avatar: { full: 'http://a/m.png' } } },
+  };
+  const row = normalizeTraktList(raw);
+  assert.equal(row.source, 'trakt');
+  assert.equal(row.externalId, 99);
+  assert.equal(row.slug, 'cult-classics');
+  assert.equal(row.name, 'Cult Classics');
+  assert.equal(row.itemCount, 693);
+  assert.equal(row.likes, 43);
+  assert.equal(row.ownerUsername, 'madmapper');
+  assert.equal(row.ownerAvatarUrl, 'http://a/m.png');
+});
+
+test('posterUrl builds a full TMDB url or null', () => {
+  assert.equal(posterUrl('/abc.jpg'), 'https://image.tmdb.org/t/p/w342/abc.jpg');
+  assert.equal(posterUrl(null), null);
+});
+
+test('listRowToApi produces the Surface B contract', () => {
+  const api = listRowToApi({
+    id: 'L1', externalId: 99, slug: 'cult-classics', name: 'Cult Classics', description: 'x',
+    itemCount: 693, likes: 43, ownerUsername: 'madmapper', ownerName: 'MadMapper',
+    ownerAvatarUrl: 'http://a/m.png', previewPosters: ['https://image.tmdb.org/t/p/w342/a.jpg'],
+  });
+  assert.equal(api.list.name, 'Cult Classics');
+  assert.equal(api.list.item_count, 693);
+  assert.equal(api.list.likes, 43);
+  assert.equal(api.list.ids.slug, 'cult-classics');
+  assert.equal(api.list.ids.trakt, 99);
+  assert.equal(api.user.username, 'madmapper');
+  assert.equal(api.user.images.avatar.full, 'http://a/m.png');
+  assert.deepEqual(api.previewPosters, ['https://image.tmdb.org/t/p/w342/a.jpg']);
 });
