@@ -839,10 +839,10 @@ function buildInternalUrl(list) {
   if (src === "tmdb") return `/lists/${list?.id}`;
 
   if (src === "trakt") {
-    const u = getTraktUsername(list);
-    const key = getTraktListKey(list);
-    if (!u || !key) return null;
-    return `/lists/trakt/${encodeURIComponent(u)}/${encodeURIComponent(String(key))}`;
+    // Comunidad: el detalle se sirve por id interno (uuid) desde nuestra BBDD.
+    const id = list?.id;
+    if (!id) return null;
+    return `/lists/community/${encodeURIComponent(String(id))}`;
   }
 
   // Colecciones: ruta interna a vista detallada
@@ -1601,7 +1601,7 @@ export default function ListsPage() {
     source === "tmdb"
       ? "Mis Listas"
       : source === "trakt"
-        ? "Listas de Trakt"
+        ? "Listas de la comunidad"
         : "Colecciones";
 
   const subtitle =
@@ -1874,7 +1874,7 @@ export default function ListsPage() {
                   {source === "collections"
                     ? "SAGAS"
                     : source === "trakt"
-                      ? "TRAKT"
+                      ? "COMUNIDAD"
                       : "TUS LISTAS"}
                 </span>
               </div>
@@ -1882,7 +1882,7 @@ export default function ListsPage() {
                 {source === "collections"
                   ? "Colecciones"
                   : source === "trakt"
-                    ? "Listas de Trakt"
+                    ? "Listas de la comunidad"
                     : "Mis Listas"}
                 <span className="text-purple-500">.</span>
               </h1>
@@ -1890,7 +1890,7 @@ export default function ListsPage() {
                 {source === "collections"
                   ? "Explora colecciones temáticas de películas."
                   : source === "trakt"
-                    ? "Descubre y explora listas populares de Trakt."
+                    ? "Descubre y explora listas populares de la comunidad."
                     : "Gestiona y organiza tus listas personales."}
               </p>
             </div>
@@ -1961,7 +1961,7 @@ export default function ListsPage() {
                           source === "tmdb"
                             ? "Mis listas"
                             : source === "trakt"
-                              ? "Trakt"
+                              ? "Comunidad"
                               : "Colecciones"
                         }
                         icon={Layers}
@@ -1984,7 +1984,7 @@ export default function ListsPage() {
                                 close();
                               }}
                             >
-                              Trakt
+                              Comunidad
                             </DropdownItem>
                             <DropdownItem
                               active={source === "collections"}
@@ -2216,7 +2216,7 @@ export default function ListsPage() {
                 source === "tmdb"
                   ? "Mis listas"
                   : source === "trakt"
-                    ? "Trakt"
+                    ? "Comunidad"
                     : "Colecciones"
               }
               icon={Layers}
@@ -2239,7 +2239,7 @@ export default function ListsPage() {
                       close();
                     }}
                   >
-                    Trakt
+                    Comunidad
                   </DropdownItem>
                   <DropdownItem
                     active={source === "collections"}
