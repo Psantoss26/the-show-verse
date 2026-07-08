@@ -22,7 +22,11 @@ import {
 } from '../lib/jwt.js';
 import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
 import { syncDedupKey } from './netflixSyncDedup.js';
-import { eq, and, gt, lt } from 'drizzle-orm';
+import {
+  shouldRecordCompletion,
+  REWATCH_COMPLETION_COOLDOWN_MS,
+} from '../lib/rewatchCompletion.js';
+import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -1053,51 +1057,66 @@ export default async function authRoutes(fastify) {
     const COMPLETE_AT = 0.9;
     const userId = account.userId;
 
-    // ── Completado (≥90% y con duración conocida): marcar visto + quitar de "Continuar viendo".
+    // ── Completado (≥90% y con duración conocida): registrar play + quitar de
+    // "Continuar viendo". Regla del "cruce del 90%" (ver lib/rewatchCompletion.js):
+    // la fila de watch_progress SOLO existe mientras percent < 0.9, así que si
+    // existía al llegar aquí es que veníamos reproduciendo por debajo del umbral y
+    // lo cruzamos AHORA → un play nuevo (primer visionado O rewatch). Los pings de
+    // cola (95%, 98%…) de una misma sesión ya no tienen fila y se colapsan por el
+    // cooldown. Esto permite re-sincronizar el mismo episodio el mismo día como un
+    // rewatch (antes: bucket de 12 h que lo descartaba).
     if (runtimeSeconds > 0 && percent >= COMPLETE_AT) {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentRows = await db
-        .select({
-          season: watchHistory.season,
-          episode: watchHistory.episode,
-          watchedAt: watchHistory.watchedAt,
-        })
-        .from(watchHistory)
-        .where(and(
-          eq(watchHistory.userId, userId),
-          eq(watchHistory.tmdbId, tmdbId),
-          eq(watchHistory.mediaType, mediaType),
-          gt(watchHistory.watchedAt, since),
-        ));
-
       const now = new Date();
-      const incomingKey = syncDedupKey({
-        tmdbId,
-        mediaType,
-        season: isTv ? (season || null) : null,
-        episode: isTv ? (episode || null) : null,
-        watchedAt: now,
-      });
-      const duplicate = recentRows.some(
-        (r) => syncDedupKey({
-          tmdbId,
-          mediaType,
-          season: r.season,
-          episode: r.episode,
-          watchedAt: r.watchedAt,
-        }) === incomingKey,
-      );
+      // Valores tal y como se guardan en watch_history (null para película o
+      // episodio desconocido); watch_progress usa el sentinel 0 (season/episode).
+      const storedSeason = isTv ? (season || null) : null;
+      const storedEpisode = isTv ? (episode || null) : null;
+
+      // 1) Quitar de "Continuar viendo" y saber si HABÍA una sesión en curso (<90%).
+      const removedProgress = await db
+        .delete(watchProgress)
+        .where(and(
+          eq(watchProgress.userId, userId),
+          eq(watchProgress.tmdbId, tmdbId),
+          eq(watchProgress.mediaType, mediaType),
+          eq(watchProgress.season, season),
+          eq(watchProgress.episode, episode),
+        ))
+        .returning({ id: watchProgress.id });
+      const wasInProgress = removedProgress.length > 0;
+
+      // 2) Sin fila (pings de cola tras completar, o salto directo al final): mira
+      //    si ya hay un play del MISMO ítem dentro del cooldown para no duplicar.
+      let hasRecentPlay = false;
+      if (!wasInProgress) {
+        const cooldownSince = new Date(now.getTime() - REWATCH_COMPLETION_COOLDOWN_MS);
+        const [recent] = await db
+          .select({ id: watchHistory.id })
+          .from(watchHistory)
+          .where(and(
+            eq(watchHistory.userId, userId),
+            eq(watchHistory.tmdbId, tmdbId),
+            eq(watchHistory.mediaType, mediaType),
+            storedSeason == null ? isNull(watchHistory.season) : eq(watchHistory.season, storedSeason),
+            storedEpisode == null ? isNull(watchHistory.episode) : eq(watchHistory.episode, storedEpisode),
+            gt(watchHistory.watchedAt, cooldownSince),
+          ))
+          .limit(1);
+        hasRecentPlay = Boolean(recent);
+      }
+
+      const recorded = shouldRecordCompletion({ wasInProgress, hasRecentPlay });
 
       let item = null;
-      if (!duplicate) {
+      if (recorded) {
         [item] = await db
           .insert(watchHistory)
           .values({
             userId,
             tmdbId,
             mediaType,
-            season: isTv ? (season || null) : null,
-            episode: isTv ? (episode || null) : null,
+            season: storedSeason,
+            episode: storedEpisode,
             watchedAt: now,
             runtimeMins: runtimeSeconds ? Math.round(runtimeSeconds / 60) : null,
             title: title || null,
@@ -1107,18 +1126,7 @@ export default async function authRoutes(fastify) {
           .returning();
       }
 
-      // Idempotente: borra la fila de progreso aunque no existiera.
-      await db
-        .delete(watchProgress)
-        .where(and(
-          eq(watchProgress.userId, userId),
-          eq(watchProgress.tmdbId, tmdbId),
-          eq(watchProgress.mediaType, mediaType),
-          eq(watchProgress.season, season),
-          eq(watchProgress.episode, episode),
-        ));
-
-      return reply.send({ ok: true, completed: true, duplicate, percent: 1, item });
+      return reply.send({ ok: true, completed: true, recorded, duplicate: !recorded, percent: 1, item });
     }
 
     // ── En curso: upsert del progreso.
