@@ -3,10 +3,10 @@ import { db } from '../db/client.js';
 import { titleCommunityState, titleComments, titleSentiment } from '../db/schema.js';
 import { and, eq, sql } from 'drizzle-orm';
 import { seedDecision, nextRetryDate } from './state.js';
-import { resolveTraktId, getComments } from './trakt.js';
-import { normalizeTraktComment } from './normalize.js';
+import { resolveTraktId, getComments, getListsContaining, getUserListItems } from './trakt.js';
+import { normalizeTraktComment, normalizeTraktList, posterUrl } from './normalize.js';
 import { buildHeuristicSentiment, generateSentiment } from './sentiment.js';
-import { upsertSentiment } from './store.js';
+import { upsertSentiment, upsertCommunityList, insertListMemberships } from './store.js';
 
 export async function getState({ tmdbId, mediaType }) {
   const [row] = await db
@@ -52,7 +52,6 @@ export async function runSeed({ tmdbId, mediaType }) {
       await db.insert(titleComments).values(rows)
         .onConflictDoNothing();
     }
-    // (Task 13 will insert lists here.)
 
     // Sentiment input: up to 50 top-liked comments (analysis only, not stored beyond 10).
     let analysisComments = rows.map((r) => ({ body: r.body }));
@@ -78,6 +77,35 @@ export async function runSeed({ tmdbId, mediaType }) {
         await upsertSentiment({ tmdbId: numId, mediaType, good: ai.good, bad: ai.bad,
           provider: ai.provider, model: ai.model, sourceCommentCount: analysisComments.length, isProvisional: false });
       }
+    }
+
+    // Copy up to 3 lists that contain this title (best-effort: a list-copy failure must not
+    // fail the whole seed — comments + sentiment already succeeded by this point).
+    try {
+      const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 3 });
+      for (const raw of listItems) {
+        const listRow = normalizeTraktList(raw);
+        if (!listRow) continue;
+        // preview posters (best-effort): first 5 items of the list
+        let members = [];
+        if (listRow.ownerUsername && listRow.slug) {
+          const its = await getUserListItems({ username: listRow.ownerUsername, listSlug: listRow.slug, page: 1, limit: 150 });
+          members = its.map((it) => {
+            const m = it.movie || it.show; const isTv = !!it.show;
+            const itemTmdbId = m?.ids?.tmdb; if (!itemTmdbId) return null;
+            return { tmdbId: itemTmdbId, mediaType: isTv ? 'tv' : 'movie', title: m?.title || null,
+              posterPath: null }; // TMDb poster hydrated lazily by the frontend
+          }).filter(Boolean).slice(0, 150);
+        }
+        const previews = members.slice(0, 5).map((m) => posterUrl(m.posterPath)).filter(Boolean);
+        const listId = await upsertCommunityList({ ...listRow, copiedItemCount: members.length, previewPosters: previews });
+        // Always record the seeding title's membership even if the full item fetch failed.
+        const membershipItems = members.length ? members : [{ tmdbId: numId, mediaType, position: 0 }];
+        await insertListMemberships(listId, membershipItems);
+      }
+    } catch (listErr) {
+      // Swallow: list-copy is a bonus feature, not core to community seeding.
+      console.error(`[community/seed] list copy failed for ${mediaType}:${numId}:`, listErr?.message || listErr);
     }
 
     await markReady({ tmdbId: numId, mediaType, traktId: resolved.traktId, commentCount: rows.length });
