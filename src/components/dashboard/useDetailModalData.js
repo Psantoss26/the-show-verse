@@ -371,47 +371,54 @@ export function useDetailModalData(item) {
         if (!cancelled) setLoading(false);
       }
 
-      // Secundario (no bloquea el skeleton): premios (OMDb) + nota IMDb.
+    })();
+
+    // Nota IMDb (rating + votos) + premios (OMDb) + RT/MC. INDEPENDIENTE y en
+    // PARALELO con la carga principal (no encadenado tras los detalles), igual
+    // que DetailsClient: IMDb y OMDb se piden a la vez, y el dataset rápido de
+    // IMDb aporta también el número de votos. OMDb es respaldo de rating/votos.
+    (async () => {
       try {
-        let imdb =
-          item?.imdb_id ||
-          details?.imdb_id ||
-          details?.external_ids?.imdb_id ||
-          null;
+        let imdb = item?.imdb_id || null;
         if (!imdb) {
           const ext = await getExternalIds(mediaType, id).catch(() => null);
           imdb = ext?.imdb_id || null;
         }
-        if (imdb && !cancelled) {
-          const [omdb, imdbDataset] = await Promise.all([
-            fetchOmdbByImdb(imdb).catch(() => null),
-            fetchImdbRatingByImdb(imdb).catch(() => null),
-          ]);
-          if (!cancelled) {
-            // Cadena CRUDA de premios (OMDb), normalizada como en DetailsClient
-            // (`normalizeOmdbAwards`): <DetailsInfoTabs>/<AwardsPanel> la formatea.
-            const rawAwards = String(omdb?.Awards || "").trim();
-            const awards = !rawAwards || rawAwards === "N/A" ? null : rawAwards;
-            const imdbRating =
-              typeof imdbDataset?.rating === "number"
-                ? imdbDataset.rating
-                : null;
-            // Rotten Tomatoes + Metacritic + votos IMDb desde el array
-            // `Ratings` de OMDb (mismos parsers que DetailsClient).
-            const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
-            const { imdbVotes: omdbImdbVotes } = extractOmdbImdbScore(omdb);
+        if (!imdb || cancelled) return;
 
-            setData((prev) => ({
-              ...prev,
-              awards: awards ?? prev.awards,
-              imdbRating: imdbRating ?? prev.imdbRating,
-              imdbVotes: omdbImdbVotes ?? prev.imdbVotes,
-              imdbId: imdb ?? prev.imdbId,
-              rtScore: rtScore ?? prev.rtScore,
-              mcScore: mcScore ?? prev.mcScore,
-            }));
-          }
-        }
+        const [omdb, imdbDataset] = await Promise.all([
+          fetchOmdbByImdb(imdb).catch(() => null),
+          fetchImdbRatingByImdb(imdb).catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        // Cadena CRUDA de premios (OMDb); la preview/panel la formatea.
+        const rawAwards = String(omdb?.Awards || "").trim();
+        const awards = !rawAwards || rawAwards === "N/A" ? null : rawAwards;
+
+        // IMDb: preferimos el dataset rápido (rating + votos); OMDb de respaldo.
+        const datasetRating =
+          typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
+        const datasetVotes =
+          typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null;
+        // Rotten Tomatoes + Metacritic + rating/votos IMDb desde el array
+        // `Ratings` de OMDb (mismos parsers que DetailsClient).
+        const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+        const { imdbRating: omdbImdbRating, imdbVotes: omdbImdbVotes } =
+          extractOmdbImdbScore(omdb);
+
+        const imdbRating = datasetRating ?? omdbImdbRating;
+        const imdbVotes = datasetVotes ?? omdbImdbVotes;
+
+        setData((prev) => ({
+          ...prev,
+          awards: awards ?? prev.awards,
+          imdbRating: imdbRating ?? prev.imdbRating,
+          imdbVotes: imdbVotes ?? prev.imdbVotes,
+          imdbId: imdb ?? prev.imdbId,
+          rtScore: rtScore ?? prev.rtScore,
+          mcScore: mcScore ?? prev.mcScore,
+        }));
       } catch {
         // sin premios / sin nota IMDb: se queda como está
       }
