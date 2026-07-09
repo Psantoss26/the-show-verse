@@ -10,7 +10,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import NextImage from "next/image";
-import { useRouter } from "next/navigation";
 import {
   Play,
   X,
@@ -29,6 +28,7 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import HeroSoundtrackPlayer from "@/components/dashboard/HeroSoundtrackPlayer";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -433,10 +433,9 @@ function FeaturedSlide({
   toggleSoundtrackVisible,
 }) {
   const { session, account } = useAuth();
-  const router = useRouter();
+  const { openDetailModal } = useDetailModal();
 
   const mediaType = getMediaTypeForItem(movie);
-  const href = `/details/${mediaType}/${movie.id}`;
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -890,7 +889,7 @@ function FeaturedSlide({
     return false;
   };
 
-  const navigateToDetails = () => router.push(href);
+  const openPreviewModal = () => openDetailModal?.(movie);
 
   const handleToggleTrailer = async (e) => {
     e.stopPropagation();
@@ -1024,7 +1023,7 @@ function FeaturedSlide({
   return (
     <div
       className="relative w-full h-full bg-black cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
-      onClick={navigateToDetails}
+      onClick={openPreviewModal}
     >
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
       <div
@@ -1751,7 +1750,7 @@ export default function FeaturedHero({
   const heroSectionRef = useRef(null);
   const pointerStartRef = useRef(null);
   const suppressClickRef = useRef(false);
-  const router = useRouter();
+  const { openDetailModal } = useDetailModal();
   const [activeIndex, setActiveIndex] = useState(0);
   const [assets, setAssets] = useState({}); // id -> { backdrop, backdrops, poster, logo }
   const [selectedBackdrops, setSelectedBackdrops] = useState({});
@@ -2094,9 +2093,7 @@ export default function FeaturedHero({
         // Si el navegador sí llega a emitir el click, handleClickCapture lo
         // cancelará al ver suppressClickRef activo, evitando doble navegación.
         suppressClickRef.current = true;
-        router.push(
-          `/details/${getMediaTypeForItem(activeMovie)}/${activeMovie.id}`,
-        );
+        openDetailModal?.(activeMovie);
       }
     }
   };
