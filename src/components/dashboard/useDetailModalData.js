@@ -479,9 +479,11 @@ export function useDetailModalData(item) {
     })();
 
     // Logo del título (arte) para la cabecera (best-effort, no bloquea).
+    // Priorizamos SIEMPRE el logo en INGLÉS; si no existe, caemos a uno sin
+    // idioma (neutro) y, como último recurso, al español.
     (async () => {
       try {
-        const logoPath = await fetchBestLogo(id, mediaType, ["es", "en", null]);
+        const logoPath = await fetchBestLogo(id, mediaType, ["en", null, "es"]);
         if (!cancelled && logoPath) {
           setData((prev) => ({ ...prev, logoPath }));
         }

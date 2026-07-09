@@ -8,13 +8,14 @@ import {
   useState,
   useCallback,
   useRef,
-  Children,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Swiper, SwiperSlide } from "swiper/react";
+import { SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
+// Carrusel con flechas COMPARTIDO (mismo componente que usan DetailsClient y DetailModal).
+import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 
 import {
   ArrowLeft,
@@ -266,170 +267,6 @@ function SectionTitle({ title, icon: Icon, className = "" }) {
         <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
         <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
       </div>
-    </div>
-  );
-}
-
-function DetailsArrowCarousel({
-  children,
-  className = "",
-  arrowClassName = "inset-y-0",
-  ...swiperProps
-}) {
-  const swiperRef = useRef(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
-  const childrenCount = Children.count(children);
-
-  const updateNav = useCallback((swiper) => {
-    if (!swiper) return;
-    const hasOverflow = !swiper.isLocked;
-    setCanPrev(hasOverflow && !swiper.isBeginning);
-    setCanNext(hasOverflow && !swiper.isEnd);
-  }, []);
-
-  const handleSwiper = useCallback(
-    (swiper) => {
-      swiperRef.current = swiper;
-      updateNav(swiper);
-      requestAnimationFrame(() => {
-        swiper.update?.();
-        updateNav(swiper);
-      });
-    },
-    [updateNav],
-  );
-
-  useEffect(() => {
-    const swiper = swiperRef.current;
-    if (!swiper) return undefined;
-
-    const refresh = () => {
-      swiper.update?.();
-      updateNav(swiper);
-    };
-
-    const raf = requestAnimationFrame(refresh);
-    const t1 = window.setTimeout(refresh, 120);
-    const t2 = window.setTimeout(refresh, 450);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, [childrenCount, updateNav]);
-
-  const getStep = useCallback((swiper) => {
-    const current = swiper?.params?.slidesPerView;
-    return typeof current === "number" ? Math.max(1, Math.floor(current)) : 1;
-  }, []);
-
-  const handlePrevClick = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const swiper = swiperRef.current;
-      if (!swiper) return;
-      swiper.slideTo(Math.max((swiper.activeIndex || 0) - getStep(swiper), 0));
-    },
-    [getStep],
-  );
-
-  const handleNextClick = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const swiper = swiperRef.current;
-      if (!swiper) return;
-      const maxIndex = Math.max((swiper.slides?.length || 1) - 1, 0);
-      swiper.slideTo(
-        Math.min((swiper.activeIndex || 0) + getStep(swiper), maxIndex),
-      );
-    },
-    [getStep],
-  );
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div style={{ overflowX: "clip", overflowY: "visible" }}>
-        <Swiper
-          {...swiperProps}
-          observer={swiperProps.observer ?? true}
-          observeParents={swiperProps.observeParents ?? true}
-          resizeObserver={swiperProps.resizeObserver ?? true}
-          onSwiper={(swiper) => {
-            handleSwiper(swiper);
-            swiperProps.onSwiper?.(swiper);
-          }}
-          onSlideChange={(swiper) => {
-            updateNav(swiper);
-            swiperProps.onSlideChange?.(swiper);
-          }}
-          onResize={(swiper) => {
-            updateNav(swiper);
-            swiperProps.onResize?.(swiper);
-          }}
-          onReachBeginning={(swiper) => {
-            updateNav(swiper);
-            swiperProps.onReachBeginning?.(swiper);
-          }}
-          onReachEnd={(swiper) => {
-            updateNav(swiper);
-            swiperProps.onReachEnd?.(swiper);
-          }}
-          className={className}
-        >
-          {children}
-        </Swiper>
-      </div>
-
-      <AnimatePresence>
-        {isHovered && canPrev && (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            type="button"
-            onClick={handlePrevClick}
-            className={`absolute -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10 ${arrowClassName}`}
-            aria-label="Anterior"
-          >
-            <motion.span
-              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
-              whileHover={{ x: -4 }}
-            >
-              ‹
-            </motion.span>
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isHovered && canNext && (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            type="button"
-            onClick={handleNextClick}
-            className={`absolute -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10 ${arrowClassName}`}
-            aria-label="Siguiente"
-          >
-            <motion.span
-              className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
-              whileHover={{ x: 4 }}
-            >
-              ›
-            </motion.span>
-          </motion.button>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

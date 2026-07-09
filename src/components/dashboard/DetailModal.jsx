@@ -35,14 +35,14 @@ import {
   Globe,
   Languages,
   Film,
-  Calendar,
-  Clock,
   Layers,
   Info,
   Users,
   ListPlus,
   ImageOff,
   ChevronDown,
+  Check,
+  PlayCircle,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -58,6 +58,7 @@ import {
   buildImg,
   getMediaTypeForItem,
   getBestTrailerCached,
+  fetchBestBackdrop,
 } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
@@ -77,6 +78,12 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+// Carrusel horizontal con flechas (Swiper) COMPARTIDO con DetailsClient: mismo
+// desplazamiento, tamaños y organización de tarjetas. Con breakpointsBase
+// "container", el nº de tarjetas se adapta al ancho disponible del modal.
+import DetailsArrowCarousel, {
+  SwiperSlide,
+} from "@/components/details/DetailsArrowCarousel";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
@@ -211,6 +218,180 @@ function SkeletonBar({ className = "" }) {
     <div className={`animate-pulse rounded-full bg-white/10 ${className}`} />
   );
 }
+
+/* =========================== TARJETA "SIMILAR" ============================= */
+// Tarjeta de "Títulos similares": muestra SOLO el backdrop (con el título
+// rotulado en inglés cuando existe). Arranca con el backdrop por defecto del
+// item y, al montar, resuelve el mejor backdrop EN INGLÉS (fetchBestBackdrop
+// prioriza en → otro idioma → textless) y lo intercambia con un fundido.
+function SimilarBackdrop({ rec, onOpen }) {
+  const recMediaType = getMediaTypeForItem(rec);
+  const recTitle = rec?.title || rec?.name || "";
+  const fallback = rec?.backdrop_path
+    ? buildImg(rec.backdrop_path, "w780")
+    : rec?.poster_path
+      ? buildImg(rec.poster_path, "w780")
+      : null;
+  const [src, setSrc] = useState(fallback);
+
+  useEffect(() => {
+    let alive = true;
+    setSrc(fallback);
+    (async () => {
+      try {
+        const path = await fetchBestBackdrop(rec.id, recMediaType);
+        if (alive && path) setSrc(buildImg(path, "w780"));
+      } catch {
+        // silencio: conservamos el backdrop por defecto
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rec?.id, recMediaType]);
+
+  return (
+    <div
+      className="group relative aspect-video w-full cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-neutral-800 shadow-md transition duration-300 hover:border-white/30 hover:shadow-lg hover:shadow-black/40"
+      role="button"
+      tabIndex={onOpen ? 0 : -1}
+      title={recTitle}
+      onClick={() => onOpen?.(rec)}
+      onKeyDown={(e) => {
+        if (onOpen && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onOpen(rec);
+        }
+      }}
+    >
+      {src ? (
+        <NextImage
+          src={src}
+          alt={recTitle}
+          fill
+          sizes="(min-width:1024px) 260px, (min-width:640px) 320px, 72vw"
+          className="object-cover transition duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs font-bold text-zinc-500">
+          {recTitle}
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <PlayCircle className="h-11 w-11 text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]" />
+      </div>
+    </div>
+  );
+}
+
+/* ======================== SELECTOR DE TEMPORADA =========================== */
+// Desplegable personalizado (glassy) que sustituye al <select> nativo: botón con
+// la temporada activa + nº de episodios, y menú animado con todas las temporadas
+// (marca la activa). Cierra al hacer click fuera o con Escape.
+function SeasonDropdown({ seasons, value, onChange, labelId }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const current = seasons.find((s) => s.season_number === value) || null;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-full sm:w-[230px]">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={labelId}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-white/5 bg-white/[0.04] px-4 text-left text-sm font-bold text-white transition hover:border-white/10 hover:bg-white/[0.08] focus:outline-none"
+      >
+        <span className="truncate">
+          Temporada {current?.season_number ?? "—"}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden="true"
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            role="listbox"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] origin-top overflow-y-auto rounded-xl border border-white/5 bg-[#141414]/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl [scrollbar-width:thin]"
+          >
+            {seasons.map((season) => {
+              const active = season.season_number === value;
+              return (
+                <li key={season.season_number}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      onChange(season.season_number);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${
+                      active
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
+                    }`}
+                  >
+                    <span className="flex-1 truncate">
+                      Temporada {season.season_number}
+                    </span>
+                    {season.episode_count ? (
+                      <span className="shrink-0 text-xs text-zinc-500 font-medium">
+                        {season.episode_count} ep.
+                      </span>
+                    ) : null}
+                    {active && (
+                      <Check
+                        className="h-4 w-4 shrink-0 text-emerald-400"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// En el modal NO mostramos las flechas de navegación (quedan apretadas contra
+// los bordes del panel estrecho): el desplazamiento se hace por arrastre /
+// deslizamiento. En DetailsClient sí se muestran (valores por defecto).
+const MODAL_ARROW_PROPS = {
+  showArrows: false,
+};
 
 /* ================================== MODAL ================================== */
 export default function DetailModal({ item, onClose }) {
@@ -1212,9 +1393,6 @@ export default function DetailModal({ item, onClose }) {
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
-  const selectedSeasonMeta = availableSeasons.find(
-    (season) => season.season_number === selectedSeasonNumber,
-  );
   const selectedSeasonEpisodes = useMemo(() => {
     const episodes = Array.isArray(seasonPreview.data?.episodes)
       ? seasonPreview.data.episodes
@@ -1225,10 +1403,6 @@ export default function DetailModal({ item, onClose }) {
   }, [seasonPreview.data]);
   const showSeasonsSection =
     mediaType === "tv" && availableSeasons.length > 0 && item?.id;
-  const seasonTitle =
-    seasonPreview.data?.name ||
-    selectedSeasonMeta?.name ||
-    (selectedSeasonNumber != null ? `Temporada ${selectedSeasonNumber}` : "");
   const prefetchEpisodeDetails = (episodeNumber) => {
     if (!item?.id || selectedSeasonNumber == null || !episodeNumber) return;
     const href = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
@@ -1417,8 +1591,9 @@ export default function DetailModal({ item, onClose }) {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
             >
-              <div className="w-full min-w-0 sm:flex-1">
+              <div className="w-full min-w-0 sm:flex-1 mx-[-20px] sm:mx-0 px-1 sm:px-0">
                 <DetailActionsRow
+                  fillMobile
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
                   trailerLoading={trailerLoading}
@@ -1668,15 +1843,26 @@ export default function DetailModal({ item, onClose }) {
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Reparto
                 </h3>
-                <div className="grid grid-cols-3 gap-3 overflow-hidden pb-1 sm:flex sm:overflow-x-auto sm:pb-2 sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden">
+                <DetailsArrowCarousel
+                  {...MODAL_ARROW_PROPS}
+                  spaceBetween={12}
+                  slidesPerView={3}
+                  breakpointsBase="container"
+                  breakpoints={{
+                    460: { slidesPerView: 4, spaceBetween: 12 },
+                    640: { slidesPerView: 5, spaceBetween: 14 },
+                    840: { slidesPerView: 6, spaceBetween: 16 },
+                  }}
+                  className="!overflow-visible pb-1"
+                >
                   {data.cast.map((person) => {
                     const photo = person?.profile_path
                       ? buildImg(person.profile_path, "w185")
                       : null;
                     return (
-                      <div
+                      <SwiperSlide
                         key={person?.id ?? person?.credit_id ?? person?.name}
-                        className="group relative w-full min-w-0 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900 shadow-md transition-colors hover:border-yellow-500/30 sm:w-[calc((100%-2.25rem)/4)] sm:shrink-0 lg:w-[calc((100%-3.75rem)/6)]"
+                        className="group relative min-w-0 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900 shadow-md transition-colors hover:border-yellow-500/30"
                       >
                         <div className="relative aspect-[2/3] overflow-hidden">
                           {photo ? (
@@ -1705,10 +1891,10 @@ export default function DetailModal({ item, onClose }) {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </SwiperSlide>
                     );
                   })}
-                </div>
+                </DetailsArrowCarousel>
               </motion.section>
             )}
 
@@ -1725,46 +1911,24 @@ export default function DetailModal({ item, onClose }) {
                   <MonitorPlay className="h-4 w-4" aria-hidden="true" />
                   Títulos similares
                 </h3>
-                <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                  {data.recommendations.slice(0, 14).map((rec) => {
-                    const art = rec?.backdrop_path
-                      ? buildImg(rec.backdrop_path, "w300")
-                      : rec?.poster_path
-                        ? buildImg(rec.poster_path, "w342")
-                        : null;
-                    const recTitle = rec?.title || rec?.name || "";
-                    return (
-                      <button
-                        key={`${getMediaTypeForItem(rec)}-${rec?.id}`}
-                        type="button"
-                        onClick={() => openDetailModal?.(rec)}
-                        disabled={!openDetailModal}
-                        className="group w-[72%] shrink-0 text-left sm:w-[calc((100%-1.5rem)/3)] lg:w-[calc((100%-2.25rem)/4)]"
-                        title={recTitle}
-                      >
-                        <div className="relative mb-1.5 aspect-video w-full overflow-hidden rounded-lg border border-white/10 bg-neutral-800 transition group-hover:border-white/30">
-                          {art ? (
-                            <NextImage
-                              src={art}
-                              alt={recTitle}
-                              fill
-                              sizes="(min-width:1024px) 210px, (min-width:640px) 280px, 72vw"
-                              className="object-cover transition duration-300 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center px-2 text-center text-[11px] font-bold text-zinc-500">
-                              {recTitle}
-                            </div>
-                          )}
-                        </div>
-                        <div className="truncate text-[11px] font-semibold text-zinc-300 group-hover:text-white">
-                          {recTitle}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <DetailsArrowCarousel
+                  {...MODAL_ARROW_PROPS}
+                  spaceBetween={12}
+                  slidesPerView={1.3}
+                  breakpointsBase="container"
+                  breakpoints={{
+                    460: { slidesPerView: 2, spaceBetween: 12 },
+                    640: { slidesPerView: 2.4, spaceBetween: 14 },
+                    840: { slidesPerView: 3, spaceBetween: 16 },
+                  }}
+                  className="!overflow-visible pb-2"
+                >
+                  {data.recommendations.slice(0, 14).map((rec) => (
+                    <SwiperSlide key={`${getMediaTypeForItem(rec)}-${rec?.id}`}>
+                      <SimilarBackdrop rec={rec} onOpen={openDetailModal} />
+                    </SwiperSlide>
+                  ))}
+                </DetailsArrowCarousel>
               </motion.section>
             )}
 
@@ -1843,47 +2007,18 @@ export default function DetailModal({ item, onClose }) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                     <Layers className="h-4 w-4" aria-hidden="true" />
-                    Temporadas
+                    Temporadas y episodios
                   </h3>
 
-                  <div className="relative w-full sm:w-auto">
-                    <label className="sr-only" htmlFor={seasonSelectId}>
-                      Seleccionar temporada
-                    </label>
-                    <select
-                      id={seasonSelectId}
-                      value={selectedSeasonNumber ?? ""}
-                      onChange={(event) =>
-                        setSelectedSeasonNumber(Number(event.target.value))
-                      }
-                      className="h-10 w-full appearance-none rounded-full border border-white/10 bg-black/35 px-4 pr-10 text-xs font-bold uppercase tracking-wide text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] outline-none transition hover:border-white/20 focus-visible:border-yellow-400/50 focus-visible:ring-2 focus-visible:ring-yellow-400/20 sm:min-w-[190px]"
-                    >
-                      {availableSeasons.map((season) => (
-                        <option
-                          key={season.season_number}
-                          value={season.season_number}
-                        >
-                          Temporada {season.season_number}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-zinc-400">
-                  <span className="text-white">{seasonTitle}</span>
-                  {selectedSeasonMeta?.episode_count ? (
-                    <>
-                      <span className="text-zinc-600" aria-hidden="true">
-                        •
-                      </span>
-                      <span>{selectedSeasonMeta.episode_count} episodios</span>
-                    </>
-                  ) : null}
+                  <span id={seasonSelectId} className="sr-only">
+                    Seleccionar temporada
+                  </span>
+                  <SeasonDropdown
+                    seasons={availableSeasons}
+                    value={selectedSeasonNumber}
+                    onChange={setSelectedSeasonNumber}
+                    labelId={seasonSelectId}
+                  />
                 </div>
 
                 {seasonPreview.loading ? (
@@ -1891,11 +2026,14 @@ export default function DetailModal({ item, onClose }) {
                     {Array.from({ length: 4 }).map((_, index) => (
                       <div
                         key={index}
-                        className="w-[78%] shrink-0 sm:w-[46%] lg:w-[32%]"
+                        className="w-[78%] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] sm:w-[46%] lg:w-[32%]"
                       >
-                        <SkeletonBar className="aspect-video h-auto rounded-xl" />
-                        <SkeletonBar className="mt-3 h-3 w-4/5 rounded-full" />
-                        <SkeletonBar className="mt-2 h-3 w-2/3 rounded-full" />
+                        <SkeletonBar className="aspect-video h-auto rounded-none" />
+                        <div className="space-y-2 p-3">
+                          <SkeletonBar className="h-3 w-1/3 rounded-full" />
+                          <SkeletonBar className="h-3 w-4/5 rounded-full" />
+                          <SkeletonBar className="h-3 w-2/3 rounded-full" />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1908,7 +2046,17 @@ export default function DetailModal({ item, onClose }) {
                     No hay episodios disponibles para esta temporada.
                   </div>
                 ) : (
-                  <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <DetailsArrowCarousel
+                    {...MODAL_ARROW_PROPS}
+                    spaceBetween={12}
+                    slidesPerView={1.25}
+                    breakpointsBase="container"
+                    breakpoints={{
+                      560: { slidesPerView: 2, spaceBetween: 12 },
+                      840: { slidesPerView: 3, spaceBetween: 14 },
+                    }}
+                    className="!overflow-visible pb-2"
+                  >
                     {selectedSeasonEpisodes.map((episode) => {
                       const episodeNumber = Number(episode?.episode_number);
                       const episodeTitle =
@@ -1924,8 +2072,11 @@ export default function DetailModal({ item, onClose }) {
                       const episodeHref = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
 
                       return (
-                        <Link
+                        <SwiperSlide
                           key={`${selectedSeasonNumber}-${episodeNumber}`}
+                          className="h-auto"
+                        >
+                        <Link
                           href={episodeHref}
                           prefetch={false}
                           onMouseEnter={() =>
@@ -1935,7 +2086,7 @@ export default function DetailModal({ item, onClose }) {
                           onTouchStart={() =>
                             prefetchEpisodeDetails(episodeNumber)
                           }
-                          className="group block w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-black/25 text-left transition hover:border-yellow-400/30 hover:bg-black/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40 sm:w-[46%] lg:w-[32%]"
+                          className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left transition hover:border-white/25 hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40"
                           title={episodeTitle}
                         >
                           <div className="relative aspect-video overflow-hidden bg-white/[0.04]">
@@ -1953,39 +2104,38 @@ export default function DetailModal({ item, onClose }) {
                                 <ImageOff className="h-7 w-7" />
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent opacity-90" />
-                            <div className="absolute inset-x-0 bottom-0 p-3">
-                              <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                            <div className="absolute inset-x-0 bottom-0 p-2.5">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
                                 Episodio {episodeNumber}
                               </div>
-                              <div className="mt-0.5 line-clamp-2 text-sm font-extrabold leading-snug text-white">
+                              <div className="mt-0.5 line-clamp-1 text-[13px] font-bold leading-snug text-white">
                                 {episodeTitle}
                               </div>
                             </div>
                           </div>
-                          <div className="space-y-2 p-3">
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-zinc-400">
-                              {episodeAirDate ? (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Calendar className="h-3.5 w-3.5" />
-                                  {episodeAirDate}
-                                </span>
-                              ) : null}
-                              {episodeRuntime ? (
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {episodeRuntime} min
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-zinc-300">
+
+                          <div className="flex flex-1 flex-col gap-1.5 p-3">
+                            {episodeAirDate || episodeRuntime ? (
+                              <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
+                                {episodeAirDate ? <span>{episodeAirDate}</span> : null}
+                                {episodeAirDate && episodeRuntime ? (
+                                  <span aria-hidden="true">·</span>
+                                ) : null}
+                                {episodeRuntime ? (
+                                  <span>{episodeRuntime} min</span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            <p className="line-clamp-2 text-xs leading-relaxed text-zinc-400">
                               {episode?.overview?.trim() || "Sin descripción."}
                             </p>
                           </div>
                         </Link>
+                        </SwiperSlide>
                       );
                     })}
-                  </div>
+                  </DetailsArrowCarousel>
                 )}
               </motion.section>
             )}
