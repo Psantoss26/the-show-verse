@@ -163,7 +163,7 @@ class MediaListenerService : NotificationListenerService() {
             noteOnce("nometa:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin metadatos")
             return
         }
-        val posMs = controller.playbackState?.position ?: 0
+        val posMs = livePositionMs(controller, pkg)
         val notif = notifExtrasFor(pkg)
         val raw = RawMetadata(
             packageName = pkg,
@@ -181,7 +181,7 @@ class MediaListenerService : NotificationListenerService() {
             artUri = md.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
             durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION),
-            positionMs = if (posMs > 0) posMs else 0,
+            positionMs = posMs,
         )
 
         // Diagnóstico: vuelca (una vez por título) los metadatos crudos NO vacíos,
@@ -203,6 +203,14 @@ class MediaListenerService : NotificationListenerService() {
             .joinToString(" ") { "${it.first}=«${it.second}»" }
         noteOnce("meta:$pkg:${raw.title}", "Metadatos ${Platforms.nameFor(pkg)} → $metaDump")
 
+        // Diagnóstico de reproducción: posición/duración/estado. Sirve para saber por
+        // qué un título no entra en "Continuar viendo" (p. ej. la app no da duración).
+        noteOnce(
+            "play:$pkg:${raw.title}",
+            "Reproducción ${Platforms.nameFor(pkg)}: pos=${raw.positionMs / 1000}s " +
+                "dur=${raw.durationMs / 1000}s estado=${controller.playbackState?.state}",
+        )
+
         // Pista de la serie desde la última ficha abierta (misma app, reciente):
         // cubre apps que no exponen la serie en la MediaSession (Netflix), donde
         // `title` es solo el episodio.
@@ -213,11 +221,12 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
 
-        // Cachea la última posición/duración conocida (para el volcado al salir).
+        // Cachea la última posición/duración conocida (para el volcado al salir). La
+        // duración puede ser 0 (desconocida): el backend la completa desde TMDb.
         val dSec = signal.durationSec
         val pSec = signal.positionSec
-        if (dSec != null && dSec > 0 && pSec != null && pSec >= 0) {
-            lastPosByPackage[pkg] = pSec to dSec
+        if (pSec != null && pSec >= 0) {
+            lastPosByPackage[pkg] = pSec to (dSec ?: 0L)
         }
 
         // Progreso: si ya resolvimos este contenido, enviamos posición/duración
@@ -257,6 +266,27 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
+    // Posición VIVA de la reproducción. `PlaybackState.position` es una foto tomada
+    // en `lastPositionUpdateTime`, así que suele estar estancada (a menudo 0): hay
+    // que extrapolar con el tiempo transcurrido × velocidad. Si la app no da una
+    // posición útil, se estima por reloj de pared desde que empezamos a verla, para
+    // que al menos entre en "Continuar viendo".
+    private fun livePositionMs(controller: MediaController, pkg: String): Long {
+        val ps = controller.playbackState
+        if (ps != null) {
+            val base = ps.position
+            val updated = ps.lastPositionUpdateTime
+            if (ps.state == PlaybackState.STATE_PLAYING && updated > 0 && base >= 0) {
+                val speed = if (ps.playbackSpeed > 0f) ps.playbackSpeed else 1f
+                val live = base + ((SystemClock.elapsedRealtime() - updated) * speed).toLong()
+                if (live > 0) return live
+            }
+            if (base > 0) return base
+        }
+        val since = playingSince[pkg]
+        return if (since != null) (SystemClock.elapsedRealtime() - since).coerceAtLeast(0L) else 0L
+    }
+
     // Envía el progreso del contenido ya resuelto, como mucho una vez cada
     // PROGRESS_PING_MS. Si el servidor responde completed=true (≥90%), deja de
     // sondear ese paquete (ya está marcado como visto).
@@ -266,9 +296,13 @@ class MediaListenerService : NotificationListenerService() {
         // a lo realmente resuelto): así el episodio que auto-reproduce a continuación
         // sigue resolviéndose con la serie correcta aunque la MediaSession no la dé.
         RecentDetail.remember(pkg, synced)
-        val durationSec = signal.durationSec ?: return
+        // Solo se exige POSICIÓN (casi siempre disponible ya, viva o estimada). La
+        // DURACIÓN es opcional: si la app no la da, se envía 0 y el backend la
+        // rellena desde TMDb. Así el título entra en "Continuar viendo" aunque la
+        // MediaSession no reporte duración (Plex, algunos episodios de Netflix).
         val positionSec = signal.positionSec ?: return
-        if (durationSec <= 0 || positionSec < 0) return
+        if (positionSec < 0) return
+        val durationSec = signal.durationSec ?: 0L
         val now = SystemClock.elapsedRealtime()
         val last = lastProgressAtByPackage[pkg] ?: 0L
         if (now - last < PROGRESS_PING_MS) return
@@ -280,11 +314,21 @@ class MediaListenerService : NotificationListenerService() {
             origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
         ) { ok, completed ->
             handler.post {
-                if (ok && completed) {
-                    prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
-                    // Notificación de "añadido al historial".
-                    QuickAccessNotifier.show(this, prefs, synced, R.string.notif_watched)
-                    syncedByPackage.remove(pkg)
+                when {
+                    ok && completed -> {
+                        prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
+                        // Notificación de "añadido al historial".
+                        QuickAccessNotifier.show(this, prefs, synced, R.string.notif_watched)
+                        syncedByPackage.remove(pkg)
+                    }
+                    ok -> noteOnce(
+                        "cw:$pkg:${synced.tmdbId}:${synced.season}:${synced.episode}",
+                        "✓ En Continuar viendo: ${synced.title ?: "#${synced.tmdbId}"}",
+                    )
+                    else -> noteOnce(
+                        "cwfail:$pkg:${synced.tmdbId}",
+                        "✗ Progreso no sincronizado (${Platforms.nameFor(pkg)})",
+                    )
                 }
             }
         }
@@ -303,8 +347,9 @@ class MediaListenerService : NotificationListenerService() {
             ?.let { if (it > 0) it / 1000 else null }
         val cached = lastPosByPackage[pkg]
         val pos = livePos ?: cached?.first ?: return
-        val dur = liveDur ?: cached?.second ?: return
-        if (dur <= 0 || pos < 0) return
+        // Duración opcional (0 = desconocida): el backend la completa desde TMDb.
+        val dur = liveDur ?: cached?.second ?: 0L
+        if (pos < 0) return
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(origin, token, synced, pos, dur, Platforms.idFor(pkg)) { ok, completed ->
