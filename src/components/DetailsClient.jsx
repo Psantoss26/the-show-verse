@@ -217,6 +217,10 @@ import {
   UnifiedRateButton,
 } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+// Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
+// listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
+// ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
+import DetailActionsRow from "@/components/details/DetailActionsRow";
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -9703,193 +9707,53 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
             <FadeIn delay={0.12} className="mb-6 px-1 w-full">
-              <div
-                className="flex flex-nowrap items-center justify-center sm:justify-start gap-1.5 sm:gap-3 w-full
-                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[48px] sm:[&>*:not(.separator)]:max-w-[52px]
-                [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]]:[container-type:inline-size]
-                [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]_svg]:!h-[46cqw] sm:[&_[data-liquid-button]_svg]:!w-[22px] sm:[&_[data-liquid-button]_svg]:!h-[22px]
-                [&_[data-liquid-button]_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]_.text-xl]:!text-[22px]
-                [&_[data-liquid-button]_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]_.text-2xl]:!text-[24px]
-                [&_[data-liquid-button]_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]_.text-lg]:!text-[18px]
-                [&_[data-liquid-button]_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]_.text-xs]:!text-[12px]"
-              >
-                {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
-                <LiquidButton
-                  onClick={() => openVideo(preferredVideo)}
-                  disabled={!preferredVideo}
-                  active={!!preferredVideo}
-                  activeColor="yellow"
-                  groupId="details-actions"
-                  className={preferredVideo ? "!bg-white !text-black" : ""}
-                  title={preferredVideo ? "Ver Tráiler" : "Sin Tráiler"}
-                >
-                  <Play
-                    className={`fill-current ${preferredVideo ? "ml-0.5 sm:ml-1" : ""}`}
-                  />
-                </LiquidButton>
-
-                {/* Botón de música/soundtrack - Abre canciones encontradas en Spotify */}
-                <LiquidButton
-                  onClick={() => openSoundtrack()}
-                  disabled={!soundtrackSearchQuery}
-                  active={!!soundtrackSearchQuery}
-                  activeColor="yellow"
-                  groupId="details-actions"
-                  className={
-                    soundtrackSearchQuery ? "!bg-white !text-black" : ""
-                  }
-                  title={
-                    soundtrackSearchQuery
-                      ? "Reproducir soundtrack"
-                      : "Sin soundtrack"
-                  }
-                >
-                  <Music2 />
-                </LiquidButton>
-
-                {/* Acceso rápido a la tabla de valoraciones, solo para series. */}
-                {type === "tv" && (
-                  <LiquidButton
-                    onClick={() => setEpisodeRatingsModalOpen(true)}
-                    active
-                    activeColor="yellow"
-                    groupId="details-actions"
-                    className="!bg-white !text-black"
-                    title="Valoración de episodios"
-                    aria-label="Abrir valoración de episodios"
-                    aria-haspopup="dialog"
-                    aria-expanded={episodeRatingsModalOpen}
-                  >
-                    <BarChart3 />
-                  </LiquidButton>
-                )}
-
-                {/* Separador vertical entre los controles multimedia y Trakt */}
-                <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
-
-                {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
-                <TraktWatchedControl
-                  connected={trakt.connected}
-                  watched={watchedActionValue}
-                  plays={watchedActionPlays}
-                  badge={watchedActionBadge}
-                  busy={!!traktBusy}
-                  loading={watchedActionLoading}
-                  onOpen={handleOpenTraktWatched}
-                />
-
-                {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
-                {/* Permite al usuario puntuar el contenido, sincronizando entre ambas plataformas */}
-                <StarRating
-                  rating={ratingActionValue}
-                  max={10}
-                  loading={actionStateLoading || ratingLoading || !!traktBusy}
-                  onRate={handleUnifiedRate}
-                  connected={
+              <DetailActionsRow
+                onTrailer={() => openVideo(preferredVideo)}
+                trailerAvailable={!!preferredVideo}
+                onSoundtrack={() => openSoundtrack()}
+                soundtrackAvailable={!!soundtrackSearchQuery}
+                onEpisodeRatings={
+                  type === "tv"
+                    ? () => setEpisodeRatingsModalOpen(true)
+                    : undefined
+                }
+                episodeRatingsOpen={episodeRatingsModalOpen}
+                trakt={{
+                  connected: trakt.connected,
+                  watched: watchedActionValue,
+                  plays: watchedActionPlays,
+                  badge: watchedActionBadge,
+                  busy: !!traktBusy,
+                  loading: watchedActionLoading,
+                  onOpen: handleOpenTraktWatched,
+                }}
+                rate={{
+                  rating: ratingActionValue,
+                  max: 10,
+                  loading: actionStateLoading || ratingLoading || !!traktBusy,
+                  onRate: handleUnifiedRate,
+                  connected:
                     authHydrated &&
-                    (!!session || trakt.connected || hasBackendSession)
-                  }
-                  onConnect={() => {
+                    (!!session || trakt.connected || hasBackendSession),
+                  onConnect: () => {
                     window.location.href = `/login?next=${encodeURIComponent(
                       window.location.pathname + window.location.search,
                     )}`;
-                  }}
-                />
-
-                {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
-                <LiquidButton
-                  onClick={toggleFavorite}
-                  disabled={favoriteActionLoading}
-                  active={favoriteActionValue}
-                  activeColor="red"
-                  groupId="details-actions"
-                  title={
-                    favoriteActionLoading
-                      ? "Cargando estado de favoritos..."
-                      : favoriteActionValue
-                        ? "Quitar de favoritos"
-                        : "Añadir a favoritos"
-                  }
-                  aria-label={
-                    favoriteActionLoading
-                      ? "Cargando estado de favoritos"
-                      : favoriteActionValue
-                        ? "Quitar de favoritos"
-                        : "Añadir a favoritos"
-                  }
-                >
-                  {favoriteActionLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Heart
-                      className={`${favoriteActionValue ? "fill-current" : ""}`}
-                    />
-                  )}
-                </LiquidButton>
-
-                {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
-                <LiquidButton
-                  onClick={toggleWatchlist}
-                  disabled={watchlistActionLoading}
-                  active={watchlistActionValue}
-                  activeColor="blue"
-                  groupId="details-actions"
-                  title={
-                    watchlistActionLoading
-                      ? "Cargando estado de pendientes..."
-                      : watchlistActionValue
-                        ? "Quitar de pendientes"
-                        : "Añadir a pendientes"
-                  }
-                  aria-label={
-                    watchlistActionLoading
-                      ? "Cargando estado de pendientes"
-                      : watchlistActionValue
-                        ? "Quitar de pendientes"
-                        : "Añadir a pendientes"
-                  }
-                >
-                  {watchlistActionLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <BookmarkPlus
-                      className={`${watchlistActionValue ? "fill-current" : ""}`}
-                    />
-                  )}
-                </LiquidButton>
-
-                {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
-                {canUseLists && (
-                  <LiquidButton
-                    onClick={openListsModal}
-                    disabled={listsPresenceLoading}
-                    active={listActive}
-                    activeColor="purple"
-                    groupId="details-actions"
-                    title="Añadir a lista"
-                  >
-                    {listsPresenceLoading ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <ListVideo />
-                    )}
-                  </LiquidButton>
-                )}
-
-                {/* Botón de Reseñas / Comentarios en Trakt */}
-                {trakt.connected && (
-                  <LiquidButton
-                    onClick={() => setCommentModalOpen(true)}
-                    active={myComments.length > 0}
-                    activeColor="orange"
-                    groupId="details-actions"
-                    title="Escribir reseña en Trakt"
-                    aria-label="Escribir reseña en Trakt"
-                  >
-                    <MessageSquare />
-                  </LiquidButton>
-                )}
-              </div>
+                  },
+                }}
+                favorite={favoriteActionValue}
+                favoriteLoading={favoriteActionLoading}
+                onToggleFavorite={toggleFavorite}
+                watchlist={watchlistActionValue}
+                watchlistLoading={watchlistActionLoading}
+                onToggleWatchlist={toggleWatchlist}
+                onAddToList={canUseLists ? openListsModal : undefined}
+                listBusy={listsPresenceLoading}
+                listActive={listActive}
+                showComments={trakt.connected}
+                commentsActive={myComments.length > 0}
+                onComments={() => setCommentModalOpen(true)}
+              />
             </FadeIn>
 
             {/* =================================================================

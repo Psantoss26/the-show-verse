@@ -862,19 +862,19 @@ export default function Navbar() {
     const tones = {
       red: {
         active: "text-red-400",
-        inactive: "text-neutral-400 hover:text-red-400",
+        inactive: "text-zinc-300 hover:text-red-400",
       },
       blue: {
         active: "text-sky-400",
-        inactive: "text-neutral-400 hover:text-sky-400",
+        inactive: "text-zinc-300 hover:text-sky-400",
       },
       purple: {
         active: "text-fuchsia-400",
-        inactive: "text-neutral-400 hover:text-fuchsia-400",
+        inactive: "text-zinc-300 hover:text-fuchsia-400",
       },
       green: {
         active: "text-emerald-400",
-        inactive: "text-neutral-400 hover:text-emerald-400",
+        inactive: "text-zinc-300 hover:text-emerald-400",
       },
     };
 
@@ -1232,7 +1232,7 @@ export default function Navbar() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed z-30 mx-auto rounded-full bg-black/45 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-3xl saturate-[140%] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_12px_36px_-6px_rgba(0,0,0,0.6)] border border-white/10 flex items-center px-2 overflow-visible transition-all duration-300 ease-out ${
+        className={`lg:hidden fixed z-30 mx-auto rounded-full bg-black/[0.28] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)] flex items-center px-2 overflow-visible transition-all duration-300 ease-out ${
           isScrolled
             ? "left-12 right-12 max-w-md bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
             : "left-4 right-4 max-w-lg bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
@@ -1240,6 +1240,11 @@ export default function Navbar() {
       >
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
         <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
+        {/* iOS 26 Liquid Glass Sheen Light Overlay */}
+        <div
+          className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/[0.08] via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+        />
 
         <Link
           href="/movies"
@@ -1252,7 +1257,7 @@ export default function Navbar() {
           {isActive("/movies") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.15)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1275,7 +1280,7 @@ export default function Navbar() {
           {isActive("/series") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(217,70,239,0.15)]"
+              className="absolute inset-0 rounded-full bg-fuchsia-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(217,70,239,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1297,7 +1302,7 @@ export default function Navbar() {
           {isActive("/in-progress") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.15)]"
+              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1319,7 +1324,7 @@ export default function Navbar() {
           {isActive("/history") && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.15)]"
+              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1341,7 +1346,7 @@ export default function Navbar() {
           {isActive(favHref) && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-red-500/20 border border-red-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(239,68,68,0.15)]"
+              className="absolute inset-0 rounded-full bg-red-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(239,68,68,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1363,7 +1368,7 @@ export default function Navbar() {
           {isActive(watchHref) && (
             <motion.div
               layoutId="activeTabMobileBottom"
-              className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/30 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.15)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}

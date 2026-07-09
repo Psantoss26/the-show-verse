@@ -8,7 +8,7 @@
 // pestañas Detalles/Producción/Sinopsis/Premios, reparto, similares y
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
@@ -53,15 +53,28 @@ import {
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
-import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import { formatCountShort } from "@/lib/details/formatters";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import AddToListModal from "@/components/details/AddToListModal";
+import SoundtrackModal from "@/components/details/SoundtrackModal";
+import TraktCommentModal from "@/components/details/TraktCommentModal";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+// Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
+// listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
+// completa (DetailsClient) para que la fila sea IDÉNTICA.
+import DetailActionsRow from "@/components/details/DetailActionsRow";
 // Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
 // ficha completa: renderiza EXACTAMENTE las mismas tarjetas que DetailsClient.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
+import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
+import {
+  traktAddComment,
+  traktUpdateComment,
+  traktDeleteComment,
+} from "@/lib/api/traktClient";
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
@@ -389,6 +402,97 @@ export default function DetailModal({ item, onClose }) {
       }`
     : null;
 
+  /* --------------------------------- soundtrack -------------------------------- */
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false);
+  const [soundtrackTracks, setSoundtrackTracks] = useState([]);
+  const [soundtrackLoading, setSoundtrackLoading] = useState(false);
+  const [soundtrackError, setSoundtrackError] = useState("");
+
+  // Consulta de búsqueda igual que DetailsClient (título + año + "soundtrack").
+  const soundtrackSearchQuery = useMemo(() => {
+    if (!title) return "";
+    return [
+      title,
+      data.year,
+      mediaType === "tv" ? "series soundtrack" : "movie soundtrack",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }, [title, data.year, mediaType]);
+
+  const soundtrackSpotifyUrl = soundtrackSearchQuery
+    ? `https://open.spotify.com/search/${encodeURIComponent(
+        soundtrackSearchQuery,
+      )}`
+    : "";
+
+  // Versión mínima de la carga de soundtrack de DetailsClient: pide a
+  // /api/soundtrack y alimenta el SoundtrackModal (que ya reproduce previews).
+  const loadSoundtrack = async () => {
+    if (!title) return;
+    setSoundtrackLoading(true);
+    setSoundtrackError("");
+    try {
+      const params = new URLSearchParams({
+        title,
+        type: mediaType === "tv" ? "tv" : "movie",
+        country: "ES",
+      });
+      if (data.originalTitle && data.originalTitle !== title) {
+        params.set("originalTitle", data.originalTitle);
+      }
+      if (data.year) params.set("year", String(data.year));
+      if (item?.id) params.set("tmdbId", String(item.id));
+
+      const res = await fetch(`/api/soundtrack?${params.toString()}`);
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload?.error || "No se pudo cargar el soundtrack");
+      }
+      const tracks = Array.isArray(payload?.tracks) ? payload.tracks : [];
+      setSoundtrackTracks(tracks);
+      if (!tracks.length) {
+        setSoundtrackError("No se encontraron canciones para este título.");
+      }
+    } catch (e) {
+      setSoundtrackTracks([]);
+      setSoundtrackError(
+        e?.message || "No se pudo cargar la música del título.",
+      );
+    } finally {
+      setSoundtrackLoading(false);
+    }
+  };
+
+  const openSoundtrack = () => {
+    setSoundtrackOpen(true);
+    void loadSoundtrack();
+  };
+
+  /* ------------------------------- reseñas Trakt ------------------------------- */
+  // Estado de conexión de Trakt en cliente (localStorage). Sirve para mostrar el
+  // botón de reseñas solo cuando procede, igual criterio que DetailsClient
+  // (allí `trakt.connected` viene del servidor; aquí usamos la señal de cliente).
+  const { isConnected: traktConnected } = useTraktAuth();
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const traktType = mediaType === "tv" ? "show" : "movie";
+
+  const handleCommentSubmit = async ({ comment, spoiler }) => {
+    await traktAddComment({ type: traktType, tmdbId: item.id, comment, spoiler });
+  };
+  const handleCommentUpdate = async ({ commentId, comment, spoiler }) => {
+    await traktUpdateComment({
+      commentId,
+      comment,
+      spoiler,
+      type: traktType,
+      tmdbId: item.id,
+    });
+  };
+  const handleCommentDelete = async ({ commentId }) => {
+    await traktDeleteComment({ commentId, type: traktType, tmdbId: item.id });
+  };
+
   /* ------------------------------ ficha completa ------------------------------ */
   const goToFullDetails = () => {
     router.push(`/details/${mediaType}/${item.id}`);
@@ -543,76 +647,37 @@ export default function DetailModal({ item, onClose }) {
 
           {/* CONTENIDO */}
           <div className="space-y-6 p-5 sm:p-7">
-            {/* Fila de acciones */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <LiquidButton
-                onClick={handleToggleTrailer}
-                loading={trailerLoading}
-                active
-                activeColor="yellow"
-                groupId="detail-modal-actions"
-                title={showTrailer ? "Cerrar tráiler" : "Ver tráiler"}
-                className="!h-11 !w-auto !rounded-full !bg-white !px-5 !text-black [&_svg]:!h-5 [&_svg]:!w-5"
-              >
-                {showTrailer ? (
-                  <span className="inline-flex items-center gap-2 font-bold">
-                    <X className="text-black" /> Cerrar
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-2 font-bold">
-                    <Play className="fill-current text-black" /> Ver tráiler
-                  </span>
-                )}
-              </LiquidButton>
-
-              <LiquidButton
-                onClick={handleToggleFavorite}
-                loading={loadingStates || updating}
-                active={favorite}
-                activeColor="red"
-                groupId="detail-modal-actions"
-                title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
-              >
-                <Heart className={favorite ? "fill-current" : ""} />
-              </LiquidButton>
-
-              <LiquidButton
-                onClick={handleToggleWatchlist}
-                loading={loadingStates || updating}
-                active={watchlist}
-                activeColor="blue"
-                groupId="detail-modal-actions"
-                title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
-              >
-                <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </LiquidButton>
-
-              {/* Puntuar (TMDb/Trakt) — mismo control que la ficha completa */}
-              <UnifiedRateButton
-                rating={userRating}
-                loading={ratingLoading}
-                onRate={handleRate}
-                connected={isLoggedIn}
-                onConnect={() => requireLogin()}
-              />
-
-              {/* Añadir a una lista */}
-              <LiquidButton
-                onClick={openListsModal}
-                active={
-                  Object.values(membershipMap || {}).some(Boolean)
-                }
-                activeColor="green"
-                groupId="detail-modal-actions"
-                title="Añadir a una lista"
-                className="!h-11 !w-11 [&_svg]:!h-5 [&_svg]:!w-5"
-              >
-                <ListPlus />
-              </LiquidButton>
-
-            </div>
+            {/* Fila de acciones — MISMO componente presentacional que la ficha
+                completa (DetailsClient). El tráiler sigue reproduciéndose inline
+                en el hero; el resto abre los modales reutilizables. Se omiten el
+                control de "visto" de Trakt y la valoración de episodios (no se
+                pasan sus handlers), por lo que no se renderizan. */}
+            <DetailActionsRow
+              onTrailer={handleToggleTrailer}
+              trailerAvailable
+              trailerLoading={trailerLoading}
+              onSoundtrack={openSoundtrack}
+              soundtrackAvailable={!!soundtrackSearchQuery}
+              rate={{
+                rating: userRating,
+                max: 10,
+                loading: ratingLoading,
+                onRate: handleRate,
+                connected: isLoggedIn,
+                onConnect: () => requireLogin(),
+              }}
+              favorite={favorite}
+              favoriteLoading={loadingStates || updating}
+              onToggleFavorite={handleToggleFavorite}
+              watchlist={watchlist}
+              watchlistLoading={loadingStates || updating}
+              onToggleWatchlist={handleToggleWatchlist}
+              onAddToList={openListsModal}
+              listActive={Object.values(membershipMap || {}).some(Boolean)}
+              showComments={traktConnected}
+              commentsActive={false}
+              onComments={() => setCommentModalOpen(true)}
+            />
 
             {/* Premios / nominaciones: misma línea verde que las previews del
                 dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
@@ -965,6 +1030,28 @@ export default function DetailModal({ item, onClose }) {
         newDesc={newListDesc}
         setNewDesc={setNewListDesc}
         onCreateList={handleCreateListAndAdd}
+      />
+
+      {/* Soundtrack — mismo modal reproductor que la ficha completa */}
+      <SoundtrackModal
+        open={soundtrackOpen}
+        onClose={() => setSoundtrackOpen(false)}
+        title={title}
+        tracks={soundtrackTracks}
+        loading={soundtrackLoading}
+        error={soundtrackError}
+        searchUrl={soundtrackSpotifyUrl}
+      />
+
+      {/* Reseñas en Trakt — mismo modal que la ficha completa */}
+      <TraktCommentModal
+        open={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        onSubmit={handleCommentSubmit}
+        onUpdate={handleCommentUpdate}
+        onDelete={handleCommentDelete}
+        title={title}
+        myComments={[]}
       />
     </div>
   );
