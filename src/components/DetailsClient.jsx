@@ -87,7 +87,6 @@ import {
   Sparkles,
   Star,
   Eye,
-  List,
   LibraryBig,
   MessageSquare,
   MoreHorizontal,
@@ -169,7 +168,6 @@ import {
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
-  formatShortNumber,
   slugifyForSeriesGraph,
   formatDateEs,
   formatVoteCount,
@@ -213,12 +211,18 @@ import {
   StatChip,
   DetailsTabsMenu,
 } from "@/components/details/DetailAtoms";
+// Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
+// ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
+import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import {
-  CompactBadge,
   ExternalLinkButton,
   UnifiedRateButton,
   ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
+import {
+  DetailsRatingsBadges,
+  DetailsStatsRow,
+} from "@/components/details/DetailsScoreboardPanel";
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -228,6 +232,10 @@ import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import DetailsMetaGenresRow, {
+  getStatusLabel,
+  getStatusBadgeClass,
+} from "@/components/details/DetailsMetaGenresRow";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 
 function getSoundtrackSourceBadge(source) {
@@ -380,241 +388,6 @@ function formatEpisodeRuntime(data) {
     data?.last_episode_to_air?.runtime,
   );
   return lastEpisodeRuntime;
-}
-
-function getStatusLabel(status) {
-  return status === "Released"
-    ? "Estrenada"
-    : status === "Ended"
-      ? "Finalizada"
-      : status === "Returning Series"
-        ? "En emisión"
-        : status === "Canceled"
-          ? "Cancelada"
-          : status === "In Production"
-            ? "En producción"
-            : status === "Post Production"
-              ? "Postproducción"
-              : status === "Planned"
-                ? "Planificada"
-                : status === "Rumored"
-                  ? "Rumoreada"
-                  : status === "Pilot"
-                    ? "Piloto"
-                    : status;
-}
-
-function getStatusBadgeClass(status) {
-  return status === "Ended" || status === "Canceled"
-    ? "bg-red-500/[0.06] text-red-300"
-    : "bg-emerald-500/[0.06] text-emerald-300";
-}
-
-const metaDotClass = "w-1 h-1 rounded-full bg-white/30 shrink-0";
-const genreChipClass =
-  "relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-bold uppercase tracking-widest text-zinc-300 backdrop-blur-[6px] shadow-none";
-
-function DetailsMetaGenresRow({
-  yearIso,
-  displayRuntimeValue,
-  status,
-  genres = [],
-}) {
-  const rowRef = useRef(null);
-  const metaProbeRef = useRef(null);
-  const genreProbeRef = useRef(null);
-  const genreDotProbeRef = useRef(null);
-  const genreChipProbeRefs = useRef([]);
-  const [visibleGenreCount, setVisibleGenreCount] = useState(() =>
-    Math.min(Array.isArray(genres) ? genres.length : 0, 3),
-  );
-
-  const visibleGenres = useMemo(
-    () =>
-      (Array.isArray(genres) ? genres : [])
-        .filter(Boolean)
-        .slice(0, 3)
-        .map((genre) => ({
-          id: genre.id ?? genre.name,
-          label: translateGenre(genre.name),
-        })),
-    [genres],
-  );
-
-  const hasMeta = Boolean(yearIso || displayRuntimeValue || status);
-  const statusLabel = status ? getStatusLabel(status) : null;
-  const statusBadgeClass = status ? getStatusBadgeClass(status) : "";
-
-  useLayoutEffect(() => {
-    const row = rowRef.current;
-    if (!row) return undefined;
-
-    const readGap = (element) => {
-      if (!element || typeof window === "undefined") return 0;
-      const styles = window.getComputedStyle(element);
-      return Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
-    };
-
-    const updateVisibleGenres = () => {
-      const maxCount = visibleGenres.length;
-      if (!maxCount) {
-        setVisibleGenreCount(0);
-        return;
-      }
-
-      const rowWidth = row.clientWidth;
-      const metaWidth = metaProbeRef.current?.scrollWidth || 0;
-      const rowGap = readGap(row);
-      const chipGap = readGap(genreProbeRef.current);
-      const dotWidth = genreDotProbeRef.current?.offsetWidth || 0;
-      const chipWidths = genreChipProbeRefs.current
-        .slice(0, maxCount)
-        .map((node) => node?.offsetWidth || 0);
-
-      let nextCount = 0;
-      for (let count = maxCount; count >= 1; count -= 1) {
-        const chipsWidth = chipWidths
-          .slice(0, count)
-          .reduce((sum, width) => sum + width, 0);
-        const genresWidth =
-          dotWidth + chipGap + chipsWidth + chipGap * (count - 1);
-        const requiredWidth = metaWidth + rowGap + genresWidth;
-
-        if (requiredWidth <= rowWidth + 1) {
-          nextCount = count;
-          break;
-        }
-      }
-
-      setVisibleGenreCount(nextCount);
-    };
-
-    updateVisibleGenres();
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateVisibleGenres)
-        : null;
-    resizeObserver?.observe(row);
-    window.addEventListener("resize", updateVisibleGenres);
-    document.fonts?.ready?.then(updateVisibleGenres).catch(() => {});
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateVisibleGenres);
-    };
-  }, [displayRuntimeValue, hasMeta, status, statusLabel, visibleGenres, yearIso]);
-
-  if (!hasMeta && visibleGenres.length === 0) return null;
-
-  const clampedGenreCount = Math.min(visibleGenreCount, visibleGenres.length);
-
-  return (
-    <div
-      ref={rowRef}
-      className="relative flex w-full min-w-0 max-w-full flex-nowrap items-center justify-center gap-2.5 overflow-hidden text-base font-medium text-zinc-300 md:justify-start md:text-lg [container-type:inline-size]"
-    >
-      <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-2.5 whitespace-nowrap">
-        {yearIso && (
-          <span className="shrink-0 text-white font-bold tracking-wide">
-            {yearIso}
-          </span>
-        )}
-
-        {yearIso && displayRuntimeValue && <span className={metaDotClass} />}
-
-        {displayRuntimeValue && (
-          <span className="shrink-0">{displayRuntimeValue}</span>
-        )}
-
-        {(yearIso || displayRuntimeValue) && status && (
-          <span className={metaDotClass} />
-        )}
-
-        {status && (
-          <span
-            className={`relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-black uppercase tracking-widest backdrop-blur-[6px] shadow-none ${statusBadgeClass}`}
-          >
-            <span
-              className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-              style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-            />
-            <span className="relative z-10">{statusLabel}</span>
-          </span>
-        )}
-      </div>
-
-      {clampedGenreCount > 0 && (
-        <div className="flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
-          {hasMeta && <span className={metaDotClass} />}
-          {visibleGenres.slice(0, clampedGenreCount).map((genre) => (
-            <span key={genre.id} className={genreChipClass}>
-              <span
-                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-              />
-              <span className="relative z-10">{genre.label}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed left-[-10000px] top-0 flex flex-nowrap items-center gap-2.5 whitespace-nowrap opacity-0"
-      >
-        <div
-          ref={metaProbeRef}
-          className="flex flex-nowrap items-center gap-2.5 whitespace-nowrap text-base font-medium text-zinc-300 md:text-lg"
-        >
-          {yearIso && (
-            <span className="shrink-0 text-white font-bold tracking-wide">
-              {yearIso}
-            </span>
-          )}
-          {yearIso && displayRuntimeValue && <span className={metaDotClass} />}
-          {displayRuntimeValue && (
-            <span className="shrink-0">{displayRuntimeValue}</span>
-          )}
-          {(yearIso || displayRuntimeValue) && status && (
-            <span className={metaDotClass} />
-          )}
-          {status && (
-            <span
-              className={`relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-black uppercase tracking-widest backdrop-blur-[6px] shadow-none ${statusBadgeClass}`}
-            >
-              <span
-                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-              />
-              <span className="relative z-10">{statusLabel}</span>
-            </span>
-          )}
-        </div>
-        <div
-          ref={genreProbeRef}
-          className="flex flex-nowrap items-center gap-2 whitespace-nowrap"
-        >
-          <span ref={genreDotProbeRef} className={metaDotClass} />
-          {visibleGenres.map((genre, index) => (
-            <span
-              key={genre.id}
-              ref={(node) => {
-                genreChipProbeRefs.current[index] = node;
-              }}
-              className={genreChipClass}
-            >
-              <span
-                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-              />
-              <span className="relative z-10">{genre.label}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function DetailsArrowCarousel({
@@ -1341,38 +1114,8 @@ function formatAwardCategory(category, groupName) {
   return formatCommonAwardCategory(raw) || raw;
 }
 
-function AwardsPanel({ awards }) {
-  const formattedAwards = formatDashboardAwards(awards);
-
-  return (
-    <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-      {/* Capa de fondo suave */}
-      <div
-        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-      />
-      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
-
-      <div className="relative z-10">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-            <Trophy className="w-8 h-8" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-bold text-white mb-2">
-              Reconocimientos
-            </h3>
-            {formattedAwards && (
-              <p className="text-base leading-relaxed text-zinc-200">
-                {formattedAwards}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// AwardsPanel se extrajo a `@/components/details/AwardsPanel` y ahora se renderiza
+// dentro de <DetailsInfoTabs> (sección de pestañas compartida con DetailModal).
 
 function normalizeOmdbAwards(value) {
   const text = String(value || "").trim();
@@ -1528,34 +1271,6 @@ function SectionTitle({ title, icon: Icon, className = "" }) {
 }
 
 // Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
-function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -1 }}
-      className="relative flex items-center gap-2 select-none shrink-0 group/statbadge py-1 px-1.5 transition-colors duration-200"
-      aria-label={tooltip || label}
-    >
-      <Icon className="h-5 w-5 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200" />
-      <div className="flex flex-col min-w-0 justify-center">
-        <span className="text-xs sm:text-sm font-bold tracking-tight text-white/90 leading-tight">
-          {value || "-"}
-        </span>
-        <span className="hidden sm:block text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5 leading-none transition-colors duration-200 group-hover/statbadge:text-zinc-400">
-          {label}
-        </span>
-      </div>
-      {tooltip && (
-        <div className="pointer-events-none absolute bottom-full mb-2.5 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1.2 text-[10px] font-bold text-white opacity-0 shadow-2xl transition-all duration-200 ease-out group-hover/statbadge:scale-100 group-hover/statbadge:opacity-100 group-hover/statbadge:delay-[1500ms]">
-          {tooltip}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
 // =====================================================================
@@ -10212,116 +9927,65 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
     "
                 >
                   {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
-                  {/* Sección de badges compactos que muestran las puntuaciones y votos de cada plataforma */}
-                  <div className="flex items-center gap-4 sm:gap-5 shrink-0">
-                    {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
-                    <div className="absolute opacity-0 pointer-events-none w-4 h-4">
-                      {tScoreboard.loading ? (
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      ) : null}
-                    </div>
-
-                    {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
-                    <CompactBadge
-                      logo="/logo-TMDb.png"
-                      logoClassName="h-5 sm:h-5"
-                      value={data.vote_average?.toFixed(1)}
-                      sub={formatCountShort(data.vote_count)}
-                      href={tmdbDetailUrl}
-                      disableHoverLift
-                      tooltip={tmdbDetailUrl ? "Ver en TMDb" : "TMDb"}
-                    />
-
-                    {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
-                    {/* En móvil sin sufijo, en desktop con % */}
-                    {traktDecimal && (
-                      <CompactBadge
-                        logo="/logo-Trakt.png"
-                        value={traktDecimal}
-                        sub={
-                          tScoreboard.votes
-                            ? formatCountShort(tScoreboard.votes)
-                            : undefined
-                        }
-                        href={trakt?.traktUrl}
-                        animateOnMount={false}
-                        disableHoverLift
-                        onClick={undefined}
-                        tooltip={trakt?.traktUrl ? "Ver en Trakt" : "Trakt"}
-                      />
-                    )}
-
-                    {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
-                    {/* Se muestra solo si el usuario no está conectado a Trakt pero hay datos públicos disponibles */}
-                    {!traktDecimal &&
-                      !trakt?.connected &&
-                      tScoreboard?.rating && (
-                        <CompactBadge
-                          logo="/logo-Trakt.png"
-                          value={Number(tScoreboard.rating).toFixed(1)}
-                          sub={
-                            tScoreboard.votes
+                  {/* Fila de badges compactos (componente presentacional compartido con DetailModal) */}
+                  <DetailsRatingsBadges
+                    loading={tScoreboard.loading}
+                    tmdb={{
+                      value: data.vote_average?.toFixed(1),
+                      sub: formatCountShort(data.vote_count),
+                      href: tmdbDetailUrl,
+                    }}
+                    trakt={
+                      traktDecimal
+                        ? {
+                            value: traktDecimal,
+                            sub: tScoreboard.votes
                               ? formatCountShort(tScoreboard.votes)
-                              : undefined
+                              : undefined,
+                            href: trakt?.traktUrl,
                           }
-                          animateOnMount={false}
-                          disableHoverLift
-                          onClick={undefined}
-                          tooltip="Ver en Trakt"
-                        />
-                      )}
-
-                    {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
-                    {extras.imdbRating && (
-                      <CompactBadge
-                        logo="/logo-IMDb.svg"
-                        logoWrapClassName="min-w-[28px]"
-                        logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
-                        value={Number(extras.imdbRating).toFixed(1)}
-                        sub={formatCountShort(extras.imdbVotes)}
-                        href={
-                          resolvedImdbId
-                            ? `https://www.imdb.com/title/${resolvedImdbId}`
-                            : undefined
-                        }
-                        disableHoverLift
-                        tooltip={resolvedImdbId ? "Ver en IMDb" : "IMDb"}
-                      />
-                    )}
-
-                    {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
-                    {/* Muestra el porcentaje de audiencia de RT, prioriza datos de Trakt sobre OMDb */}
-                    {(tScoreboard?.external?.rtAudience != null ||
-                      extras.rtScore != null) && (
-                      <div className="hidden sm:block">
-                        <CompactBadge
-                          logo="/logo-RottenTomatoes.png"
-                          value={
-                            tScoreboard?.external?.rtAudience != null
-                              ? Math.round(tScoreboard.external.rtAudience)
-                              : extras.rtScore != null
-                                ? Math.round(extras.rtScore)
-                                : null
+                        : null
+                    }
+                    traktPublic={
+                      !traktDecimal && !trakt?.connected && tScoreboard?.rating
+                        ? {
+                            value: Number(tScoreboard.rating).toFixed(1),
+                            sub: tScoreboard.votes
+                              ? formatCountShort(tScoreboard.votes)
+                              : undefined,
                           }
-                          suffix="%"
-                          tooltip="Rotten Tomatoes"
-                        />
-                      </div>
-                    )}
-
-                    {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
-                    {/* Muestra la puntuación de Metacritic sobre 100 */}
-                    {extras.mcScore != null && (
-                      <div className="hidden sm:block">
-                        <CompactBadge
-                          logo="/logo-Metacritic.png"
-                          value={Math.round(extras.mcScore)}
-                          suffix="/100"
-                          tooltip="Metacritic"
-                        />
-                      </div>
-                    )}
-                  </div>
+                        : null
+                    }
+                    imdb={
+                      extras.imdbRating
+                        ? {
+                            value: Number(extras.imdbRating).toFixed(1),
+                            sub: formatCountShort(extras.imdbVotes),
+                            href: resolvedImdbId
+                              ? `https://www.imdb.com/title/${resolvedImdbId}`
+                              : undefined,
+                          }
+                        : null
+                    }
+                    rt={
+                      tScoreboard?.external?.rtAudience != null ||
+                      extras.rtScore != null
+                        ? {
+                            value:
+                              tScoreboard?.external?.rtAudience != null
+                                ? Math.round(tScoreboard.external.rtAudience)
+                                : extras.rtScore != null
+                                  ? Math.round(extras.rtScore)
+                                  : null,
+                          }
+                        : null
+                    }
+                    mc={
+                      extras.mcScore != null
+                        ? { value: Math.round(extras.mcScore) }
+                        : null
+                    }
+                  />
 
                   {/* ========== Separador vertical 1 ========== */}
                   {/* Solo se muestra cuando NO estamos en modo backdrop */}
@@ -10410,66 +10074,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                  ================================================================= */}
                 {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
                 {/* Visible en móvil sin recortes gracias al padding con safe-area */}
-                {/* Mostrar cuando hay stats numéricas (incluyendo de cache stale) */}
-                {Object.values(tScoreboard?.stats || {}).some(
-                  (v) => typeof v === "number",
-                ) && (
-                  <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
-                    {/* Scroller con padding + safe-area para que no se recorte en bordes */}
-                    <div
-                      className="
-        overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-x]
-        py-2.5
-        pl-[calc(1rem+env(safe-area-inset-left))]
-        pr-[calc(1rem+env(safe-area-inset-right))]
-        md:overflow-x-visible
-      "
-                    >
-                      {/* Contenedor interno con flex-wrap para que se distribuya en línea y optimice el espacio */}
-                      <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1.5">
-                        {/* Watchers - Usuarios que siguen este contenido */}
-                        <TraktStatBadge
-                          icon={Eye}
-                          value={formatShortNumber(
-                            tScoreboard?.stats?.watchers ?? 0,
-                          )?.toUpperCase() || "0"}
-                          label="SEGUIDORES"
-                          tooltip="Seguidores"
-                        />
-
-                        {/* Plays - Número de reproducciones totales */}
-                        <TraktStatBadge
-                          icon={Play}
-                          value={formatShortNumber(
-                            tScoreboard?.stats?.plays ?? 0,
-                          )?.toUpperCase() || "0"}
-                          label="REPRODUCCIONES"
-                          tooltip="Reproducciones"
-                        />
-
-                        {/* Lists - Cantidad de listas que incluyen este contenido */}
-                        <TraktStatBadge
-                          icon={List}
-                          value={formatShortNumber(
-                            tScoreboard?.stats?.lists ?? 0,
-                          )?.toUpperCase() || "0"}
-                          label="LISTAS"
-                          tooltip="En listas"
-                        />
-
-                        {/* Favorited - Usuarios que lo han marcado como favorito */}
-                        <TraktStatBadge
-                          icon={Heart}
-                          value={formatShortNumber(
-                            tScoreboard?.stats?.favorited ?? 0,
-                          )?.toUpperCase() || "0"}
-                          label="FAVORITOS"
-                          tooltip="Favoritos"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Componente presentacional compartido con DetailModal */}
+                <DetailsStatsRow stats={tScoreboard?.stats} />
               </div>
 
             {/* =================================================================
@@ -10480,221 +10086,38 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {!isBackdropPoster && (
               <FadeIn delay={0.24}>
                 <div>
-                  {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
-                  {/* Pestañas clicables para cambiar entre diferentes vistas de información */}
-                  {/* Incluye: Detalles, Producción, Sinopsis, y Premios (si están disponibles) */}
-                  <DetailsTabsMenu
-                    tabs={[
-                      { id: "details", label: "Detalles" },
-                      { id: "production", label: "Producción" },
-                      { id: "synopsis", label: "Sinopsis" },
-                      ...(extras.awards || hasAwardItems
-                        ? [{ id: "awards", label: "Premios" }]
-                        : []),
-                    ]}
-                    activeTab={activeTab}
-                    onChangeTab={setActiveTab}
+                  {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
+                      variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
+                      y tagline con comillas tipográficas. */}
+                  <DetailsInfoTabs
+                    key={id}
+                    variant="normal"
                     layoutId="detailsTabInline"
+                    mediaType={type}
+                    originalTitle={
+                      type === "movie"
+                        ? data.original_title
+                        : data.original_name
+                    }
+                    formatValue={
+                      data.number_of_seasons
+                        ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                        : "—"
+                    }
+                    releaseDateValue={releaseDateValue}
+                    status={data.status}
+                    lastAirDateValue={lastAirDateValue}
+                    budgetValue={budgetValue}
+                    revenueValue={revenueValue}
+                    director={movieDirector}
+                    creators={createdByNames}
+                    network={network}
+                    productionText={production}
+                    tagline={data.tagline}
+                    overview={data.overview}
+                    awards={extras.awards}
+                    awardItems={awardItems}
                   />
-
-                  {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
-                  {/* Muestra el contenido de la tab activa con animaciones de transición */}
-                  {/* Usa AnimatePresence de Framer Motion para animar cambios entre tabs */}
-                  <div className="relative min-h-[100px]">
-                    <AnimatePresence mode="wait">
-                      {/* ===== TAB 1: SINOPSIS ===== */}
-                      {/* Muestra el tagline (si existe) y la descripción completa del contenido */}
-                      {activeTab === "synopsis" && (
-                        <div key="synopsis">
-                          <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                            {/* Capa de fondo suave */}
-                            <div
-                              className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                              style={{
-                                WebkitMaskImage:
-                                  "-webkit-radial-gradient(white, black)",
-                              }}
-                            />
-                            <div className="relative z-10">
-                              {data.tagline && (
-                                <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                                  “{data.tagline}”
-                                </div>
-                              )}
-                              <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                                {data.overview ||
-                                  "No hay descripción disponible."}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* ===== TAB 2: DETALLES ===== */}
-                      {/* Información técnica: título original, formato, fechas, presupuesto, recaudación */}
-                      {activeTab === "details" && (
-                        <div key="details">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                            {/* Tarjeta: Título Original - Nombre del contenido en su idioma original */}
-                            <VisualMetaCard
-                              icon={type === "movie" ? FilmIcon : MonitorPlay}
-                              label="Título Original"
-                              value={
-                                type === "movie"
-                                  ? data.original_title
-                                  : data.original_name
-                              }
-                              expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-
-                            {/* Tarjeta: Formato - Solo para series (número de temporadas y episodios) */}
-                            {type !== "movie" ? (
-                              <VisualMetaCard
-                                icon={Layers}
-                                label="Formato"
-                                value={
-                                  data.number_of_seasons
-                                    ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                                    : "—"
-                                }
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                              />
-                            ) : null}
-
-                            {/* Tarjeta: Fecha de Estreno/Inicio - Película: fecha de estreno, Serie: fecha de inicio */}
-                            <VisualMetaCard
-                              icon={CalendarIcon}
-                              label={type === "movie" ? "Estreno" : "Inicio"}
-                              value={releaseDateValue || "—"}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-
-                            {/* Tarjeta: Finalización/Última Emisión - Solo para series */}
-                            {type !== "movie" && lastAirDateValue && (
-                              <VisualMetaCard
-                                icon={CalendarIcon}
-                                label={
-                                  data.status === "Ended"
-                                    ? "Finalización"
-                                    : "Última emisión"
-                                }
-                                value={lastAirDateValue || "En emisión"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                              />
-                            )}
-
-                            {/* Tarjetas de Presupuesto y Recaudación - Solo para películas */}
-                            {type === "movie" && (
-                              <>
-                                <VisualMetaCard
-                                  icon={BadgeDollarSignIcon}
-                                  label="Presupuesto"
-                                  value={budgetValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                                />
-                                <VisualMetaCard
-                                  icon={TrendingUp}
-                                  label="Recaudación"
-                                  value={revenueValue || "—"}
-                                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                                />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* ===== TAB 3: PRODUCCIÓN Y EQUIPO ===== */}
-                      {/* Información sobre el equipo creativo: director/creadores, canal, productoras */}
-                      {activeTab === "production" && (
-                        <div key="production">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                            {/* Tarjeta: Director (Cine) / Creadores (TV) - Equipo principal creativo */}
-                            <VisualMetaCard
-                              icon={Users}
-                              label={
-                                type === "movie" ? "Director" : "Creadores"
-                              }
-                              value={
-                                type === "movie"
-                                  ? movieDirector || "Desconocido"
-                                  : createdByNames || "Desconocido"
-                              }
-                              expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-
-                            {/* Canal (solo TV) */}
-                            {type !== "movie" ? (
-                              <VisualMetaCard
-                                icon={MonitorPlay}
-                                label="Canal"
-                                value={network || "—"}
-                                className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                              />
-                            ) : null}
-
-                            {/* Producción (ambos) */}
-                            <VisualMetaCard
-                              icon={Building2}
-                              label="Producción"
-                              value={production || "—"}
-                              expanded={true}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 4. PREMIOS */}
-                      {activeTab === "awards" &&
-                        (extras.awards || hasAwardItems) && (
-                          <div key="awards">
-                            {extras.awards ? (
-                              <AwardsPanel awards={extras.awards} />
-                            ) : (
-                              <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                                <div
-                                  className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                                  style={{
-                                    WebkitMaskImage:
-                                      "-webkit-radial-gradient(white, black)",
-                                  }}
-                                />
-                                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
-                                <div className="relative z-10">
-                                  <div className="flex items-start gap-4">
-                                    <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                                      <Trophy className="w-8 h-8" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <h3 className="text-lg font-bold text-white mb-2">
-                                        Premios y nominaciones
-                                      </h3>
-                                      <p className="text-base leading-relaxed text-zinc-200">
-                                        {
-                                          awardItems.filter(
-                                            (a) => a.result === "winner",
-                                          ).length
-                                        }{" "}
-                                        premios y{" "}
-                                        {
-                                          awardItems.filter(
-                                            (a) => a.result === "nominee",
-                                          ).length
-                                        }{" "}
-                                        nominaciones
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </AnimatePresence>
-                  </div>
                 </div>
               </FadeIn>
             )}
@@ -10704,206 +10127,36 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
           <FadeIn delay={0.24} className="mt-8 lg:mt-6 w-full">
-            {/* --- MENÚ DE NAVEGACIÓN --- */}
-            <DetailsTabsMenu
-              tabs={[
-                { id: "details", label: "Detalles" },
-                { id: "production", label: "Producción" },
-                { id: "synopsis", label: "Sinopsis" },
-                ...(extras.awards || hasAwardItems
-                  ? [{ id: "awards", label: "Premios" }]
-                  : []),
-              ]}
-              activeTab={activeTab}
-              onChangeTab={setActiveTab}
+            {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
+                variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
+                y tagline con comillas rectas. */}
+            <DetailsInfoTabs
+              key={id}
+              variant="backdrop"
               layoutId="detailsTabBackdrop"
+              mediaType={type}
+              originalTitle={
+                type === "movie" ? data.original_title : data.original_name
+              }
+              formatValue={
+                data.number_of_seasons
+                  ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
+                  : "—"
+              }
+              releaseDateValue={releaseDateValue}
+              status={data.status}
+              lastAirDateValue={lastAirDateValue}
+              budgetValue={budgetValue}
+              revenueValue={revenueValue}
+              director={movieDirector}
+              creators={createdByNames}
+              network={network}
+              productionText={production}
+              tagline={data.tagline}
+              overview={data.overview}
+              awards={extras.awards}
+              awardItems={awardItems}
             />
-
-            {/* --- ÁREA DE CONTENIDO --- */}
-            <div className="relative min-h-[100px]">
-              <AnimatePresence mode="wait">
-                {/* 1. SINOPSIS */}
-                {activeTab === "synopsis" && (
-                  <div key="synopsis-backdrop">
-                    <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                      {/* Capa de fondo suave */}
-                      <div
-                        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                        style={{
-                          WebkitMaskImage:
-                            "-webkit-radial-gradient(white, black)",
-                        }}
-                      />
-                      <div className="relative z-10">
-                        {data.tagline && (
-                          <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                            "{data.tagline}"
-                          </div>
-                        )}
-                        <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                          {data.overview || "No hay descripción disponible."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. DETALLES */}
-                {activeTab === "details" && (
-                  <div key="details-backdrop">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                      <VisualMetaCard
-                        icon={type === "movie" ? FilmIcon : MonitorPlay}
-                        label="Título Original"
-                        value={
-                          type === "movie"
-                            ? data.original_title
-                            : data.original_name
-                        }
-                        expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-
-                      {type !== "movie" ? (
-                        <VisualMetaCard
-                          icon={Layers}
-                          label="Formato"
-                          value={
-                            data.number_of_seasons
-                              ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                              : "—"
-                          }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      ) : null}
-
-                      <VisualMetaCard
-                        icon={CalendarIcon}
-                        label={type === "movie" ? "Estreno" : "Inicio"}
-                        value={releaseDateValue || "—"}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-
-                      {type !== "movie" && lastAirDateValue && (
-                        <VisualMetaCard
-                          icon={CalendarIcon}
-                          label={
-                            data.status === "Ended"
-                              ? "Finalización"
-                              : "Última emisión"
-                          }
-                          value={lastAirDateValue}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      )}
-
-                      {type === "movie" && (
-                        <>
-                          {budgetValue && (
-                            <VisualMetaCard
-                              icon={BadgeDollarSignIcon}
-                              label="Presupuesto"
-                              value={budgetValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-                          )}
-                          {revenueValue && (
-                            <VisualMetaCard
-                              icon={TrendingUp}
-                              label="Recaudación"
-                              value={revenueValue}
-                              className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. PRODUCCIÓN */}
-                {activeTab === "production" && (
-                  <div key="production-backdrop">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                      <VisualMetaCard
-                        icon={Users}
-                        label={type === "movie" ? "Director" : "Creadores"}
-                        value={
-                          type === "movie"
-                            ? movieDirector || "Desconocido"
-                            : createdByNames || "Desconocido"
-                        }
-                        expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-
-                      {type !== "movie" && network && (
-                        <VisualMetaCard
-                          icon={MonitorPlay}
-                          label="Canal"
-                          value={network}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      )}
-
-                      <VisualMetaCard
-                        icon={Building2}
-                        label="Producción"
-                        value={production || "—"}
-                        expanded={true}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* ===== TAB 4: PREMIOS ===== */}
-                {activeTab === "awards" && (extras.awards || hasAwardItems) && (
-                  <div key="awards-backdrop">
-                    {extras.awards ? (
-                      <AwardsPanel awards={extras.awards} />
-                    ) : (
-                      <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                        <div
-                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                          style={{
-                            WebkitMaskImage:
-                              "-webkit-radial-gradient(white, black)",
-                          }}
-                        />
-                        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
-                        <div className="relative z-10">
-                          <div className="flex items-start gap-4">
-                            <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                              <Trophy className="w-8 h-8" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-lg font-bold text-white mb-2">
-                                Premios y nominaciones
-                              </h3>
-                              <p className="text-base leading-relaxed text-zinc-200">
-                                {
-                                  awardItems.filter(
-                                    (a) => a.result === "winner",
-                                  ).length
-                                }{" "}
-                                premios y{" "}
-                                {
-                                  awardItems.filter(
-                                    (a) => a.result === "nominee",
-                                  ).length
-                                }{" "}
-                                nominaciones
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </AnimatePresence>
-            </div>
           </FadeIn>
         )}
 

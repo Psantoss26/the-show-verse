@@ -27,6 +27,7 @@ import {
   X,
   Award,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -42,6 +43,7 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import LiquidButton from "@/components/LiquidButton";
+import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 
 import {
   buildImg,
@@ -266,6 +268,7 @@ function BackdropPreviewCard({
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(item);
   const { backdropPath } = useItemBackdrop(item, backdropOverride);
 
@@ -711,6 +714,21 @@ function BackdropPreviewCard({
           >
             <BookmarkPlus className={watchlist ? "fill-current" : ""} />
           </LiquidButton>
+
+          {openDetailModal && (
+            <LiquidButton
+              onClick={(e) => {
+                e.stopPropagation();
+                openDetailModal(item);
+              }}
+              groupId="dashboard-backdrop-actions"
+              title="Ver detalles"
+              aria-label="Ver detalles"
+              className={previewBtnClass}
+            >
+              <ChevronDown />
+            </LiquidButton>
+          )}
         </div>
 
         {/* Premios (hueco reservado para que la carga tardía no dé saltos) */}

@@ -1,0 +1,508 @@
+"use client";
+
+// /src/components/dashboard/useDetailModalData.js
+// Hook que, al cambiar `item` a un valor no nulo, descarga el conjunto (ahora
+// más rico) de datos de la ficha rápida del dashboard. Devuelve { loading, data }.
+// Nunca lanza: captura errores y degrada campo a campo.
+//
+// Estrategia: detalles + créditos + recomendaciones en paralelo (contenido
+// principal) y, en segundo plano y de forma independiente, IDs externos -> OMDb
+// (premios) + IMDb (nota), y la comunidad de Trakt (sentimientos + scoreboard).
+// Se cancela con un flag al desmontar o cambiar de item.
+
+import { useEffect, useState } from "react";
+
+import {
+  getDetails,
+  getCredits,
+  getRecommendations,
+  getExternalIds,
+} from "@/lib/api/tmdb";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
+import {
+  extractOmdbExtraScores,
+  extractOmdbImdbScore,
+} from "@/lib/details/omdbCache";
+import { formatDateEs } from "@/lib/details/formatters";
+import { traktGetSentiments, traktGetScoreboard } from "@/lib/api/traktClient";
+import {
+  yearOf,
+  ratingOf,
+  formatRuntime,
+  GENRES,
+  getMediaTypeForItem,
+  fetchBestLogo,
+} from "@/lib/dashboard/media";
+
+// Mapa estado (TMDb) -> etiqueta ES, espejo de `getStatusLabel` en DetailsClient.
+function statusLabelEs(status) {
+  const map = {
+    Released: "Estrenada",
+    Ended: "Finalizada",
+    "Returning Series": "En emisión",
+    Canceled: "Cancelada",
+    "In Production": "En producción",
+    "Post Production": "Postproducción",
+    Planned: "Planificada",
+    Rumored: "Rumoreada",
+    Pilot: "Piloto",
+  };
+  return map[status] || status || null;
+}
+
+// Espejo de `isMainDirectorCredit` + `getMovieDirectorsFromCrew` +
+// `formatCreditNames` en DetailsClient: nombres de los directores (job "Director"
+// / "Co-Director") del equipo de créditos, unidos con ", ".
+const isMainDirectorCredit = (credit) =>
+  credit?.job === "Director" || credit?.job === "Co-Director";
+
+function movieDirectorNames(crew) {
+  const list = Array.isArray(crew) ? crew.filter(isMainDirectorCredit) : [];
+  return list.length
+    ? list.map((p) => p?.name).filter(Boolean).join(", ")
+    : null;
+}
+
+// Deduplica y recorta la lista de sentimientos de Trakt usando `sentiment_es`
+// (espejo de `formatTraktSentimentList` en DetailsClient).
+const DIACRITICS_RE = new RegExp("[\\u0300-\\u036f]", "g");
+
+function formatSentimentList(items = [], max = 4) {
+  const seen = new Set();
+  const out = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    const text = String(item?.sentiment_es || "").trim();
+    const key = text
+      .normalize("NFD")
+      .replace(DIACRITICS_RE, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+const EMPTY_PRODUCTION = {
+  companies: [],
+  networks: [],
+  countries: [],
+  status: null,
+  originalLanguage: null,
+};
+
+const EMPTY_SENTIMENT = { pros: [], cons: [] };
+
+const EMPTY_DATA = {
+  mediaType: null,
+  title: null,
+  logoPath: null,
+  overview: null,
+  backdropPath: null,
+  posterPath: null,
+  year: null,
+  runtime: null,
+  genres: [],
+  genreObjects: [],
+  status: null,
+  // Campos que alimentan las pestañas compartidas <DetailsInfoTabs>
+  originalTitle: null,
+  numberOfSeasons: null,
+  numberOfEpisodes: null,
+  releaseDateValue: null,
+  lastAirDateValue: null,
+  budgetValue: null,
+  revenueValue: null,
+  director: null,
+  creators: null,
+  network: null,
+  productionText: null,
+  tagline: null,
+  tmdbRating: null,
+  tmdbVotes: null,
+  imdbRating: null,
+  imdbVotes: null,
+  imdbId: null,
+  rtScore: null,
+  mcScore: null,
+  awards: null,
+  cast: [],
+  recommendations: [],
+  production: EMPTY_PRODUCTION,
+  sentiment: EMPTY_SENTIMENT,
+  scoreboard: null,
+  providers: [],
+};
+
+// Normaliza la respuesta de /api/streaming (JustWatch) a la forma mínima que
+// consume la ficha rápida: { name, logo_path, url }. Dedupe por nombre y recorta
+// a los primeros ~6. `logo_path` viene como ruta de TMDb (p. ej. "/abc.jpg").
+function normalizeProviders(list, max = 6) {
+  const seen = new Set();
+  const out = [];
+  for (const p of Array.isArray(list) ? list : []) {
+    const name = p?.provider_name || p?.name || null;
+    const url = typeof p?.url === "string" && p.url ? p.url : null;
+    if (!name || !url) continue;
+    const key = String(name).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, logo_path: p?.logo_path || p?.logo || null, url });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+export function useDetailModalData(item) {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState(EMPTY_DATA);
+
+  useEffect(() => {
+    if (!item || item.id == null) {
+      setData(EMPTY_DATA);
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const mediaType = getMediaTypeForItem(item);
+    const id = item.id;
+
+    setLoading(true);
+    // Semilla inmediata con lo que ya trae el item (evita salto en cabecera).
+    setData({
+      ...EMPTY_DATA,
+      mediaType,
+      title: item.title || item.name || null,
+      backdropPath: item.backdrop_path || null,
+      posterPath: item.poster_path || null,
+      year: yearOf(item) || null,
+    });
+
+    (async () => {
+      let details = null;
+      try {
+        const [detailsRes, credits, recs] = await Promise.all([
+          getDetails(mediaType, id).catch(() => null),
+          getCredits(mediaType, id).catch(() => null),
+          getRecommendations(mediaType, id).catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        details = detailsRes;
+        const source = details || item;
+
+        const title =
+          source?.title || source?.name || item?.title || item?.name || null;
+        const overview =
+          (typeof source?.overview === "string" && source.overview.trim()) ||
+          null;
+        const backdropPath =
+          source?.backdrop_path || item?.backdrop_path || null;
+        const posterPath = source?.poster_path || item?.poster_path || null;
+        const year = yearOf(source) || yearOf(item) || null;
+
+        // Etiqueta de duración: minutos para películas; "N Temp. · M Eps." para
+        // series (mismo formato que InlinePreviewCard).
+        let runtime = null;
+        if (mediaType === "tv") {
+          if (source?.number_of_seasons) {
+            runtime = `${source.number_of_seasons} Temp.`;
+            if (source?.number_of_episodes) {
+              runtime += ` · ${source.number_of_episodes} Eps.`;
+            }
+          }
+        } else {
+          runtime = formatRuntime(source?.runtime) || null;
+        }
+
+        // Nombres de género: desde `genres` [{id,name}] o `genre_ids` -> GENRES.
+        let genres = [];
+        if (Array.isArray(source?.genres) && source.genres.length) {
+          genres = source.genres.map((g) => g?.name).filter(Boolean);
+        } else {
+          const ids = source?.genre_ids || item?.genre_ids || [];
+          genres = (Array.isArray(ids) ? ids : [])
+            .map((gid) => GENRES[gid])
+            .filter(Boolean);
+        }
+
+        // Objetos de género { id, name } para <DetailsMetaGenresRow>, que llama
+        // internamente translateGenre(genre.name). Mismo origen que `genres`.
+        let genreObjects = [];
+        if (Array.isArray(source?.genres) && source.genres.length) {
+          genreObjects = source.genres
+            .filter((g) => g && g.name)
+            .map((g) => ({ id: g.id ?? g.name, name: g.name }));
+        } else {
+          const ids = source?.genre_ids || item?.genre_ids || [];
+          genreObjects = (Array.isArray(ids) ? ids : [])
+            .map((gid) => (GENRES[gid] ? { id: gid, name: GENRES[gid] } : null))
+            .filter(Boolean);
+        }
+
+        const tmdbRatingStr = ratingOf(source);
+        const tmdbRating = tmdbRatingStr !== "–" ? tmdbRatingStr : null;
+        const tmdbVotes =
+          typeof source?.vote_count === "number" && source.vote_count > 0
+            ? source.vote_count
+            : null;
+
+        const cast = Array.isArray(credits?.cast)
+          ? credits.cast.slice(0, 12)
+          : [];
+        const recommendations = Array.isArray(recs?.results)
+          ? recs.results
+          : [];
+
+        // Producción: derivable de getDetails (production_companies, networks,
+        // production_countries, status, original_language).
+        const production = {
+          companies: Array.isArray(details?.production_companies)
+            ? details.production_companies.map((c) => c?.name).filter(Boolean)
+            : [],
+          networks: Array.isArray(details?.networks)
+            ? details.networks.map((n) => n?.name).filter(Boolean)
+            : [],
+          countries: Array.isArray(details?.production_countries)
+            ? details.production_countries.map((c) => c?.name).filter(Boolean)
+            : [],
+          status: statusLabelEs(details?.status),
+          originalLanguage: details?.original_language || null,
+        };
+
+        // Campos que alimentan las pestañas compartidas <DetailsInfoTabs>,
+        // derivados IGUAL que en DetailsClient (mismos formatters).
+        const originalTitle =
+          mediaType === "movie"
+            ? source?.original_title || null
+            : source?.original_name || null;
+
+        const numberOfSeasons =
+          typeof source?.number_of_seasons === "number"
+            ? source.number_of_seasons
+            : null;
+        const numberOfEpisodes =
+          typeof source?.number_of_episodes === "number"
+            ? source.number_of_episodes
+            : null;
+
+        const releaseDateValue =
+          mediaType === "movie"
+            ? formatDateEs(source?.release_date)
+            : formatDateEs(source?.first_air_date);
+        const lastAirDateValue =
+          mediaType === "tv" ? formatDateEs(source?.last_air_date) : null;
+
+        const budgetValue =
+          mediaType === "movie" && source?.budget > 0
+            ? `$${(source.budget / 1_000_000).toFixed(1)}M`
+            : null;
+        const revenueValue =
+          mediaType === "movie" && source?.revenue > 0
+            ? `$${(source.revenue / 1_000_000).toFixed(1)}M`
+            : null;
+
+        const director =
+          mediaType === "movie" ? movieDirectorNames(credits?.crew) : null;
+        const creators =
+          mediaType === "tv" &&
+          Array.isArray(details?.created_by) &&
+          details.created_by.length
+            ? details.created_by.map((d) => d.name).join(", ")
+            : null;
+
+        const network =
+          mediaType === "tv"
+            ? details?.networks?.[0]?.name ||
+              details?.networks?.[0]?.original_name ||
+              null
+            : null;
+
+        const productionText =
+          (Array.isArray(details?.production_companies)
+            ? details.production_companies
+                .slice(0, 3)
+                .map((c) => c?.name)
+                .join(", ")
+            : "") || null;
+
+        const tagline =
+          (typeof source?.tagline === "string" && source.tagline.trim()) ||
+          null;
+
+        setData((prev) => ({
+          ...prev,
+          mediaType,
+          title,
+          overview,
+          backdropPath,
+          posterPath,
+          year,
+          runtime,
+          genres,
+          genreObjects,
+          status: details?.status || null,
+          originalTitle,
+          numberOfSeasons,
+          numberOfEpisodes,
+          releaseDateValue,
+          lastAirDateValue,
+          budgetValue,
+          revenueValue,
+          director,
+          creators,
+          network,
+          productionText,
+          tagline,
+          tmdbRating,
+          tmdbVotes,
+          cast,
+          recommendations,
+          production,
+        }));
+      } catch {
+        // Degradamos en silencio: nos quedamos con la semilla del item.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+
+      // Secundario (no bloquea el skeleton): premios (OMDb) + nota IMDb.
+      try {
+        let imdb =
+          item?.imdb_id ||
+          details?.imdb_id ||
+          details?.external_ids?.imdb_id ||
+          null;
+        if (!imdb) {
+          const ext = await getExternalIds(mediaType, id).catch(() => null);
+          imdb = ext?.imdb_id || null;
+        }
+        if (imdb && !cancelled) {
+          const [omdb, imdbDataset] = await Promise.all([
+            fetchOmdbByImdb(imdb).catch(() => null),
+            fetchImdbRatingByImdb(imdb).catch(() => null),
+          ]);
+          if (!cancelled) {
+            // Cadena CRUDA de premios (OMDb), normalizada como en DetailsClient
+            // (`normalizeOmdbAwards`): <DetailsInfoTabs>/<AwardsPanel> la formatea.
+            const rawAwards = String(omdb?.Awards || "").trim();
+            const awards = !rawAwards || rawAwards === "N/A" ? null : rawAwards;
+            const imdbRating =
+              typeof imdbDataset?.rating === "number"
+                ? imdbDataset.rating
+                : null;
+            // Rotten Tomatoes + Metacritic + votos IMDb desde el array
+            // `Ratings` de OMDb (mismos parsers que DetailsClient).
+            const { rtScore, mcScore } = extractOmdbExtraScores(omdb);
+            const { imdbVotes: omdbImdbVotes } = extractOmdbImdbScore(omdb);
+
+            setData((prev) => ({
+              ...prev,
+              awards: awards ?? prev.awards,
+              imdbRating: imdbRating ?? prev.imdbRating,
+              imdbVotes: omdbImdbVotes ?? prev.imdbVotes,
+              imdbId: imdb ?? prev.imdbId,
+              rtScore: rtScore ?? prev.rtScore,
+              mcScore: mcScore ?? prev.mcScore,
+            }));
+          }
+        }
+      } catch {
+        // sin premios / sin nota IMDb: se queda como está
+      }
+    })();
+
+    // Comunidad de Trakt (best-effort, en paralelo, no bloquea): sentimientos.
+    (async () => {
+      try {
+        const s = await traktGetSentiments({ type: mediaType, tmdbId: id });
+        if (cancelled || !s) return;
+        const pros = formatSentimentList(s?.good, 4);
+        const cons = formatSentimentList(s?.bad, 4);
+        if (pros.length || cons.length) {
+          setData((prev) => ({ ...prev, sentiment: { pros, cons } }));
+        }
+      } catch {
+        // sin sentimientos: se omite la sección
+      }
+    })();
+
+    // Comunidad de Trakt (best-effort, en paralelo, no bloquea): scoreboard.
+    (async () => {
+      try {
+        const sb = await traktGetScoreboard({ type: mediaType, tmdbId: id });
+        if (cancelled || !sb?.found) return;
+        const rating =
+          typeof sb?.community?.rating === "number" ? sb.community.rating : null;
+        const votes =
+          typeof sb?.community?.votes === "number" ? sb.community.votes : null;
+        const st = sb?.stats || {};
+        const stats = {
+          watchers: typeof st.watchers === "number" ? st.watchers : null,
+          plays: typeof st.plays === "number" ? st.plays : null,
+          lists: typeof st.lists === "number" ? st.lists : null,
+          favorited: typeof st.favorited === "number" ? st.favorited : null,
+        };
+        const hasStats = Object.values(stats).some((v) => typeof v === "number");
+        if (rating != null || votes != null || hasStats) {
+          setData((prev) => ({
+            ...prev,
+            scoreboard: { rating, votes, stats },
+          }));
+        }
+      } catch {
+        // sin scoreboard: se degrada, no se muestra
+      }
+    })();
+
+    // Logo del título (arte) para la cabecera (best-effort, no bloquea).
+    (async () => {
+      try {
+        const logoPath = await fetchBestLogo(id, mediaType, ["es", "en", null]);
+        if (!cancelled && logoPath) {
+          setData((prev) => ({ ...prev, logoPath }));
+        }
+      } catch {
+        // sin logo: la cabecera cae al título de texto
+      }
+    })();
+
+    // Plataformas de streaming disponibles (JustWatch vía /api/streaming). Se usa
+    // el título/año semilla del item (equivalen a los de TMDb). Best-effort:
+    // nunca lanza; si falla, providers se queda en [] y no se pinta la fila.
+    (async () => {
+      try {
+        const streamTitle = (item.title || item.name || "").trim();
+        if (!streamTitle) return;
+        const params = new URLSearchParams({
+          title: streamTitle,
+          type: mediaType === "tv" ? "tv" : "movie",
+        });
+        const y = yearOf(item);
+        if (y) params.append("year", String(y));
+        params.append("tmdbId", String(id));
+
+        const res = await fetch(`/api/streaming?${params.toString()}`);
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const providers = normalizeProviders(json?.providers, 6);
+        if (!cancelled && providers.length) {
+          setData((prev) => ({ ...prev, providers }));
+        }
+      } catch {
+        // sin plataformas: no se muestra la fila
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item]);
+
+  return { loading, data };
+}

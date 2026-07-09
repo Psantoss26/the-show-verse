@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, BookmarkPlus, Play, Award, CalendarDays, ChevronRight } from "lucide-react";
+import { Heart, BookmarkPlus, Play, Award, CalendarDays, ChevronRight, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { getLocalInProgress } from "@/lib/api/progressClient";
@@ -29,6 +29,7 @@ import {
   videoEmbedUrl,
 } from "@/lib/details/videos";
 import LiquidButton from "@/components/LiquidButton";
+import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import {
   buildImg,
   fetchBestWatchingBackdrop,
@@ -826,6 +827,7 @@ function ContinueWatchingPreviewCard({
   onPreviewMouseLeave,
 }) {
   const { session, account } = useAuth();
+  const { openDetailModal } = useDetailModal();
   const router = useRouter();
   const mediaType = mediaTypeOf(show);
   const { backdropPath, ready } = useShowBackdrop(show);
@@ -1535,6 +1537,21 @@ function ContinueWatchingPreviewCard({
           >
             <BookmarkPlus className={watchlist ? "fill-current" : ""} />
           </LiquidButton>
+
+          {openDetailModal && (
+            <LiquidButton
+              onClick={(e) => {
+                e.stopPropagation();
+                openDetailModal(show);
+              }}
+              groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
+              title="Ver detalles"
+              aria-label="Ver detalles"
+              className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
+            >
+              <ChevronDown />
+            </LiquidButton>
+          )}
         </div>
 
         {/* Premios — hueco reservado (min-height) para que la carga tardía de
