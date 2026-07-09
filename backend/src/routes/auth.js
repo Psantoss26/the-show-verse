@@ -26,6 +26,7 @@ import {
   shouldRecordCompletion,
   REWATCH_COMPLETION_COOLDOWN_MS,
 } from '../lib/rewatchCompletion.js';
+import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
 import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
@@ -1053,7 +1054,20 @@ export default async function authRoutes(fastify) {
     // Clave del índice único: 0 para película o episodio desconocido.
     const season = isTv ? (parsed.data.season ?? 0) : 0;
     const episode = isTv ? (parsed.data.episode ?? 0) : 0;
-    const percent = runtimeSeconds > 0 ? Math.min(1, positionSeconds / runtimeSeconds) : 0;
+
+    // Duración efectiva: la que reporta el cliente o, si no la trae (Plex y algunos
+    // episodios de Netflix no exponen duración en la MediaSession), la de TMDb. Sin
+    // ella no se puede calcular el % y el título no entraba en "Continuar viendo".
+    let effectiveRuntime = runtimeSeconds > 0 ? runtimeSeconds : 0;
+    if (effectiveRuntime <= 0) {
+      effectiveRuntime = await getRuntimeSeconds({
+        tmdbId,
+        mediaType,
+        season: isTv ? season : 0,
+        episode: isTv ? episode : 0,
+      });
+    }
+    const percent = effectiveRuntime > 0 ? Math.min(1, positionSeconds / effectiveRuntime) : 0;
     const COMPLETE_AT = 0.9;
     const userId = account.userId;
 
@@ -1065,7 +1079,7 @@ export default async function authRoutes(fastify) {
     // cola (95%, 98%…) de una misma sesión ya no tienen fila y se colapsan por el
     // cooldown. Esto permite re-sincronizar el mismo episodio el mismo día como un
     // rewatch (antes: bucket de 12 h que lo descartaba).
-    if (runtimeSeconds > 0 && percent >= COMPLETE_AT) {
+    if (effectiveRuntime > 0 && percent >= COMPLETE_AT) {
       const now = new Date();
       // Valores tal y como se guardan en watch_history (null para película o
       // episodio desconocido); watch_progress usa el sentinel 0 (season/episode).
@@ -1118,7 +1132,7 @@ export default async function authRoutes(fastify) {
             season: storedSeason,
             episode: storedEpisode,
             watchedAt: now,
-            runtimeMins: runtimeSeconds ? Math.round(runtimeSeconds / 60) : null,
+            runtimeMins: effectiveRuntime ? Math.round(effectiveRuntime / 60) : null,
             title: title || null,
             posterPath: posterPath || null,
             confidence: 'high',
@@ -1139,7 +1153,7 @@ export default async function authRoutes(fastify) {
         season,
         episode,
         positionSeconds,
-        runtimeSeconds,
+        runtimeSeconds: effectiveRuntime,
         percent,
         platform: platform || null,
         title: title || null,
@@ -1156,7 +1170,7 @@ export default async function authRoutes(fastify) {
         ],
         set: {
           positionSeconds,
-          runtimeSeconds,
+          runtimeSeconds: effectiveRuntime,
           percent,
           platform: platform || null,
           title: title || null,
