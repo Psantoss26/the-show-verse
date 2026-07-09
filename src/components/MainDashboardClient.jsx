@@ -15,7 +15,6 @@ import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useRouter } from "next/navigation";
 import {
   Heart,
   HeartOff,
@@ -26,7 +25,6 @@ import {
   FilmIcon,
   TvIcon,
   ChevronRight,
-  ChevronDown,
   Award,
   Loader2,
   Music2,
@@ -314,16 +312,16 @@ const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
     "relative isolate overflow-hidden text-white cursor-pointer transform-gpu",
     isSpotlight
       ? "rounded-2xl bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
-      : "grid grid-rows-[76%_24%] rounded-lg bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
+      : "flex flex-col rounded-xl border border-white/10 bg-[#141414]/95 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl",
     "transition-all duration-300",
-    heightClass,
+    isSpotlight ? heightClass : "",
   ].join(" ");
 
 const dashboardPreviewMediaClass =
-  "relative h-full w-full overflow-hidden bg-transparent";
+  "relative aspect-video w-full shrink-0 overflow-hidden bg-neutral-900";
 
 const dashboardPreviewInfoClass =
-  "relative h-full w-full overflow-hidden bg-black/10 bg-gradient-to-br from-white/5 via-transparent to-black/20 backdrop-blur-[50px]";
+  "w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4";
 
 const dashboardPreviewBackdropFadeStyle = {
   WebkitMaskImage:
@@ -586,7 +584,6 @@ function InlinePreviewCard({
   isSpotlight = false,
 }) {
   const { session, account } = useAuth();
-  const router = useRouter();
   const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(movie);
 
@@ -863,24 +860,10 @@ function InlinePreviewCard({
     };
   }, [isSpotlight, mediaType, movie, stableBackdropOverride]);
 
-  const href = `/details/${mediaType}/${movie.id}`;
-
   const cardRef = useRef(null);
-  const prefetchedRef = useRef(false);
 
-  const prefetchHref = () => {
-    if (prefetchedRef.current) return;
-    prefetchedRef.current = true;
-    // Prefetch de RUTA (RSC) solo bajo intención real del usuario (hover /
-    // focus / touch). Se elimina el prefetch automático al entrar en viewport y
-    // el fetch(href) de la página completa: por cada tarjeta disparaban muchas
-    // invocaciones y transferencia en Vercel al hacer scroll. router.prefetch
-    // basta para que la navegación al pulsar sea inmediata.
-    router.prefetch(href);
-  };
-
-  const navigateToDetails = () => {
-    router.push(href);
+  const openPreviewModal = () => {
+    openDetailModal?.(movie);
   };
 
   const requireLogin = () => {
@@ -1115,10 +1098,7 @@ function InlinePreviewCard({
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       ref={cardRef}
       className={dashboardPreviewCardClass(heightClass, isSpotlight)}
-      onClick={navigateToDetails}
-      onMouseEnter={prefetchHref}
-      onFocus={prefetchHref}
-      onTouchStart={prefetchHref}
+      onClick={openPreviewModal}
     >
       <div
         className={
@@ -1343,20 +1323,6 @@ function InlinePreviewCard({
                   <BookmarkPlus className={watchlist ? "fill-current" : ""} />
                 </LiquidButton>
 
-                {openDetailModal && (
-                  <LiquidButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDetailModal(movie);
-                    }}
-                    groupId="dashboard-spotlight-actions"
-                    title="Ver detalles"
-                    aria-label="Ver detalles"
-                    className={previewBtnClass}
-                  >
-                    <ChevronDown />
-                  </LiquidButton>
-                )}
               </motion.div>
 
               {extras?.awards && (
@@ -1447,72 +1413,13 @@ function InlinePreviewCard({
             </div>
           </div>
         ) : (
-          <div className="flex h-full items-center justify-between gap-4 px-4 py-2 sm:px-6 sm:py-2.5 lg:px-8">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-200 sm:text-xs">
-                {yearOf(movie) && <span>{yearOf(movie)}</span>}
-                {extras?.runtime && (
-                  <span>• {formatRuntime(extras.runtime)}</span>
-                )}
-
-                {hasTmdbRating && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <NextImage
-                      src="/logo-TMDb.png"
-                      alt="TMDb"
-                      className="h-3 w-auto"
-                      width={2560}
-                      height={1846}
-                      sizes="32px"
-                      loading="lazy"
-                    />
-                    <span className="font-medium">{tmdbRating}</span>
-                  </span>
-                )}
-
-                {typeof extras?.imdbRating === "number" && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <NextImage
-                      src="/logo-IMDb.svg"
-                      alt="IMDb"
-                      className="h-4 w-auto"
-                      width={575}
-                      height={290}
-                      sizes="40px"
-                      loading="lazy"
-                    />
-                    <span className="font-medium">
-                      {extras.imdbRating.toFixed(1)}
-                    </span>
-                  </span>
-                )}
-              </div>
-
-              {genres && (
-                <div className="mt-1 line-clamp-1 text-[11px] text-neutral-100/90 sm:text-xs">
-                  {genres}
-                </div>
-              )}
-
-              {extras?.awards && (
-                <div className="mt-1 text-[10px] leading-tight text-emerald-300 sm:text-[11px]">
-                  {extras.awards}
-                </div>
-              )}
-
-              {error && (
-                <p className="mt-1 line-clamp-1 text-[11px] text-red-400">
-                  {error}
-                </p>
-              )}
-            </div>
-
-            <motion.div
-              className="flex flex-shrink-0 items-center gap-2 sm:gap-3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
+            className="h-full"
+          >
+            <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
               <LiquidButton
                 onClick={handleToggleTrailer}
                 loading={trailerLoading}
@@ -1520,6 +1427,7 @@ function InlinePreviewCard({
                 activeColor="yellow"
                 groupId="dashboard-preview-actions"
                 title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+                aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
                 className={`!bg-white !text-black ${previewBtnClass}`}
               >
                 {showTrailer ? (
@@ -1538,6 +1446,9 @@ function InlinePreviewCard({
                 title={
                   favorite ? "Quitar de favoritos" : "Añadir a favoritos"
                 }
+                aria-label={
+                  favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                }
                 className={previewBtnClass}
               >
                 <Heart className={favorite ? "fill-current" : ""} />
@@ -1552,27 +1463,103 @@ function InlinePreviewCard({
                 title={
                   watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
                 }
+                aria-label={
+                  watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+                }
                 className={previewBtnClass}
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </LiquidButton>
 
-              {openDetailModal && (
-                <LiquidButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openDetailModal(movie);
-                  }}
-                  groupId="dashboard-preview-actions"
-                  title="Ver detalles"
-                  aria-label="Ver detalles"
-                  className={previewBtnClass}
+            </div>
+
+            {extras?.awards && (
+              <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+                <motion.span
+                  key={extras.awards}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="flex min-w-0 items-center gap-1.5"
                 >
-                  <ChevronDown />
-                </LiquidButton>
-              )}
-            </motion.div>
-          </div>
+                  <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{extras.awards}</span>
+                </motion.span>
+              </div>
+            )}
+
+            <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
+              {(() => {
+                const parts = [];
+                if (yearOf(movie))
+                  parts.push(<span key="year">{yearOf(movie)}</span>);
+                if (extras?.runtime)
+                  parts.push(
+                    <span key="runtime">
+                      {typeof extras.runtime === "number"
+                        ? formatRuntime(extras.runtime)
+                        : extras.runtime}
+                    </span>,
+                  );
+                if (hasTmdbRating)
+                  parts.push(
+                    <span key="tmdb" className="inline-flex items-center gap-1.5">
+                      <NextImage
+                        src="/logo-TMDb.png"
+                        alt="TMDb"
+                        width={2560}
+                        height={1846}
+                        sizes="28px"
+                        className="h-2.5 w-auto"
+                        loading="lazy"
+                      />
+                      <span className="font-bold">{tmdbRating}</span>
+                    </span>,
+                  );
+                if (typeof extras?.imdbRating === "number")
+                  parts.push(
+                    <span key="imdb" className="inline-flex items-center gap-1.5">
+                      <NextImage
+                        src="/logo-IMDb.svg"
+                        alt="IMDb"
+                        width={575}
+                        height={290}
+                        sizes="34px"
+                        className="h-3 w-auto"
+                        loading="lazy"
+                      />
+                      <span className="font-bold">
+                        {extras.imdbRating.toFixed(1)}
+                      </span>
+                    </span>,
+                  );
+                return parts.reduce((acc, part, index) => {
+                  if (index === 0) return [part];
+                  return [
+                    ...acc,
+                    <span
+                      key={`sep-${index}`}
+                      className="select-none text-[0.8em] font-bold text-zinc-500/70"
+                      aria-hidden="true"
+                    >
+                      •
+                    </span>,
+                    part,
+                  ];
+                }, []);
+              })()}
+            </div>
+
+            <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
+              {genres && <span className="truncate">{genres}</span>}
+            </div>
+
+            {error && (
+              <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
+                {error}
+              </p>
+            )}
+          </motion.div>
         )}
       </div>
 
@@ -1723,13 +1710,8 @@ function InlinePreviewCardAnticipated({
   alignment,
 }) {
   const { session, account } = useAuth();
-  const router = useRouter();
   const { openDetailModal } = useDetailModal();
 
-  const [extras, setExtras] = useState({
-    runtime: null,
-    country: null,
-  });
   const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
   const [stableBackdropState, setStableBackdropState] = useState(() => ({
     mediaIdentity,
@@ -1845,47 +1827,6 @@ function InlinePreviewCardAnticipated({
         }
       }
 
-      // Detectar tipo de media
-      const mediaType =
-        movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
-          ? "tv"
-          : "movie";
-
-      // Extras: runtime/temporadas + país
-      try {
-        let runtime = null;
-        let country = null;
-
-        if (mediaType === "movie") {
-          const details = await getMovieDetails(movie.id).catch(() => null);
-          runtime = details?.runtime ?? null;
-          country = details?.production_countries?.[0]?.name || null;
-        } else {
-          // Para series
-          const response = await fetch(
-            `https://api.themoviedb.org/3/tv/${movie.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
-          );
-          if (response.ok) {
-            const details = await response.json();
-            if (details.number_of_seasons) {
-              runtime = `${details.number_of_seasons} Temp.`;
-              if (details.number_of_episodes) {
-                runtime += ` / ${details.number_of_episodes} Eps.`;
-              }
-            }
-            country =
-              details?.origin_country?.[0] ||
-              details?.production_countries?.[0]?.name ||
-              null;
-          }
-        }
-
-        if (!abort) setExtras({ runtime, country });
-      } catch {
-        if (!abort) setExtras({ runtime: null, country: null });
-      }
     };
 
     loadAll();
@@ -1900,24 +1841,11 @@ function InlinePreviewCardAnticipated({
     movie.first_air_date
       ? "tv"
       : "movie";
-  const href = `/details/${mediaType}/${movie.id}`;
 
   const cardRef = useRef(null);
-  const prefetchedRef = useRef(false);
 
-  const prefetchHref = () => {
-    if (prefetchedRef.current) return;
-    prefetchedRef.current = true;
-    // Prefetch de RUTA (RSC) solo bajo intención real del usuario (hover /
-    // focus / touch). Se elimina el prefetch automático al entrar en viewport y
-    // el fetch(href) de la página completa: por cada tarjeta disparaban muchas
-    // invocaciones y transferencia en Vercel al hacer scroll. router.prefetch
-    // basta para que la navegación al pulsar sea inmediata.
-    router.prefetch(href);
-  };
-
-  const navigateToDetails = () => {
-    router.push(href);
+  const openPreviewModal = () => {
+    openDetailModal?.(movie);
   };
 
   const requireLogin = () => {
@@ -2011,7 +1939,8 @@ function InlinePreviewCardAnticipated({
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
-
+  const tmdbRating = ratingOf(movie);
+  const hasTmdbRating = tmdbRating !== "–";
   const genres = (() => {
     const ids =
       movie.genre_ids ||
@@ -2019,15 +1948,6 @@ function InlinePreviewCardAnticipated({
     const names = ids.map((id) => GENRES[id]).filter(Boolean);
     return names.slice(0, 2).join(" • ");
   })();
-
-  const release = movie?.release_date || null;
-  const releaseText = release
-    ? new Date(release).toLocaleDateString("es-ES", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : yearOf(movie) || "—";
 
   // Determinar la alineación horizontal de la tarjeta absoluta.
   // IMPORTANTE: el posicionamiento se hace con valores de framer-motion (x/y),
@@ -2066,9 +1986,7 @@ function InlinePreviewCardAnticipated({
       }}
       ref={cardRef}
       className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
-      onClick={navigateToDetails}
-      onMouseEnter={prefetchHref}
-      onFocus={prefetchHref}
+      onClick={openPreviewModal}
       style={{ willChange: "transform, opacity", transformOrigin }}
     >
       {/* Backdrop de 16:9 */}
@@ -2147,33 +2065,7 @@ function InlinePreviewCardAnticipated({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
       >
-        <div className="h-full flex items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            {/* META NUEVA SOLO PARA MÁS ESPERADAS */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-neutral-200">
-              <span className="font-semibold text-white">{releaseText}</span>
-              {extras?.runtime && (
-                <span className="text-neutral-300">• {formatRuntime(extras.runtime)}</span>
-              )}
-              {extras?.country && (
-                <span className="text-neutral-300">• {extras.country}</span>
-              )}
-            </div>
-
-            {genres && (
-              <div className="mt-0.5 text-[11px] sm:text-xs text-neutral-100/90 line-clamp-1">
-                {genres}
-              </div>
-            )}
-
-            {error && (
-              <p className="mt-0.5 text-[11px] text-red-400 line-clamp-1">
-                {error}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
+        <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
             <LiquidButton
               onClick={handleToggleTrailer}
               loading={trailerLoading}
@@ -2181,6 +2073,7 @@ function InlinePreviewCardAnticipated({
               activeColor="yellow"
               groupId="dashboard-preview-actions"
               title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+              aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
               className="!h-9 !w-9 !bg-white !text-black [&_svg]:!h-5 [&_svg]:!w-5"
             >
               {showTrailer ? (
@@ -2197,6 +2090,7 @@ function InlinePreviewCardAnticipated({
               activeColor="red"
               groupId="dashboard-preview-actions"
               title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+              aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
               className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
             >
               <Heart className={favorite ? "fill-current" : ""} />
@@ -2209,27 +2103,59 @@ function InlinePreviewCardAnticipated({
               activeColor="blue"
               groupId="dashboard-preview-actions"
               title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+              aria-label={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
               className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
             >
               <BookmarkPlus className={watchlist ? "fill-current" : ""} />
             </LiquidButton>
 
-            {openDetailModal && (
-              <LiquidButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openDetailModal(movie);
-                }}
-                groupId="dashboard-preview-actions"
-                title="Ver detalles"
-                aria-label="Ver detalles"
-                className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
-              >
-                <ChevronDown />
-              </LiquidButton>
-            )}
-          </div>
         </div>
+
+        <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
+          {(() => {
+            const parts = [];
+            if (yearOf(movie)) parts.push(<span key="year">{yearOf(movie)}</span>);
+            if (hasTmdbRating)
+              parts.push(
+                <span key="tmdb" className="inline-flex items-center gap-1.5">
+                  <NextImage
+                    src="/logo-TMDb.png"
+                    alt="TMDb"
+                    width={2560}
+                    height={1846}
+                    sizes="28px"
+                    className="h-2.5 w-auto"
+                    loading="lazy"
+                  />
+                  <span className="font-bold">{tmdbRating}</span>
+                </span>,
+              );
+            return parts.reduce((acc, part, index) => {
+              if (index === 0) return [part];
+              return [
+                ...acc,
+                <span
+                  key={`sep-${index}`}
+                  className="select-none text-[0.8em] font-bold text-zinc-500/70"
+                  aria-hidden="true"
+                >
+                  •
+                </span>,
+                part,
+              ];
+            }, []);
+          })()}
+        </div>
+
+        <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
+          {genres && <span className="truncate">{genres}</span>}
+        </div>
+
+        {error && (
+          <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
+            {error}
+          </p>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -2456,6 +2382,7 @@ function Row({
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
   const hoverIntentRef = useRef(0);
+  const { openDetailModal } = useDetailModal();
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -2704,10 +2631,13 @@ function Row({
       ref={rowRef}
       {...revealProps}
       variants={fadeInUp}
-      // En "Más esperadas" la vista previa se superpone fuera de la fila, así
-      // que NO usamos `sv-deferred-row` (content-visibility recortaría el
-      // overflow del popover por arriba/abajo). El resto de filas sí lo usan.
-      className={`relative group ${previewKind === "anticipated" ? "" : "sv-deferred-row"}`}
+      // Las previews superpuestas no pueden convivir con `content-visibility`:
+      // el navegador puede recortar el popover al límite de la sección.
+      className={`relative group ${
+        previewKind === "anticipated" || hasActivePreview
+          ? ""
+          : "sv-deferred-row"
+      }`}
     >
       {!hideTitle && (
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
@@ -2772,8 +2702,14 @@ function Row({
                 : false
             }
             modules={[Navigation, FreeMode]}
-            className={`group relative ${previewKind === "anticipated" ? "!py-20 sm:!py-24 md:!py-28 !-my-20 sm:!-my-24 md:!-my-28" : ""}`}
-            wrapperClass={previewKind === "anticipated" ? "flex items-center" : ""}
+            className={`group relative ${
+              previewKind === "anticipated"
+                ? "!py-20 sm:!py-24 md:!py-28 !-my-20 sm:!-my-24 md:!-my-28"
+                : hasActivePreview
+                  ? "!overflow-visible"
+                  : ""
+            }`}
+            wrapperClass={previewKind === "anticipated" || hasActivePreview ? "flex items-center" : ""}
             breakpoints={breakpointsRow}
           >
             {normalizedItems.map((m, i) => {
@@ -2794,10 +2730,13 @@ function Row({
               const base =
                 "relative flex-shrink-0 transition-all duration-300 ease-in-out";
 
+              const isStandardPopoverPreview =
+                isActive && previewKind !== "anticipated" && !isSpotlight;
+
               const sizeClasses = isMobile
                 ? "w-full"
                 : (isActive && previewKind !== "anticipated")
-                  ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
+                  ? `${isSpotlight ? spotlightPreviewWidthClass : normalPosterWidthClass} z-20`
                   : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
               // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
               // en la vista previa destacada. Si la activa usa una altura
@@ -2818,7 +2757,13 @@ function Row({
 
               // Determinar si el item activo está cerca del borde y calcular transformación
               let transformClass = "";
-              if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0 && previewKind !== "anticipated") {
+              if (
+                !isMobile &&
+                hoveredIndex !== null &&
+                hoveredIndex >= 0 &&
+                previewKind !== "anticipated" &&
+                isSpotlight
+              ) {
                 const activeIndex = hoveredIndex;
                 const totalItems = normalizedItems.length;
 
@@ -2872,6 +2817,19 @@ function Row({
                 ? (isActive ? "!relative !z-[100] !overflow-visible" : isAnimatingOut ? "!relative !z-[50] !overflow-visible" : "!relative !z-10")
                 : (isActive ? "!relative !z-20 !overflow-visible" : "!relative !z-10");
 
+              let standardPreviewAlignmentClass = "left-1/2";
+              let standardPreviewX = "-50%";
+              let standardPreviewTransformOrigin = "center center";
+              if (hoveredAlignment === "left") {
+                standardPreviewAlignmentClass = "left-0";
+                standardPreviewX = "0%";
+                standardPreviewTransformOrigin = "left center";
+              } else if (hoveredAlignment === "right") {
+                standardPreviewAlignmentClass = "right-0";
+                standardPreviewX = "0%";
+                standardPreviewTransformOrigin = "right center";
+              }
+
               return (
                 <SwiperSlide
                   key={itemKey}
@@ -2907,23 +2865,54 @@ function Row({
                             activeIndex={activeIndex}
                             alignment={hoveredAlignment}
                           />
-                        ) : (
-                          <motion.div
-                            key="preview-normal"
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{
-                              opacity: 0,
-                              scale: 0.95,
-                              transition: { duration: 0.12 },
-                            }}
-                            transition={{
-                              duration: 0.25,
-                              ease: [0.4, 0, 0.2, 1],
-                            }}
-                            className="hidden sm:block w-full h-full"
-                            style={{ willChange: "transform, opacity" }}
-                          >
+                          ) : (
+                            <motion.div
+                              key="preview-normal"
+                              initial={
+                                isStandardPopoverPreview
+                                  ? {
+                                      opacity: 0,
+                                      scale: 0.92,
+                                      x: standardPreviewX,
+                                      y: "-50%",
+                                    }
+                                  : { opacity: 0, scale: 0.98 }
+                              }
+                              animate={
+                                isStandardPopoverPreview
+                                  ? {
+                                      opacity: 1,
+                                      scale: 1,
+                                      x: standardPreviewX,
+                                      y: "-50%",
+                                    }
+                                  : { opacity: 1, scale: 1 }
+                              }
+                              exit={{
+                                opacity: 0,
+                                scale: isStandardPopoverPreview ? 0.92 : 0.95,
+                                ...(isStandardPopoverPreview
+                                  ? { x: standardPreviewX, y: "-50%" }
+                                  : {}),
+                                transition: { duration: 0.12 },
+                              }}
+                              transition={{
+                                duration: 0.25,
+                                ease: [0.4, 0, 0.2, 1],
+                              }}
+                              className={
+                                isStandardPopoverPreview
+                                  ? `absolute top-1/2 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} z-[80] hidden sm:block`
+                                  : "hidden sm:block h-full w-full"
+                              }
+                              style={{
+                                willChange: "transform, opacity",
+                                transformOrigin:
+                                  isStandardPopoverPreview
+                                    ? standardPreviewTransformOrigin
+                                    : undefined,
+                              }}
+                            >
                             <InlinePreviewCard
                               movie={m}
                               heightClass={
@@ -2955,9 +2944,11 @@ function Row({
                           className="w-full h-full"
                           style={{ willChange: "transform, opacity" }}
                         >
-                          <Link
-                            href={`/details/${m.media_type === "tv" || (m.name && !m.title) || m.first_air_date ? "tv" : "movie"}/${m.id}`}
-                            prefetch={false}
+                          <button
+                            type="button"
+                            className="block h-full w-full cursor-pointer text-left"
+                            onClick={() => openDetailModal?.(m)}
+                            aria-label={`Abrir vista previa de ${m.title || m.name || "este título"}`}
                           >
                             <PosterImage
                               movie={m}
@@ -2966,7 +2957,7 @@ function Row({
                               isMobile={isMobile}
                               posterOverride={posterOverride}
                             />
-                          </Link>
+                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -3030,6 +3021,8 @@ function Row({
 }
 
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
+  const { openDetailModal } = useDetailModal();
+
   if (!items || items.length === 0) return null;
 
   // Etiqueta superior representativa (centralizada): todas las filas la tienen.
@@ -3099,10 +3092,9 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
           breakpoints={breakpointsRow}
           className="group relative"
         >
-          {items.map((m) => {
-            const type = m?.media_type || "movie";
-            const href = `/details/${type}/${m.id}`;
-            const poster = m?.poster_path
+            {items.map((m) => {
+              const type = m?.media_type || "movie";
+              const poster = m?.poster_path
               ? buildImg(m.poster_path, "w342")
               : "/default-poster.png";
 
@@ -3114,8 +3106,13 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
                 <div
                   className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${isMobile ? "w-full" : "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]"} ${posterBoxClass}`}
                 >
-                  <Link href={href}>
-                    <div className="w-full h-full">
+                    <button
+                      type="button"
+                      className="block h-full w-full cursor-pointer text-left"
+                      onClick={() => openDetailModal?.(m)}
+                      aria-label={`Abrir vista previa de ${m.title || m.name || "este título"}`}
+                    >
+                      <div className="w-full h-full">
                       <NextImage
                         src={poster}
                         alt={m.title || m.name || ""}
@@ -3132,8 +3129,8 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
                         )}
                         <span className="line-clamp-1">{formatMeta(m)}</span>
                       </div>
-                    </div>
-                  </Link>
+                      </div>
+                    </button>
                 </div>
               </SwiperSlide>
             );
@@ -3394,6 +3391,7 @@ function TopRatedHero({
   backdropOverrides,
 }) {
   const [activeTab, setActiveTab] = useState("movies");
+  const { openDetailModal } = useDetailModal();
   const items = activeTab === "movies" ? movieItems : tvItems;
 
   if (
@@ -3629,20 +3627,30 @@ function TopRatedHero({
                     ? "tv"
                     : "movie";
 
-                if (!heroBackdrop) {
+                  if (!heroBackdrop) {
+                    return (
+                      <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
+                        <button
+                          type="button"
+                          className="block w-full cursor-pointer text-left"
+                          onClick={() => openDetailModal?.(movie)}
+                          aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
+                        >
+                          <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
+                        </button>
+                      </SwiperSlide>
+                    );
+                  }
+  
                   return (
                     <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
-                      <Link href={`/details/${mediaType}/${movie.id}`} prefetch={false}>
-                        <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
-                      </Link>
-                    </SwiperSlide>
-                  );
-                }
-
-                return (
-                  <SwiperSlide key={`${mediaType}:${movie.id}:${index}`} className={slideClass}>
-                    <Link href={`/details/${mediaType}/${movie.id}`} prefetch={false}>
-                      <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
+                      <button
+                        type="button"
+                        className="block w-full cursor-pointer text-left"
+                        onClick={() => openDetailModal?.(movie)}
+                        aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
+                      >
+                        <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
                         <NextImage
                           src={buildImg(heroBackdrop, "w780")}
                           alt=""
@@ -3690,11 +3698,11 @@ function TopRatedHero({
                             }
                           />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
-                      </motion.div>
-                    </Link>
-                  </SwiperSlide>
-                );
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/hero:opacity-100 transition-opacity duration-300" />
+                        </motion.div>
+                      </button>
+                    </SwiperSlide>
+                  );
               })}
             </Swiper>
           </div>

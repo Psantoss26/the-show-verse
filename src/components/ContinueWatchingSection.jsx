@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, BookmarkPlus, Play, Award, CalendarDays, ChevronRight, ChevronDown } from "lucide-react";
+import { Heart, BookmarkPlus, Play, Award, CalendarDays, ChevronRight } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { getLocalInProgress } from "@/lib/api/progressClient";
@@ -1330,7 +1330,7 @@ function ContinueWatchingPreviewCard({
       // El ancho se calcula según las tarjetas visibles del breakpoint activo:
       // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
       className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
-      onClick={() => router.push(href)}
+      onClick={() => openDetailModal?.(show)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
         prefetchHref();
@@ -1565,20 +1565,6 @@ function ContinueWatchingPreviewCard({
             <BookmarkPlus className={watchlist ? "fill-current" : ""} />
           </LiquidButton>
 
-          {openDetailModal && (
-            <LiquidButton
-              onClick={(e) => {
-                e.stopPropagation();
-                openDetailModal(show);
-              }}
-              groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
-              title="Ver detalles"
-              aria-label="Ver detalles"
-              className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-            >
-              <ChevronDown />
-            </LiquidButton>
-          )}
         </div>
 
         {/* Premios — hueco reservado (min-height) para que la carga tardía de
@@ -1708,7 +1694,7 @@ function ContinueWatchingSection({
   mode = "continue",
 }) {
   const { authenticated, hydrated: authReady } = useAuth();
-  const router = useRouter();
+  const { openDetailModal } = useDetailModal();
   // Igual que las demás filas: oculta al cargar, se revela con animación al
   // hacer scroll y entrar en la ventana.
   const revealProps = useScrollRevealProps();
@@ -2184,11 +2170,11 @@ function ContinueWatchingSection({
                             scale: 0.98,
                             transition: { duration: 0.12 },
                           }}
-                          transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-                          className="h-full w-full cursor-pointer"
-                          style={{ willChange: "transform, opacity" }}
-                          onClick={() => router.push(nextEpisodeHref(show))}
-                        >
+                            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                            className="h-full w-full cursor-pointer"
+                            style={{ willChange: "transform, opacity" }}
+                            onClick={() => openDetailModal?.(show)}
+                          >
                           <ContinueWatchingBaseCard show={show} mode={mode} />
                         </motion.div>
                       )}

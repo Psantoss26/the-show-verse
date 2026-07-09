@@ -8,8 +8,9 @@
 // pestañas Detalles/Producción/Sinopsis/Premios, reparto, similares y
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import {
@@ -34,6 +35,8 @@ import {
   Info,
   Users,
   ListPlus,
+  ImageOff,
+  ChevronDown,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -50,12 +53,14 @@ import {
   getMediaTypeForItem,
   getBestTrailerCached,
 } from "@/lib/dashboard/media";
+import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import {
   formatCountShort,
+  formatDateEs,
   slugifyForSeriesGraph,
 } from "@/lib/details/formatters";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
@@ -119,6 +124,33 @@ async function fetchResolvedExternalLink(url, { signal } = {}) {
   return json?.url || null;
 }
 
+const modalSeasonCache = new Map();
+
+async function fetchModalSeasonEpisodes({ showId, seasonNumber, signal }) {
+  const cacheKey = `${showId}:${seasonNumber}`;
+  if (modalSeasonCache.has(cacheKey)) {
+    return modalSeasonCache.get(cacheKey);
+  }
+
+  const response = await fetch(
+    `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(
+      seasonNumber,
+    )}`,
+    { signal, cache: "no-store" },
+  );
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(json?.error || `Request failed: ${response.status}`);
+  }
+  modalSeasonCache.set(cacheKey, json);
+  return json;
+}
+
+function normalizeSeasonNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 /* =============================== ANIMACIÓN =============================== */
 const backdropVariants = {
   hidden: { opacity: 0 },
@@ -177,6 +209,34 @@ export default function DetailModal({ item, onClose }) {
   const title = data.title || item?.title || item?.name || "";
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
   const heroSrc = backdropPath ? buildImg(backdropPath, "w1280") : null;
+  const seasonSelectId = useId();
+  const availableSeasons = useMemo(() => {
+    const source = Array.isArray(data.seasons) ? data.seasons : [];
+    return source
+      .map((season) => ({
+        ...season,
+        season_number: normalizeSeasonNumber(season?.season_number),
+        episode_count: Number(season?.episode_count || 0),
+      }))
+      .filter(
+        (season) =>
+          season.season_number != null &&
+          season.season_number > 0 &&
+          season.episode_count > 0,
+      )
+      .sort((a, b) => a.season_number - b.season_number);
+  }, [data.seasons]);
+  const availableSeasonsKey = useMemo(
+    () => availableSeasons.map((season) => season.season_number).join(","),
+    [availableSeasons],
+  );
+  const preferredSeasonNumber = normalizeSeasonNumber(item?.nextEpisode?.season);
+  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(null);
+  const [seasonPreview, setSeasonPreview] = useState({
+    loading: false,
+    error: "",
+    data: null,
+  });
 
   /* --------------------------- favorito / pendientes --------------------------- */
   const [favorite, setFavorite] = useState(false);
@@ -232,6 +292,71 @@ export default function DetailModal({ item, onClose }) {
       cancel = true;
     };
   }, [item, session, account, mediaType]);
+
+  useEffect(() => {
+    if (mediaType !== "tv" || availableSeasons.length === 0) {
+      setSelectedSeasonNumber(null);
+      return;
+    }
+
+    const preferred =
+      preferredSeasonNumber != null &&
+      availableSeasons.some(
+        (season) => season.season_number === preferredSeasonNumber,
+      )
+        ? preferredSeasonNumber
+        : availableSeasons[0].season_number;
+
+    setSelectedSeasonNumber((current) =>
+      availableSeasons.some((season) => season.season_number === current)
+        ? current
+        : preferred,
+    );
+  }, [
+    mediaType,
+    availableSeasons,
+    availableSeasonsKey,
+    preferredSeasonNumber,
+    item?.id,
+  ]);
+
+  useEffect(() => {
+    if (mediaType !== "tv" || !item?.id || selectedSeasonNumber == null) {
+      setSeasonPreview({ loading: false, error: "", data: null });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const showId = Number(item.id);
+    const cacheKey = `${showId}:${selectedSeasonNumber}`;
+    const cached = modalSeasonCache.get(cacheKey);
+    if (cached) {
+      setSeasonPreview({ loading: false, error: "", data: cached });
+      return undefined;
+    }
+
+    setSeasonPreview({ loading: true, error: "", data: null });
+    fetchModalSeasonEpisodes({
+      showId,
+      seasonNumber: selectedSeasonNumber,
+      signal: controller.signal,
+    })
+      .then((seasonData) => {
+        if (!controller.signal.aborted) {
+          setSeasonPreview({ loading: false, error: "", data: seasonData });
+        }
+      })
+      .catch((err) => {
+        if (err?.name === "AbortError" || controller.signal.aborted) return;
+        setSeasonPreview({
+          loading: false,
+          error: "No se pudieron cargar los episodios.",
+          data: null,
+        });
+      });
+
+    return () => controller.abort();
+  }, [mediaType, item?.id, selectedSeasonNumber]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -761,7 +886,7 @@ export default function DetailModal({ item, onClose }) {
 
   /* ------------------------------ ficha completa ------------------------------ */
   const goToFullDetails = () => {
-    router.push(`/details/${mediaType}/${item.id}`);
+    router.push(dashboardDetailHref(item, mediaType));
     onClose();
   };
 
@@ -1022,6 +1147,31 @@ export default function DetailModal({ item, onClose }) {
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
+  const selectedSeasonMeta = availableSeasons.find(
+    (season) => season.season_number === selectedSeasonNumber,
+  );
+  const selectedSeasonEpisodes = useMemo(() => {
+    const episodes = Array.isArray(seasonPreview.data?.episodes)
+      ? seasonPreview.data.episodes
+      : [];
+    return episodes
+      .filter((episode) => Number.isFinite(Number(episode?.episode_number)))
+      .sort((a, b) => Number(a.episode_number) - Number(b.episode_number));
+  }, [seasonPreview.data]);
+  const showSeasonsSection =
+    mediaType === "tv" && availableSeasons.length > 0 && item?.id;
+  const seasonTitle =
+    seasonPreview.data?.name ||
+    selectedSeasonMeta?.name ||
+    (selectedSeasonNumber != null ? `Temporada ${selectedSeasonNumber}` : "");
+  const prefetchEpisodeDetails = (episodeNumber) => {
+    if (!item?.id || selectedSeasonNumber == null || !episodeNumber) return;
+    const href = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
+    router.prefetch(href);
+    if (typeof window !== "undefined") {
+      fetch(href, { priority: "low" }).catch(() => {});
+    }
+  };
 
   return (
     <div
@@ -1578,6 +1728,164 @@ export default function DetailModal({ item, onClose }) {
                     </div>
                   )}
                 </div>
+              </motion.section>
+            )}
+
+            {showSeasonsSection && (
+              <motion.section
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-15px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-4 pb-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    <Layers className="h-4 w-4" aria-hidden="true" />
+                    Temporadas
+                  </h3>
+
+                  <div className="relative w-full sm:w-auto">
+                    <label className="sr-only" htmlFor={seasonSelectId}>
+                      Seleccionar temporada
+                    </label>
+                    <select
+                      id={seasonSelectId}
+                      value={selectedSeasonNumber ?? ""}
+                      onChange={(event) =>
+                        setSelectedSeasonNumber(Number(event.target.value))
+                      }
+                      className="h-10 w-full appearance-none rounded-full border border-white/10 bg-black/35 px-4 pr-10 text-xs font-bold uppercase tracking-wide text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] outline-none transition hover:border-white/20 focus-visible:border-yellow-400/50 focus-visible:ring-2 focus-visible:ring-yellow-400/20 sm:min-w-[190px]"
+                    >
+                      {availableSeasons.map((season) => (
+                        <option
+                          key={season.season_number}
+                          value={season.season_number}
+                        >
+                          Temporada {season.season_number}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-zinc-400">
+                  <span className="text-white">{seasonTitle}</span>
+                  {selectedSeasonMeta?.episode_count ? (
+                    <>
+                      <span className="text-zinc-600" aria-hidden="true">
+                        •
+                      </span>
+                      <span>{selectedSeasonMeta.episode_count} episodios</span>
+                    </>
+                  ) : null}
+                </div>
+
+                {seasonPreview.loading ? (
+                  <div className="flex gap-3 overflow-hidden pb-2">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="w-[78%] shrink-0 sm:w-[46%] lg:w-[32%]"
+                      >
+                        <SkeletonBar className="aspect-video h-auto rounded-xl" />
+                        <SkeletonBar className="mt-3 h-3 w-4/5 rounded-full" />
+                        <SkeletonBar className="mt-2 h-3 w-2/3 rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                ) : seasonPreview.error ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
+                    {seasonPreview.error}
+                  </div>
+                ) : selectedSeasonEpisodes.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
+                    No hay episodios disponibles para esta temporada.
+                  </div>
+                ) : (
+                  <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {selectedSeasonEpisodes.map((episode) => {
+                      const episodeNumber = Number(episode?.episode_number);
+                      const episodeTitle =
+                        episode?.name || `Episodio ${episodeNumber}`;
+                      const episodeAirDate = episode?.air_date
+                        ? formatDateEs(episode.air_date)
+                        : null;
+                      const episodeRuntime =
+                        Number(episode?.runtime || 0) || null;
+                      const episodeStill = episode?.still_path
+                        ? buildImg(episode.still_path, "w780")
+                        : null;
+                      const episodeHref = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
+
+                      return (
+                        <Link
+                          key={`${selectedSeasonNumber}-${episodeNumber}`}
+                          href={episodeHref}
+                          prefetch={false}
+                          onMouseEnter={() =>
+                            prefetchEpisodeDetails(episodeNumber)
+                          }
+                          onFocus={() => prefetchEpisodeDetails(episodeNumber)}
+                          onTouchStart={() =>
+                            prefetchEpisodeDetails(episodeNumber)
+                          }
+                          className="group block w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-black/25 text-left transition hover:border-yellow-400/30 hover:bg-black/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40 sm:w-[46%] lg:w-[32%]"
+                          title={episodeTitle}
+                        >
+                          <div className="relative aspect-video overflow-hidden bg-white/[0.04]">
+                            {episodeStill ? (
+                              <NextImage
+                                src={episodeStill}
+                                alt={episodeTitle}
+                                fill
+                                sizes="(min-width:1024px) 300px, (min-width:640px) 46vw, 78vw"
+                                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+                                <ImageOff className="h-7 w-7" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent opacity-90" />
+                            <div className="absolute inset-x-0 bottom-0 p-3">
+                              <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">
+                                Episodio {episodeNumber}
+                              </div>
+                              <div className="mt-0.5 line-clamp-2 text-sm font-extrabold leading-snug text-white">
+                                {episodeTitle}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2 p-3">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-zinc-400">
+                              {episodeAirDate ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Calendar className="h-3.5 w-3.5" />
+                                  {episodeAirDate}
+                                </span>
+                              ) : null}
+                              {episodeRuntime ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {episodeRuntime} min
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-zinc-300">
+                              {episode?.overview?.trim() || "Sin descripción."}
+                            </p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </motion.section>
             )}
           </div>

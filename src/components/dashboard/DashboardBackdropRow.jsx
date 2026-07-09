@@ -19,7 +19,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
-import { useRouter } from "next/navigation";
 import {
   Play,
   Heart,
@@ -27,7 +26,6 @@ import {
   X,
   Award,
   ChevronRight,
-  ChevronDown,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -106,9 +104,6 @@ const dashboardPreviewBackdropFadeStyle = {
 };
 
 /* =================== HELPERS =================== */
-const detailsHref = (item) =>
-  `/details/${getMediaTypeForItem(item)}/${item?.id}`;
-
 const genresText = (item) => {
   const ids =
     item?.genre_ids ||
@@ -267,7 +262,6 @@ function BackdropPreviewCard({
   onPreviewMouseLeave,
 }) {
   const { session, account } = useAuth();
-  const router = useRouter();
   const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(item);
   const { backdropPath } = useItemBackdrop(item, backdropOverride);
@@ -292,9 +286,6 @@ function BackdropPreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
-
-  const prefetchedRef = useRef(false);
-  const href = detailsHref(item);
 
   // Estado favorito/pendientes en el backend.
   useEffect(() => {
@@ -413,12 +404,6 @@ function BackdropPreviewCard({
       abort = true;
     };
   }, [item, mediaType]);
-
-  const prefetchHref = () => {
-    if (prefetchedRef.current) return;
-    prefetchedRef.current = true;
-    router.prefetch(href);
-  };
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -573,13 +558,11 @@ function BackdropPreviewCard({
       }}
       transition={{ type: "spring", stiffness: 180, damping: 20, mass: 0.8 }}
       className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414]/95 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
-      onClick={() => router.push(href)}
+      onClick={() => openDetailModal?.(item)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
-        prefetchHref();
       }}
       onMouseLeave={onPreviewMouseLeave}
-      onFocus={prefetchHref}
       style={{
         width: previewMaxWidth,
         willChange: "transform, opacity",
@@ -659,20 +642,13 @@ function BackdropPreviewCard({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
       </div>
 
-      {/* Panel de info: logo/título · metadatos · acciones */}
+      {/* Panel de info: acciones · metadatos */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        <div className="mb-2.5 min-w-0">
-          {/* Título en texto normal (como en "Continuar viendo"), sin logo. */}
-          <h3 className="truncate text-base font-black leading-tight text-white sm:text-lg">
-            {title}
-          </h3>
-        </div>
-
         {/* Fila de acciones: trailer + favorito + pendientes */}
         <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
           <LiquidButton
@@ -715,25 +691,10 @@ function BackdropPreviewCard({
             <BookmarkPlus className={watchlist ? "fill-current" : ""} />
           </LiquidButton>
 
-          {openDetailModal && (
-            <LiquidButton
-              onClick={(e) => {
-                e.stopPropagation();
-                openDetailModal(item);
-              }}
-              groupId="dashboard-backdrop-actions"
-              title="Ver detalles"
-              aria-label="Ver detalles"
-              className={previewBtnClass}
-            >
-              <ChevronDown />
-            </LiquidButton>
-          )}
         </div>
 
-        {/* Premios (hueco reservado para que la carga tardía no dé saltos) */}
-        <div className="mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
-          {extras?.awards && (
+        {extras?.awards && (
+          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
             <motion.span
               key={extras.awards}
               initial={{ opacity: 0 }}
@@ -744,8 +705,8 @@ function BackdropPreviewCard({
               <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="line-clamp-1">{extras.awards}</span>
             </motion.span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Metadatos: año · duración/temporadas · nota TMDb · nota IMDb */}
         <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
@@ -835,7 +796,7 @@ export default function DashboardBackdropRow({
   hydrated,
   backdropOverrides = {},
 }) {
-  const router = useRouter();
+  const { openDetailModal } = useDetailModal();
   const revealProps = useScrollRevealProps();
 
   const swiperRef = useRef(null);
@@ -1112,11 +1073,11 @@ export default function DashboardBackdropRow({
                           transition={{
                             duration: 0.18,
                             ease: [0.4, 0, 0.2, 1],
-                          }}
-                          className="h-full w-full cursor-pointer"
-                          style={{ willChange: "transform, opacity" }}
-                          onClick={() => router.push(detailsHref(item))}
-                        >
+                            }}
+                            className="h-full w-full cursor-pointer"
+                            style={{ willChange: "transform, opacity" }}
+                            onClick={() => openDetailModal?.(item)}
+                          >
                           <BackdropBaseCard
                             item={item}
                             backdropOverride={backdropOverride}
