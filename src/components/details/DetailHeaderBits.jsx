@@ -310,15 +310,19 @@ export function ActionShareButton({ title, text, url }) {
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden rounded-xl border border-transparent bg-white/[0.06] bg-gradient-to-br from-white/15 via-white/[0.07] to-white/[0.03] p-0 text-zinc-200 leading-none shadow-[0_10px_30px_-12px_rgba(0,0,0,0.55)] backdrop-blur-[50px] transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2"
+      className="group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:bg-white/[0.08] hover:text-white hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2"
       aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
     >
+      <div
+        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+      />
       {copied ? (
-        <Check className="block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
+        <Check className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
       ) : (
-        <Share2 className="block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
+        <Share2 className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
       )}
-      <span className="hidden sm:block text-sm font-medium">
+      <span className="relative z-10 hidden sm:block text-sm font-medium">
         {copied ? "Copiado" : "Compartir"}
       </span>
       <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/share:scale-100 group-hover/share:opacity-100 group-hover/share:delay-[2000ms] sm:hidden">

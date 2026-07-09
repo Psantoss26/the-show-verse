@@ -1450,7 +1450,7 @@ function ViewModeControl({ value, onChange }) {
   ];
 
   return (
-    <div className="inline-flex h-9 items-center rounded-full border border-white/5 p-0.5 gap-0 bg-gradient-to-br from-white/5 via-transparent to-black/35 backdrop-blur-md shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.08)]">
+    <div className="inline-flex h-9 items-center rounded-full border border-transparent p-0.5 gap-0 bg-white/[0.035] backdrop-blur-sm shadow-none">
       {options.map((opt) => {
         const active = opt.id === value;
         const Icon = opt.icon;
@@ -1462,17 +1462,19 @@ function ViewModeControl({ value, onChange }) {
             onClick={() => onChange(opt.id)}
             aria-pressed={active}
             className={`
-              h-7 rounded-full px-3 text-[11px] font-bold uppercase tracking-wider
+              h-7 rounded-full px-3 text-[11px] font-bold uppercase tracking-wider leading-none
               inline-flex items-center gap-1.5 transition-all duration-200 focus:outline-none
               ${
                 active
-                  ? "bg-gradient-to-br from-white/15 to-white/5 text-white font-extrabold border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_2px_rgba(0,0,0,0.2)]"
-                  : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+                  ? "bg-white/[0.075] text-white font-extrabold border border-transparent shadow-none"
+                  : "text-zinc-500 hover:bg-white/[0.045] hover:text-zinc-200 border border-transparent"
               }
             `}
           >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{opt.label}</span>
+            <Icon className="block h-3.5 w-3.5 shrink-0" />
+            <span className="hidden leading-none [text-box:trim-both_cap_alphabetic] sm:inline-flex">
+              {opt.label}
+            </span>
           </button>
         );
       })}
@@ -1498,10 +1500,10 @@ function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
           relative h-5 w-9 rounded-full transition-all duration-200 focus:outline-none backdrop-blur-sm
           ${
             disabled
-              ? "cursor-not-allowed border-white/5 bg-zinc-950"
+              ? "cursor-not-allowed bg-zinc-950/70"
               : checked
-                ? "border-emerald-500/30 bg-emerald-500/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(16,185,129,0.15)]"
-                : "border-white/10 bg-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                ? "bg-emerald-500/[0.12] shadow-none"
+                : "bg-white/[0.045] shadow-none"
           }
         `}
         aria-label={label}
@@ -1513,8 +1515,8 @@ function IconToggle({ icon: Icon, label, checked, onChange, disabled }) {
             transition-all duration-200
             ${
               checked
-                ? "translate-x-4 bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
-                : "translate-x-0 bg-white"
+                ? "translate-x-4 bg-emerald-300 shadow-none"
+                : "translate-x-0 bg-white/80 shadow-none"
             }
           `}
         />
