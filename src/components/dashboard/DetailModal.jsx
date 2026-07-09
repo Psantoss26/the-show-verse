@@ -1180,57 +1180,81 @@ export default function DetailModal({ item, onClose }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <DetailActionsRow
-                onTrailer={handleToggleTrailer}
-                trailerAvailable
-                trailerLoading={trailerLoading}
-                onSoundtrack={openSoundtrack}
-                soundtrackAvailable={!!soundtrackSearchQuery}
-                onEpisodeRatings={
-                  mediaType === "tv"
-                    ? () => setEpisodeRatingsOpen(true)
-                    : undefined
-                }
-                episodeRatingsOpen={episodeRatingsOpen}
-                trakt={{
-                  connected: traktConnected || traktStatus.connected,
-                  // Series: el ojo refleja "algún episodio visto" (misma señal que
-                  // DetailsClient). Películas: estado de visionado del título.
-                  watched:
+              <div className="flex-1 min-w-0">
+                <DetailActionsRow
+                  onTrailer={handleToggleTrailer}
+                  trailerAvailable
+                  trailerLoading={trailerLoading}
+                  onSoundtrack={openSoundtrack}
+                  soundtrackAvailable={!!soundtrackSearchQuery}
+                  onEpisodeRatings={
                     mediaType === "tv"
-                      ? episodesWatched.hasAnyWatchedEpisode(
-                          episodesWatched.watchedBySeason,
-                        )
-                      : traktStatus.watched,
-                  // Para series no mostramos recuento de plays en el ojo (igual que
-                  // DetailsClient, que allí usa un badge de progreso %).
-                  plays: mediaType === "tv" ? 0 : traktStatus.plays,
-                  badge: null,
-                  busy: !!traktBusy,
-                  loading: traktStatusLoading,
-                  onOpen: openTraktWatched,
-                }}
-                rate={{
-                  rating: ratingActionValue,
-                  max: 10,
-                  loading: ratingActionLoading,
-                  onRate: handleRate,
-                  connected: ratingActionConnected,
-                  onConnect: () => requireLogin(),
-                }}
-                favorite={favorite}
-                favoriteLoading={loadingStates || updating}
-                onToggleFavorite={handleToggleFavorite}
-                watchlist={watchlist}
-                watchlistLoading={loadingStates || updating}
-                onToggleWatchlist={handleToggleWatchlist}
-                onAddToList={openListsModal}
-                listActive={Object.values(membershipMap || {}).some(Boolean)}
-                showComments={traktConnected || traktStatus.connected}
-                commentsActive={false}
-                onComments={() => setCommentModalOpen(true)}
-              />
+                      ? () => setEpisodeRatingsOpen(true)
+                      : undefined
+                  }
+                  episodeRatingsOpen={episodeRatingsOpen}
+                  trakt={{
+                    connected: traktConnected || traktStatus.connected,
+                    // Series: el ojo refleja "algún episodio visto" (misma señal que
+                    // DetailsClient). Películas: estado de visionado del título.
+                    watched:
+                      mediaType === "tv"
+                        ? episodesWatched.hasAnyWatchedEpisode(
+                            episodesWatched.watchedBySeason,
+                          )
+                        : traktStatus.watched,
+                    // Para series no mostramos recuento de plays en el ojo (igual que
+                    // DetailsClient, que allí usa un badge de progreso %).
+                    plays: mediaType === "tv" ? 0 : traktStatus.plays,
+                    badge: null,
+                    busy: !!traktBusy,
+                    loading: traktStatusLoading,
+                    onOpen: openTraktWatched,
+                  }}
+                  rate={{
+                    rating: ratingActionValue,
+                    max: 10,
+                    loading: ratingActionLoading,
+                    onRate: handleRate,
+                    connected: ratingActionConnected,
+                    onConnect: () => requireLogin(),
+                  }}
+                  favorite={favorite}
+                  favoriteLoading={loadingStates || updating}
+                  onToggleFavorite={handleToggleFavorite}
+                  watchlist={watchlist}
+                  watchlistLoading={loadingStates || updating}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onAddToList={openListsModal}
+                  listActive={Object.values(membershipMap || {}).some(Boolean)}
+                  showComments={traktConnected || traktStatus.connected}
+                  commentsActive={false}
+                  onComments={() => setCommentModalOpen(true)}
+                />
+              </div>
+
+              {hasProviders && (
+                <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+                  {streamingProviders.map((prov) => (
+                    <a
+                      key={prov.key}
+                      href={prov.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={prov.title}
+                      className="transition-transform duration-300 hover:scale-110 active:scale-95 shrink-0"
+                    >
+                      <img
+                        src={prov.icon}
+                        alt={prov.title}
+                        className="h-11 w-11 rounded-xl object-contain shadow-lg"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
             </motion.div>
 
             {/* Premios / nominaciones: misma línea verde que las previews del
@@ -1279,7 +1303,7 @@ export default function DetailModal({ item, onClose }) {
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
-            {(hasRatings || hasProviders || hasExternalLinks) && (
+            {(hasRatings || hasExternalLinks) && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -1333,7 +1357,7 @@ export default function DetailModal({ item, onClose }) {
                       : null
                   }
                   externalLinks={externalLinks}
-                  streamingProviders={streamingProviders}
+                  streamingProviders={[]}
                   onMoreLinks={() => setExternalLinksOpen(true)}
                   share={{
                     title,
