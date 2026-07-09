@@ -19,6 +19,7 @@ import {
   BookmarkPlus,
   ArrowUpRight,
   Trophy,
+  Award,
   ThumbsUp,
   ThumbsDown,
   Sparkles,
@@ -52,12 +53,10 @@ import {
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
-import {
-  UnifiedRateButton,
-  ActionShareButton,
-} from "@/components/details/DetailHeaderBits";
+import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import { formatCountShort } from "@/lib/details/formatters";
+import { formatDashboardAwards } from "@/lib/details/awardsText";
 import AddToListModal from "@/components/details/AddToListModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 // Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
@@ -447,7 +446,7 @@ export default function DetailModal({ item, onClose }) {
         animate="visible"
         exit="exit"
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 mt-[4vh] flex h-[96vh] w-[94vw] max-w-[920px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+        className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1200px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
         {/* Botón superior derecho: abre la ficha completa */}
         <button
@@ -613,17 +612,19 @@ export default function DetailModal({ item, onClose }) {
                 <ListPlus />
               </LiquidButton>
 
-              {/* Compartir (Web Share API o copia el enlace) */}
-              <ActionShareButton
-                title={title}
-                text={`Echa un vistazo a ${title} en The Show Verse`}
-                url={
-                  typeof window !== "undefined" && item?.id
-                    ? `${window.location.origin}/details/${mediaType}/${item.id}`
-                    : undefined
-                }
-              />
             </div>
+
+            {/* Premios / nominaciones: misma línea verde que las previews del
+                dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
+                OMDb (data.awards) formateada con formatDashboardAwards. */}
+            {data.awards && (
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
+                <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="line-clamp-1">
+                  {formatDashboardAwards(data.awards)}
+                </span>
+              </div>
+            )}
 
             {error && (
               <p className="line-clamp-1 text-xs font-medium text-red-400">
@@ -690,6 +691,32 @@ export default function DetailModal({ item, onClose }) {
                     ? { value: Math.round(data.mcScore) }
                     : null
                 }
+                externalLinks={[
+                  {
+                    icon: "/logo-TMDb.png",
+                    title: "TMDb",
+                    href: `https://www.themoviedb.org/${
+                      mediaType === "tv" ? "tv" : "movie"
+                    }/${item?.id}`,
+                  },
+                  ...(data.imdbId
+                    ? [
+                        {
+                          icon: "/logo-IMDb.svg",
+                          title: "IMDb",
+                          href: `https://www.imdb.com/title/${data.imdbId}`,
+                        },
+                      ]
+                    : []),
+                ]}
+                share={{
+                  title,
+                  text: `Echa un vistazo a ${title} en The Show Verse`,
+                  url:
+                    typeof window !== "undefined" && item?.id
+                      ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                      : undefined,
+                }}
                 stats={scoreStats}
               >
                 {/* Plataformas de streaming disponibles */}

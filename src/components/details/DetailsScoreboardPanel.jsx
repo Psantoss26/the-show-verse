@@ -24,10 +24,15 @@
 // ficha: formatCountShort para los sub-labels). Las stats se formatean aquí con
 // formatShortNumber para garantizar que ambos consumidores rindan igual.
 
+import { Fragment } from "react";
 import { motion } from "framer-motion";
-import { Eye, Play, List, Heart } from "lucide-react";
+import { Eye, Play, List, Heart, MoreHorizontal } from "lucide-react";
 
-import { CompactBadge } from "@/components/details/DetailHeaderBits";
+import {
+  CompactBadge,
+  ExternalLinkButton,
+  ActionShareButton,
+} from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
@@ -234,8 +239,85 @@ export function DetailsStatsRow({ stats = null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Panel compuesto: contenedor + fila de ratings + fila de stats + `children`.
-// Reproduce la tarjeta de DetailsClient para usarse en el modal del dashboard.
+// C. Región de acciones de la barra: separador + enlaces externos + separador +
+//    botón de compartir. Markup VERBATIM del bloque original de DetailsClient.
+//    - `externalLinks`: array de descriptores { icon, href, title?, fallbackHref?,
+//       wrapperClassName?, key? }. Si está vacío/ausente no se pinta la región de
+//       enlaces (equivale al modo backdrop de DetailsClient).
+//    - `onMoreLinks`: callback del botón "..." móvil (solo se pinta si se pasa).
+//    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
+//       derecha con ml-auto (siempre visible si se pasa).
+// ---------------------------------------------------------------------------
+function DetailsToolbarActions({ externalLinks = null, onMoreLinks, share = null }) {
+  const hasExternalLinks =
+    Array.isArray(externalLinks) && externalLinks.length > 0;
+
+  return (
+    <>
+      {/* ========== Separador vertical 1 + ENLACES EXTERNOS + Separador 2 ========== */}
+      {hasExternalLinks && (
+        <>
+          <div className="w-px h-6 bg-white/35 shrink-0" />
+
+          <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
+            {/* Versión Desktop: iconos normales de enlaces externos */}
+            <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+              {externalLinks.map((link, i) => {
+                const key = link.key ?? `${link.icon}-${i}`;
+                const btn = (
+                  <ExternalLinkButton
+                    icon={link.icon}
+                    title={link.title}
+                    href={link.href}
+                    fallbackHref={link.fallbackHref}
+                  />
+                );
+                return link.wrapperClassName ? (
+                  <div key={key} className={link.wrapperClassName}>
+                    {btn}
+                  </div>
+                ) : (
+                  <Fragment key={key}>{btn}</Fragment>
+                );
+              })}
+            </div>
+
+            {/* Versión Móvil: botón "..." que abre modal de enlaces */}
+            {onMoreLinks && (
+              <button
+                type="button"
+                onClick={onMoreLinks}
+                className="sm:hidden flex isolate transform-gpu items-center justify-center w-10 h-10 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 transition-all duration-300 hover:text-white hover:bg-white/10"
+                title="Enlaces"
+                aria-label="Abrir enlaces externos"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+
+          <div className="hidden md:block w-px h-6 bg-white/35 shrink-0" />
+        </>
+      )}
+
+      {/* ========== Botón de Compartir (anclado a la derecha con ml-auto) ========== */}
+      {share && (
+        <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
+          <ActionShareButton
+            title={share.title}
+            text={share.text}
+            url={share.url}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Panel compuesto: contenedor + barra (ratings + enlaces/compartir) + stats +
+// `children`. Reproduce la tarjeta de DetailsClient; la usan tanto la ficha
+// (DetailsClient) como el modal del dashboard.
 // `children` se renderiza al final (p. ej. la fila de "plataformas disponibles").
 // ---------------------------------------------------------------------------
 export default function DetailsScoreboardPanel({
@@ -247,6 +329,9 @@ export default function DetailsScoreboardPanel({
   rt = null,
   mc = null,
   stats = null,
+  externalLinks = null,
+  onMoreLinks,
+  share = null,
   className = "",
   children = null,
 }) {
@@ -254,8 +339,11 @@ export default function DetailsScoreboardPanel({
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
+  const hasExternalLinks =
+    Array.isArray(externalLinks) && externalLinks.length > 0;
+  const hasToolbar = hasRatings || hasExternalLinks || !!share;
 
-  if (!hasRatings && !hasStats && !children) return null;
+  if (!hasToolbar && !hasStats && !children) return null;
 
   return (
     <div
@@ -268,7 +356,7 @@ export default function DetailsScoreboardPanel({
         }}
       />
 
-      {hasRatings && (
+      {hasToolbar && (
         <div
           className="
       relative z-10
@@ -288,6 +376,12 @@ export default function DetailsScoreboardPanel({
             imdb={imdb}
             rt={rt}
             mc={mc}
+          />
+
+          <DetailsToolbarActions
+            externalLinks={externalLinks}
+            onMoreLinks={onMoreLinks}
+            share={share}
           />
         </div>
       )}

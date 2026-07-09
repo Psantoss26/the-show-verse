@@ -89,7 +89,6 @@ import {
   Eye,
   LibraryBig,
   MessageSquare,
-  MoreHorizontal,
   SlidersHorizontal,
   BarChart3,
 } from "lucide-react";
@@ -215,14 +214,9 @@ import {
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import {
-  ExternalLinkButton,
   UnifiedRateButton,
-  ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
-import {
-  DetailsRatingsBadges,
-  DetailsStatsRow,
-} from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -9904,179 +9898,112 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Tarjeta compacta que muestra los ratings de diferentes plataformas
                 (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic) y estadísticas
                 de visualización (watchers, plays, lists, favorited) */}
-              <div
-                className={`relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[4px] ${
-                  isBackdropPoster ? "" : "mb-6"
-                }`}
-              >
-                <div
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                  style={{
-                    WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-                  }}
-                />
-                <div
-                  className="
-      relative z-10
-      py-3
-      pl-[calc(1rem+env(safe-area-inset-left))]
-      pr-[calc(1.25rem+env(safe-area-inset-right))]
-      sm:px-4
-      flex items-center gap-3 sm:gap-4
-      overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
-    "
-                >
-                  {/* ========== A. RATINGS - Puntuaciones de diferentes plataformas ========== */}
-                  {/* Fila de badges compactos (componente presentacional compartido con DetailModal) */}
-                  <DetailsRatingsBadges
-                    loading={tScoreboard.loading}
-                    tmdb={{
-                      value: data.vote_average?.toFixed(1),
-                      sub: formatCountShort(data.vote_count),
-                      href: tmdbDetailUrl,
-                    }}
-                    trakt={
-                      traktDecimal
-                        ? {
-                            value: traktDecimal,
-                            sub: tScoreboard.votes
-                              ? formatCountShort(tScoreboard.votes)
-                              : undefined,
-                            href: trakt?.traktUrl,
-                          }
-                        : null
-                    }
-                    traktPublic={
-                      !traktDecimal && !trakt?.connected && tScoreboard?.rating
-                        ? {
-                            value: Number(tScoreboard.rating).toFixed(1),
-                            sub: tScoreboard.votes
-                              ? formatCountShort(tScoreboard.votes)
-                              : undefined,
-                          }
-                        : null
-                    }
-                    imdb={
-                      extras.imdbRating
-                        ? {
-                            value: Number(extras.imdbRating).toFixed(1),
-                            sub: formatCountShort(extras.imdbVotes),
-                            href: resolvedImdbId
-                              ? `https://www.imdb.com/title/${resolvedImdbId}`
-                              : undefined,
-                          }
-                        : null
-                    }
-                    rt={
-                      tScoreboard?.external?.rtAudience != null ||
-                      extras.rtScore != null
-                        ? {
-                            value:
-                              tScoreboard?.external?.rtAudience != null
-                                ? Math.round(tScoreboard.external.rtAudience)
-                                : extras.rtScore != null
-                                  ? Math.round(extras.rtScore)
-                                  : null,
-                          }
-                        : null
-                    }
-                    mc={
-                      extras.mcScore != null
-                        ? { value: Math.round(extras.mcScore) }
-                        : null
-                    }
-                  />
-
-                  {/* ========== Separador vertical 1 ========== */}
-                  {/* Solo se muestra cuando NO estamos en modo backdrop */}
-                  {!isBackdropPoster && (
-                    <div className="w-px h-6 bg-white/35 shrink-0" />
-                  )}
-
-                  {/* ========== B. ENLACES EXTERNOS ========== */}
-                  {/* Botones para acceder a páginas externas (Web oficial, JustWatch, etc.) */}
-                  {/* Solo se muestran aquí cuando NO estamos en modo backdrop (en ese modo se muestran abajo con las plataformas) */}
-                  {!isBackdropPoster && (
-                    <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-                      {/* Versión Desktop: iconos normales de enlaces externos */}
-                      <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
-                        {/* Sitio web oficial */}
-                        <div className="hidden sm:block">
-                          <ExternalLinkButton
-                            icon="/logo-Web.png"
-                            href={officialSiteUrl}
-                          />
-                        </div>
-
-                        {/* JustWatch - dónde ver el contenido */}
-                        <ExternalLinkButton
-                          icon="/logo-JustWatch.png"
-                          title="JustWatch"
-                          href={jwHref}
-                          fallbackHref={justWatchUrl}
-                        />
-
-                        {/* Letterboxd - solo para películas */}
-                        {isMovie && (
-                          <ExternalLinkButton
-                            icon="/logo-Letterboxd.png"
-                            href={letterboxdUrl}
-                          />
-                        )}
-
-                        {/* SeriesGraph - solo para series */}
-                        {type === "tv" && (
-                          <ExternalLinkButton
-                            icon="/logoseriesgraph.png"
-                            href={seriesGraphUrl}
-                          />
-                        )}
-
-                        {/* FilmAffinity */}
-                        <ExternalLinkButton
-                          icon="/logoFilmaffinity.png"
-                          title="FilmAffinity"
-                          href={filmAffinitySearchUrl}
-                        />
-                      </div>
-
-                      {/* Versión Móvil: botón "..." que abre modal de enlaces */}
-                      <button
-                        type="button"
-                        onClick={() => setExternalLinksOpen(true)}
-                        className="sm:hidden flex isolate transform-gpu items-center justify-center w-10 h-10 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 transition-all duration-300 hover:text-white hover:bg-white/10"
-                        title="Enlaces"
-                        aria-label="Abrir enlaces externos"
-                      >
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ========== Separador vertical 2 ========== */}
-                  {/* Solo visible en desktop (>= md) y cuando NO estamos en modo backdrop */}
-                  {!isBackdropPoster && (
-                    <div className="hidden md:block w-px h-6 bg-white/35 shrink-0" />
-                  )}
-
-                  {/* ========== Botón de Compartir ========== */}
-                  {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
-                  {/* Se mantiene pegado al extremo derecho con ml-auto */}
-                  <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
-                    <ActionShareButton
-                      title={title}
-                      text={`Echa un vistazo a ${title} en The Show Verse`}
-                    />
-                  </div>
-                </div>
-                {/* =================================================================
-                  FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
-                 ================================================================= */}
-                {/* Muestra estadísticas de Trakt en formato compacto con scroll horizontal */}
-                {/* Visible en móvil sin recortes gracias al padding con safe-area */}
-                {/* Componente presentacional compartido con DetailModal */}
-                <DetailsStatsRow stats={tScoreboard?.stats} />
-              </div>
+              {/* Panel de puntuaciones + barra de acciones (ratings, enlaces
+                  externos y compartir) + estadísticas. Componente presentacional
+                  compartido con DetailModal para que se vean IDÉNTICOS. */}
+              <DetailsScoreboardPanel
+                className={isBackdropPoster ? "" : "mb-6"}
+                loading={tScoreboard.loading}
+                tmdb={{
+                  value: data.vote_average?.toFixed(1),
+                  sub: formatCountShort(data.vote_count),
+                  href: tmdbDetailUrl,
+                }}
+                trakt={
+                  traktDecimal
+                    ? {
+                        value: traktDecimal,
+                        sub: tScoreboard.votes
+                          ? formatCountShort(tScoreboard.votes)
+                          : undefined,
+                        href: trakt?.traktUrl,
+                      }
+                    : null
+                }
+                traktPublic={
+                  !traktDecimal && !trakt?.connected && tScoreboard?.rating
+                    ? {
+                        value: Number(tScoreboard.rating).toFixed(1),
+                        sub: tScoreboard.votes
+                          ? formatCountShort(tScoreboard.votes)
+                          : undefined,
+                      }
+                    : null
+                }
+                imdb={
+                  extras.imdbRating
+                    ? {
+                        value: Number(extras.imdbRating).toFixed(1),
+                        sub: formatCountShort(extras.imdbVotes),
+                        href: resolvedImdbId
+                          ? `https://www.imdb.com/title/${resolvedImdbId}`
+                          : undefined,
+                      }
+                    : null
+                }
+                rt={
+                  tScoreboard?.external?.rtAudience != null ||
+                  extras.rtScore != null
+                    ? {
+                        value:
+                          tScoreboard?.external?.rtAudience != null
+                            ? Math.round(tScoreboard.external.rtAudience)
+                            : extras.rtScore != null
+                              ? Math.round(extras.rtScore)
+                              : null,
+                      }
+                    : null
+                }
+                mc={
+                  extras.mcScore != null
+                    ? { value: Math.round(extras.mcScore) }
+                    : null
+                }
+                externalLinks={
+                  isBackdropPoster
+                    ? null
+                    : [
+                        {
+                          icon: "/logo-Web.png",
+                          href: officialSiteUrl,
+                          wrapperClassName: "hidden sm:block",
+                        },
+                        {
+                          icon: "/logo-JustWatch.png",
+                          title: "JustWatch",
+                          href: jwHref,
+                          fallbackHref: justWatchUrl,
+                        },
+                        ...(isMovie
+                          ? [
+                              {
+                                icon: "/logo-Letterboxd.png",
+                                href: letterboxdUrl,
+                              },
+                            ]
+                          : []),
+                        ...(type === "tv"
+                          ? [
+                              {
+                                icon: "/logoseriesgraph.png",
+                                href: seriesGraphUrl,
+                              },
+                            ]
+                          : []),
+                        {
+                          icon: "/logoFilmaffinity.png",
+                          title: "FilmAffinity",
+                          href: filmAffinitySearchUrl,
+                        },
+                      ]
+                }
+                onMoreLinks={() => setExternalLinksOpen(true)}
+                share={{
+                  title,
+                  text: `Echa un vistazo a ${title} en The Show Verse`,
+                }}
+                stats={tScoreboard?.stats}
+              />
 
             {/* =================================================================
                 CONTENEDOR DE TABS Y CONTENIDO - Información detallada
