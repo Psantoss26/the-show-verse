@@ -28,8 +28,8 @@ import {
 
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
-const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start gap-1.5 sm:gap-3 w-full
-                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[48px] sm:[&>*:not(.separator)]:max-w-[52px]
+const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start gap-1 sm:gap-3 w-full
+                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] sm:[&>*:not(.separator)]:max-w-[52px]
                 [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]]:[container-type:inline-size]
                 [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]_svg]:!h-[46cqw] sm:[&_[data-liquid-button]_svg]:!w-[22px] sm:[&_[data-liquid-button]_svg]:!h-[22px]
                 [&_[data-liquid-button]_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]_.text-xl]:!text-[22px]
@@ -79,6 +79,11 @@ const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-
 export default function DetailActionsRow({
   className = "",
   showSeparator = true,
+  // En móvil, por defecto cada botón se limita a 60px (evita botones enormes en
+  // la ficha completa). Con `fillMobile` se quita ese tope para que los botones
+  // crezcan y ocupen TODO el ancho disponible (usado en el modal del dashboard,
+  // más ancho, donde con el tope quedaban centrados dejando huecos laterales).
+  fillMobile = false,
 
   onTrailer,
   trailerAvailable = false,
@@ -109,8 +114,15 @@ export default function DetailActionsRow({
   commentsActive = false,
   onComments,
 }) {
+  // Tope de tamaño de botón en móvil: por defecto 60px; con fillMobile sin tope.
+  const mobileCapClass = fillMobile
+    ? ""
+    : "[&>*:not(.separator)]:max-w-[60px]";
+  const rowClass = [BASE_ROW_CLASS, mobileCapClass, className]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={className ? `${BASE_ROW_CLASS} ${className}` : BASE_ROW_CLASS}>
+    <div className={rowClass}>
       {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
       {onTrailer && (
         <LiquidButton
