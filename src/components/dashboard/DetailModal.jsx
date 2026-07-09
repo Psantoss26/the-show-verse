@@ -54,7 +54,10 @@ import {
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
-import { formatCountShort } from "@/lib/details/formatters";
+import {
+  formatCountShort,
+  slugifyForSeriesGraph,
+} from "@/lib/details/formatters";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import AddToListModal from "@/components/details/AddToListModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
@@ -63,6 +66,7 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
 // completa (DetailsClient) para que la fila sea IDÉNTICA.
@@ -97,6 +101,24 @@ function providerLogoSrc(provider) {
   if (/^https?:\/\//.test(lp)) return lp;
   if (lp.startsWith("/logo") || lp.startsWith("/_next")) return lp;
   return buildImg(lp, "w45");
+}
+
+function normalizeUrl(url) {
+  if (!url) return null;
+  const value = String(url).trim();
+  if (!value) return null;
+  return value.startsWith("http://") || value.startsWith("https://")
+    ? value
+    : `https://${value}`;
+}
+
+async function fetchResolvedExternalLink(url, { signal } = {}) {
+  const response = await fetch(url, { signal, cache: "no-store" });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(json?.error || `Request failed: ${response.status}`);
+  }
+  return json?.url || null;
 }
 
 /* =============================== ANIMACIÓN =============================== */
@@ -164,6 +186,15 @@ export default function DetailModal({ item, onClose }) {
   const [loadingStates, setLoadingStates] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false);
+  const [officialSiteState, setOfficialSiteState] = useState({
+    itemKey: "",
+    url: null,
+  });
+  const [resolvedExternalLinks, setResolvedExternalLinks] = useState({
+    justwatch: null,
+    letterboxd: null,
+  });
 
   useEffect(() => {
     let cancel = false;
@@ -716,6 +747,217 @@ export default function DetailModal({ item, onClose }) {
   }, [data.providers]);
   const hasProviders = streamingProviders.length > 0;
 
+  const titleQuery = title.trim();
+  const yearIso = data.year ? String(data.year).trim() : "";
+  const isMovie = mediaType === "movie";
+  const externalItemKey = `${mediaType || ""}:${item?.id ?? ""}`;
+  const tmdbOfficialSiteUrl = useMemo(
+    () => normalizeUrl(data.homepage),
+    [data.homepage],
+  );
+  const officialSiteUrl =
+    officialSiteState.itemKey === externalItemKey
+      ? officialSiteState.url
+      : tmdbOfficialSiteUrl;
+
+  useEffect(() => {
+    setOfficialSiteState({
+      itemKey: externalItemKey,
+      url: tmdbOfficialSiteUrl,
+    });
+  }, [externalItemKey, tmdbOfficialSiteUrl]);
+
+  useEffect(() => {
+    if (!item?.id || !mediaType) return undefined;
+
+    const ac = new AbortController();
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          type: mediaType === "tv" ? "tv" : "movie",
+          tmdbId: String(item.id),
+        });
+        const resolved = await fetchResolvedExternalLink(
+          `/api/trakt/official-site?${params.toString()}`,
+          { signal: ac.signal },
+        );
+        if (!ac.signal.aborted && resolved) {
+          setOfficialSiteState({
+            itemKey: externalItemKey,
+            url: normalizeUrl(resolved),
+          });
+        }
+      } catch {
+        // El enlace oficial es best-effort; se conserva el fallback de TMDb.
+      }
+    })();
+
+    return () => ac.abort();
+  }, [externalItemKey, item?.id, mediaType]);
+
+  useEffect(() => {
+    if (!titleQuery) {
+      setResolvedExternalLinks((prev) => ({ ...prev, justwatch: null }));
+      return undefined;
+    }
+
+    const ac = new AbortController();
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          country: "es",
+          title: titleQuery,
+        });
+        if (yearIso) params.set("year", yearIso);
+
+        const resolved = await fetchResolvedExternalLink(
+          `/api/links/justwatch?${params.toString()}`,
+          { signal: ac.signal },
+        );
+        if (!ac.signal.aborted) {
+          setResolvedExternalLinks((prev) => ({
+            ...prev,
+            justwatch: resolved || null,
+          }));
+        }
+      } catch {
+        if (!ac.signal.aborted) {
+          setResolvedExternalLinks((prev) => ({ ...prev, justwatch: null }));
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, [titleQuery, yearIso]);
+
+  useEffect(() => {
+    if (!isMovie || (!titleQuery && !data.imdbId)) {
+      setResolvedExternalLinks((prev) => ({ ...prev, letterboxd: null }));
+      return undefined;
+    }
+
+    const ac = new AbortController();
+
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (data.imdbId) params.set("imdb", data.imdbId);
+        else params.set("title", titleQuery);
+
+        const resolved = await fetchResolvedExternalLink(
+          `/api/links/letterboxd?${params.toString()}`,
+          { signal: ac.signal },
+        );
+        if (!ac.signal.aborted) {
+          setResolvedExternalLinks((prev) => ({
+            ...prev,
+            letterboxd: resolved || null,
+          }));
+        }
+      } catch {
+        if (!ac.signal.aborted) {
+          setResolvedExternalLinks((prev) => ({ ...prev, letterboxd: null }));
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, [data.imdbId, isMovie, titleQuery]);
+
+  const justWatchFallbackUrl = titleQuery
+    ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(titleQuery)}`
+    : null;
+  const justWatchHref = resolvedExternalLinks.justwatch || justWatchFallbackUrl;
+  const letterboxdFallbackUrl =
+    isMovie && titleQuery
+      ? data.imdbId
+        ? `https://letterboxd.com/imdb/${encodeURIComponent(data.imdbId)}/`
+        : `https://letterboxd.com/search/${encodeURIComponent(titleQuery)}/`
+      : null;
+  const letterboxdHref =
+    resolvedExternalLinks.letterboxd || letterboxdFallbackUrl;
+  const seriesGraphTitle = data.originalTitle || titleQuery;
+  const seriesGraphUrl =
+    mediaType === "tv" && item?.id && seriesGraphTitle
+      ? `https://seriesgraph.com/show/${item.id}-${slugifyForSeriesGraph(
+          seriesGraphTitle,
+        )}`
+      : null;
+  const filmAffinitySearchUrl = titleQuery
+    ? `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
+        titleQuery,
+      )}&stype=title`
+    : null;
+  const externalLinks = useMemo(() => {
+    const links = [];
+
+    if (officialSiteUrl) {
+      links.push({
+        id: "web",
+        label: "Web oficial",
+        title: "Web oficial",
+        icon: "/logo-Web.png",
+        href: officialSiteUrl,
+        wrapperClassName: "hidden sm:block",
+      });
+    }
+
+    if (justWatchHref) {
+      links.push({
+        id: "jw",
+        label: "JustWatch",
+        title: "JustWatch",
+        icon: "/logo-JustWatch.png",
+        href: justWatchHref,
+        fallbackHref: justWatchFallbackUrl,
+      });
+    }
+
+    if (isMovie && letterboxdHref) {
+      links.push({
+        id: "lb",
+        label: "Letterboxd",
+        title: "Letterboxd",
+        icon: "/logo-Letterboxd.png",
+        href: letterboxdHref,
+      });
+    }
+
+    if (mediaType === "tv" && seriesGraphUrl) {
+      links.push({
+        id: "sg",
+        label: "SeriesGraph",
+        title: "SeriesGraph",
+        icon: "/logoseriesgraph.png",
+        href: seriesGraphUrl,
+      });
+    }
+
+    if (filmAffinitySearchUrl) {
+      links.push({
+        id: "fa",
+        label: "FilmAffinity",
+        title: "FilmAffinity",
+        icon: "/logoFilmaffinity.png",
+        href: filmAffinitySearchUrl,
+      });
+    }
+
+    return links;
+  }, [
+    filmAffinitySearchUrl,
+    isMovie,
+    justWatchFallbackUrl,
+    justWatchHref,
+    letterboxdHref,
+    mediaType,
+    officialSiteUrl,
+    seriesGraphUrl,
+  ]);
+  const hasExternalLinks = externalLinks.length > 0;
+
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
@@ -971,7 +1213,7 @@ export default function DetailModal({ item, onClose }) {
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
-            {(hasRatings || hasProviders) && (
+            {(hasRatings || hasProviders || hasExternalLinks) && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -985,7 +1227,11 @@ export default function DetailModal({ item, onClose }) {
                       ? {
                           value: data.tmdbRating,
                           sub: formatCountShort(data.tmdbVotes),
-                          href: undefined,
+                          href: item?.id
+                            ? `https://www.themoviedb.org/${
+                                mediaType === "tv" ? "tv" : "movie"
+                              }/${item.id}`
+                            : undefined,
                         }
                       : null
                   }
@@ -1020,25 +1266,9 @@ export default function DetailModal({ item, onClose }) {
                       ? { value: Math.round(data.mcScore) }
                       : null
                   }
-                  externalLinks={[
-                    {
-                      icon: "/logo-TMDb.png",
-                      title: "TMDb",
-                      href: `https://www.themoviedb.org/${
-                        mediaType === "tv" ? "tv" : "movie"
-                      }/${item?.id}`,
-                    },
-                    ...(data.imdbId
-                      ? [
-                          {
-                            icon: "/logo-IMDb.svg",
-                            title: "IMDb",
-                            href: `https://www.imdb.com/title/${data.imdbId}`,
-                          },
-                        ]
-                      : []),
-                  ]}
+                  externalLinks={externalLinks}
                   streamingProviders={streamingProviders}
+                  onMoreLinks={() => setExternalLinksOpen(true)}
                   share={{
                     title,
                     text: `Echa un vistazo a ${title} en The Show Verse`,
@@ -1306,6 +1536,13 @@ export default function DetailModal({ item, onClose }) {
         onDelete={handleCommentDelete}
         title={title}
         myComments={[]}
+      />
+
+      {/* Enlaces externos — mismo listado que la ficha completa */}
+      <ExternalLinksModal
+        open={externalLinksOpen}
+        onClose={() => setExternalLinksOpen(false)}
+        links={externalLinks}
       />
 
       {/* Visto en Trakt — gestor de reproducciones (mismo modal que la ficha

@@ -114,6 +114,23 @@ function writeContinueWatchingCache(shows) {
 // Convierte las filas de progreso local (streaming: películas y episodios) a las
 // tarjetas de "Continuar viendo". El % es la POSICIÓN real de reproducción
 // (0..1 → 0..100), no el progreso por episodios de la serie.
+function formatRemainingTime(runtimeSeconds, positionSeconds) {
+  if (!runtimeSeconds || !positionSeconds) return null;
+  const remainingSeconds = runtimeSeconds - positionSeconds;
+  if (remainingSeconds <= 0) return null;
+
+  const remainingMinutes = Math.max(0, Math.ceil(remainingSeconds / 60));
+  if (remainingMinutes < 60) {
+    return `Quedan ${remainingMinutes} min`;
+  }
+  const hours = Math.floor(remainingMinutes / 60);
+  const mins = remainingMinutes % 60;
+  if (mins === 0) {
+    return `Quedan ${hours} h`;
+  }
+  return `Quedan ${hours} h ${mins} min`;
+}
+
 function mapLocalProgressItems(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter((r) => r && Number(r.tmdbId) > 0)
@@ -131,6 +148,7 @@ function mapLocalProgressItems(rows) {
         0,
         Math.min(100, Math.round((Number(r.percent) || 0) * 100)),
       );
+      const remainingLabel = formatRemainingTime(Number(r.runtimeSeconds), Number(r.positionSeconds));
       return {
         id: Number(r.tmdbId),
         media_type: isTv ? "tv" : "movie",
@@ -146,6 +164,7 @@ function mapLocalProgressItems(rows) {
         lastEpisode: null,
         lastWatchedAt: r.updatedAt || null,
         isRewatch: false,
+        remainingLabel,
       };
     });
 }
@@ -786,7 +805,15 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
         ) : ep ? (
           <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
             <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
-            <span>T{ep.season}·E{ep.number}</span>
+            <span>
+              T{ep.season}·E{ep.number}
+              {show?.remainingLabel ? ` · ${show.remainingLabel}` : ""}
+            </span>
+          </div>
+        ) : show?.remainingLabel ? (
+          <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
+            <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
+            <span>{show.remainingLabel}</span>
           </div>
         ) : null}
         {isCalendar ? (
@@ -1596,6 +1623,12 @@ function ContinueWatchingPreviewCard({
               );
             }
             if (progressLabel) parts.push(<span key="prog">{progressLabel}</span>);
+            if (show?.remainingLabel)
+              parts.push(
+                <span key="remain" className="text-emerald-400 font-bold">
+                  {show.remainingLabel}
+                </span>,
+              );
             if (extras?.year) parts.push(<span key="year">{extras.year}</span>);
             if (extras?.seasons)
               parts.push(<span key="seasons">{extras.seasons}</span>);

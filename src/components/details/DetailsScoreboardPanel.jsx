@@ -312,8 +312,23 @@ function DetailsToolbarActions({
           <ToolbarSeparator />
 
           <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
-            {/* Versión Desktop: iconos normales de enlaces externos */}
+            {/* Versión Desktop: plataformas primero, enlaces externos después */}
             <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+              {hasStreamingProviders && (
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  {streamingProviders.map((provider, i) => (
+                    <StreamingProviderButton
+                      key={provider.key ?? `${provider.title}-${i}`}
+                      provider={provider}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {hasStreamingProviders && hasExternalLinks && (
+                <ToolbarSeparator className="mx-0.5" />
+              )}
+
               {hasExternalLinks && (
                 <>
                   {externalLinks.map((link, i) => {
@@ -335,21 +350,6 @@ function DetailsToolbarActions({
                     );
                   })}
                 </>
-              )}
-
-              {hasExternalLinks && hasStreamingProviders && (
-                <ToolbarSeparator className="mx-0.5" />
-              )}
-
-              {hasStreamingProviders && (
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                  {streamingProviders.map((provider, i) => (
-                    <StreamingProviderButton
-                      key={provider.key ?? `${provider.title}-${i}`}
-                      provider={provider}
-                    />
-                  ))}
-                </div>
               )}
             </div>
 

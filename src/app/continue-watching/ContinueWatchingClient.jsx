@@ -113,25 +113,46 @@ function platformLabel(platform) {
   return PLATFORM_LABELS[key] || String(platform);
 }
 
+function formatRemainingTime(runtimeSeconds, positionSeconds) {
+  if (!runtimeSeconds || !positionSeconds) return null;
+  const remainingSeconds = runtimeSeconds - positionSeconds;
+  if (remainingSeconds <= 0) return null;
+
+  const remainingMinutes = Math.max(0, Math.ceil(remainingSeconds / 60));
+  if (remainingMinutes < 60) {
+    return `Quedan ${remainingMinutes} min`;
+  }
+  const hours = Math.floor(remainingMinutes / 60);
+  const mins = remainingMinutes % 60;
+  if (mins === 0) {
+    return `Quedan ${hours} h`;
+  }
+  return `Quedan ${hours} h ${mins} min`;
+}
+
 // Convierte las filas de /api/progress al item de la página.
 function mapRows(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter((r) => r && Number(r.tmdbId) > 0)
-    .map((r) => ({
-      // id de la fila watch_progress: es la clave que necesita el borrado
-      // (DELETE /api/progress?id=…). Distinto del tmdbId.
-      progressId: r.id != null ? String(r.id) : null,
-      id: Number(r.tmdbId),
-      media_type: r.mediaType === "tv" ? "tv" : "movie",
-      title: r.title || "",
-      poster_path: r.posterPath || null,
-      backdrop_path: null,
-      season: r.season || null,
-      episode: r.episode || null,
-      pct: clampPct((Number(r.percent) || 0) * 100),
-      platform: r.platform || null,
-      lastWatchedAt: r.updatedAt || null,
-    }));
+    .map((r) => {
+      const remainingLabel = formatRemainingTime(Number(r.runtimeSeconds), Number(r.positionSeconds));
+      return {
+        // id de la fila watch_progress: es la clave que necesita el borrado
+        // (DELETE /api/progress?id=…). Distinto del tmdbId.
+        progressId: r.id != null ? String(r.id) : null,
+        id: Number(r.tmdbId),
+        media_type: r.mediaType === "tv" ? "tv" : "movie",
+        title: r.title || "",
+        poster_path: r.posterPath || null,
+        backdrop_path: null,
+        season: r.season || null,
+        episode: r.episode || null,
+        pct: clampPct((Number(r.percent) || 0) * 100),
+        platform: r.platform || null,
+        lastWatchedAt: r.updatedAt || null,
+        remainingLabel,
+      };
+    });
 }
 
 // Paleta por % IGUAL que la de "En progreso" (bar/text/bg/border/stroke/trail…).
@@ -462,6 +483,12 @@ const ProgressCard = memo(function ProgressCard({
                     <span className="text-zinc-400">{platform}</span>
                   </>
                 )}
+                {item.remainingLabel && (
+                  <>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-bold">{item.remainingLabel}</span>
+                  </>
+                )}
               </div>
               <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden relative">
                 <motion.div
@@ -531,6 +558,9 @@ const ProgressCard = memo(function ProgressCard({
                   {platform && (
                     <p className="text-sky-400 text-xs font-bold drop-shadow-md">{platform}</p>
                   )}
+                  {item.remainingLabel && (
+                    <p className="text-emerald-400 text-xs font-bold drop-shadow-md">{item.remainingLabel}</p>
+                  )}
                   <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5" />
                     {lastWatched}
@@ -585,12 +615,20 @@ const ProgressCard = memo(function ProgressCard({
                 </div>
               )}
             </div>
-            {code && (
+            {code ? (
               <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
                 <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
-                <span className="text-[11px] font-bold text-white">{code}</span>
+                <span className="text-[11px] font-bold text-white">
+                  {code}
+                  {item.remainingLabel ? ` · ${item.remainingLabel}` : ""}
+                </span>
               </div>
-            )}
+            ) : item.remainingLabel ? (
+              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
+                <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
+                <span className="text-[11px] font-bold text-white">{item.remainingLabel}</span>
+              </div>
+            ) : null}
             <div className="absolute bottom-0 left-0 right-0 p-4">
               <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">{title}</h3>
               {platform && <span className="text-xs text-zinc-300">{platform}</span>}
@@ -599,7 +637,9 @@ const ProgressCard = memo(function ProgressCard({
           <div className="p-4 space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Progreso</span>
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                  {item.remainingLabel ? `Progreso · ${item.remainingLabel}` : "Progreso"}
+                </span>
                 <span className="text-[11px] text-zinc-500">{pct}% visto</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-zinc-800/80 overflow-hidden relative">
