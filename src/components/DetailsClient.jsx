@@ -216,7 +216,6 @@ import {
 import {
   CompactBadge,
   ExternalLinkButton,
-  MiniStat,
   UnifiedRateButton,
   ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
@@ -381,6 +380,241 @@ function formatEpisodeRuntime(data) {
     data?.last_episode_to_air?.runtime,
   );
   return lastEpisodeRuntime;
+}
+
+function getStatusLabel(status) {
+  return status === "Released"
+    ? "Estrenada"
+    : status === "Ended"
+      ? "Finalizada"
+      : status === "Returning Series"
+        ? "En emisión"
+        : status === "Canceled"
+          ? "Cancelada"
+          : status === "In Production"
+            ? "En producción"
+            : status === "Post Production"
+              ? "Postproducción"
+              : status === "Planned"
+                ? "Planificada"
+                : status === "Rumored"
+                  ? "Rumoreada"
+                  : status === "Pilot"
+                    ? "Piloto"
+                    : status;
+}
+
+function getStatusBadgeClass(status) {
+  return status === "Ended" || status === "Canceled"
+    ? "bg-red-500/[0.06] text-red-300"
+    : "bg-emerald-500/[0.06] text-emerald-300";
+}
+
+const metaDotClass = "w-1 h-1 rounded-full bg-white/30 shrink-0";
+const genreChipClass =
+  "relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-bold uppercase tracking-widest text-zinc-300 backdrop-blur-[6px] shadow-none";
+
+function DetailsMetaGenresRow({
+  yearIso,
+  displayRuntimeValue,
+  status,
+  genres = [],
+}) {
+  const rowRef = useRef(null);
+  const metaProbeRef = useRef(null);
+  const genreProbeRef = useRef(null);
+  const genreDotProbeRef = useRef(null);
+  const genreChipProbeRefs = useRef([]);
+  const [visibleGenreCount, setVisibleGenreCount] = useState(() =>
+    Math.min(Array.isArray(genres) ? genres.length : 0, 3),
+  );
+
+  const visibleGenres = useMemo(
+    () =>
+      (Array.isArray(genres) ? genres : [])
+        .filter(Boolean)
+        .slice(0, 3)
+        .map((genre) => ({
+          id: genre.id ?? genre.name,
+          label: translateGenre(genre.name),
+        })),
+    [genres],
+  );
+
+  const hasMeta = Boolean(yearIso || displayRuntimeValue || status);
+  const statusLabel = status ? getStatusLabel(status) : null;
+  const statusBadgeClass = status ? getStatusBadgeClass(status) : "";
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+
+    const readGap = (element) => {
+      if (!element || typeof window === "undefined") return 0;
+      const styles = window.getComputedStyle(element);
+      return Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+    };
+
+    const updateVisibleGenres = () => {
+      const maxCount = visibleGenres.length;
+      if (!maxCount) {
+        setVisibleGenreCount(0);
+        return;
+      }
+
+      const rowWidth = row.clientWidth;
+      const metaWidth = metaProbeRef.current?.scrollWidth || 0;
+      const rowGap = readGap(row);
+      const chipGap = readGap(genreProbeRef.current);
+      const dotWidth = genreDotProbeRef.current?.offsetWidth || 0;
+      const chipWidths = genreChipProbeRefs.current
+        .slice(0, maxCount)
+        .map((node) => node?.offsetWidth || 0);
+
+      let nextCount = 0;
+      for (let count = maxCount; count >= 1; count -= 1) {
+        const chipsWidth = chipWidths
+          .slice(0, count)
+          .reduce((sum, width) => sum + width, 0);
+        const genresWidth =
+          dotWidth + chipGap + chipsWidth + chipGap * (count - 1);
+        const requiredWidth = metaWidth + rowGap + genresWidth;
+
+        if (requiredWidth <= rowWidth + 1) {
+          nextCount = count;
+          break;
+        }
+      }
+
+      setVisibleGenreCount(nextCount);
+    };
+
+    updateVisibleGenres();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateVisibleGenres)
+        : null;
+    resizeObserver?.observe(row);
+    window.addEventListener("resize", updateVisibleGenres);
+    document.fonts?.ready?.then(updateVisibleGenres).catch(() => {});
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateVisibleGenres);
+    };
+  }, [displayRuntimeValue, hasMeta, status, statusLabel, visibleGenres, yearIso]);
+
+  if (!hasMeta && visibleGenres.length === 0) return null;
+
+  const clampedGenreCount = Math.min(visibleGenreCount, visibleGenres.length);
+
+  return (
+    <div
+      ref={rowRef}
+      className="relative flex w-full min-w-0 max-w-full flex-nowrap items-center justify-center gap-2.5 overflow-hidden text-base font-medium text-zinc-300 md:justify-start md:text-lg [container-type:inline-size]"
+    >
+      <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-2.5 whitespace-nowrap">
+        {yearIso && (
+          <span className="shrink-0 text-white font-bold tracking-wide">
+            {yearIso}
+          </span>
+        )}
+
+        {yearIso && displayRuntimeValue && <span className={metaDotClass} />}
+
+        {displayRuntimeValue && (
+          <span className="shrink-0">{displayRuntimeValue}</span>
+        )}
+
+        {(yearIso || displayRuntimeValue) && status && (
+          <span className={metaDotClass} />
+        )}
+
+        {status && (
+          <span
+            className={`relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-black uppercase tracking-widest backdrop-blur-[6px] shadow-none ${statusBadgeClass}`}
+          >
+            <span
+              className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+              style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+            />
+            <span className="relative z-10">{statusLabel}</span>
+          </span>
+        )}
+      </div>
+
+      {clampedGenreCount > 0 && (
+        <div className="flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
+          {hasMeta && <span className={metaDotClass} />}
+          {visibleGenres.slice(0, clampedGenreCount).map((genre) => (
+            <span key={genre.id} className={genreChipClass}>
+              <span
+                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+              />
+              <span className="relative z-10">{genre.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed left-[-10000px] top-0 flex flex-nowrap items-center gap-2.5 whitespace-nowrap opacity-0"
+      >
+        <div
+          ref={metaProbeRef}
+          className="flex flex-nowrap items-center gap-2.5 whitespace-nowrap text-base font-medium text-zinc-300 md:text-lg"
+        >
+          {yearIso && (
+            <span className="shrink-0 text-white font-bold tracking-wide">
+              {yearIso}
+            </span>
+          )}
+          {yearIso && displayRuntimeValue && <span className={metaDotClass} />}
+          {displayRuntimeValue && (
+            <span className="shrink-0">{displayRuntimeValue}</span>
+          )}
+          {(yearIso || displayRuntimeValue) && status && (
+            <span className={metaDotClass} />
+          )}
+          {status && (
+            <span
+              className={`relative isolate inline-flex shrink-0 items-center px-2 py-0.5 rounded-md overflow-hidden bg-gradient-to-br from-white/10 via-transparent to-black/10 text-[10px] font-black uppercase tracking-widest backdrop-blur-[6px] shadow-none ${statusBadgeClass}`}
+            >
+              <span
+                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+              />
+              <span className="relative z-10">{statusLabel}</span>
+            </span>
+          )}
+        </div>
+        <div
+          ref={genreProbeRef}
+          className="flex flex-nowrap items-center gap-2 whitespace-nowrap"
+        >
+          <span ref={genreDotProbeRef} className={metaDotClass} />
+          {visibleGenres.map((genre, index) => (
+            <span
+              key={genre.id}
+              ref={(node) => {
+                genreChipProbeRefs.current[index] = node;
+              }}
+              className={genreChipClass}
+            >
+              <span
+                className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+                style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+              />
+              <span className="relative z-10">{genre.label}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DetailsArrowCarousel({
@@ -1290,6 +1524,35 @@ function SectionTitle({ title, icon: Icon, className = "" }) {
         <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
       </div>
     </div>
+  );
+}
+
+// Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
+function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -1 }}
+      className="relative flex items-center gap-2 select-none shrink-0 group/statbadge py-1 px-1.5 transition-colors duration-200"
+      aria-label={tooltip || label}
+    >
+      <Icon className="h-5 w-5 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200" />
+      <div className="flex flex-col min-w-0 justify-center">
+        <span className="text-xs sm:text-sm font-bold tracking-tight text-white/90 leading-tight">
+          {value || "-"}
+        </span>
+        <span className="hidden sm:block text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5 leading-none transition-colors duration-200 group-hover/statbadge:text-zinc-400">
+          {label}
+        </span>
+      </div>
+      {tooltip && (
+        <div className="pointer-events-none absolute bottom-full mb-2.5 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1.2 text-[10px] font-bold text-white opacity-0 shadow-2xl transition-all duration-200 ease-out group-hover/statbadge:scale-100 group-hover/statbadge:opacity-100 group-hover/statbadge:delay-[1500ms]">
+          {tooltip}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -9717,76 +9980,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {title}
               </h1>
 
-              <div className="flex flex-col md:flex-row md:flex-wrap items-center gap-3 text-base md:text-lg font-medium text-zinc-300 w-full">
-                {/* Metadata: Año, Duración y Estado */}
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-                  {yearIso && (
-                    <span className="text-white font-bold tracking-wide">
-                      {yearIso}
-                    </span>
-                  )}
-
-                  {yearIso && displayRuntimeValue && (
-                    <span className="w-1 h-1 rounded-full bg-white/30" />
-                  )}
-
-                  {displayRuntimeValue && <span>{displayRuntimeValue}</span>}
-
-                  {(yearIso || displayRuntimeValue) && data.status && (
-                    <span className="w-1 h-1 rounded-full bg-white/30" />
-                  )}
-
-                  {data.status && (
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest backdrop-blur-md shadow-sm ${
-                        data.status === "Ended" || data.status === "Canceled"
-                          ? "bg-red-500/10 border-red-500/20 text-red-300"
-                          : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                      }`}
-                    >
-                      {data.status === "Released"
-                        ? "Estrenada"
-                        : data.status === "Ended"
-                          ? "Finalizada"
-                          : data.status === "Returning Series"
-                            ? "En emisión"
-                            : data.status === "Canceled"
-                              ? "Cancelada"
-                              : data.status === "In Production"
-                                ? "En producción"
-                                : data.status === "Post Production"
-                                  ? "Postproducción"
-                                  : data.status === "Planned"
-                                    ? "Planificada"
-                                    : data.status === "Rumored"
-                                      ? "Rumoreada"
-                                      : data.status === "Pilot"
-                                        ? "Piloto"
-                                        : data.status}
-                    </span>
-                  )}
-                </div>
-
-                {/* Separador entre Metadata y Géneros (oculto en móvil, visible en md+) */}
-                {(yearIso || displayRuntimeValue || data.status) &&
-                  data.genres?.length > 0 && (
-                    <span className="hidden md:inline-block w-1 h-1 rounded-full bg-white/30" />
-                  )}
-
-                {/* Géneros */}
-                {data.genres?.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                    {data.genres.slice(0, 3).map((g) => (
-                      <span
-                        key={g.id}
-                        className="inline-flex items-center px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 backdrop-blur-md shadow-sm"
-                      >
-                        {translateGenre(g.name)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <DetailsMetaGenresRow
+                yearIso={yearIso}
+                displayRuntimeValue={displayRuntimeValue}
+                status={data.status}
+                genres={data.genres}
+              />
             </FadeIn>
 
             {/* =================================================================
@@ -10199,7 +10398,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   {/* ========== Botón de Compartir ========== */}
                   {/* Permite compartir el contenido usando la API Web Share o copiando el enlace */}
                   {/* Se mantiene pegado al extremo derecho con ml-auto */}
-                  <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/20 max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-white/5 max-sm:[&>button]:!to-black/40 max-sm:[&>button]:!backdrop-blur-[50px] max-sm:[&>button]:!shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/10 hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
+                  <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
                     <ActionShareButton
                       title={title}
                       text={`Echa un vistazo a ${title} en The Show Verse`}
@@ -10215,61 +10414,58 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {Object.values(tScoreboard?.stats || {}).some(
                   (v) => typeof v === "number",
                 ) && (
-                  <div className="relative z-10 border-t border-white/5 bg-black/[0.06] rounded-b-2xl">
+                  <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
                     {/* Scroller con padding + safe-area para que no se recorte en bordes */}
                     <div
                       className="
-        overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
-        py-2
+        overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-x]
+        py-2.5
         pl-[calc(1rem+env(safe-area-inset-left))]
         pr-[calc(1rem+env(safe-area-inset-right))]
+        md:overflow-x-visible
       "
                     >
-                      {/* Contenedor interno con min-w-max para evitar que se corten los últimos elementos */}
-                      <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
+                      {/* Contenedor interno con flex-wrap para que se distribuya en línea y optimice el espacio */}
+                      <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1.5">
                         {/* Watchers - Usuarios que siguen este contenido */}
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={Eye}
-                            value={formatVoteCount(
-                              tScoreboard?.stats?.watchers ?? 0,
-                            )}
-                            tooltip="Watchers"
-                          />
-                        </div>
+                        <TraktStatBadge
+                          icon={Eye}
+                          value={formatShortNumber(
+                            tScoreboard?.stats?.watchers ?? 0,
+                          )?.toUpperCase() || "0"}
+                          label="SEGUIDORES"
+                          tooltip="Seguidores"
+                        />
 
                         {/* Plays - Número de reproducciones totales */}
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={Play}
-                            value={formatVoteCount(
-                              tScoreboard?.stats?.plays ?? 0,
-                            )}
-                            tooltip="Plays"
-                          />
-                        </div>
+                        <TraktStatBadge
+                          icon={Play}
+                          value={formatShortNumber(
+                            tScoreboard?.stats?.plays ?? 0,
+                          )?.toUpperCase() || "0"}
+                          label="REPRODUCCIONES"
+                          tooltip="Reproducciones"
+                        />
 
                         {/* Lists - Cantidad de listas que incluyen este contenido */}
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={List}
-                            value={formatVoteCount(
-                              tScoreboard?.stats?.lists ?? 0,
-                            )}
-                            tooltip="Lists"
-                          />
-                        </div>
+                        <TraktStatBadge
+                          icon={List}
+                          value={formatShortNumber(
+                            tScoreboard?.stats?.lists ?? 0,
+                          )?.toUpperCase() || "0"}
+                          label="LISTAS"
+                          tooltip="En listas"
+                        />
 
                         {/* Favorited - Usuarios que lo han marcado como favorito */}
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={Heart}
-                            value={formatVoteCount(
-                              tScoreboard?.stats?.favorited ?? 0,
-                            )}
-                            tooltip="Favorited"
-                          />
-                        </div>
+                        <TraktStatBadge
+                          icon={Heart}
+                          value={formatShortNumber(
+                            tScoreboard?.stats?.favorited ?? 0,
+                          )?.toUpperCase() || "0"}
+                          label="FAVORITOS"
+                          tooltip="Favoritos"
+                        />
                       </div>
                     </div>
                   </div>
