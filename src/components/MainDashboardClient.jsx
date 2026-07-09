@@ -50,6 +50,7 @@ import LiquidButton from "@/components/LiquidButton";
 import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
+import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import {
@@ -4001,24 +4002,44 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
 
             const nodes = [];
             let blockInserted = false;
+            // Alternancia backdrop/poster de las filas genéricas: la 1ª
+            // (Recomendaciones, idx 0) sigue en poster; de la 2ª en adelante
+            // alternan empezando por backdrop (idx 1). Continúa el patrón
+            // CW(backdrop)·Recom(poster)·Calendario(backdrop)·Más esperadas(poster)·…
+            // Las filas "spotlight" (Estrenos) conservan su preview grande en poster.
+            let genericIndex = -1;
             for (const row of visibleEngineRows) {
               // "Más esperadas" se pinta en el bloque superior, no en su sitio.
               if (row.key === "anticipated") continue;
+              genericIndex += 1;
+              const isSpotlight =
+                !!spotlightRowTitle && row.title === spotlightRowTitle;
+              const useBackdrop = genericIndex % 2 === 1 && !isSpotlight;
               nodes.push(
-                <Row
-                  key={row.key}
-                  title={row.title}
-                  items={row.items}
-                  isMobile={isMobile}
-                  hydrated={hydrated}
-                  posterCacheRef={posterCacheRef}
-                  posterOverrides={posterOverrides}
-                  backdropOverrides={backdropOverrides}
-                  overridesReady={overridesReady}
-                  spotlight={
-                    !!spotlightRowTitle && row.title === spotlightRowTitle
-                  }
-                />,
+                useBackdrop ? (
+                  <DashboardBackdropRow
+                    key={row.key}
+                    title={row.title}
+                    href={EXPANDABLE_SECTION_HREFS[row.title]}
+                    items={row.items}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    backdropOverrides={backdropOverrides}
+                  />
+                ) : (
+                  <Row
+                    key={row.key}
+                    title={row.title}
+                    items={row.items}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={posterOverrides}
+                    backdropOverrides={backdropOverrides}
+                    overridesReady={overridesReady}
+                    spotlight={isSpotlight}
+                  />
+                ),
               );
               // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el bloque.
               if (!blockInserted) {
