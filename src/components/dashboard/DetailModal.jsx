@@ -1591,7 +1591,7 @@ export default function DetailModal({ item, onClose }) {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
             >
-              <div className="w-full min-w-0 sm:flex-1">
+              <div className="w-full min-w-0 sm:flex-1 mx-[-20px] sm:mx-0 px-2 sm:px-0">
                 <DetailActionsRow
                   fillMobile
                   onTrailer={handleToggleTrailer}
@@ -1661,7 +1661,7 @@ export default function DetailModal({ item, onClose }) {
               </div>
 
               {hasProviders && (
-                <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
+                <div className="hidden shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:flex sm:justify-end">
                   {streamingProviders.map((prov) => (
                     <a
                       key={prov.key}
