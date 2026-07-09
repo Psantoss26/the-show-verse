@@ -74,6 +74,10 @@ import {
   traktAddComment,
   traktUpdateComment,
   traktDeleteComment,
+  traktGetItemStatus,
+  traktAddWatchPlay,
+  traktUpdateWatchPlay,
+  traktRemoveWatchPlay,
 } from "@/lib/api/traktClient";
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
@@ -493,6 +497,143 @@ export default function DetailModal({ item, onClose }) {
     await traktDeleteComment({ commentId, type: traktType, tmdbId: item.id });
   };
 
+  /* ------------------------------ visto en Trakt ------------------------------ */
+  // Estado de visionado del título en Trakt. Un único endpoint genérico
+  // (/api/trakt/item/status) devuelve connected/watched/plays/lastWatchedAt/
+  // traktUrl/history tanto para películas como para series, así que sirve para
+  // pintar el botón (ojo/ojo tachado) y alimentar el TraktWatchedModal (gestor de
+  // reproducciones). No replicamos la máquina de episodios de DetailsClient (para
+  // TV allí se abre TraktEpisodesWatchedModal); aquí el botón muestra visto/no
+  // visto y abre el gestor de reproducciones, que es funcional en ambos tipos.
+  const [traktStatus, setTraktStatus] = useState({
+    connected: false,
+    found: false,
+    watched: false,
+    plays: 0,
+    lastWatchedAt: null,
+    traktUrl: null,
+    history: [],
+  });
+  const [traktStatusLoading, setTraktStatusLoading] = useState(false);
+  const [traktBusy, setTraktBusy] = useState("");
+  const [traktWatchedOpen, setTraktWatchedOpen] = useState(false);
+
+  const applyTraktStatus = (st) => {
+    setTraktStatus({
+      connected: !!st?.connected,
+      found: !!st?.found,
+      watched: !!st?.watched,
+      plays: Number(st?.plays || 0),
+      lastWatchedAt: st?.lastWatchedAt || null,
+      traktUrl: st?.traktUrl || null,
+      history: Array.isArray(st?.history) ? st.history : [],
+    });
+  };
+
+  const refreshTraktStatus = async (force = false) => {
+    if (!item) return;
+    try {
+      setTraktStatusLoading(true);
+      const st = await traktGetItemStatus({
+        type: traktType,
+        tmdbId: item.id,
+        force,
+      });
+      applyTraktStatus(st);
+    } catch {
+      // silencio: dejamos el estado por defecto (no visto)
+    } finally {
+      setTraktStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!item) return;
+      try {
+        setTraktStatusLoading(true);
+        const st = await traktGetItemStatus({
+          type: traktType,
+          tmdbId: item.id,
+        });
+        if (!cancel) applyTraktStatus(st);
+      } catch {
+        // sin estado de Trakt: botón en "no visto"
+      } finally {
+        if (!cancel) setTraktStatusLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, traktType]);
+
+  const openTraktWatched = () => {
+    if (!traktStatus.connected && !traktConnected) {
+      requireLogin();
+      return;
+    }
+    setTraktWatchedOpen(true);
+    void refreshTraktStatus(true);
+  };
+
+  const handleTraktAddPlay = async (watchedAt) => {
+    setTraktBusy("add");
+    setError("");
+    try {
+      await traktAddWatchPlay({
+        type: traktType,
+        tmdbId: item.id,
+        watchedAt,
+        title,
+        posterPath: posterForMutation,
+      });
+      await refreshTraktStatus(true);
+    } catch {
+      setError("No se pudo añadir la reproducción.");
+    } finally {
+      setTraktBusy("");
+    }
+  };
+
+  const handleTraktUpdatePlay = async (historyId, watchedAt) => {
+    setTraktBusy("update");
+    setError("");
+    try {
+      await traktUpdateWatchPlay({
+        type: traktType,
+        tmdbId: item.id,
+        historyId,
+        watchedAt,
+        title,
+        posterPath: posterForMutation,
+      });
+      await refreshTraktStatus(true);
+    } catch {
+      setError("No se pudo actualizar la reproducción.");
+    } finally {
+      setTraktBusy("");
+    }
+  };
+
+  const handleTraktRemovePlay = async (historyId) => {
+    setTraktBusy("remove");
+    setError("");
+    try {
+      await traktRemoveWatchPlay({ historyId });
+      await refreshTraktStatus(true);
+    } catch {
+      setError("No se pudo eliminar la reproducción.");
+    } finally {
+      setTraktBusy("");
+    }
+  };
+
+  /* --------------------------- valoración de episodios (TV) --------------------------- */
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+
   /* ------------------------------ ficha completa ------------------------------ */
   const goToFullDetails = () => {
     router.push(`/details/${mediaType}/${item.id}`);
@@ -550,7 +691,7 @@ export default function DetailModal({ item, onClose }) {
         animate="visible"
         exit="exit"
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1200px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+        className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
         {/* Botón superior derecho: abre la ficha completa */}
         <button
@@ -658,6 +799,23 @@ export default function DetailModal({ item, onClose }) {
               trailerLoading={trailerLoading}
               onSoundtrack={openSoundtrack}
               soundtrackAvailable={!!soundtrackSearchQuery}
+              onEpisodeRatings={
+                mediaType === "tv"
+                  ? () => setEpisodeRatingsOpen(true)
+                  : undefined
+              }
+              episodeRatingsOpen={episodeRatingsOpen}
+              trakt={{
+                connected: traktConnected || traktStatus.connected,
+                watched: traktStatus.watched,
+                // Para series no mostramos recuento de plays en el ojo (igual que
+                // DetailsClient, que allí usa un badge de progreso %).
+                plays: mediaType === "tv" ? 0 : traktStatus.plays,
+                badge: null,
+                busy: !!traktBusy,
+                loading: traktStatusLoading,
+                onOpen: openTraktWatched,
+              }}
               rate={{
                 rating: userRating,
                 max: 10,
@@ -1053,6 +1211,40 @@ export default function DetailModal({ item, onClose }) {
         title={title}
         myComments={[]}
       />
+
+      {/* Visto en Trakt — gestor de reproducciones (mismo modal que la ficha
+          completa para películas). Muestra plays/historial y permite añadir,
+          editar y borrar visionados. */}
+      <TraktWatchedModal
+        open={traktWatchedOpen}
+        onClose={() => {
+          setTraktWatchedOpen(false);
+          setTraktBusy("");
+        }}
+        title={title}
+        connected={traktStatus.connected}
+        found={traktStatus.found}
+        traktUrl={traktStatus.traktUrl}
+        watched={traktStatus.watched}
+        plays={traktStatus.plays}
+        lastWatchedAt={traktStatus.lastWatchedAt}
+        history={traktStatus.history}
+        busyKey={traktBusy}
+        onAddPlay={handleTraktAddPlay}
+        onUpdatePlay={handleTraktUpdatePlay}
+        onRemovePlay={handleTraktRemovePlay}
+      />
+
+      {/* Valoración de episodios (solo series) — mismo modal que la ficha
+          completa; se autoabastece (ratings + temporadas) al abrirse. */}
+      {mediaType === "tv" && (
+        <EpisodeRatingsModal
+          open={episodeRatingsOpen}
+          onClose={() => setEpisodeRatingsOpen(false)}
+          showId={Number(item?.id)}
+          title={title}
+        />
+      )}
     </div>
   );
 }
