@@ -26,6 +26,7 @@ import {
   FilmIcon,
   TvIcon,
   ChevronRight,
+  ChevronDown,
   Award,
   Loader2,
   Music2,
@@ -51,6 +52,9 @@ import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import DetailModalProvider, {
+  useDetailModal,
+} from "@/components/dashboard/DetailModalProvider";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import {
@@ -583,6 +587,7 @@ function InlinePreviewCard({
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(movie);
 
   const [extras, setExtras] = useState({
@@ -1337,6 +1342,21 @@ function InlinePreviewCard({
                 >
                   <BookmarkPlus className={watchlist ? "fill-current" : ""} />
                 </LiquidButton>
+
+                {openDetailModal && (
+                  <LiquidButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetailModal(movie);
+                    }}
+                    groupId="dashboard-spotlight-actions"
+                    title="Ver detalles"
+                    aria-label="Ver detalles"
+                    className={previewBtnClass}
+                  >
+                    <ChevronDown />
+                  </LiquidButton>
+                )}
               </motion.div>
 
               {extras?.awards && (
@@ -1536,6 +1556,21 @@ function InlinePreviewCard({
               >
                 <BookmarkPlus className={watchlist ? "fill-current" : ""} />
               </LiquidButton>
+
+              {openDetailModal && (
+                <LiquidButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDetailModal(movie);
+                  }}
+                  groupId="dashboard-preview-actions"
+                  title="Ver detalles"
+                  aria-label="Ver detalles"
+                  className={previewBtnClass}
+                >
+                  <ChevronDown />
+                </LiquidButton>
+              )}
             </motion.div>
           </div>
         )}
@@ -1689,6 +1724,7 @@ function InlinePreviewCardAnticipated({
 }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  const { openDetailModal } = useDetailModal();
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -2177,6 +2213,21 @@ function InlinePreviewCardAnticipated({
             >
               <BookmarkPlus className={watchlist ? "fill-current" : ""} />
             </LiquidButton>
+
+            {openDetailModal && (
+              <LiquidButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDetailModal(movie);
+                }}
+                groupId="dashboard-preview-actions"
+                title="Ver detalles"
+                aria-label="Ver detalles"
+                className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
+              >
+                <ChevronDown />
+              </LiquidButton>
+            )}
           </div>
         </div>
       </motion.div>
@@ -3919,6 +3970,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
   }
 
   return (
+    <DetailModalProvider>
     <motion.div
       className="relative -mt-16 min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30"
       initial="hidden"
@@ -4055,5 +4107,6 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
         </div>
       </div>
     </motion.div>
+    </DetailModalProvider>
   );
 }
