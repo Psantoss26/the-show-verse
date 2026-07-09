@@ -91,8 +91,6 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 // lógica de toggles, rewatches, plays y persistencia en localStorage.
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-
 // Resuelve la URL del logo de una plataforma: rutas de TMDb -> buildImg;
 // URLs absolutas o assets locales (/logo-*) se usan tal cual.
 function providerLogoSrc(provider) {
@@ -195,6 +193,8 @@ export default function DetailModal({ item, onClose }) {
     justwatch: null,
     letterboxd: null,
   });
+  const [userRating, setUserRating] = useState(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -213,6 +213,13 @@ export default function DetailModal({ item, onClose }) {
         if (!cancel) {
           setFavorite(!!st.favorite);
           setWatchlist(!!st.watchlist);
+          if (st.rating !== undefined) {
+            const rating =
+              st.rating == null || !Number.isFinite(Number(st.rating))
+                ? null
+                : Number(st.rating);
+            setUserRating(rating);
+          }
         }
       } catch {
         // silencio
@@ -295,8 +302,6 @@ export default function DetailModal({ item, onClose }) {
 
   /* -------------------------------- puntuación -------------------------------- */
   const isLoggedIn = !!session && !!account?.id;
-  const [userRating, setUserRating] = useState(null);
-  const [ratingLoading, setRatingLoading] = useState(false);
 
   // Al cambiar de título, resetea la nota local (no persiste entre items).
   useEffect(() => {
@@ -304,21 +309,62 @@ export default function DetailModal({ item, onClose }) {
   }, [item]);
 
   const handleRate = async (value) => {
-    if (requireLogin() || ratingLoading || !item) return;
-    setUserRating(value); // optimista
-    // Persistencia best-effort en TMDb si hay sesión + API key; si no, queda local.
-    if (!TMDB_API_KEY || !session) return;
+    const canRate = isLoggedIn || traktConnected || traktStatus.connected;
+    if (!canRate) {
+      requireLogin();
+      return false;
+    }
+    if (ratingLoading || !item) return false;
+
+    const previousRating =
+      userRating ??
+      (typeof traktStatus.rating === "number" ? traktStatus.rating : null);
+    const optimisticRating = value == null ? null : Number(value);
+
     try {
       setRatingLoading(true);
       setError("");
-      const url = `https://api.themoviedb.org/3/${mediaType}/${item.id}/rating?api_key=${TMDB_API_KEY}&session_id=${session}`;
-      await fetch(url, {
-        method: value == null ? "DELETE" : "POST",
-        headers: { "Content-Type": "application/json;charset=utf-8" },
-        ...(value == null ? {} : { body: JSON.stringify({ value }) }),
+      setUserRating(optimisticRating);
+      setTraktStatus((prev) => ({ ...prev, rating: optimisticRating }));
+
+      const res = await fetch("/api/trakt/item/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: mediaType,
+          tmdbId: item.id,
+          rating: value,
+          title,
+          posterPath: posterForMutation,
+        }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.assign(
+            `/login?next=${encodeURIComponent(
+              window.location.pathname + window.location.search,
+            )}`,
+          );
+          return false;
+        }
+        throw new Error(json?.error || "No se pudo guardar la puntuación.");
+      }
+
+      const savedRating = json.rating == null ? null : Number(json.rating);
+      setUserRating(savedRating);
+      setTraktStatus((prev) => ({
+        ...prev,
+        connected: true,
+        rating: savedRating,
+      }));
+      return true;
     } catch {
+      setUserRating(previousRating);
+      setTraktStatus((prev) => ({ ...prev, rating: previousRating }));
       setError("No se pudo guardar la puntuación.");
+      return false;
     } finally {
       setRatingLoading(false);
     }
@@ -566,6 +612,7 @@ export default function DetailModal({ item, onClose }) {
     lastWatchedAt: null,
     traktUrl: null,
     history: [],
+    rating: null,
   });
   const [traktStatusLoading, setTraktStatusLoading] = useState(false);
   const [traktBusy, setTraktBusy] = useState("");
@@ -584,6 +631,11 @@ export default function DetailModal({ item, onClose }) {
   });
 
   const applyTraktStatus = (st) => {
+    const rating =
+      st?.rating == null || !Number.isFinite(Number(st.rating))
+        ? null
+        : Number(st.rating);
+
     setTraktStatus({
       connected: !!st?.connected,
       found: !!st?.found,
@@ -592,7 +644,9 @@ export default function DetailModal({ item, onClose }) {
       lastWatchedAt: st?.lastWatchedAt || null,
       traktUrl: st?.traktUrl || null,
       history: Array.isArray(st?.history) ? st.history : [],
+      rating,
     });
+    setUserRating(rating);
   };
 
   const refreshTraktStatus = async (force = false) => {
@@ -958,6 +1012,13 @@ export default function DetailModal({ item, onClose }) {
   ]);
   const hasExternalLinks = externalLinks.length > 0;
 
+  const ratingActionValue =
+    userRating ??
+    (typeof traktStatus.rating === "number" ? traktStatus.rating : null);
+  const ratingActionLoading = ratingLoading || traktStatusLoading;
+  const ratingActionConnected =
+    isLoggedIn || traktConnected || traktStatus.connected;
+
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
@@ -1008,7 +1069,12 @@ export default function DetailModal({ item, onClose }) {
           {/* HERO: backdrop grande (o tráiler inline) + degradado */}
           <div className="relative aspect-video w-full overflow-hidden bg-neutral-950">
             <motion.div
-              style={{ y: yParallax, scale }}
+              style={{
+                y: yParallax,
+                scale,
+                WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
+                maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
+              }}
               className="absolute inset-0 w-full h-full"
             >
               {!showTrailer && heroSrc && (
@@ -1075,7 +1141,7 @@ export default function DetailModal({ item, onClose }) {
             {/* Bottom shadow gradient (fades with logo) */}
             <motion.div
               style={{ opacity: logoOpacity }}
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/50 to-transparent z-10"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-neutral-950 via-neutral-950/70 to-transparent z-10"
             />
 
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
@@ -1146,11 +1212,11 @@ export default function DetailModal({ item, onClose }) {
                   onOpen: openTraktWatched,
                 }}
                 rate={{
-                  rating: userRating,
+                  rating: ratingActionValue,
                   max: 10,
-                  loading: ratingLoading,
+                  loading: ratingActionLoading,
                   onRate: handleRate,
-                  connected: isLoggedIn,
+                  connected: ratingActionConnected,
                   onConnect: () => requireLogin(),
                 }}
                 favorite={favorite}
