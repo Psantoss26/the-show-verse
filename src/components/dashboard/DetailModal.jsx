@@ -9,7 +9,7 @@
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import {
@@ -134,6 +134,24 @@ export default function DetailModal({ item, onClose }) {
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data } = useDetailModalData(item);
+
+  const scrollContainerRef = useRef(null);
+  const { scrollY } = useScroll({ container: scrollContainerRef });
+
+  // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
+  const yParallax = useTransform(scrollY, [0, 400], [0, 130]);
+  
+  // Escala del hero: hace un sutil zoom-in al hacer scroll
+  const scale = useTransform(scrollY, [0, 400], [1, 1.08]);
+
+  // Opacidad del logo/título: se desvanece más tarde al hacer scroll
+  const logoOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+
+  // Parallax del logo/título: sube ligeramente al desvanecerse
+  const logoY = useTransform(scrollY, [0, 300], [0, -20]);
+
+  // Degradado oscuro: se oscurece sutilmente al hacer scroll
+  const darkOverlayOpacity = useTransform(scrollY, [0, 300], [0, 0.5]);
 
   const mediaType = data.mediaType || getMediaTypeForItem(item);
   const title = data.title || item?.title || item?.name || "";
@@ -741,67 +759,88 @@ export default function DetailModal({ item, onClose }) {
         </button>
 
         {/* Contenedor con scroll interno (barra oculta) */}
-        <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
           {/* HERO: backdrop grande (o tráiler inline) + degradado */}
           <div className="relative aspect-video w-full overflow-hidden bg-neutral-950">
-            {!showTrailer && heroSrc && (
-              <NextImage
-                key={heroSrc}
-                src={heroSrc}
-                alt={title}
-                fill
-                sizes="(min-width:920px) 920px, 94vw"
-                className="object-cover"
-                loading="eager"
-                priority
-              />
-            )}
+            <motion.div
+              style={{ y: yParallax, scale }}
+              className="absolute inset-0 w-full h-full"
+            >
+              {!showTrailer && heroSrc && (
+                <NextImage
+                  key={heroSrc}
+                  src={heroSrc}
+                  alt={title}
+                  fill
+                  sizes="(min-width:920px) 920px, 94vw"
+                  className="object-cover"
+                  loading="eager"
+                  priority
+                />
+              )}
 
-            {!showTrailer && !heroSrc && (
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
-            )}
+              {!showTrailer && !heroSrc && (
+                <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
+              )}
 
-            {showTrailer && (
-              <>
-                {(trailerLoading || !trailerSrc) && (
-                  <div className="absolute inset-0 animate-pulse bg-neutral-900" />
-                )}
-                {trailerSrc && (
-                  <div className="absolute inset-0 overflow-hidden">
-                    <iframe
-                      key={trailer.key}
-                      ref={trailerIframeRef}
-                      className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
-                      src={trailerSrc}
-                      title={`Tráiler - ${title}`}
-                      allow="autoplay; encrypted-media; picture-in-picture"
-                      allowFullScreen={false}
-                      onLoad={() => {
-                        try {
-                          const win = trailerIframeRef.current?.contentWindow;
-                          if (!win) return;
-                          const target = "https://www.youtube-nocookie.com";
-                          const cmd = (func, args = []) =>
-                            win.postMessage(
-                              JSON.stringify({ event: "command", func, args }),
-                              target,
-                            );
-                          setTimeout(() => {
-                            cmd("unMute");
-                            cmd("setVolume", [30]);
-                          }, 120);
-                        } catch {}
-                      }}
-                    />
-                  </div>
-                )}
-              </>
-            )}
+              {showTrailer && (
+                <>
+                  {(trailerLoading || !trailerSrc) && (
+                    <div className="absolute inset-0 animate-pulse bg-neutral-900" />
+                  )}
+                  {trailerSrc && (
+                    <div className="absolute inset-0 overflow-hidden">
+                      <iframe
+                        key={trailer.key}
+                        ref={trailerIframeRef}
+                        className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
+                        src={trailerSrc}
+                        title={`Tráiler - ${title}`}
+                        allow="autoplay; encrypted-media; picture-in-picture"
+                        allowFullScreen={false}
+                        onLoad={() => {
+                          try {
+                            const win = trailerIframeRef.current?.contentWindow;
+                            if (!win) return;
+                            const target = "https://www.youtube-nocookie.com";
+                            const cmd = (func, args = []) =>
+                              win.postMessage(
+                                JSON.stringify({ event: "command", func, args }),
+                                target,
+                                );
+                            setTimeout(() => {
+                              cmd("unMute");
+                              cmd("setVolume", [30]);
+                            }, 120);
+                          } catch {}
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/50 to-transparent" />
+            {/* Dark overlay that increases as we scroll */}
+            <motion.div
+              style={{ opacity: darkOverlayOpacity }}
+              className="pointer-events-none absolute inset-0 bg-black/60 z-10"
+            />
+
+            {/* Bottom shadow gradient (fades with logo) */}
+            <motion.div
+              style={{ opacity: logoOpacity }}
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/50 to-transparent z-10"
+            />
 
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
-            <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+            <motion.div
+              style={{ opacity: logoOpacity, y: logoY }}
+              className="absolute inset-x-0 bottom-0 p-5 sm:p-7 z-15"
+            >
               {data.logoPath ? (
                 <NextImage
                   key={data.logoPath}
@@ -810,16 +849,16 @@ export default function DetailModal({ item, onClose }) {
                   width={500}
                   height={200}
                   sizes="(min-width:920px) 460px, 70vw"
-                  className="h-auto max-h-20 w-auto max-w-[75%] object-contain object-left drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:max-h-24"
+                  className="h-auto max-h-28 w-auto max-w-[85%] object-contain object-left drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:max-h-36"
                   loading="eager"
                   priority
                 />
               ) : (
-                <h2 className="max-w-[80%] text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-4xl">
+                <h2 className="max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-5xl">
                   {title || <SkeletonBar className="h-8 w-64" />}
                 </h2>
               )}
-            </div>
+            </motion.div>
           </div>
 
           {/* CONTENIDO */}
@@ -829,67 +868,79 @@ export default function DetailModal({ item, onClose }) {
                 en el hero; el resto abre los modales reutilizables. Se omiten el
                 control de "visto" de Trakt y la valoración de episodios (no se
                 pasan sus handlers), por lo que no se renderizan. */}
-            <DetailActionsRow
-              onTrailer={handleToggleTrailer}
-              trailerAvailable
-              trailerLoading={trailerLoading}
-              onSoundtrack={openSoundtrack}
-              soundtrackAvailable={!!soundtrackSearchQuery}
-              onEpisodeRatings={
-                mediaType === "tv"
-                  ? () => setEpisodeRatingsOpen(true)
-                  : undefined
-              }
-              episodeRatingsOpen={episodeRatingsOpen}
-              trakt={{
-                connected: traktConnected || traktStatus.connected,
-                // Series: el ojo refleja "algún episodio visto" (misma señal que
-                // DetailsClient). Películas: estado de visionado del título.
-                watched:
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <DetailActionsRow
+                onTrailer={handleToggleTrailer}
+                trailerAvailable
+                trailerLoading={trailerLoading}
+                onSoundtrack={openSoundtrack}
+                soundtrackAvailable={!!soundtrackSearchQuery}
+                onEpisodeRatings={
                   mediaType === "tv"
-                    ? episodesWatched.hasAnyWatchedEpisode(
-                        episodesWatched.watchedBySeason,
-                      )
-                    : traktStatus.watched,
-                // Para series no mostramos recuento de plays en el ojo (igual que
-                // DetailsClient, que allí usa un badge de progreso %).
-                plays: mediaType === "tv" ? 0 : traktStatus.plays,
-                badge: null,
-                busy: !!traktBusy,
-                loading: traktStatusLoading,
-                onOpen: openTraktWatched,
-              }}
-              rate={{
-                rating: userRating,
-                max: 10,
-                loading: ratingLoading,
-                onRate: handleRate,
-                connected: isLoggedIn,
-                onConnect: () => requireLogin(),
-              }}
-              favorite={favorite}
-              favoriteLoading={loadingStates || updating}
-              onToggleFavorite={handleToggleFavorite}
-              watchlist={watchlist}
-              watchlistLoading={loadingStates || updating}
-              onToggleWatchlist={handleToggleWatchlist}
-              onAddToList={openListsModal}
-              listActive={Object.values(membershipMap || {}).some(Boolean)}
-              showComments={traktConnected || traktStatus.connected}
-              commentsActive={false}
-              onComments={() => setCommentModalOpen(true)}
-            />
+                    ? () => setEpisodeRatingsOpen(true)
+                    : undefined
+                }
+                episodeRatingsOpen={episodeRatingsOpen}
+                trakt={{
+                  connected: traktConnected || traktStatus.connected,
+                  // Series: el ojo refleja "algún episodio visto" (misma señal que
+                  // DetailsClient). Películas: estado de visionado del título.
+                  watched:
+                    mediaType === "tv"
+                      ? episodesWatched.hasAnyWatchedEpisode(
+                          episodesWatched.watchedBySeason,
+                        )
+                      : traktStatus.watched,
+                  // Para series no mostramos recuento de plays en el ojo (igual que
+                  // DetailsClient, que allí usa un badge de progreso %).
+                  plays: mediaType === "tv" ? 0 : traktStatus.plays,
+                  badge: null,
+                  busy: !!traktBusy,
+                  loading: traktStatusLoading,
+                  onOpen: openTraktWatched,
+                }}
+                rate={{
+                  rating: userRating,
+                  max: 10,
+                  loading: ratingLoading,
+                  onRate: handleRate,
+                  connected: isLoggedIn,
+                  onConnect: () => requireLogin(),
+                }}
+                favorite={favorite}
+                favoriteLoading={loadingStates || updating}
+                onToggleFavorite={handleToggleFavorite}
+                watchlist={watchlist}
+                watchlistLoading={loadingStates || updating}
+                onToggleWatchlist={handleToggleWatchlist}
+                onAddToList={openListsModal}
+                listActive={Object.values(membershipMap || {}).some(Boolean)}
+                showComments={traktConnected || traktStatus.connected}
+                commentsActive={false}
+                onComments={() => setCommentModalOpen(true)}
+              />
+            </motion.div>
 
             {/* Premios / nominaciones: misma línea verde que las previews del
                 dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
                 OMDb (data.awards) formateada con formatDashboardAwards. */}
             {data.awards && (
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10px" }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm"
+              >
                 <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="line-clamp-1">
                   {formatDashboardAwards(data.awards)}
                 </span>
-              </div>
+              </motion.div>
             )}
 
             {error && (
@@ -900,12 +951,19 @@ export default function DetailModal({ item, onClose }) {
 
             {/* Fila meta + géneros (componente real compartido con DetailsClient) */}
             {hasMetaRow ? (
-              <DetailsMetaGenresRow
-                yearIso={data.year}
-                displayRuntimeValue={data.runtime}
-                status={data.status}
-                genres={data.genreObjects}
-              />
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10px" }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <DetailsMetaGenresRow
+                  yearIso={data.year}
+                  displayRuntimeValue={data.runtime}
+                  status={data.status}
+                  genres={data.genreObjects}
+                />
+              </motion.div>
             ) : (
               loading && <SkeletonBar className="h-4 w-52" />
             )}
@@ -914,81 +972,93 @@ export default function DetailModal({ item, onClose }) {
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
             {(hasRatings || hasProviders) && (
-              <DetailsScoreboardPanel
-                loading={loading}
-                tmdb={
-                  data.tmdbRating != null
-                    ? {
-                        value: data.tmdbRating,
-                        sub: formatCountShort(data.tmdbVotes),
-                        href: undefined,
-                      }
-                    : null
-                }
-                traktPublic={
-                  typeof scoreboard?.rating === "number"
-                    ? {
-                        value: Number(scoreboard.rating).toFixed(1),
-                        sub: scoreboard.votes
-                          ? formatCountShort(scoreboard.votes)
-                          : undefined,
-                      }
-                    : null
-                }
-                imdb={
-                  typeof data.imdbRating === "number"
-                    ? {
-                        value: data.imdbRating.toFixed(1),
-                        sub: formatCountShort(data.imdbVotes),
-                        href: data.imdbId
-                          ? `https://www.imdb.com/title/${data.imdbId}`
-                          : undefined,
-                      }
-                    : null
-                }
-                rt={
-                  data.rtScore != null
-                    ? { value: Math.round(data.rtScore) }
-                    : null
-                }
-                mc={
-                  data.mcScore != null
-                    ? { value: Math.round(data.mcScore) }
-                    : null
-                }
-                externalLinks={[
-                  {
-                    icon: "/logo-TMDb.png",
-                    title: "TMDb",
-                    href: `https://www.themoviedb.org/${
-                      mediaType === "tv" ? "tv" : "movie"
-                    }/${item?.id}`,
-                  },
-                  ...(data.imdbId
-                    ? [
-                        {
-                          icon: "/logo-IMDb.svg",
-                          title: "IMDb",
-                          href: `https://www.imdb.com/title/${data.imdbId}`,
-                        },
-                      ]
-                    : []),
-                ]}
-                streamingProviders={streamingProviders}
-                share={{
-                  title,
-                  text: `Echa un vistazo a ${title} en The Show Verse`,
-                  url:
-                    typeof window !== "undefined" && item?.id
-                      ? `${window.location.origin}/details/${mediaType}/${item.id}`
-                      : undefined,
-                }}
-                stats={scoreStats}
-              />
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <DetailsScoreboardPanel
+                  loading={loading}
+                  tmdb={
+                    data.tmdbRating != null
+                      ? {
+                          value: data.tmdbRating,
+                          sub: formatCountShort(data.tmdbVotes),
+                          href: undefined,
+                        }
+                      : null
+                  }
+                  traktPublic={
+                    typeof scoreboard?.rating === "number"
+                      ? {
+                          value: Number(scoreboard.rating).toFixed(1),
+                          sub: scoreboard.votes
+                            ? formatCountShort(scoreboard.votes)
+                            : undefined,
+                        }
+                      : null
+                  }
+                  imdb={
+                    typeof data.imdbRating === "number"
+                      ? {
+                          value: data.imdbRating.toFixed(1),
+                          sub: formatCountShort(data.imdbVotes),
+                          href: data.imdbId
+                            ? `https://www.imdb.com/title/${data.imdbId}`
+                            : undefined,
+                        }
+                      : null
+                  }
+                  rt={
+                    data.rtScore != null
+                      ? { value: Math.round(data.rtScore) }
+                      : null
+                  }
+                  mc={
+                    data.mcScore != null
+                      ? { value: Math.round(data.mcScore) }
+                      : null
+                  }
+                  externalLinks={[
+                    {
+                      icon: "/logo-TMDb.png",
+                      title: "TMDb",
+                      href: `https://www.themoviedb.org/${
+                        mediaType === "tv" ? "tv" : "movie"
+                      }/${item?.id}`,
+                    },
+                    ...(data.imdbId
+                      ? [
+                          {
+                            icon: "/logo-IMDb.svg",
+                            title: "IMDb",
+                            href: `https://www.imdb.com/title/${data.imdbId}`,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  streamingProviders={streamingProviders}
+                  share={{
+                    title,
+                    text: `Echa un vistazo a ${title} en The Show Verse`,
+                    url:
+                      typeof window !== "undefined" && item?.id
+                        ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                        : undefined,
+                  }}
+                  stats={scoreStats}
+                />
+              </motion.div>
             )}
 
             {/* Pestañas: Detalles · Producción · Sinopsis · Premios */}
-            <div>
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-10px" }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
               <DetailsInfoTabs
                 variant="normal"
                 layoutId="detailModalTab"
@@ -1012,11 +1082,17 @@ export default function DetailModal({ item, onClose }) {
                 overview={data.overview}
                 awards={data.awards}
               />
-            </div>
+            </motion.div>
 
             {/* Reparto */}
             {data.cast?.length > 0 && (
-              <section className="space-y-3">
+              <motion.section
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-15px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-3"
+              >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Reparto
@@ -1062,12 +1138,18 @@ export default function DetailModal({ item, onClose }) {
                     );
                   })}
                 </div>
-              </section>
+              </motion.section>
             )}
 
             {/* Títulos similares */}
             {data.recommendations?.length > 0 && (
-              <section className="space-y-3">
+              <motion.section
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-15px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-3"
+              >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <MonitorPlay className="h-4 w-4" aria-hidden="true" />
                   Títulos similares
@@ -1112,12 +1194,18 @@ export default function DetailModal({ item, onClose }) {
                     );
                   })}
                 </div>
-              </section>
+              </motion.section>
             )}
 
             {/* Sentimientos de la comunidad (pros / cons) */}
             {hasSentiment && (
-              <section className="space-y-3">
+              <motion.section
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-15px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-3"
+              >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Sparkles className="h-4 w-4" aria-hidden="true" />
                   Sentimientos de la comunidad
@@ -1170,7 +1258,7 @@ export default function DetailModal({ item, onClose }) {
                     </div>
                   )}
                 </div>
-              </section>
+              </motion.section>
             )}
           </div>
         </div>
