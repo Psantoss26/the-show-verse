@@ -1594,6 +1594,7 @@ export default function DetailModal({ item, onClose }) {
               <div className="w-full min-w-0 sm:flex-1 mx-[-20px] sm:mx-0 px-2 sm:px-0">
                 <DetailActionsRow
                   fillMobile
+                  mobileGapClass="gap-1.5"
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
                   trailerLoading={trailerLoading}
