@@ -1067,7 +1067,7 @@ export default function DetailModal({ item, onClose }) {
           className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
           {/* HERO: backdrop grande (o tráiler inline) + degradado */}
-          <div className="relative aspect-video w-full overflow-hidden bg-neutral-950">
+          <div className="relative aspect-video w-full overflow-hidden bg-neutral-950 border-b border-white/[0.06]">
             <motion.div
               style={{
                 y: yParallax,
