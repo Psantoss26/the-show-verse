@@ -348,19 +348,20 @@ export async function POST(request) {
       }
     }
 
-    // Nombre del episodio (solo con episodio concreto). Se expone APARTE
-    // (episodeName) por si algún cliente quiere mostrarlo, pero NO se concatena al
-    // título que se guarda en el historial: un episodio debe guardarse como la
-    // SERIE ("La casa del dragón" + T1·E1), igual que al marcarlo a mano desde el
-    // modal de episodios vistos. Antes se guardaba "Serie: Nombre del episodio".
-    let episodeName = null;
+    // Nombre canónico del episodio en TMDb (solo con episodio concreto). Se expone
+    // APARTE (synced.episodeName) por si algún cliente quiere mostrarlo, pero NO se
+    // concatena al título que se guarda en el historial: un episodio debe guardarse
+    // como la SERIE ("La casa del dragón" + T1·E1), igual que al marcarlo a mano
+    // desde el modal. Antes se guardaba "Serie: Nombre del episodio". (El nombre va
+    // en una variable propia para no colisionar con `episodeName` del body.)
+    let tmdbEpisodeName = null;
     if (isTv && tmdbId && episode != null && season != null && TMDB_API_KEY) {
       try {
         const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
         const epRes = await fetch(epUrl);
         if (epRes.ok) {
           const epData = await epRes.json();
-          if (epData.name) episodeName = epData.name;
+          if (epData.name) tmdbEpisodeName = epData.name;
         }
       } catch (e) {
         console.error("[Extension Sync] Failed to fetch episode name:", e);
@@ -384,7 +385,7 @@ export async function POST(request) {
           season: isTv ? season : null,
           episode: isTv ? episode : null,
           title: resolvedTitle,
-          episodeName: isTv ? episodeName : null,
+          episodeName: isTv ? (tmdbEpisodeName || episodeName || null) : null,
           posterPath,
         },
       });
@@ -466,7 +467,7 @@ export async function POST(request) {
         season,
         episode,
         title: resolvedTitle,
-        episodeName: isTv ? episodeName : null,
+        episodeName: isTv ? (tmdbEpisodeName || episodeName || null) : null,
         posterPath,
         confidence,
         duplicate: Boolean(historyRes.json?.duplicate),
