@@ -61,6 +61,7 @@ import SoundtrackModal from "@/components/details/SoundtrackModal";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
+import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
@@ -82,6 +83,9 @@ import {
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+// Máquina de episodios vistos (series) COMPARTIDA con DetailsClient: misma
+// lógica de toggles, rewatches, plays y persistencia en localStorage.
+import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -517,6 +521,18 @@ export default function DetailModal({ item, onClose }) {
   const [traktStatusLoading, setTraktStatusLoading] = useState(false);
   const [traktBusy, setTraktBusy] = useState("");
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false);
+  // Modal de episodios vistos (solo series). Su máquina de estado vive en el
+  // hook compartido; aquí solo controlamos abrir/cerrar.
+  const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
+  const episodesWatched = useTraktEpisodesWatched({
+    mediaType,
+    tmdbId: item?.id,
+    title,
+    connected: traktConnected || traktStatus.connected,
+    seasons: data.seasons,
+    episodesModalOpen: traktEpisodesOpen,
+    onStatusShouldRefresh: () => refreshTraktStatus(true),
+  });
 
   const applyTraktStatus = (st) => {
     setTraktStatus({
@@ -573,6 +589,12 @@ export default function DetailModal({ item, onClose }) {
   const openTraktWatched = () => {
     if (!traktStatus.connected && !traktConnected) {
       requireLogin();
+      return;
+    }
+    // Series → modal de EPISODIOS vistos (temporadas, rewatches, plays), igual
+    // que DetailsClient. Películas → gestor de reproducciones.
+    if (mediaType === "tv") {
+      setTraktEpisodesOpen(true);
       return;
     }
     setTraktWatchedOpen(true);
@@ -659,8 +681,22 @@ export default function DetailModal({ item, onClose }) {
   const hasMetaRow =
     !!data.year || !!data.runtime || !!statusLabel || data.genres?.length > 0;
 
-  const providers = Array.isArray(data.providers) ? data.providers : [];
-  const hasProviders = providers.length > 0;
+  const streamingProviders = useMemo(() => {
+    const providers = Array.isArray(data.providers) ? data.providers : [];
+    return providers
+      .map((provider) => {
+        const icon = providerLogoSrc(provider);
+        if (!icon || !provider?.url || !provider?.name) return null;
+        return {
+          key: `${provider.name}-${provider.url}`,
+          title: `Ver en ${provider.name}`,
+          href: provider.url,
+          icon,
+        };
+      })
+      .filter(Boolean);
+  }, [data.providers]);
+  const hasProviders = streamingProviders.length > 0;
 
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
@@ -807,7 +843,14 @@ export default function DetailModal({ item, onClose }) {
               episodeRatingsOpen={episodeRatingsOpen}
               trakt={{
                 connected: traktConnected || traktStatus.connected,
-                watched: traktStatus.watched,
+                // Series: el ojo refleja "algún episodio visto" (misma señal que
+                // DetailsClient). Películas: estado de visionado del título.
+                watched:
+                  mediaType === "tv"
+                    ? episodesWatched.hasAnyWatchedEpisode(
+                        episodesWatched.watchedBySeason,
+                      )
+                    : traktStatus.watched,
                 // Para series no mostramos recuento de plays en el ojo (igual que
                 // DetailsClient, que allí usa un badge de progreso %).
                 plays: mediaType === "tv" ? 0 : traktStatus.plays,
@@ -832,7 +875,7 @@ export default function DetailModal({ item, onClose }) {
               onToggleWatchlist={handleToggleWatchlist}
               onAddToList={openListsModal}
               listActive={Object.values(membershipMap || {}).some(Boolean)}
-              showComments={traktConnected}
+              showComments={traktConnected || traktStatus.connected}
               commentsActive={false}
               onComments={() => setCommentModalOpen(true)}
             />
@@ -869,8 +912,7 @@ export default function DetailModal({ item, onClose }) {
 
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
-                stats), para que se vea IDÉNTICO. La fila de "plataformas
-                disponibles" se mantiene debajo, como children. */}
+                stats), con plataformas integradas en la barra superior. */}
             {(hasRatings || hasProviders) && (
               <DetailsScoreboardPanel
                 loading={loading}
@@ -932,6 +974,7 @@ export default function DetailModal({ item, onClose }) {
                       ]
                     : []),
                 ]}
+                streamingProviders={streamingProviders}
                 share={{
                   title,
                   text: `Echa un vistazo a ${title} en The Show Verse`,
@@ -941,42 +984,7 @@ export default function DetailModal({ item, onClose }) {
                       : undefined,
                 }}
                 stats={scoreStats}
-              >
-                {/* Plataformas de streaming disponibles */}
-                {hasProviders && (
-                  <div className="relative z-10 rounded-b-2xl border-t border-white/5 bg-black/[0.06]">
-                    <div className="flex flex-wrap items-center gap-2.5 p-3 sm:px-4">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                        Disponible en
-                      </span>
-                      {providers.map((p) => {
-                        const src = providerLogoSrc(p);
-                        if (!src) return null;
-                        return (
-                          <a
-                            key={`${p.name}-${p.url}`}
-                            href={p.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            title={`Ver en ${p.name}`}
-                            aria-label={`Ver en ${p.name}`}
-                            className="group relative block h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/30 transition hover:scale-105 hover:border-white/30"
-                          >
-                            <NextImage
-                              src={src}
-                              alt={p.name}
-                              fill
-                              sizes="36px"
-                              className="object-cover"
-                              loading="lazy"
-                            />
-                          </a>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </DetailsScoreboardPanel>
+              />
             )}
 
             {/* Pestañas: Detalles · Producción · Sinopsis · Premios */}
@@ -1234,6 +1242,44 @@ export default function DetailModal({ item, onClose }) {
         onUpdatePlay={handleTraktUpdatePlay}
         onRemovePlay={handleTraktRemovePlay}
       />
+
+      {/* Visto en Trakt (SERIES) — modal de EPISODIOS vistos: temporadas,
+          rewatches y plays. MISMO componente + MISMA lógica (hook compartido)
+          que DetailsClient. */}
+      {mediaType === "tv" && (
+        <TraktEpisodesWatchedModal
+          key={`${item?.id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
+          open={traktEpisodesOpen}
+          onClose={() => {
+            setTraktEpisodesOpen(false);
+            episodesWatched.reconcileAfterClose();
+          }}
+          mediaType={mediaType}
+          tmdbId={Number(item?.id)}
+          title={title}
+          connected={traktConnected || traktStatus.connected}
+          seasons={Array.isArray(data.seasons) ? data.seasons : []}
+          watchedBySeason={episodesWatched.watchedBySeason}
+          busyKey={episodesWatched.episodeBusyKey}
+          episodeBusyKey={episodesWatched.episodeBusyKey}
+          onToggleEpisodeWatched={episodesWatched.toggleEpisodeWatched}
+          onToggleShowWatched={episodesWatched.onToggleShowWatched}
+          showPlays={episodesWatched.showPlays}
+          showReleaseDate={data.showReleaseDate || null}
+          onAddShowPlay={episodesWatched.onAddShowPlay}
+          rewatchRuns={episodesWatched.rewatchRuns}
+          activeView={episodesWatched.activeEpisodesView}
+          activeEpisodesView={episodesWatched.activeEpisodesView}
+          onChangeView={episodesWatched.changeEpisodesView}
+          onChangeEpisodesView={episodesWatched.changeEpisodesView}
+          onCreateRewatchRun={episodesWatched.createRewatchRun}
+          onDeleteRewatchRun={episodesWatched.deleteRewatchRun}
+          rewatchStartAt={episodesWatched.rewatchStartAt}
+          watchedBySeasonRewatch={episodesWatched.rewatchWatchedBySeason}
+          rewatchWatchedBySeason={episodesWatched.rewatchWatchedBySeason}
+          onToggleEpisodeRewatch={episodesWatched.toggleEpisodeRewatch}
+        />
+      )}
 
       {/* Valoración de episodios (solo series) — mismo modal que la ficha
           completa; se autoabastece (ratings + temporadas) al abrirse. */}

@@ -136,6 +136,8 @@ const EMPTY_DATA = {
   sentiment: EMPTY_SENTIMENT,
   scoreboard: null,
   providers: [],
+  seasons: [],
+  showReleaseDate: null,
 };
 
 // Normaliza la respuesta de /api/streaming (JustWatch) a la forma mínima que
@@ -364,6 +366,11 @@ export function useDetailModalData(item) {
           cast,
           recommendations,
           production,
+          // Datos crudos para el modal de episodios vistos (solo TV): array de
+          // temporadas de TMDb y fecha de estreno ISO sin formatear.
+          seasons: Array.isArray(source?.seasons) ? source.seasons : [],
+          showReleaseDate:
+            source?.first_air_date || source?.release_date || null,
         }));
       } catch {
         // Degradamos en silencio: nos quedamos con la semilla del item.
