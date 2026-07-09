@@ -9,7 +9,13 @@
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
@@ -154,22 +160,48 @@ function normalizeSeasonNumber(value) {
 /* =============================== ANIMACIÓN =============================== */
 const backdropVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
-// Panel anclado abajo: entra deslizando desde el borde inferior.
-const panelVariants = {
-  hidden: { opacity: 0, y: 48 },
   visible: {
     opacity: 1,
-    y: 0,
-    transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
+  },
+  navigate: {
+    opacity: 0,
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
   },
   exit: {
     opacity: 0,
-    y: 32,
-    transition: { duration: 0.2, ease: "easeInOut" },
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+  },
+};
+
+// Panel anclado abajo: entra como una hoja de preview y sale hacia la ficha.
+const panelVariants = {
+  hidden: { opacity: 0, y: 86, scale: 0.965, filter: "blur(10px)" },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      type: "spring",
+      stiffness: 170,
+      damping: 22,
+      mass: 0.9,
+    },
+  },
+  navigate: {
+    opacity: 0,
+    y: -28,
+    scale: 0.985,
+    filter: "blur(4px)",
+    transition: { duration: 0.22, ease: [0.4, 0, 1, 1] },
+  },
+  exit: {
+    opacity: 0,
+    y: 52,
+    scale: 0.985,
+    filter: "blur(6px)",
+    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
   },
 };
 
@@ -183,11 +215,13 @@ function SkeletonBar({ className = "" }) {
 /* ================================== MODAL ================================== */
 export default function DetailModal({ item, onClose }) {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data } = useDetailModalData(item);
 
   const scrollContainerRef = useRef(null);
+  const fullDetailsTimerRef = useRef(null);
   const { scrollY } = useScroll({ container: scrollContainerRef });
 
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
@@ -208,7 +242,19 @@ export default function DetailModal({ item, onClose }) {
   const mediaType = data.mediaType || getMediaTypeForItem(item);
   const title = data.title || item?.title || item?.name || "";
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
-  const heroSrc = backdropPath ? buildImg(backdropPath, "w1280") : null;
+  const posterPath = data.posterPath || item?.poster_path || null;
+  const mobilePosterPath = data.heroPosterPath || null;
+  const desktopHeroSrc = backdropPath
+    ? buildImg(backdropPath, "w1280")
+    : posterPath
+      ? buildImg(posterPath, "w780")
+      : null;
+  const mobileHeroSrc = mobilePosterPath
+    ? buildImg(mobilePosterPath, "w780")
+    : backdropPath
+      ? buildImg(backdropPath, "w1280")
+      : null;
+  const hasHeroArt = !!(desktopHeroSrc || mobileHeroSrc);
   const seasonSelectId = useId();
   const availableSeasons = useMemo(() => {
     const source = Array.isArray(data.seasons) ? data.seasons : [];
@@ -255,6 +301,15 @@ export default function DetailModal({ item, onClose }) {
   });
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
+  const [navigatingToFullDetails, setNavigatingToFullDetails] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (fullDetailsTimerRef.current) {
+        window.clearTimeout(fullDetailsTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancel = false;
@@ -886,8 +941,18 @@ export default function DetailModal({ item, onClose }) {
 
   /* ------------------------------ ficha completa ------------------------------ */
   const goToFullDetails = () => {
-    router.push(dashboardDetailHref(item, mediaType));
-    onClose();
+    if (navigatingToFullDetails) return;
+    const href = dashboardDetailHref(item, mediaType);
+
+    if (prefersReducedMotion) {
+      router.push(href);
+      return;
+    }
+
+    setNavigatingToFullDetails(true);
+    fullDetailsTimerRef.current = window.setTimeout(() => {
+      router.push(href);
+    }, 190);
   };
 
   /* --------------------------------- derivados --------------------------------- */
@@ -1184,18 +1249,17 @@ export default function DetailModal({ item, onClose }) {
       <motion.div
         variants={backdropVariants}
         initial="hidden"
-        animate="visible"
+        animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
-        transition={{ duration: 0.25 }}
         className="fixed inset-0 bg-black/70 backdrop-blur-xl"
-        onClick={onClose}
+        onClick={navigatingToFullDetails ? undefined : onClose}
       />
 
       {/* Panel ancho anclado al borde inferior, esquinas superiores redondeadas */}
       <motion.div
         variants={panelVariants}
         initial="hidden"
-        animate="visible"
+        animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         onClick={(e) => e.stopPropagation()}
         className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
@@ -1204,8 +1268,10 @@ export default function DetailModal({ item, onClose }) {
         <button
           type="button"
           onClick={goToFullDetails}
-          className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition hover:bg-black/60 hover:text-white"
+          disabled={navigatingToFullDetails}
+          className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition hover:bg-black/60 hover:text-white disabled:pointer-events-none disabled:opacity-70"
           aria-label="Ver ficha completa"
+          aria-busy={navigatingToFullDetails ? "true" : undefined}
           title="Ver ficha completa"
         >
           <ArrowUpRight className="h-5 w-5" />
@@ -1216,8 +1282,8 @@ export default function DetailModal({ item, onClose }) {
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
-          {/* HERO: backdrop grande (o tráiler inline) + degradado */}
-          <div className="relative aspect-video w-full overflow-hidden bg-neutral-950 border-b border-white/[0.06]">
+          {/* HERO: póster textless en móvil, backdrop panorámico en sm+. */}
+          <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-950 border-b border-white/[0.06] sm:aspect-video">
             <motion.div
               style={{
                 y: yParallax,
@@ -1227,20 +1293,39 @@ export default function DetailModal({ item, onClose }) {
               }}
               className="absolute inset-0 w-full h-full"
             >
-              {!showTrailer && heroSrc && (
-                <NextImage
-                  key={heroSrc}
-                  src={heroSrc}
-                  alt={title}
-                  fill
-                  sizes="(min-width:920px) 920px, 94vw"
-                  className="object-cover"
-                  loading="eager"
-                  priority
-                />
+              {!showTrailer && hasHeroArt && (
+                <>
+                  {mobileHeroSrc && (
+                    <img
+                      key={`mobile-${mobileHeroSrc}`}
+                      src={mobileHeroSrc}
+                      alt={title}
+                      className="block h-full w-full object-contain sm:hidden"
+                      loading="eager"
+                      fetchPriority="high"
+                    />
+                  )}
+
+                  {desktopHeroSrc && (
+                    <img
+                      key={`desktop-${desktopHeroSrc}`}
+                      src={desktopHeroSrc}
+                      alt={title}
+                      className={`h-full w-full ${
+                        mobileHeroSrc
+                          ? "hidden object-cover sm:block"
+                          : backdropPath
+                            ? "block object-contain sm:object-cover"
+                            : "hidden object-cover sm:block"
+                      }`}
+                      loading="eager"
+                      fetchPriority="high"
+                    />
+                  )}
+                </>
               )}
 
-              {!showTrailer && !heroSrc && (
+              {!showTrailer && !hasHeroArt && (
                 <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
               )}
 
@@ -1297,7 +1382,7 @@ export default function DetailModal({ item, onClose }) {
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
             <motion.div
               style={{ opacity: logoOpacity, y: logoY }}
-              className="absolute inset-x-0 bottom-0 p-5 sm:p-7 z-15"
+              className="absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center sm:block sm:p-7 sm:text-left"
             >
               {data.logoPath ? (
                 <NextImage
@@ -1307,12 +1392,12 @@ export default function DetailModal({ item, onClose }) {
                   width={500}
                   height={200}
                   sizes="(min-width:920px) 460px, 70vw"
-                  className="h-auto max-h-28 w-auto max-w-[85%] object-contain object-left drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:max-h-36"
+                  className="h-auto max-h-28 w-auto max-w-[85%] object-contain object-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:max-h-36 sm:object-left"
                   loading="eager"
                   priority
                 />
               ) : (
-                <h2 className="max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-5xl">
+                <h2 className="mx-auto max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:mx-0 sm:text-5xl">
                   {title || <SkeletonBar className="h-8 w-64" />}
                 </h2>
               )}
@@ -1330,9 +1415,9 @@ export default function DetailModal({ item, onClose }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
             >
-              <div className="flex-1 min-w-0">
+              <div className="w-full min-w-0 sm:flex-1">
                 <DetailActionsRow
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
@@ -1358,9 +1443,20 @@ export default function DetailModal({ item, onClose }) {
                     // Para series no mostramos recuento de plays en el ojo (igual que
                     // DetailsClient, que allí usa un badge de progreso %).
                     plays: mediaType === "tv" ? 0 : traktStatus.plays,
-                    badge: null,
+                    // Series En progreso: % de episodios vistos en el botón, igual
+                    // que DetailsClient (mismo cálculo, desde el hook compartido).
+                    badge:
+                      mediaType === "tv" ? episodesWatched.tvProgressBadge : null,
                     busy: !!traktBusy,
-                    loading: traktStatusLoading,
+                    // Para TV esperamos también a que cargue el estado de episodios
+                    // (evita el parpadeo "visto sin %"): mismo criterio que el
+                    // watchedActionLoading de DetailsClient.
+                    loading:
+                      mediaType === "tv"
+                        ? traktStatusLoading ||
+                          ((traktConnected || traktStatus.connected) &&
+                            !episodesWatched.watchedBySeasonLoaded)
+                        : traktStatusLoading,
                     onOpen: openTraktWatched,
                   }}
                   rate={{
@@ -1377,8 +1473,12 @@ export default function DetailModal({ item, onClose }) {
                   watchlist={watchlist}
                   watchlistLoading={loadingStates || updating}
                   onToggleWatchlist={handleToggleWatchlist}
-                  onAddToList={openListsModal}
-                  listActive={Object.values(membershipMap || {}).some(Boolean)}
+                  onAddToList={mediaType === "tv" ? undefined : openListsModal}
+                  listActive={
+                    mediaType === "tv"
+                      ? false
+                      : Object.values(membershipMap || {}).some(Boolean)
+                  }
                   showComments={traktConnected || traktStatus.connected}
                   commentsActive={false}
                   onComments={() => setCommentModalOpen(true)}
@@ -1386,7 +1486,7 @@ export default function DetailModal({ item, onClose }) {
               </div>
 
               {hasProviders && (
-                <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+                <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
                   {streamingProviders.map((prov) => (
                     <a
                       key={prov.key}
@@ -1416,7 +1516,7 @@ export default function DetailModal({ item, onClose }) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10px" }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm"
+                className="flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:justify-start sm:text-left sm:text-sm"
               >
                 <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="line-clamp-1">
@@ -1518,6 +1618,7 @@ export default function DetailModal({ item, onClose }) {
                         : undefined,
                   }}
                   stats={scoreStats}
+                  className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
                 />
               </motion.div>
             )}
@@ -1567,7 +1668,7 @@ export default function DetailModal({ item, onClose }) {
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Reparto
                 </h3>
-                <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-cols-3 gap-3 overflow-hidden pb-1 sm:flex sm:overflow-x-auto sm:pb-2 sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden">
                   {data.cast.map((person) => {
                     const photo = person?.profile_path
                       ? buildImg(person.profile_path, "w185")
@@ -1575,7 +1676,7 @@ export default function DetailModal({ item, onClose }) {
                     return (
                       <div
                         key={person?.id ?? person?.credit_id ?? person?.name}
-                        className="group relative w-[30%] shrink-0 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900 shadow-md transition-colors hover:border-yellow-500/30 sm:w-[calc((100%-2.25rem)/4)] lg:w-[calc((100%-3.75rem)/6)]"
+                        className="group relative w-full min-w-0 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900 shadow-md transition-colors hover:border-yellow-500/30 sm:w-[calc((100%-2.25rem)/4)] sm:shrink-0 lg:w-[calc((100%-3.75rem)/6)]"
                       >
                         <div className="relative aspect-[2/3] overflow-hidden">
                           {photo ? (

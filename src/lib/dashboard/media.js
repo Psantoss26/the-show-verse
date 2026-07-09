@@ -505,11 +505,15 @@ export async function fetchBestWatchingBackdrop(itemId, mediaType = "movie") {
 
 // Selecciona el mejor cartel SIN idioma (textless). Si no hay textless, cae al
 // de mayor resolución disponible.
-export function pickBestPosterNoLang(list, { minWidth = 500 } = {}) {
+export function pickBestPosterNoLang(
+  list,
+  { minWidth = 500, fallbackToAny = true } = {},
+) {
   if (!Array.isArray(list) || list.length === 0) return null;
 
   const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
   const noLang = list.filter((p) => !norm(p?.iso_639_1));
+  if (!noLang.length && !fallbackToAny) return null;
   const pool = noLang.length ? noLang : list;
 
   const sized = pool.filter((p) => (p?.width || 0) >= minWidth);
@@ -524,9 +528,13 @@ export function pickBestPosterNoLang(list, { minWidth = 500 } = {}) {
   );
 }
 
-export async function fetchBestPosterNoLang(itemId, mediaType = "movie") {
+export async function fetchBestPosterNoLang(
+  itemId,
+  mediaType = "movie",
+  opts = {},
+) {
   const { posters } = await getMovieImages(itemId, mediaType);
-  const best = pickBestPosterNoLang(posters);
+  const best = pickBestPosterNoLang(posters, opts);
   return best?.file_path || null;
 }
 

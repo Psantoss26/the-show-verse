@@ -94,6 +94,12 @@ export function getWatchedEpisodeCountForSeason(value, seasonNumber, total) {
   ).size;
 }
 
+// Episodios disponibles de una temporada (regular). Espejo de DetailsClient.
+export function getAvailableEpisodeTotal(season) {
+  const total = Number(season?.episode_count || 0);
+  return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+}
+
 /* -------------------------------- hook ------------------------------------ */
 
 export function useTraktEpisodesWatched({
@@ -1228,11 +1234,44 @@ export function useTraktEpisodesWatched({
     ],
   );
 
+  // Badge de progreso ("47%") para el botón "visto" en series. MISMA fórmula
+  // que DetailsClient: % de episodios vistos sobre el total de temporadas
+  // regulares. null si no procede (no conectado, sin cargar, 0% o película).
+  const tvProgressBadge = useMemo(() => {
+    if (type !== "tv") return null;
+    if (!connected) return null;
+    if (!watchedBySeasonLoaded) return null;
+
+    const seasonsList = Array.isArray(seasons) ? seasons : [];
+    const usable = seasonsList.filter(
+      (s) => typeof s?.season_number === "number" && s.season_number > 0,
+    );
+    if (usable.length === 0) return null;
+
+    const totalEpisodes = usable.reduce(
+      (acc, s) => acc + getAvailableEpisodeTotal(s),
+      0,
+    );
+    if (totalEpisodes <= 0) return null;
+
+    const watchedEpisodes = usable.reduce((acc, s) => {
+      const sn = s.season_number;
+      const total = getAvailableEpisodeTotal(s);
+      return acc + getWatchedEpisodeCountForSeason(watchedBySeason, sn, total);
+    }, 0);
+
+    const pct = Math.round((watchedEpisodes / totalEpisodes) * 100);
+    const safePct = Math.min(100, Math.max(0, pct));
+    if (safePct <= 0) return null;
+    return `${safePct}%`;
+  }, [type, connected, watchedBySeasonLoaded, seasons, watchedBySeason]);
+
   return {
     // estado
     watchedBySeason,
     watchedBySeasonLoaded,
     episodeBusyKey,
+    tvProgressBadge,
     showPlays,
     rewatchStartAt,
     rewatchWatchedBySeason,
