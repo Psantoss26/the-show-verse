@@ -1591,7 +1591,7 @@ export default function DetailModal({ item, onClose }) {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
             >
-              <div className="w-full min-w-0 sm:flex-1 mx-[-20px] sm:mx-0 px-2 sm:px-0">
+              <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
                 <DetailActionsRow
                   fillMobile
                   mobileGapClass="gap-1.5"
