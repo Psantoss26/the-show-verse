@@ -100,6 +100,7 @@ const EMPTY_SENTIMENT = { pros: [], cons: [] };
 const EMPTY_DATA = {
   mediaType: null,
   title: null,
+  homepage: null,
   logoPath: null,
   overview: null,
   backdropPath: null,
@@ -341,6 +342,7 @@ export function useDetailModalData(item) {
           ...prev,
           mediaType,
           title,
+          homepage: source?.homepage || null,
           overview,
           backdropPath,
           posterPath,
