@@ -26,6 +26,7 @@
 
 import { Fragment } from "react";
 import { motion } from "framer-motion";
+import NextImage from "next/image";
 import { Eye, Play, List, Heart, MoreHorizontal } from "lucide-react";
 
 import {
@@ -248,38 +249,108 @@ export function DetailsStatsRow({ stats = null }) {
 //    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
 //       derecha con ml-auto (siempre visible si se pasa).
 // ---------------------------------------------------------------------------
-function DetailsToolbarActions({ externalLinks = null, onMoreLinks, share = null }) {
+function ToolbarSeparator({ className = "" }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`h-6 w-px shrink-0 bg-white/20 ${className}`}
+    />
+  );
+}
+
+function StreamingProviderButton({ provider }) {
+  if (!provider?.icon || !provider?.href) return null;
+
+  return (
+    <motion.a
+      href={provider.href}
+      target="_blank"
+      rel="noreferrer"
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ scale: 1.1 }}
+      aria-label={provider.title}
+      title={provider.title}
+      className="group/stream relative block shrink-0 transition hover:brightness-110"
+    >
+      <span className="relative block h-7 w-7 overflow-hidden rounded-xl bg-black/20 shadow-lg lg:h-8 lg:w-8">
+        <NextImage
+          src={provider.icon}
+          alt=""
+          fill
+          sizes="32px"
+          className="object-cover"
+          loading="lazy"
+        />
+      </span>
+
+      <div className="pointer-events-none absolute top-full left-1/2 z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/stream:scale-100 group-hover/stream:opacity-100 group-hover/stream:delay-[2000ms]">
+        {provider.title}
+      </div>
+    </motion.a>
+  );
+}
+
+function DetailsToolbarActions({
+  externalLinks = null,
+  streamingProviders = null,
+  onMoreLinks,
+  share = null,
+}) {
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
+  const hasStreamingProviders =
+    Array.isArray(streamingProviders) && streamingProviders.length > 0;
+  const hasInlineActions = hasExternalLinks || hasStreamingProviders;
 
   return (
     <>
-      {/* ========== Separador vertical 1 + ENLACES EXTERNOS + Separador 2 ========== */}
-      {hasExternalLinks && (
+      {/* ========== Separador vertical 1 + ENLACES EXTERNOS / STREAMING ========== */}
+      {hasInlineActions && (
         <>
-          <div className="w-px h-6 bg-white/35 shrink-0" />
+          <ToolbarSeparator />
 
           <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
             {/* Versión Desktop: iconos normales de enlaces externos */}
             <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
-              {externalLinks.map((link, i) => {
-                const key = link.key ?? `${link.icon}-${i}`;
-                const btn = (
-                  <ExternalLinkButton
-                    icon={link.icon}
-                    title={link.title}
-                    href={link.href}
-                    fallbackHref={link.fallbackHref}
-                  />
-                );
-                return link.wrapperClassName ? (
-                  <div key={key} className={link.wrapperClassName}>
-                    {btn}
-                  </div>
-                ) : (
-                  <Fragment key={key}>{btn}</Fragment>
-                );
-              })}
+              {hasExternalLinks && (
+                <>
+                  {externalLinks.map((link, i) => {
+                    const key = link.key ?? `${link.icon}-${i}`;
+                    const btn = (
+                      <ExternalLinkButton
+                        icon={link.icon}
+                        title={link.title}
+                        href={link.href}
+                        fallbackHref={link.fallbackHref}
+                      />
+                    );
+                    return link.wrapperClassName ? (
+                      <div key={key} className={link.wrapperClassName}>
+                        {btn}
+                      </div>
+                    ) : (
+                      <Fragment key={key}>{btn}</Fragment>
+                    );
+                  })}
+                </>
+              )}
+
+              {hasExternalLinks && hasStreamingProviders && (
+                <ToolbarSeparator className="mx-0.5" />
+              )}
+
+              {hasStreamingProviders && (
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  {streamingProviders.map((provider, i) => (
+                    <StreamingProviderButton
+                      key={provider.key ?? `${provider.title}-${i}`}
+                      provider={provider}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Versión Móvil: botón "..." que abre modal de enlaces */}
@@ -296,7 +367,7 @@ function DetailsToolbarActions({ externalLinks = null, onMoreLinks, share = null
             )}
           </div>
 
-          <div className="hidden md:block w-px h-6 bg-white/35 shrink-0" />
+          {share && <ToolbarSeparator className="hidden md:block" />}
         </>
       )}
 
@@ -330,6 +401,7 @@ export default function DetailsScoreboardPanel({
   mc = null,
   stats = null,
   externalLinks = null,
+  streamingProviders = null,
   onMoreLinks,
   share = null,
   className = "",
@@ -341,7 +413,10 @@ export default function DetailsScoreboardPanel({
   );
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
-  const hasToolbar = hasRatings || hasExternalLinks || !!share;
+  const hasStreamingProviders =
+    Array.isArray(streamingProviders) && streamingProviders.length > 0;
+  const hasToolbar =
+    hasRatings || hasExternalLinks || hasStreamingProviders || !!share;
 
   if (!hasToolbar && !hasStats && !children) return null;
 
@@ -380,6 +455,7 @@ export default function DetailsScoreboardPanel({
 
           <DetailsToolbarActions
             externalLinks={externalLinks}
+            streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             share={share}
           />
