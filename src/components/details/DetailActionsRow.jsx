@@ -28,7 +28,7 @@ import {
 
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
-const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start gap-1 sm:gap-3 w-full
+const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
                 [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] sm:[&>*:not(.separator)]:max-w-[52px]
                 [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]]:[container-type:inline-size]
                 [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]_svg]:!h-[46cqw] sm:[&_[data-liquid-button]_svg]:!w-[22px] sm:[&_[data-liquid-button]_svg]:!h-[22px]
@@ -84,6 +84,9 @@ export default function DetailActionsRow({
   // crezcan y ocupen TODO el ancho disponible (usado en el modal del dashboard,
   // más ancho, donde con el tope quedaban centrados dejando huecos laterales).
   fillMobile = false,
+  // Separación entre botones en móvil (en sm+ siempre es gap-3). Por defecto
+  // gap-1 (como DetailsClient); el modal la sube un poco para no verlos pegados.
+  mobileGapClass = "gap-1",
 
   onTrailer,
   trailerAvailable = false,
@@ -118,7 +121,7 @@ export default function DetailActionsRow({
   const mobileCapClass = fillMobile
     ? ""
     : "[&>*:not(.separator)]:max-w-[60px]";
-  const rowClass = [BASE_ROW_CLASS, mobileCapClass, className]
+  const rowClass = [BASE_ROW_CLASS, mobileGapClass, mobileCapClass, className]
     .filter(Boolean)
     .join(" ");
   return (
