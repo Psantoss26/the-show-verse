@@ -45,12 +45,12 @@ function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -1 }}
-      className="relative flex items-center gap-2 select-none shrink-0 group/statbadge py-1 px-1.5 transition-colors duration-200"
+      className="relative flex min-w-0 items-center justify-center gap-1 select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:justify-start sm:gap-2 sm:px-1.5"
       aria-label={tooltip || label}
     >
-      <Icon className="h-5 w-5 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200" />
+      <Icon className="h-4 w-4 shrink-0 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
       <div className="flex flex-col min-w-0 justify-center">
-        <span className="text-xs sm:text-sm font-bold tracking-tight text-white/90 leading-tight">
+        <span className="text-[11px] sm:text-sm font-bold tracking-tight text-white/90 leading-tight">
           {value || "-"}
         </span>
         <span className="hidden sm:block text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5 leading-none transition-colors duration-200 group-hover/statbadge:text-zinc-400">
@@ -80,7 +80,7 @@ export function DetailsRatingsBadges({
   mc = null,
 }) {
   return (
-    <div className="flex items-center gap-4 sm:gap-5 shrink-0">
+    <div className="flex items-center gap-3 sm:gap-5 shrink-0">
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
         {loading ? (
@@ -187,13 +187,15 @@ export function DetailsStatsRow({ stats = null }) {
         className="
         overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-x]
         py-2.5
-        pl-[calc(1rem+env(safe-area-inset-left))]
-        pr-[calc(1rem+env(safe-area-inset-right))]
+        pl-[calc(0.75rem+env(safe-area-inset-left))]
+        pr-[calc(0.75rem+env(safe-area-inset-right))]
+        sm:pl-[calc(1rem+env(safe-area-inset-left))]
+        sm:pr-[calc(1rem+env(safe-area-inset-right))]
         md:overflow-x-visible
       "
       >
-        {/* Contenedor interno con flex-wrap para que se distribuya en línea y optimice el espacio */}
-        <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1.5">
+        {/* En móvil se bloquean cuatro columnas para que las stats no salten de línea. */}
+        <div className="grid grid-cols-4 items-center gap-x-1 gap-y-1.5 sm:flex sm:flex-wrap sm:justify-start sm:gap-x-4">
           {/* Watchers - Usuarios que siguen este contenido */}
           <TraktStatBadge
             icon={Eye}
@@ -436,10 +438,12 @@ export default function DetailsScoreboardPanel({
           className="
       relative z-10
       py-3
-      pl-[calc(1rem+env(safe-area-inset-left))]
-      pr-[calc(1.25rem+env(safe-area-inset-right))]
+      pl-[calc(0.75rem+env(safe-area-inset-left))]
+      pr-[calc(0.75rem+env(safe-area-inset-right))]
+      sm:pl-[calc(1rem+env(safe-area-inset-left))]
+      sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
       sm:px-4
-      flex items-center gap-3 sm:gap-4
+      flex items-center gap-2.5 sm:gap-4
       overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
     "
         >

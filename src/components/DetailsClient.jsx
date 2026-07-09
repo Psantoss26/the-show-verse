@@ -3353,6 +3353,7 @@ export default function DetailsClient({
     createRewatchRun,
     deleteRewatchRun,
     getWatchedEpisodeCountForSeason,
+    tvProgressBadge,
     reconcileAfterClose,
     hasAnyWatchedEpisode: hasAnyWatchedEpisodeInMap,
     setWatchedBySeason,
@@ -3361,56 +3362,6 @@ export default function DetailsClient({
     watchedBySeasonRef,
     watchedBySeasonLoadedRef,
   } = episodesMachine;
-
-  const getAvailableEpisodeTotal = useCallback((season) => {
-    const total = Number(season?.episode_count || 0);
-    return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
-  }, []);
-
-  // Badge de progreso para el boton "visto" en series: calcula el % de episodios vistos
-  // (excluyendo especiales, solo temporadas regulares)
-  const tvProgressBadge = useMemo(() => {
-    if (endpointType !== "tv") return null;
-    if (!trakt?.connected) return null;
-
-    // Mientras no se haya cargado el estado de episodios vistos, no mostrar nada
-    if (!watchedBySeasonLoaded) return null;
-
-    const seasonsList = Array.isArray(data?.seasons) ? data.seasons : [];
-    const usable = seasonsList.filter(
-      (s) => typeof s?.season_number === "number" && s.season_number > 0,
-    );
-
-    // Si aun no hay temporadas validas, no mostrar nada
-    if (usable.length === 0) return null;
-
-    const totalEpisodes = usable.reduce(
-      (acc, s) => acc + getAvailableEpisodeTotal(s),
-      0,
-    );
-    if (totalEpisodes <= 0) return null;
-
-    const watchedEpisodes = usable.reduce((acc, s) => {
-      const sn = s.season_number;
-      const total = getAvailableEpisodeTotal(s);
-      return (
-        acc + getWatchedEpisodeCountForSeason(watchedBySeason, sn, total)
-      );
-    }, 0);
-
-    const pct = Math.round((watchedEpisodes / totalEpisodes) * 100);
-    const safePct = Math.min(100, Math.max(0, pct));
-    if (safePct <= 0) return null;
-    return `${safePct}%`;
-  }, [
-    endpointType,
-    trakt?.connected,
-    watchedBySeasonLoaded,
-    data?.seasons,
-    watchedBySeason,
-    getAvailableEpisodeTotal,
-    getWatchedEpisodeCountForSeason,
-  ]);
 
   // Sincroniza trakt.watched con el estado real de episodios vistos.
   // Si hay al menos un episodio visto, trakt.watched debe ser true.

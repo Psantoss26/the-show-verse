@@ -95,6 +95,11 @@ function toLandscapeShow(item) {
 
   return {
     id,
+    // Los episodios del calendario SIEMPRE son de series. Marcamos el tipo para
+    // que getMediaTypeForItem (y por tanto la preview de DetailModal) resuelva
+    // la ficha como serie y no como película. Sin esto, al pulsar la tarjeta se
+    // abría una preview de "movie" rota con el tmdbId de la serie.
+    media_type: "tv",
     // Identificador ÚNICO por episodio (una misma serie puede aparecer varias
     // veces en el calendario). `id` se mantiene como tmdbId para navegación y
     // acciones (favoritos/pendientes); `uid` es la key estable del carrusel.

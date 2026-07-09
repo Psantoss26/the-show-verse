@@ -33,6 +33,7 @@ import {
   GENRES,
   getMediaTypeForItem,
   fetchBestLogo,
+  fetchBestPosterNoLang,
 } from "@/lib/dashboard/media";
 
 // Mapa estado (TMDb) -> etiqueta ES, espejo de `getStatusLabel` en DetailsClient.
@@ -105,6 +106,7 @@ const EMPTY_DATA = {
   overview: null,
   backdropPath: null,
   posterPath: null,
+  heroPosterPath: null,
   year: null,
   runtime: null,
   genres: [],
@@ -485,6 +487,21 @@ export function useDetailModalData(item) {
         }
       } catch {
         // sin logo: la cabecera cae al título de texto
+      }
+    })();
+
+    // Póster textless para el hero móvil. En modo estricto no se sustituye por
+    // pósters con idioma si TMDb no tiene arte sin texto.
+    (async () => {
+      try {
+        const heroPosterPath = await fetchBestPosterNoLang(id, mediaType, {
+          fallbackToAny: false,
+        });
+        if (!cancelled && heroPosterPath) {
+          setData((prev) => ({ ...prev, heroPosterPath }));
+        }
+      } catch {
+        // sin póster textless: se mantiene el fallback visual, nunca uno con texto
       }
     })();
 
