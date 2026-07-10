@@ -30,7 +30,13 @@ import "swiper/swiper-bundle.css";
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 
 // -- Animaciones con Framer Motion --
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 
 // -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
@@ -7578,6 +7584,30 @@ export default function DetailsClient({
   const posterShineRef = useRef(null);
   const posterRafRef = useRef(0);
   const prefersReducedMotion = useReducedMotion();
+
+  // -- Scroll del HERO MÓVIL (mismo lenguaje que el hero de DetailModal) --
+  // Aquí el scroll es el de la ventana (la ficha es una página completa, no un
+  // panel con scroll interno como el modal). El hero solo existe en <640px, así
+  // que estos transforms no afectan al escritorio.
+  const { scrollY: pageScrollY } = useScroll();
+  // Parallax: la portada se desplaza a ~1/3 de la velocidad del scroll.
+  const heroParallaxY = useTransform(
+    pageScrollY,
+    [0, 400],
+    prefersReducedMotion ? [0, 0] : [0, 130],
+  );
+  // Zoom-in sutil al hacer scroll.
+  const heroScale = useTransform(
+    pageScrollY,
+    [0, 400],
+    prefersReducedMotion ? [1, 1] : [1, 1.08],
+  );
+  // La portada se va oscureciendo conforme se sale de pantalla.
+  const heroDarkOpacity = useTransform(
+    pageScrollY,
+    [0, 300],
+    prefersReducedMotion ? [0, 0] : [0, 0.5],
+  );
   const [poster3dEnabled, setPoster3dEnabled] = useState(false);
   const posterTiltRef = useRef(null); // El recuadro completo que se inclina
   const posterAnimRafRef = useRef(0); // Un solo rAF
@@ -7818,24 +7848,38 @@ export default function DetailsClient({
           <div className="relative -ml-4 -mt-8 aspect-[2/3] w-[calc(100%_+_2rem)] overflow-hidden bg-[#101010] sm:hidden">
             {/* SOLO la portada. Mientras se resuelve el póster no se pinta nada
                 (el fondo del contenedor ya es #101010): así no aparecen
-                placeholders ni un póster intermedio que luego se sustituye. */}
+                placeholders ni un póster intermedio que luego se sustituye.
+                El wrapper `motion.div` lleva el parallax + zoom del scroll y la
+                máscara inferior, igual que el hero de DetailModal. */}
             {mobileHeroPosterSrc && (
-              <OptimizedImage
-                key={mobileHeroPosterSrc}
-                src={mobileHeroPosterSrc}
-                alt={title}
-                className="block h-full w-full object-contain"
+              <motion.div
                 style={{
+                  y: heroParallaxY,
+                  scale: heroScale,
                   WebkitMaskImage:
                     "linear-gradient(to bottom, black 72%, transparent 100%)",
                   maskImage:
                     "linear-gradient(to bottom, black 72%, transparent 100%)",
                 }}
-                priority
-                fetchPriority="high"
-                unoptimized
-              />
+                className="absolute inset-0 h-full w-full"
+              >
+                <OptimizedImage
+                  key={mobileHeroPosterSrc}
+                  src={mobileHeroPosterSrc}
+                  alt={title}
+                  className="block h-full w-full object-contain"
+                  priority
+                  fetchPriority="high"
+                  unoptimized
+                />
+              </motion.div>
             )}
+
+            {/* Oscurecido progresivo al hacer scroll (como en DetailModal) */}
+            <motion.div
+              style={{ opacity: heroDarkOpacity }}
+              className="pointer-events-none absolute inset-0 z-10 bg-black/60"
+            />
 
             {/* Degradado inferior: funde el hero con el fondo (#101010) de la página */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#101010] via-[#101010]/70 to-transparent z-10" />
