@@ -381,20 +381,31 @@ html {
    Degrada solo (navegación normal) donde no hay soporte.
    ========================================================================== */
 @media not (prefers-reduced-motion: reduce) {
-  /* El VIEJO (modal) va ENCIMA y baja hasta salir por el borde inferior. */
-  ::view-transition-old(root) {
+  /* SOLO el panel del modal se desliza hacia abajo, por encima de todo. */
+  ::view-transition-group(modal-panel) {
+    z-index: 30;
+  }
+  ::view-transition-old(modal-panel) {
     animation: dm-slide-down-out 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
-    z-index: 20;
-    transform-origin: bottom center;
   }
 
-  /* El NUEVO (DetailsClient) queda DEBAJO, SIEMPRE llenando el viewport (sin
-     transform, para que nunca haya un hueco/espacio detrás del modal que baja).
-     Solo un fundido suave; el contenido entra además con sus propias animaciones
-     (FadeIn/AnimatedSection de DetailsClient). */
+  /* El fondo difuminado desaparece CASI AL INSTANTE (fundido corto al inicio):
+     no debe quedarse como un velo borroso durante la transición. Tras esos ~140ms
+     solo queda el panel bajando sobre DetailsClient, limpio. */
+  ::view-transition-group(modal-dim) {
+    z-index: 20;
+  }
+  ::view-transition-old(modal-dim) {
+    animation: dm-fade-out 140ms ease-out both;
+  }
+
+  /* Detrás queda la ficha (root), sólida desde el inicio y sin desplazarse →
+     nunca hay hueco. Su contenido entra además con sus propias animaciones. */
   ::view-transition-new(root) {
-    animation: dm-reveal-in 460ms ease-out both;
-    z-index: 1;
+    animation: dm-reveal-in 160ms ease-out both;
+  }
+  ::view-transition-old(root) {
+    animation: dm-fade-out 140ms ease-out both;
   }
 }
 
@@ -407,9 +418,18 @@ html {
   }
 }
 
+@keyframes dm-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes dm-reveal-in {
   from {
-    opacity: 0.55;
+    opacity: 0.7;
   }
   to {
     opacity: 1;
