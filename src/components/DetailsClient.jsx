@@ -30,13 +30,7 @@ import "swiper/swiper-bundle.css";
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 
 // -- Animaciones con Framer Motion --
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
@@ -166,10 +160,6 @@ import {
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
-
-// Arte para el hero MÓVIL: póster CON idioma, priorizando INGLÉS (el propio
-// póster ya trae el título rotulado, por eso no se superpone logo ni texto).
-import { fetchBestPoster } from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
@@ -1387,14 +1377,6 @@ export default function DetailsClient({
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
 
-  // Arte para el HERO MÓVIL: mejor póster CON idioma (prioriza inglés). Como el
-  // póster ya lleva el título rotulado, NO se superpone logo ni texto.
-  // `heroPosterReady` marca que la búsqueda terminó (con o sin éxito): hasta
-  // entonces no se pinta ninguna imagen, para no mostrar primero el póster base
-  // y sustituirlo después (evita el parpadeo de "aparecen otras cosas").
-  const [heroPosterPath, setHeroPosterPath] = useState(null);
-  const [heroPosterReady, setHeroPosterReady] = useState(false);
-
   /**
    * Extrae un ID consistente de una lista (puede venir como objeto o como valor directo).
    * Soporta formatos de TMDb y Trakt.
@@ -1440,29 +1422,6 @@ export default function DetailsClient({
       else mqMobile.removeListener(updateMobile);
     };
   }, []);
-
-  // Póster del HERO MÓVIL: `fetchBestPoster` prioriza INGLÉS (y si no hay, cae a
-  // uno sin idioma y por último a cualquiera). Marcamos `heroPosterReady` al
-  // terminar —haya o no resultado— para pintar la portada UNA sola vez.
-  useEffect(() => {
-    let cancelled = false;
-    setHeroPosterPath(null);
-    setHeroPosterReady(false);
-    (async () => {
-      let path = null;
-      try {
-        path = await fetchBestPoster(id, endpointType);
-      } catch {
-        // sin arte: caeremos al póster base del componente
-      }
-      if (cancelled) return;
-      if (path) setHeroPosterPath(path);
-      setHeroPosterReady(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [id, endpointType]);
 
   // Si pasamos a desktop, cerramos el boton de limpiar rating movil
   useEffect(() => {
@@ -2743,18 +2702,6 @@ export default function DetailsClient({
   // Imagen principal del poster: en modo preview muestra backdrop, si no el poster
   const displayPosterPath =
     posterViewMode === "preview" ? previewBackdropPath : basePosterDisplayPath;
-
-  // Origen de imagen para el HERO MÓVIL. Solo se resuelve cuando la búsqueda del
-  // póster ha terminado (`heroPosterReady`): así se pinta la portada definitiva
-  // de una vez, en lugar de mostrar el póster base y sustituirlo después. Si no
-  // hubo póster en inglés, cae al póster base ya calculado por el componente.
-  const mobileHeroPosterSrc = !heroPosterReady
-    ? null
-    : heroPosterPath
-      ? `https://image.tmdb.org/t/p/w780${heroPosterPath}`
-      : basePosterDisplayPath
-        ? `https://image.tmdb.org/t/p/w780${basePosterDisplayPath}`
-        : null;
 
   // Precarga ambas variantes para que el cambio entre poster y preview sea instantáneo.
   useEffect(() => {
@@ -7584,30 +7531,6 @@ export default function DetailsClient({
   const posterShineRef = useRef(null);
   const posterRafRef = useRef(0);
   const prefersReducedMotion = useReducedMotion();
-
-  // -- Scroll del HERO MÓVIL (mismo lenguaje que el hero de DetailModal) --
-  // Aquí el scroll es el de la ventana (la ficha es una página completa, no un
-  // panel con scroll interno como el modal). El hero solo existe en <640px, así
-  // que estos transforms no afectan al escritorio.
-  const { scrollY: pageScrollY } = useScroll();
-  // Parallax: la portada se desplaza a ~1/3 de la velocidad del scroll.
-  const heroParallaxY = useTransform(
-    pageScrollY,
-    [0, 400],
-    prefersReducedMotion ? [0, 0] : [0, 130],
-  );
-  // Zoom-in sutil al hacer scroll.
-  const heroScale = useTransform(
-    pageScrollY,
-    [0, 400],
-    prefersReducedMotion ? [1, 1] : [1, 1.08],
-  );
-  // La portada se va oscureciendo conforme se sale de pantalla.
-  const heroDarkOpacity = useTransform(
-    pageScrollY,
-    [0, 300],
-    prefersReducedMotion ? [0, 0] : [0, 0.5],
-  );
   const [poster3dEnabled, setPoster3dEnabled] = useState(false);
   const posterTiltRef = useRef(null); // El recuadro completo que se inclina
   const posterAnimRafRef = useRef(0); // Un solo rAF
@@ -7744,11 +7667,7 @@ export default function DetailsClient({
   return (
     <div
       data-details-root
-      /* -mt-16 (solo móvil): sube la página los 64px de la navbar sticky para que
-         el hero de portada arranque pegado arriba y la navbar quede SUPERPUESTA y
-         sin fondo (mismo patrón que FeaturedHero). En sm+ se anula con sm:mt-0,
-         así el layout de escritorio no cambia. */
-      className="relative -mt-16 min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30 sm:mt-0"
+      className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
     >
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
@@ -7823,7 +7742,7 @@ export default function DetailsClient({
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div
         ref={contentTopRef}
-        className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto"
+        className="relative z-10 px-4 pt-6 pb-8 lg:pt-8 lg:pb-12 max-w-7xl mx-auto"
       >
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
@@ -7834,71 +7753,18 @@ export default function DetailsClient({
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
         >
-          {/* =================================================================
-              HERO MÓVIL (solo <640px): póster textless a pantalla completa con
-              el logo del título superpuesto. Espeja el hero móvil de DetailModal
-              (mismas clases). En sm+ se oculta por completo (sm:hidden), por lo
-              que el layout de escritorio queda intacto. Sustituye visualmente a
-              la tarjeta de póster y al <h1>, que se ocultan en móvil más abajo.
-             ================================================================= */}
-          {/* A SANGRE: el contenedor padre tiene px-4 (16px) y pt-8 (32px). Un
-              `w-full` con margen negativo NO ensancha (solo desplaza), así que se
-              fuerza el ancho a 100%+2rem y se desplaza -ml-4 para llegar a ambos
-              bordes; -mt-8 cancela el padding superior para pegarlo arriba. */}
-          <div className="relative -ml-4 -mt-8 aspect-[2/3] w-[calc(100%_+_2rem)] overflow-hidden bg-[#101010] sm:hidden">
-            {/* SOLO la portada. Mientras se resuelve el póster no se pinta nada
-                (el fondo del contenedor ya es #101010): así no aparecen
-                placeholders ni un póster intermedio que luego se sustituye.
-                El wrapper `motion.div` lleva el parallax + zoom del scroll y la
-                máscara inferior, igual que el hero de DetailModal. */}
-            {mobileHeroPosterSrc && (
-              <motion.div
-                style={{
-                  y: heroParallaxY,
-                  scale: heroScale,
-                  WebkitMaskImage:
-                    "linear-gradient(to bottom, black 72%, transparent 100%)",
-                  maskImage:
-                    "linear-gradient(to bottom, black 72%, transparent 100%)",
-                }}
-                className="absolute inset-0 h-full w-full"
-              >
-                <OptimizedImage
-                  key={mobileHeroPosterSrc}
-                  src={mobileHeroPosterSrc}
-                  alt={title}
-                  className="block h-full w-full object-contain"
-                  priority
-                  fetchPriority="high"
-                  unoptimized
-                />
-              </motion.div>
-            )}
-
-            {/* Oscurecido progresivo al hacer scroll (como en DetailModal) */}
-            <motion.div
-              style={{ opacity: heroDarkOpacity }}
-              className="pointer-events-none absolute inset-0 z-10 bg-black/60"
-            />
-
-            {/* Degradado inferior: funde el hero con el fondo (#101010) de la página */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#101010] via-[#101010]/70 to-transparent z-10" />
-          </div>
-
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 ${
+            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 lg:gap-7 relative z-10 ${
               isBackdropPoster
                 ? "max-w-full lg:max-w-[600px]"
-                : "max-w-[280px] lg:max-w-[320px]"
+                : "max-w-[320px] lg:max-w-[320px]"
             }`}
             style={{
               transition: "max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)",
             }}
           >
-            {/* Poster Card — OCULTA en móvil (<640px): allí se muestra el HERO
-                MÓVIL de arriba. En sm+ (`sm:block`) se comporta igual que antes,
-                por lo que el layout de escritorio no cambia. */}
+            {/* Poster Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -7907,7 +7773,7 @@ export default function DetailsClient({
                 delay: 0.08,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="relative hidden sm:block"
+              className="relative"
             >
               {/* Wrapper: solo perspectiva + captura puntero. Ya NO cicla al
                   pulsar en toda la portada: el cambio póster/backdrop se hace
@@ -8212,6 +8078,29 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         className="pointer-events-auto absolute inset-y-0 left-0 z-20 w-1/3 cursor-pointer"
                       />
                     )}
+
+                  {/* MÓVIL (táctil): una pulsación en cualquier parte del póster
+                      alterna entre póster y backdrop. En móvil el botón central de
+                      reproducir no es visible, así que no hay conflicto. Solo se
+                      renderiza sin hover, para no alterar el comportamiento de
+                      escritorio (que sigue usando las zonas laterales). */}
+                  {!supportsHover && (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={
+                        posterViewMode === "preview"
+                          ? "Ver póster"
+                          : "Ver imagen de fondo"
+                      }
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCyclePoster();
+                      }}
+                      className="pointer-events-auto absolute inset-0 z-30 cursor-pointer"
+                    />
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -8220,7 +8109,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {(limitedProviders && limitedProviders.length > 0) ||
             (isBackdropPoster && externalLinks.length > 0) ? (
               <StaggerContainer
-                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-2"
+                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-1"
                 staggerDelay={0.05}
               >
                 {/* Providers - Solo si hay plataformas */}
@@ -8397,10 +8286,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <FadeIn delay={0.06} className="mb-6 px-1 flex flex-col items-center md:items-start text-center md:text-left">
-              {/* Título de texto — OCULTO en móvil (<640px): allí el título va
-                  como logo sobre el HERO MÓVIL. En sm+ (`sm:block`) se renderiza
-                  igual que antes, sin cambios en escritorio. */}
-              <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
 
