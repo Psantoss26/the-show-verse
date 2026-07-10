@@ -119,7 +119,7 @@ import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 // deadlock → TimeoutError y página congelada). Por eso sondeamos con setTimeout
 // (macrotask, no ligado al render). Resuelve al detectar [data-details-root] o
 // al agotar `maxMs` (fallback a crossfade; nunca cuelga).
-function waitForDetailsRoot(maxMs = 1000) {
+function waitForDetailsRoot(maxMs = 450) {
   if (typeof document === "undefined") return Promise.resolve();
   return new Promise((resolve) => {
     const start = Date.now();
@@ -132,7 +132,7 @@ function waitForDetailsRoot(maxMs = 1000) {
     const check = () => {
       if (document.querySelector("[data-details-root]")) return finish();
       if (Date.now() - start > maxMs) return finish();
-      setTimeout(check, 16);
+      setTimeout(check, 8);
     };
     check();
   });
@@ -438,7 +438,6 @@ export default function DetailModal({ item, onClose }) {
 
   const scrollContainerRef = useRef(null);
   const fullDetailsTimerRef = useRef(null);
-  const panelRef = useRef(null);
   const dimRef = useRef(null);
   const { scrollY } = useScroll({ container: scrollContainerRef });
 
@@ -1181,31 +1180,20 @@ export default function DetailModal({ item, onClose }) {
 
     setNavigatingToFullDetails(true);
 
-    // SÍNCRONO antes de capturar: quitar el cristal del panel (blur + fondo +
-    // sombra) para que su snapshot de la View Transition sea TRANSPARENTE y al
-    // deslizarse no arrastre ningún fondo borroso sobre DetailsClient.
-    if (panelRef.current) {
-      const s = panelRef.current.style;
-      s.backdropFilter = "none";
-      s.webkitBackdropFilter = "none";
-      s.backgroundColor = "transparent";
-      s.backgroundImage = "none";
-      s.boxShadow = "none";
-    }
-    // El fondo difuminado: quitamos el blur para que su breve desvanecido no
-    // deje ningún rastro borroso (solo un oscurecido muy corto, ya en el CSS).
+    // OJO: NO tocamos el cristal del panel (bg + backdrop-blur + sombra). Ese
+    // fondo es parte del modal y debe BAJAR CON ÉL en la transición. El velo
+    // borroso que sobraba era el `modal-dim` de pantalla completa, que sí se
+    // desvanece (ver globals.css). Solo le quitamos el blur al dim para que su
+    // desvanecido no deje rastro borroso sobre DetailsClient.
     if (dimRef.current) {
       dimRef.current.style.backdropFilter = "none";
       dimRef.current.style.webkitBackdropFilter = "none";
     }
 
     if (typeof document !== "undefined" && document.startViewTransition) {
-      // View Transition de elementos compartidos (backdrop, botones, scoreboard,
-      // pestañas, reparto). CLAVE: el callback devuelve una promesa que NO
-      // resuelve hasta que DetailsClient ha renderizado (detectamos su root),
-      // para que el navegador capture el estado NUEVO ya pintado y así MORFEE
-      // los elementos en vez de hacer un simple crossfade. Con un tope de tiempo
-      // por si la página tarda, para no congelar el frame.
+      // El callback espera (breve) a que DetailsClient pinte para capturarlo ya
+      // renderizado detrás; si no, se revelaría un hueco. El prefetch al abrir
+      // el modal mantiene esta espera al mínimo.
       document.startViewTransition(() => {
         router.push(href);
         return waitForDetailsRoot();
@@ -1517,7 +1505,6 @@ export default function DetailModal({ item, onClose }) {
           En la transición a la ficha completa SOLO este panel se desliza hacia
           abajo (grupo propio, por encima del fondo difuminado). */}
       <motion.div
-        ref={panelRef}
         variants={panelVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
