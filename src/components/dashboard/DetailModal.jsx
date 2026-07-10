@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
+import OptimizedImage from "@/components/OptimizedImage";
 import {
   X,
   Play,
@@ -109,6 +110,34 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 // lógica de toggles, rewatches, plays y persistencia en localStorage.
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 
+// Espera (best-effort) a que DetailsClient haya montado su root en el DOM tras
+// router.push, para que la View Transition capture el estado NUEVO ya pintado y
+// MORFEE los elementos compartidos en vez de hacer un crossfade.
+//
+// IMPORTANTE: durante el callback de startViewTransition el navegador SUSPENDE
+// el pipeline de render, así que requestAnimationFrame NO se dispara (provoca un
+// deadlock → TimeoutError y página congelada). Por eso sondeamos con setTimeout
+// (macrotask, no ligado al render). Resuelve al detectar [data-details-root] o
+// al agotar `maxMs` (fallback a crossfade; nunca cuelga).
+function waitForDetailsRoot(maxMs = 1000) {
+  if (typeof document === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    const check = () => {
+      if (document.querySelector("[data-details-root]")) return finish();
+      if (Date.now() - start > maxMs) return finish();
+      setTimeout(check, 16);
+    };
+    check();
+  });
+}
+
 // Resuelve la URL del logo de una plataforma: rutas de TMDb -> buildImg;
 // URLs absolutas o assets locales (/logo-*) se usan tal cual.
 function providerLogoSrc(provider) {
@@ -197,11 +226,11 @@ const panelVariants = {
     },
   },
   navigate: {
-    opacity: 0,
-    y: -28,
-    scale: 0.985,
-    filter: "blur(4px)",
-    transition: { duration: 0.22, ease: [0.4, 0, 1, 1] },
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { duration: 0.2 },
   },
   exit: {
     opacity: 0,
@@ -320,14 +349,18 @@ function SeasonDropdown({ seasons, value, onChange, labelId }) {
         aria-expanded={open}
         aria-labelledby={labelId}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-white/5 bg-white/[0.04] px-4 text-left text-sm font-bold text-white transition hover:border-white/10 hover:bg-white/[0.08] focus:outline-none"
+        className={`group flex h-11 w-full items-center justify-between rounded-xl border px-4 text-left text-sm font-bold transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 active:outline-none ${
+          open
+            ? "border-yellow-500/40 bg-white/[0.08] text-white shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+            : "border-white/10 bg-white/[0.03] text-zinc-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+        }`}
       >
         <span className="truncate">
           Temporada {current?.season_number ?? "—"}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
+          className={`h-4 w-4 shrink-0 transition-all duration-300 ${
+            open ? "rotate-180 text-yellow-400" : "text-zinc-400 group-hover:text-zinc-200"
           }`}
           aria-hidden="true"
         />
@@ -337,16 +370,16 @@ function SeasonDropdown({ seasons, value, onChange, labelId }) {
         {open && (
           <motion.ul
             role="listbox"
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] origin-top overflow-y-auto rounded-xl border border-white/5 bg-[#141414]/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl [scrollbar-width:thin]"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl soundtrack-scrollbar outline-none focus:outline-none"
           >
             {seasons.map((season) => {
               const active = season.season_number === value;
               return (
-                <li key={season.season_number}>
+                <li key={season.season_number} className="list-none">
                   <button
                     type="button"
                     role="option"
@@ -355,23 +388,25 @@ function SeasonDropdown({ seasons, value, onChange, labelId }) {
                       onChange(season.season_number);
                       setOpen(false);
                     }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all duration-200 select-none outline-none focus:outline-none focus:ring-0 active:outline-none ${
                       active
-                        ? "bg-white/10 text-white"
-                        : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
+                        ? "bg-yellow-500/10 text-yellow-400 font-bold shadow-[inset_0_1px_1px_rgba(254,240,138,0.05)]"
+                        : "text-zinc-400 hover:bg-white/[0.05] hover:text-white"
                     }`}
                   >
                     <span className="flex-1 truncate">
                       Temporada {season.season_number}
                     </span>
                     {season.episode_count ? (
-                      <span className="shrink-0 text-xs text-zinc-500 font-medium">
+                      <span className={`shrink-0 text-xs font-medium transition-colors ${
+                        active ? "text-yellow-500/80" : "text-zinc-500 group-hover:text-zinc-400"
+                      }`}>
                         {season.episode_count} ep.
                       </span>
                     ) : null}
                     {active && (
                       <Check
-                        className="h-4 w-4 shrink-0 text-emerald-400"
+                        className="h-4 w-4 shrink-0 text-yellow-400"
                         aria-hidden="true"
                       />
                     )}
@@ -1121,6 +1156,18 @@ export default function DetailModal({ item, onClose }) {
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
 
   /* ------------------------------ ficha completa ------------------------------ */
+  // Prefetch de la ficha completa al abrir el modal: así, al pulsar "Ver ficha
+  // completa", DetailsClient ya está (casi) listo y la espera antes de deslizar
+  // el modal es mínima (transición sin cortes ni pausas perceptibles).
+  useEffect(() => {
+    if (!item?.id) return;
+    try {
+      router.prefetch(dashboardDetailHref(item, mediaType));
+    } catch {
+      // prefetch best-effort
+    }
+  }, [item?.id, mediaType, router]);
+
   const goToFullDetails = () => {
     if (navigatingToFullDetails) return;
     const href = dashboardDetailHref(item, mediaType);
@@ -1131,9 +1178,23 @@ export default function DetailModal({ item, onClose }) {
     }
 
     setNavigatingToFullDetails(true);
-    fullDetailsTimerRef.current = window.setTimeout(() => {
-      router.push(href);
-    }, 190);
+
+    if (typeof document !== "undefined" && document.startViewTransition) {
+      // View Transition de elementos compartidos (backdrop, botones, scoreboard,
+      // pestañas, reparto). CLAVE: el callback devuelve una promesa que NO
+      // resuelve hasta que DetailsClient ha renderizado (detectamos su root),
+      // para que el navegador capture el estado NUEVO ya pintado y así MORFEE
+      // los elementos en vez de hacer un simple crossfade. Con un tope de tiempo
+      // por si la página tarda, para no congelar el frame.
+      document.startViewTransition(() => {
+        router.push(href);
+        return waitForDetailsRoot();
+      });
+    } else {
+      fullDetailsTimerRef.current = window.setTimeout(() => {
+        router.push(href);
+      }, 190);
+    }
   };
 
   /* --------------------------------- derivados --------------------------------- */
@@ -1438,17 +1499,36 @@ export default function DetailModal({ item, onClose }) {
         onClick={(e) => e.stopPropagation()}
         className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
+        {/* Botón superior izquierdo: cierra el modal */}
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={navigatingToFullDetails}
+          className={`absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition-all duration-300 hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] group ${
+            navigatingToFullDetails ? "opacity-0 pointer-events-none" : "opacity-100"
+          }`}
+          aria-label="Cerrar modal"
+        >
+          <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
+        </button>
+
         {/* Botón superior derecho: abre la ficha completa */}
         <button
           type="button"
           onClick={goToFullDetails}
           disabled={navigatingToFullDetails}
-          className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition hover:bg-black/60 hover:text-white disabled:pointer-events-none disabled:opacity-70"
+          className={`absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[158px] items-center justify-start overflow-hidden rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition-all duration-300 ease-out hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] ${
+            navigatingToFullDetails ? "opacity-0 pointer-events-none" : "opacity-100"
+          }`}
           aria-label="Ver ficha completa"
           aria-busy={navigatingToFullDetails ? "true" : undefined}
-          title="Ver ficha completa"
         >
-          <ArrowUpRight className="h-5 w-5" />
+          <div className="flex h-full w-10 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
+            <ArrowUpRight className="h-5 w-5" />
+          </div>
+          <span className="whitespace-nowrap text-xs font-bold tracking-wide opacity-0 transition-opacity duration-200 group-hover:opacity-100 pr-4 leading-none">
+            Ver ficha completa
+          </span>
         </button>
 
         {/* Contenedor con scroll interno (barra oculta) */}
@@ -1858,40 +1938,41 @@ export default function DetailModal({ item, onClose }) {
                 >
                   {data.cast.map((person) => {
                     const photo = person?.profile_path
-                      ? buildImg(person.profile_path, "w185")
+                      ? buildImg(person.profile_path, "w342")
                       : null;
                     return (
-                      <SwiperSlide
-                        key={person?.id ?? person?.credit_id ?? person?.name}
-                        className="group relative min-w-0 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900 shadow-md transition-colors hover:border-yellow-500/30"
-                      >
-                        <div className="relative aspect-[2/3] overflow-hidden">
-                          {photo ? (
-                            <NextImage
-                              src={photo}
-                              alt={person?.name || ""}
-                              fill
-                              sizes="(min-width:1024px) 130px, (min-width:640px) 200px, 30vw"
-                              className="object-cover transition-transform duration-500 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
-                              <Users className="h-8 w-8" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-                          <div className="absolute inset-x-0 bottom-0 p-2.5">
-                            <p className="line-clamp-1 text-xs font-extrabold leading-tight text-white drop-shadow-sm">
-                              {person?.name}
-                            </p>
-                            {person?.character && (
-                              <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold leading-tight text-zinc-300 drop-shadow-sm">
-                                {person.character}
-                              </p>
+                      <SwiperSlide key={person?.id ?? person?.credit_id ?? person?.name}>
+                        <Link
+                          href={`/details/person/${person.id}`}
+                          className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                        >
+                          <div className="aspect-[2/3] overflow-hidden relative">
+                            {photo ? (
+                              <OptimizedImage
+                                src={photo}
+                                alt={person?.name || ""}
+                                className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
+                                <Users className="h-10 w-10" />
+                              </div>
                             )}
+
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+
+                            <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                              <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                                {person?.name}
+                              </p>
+                              {person?.character && (
+                                <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                                  {person.character}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </Link>
                       </SwiperSlide>
                     );
                   })}

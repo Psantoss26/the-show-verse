@@ -7665,7 +7665,10 @@ export default function DetailsClient({
   const watchlistActionLoading = actionStateLoading || wlLoading;
 
   return (
-    <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
+    <div
+      data-details-root
+      className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
+    >
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {useBackdrop && heroBackgroundPath ? (
@@ -8277,8 +8280,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                ================================================================= */}
             {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
-            <FadeIn delay={0.12} className="mb-6 px-1 w-full">
-              <DetailActionsRow
+            <div>
+              <FadeIn delay={0.12} className="mb-6 px-1 w-full">
+                <DetailActionsRow
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
                 onSoundtrack={() => openSoundtrack()}
@@ -8326,6 +8330,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 onComments={() => setCommentModalOpen(true)}
               />
             </FadeIn>
+          </div>
 
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
@@ -8336,8 +8341,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* Panel de puntuaciones + barra de acciones (ratings, enlaces
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
+            <div className={isBackdropPoster ? "" : "mb-6"}>
               <DetailsScoreboardPanel
-                className={isBackdropPoster ? "" : "mb-6"}
                 loading={tScoreboard.loading}
                 tmdb={{
                   value: data.vote_average?.toFixed(1),
@@ -8439,6 +8444,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
                 stats={tScoreboard?.stats}
               />
+            </div>
 
             {/* =================================================================
                 CONTENEDOR DE TABS Y CONTENIDO - Información detallada
@@ -8492,7 +8498,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
-            <DetailsInfoTabs
+            <div>
+              <DetailsInfoTabs
               key={id}
               variant="backdrop"
               layoutId="detailsTabBackdrop"
@@ -8519,8 +8526,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               awards={extras.awards}
               awardItems={awardItems}
             />
-          </FadeIn>
-        )}
+          </div>
+        </FadeIn>
+      )}
 
         {/* =================================================================
             MENÚ DE NAVEGACIÓN STICKY Y SECCIONES DE CONTENIDO
@@ -8554,7 +8562,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="mt-14 space-y-14">
-            <section id="section-cast" ref={registerSection("cast")}>
+            <section
+              id="section-cast"
+              ref={registerSection("cast")}
+            >
               <AnimatedSection delay={0.04}>
                 {/* === REPARTO PRINCIPAL (Cast) === */}
                 {!castSectionLoading &&

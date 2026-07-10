@@ -370,3 +370,48 @@ html {
   }
 }
 
+
+/* =============================================================================
+   VIEW TRANSITIONS — preview (DetailModal) → ficha completa (DetailsClient)
+   Efecto "cortina": el estado VIEJO (el modal + su fondo) se desliza HACIA ABAJO
+   por encima, revelando el estado NUEVO (DetailsClient, ya renderizado detrás:
+   backdrop de fondo + contenido). Sin cortes: el navegador pinta ambos snapshots
+   a la vez, así que detrás del modal que baja siempre está la ficha. El contenido
+   nuevo entra con un leve fundido/subida además de sus propias animaciones.
+   Degrada solo (navegación normal) donde no hay soporte.
+   ========================================================================== */
+@media not (prefers-reduced-motion: reduce) {
+  /* El VIEJO (modal) va ENCIMA y baja hasta salir por el borde inferior. */
+  ::view-transition-old(root) {
+    animation: dm-slide-down-out 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    z-index: 20;
+    transform-origin: bottom center;
+  }
+
+  /* El NUEVO (DetailsClient) queda DEBAJO, SIEMPRE llenando el viewport (sin
+     transform, para que nunca haya un hueco/espacio detrás del modal que baja).
+     Solo un fundido suave; el contenido entra además con sus propias animaciones
+     (FadeIn/AnimatedSection de DetailsClient). */
+  ::view-transition-new(root) {
+    animation: dm-reveal-in 460ms ease-out both;
+    z-index: 1;
+  }
+}
+
+@keyframes dm-slide-down-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes dm-reveal-in {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
