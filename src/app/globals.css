@@ -389,14 +389,14 @@ html {
     animation: dm-slide-down-out 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
-  /* El fondo difuminado desaparece CASI AL INSTANTE (fundido corto al inicio):
-     no debe quedarse como un velo borroso durante la transición. Tras esos ~140ms
-     solo queda el panel bajando sobre DetailsClient, limpio. */
+  /* El oscurecido de pantalla completa (los "lados") NO se desliza: se desvanece
+     ACOMPAÑANDO el movimiento del panel (no antes), por debajo de él. Se le quita
+     el blur por JS antes de capturar, así su fundido no deja rastro borroso. */
   ::view-transition-group(modal-dim) {
     z-index: 20;
   }
   ::view-transition-old(modal-dim) {
-    animation: dm-fade-out 140ms ease-out both;
+    animation: dm-fade-out 380ms ease-out both;
   }
 
   /* Detrás queda la ficha (root), sólida desde el inicio y sin desplazarse →
