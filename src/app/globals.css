@@ -373,30 +373,20 @@ html {
 
 /* =============================================================================
    VIEW TRANSITIONS — preview (DetailModal) → ficha completa (DetailsClient)
-   Efecto "cortina": el estado VIEJO (el modal + su fondo) se desliza HACIA ABAJO
-   por encima, revelando el estado NUEVO (DetailsClient, ya renderizado detrás:
+   Efecto "cortina": el estado VIEJO (el modal completo: panel + fondo blur) se
+   desliza HACIA ABAJO por encima, revelando el estado NUEVO (DetailsClient, ya renderizado detrás:
    backdrop de fondo + contenido). Sin cortes: el navegador pinta ambos snapshots
    a la vez, así que detrás del modal que baja siempre está la ficha. El contenido
    nuevo entra con un leve fundido/subida además de sus propias animaciones.
    Degrada solo (navegación normal) donde no hay soporte.
    ========================================================================== */
 @media not (prefers-reduced-motion: reduce) {
-  /* SOLO el panel del modal se desliza hacia abajo, por encima de todo. */
+  /* El modal completo se desliza hacia abajo, incluyendo su fondo difuminado. */
   ::view-transition-group(modal-panel) {
     z-index: 30;
   }
   ::view-transition-old(modal-panel) {
     animation: dm-slide-down-out 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  }
-
-  /* El oscurecido de pantalla completa (los "lados") NO se desliza: se desvanece
-     ACOMPAÑANDO el movimiento del panel (no antes), por debajo de él. Se le quita
-     el blur por JS antes de capturar, así su fundido no deja rastro borroso. */
-  ::view-transition-group(modal-dim) {
-    z-index: 20;
-  }
-  ::view-transition-old(modal-dim) {
-    animation: dm-fade-out 380ms ease-out both;
   }
 
   /* Detrás queda la ficha (root), sólida desde el inicio y sin desplazarse →
