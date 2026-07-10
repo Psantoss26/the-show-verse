@@ -438,7 +438,6 @@ export default function DetailModal({ item, onClose }) {
 
   const scrollContainerRef = useRef(null);
   const fullDetailsTimerRef = useRef(null);
-  const dimRef = useRef(null);
   const { scrollY } = useScroll({ container: scrollContainerRef });
 
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
@@ -1180,15 +1179,8 @@ export default function DetailModal({ item, onClose }) {
 
     setNavigatingToFullDetails(true);
 
-    // OJO: NO tocamos el cristal del panel (bg + backdrop-blur + sombra). Ese
-    // fondo es parte del modal y debe BAJAR CON ÉL en la transición. El velo
-    // borroso que sobraba era el `modal-dim` de pantalla completa, que sí se
-    // desvanece (ver globals.css). Solo le quitamos el blur al dim para que su
-    // desvanecido no deje rastro borroso sobre DetailsClient.
-    if (dimRef.current) {
-      dimRef.current.style.backdropFilter = "none";
-      dimRef.current.style.webkitBackdropFilter = "none";
-    }
+    // OJO: NO tocamos el cristal ni el velo blur: ambos se capturan como una
+    // sola capa del modal y bajan juntos en la transición (ver globals.css).
 
     if (typeof document !== "undefined" && document.startViewTransition) {
       // El callback espera (breve) a que DetailsClient pinte para capturarlo ya
@@ -1487,30 +1479,27 @@ export default function DetailModal({ item, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label={title || "Ficha rápida"}
+      style={{ viewTransitionName: "modal-panel" }}
     >
-      {/* Backdrop difuminado — clic fuera cierra. En la transición a la ficha
-          completa este fondo se DESVANECE (no se desliza): grupo propio. */}
+      {/* Backdrop difuminado — clic fuera cierra. Durante la transición a la
+          ficha completa viaja en el mismo snapshot que el panel. */}
       <motion.div
-        ref={dimRef}
         variants={backdropVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         className="fixed inset-0 bg-black/70 backdrop-blur-xl"
-        style={{ viewTransitionName: "modal-dim" }}
         onClick={navigatingToFullDetails ? undefined : onClose}
       />
 
       {/* Panel ancho anclado al borde inferior, esquinas superiores redondeadas.
-          En la transición a la ficha completa SOLO este panel se desliza hacia
-          abajo (grupo propio, por encima del fondo difuminado). */}
+          En la transición a la ficha completa baja junto con el fondo blur. */}
       <motion.div
         variants={panelVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         onClick={(e) => e.stopPropagation()}
-        style={{ viewTransitionName: "modal-panel" }}
         className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
         {/* Botón superior izquierdo: cierra el modal */}
