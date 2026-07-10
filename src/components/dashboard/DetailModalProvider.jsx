@@ -22,8 +22,10 @@ import {
   useState,
 } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
+import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import DetailModal from "@/components/dashboard/DetailModal";
 
 const DetailModalContext = createContext({
@@ -38,6 +40,15 @@ export function useDetailModal() {
 
 const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
+
+// En móvil (<640px) NUNCA se abre la ficha rápida: siempre se navega a la ficha
+// completa (DetailsClient), que ya trae su propio hero de portada + logo. Se
+// consulta en el momento del click (no en render) para no arriesgar hydration.
+const MOBILE_MQ = "(max-width: 639px)";
+function isMobileViewport() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(MOBILE_MQ).matches;
+}
 
 /* ------------------------- helpers de URL (window) ------------------------- */
 function buildPreviewUrl(item) {
@@ -75,6 +86,7 @@ function readPreviewFromLocation() {
 }
 
 export default function DetailModalProvider({ children }) {
+  const router = useRouter();
   const [activeItem, setActiveItem] = useState(null);
 
   // Refs para que los listeners globales (popstate/keydown) lean siempre el
@@ -112,9 +124,15 @@ export default function DetailModalProvider({ children }) {
 
   const openDetailModal = useCallback(
     (item) => {
+      if (!item) return;
+      // Móvil: sin ficha rápida. Navegamos directamente a la ficha completa.
+      if (isMobileViewport()) {
+        router.push(dashboardDetailHref(item, getMediaTypeForItem(item)));
+        return;
+      }
       applyOpen(item, { push: true });
     },
-    [applyOpen],
+    [applyOpen, router],
   );
 
   const closeDetailModal = useCallback(() => {
@@ -134,11 +152,17 @@ export default function DetailModalProvider({ children }) {
   }, [clearActive]);
 
   // Deep-link: al montar, si la URL ya trae ?preview=<tipo>-<id>, abrimos la
-  // ficha con un item mínimo (el hook de datos completará el resto).
+  // ficha con un item mínimo (el hook de datos completará el resto). En móvil
+  // no se abre: se redirige a la ficha completa y se limpia el parámetro.
   useEffect(() => {
     const item = readPreviewFromLocation();
-    if (item) applyOpen(item, { push: false });
-  }, [applyOpen]);
+    if (!item) return;
+    if (isMobileViewport()) {
+      router.replace(dashboardDetailHref(item, getMediaTypeForItem(item)));
+      return;
+    }
+    applyOpen(item, { push: false });
+  }, [applyOpen, router]);
 
   // popstate (Atrás/Adelante del navegador): si la ficha está abierta, la
   // entrada que empujamos ya se descartó, así que solo limpiamos el estado SIN

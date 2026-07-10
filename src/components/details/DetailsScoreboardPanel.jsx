@@ -438,11 +438,10 @@ export default function DetailsScoreboardPanel({
           className="
       relative z-10
       py-3
-      pl-[calc(0.75rem+env(safe-area-inset-left))]
+      pl-[calc(1.25rem+env(safe-area-inset-left))]
       pr-[calc(0.75rem+env(safe-area-inset-right))]
-      sm:pl-[calc(1rem+env(safe-area-inset-left))]
+      sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
       sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
-      sm:px-4
       flex items-center gap-2.5 sm:gap-4
       overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
     "

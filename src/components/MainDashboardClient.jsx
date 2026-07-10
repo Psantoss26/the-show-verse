@@ -37,15 +37,32 @@ import {
   markAsFavorite,
   markInWatchlist,
   getMovieDetails,
+  getDetails,
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
+import {
+  traktGetItemStatus,
+  traktGetShowWatched,
+  traktSetRating,
+} from "@/lib/api/traktClient";
+import {
+  getWatchedEpisodeCountForSeason,
+  getAvailableEpisodeTotal,
+} from "@/lib/hooks/useTraktEpisodesWatched";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchArtworkOverrides } from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
+// Fila de acciones + fila meta/géneros COMPARTIDAS con DetailsClient/DetailModal:
+// misma UI y estilo que la ficha rápida del dashboard.
+import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
+import { formatCountShort } from "@/lib/details/formatters";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
@@ -631,6 +648,33 @@ function InlinePreviewCard({
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
 
+  // Datos enriquecidos para la fila meta compartida (<DetailsMetaGenresRow>):
+  // estado TMDb crudo, géneros [{id,name}], temporadas y duración de respaldo.
+  // Espejo de useDetailModalData para que el diseño coincida con DetailModal.
+  const [previewDetails, setPreviewDetails] = useState({
+    status: null,
+    genreObjects: [],
+    seasons: [],
+    runtimeFallback: null,
+  });
+
+  // Estado de Trakt para el control de "visto" (<TraktWatchedControl>): conexión,
+  // visto, plays, badge de progreso (%) para series, y flag de carga.
+  const [traktInfo, setTraktInfo] = useState({
+    connected: false,
+    watched: false,
+    plays: 0,
+    badge: null,
+    loading: false,
+  });
+
+  // Puntuación del usuario (Trakt) para el <StarRating> de la fila de acciones.
+  const [rating, setRating] = useState(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
+
+  // Modal de valoración de episodios (solo series).
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+
   useEffect(() => {
     setStableBackdropState((prev) =>
       prev.mediaIdentity === mediaIdentity
@@ -860,6 +904,164 @@ function InlinePreviewCard({
     };
   }, [isSpotlight, mediaType, movie, stableBackdropOverride]);
 
+  // Carga perezosa (en hover == al montar) de los datos que alimentan la fila de
+  // acciones y la fila meta compartidas. Best-effort: nunca lanza, degrada en
+  // silencio, se cancela al desmontar y NO bloquea el render inicial de la card.
+  // Solo aplica a la vista previa de portada (no al spotlight, que no usa esta UI).
+  useEffect(() => {
+    if (isSpotlight || !movie?.id) return undefined;
+
+    let cancelled = false;
+    const isTv = mediaType === "tv";
+
+    // Detalles TMDb (espejo de useDetailModalData): estado crudo, géneros y
+    // temporadas + una duración/duración-de-temporadas de respaldo.
+    const detailsPromise = getDetails(mediaType, movie.id).catch(() => null);
+
+    (async () => {
+      try {
+        const details = await detailsPromise;
+        if (cancelled || !details) return;
+
+        let genreObjects = [];
+        if (Array.isArray(details?.genres) && details.genres.length) {
+          genreObjects = details.genres
+            .filter((g) => g && g.name)
+            .map((g) => ({ id: g.id ?? g.name, name: g.name }));
+        } else {
+          const ids = movie.genre_ids || [];
+          genreObjects = (Array.isArray(ids) ? ids : [])
+            .map((gid) => (GENRES[gid] ? { id: gid, name: GENRES[gid] } : null))
+            .filter(Boolean);
+        }
+
+        // Etiqueta de duración: minutos para películas; "N Temp. · M Eps." para
+        // series (mismo formato que useDetailModalData / DetailModal).
+        let runtimeFallback = null;
+        if (isTv) {
+          if (details?.number_of_seasons) {
+            runtimeFallback = `${details.number_of_seasons} Temp.`;
+            if (details?.number_of_episodes) {
+              runtimeFallback += ` · ${details.number_of_episodes} Eps.`;
+            }
+          }
+        } else {
+          runtimeFallback = formatRuntime(details?.runtime) || null;
+        }
+
+        setPreviewDetails({
+          status: details?.status || null,
+          genreObjects,
+          seasons: Array.isArray(details?.seasons) ? details.seasons : [],
+          runtimeFallback,
+        });
+      } catch {
+        // sin detalles: la fila meta se queda con el año que ya trae el item
+      }
+    })();
+
+    // Estado de Trakt del título (visto/plays/puntuación) y, para series, el
+    // badge de progreso (%) calculado con las temporadas de TMDb.
+    (async () => {
+      try {
+        setTraktInfo((prev) => ({ ...prev, loading: true }));
+        setRatingLoading(true);
+
+        const status = await traktGetItemStatus({
+          type: isTv ? "show" : "movie",
+          tmdbId: movie.id,
+        });
+        if (cancelled) return;
+
+        const connected = !!status?.connected;
+        const ratingValue =
+          status?.rating == null || !Number.isFinite(Number(status.rating))
+            ? null
+            : Number(status.rating);
+        setRating(ratingValue);
+        setRatingLoading(false);
+
+        if (!isTv) {
+          setTraktInfo({
+            connected,
+            watched: !!status?.watched,
+            plays: Number(status?.plays || 0),
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        // Series: sin conexión, no hay progreso que mostrar.
+        if (!connected) {
+          setTraktInfo({
+            connected: false,
+            watched: false,
+            plays: 0,
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        // Series conectada: episodios vistos + temporadas -> % de progreso.
+        const [watchedRes, details] = await Promise.all([
+          traktGetShowWatched({ tmdbId: movie.id }).catch(() => null),
+          detailsPromise,
+        ]);
+        if (cancelled) return;
+
+        const watchedBySeason = watchedRes?.watchedBySeason || {};
+        const seasonsList = Array.isArray(details?.seasons)
+          ? details.seasons
+          : [];
+        const usable = seasonsList.filter(
+          (s) => typeof s?.season_number === "number" && s.season_number > 0,
+        );
+        const totalEpisodes = usable.reduce(
+          (acc, s) => acc + getAvailableEpisodeTotal(s),
+          0,
+        );
+        const watchedEpisodes = usable.reduce((acc, s) => {
+          const total = getAvailableEpisodeTotal(s);
+          return (
+            acc +
+            getWatchedEpisodeCountForSeason(watchedBySeason, s.season_number, total)
+          );
+        }, 0);
+        const pct =
+          totalEpisodes > 0
+            ? Math.min(
+                100,
+                Math.max(0, Math.round((watchedEpisodes / totalEpisodes) * 100)),
+              )
+            : 0;
+        const badge = pct > 0 ? `${pct}%` : null;
+
+        const hasAnyWatched = Object.values(watchedBySeason || {}).some(
+          (eps) => Array.isArray(eps) && eps.length > 0,
+        );
+
+        setTraktInfo({
+          connected: true,
+          watched: hasAnyWatched,
+          plays: 0,
+          badge,
+          loading: false,
+        });
+      } catch {
+        if (!cancelled) {
+          setTraktInfo((prev) => ({ ...prev, loading: false }));
+          setRatingLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSpotlight, mediaType, movie?.id]);
+
   const cardRef = useRef(null);
 
   const openPreviewModal = () => {
@@ -934,6 +1136,43 @@ function InlinePreviewCard({
     setSoundtrackLoading(false);
     setSoundtrackPlaying(false);
     setSoundtrackOpen(false);
+  };
+
+  // Puntuación optimista en Trakt (StarRating). El StarRating no expone el evento
+  // de click: la propagación al onClick de la card la corta el contenedor de la
+  // fila de acciones (ver más abajo). Revierte la nota local si el guardado falla.
+  const handleRatePreview = async (value) => {
+    if (!traktInfo.connected) {
+      requireLogin();
+      return false;
+    }
+    if (ratingLoading || !movie) return false;
+
+    const previousRating = rating;
+    const optimisticRating = value == null ? null : Number(value);
+
+    try {
+      setRatingLoading(true);
+      setError("");
+      setRating(optimisticRating);
+      const res = await traktSetRating({
+        type: mediaType === "tv" ? "show" : "movie",
+        tmdbId: movie.id,
+        rating: value,
+      });
+      const saved =
+        res?.rating == null || !Number.isFinite(Number(res.rating))
+          ? optimisticRating
+          : Number(res.rating);
+      setRating(saved);
+      return true;
+    } catch {
+      setRating(previousRating);
+      setError("No se pudo guardar la puntuación.");
+      return false;
+    } finally {
+      setRatingLoading(false);
+    }
   };
 
   const handleToggleTrailer = async (e) => {
@@ -1091,6 +1330,7 @@ function InlinePreviewCard({
     : "!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5";
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -1419,58 +1659,58 @@ function InlinePreviewCard({
             transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
             className="h-full"
           >
-            <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
-              <LiquidButton
-                onClick={handleToggleTrailer}
-                loading={trailerLoading}
-                active
-                activeColor="yellow"
-                groupId="dashboard-preview-actions"
-                title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className={`!bg-white !text-black ${previewBtnClass}`}
-              >
-                {showTrailer ? (
-                  <X className="text-black" />
-                ) : (
-                  <Play className="ml-0.5 fill-current text-black" />
-                )}
-              </LiquidButton>
-
-              <LiquidButton
-                onClick={handleToggleFavorite}
-                loading={loadingStates || updating}
-                active={favorite}
-                activeColor="red"
-                groupId="dashboard-preview-actions"
-                title={
-                  favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+            {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal. Va
+                envuelta en un contenedor que corta la propagación al onClick de
+                la card (que abre la ficha rápida): así los clics en los botones
+                accionan su función y no abren el modal a la vez. Cada handler
+                además llama a e.stopPropagation() por robustez. */}
+            <div
+              className="mb-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DetailActionsRow
+                onTrailer={handleToggleTrailer}
+                trailerAvailable
+                trailerLoading={trailerLoading}
+                trailerLabel="Ver tráiler"
+                onSoundtrack={handleToggleSoundtrack}
+                soundtrackAvailable
+                onEpisodeRatings={
+                  mediaType === "tv"
+                    ? (e) => {
+                        e?.stopPropagation?.();
+                        setEpisodeRatingsOpen(true);
+                      }
+                    : undefined
                 }
-                aria-label={
-                  favorite ? "Quitar de favoritos" : "Añadir a favoritos"
-                }
-                className={previewBtnClass}
-              >
-                <Heart className={favorite ? "fill-current" : ""} />
-              </LiquidButton>
-
-              <LiquidButton
-                onClick={handleToggleWatchlist}
-                loading={loadingStates || updating}
-                active={watchlist}
-                activeColor="blue"
-                groupId="dashboard-preview-actions"
-                title={
-                  watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-                }
-                aria-label={
-                  watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-                }
-                className={previewBtnClass}
-              >
-                <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </LiquidButton>
-
+                episodeRatingsOpen={episodeRatingsOpen}
+                trakt={{
+                  connected: traktInfo.connected,
+                  watched: traktInfo.watched,
+                  plays: traktInfo.plays,
+                  badge: traktInfo.badge,
+                  busy: false,
+                  loading: traktInfo.loading,
+                  onOpen: (e) => {
+                    e?.stopPropagation?.();
+                    openDetailModal?.(movie);
+                  },
+                }}
+                rate={{
+                  rating,
+                  max: 10,
+                  loading: ratingLoading,
+                  onRate: handleRatePreview,
+                  connected: traktInfo.connected,
+                  onConnect: () => requireLogin(),
+                }}
+                favorite={favorite}
+                favoriteLoading={loadingStates || updating}
+                onToggleFavorite={handleToggleFavorite}
+                watchlist={watchlist}
+                watchlistLoading={loadingStates || updating}
+                onToggleWatchlist={handleToggleWatchlist}
+              />
             </div>
 
             {extras?.awards && (
@@ -1488,71 +1728,34 @@ function InlinePreviewCard({
               </div>
             )}
 
-            <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
-              {(() => {
-                const parts = [];
-                if (yearOf(movie))
-                  parts.push(<span key="year">{yearOf(movie)}</span>);
-                if (extras?.runtime)
-                  parts.push(
-                    <span key="runtime">
-                      {typeof extras.runtime === "number"
-                        ? formatRuntime(extras.runtime)
-                        : extras.runtime}
-                    </span>,
-                  );
-                if (hasTmdbRating)
-                  parts.push(
-                    <span key="tmdb" className="inline-flex items-center gap-1.5">
-                      <NextImage
-                        src="/logo-TMDb.png"
-                        alt="TMDb"
-                        width={2560}
-                        height={1846}
-                        sizes="28px"
-                        className="h-2.5 w-auto"
-                        loading="lazy"
-                      />
-                      <span className="font-bold">{tmdbRating}</span>
-                    </span>,
-                  );
-                if (typeof extras?.imdbRating === "number")
-                  parts.push(
-                    <span key="imdb" className="inline-flex items-center gap-1.5">
-                      <NextImage
-                        src="/logo-IMDb.svg"
-                        alt="IMDb"
-                        width={575}
-                        height={290}
-                        sizes="34px"
-                        className="h-3 w-auto"
-                        loading="lazy"
-                      />
-                      <span className="font-bold">
-                        {extras.imdbRating.toFixed(1)}
-                      </span>
-                    </span>,
-                  );
-                return parts.reduce((acc, part, index) => {
-                  if (index === 0) return [part];
-                  return [
-                    ...acc,
-                    <span
-                      key={`sep-${index}`}
-                      className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                      aria-hidden="true"
-                    >
-                      •
-                    </span>,
-                    part,
-                  ];
-                }, []);
-              })()}
-            </div>
+            {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
+                año · duración · estado · géneros (mismo componente y diseño).
+                Se alimenta igual que useDetailModalData. */}
+            <DetailsMetaGenresRow
+              yearIso={yearOf(movie)}
+              displayRuntimeValue={previewDetails.runtimeFallback}
+              status={previewDetails.status}
+              genres={previewDetails.genreObjects}
+            />
 
-            <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
-              {genres && <span className="truncate">{genres}</span>}
-            </div>
+            {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que
+                usa DetailModal (mismo diseño). Orden espejo del modal:
+                acciones → premios → meta → puntuaciones. */}
+            <DetailsRatingsBadges
+              tmdb={
+                hasTmdbRating
+                  ? {
+                      value: tmdbRating,
+                      sub: formatCountShort(movie.vote_count),
+                    }
+                  : null
+              }
+              imdb={
+                typeof extras?.imdbRating === "number"
+                  ? { value: extras.imdbRating.toFixed(1), sub: null }
+                  : null
+              }
+            />
 
             {error && (
               <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
@@ -1697,6 +1900,18 @@ function InlinePreviewCard({
         )}
       </AnimatePresence>
     </motion.div>
+
+    {/* Valoración de episodios (solo series) — mismo modal que la ficha
+        completa y DetailModal. Fuera del área clicable de la card. */}
+    {mediaType === "tv" && (
+      <EpisodeRatingsModal
+        open={episodeRatingsOpen}
+        onClose={() => setEpisodeRatingsOpen(false)}
+        showId={Number(movie.id)}
+        title={movie.title || movie.name}
+      />
+    )}
+    </>
   );
 }
 

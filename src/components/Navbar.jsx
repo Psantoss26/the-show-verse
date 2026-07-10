@@ -741,6 +741,14 @@ export default function Navbar() {
   // El fondo difuminado aparece al hacer scroll.
   const heroNavMode = isFeaturedHeroRoute && !isScrolled;
 
+  // La ficha completa (/details/…) arranca con un hero a sangre SOLO en móvil
+  // (<640px), donde la navbar debe ir superpuesta y sin fondo. IMPORTANTE: no se
+  // usa un flag de viewport en JS (en el primer render valdría `false` y la
+  // navbar aparecería un instante con el cristal antes de volverse transparente).
+  // Se decide por `pathname` —conocido ya en el primer render— y el móvil/desktop
+  // se resuelve con variantes `sm:` de CSS, así no hay ningún parpadeo.
+  const detailsHeroNav = (pathname || "").startsWith("/details/") && !isScrolled;
+
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
     activePath === href || (href !== "/" && activePath?.startsWith(href));
@@ -849,10 +857,18 @@ export default function Navbar() {
     // En la fase inicial del hero (navbar transparente) los iconos pueden
     // perderse sobre backdrops claros: los aclaramos y les damos una sombra
     // oscura para garantizar contraste sobre cualquier fondo.
-    const inactiveColor = heroNavMode ? "text-neutral-100" : "text-neutral-400";
+    // En /details/… la navbar solo es transparente en móvil, así que el realce se
+    // aplica por CSS y se revierte a partir de `sm` (sin flags de viewport).
+    const inactiveColor = heroNavMode
+      ? "text-neutral-100"
+      : detailsHeroNav
+        ? "text-neutral-100 sm:text-neutral-400"
+        : "text-neutral-400";
     const heroShadow = heroNavMode
       ? " drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
-      : "";
+      : detailsHeroNav
+        ? " drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)] sm:drop-shadow-none"
+        : "";
     return `${base} ${active ? t.active : t.hover} ${active ? "" : inactiveColor}${heroShadow}`;
   };
 
@@ -927,12 +943,17 @@ export default function Navbar() {
       {/* ===================== TOP BAR ===================== */}
       {/* En páginas con FeaturedHero (arriba del todo) la navbar es transparente
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
-          al hacer scroll aparece el fondo glass difuminado. */}
+          al hacer scroll aparece el fondo glass difuminado.
+          En /details/… se hace lo mismo pero SOLO en móvil: transparente por
+          defecto y, a partir de `sm`, se restaura el cristal con variantes CSS
+          (sin flags de viewport en JS → sin parpadeo al entrar). */}
       <nav
         className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
-            : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+            : detailsHeroNav
+              ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent sm:bg-black/20 sm:bg-gradient-to-br sm:from-white/10 sm:via-transparent sm:to-black/40 sm:backdrop-blur-[50px] sm:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+              : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
         }`}
       >
         {/* ---------------- Desktop ---------------- */}
@@ -1161,7 +1182,11 @@ export default function Navbar() {
               <UserAvatar
                 account={account}
                 className={
-                  heroNavMode ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]" : ""
+                  heroNavMode
+                    ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]"
+                    : detailsHeroNav
+                      ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)] sm:drop-shadow-none"
+                      : ""
                 }
               />
             )}

@@ -28,14 +28,19 @@ import {
 
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
+// NOTA: los selectores excluyen `.labeled` además de `.separator`. Un botón
+// "labeled" (p. ej. el tráiler con texto en la preview del dashboard) no debe
+// heredar el tamaño cuadrado/tope de ancho de los botones-icono. Si no hay
+// ningún hijo `.labeled` el comportamiento es idéntico al anterior.
 const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
-                [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] sm:[&>*:not(.separator)]:max-w-[52px]
-                [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]]:[container-type:inline-size]
-                [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]_svg]:!h-[46cqw] sm:[&_[data-liquid-button]_svg]:!w-[22px] sm:[&_[data-liquid-button]_svg]:!h-[22px]
-                [&_[data-liquid-button]_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]_.text-xl]:!text-[22px]
-                [&_[data-liquid-button]_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]_.text-2xl]:!text-[24px]
-                [&_[data-liquid-button]_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]_.text-lg]:!text-[18px]
-                [&_[data-liquid-button]_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]_.text-xs]:!text-[12px]`;
+                [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
+                [&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
+                [&_[data-liquid-button]:not(.labeled)]:!w-full [&_[data-liquid-button]:not(.labeled)]:!h-auto [&_[data-liquid-button]:not(.labeled)]:aspect-square [&_[data-liquid-button]:not(.labeled)]:[container-type:inline-size]
+                [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
+                [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
+                [&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]
+                [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
+                [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
 
 /**
  * Fila de acciones presentacional. Cada elemento aparece solo si su
@@ -91,6 +96,10 @@ export default function DetailActionsRow({
   onTrailer,
   trailerAvailable = false,
   trailerLoading,
+  // Si se pasa, el botón de tráiler se muestra como PÍLDORA con texto (icono +
+  // etiqueta) en vez de icono-only. Solo lo usa la preview del dashboard;
+  // DetailModal y DetailsClient lo omiten y mantienen el icono.
+  trailerLabel = null,
 
   onSoundtrack,
   soundtrackAvailable = false,
@@ -121,7 +130,13 @@ export default function DetailActionsRow({
   const mobileCapClass = fillMobile
     ? ""
     : "[&>*:not(.separator)]:max-w-[60px]";
-  const rowClass = [BASE_ROW_CLASS, mobileGapClass, mobileCapClass, className]
+  const rowClass = [
+    BASE_ROW_CLASS,
+    mobileGapClass,
+    mobileCapClass,
+    trailerLabel ? "labeled-row" : "",
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
   return (
@@ -135,12 +150,30 @@ export default function DetailActionsRow({
           loading={trailerLoading}
           activeColor="yellow"
           groupId="details-actions"
-          className={trailerAvailable ? "!bg-white !text-black" : ""}
+          className={[
+            trailerAvailable ? "!bg-white !text-black" : "",
+            trailerLabel
+              ? "labeled shrink-0 !aspect-auto !h-10 !w-auto !max-w-none px-4"
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           title={trailerAvailable ? "Ver Tráiler" : "Sin Tráiler"}
         >
           <Play
-            className={`fill-current ${trailerAvailable ? "ml-0.5 sm:ml-1" : ""}`}
+            className={`fill-current ${
+              trailerLabel
+                ? "mr-2 h-4 w-4"
+                : trailerAvailable
+                  ? "ml-0.5 sm:ml-1"
+                  : ""
+            }`}
           />
+          {trailerLabel && (
+            <span className="whitespace-nowrap text-[13px] font-bold">
+              {trailerLabel}
+            </span>
+          )}
         </LiquidButton>
       )}
 
