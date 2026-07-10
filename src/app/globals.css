@@ -373,29 +373,27 @@ html {
 
 /* =============================================================================
    VIEW TRANSITIONS — preview (DetailModal) → ficha completa (DetailsClient)
-   Efecto "cortina": el estado VIEJO (el modal completo: panel + fondo blur) se
-   desliza HACIA ABAJO por encima, revelando el estado NUEVO (DetailsClient, ya renderizado detrás:
-   backdrop de fondo + contenido). Sin cortes: el navegador pinta ambos snapshots
-   a la vez, así que detrás del modal que baja siempre está la ficha. El contenido
-   nuevo entra con un leve fundido/subida además de sus propias animaciones.
+   Efecto "cortina": el panel VIEJO de DetailModal baja como una sola pieza
+   dentro de su propio rectángulo, revelando DetailsClient ya renderizado detrás.
    Degrada solo (navegación normal) donde no hay soporte.
    ========================================================================== */
 @media not (prefers-reduced-motion: reduce) {
-  /* El modal completo se desliza hacia abajo, incluyendo su fondo difuminado. */
+  /* El snapshot se toma del panel, no del wrapper fixed/inset-0. Así evitamos
+     desplazar la viewport completa y mantenemos pegado el fondo blur del panel. */
   ::view-transition-group(modal-panel) {
     z-index: 30;
   }
   ::view-transition-old(modal-panel) {
-    animation: dm-slide-down-out 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation: dm-slide-down-out 560ms cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
-  /* Detrás queda la ficha (root), sólida desde el inicio y sin desplazarse →
-     nunca hay hueco. Su contenido entra además con sus propias animaciones. */
+  /* La página nueva queda detrás desde el arranque. El movimiento pertenece solo
+     al panel del modal, no al snapshot root de toda la pantalla. */
   ::view-transition-new(root) {
-    animation: dm-reveal-in 160ms ease-out both;
+    animation: none;
   }
   ::view-transition-old(root) {
-    animation: dm-fade-out 140ms ease-out both;
+    animation: dm-instant-fade-out 1ms linear both;
   }
 }
 
@@ -408,20 +406,11 @@ html {
   }
 }
 
-@keyframes dm-fade-out {
+@keyframes dm-instant-fade-out {
   from {
     opacity: 1;
   }
   to {
     opacity: 0;
-  }
-}
-
-@keyframes dm-reveal-in {
-  from {
-    opacity: 0.7;
-  }
-  to {
-    opacity: 1;
   }
 }

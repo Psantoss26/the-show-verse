@@ -21,8 +21,10 @@ import Link from "next/link";
 import NextImage from "next/image";
 import {
   Play,
-  Heart,
-  BookmarkPlus,
+  Pause,
+  Volume2,
+  Music2,
+  Loader2,
   X,
   Award,
   ChevronRight,
@@ -34,13 +36,30 @@ import {
   markAsFavorite,
   markInWatchlist,
   getMovieDetails,
+  getDetails,
   getExternalIds,
 } from "@/lib/api/tmdb";
+import {
+  traktGetItemStatus,
+  traktGetShowWatched,
+  traktSetRating,
+} from "@/lib/api/traktClient";
+import {
+  getWatchedEpisodeCountForSeason,
+  getAvailableEpisodeTotal,
+} from "@/lib/hooks/useTraktEpisodesWatched";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
+import { formatCountShort } from "@/lib/details/formatters";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
-import LiquidButton from "@/components/LiquidButton";
+import OptimizedImage from "@/components/OptimizedImage";
+// Fila de acciones + fila meta/géneros + puntuaciones COMPARTIDAS con
+// DetailsClient/DetailModal: misma UI que la ficha rápida del dashboard.
+import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 
 import {
@@ -104,15 +123,6 @@ const dashboardPreviewBackdropFadeStyle = {
 };
 
 /* =================== HELPERS =================== */
-const genresText = (item) => {
-  const ids =
-    item?.genre_ids ||
-    (Array.isArray(item?.genres) ? item.genres.map((g) => g.id) : []);
-  const names = (Array.isArray(ids) ? ids : [])
-    .map((id) => GENRES[id])
-    .filter(Boolean);
-  return names.slice(0, 2).join(" • ");
-};
 
 // Backdrop inicial (síncrono) para pintar algo desde el primer render sin
 // esperar a la petición: preferencia del usuario → override → caché → backdrop
@@ -287,6 +297,73 @@ function BackdropPreviewCard({
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
 
+  // Soundtrack (mismo mecanismo que InlinePreviewCard): búsqueda de la canción
+  // con preview, reproducción en un overlay dentro de la propia tarjeta.
+  const [soundtrackTrack, setSoundtrackTrack] = useState(null);
+  const [soundtrackLoading, setSoundtrackLoading] = useState(false);
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false);
+  const [soundtrackError, setSoundtrackError] = useState("");
+  const audioRef = useRef(null);
+  const soundtrackAbortRef = useRef(null);
+
+  // Datos enriquecidos para la fila meta compartida (<DetailsMetaGenresRow>):
+  // estado TMDb crudo, géneros [{id,name}], temporadas y duración de respaldo.
+  // Espejo de useDetailModalData para que el diseño coincida con DetailModal.
+  const [previewDetails, setPreviewDetails] = useState({
+    status: null,
+    genreObjects: [],
+    seasons: [],
+    runtimeFallback: null,
+  });
+
+  // Estado de Trakt para el control de "visto" (<TraktWatchedControl>): conexión,
+  // visto, plays, badge de progreso (%) para series, y flag de carga.
+  const [traktInfo, setTraktInfo] = useState({
+    connected: false,
+    watched: false,
+    plays: 0,
+    badge: null,
+    loading: false,
+  });
+
+  // Puntuación del usuario (Trakt) para el <StarRating> de la fila de acciones.
+  const [rating, setRating] = useState(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
+
+  // Modal de valoración de episodios (solo series).
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+
+  // Reinicio del soundtrack al cambiar de título.
+  useEffect(() => {
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackTrack(null);
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+    setSoundtrackError("");
+  }, [item?.id]);
+
+  // Cierre del overlay de soundtrack con Escape.
+  useEffect(() => {
+    if (!soundtrackOpen) return;
+
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      soundtrackAbortRef.current?.abort();
+      soundtrackAbortRef.current = null;
+      audioRef.current?.pause();
+      setSoundtrackLoading(false);
+      setSoundtrackPlaying(false);
+      setSoundtrackOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [soundtrackOpen]);
+
   // Estado favorito/pendientes en el backend.
   useEffect(() => {
     let cancel = false;
@@ -405,6 +482,163 @@ function BackdropPreviewCard({
     };
   }, [item, mediaType]);
 
+  // Carga perezosa (al montar la vista previa en hover) de los datos que
+  // alimentan la fila de acciones y la fila meta compartidas. Best-effort: nunca
+  // lanza, degrada en silencio, se cancela al desmontar y NO bloquea el render.
+  useEffect(() => {
+    if (!item?.id) return undefined;
+
+    let cancelled = false;
+    const isTv = mediaType === "tv";
+
+    // Detalles TMDb (espejo de useDetailModalData): estado crudo, géneros y
+    // temporadas + una duración/duración-de-temporadas de respaldo.
+    const detailsPromise = getDetails(mediaType, item.id).catch(() => null);
+
+    (async () => {
+      try {
+        const details = await detailsPromise;
+        if (cancelled || !details) return;
+
+        let genreObjects = [];
+        if (Array.isArray(details?.genres) && details.genres.length) {
+          genreObjects = details.genres
+            .filter((g) => g && g.name)
+            .map((g) => ({ id: g.id ?? g.name, name: g.name }));
+        } else {
+          const ids = item.genre_ids || [];
+          genreObjects = (Array.isArray(ids) ? ids : [])
+            .map((gid) => (GENRES[gid] ? { id: gid, name: GENRES[gid] } : null))
+            .filter(Boolean);
+        }
+
+        // Etiqueta de duración: minutos para películas; "N Temp. · M Eps." para
+        // series (mismo formato que useDetailModalData / DetailModal).
+        let runtimeFallback = null;
+        if (isTv) {
+          if (details?.number_of_seasons) {
+            runtimeFallback = `${details.number_of_seasons} Temp.`;
+            if (details?.number_of_episodes) {
+              runtimeFallback += ` · ${details.number_of_episodes} Eps.`;
+            }
+          }
+        } else {
+          runtimeFallback = formatRuntime(details?.runtime) || null;
+        }
+
+        setPreviewDetails({
+          status: details?.status || null,
+          genreObjects,
+          seasons: Array.isArray(details?.seasons) ? details.seasons : [],
+          runtimeFallback,
+        });
+      } catch {
+        // sin detalles: la fila meta se queda con el año que ya trae el item
+      }
+    })();
+
+    // Estado de Trakt del título (visto/plays/puntuación) y, para series, el
+    // badge de progreso (%) calculado con las temporadas de TMDb.
+    (async () => {
+      try {
+        setTraktInfo((prev) => ({ ...prev, loading: true }));
+        setRatingLoading(true);
+
+        const status = await traktGetItemStatus({
+          type: isTv ? "show" : "movie",
+          tmdbId: item.id,
+        });
+        if (cancelled) return;
+
+        const connected = !!status?.connected;
+        const ratingValue =
+          status?.rating == null || !Number.isFinite(Number(status.rating))
+            ? null
+            : Number(status.rating);
+        setRating(ratingValue);
+        setRatingLoading(false);
+
+        if (!isTv) {
+          setTraktInfo({
+            connected,
+            watched: !!status?.watched,
+            plays: Number(status?.plays || 0),
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        // Series: sin conexión, no hay progreso que mostrar.
+        if (!connected) {
+          setTraktInfo({
+            connected: false,
+            watched: false,
+            plays: 0,
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        // Series conectada: episodios vistos + temporadas -> % de progreso.
+        const [watchedRes, details] = await Promise.all([
+          traktGetShowWatched({ tmdbId: item.id }).catch(() => null),
+          detailsPromise,
+        ]);
+        if (cancelled) return;
+
+        const watchedBySeason = watchedRes?.watchedBySeason || {};
+        const seasonsList = Array.isArray(details?.seasons)
+          ? details.seasons
+          : [];
+        const usable = seasonsList.filter(
+          (s) => typeof s?.season_number === "number" && s.season_number > 0,
+        );
+        const totalEpisodes = usable.reduce(
+          (acc, s) => acc + getAvailableEpisodeTotal(s),
+          0,
+        );
+        const watchedEpisodes = usable.reduce((acc, s) => {
+          const total = getAvailableEpisodeTotal(s);
+          return (
+            acc +
+            getWatchedEpisodeCountForSeason(watchedBySeason, s.season_number, total)
+          );
+        }, 0);
+        const pct =
+          totalEpisodes > 0
+            ? Math.min(
+                100,
+                Math.max(0, Math.round((watchedEpisodes / totalEpisodes) * 100)),
+              )
+            : 0;
+        const badge = pct > 0 ? `${pct}%` : null;
+
+        const hasAnyWatched = Object.values(watchedBySeason || {}).some(
+          (eps) => Array.isArray(eps) && eps.length > 0,
+        );
+
+        setTraktInfo({
+          connected: true,
+          watched: hasAnyWatched,
+          plays: 0,
+          badge,
+          loading: false,
+        });
+      } catch {
+        if (!cancelled) {
+          setTraktInfo((prev) => ({ ...prev, loading: false }));
+          setRatingLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.id, mediaType]);
+
   const requireLogin = () => {
     if (!session || !account?.id) {
       window.location.href = `/login?next=${encodeURIComponent(
@@ -465,8 +699,54 @@ function BackdropPreviewCard({
     }
   };
 
+  const closeSoundtrackOverlay = (e) => {
+    e?.stopPropagation();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+  };
+
+  // Puntuación optimista en Trakt (StarRating). Revierte la nota local si falla.
+  const handleRatePreview = async (value) => {
+    if (!traktInfo.connected) {
+      requireLogin();
+      return false;
+    }
+    if (ratingLoading || !item) return false;
+
+    const previousRating = rating;
+    const optimisticRating = value == null ? null : Number(value);
+
+    try {
+      setRatingLoading(true);
+      setError("");
+      setRating(optimisticRating);
+      const res = await traktSetRating({
+        type: mediaType === "tv" ? "show" : "movie",
+        tmdbId: item.id,
+        rating: value,
+      });
+      const saved =
+        res?.rating == null || !Number.isFinite(Number(res.rating))
+          ? optimisticRating
+          : Number(res.rating);
+      setRating(saved);
+      return true;
+    } catch {
+      setRating(previousRating);
+      setError("No se pudo guardar la puntuación.");
+      return false;
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
   const handleToggleTrailer = async (e) => {
     e.stopPropagation();
+    closeSoundtrackOverlay();
     if (showTrailer) {
       setShowTrailer(false);
       return;
@@ -492,11 +772,100 @@ function BackdropPreviewCard({
     }
   };
 
+  const handleToggleSoundtrack = async (e) => {
+    e.stopPropagation();
+    if (soundtrackLoading) return;
+
+    if (soundtrackOpen) {
+      closeSoundtrackOverlay();
+      return;
+    }
+
+    if (showTrailer) setShowTrailer(false);
+    setSoundtrackOpen(true);
+    setSoundtrackError("");
+
+    if (soundtrackTrack?.previewUrl) return;
+
+    const controller = new AbortController();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = controller;
+    setSoundtrackLoading(true);
+
+    try {
+      const title = item.title || item.name || "";
+      const params = new URLSearchParams({
+        title,
+        type: mediaType,
+        country: "ES",
+        tmdbId: String(item.id),
+      });
+      const originalTitle = item.original_title || item.original_name;
+      if (originalTitle && originalTitle !== title) {
+        params.set("originalTitle", originalTitle);
+      }
+      const year = yearOf(item);
+      if (year) params.set("year", String(year));
+
+      const response = await fetch(`/api/soundtrack?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Soundtrack HTTP ${response.status}`);
+
+      const data = await response.json();
+      const track = Array.isArray(data?.tracks)
+        ? data.tracks.find((entry) => entry?.previewUrl)
+        : null;
+
+      if (!track?.previewUrl) {
+        setSoundtrackError(
+          "No se encontró una canción con preview para este título.",
+        );
+        return;
+      }
+
+      setSoundtrackTrack({
+        id: track.id || track.previewUrl,
+        previewUrl: track.previewUrl,
+        trackName: track.trackName || track.name || "Soundtrack",
+        artistName: track.artistName || "",
+        artworkUrl: track.artworkUrl || "",
+        source: track.source || "",
+      });
+    } catch (requestError) {
+      if (requestError?.name !== "AbortError") {
+        setSoundtrackError("No se pudo cargar el soundtrack.");
+      }
+    } finally {
+      if (soundtrackAbortRef.current === controller) {
+        soundtrackAbortRef.current = null;
+        setSoundtrackLoading(false);
+      }
+    }
+  };
+
+  const handleToggleSoundtrackPlayback = async (e) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio || !soundtrackTrack?.previewUrl) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+
+    audio.volume = 0.3;
+    try {
+      await audio.play();
+    } catch {
+      setSoundtrackPlaying(false);
+    }
+  };
+
   const bgSrc = backdropPath ? buildImg(backdropPath, BACKDROP_SIZE) : null;
   const title = item?.title || item?.name || "";
   const tmdbRating = ratingOf(item);
   const hasTmdbRating = tmdbRating !== "–";
-  const genres = genresText(item);
 
   const trailerSrc = trailer?.key
     ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
@@ -547,6 +916,7 @@ function BackdropPreviewCard({
   const previewBtnClass = "!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5";
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, scale: 0.9, y: 0 }}
       animate={{ opacity: 1, scale: previewScale, y: -8 }}
@@ -649,48 +1019,55 @@ function BackdropPreviewCard({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        {/* Fila de acciones: trailer + favorito + pendientes */}
-        <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
-          <LiquidButton
-            onClick={handleToggleTrailer}
-            loading={trailerLoading}
-            active
-            activeColor="yellow"
-            groupId="dashboard-backdrop-actions"
-            title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-            className={`!bg-white !text-black ${previewBtnClass}`}
-          >
-            {showTrailer ? (
-              <X className="text-black" />
-            ) : (
-              <Play className="ml-0.5 fill-current text-black" />
-            )}
-          </LiquidButton>
-
-          <LiquidButton
-            onClick={handleToggleFavorite}
-            loading={loadingStates || updating}
-            active={favorite}
-            activeColor="red"
-            groupId="dashboard-backdrop-actions"
-            title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-            className={previewBtnClass}
-          >
-            <Heart className={favorite ? "fill-current" : ""} />
-          </LiquidButton>
-
-          <LiquidButton
-            onClick={handleToggleWatchlist}
-            loading={loadingStates || updating}
-            active={watchlist}
-            activeColor="blue"
-            groupId="dashboard-backdrop-actions"
-            title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-            className={previewBtnClass}
-          >
-            <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-          </LiquidButton>
-
+        {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal. Va
+            envuelta en un contenedor que corta la propagación al onClick de la
+            card (que abre la ficha rápida): así los clics en los botones
+            accionan su función y no abren el modal a la vez. Cada handler
+            además llama a e.stopPropagation() por robustez. */}
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <DetailActionsRow
+            onTrailer={handleToggleTrailer}
+            trailerAvailable
+            trailerLoading={trailerLoading}
+            trailerLabel="Ver tráiler"
+            onSoundtrack={handleToggleSoundtrack}
+            soundtrackAvailable
+            onEpisodeRatings={
+              mediaType === "tv"
+                ? (e) => {
+                    e?.stopPropagation?.();
+                    setEpisodeRatingsOpen(true);
+                  }
+                : undefined
+            }
+            episodeRatingsOpen={episodeRatingsOpen}
+            trakt={{
+              connected: traktInfo.connected,
+              watched: traktInfo.watched,
+              plays: traktInfo.plays,
+              badge: traktInfo.badge,
+              busy: false,
+              loading: traktInfo.loading,
+              onOpen: (e) => {
+                e?.stopPropagation?.();
+                openDetailModal?.(item);
+              },
+            }}
+            rate={{
+              rating,
+              max: 10,
+              loading: ratingLoading,
+              onRate: handleRatePreview,
+              connected: traktInfo.connected,
+              onConnect: () => requireLogin(),
+            }}
+            favorite={favorite}
+            favoriteLoading={loadingStates || updating}
+            onToggleFavorite={handleToggleFavorite}
+            watchlist={watchlist}
+            watchlistLoading={loadingStates || updating}
+            onToggleWatchlist={handleToggleWatchlist}
+          />
         </div>
 
         {extras?.awards && (
@@ -708,79 +1085,183 @@ function BackdropPreviewCard({
           </div>
         )}
 
-        {/* Metadatos: año · duración/temporadas · nota TMDb · nota IMDb */}
-        <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
-          {(() => {
-            const parts = [];
-            if (yearOf(item))
-              parts.push(<span key="year">{yearOf(item)}</span>);
-            if (extras?.runtime)
-              parts.push(
-                <span key="runtime">
-                  {typeof extras.runtime === "number"
-                    ? formatRuntime(extras.runtime)
-                    : extras.runtime}
-                </span>,
-              );
-            if (hasTmdbRating)
-              parts.push(
-                <span key="tmdb" className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-TMDb.png"
-                    alt="TMDb"
-                    width={2560}
-                    height={1846}
-                    sizes="28px"
-                    className="h-2.5 w-auto"
-                    loading="lazy"
-                  />
-                  <span className="font-bold">{tmdbRating}</span>
-                </span>,
-              );
-            if (typeof extras?.imdbRating === "number")
-              parts.push(
-                <span key="imdb" className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-IMDb.svg"
-                    alt="IMDb"
-                    width={575}
-                    height={290}
-                    sizes="34px"
-                    className="h-3 w-auto"
-                    loading="lazy"
-                  />
-                  <span className="font-bold">
-                    {extras.imdbRating.toFixed(1)}
-                  </span>
-                </span>,
-              );
-            return parts.reduce((acc, part, i) => {
-              if (i === 0) return [part];
-              return [
-                ...acc,
-                <span
-                  key={`sep-${i}`}
-                  className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                  aria-hidden="true"
-                >
-                  •
-                </span>,
-                part,
-              ];
-            }, []);
-          })()}
-        </div>
+        {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
+            año · duración · estado · géneros (mismo componente y diseño).
+            Se alimenta igual que useDetailModalData. */}
+        <DetailsMetaGenresRow
+          yearIso={yearOf(item)}
+          displayRuntimeValue={previewDetails.runtimeFallback}
+          status={previewDetails.status}
+          genres={previewDetails.genreObjects}
+        />
 
-        {/* Géneros (hueco reservado igual que la fila de premios) */}
-        <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
-          {genres && <span className="truncate">{genres}</span>}
-        </div>
+        {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que usa
+            DetailModal (mismo diseño). Orden espejo del modal: acciones →
+            premios → meta → puntuaciones. */}
+        <DetailsRatingsBadges
+          tmdb={
+            hasTmdbRating
+              ? { value: tmdbRating, sub: formatCountShort(item.vote_count) }
+              : null
+          }
+          imdb={
+            typeof extras?.imdbRating === "number"
+              ? { value: extras.imdbRating.toFixed(1), sub: null }
+              : null
+          }
+        />
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>
         )}
       </motion.div>
+
+      {/* Overlay de soundtrack (mismo diseño que InlinePreviewCard): se pinta
+          dentro de la propia tarjeta y corta la propagación de clics. */}
+      <AnimatePresence>
+        {soundtrackOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden rounded-[inherit] p-4"
+            role="dialog"
+            aria-label={`Soundtrack de ${title}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {bgSrc && (
+              <NextImage
+                src={bgSrc}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes={previewImageSizes}
+                className="scale-110 object-cover opacity-55 blur-2xl"
+              />
+            )}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl" />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="relative flex min-h-32 w-full max-w-[32rem] items-center gap-4 overflow-hidden rounded-[1.75rem] bg-black/45 bg-gradient-to-br from-white/15 via-white/[0.06] to-black/35 p-4 pr-12 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.16),0_24px_50px_-18px_rgba(0,0,0,0.95)] backdrop-blur-3xl sm:gap-5 sm:p-5 sm:pr-14"
+            >
+              <button
+                type="button"
+                onClick={closeSoundtrackOverlay}
+                autoFocus
+                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:h-10 sm:w-10"
+                aria-label="Cerrar soundtrack"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+
+              {soundtrackLoading ? (
+                <div
+                  className="flex min-h-24 w-full items-center justify-center gap-3 text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Loader2 className="h-7 w-7 animate-spin text-amber-300" />
+                  <span className="text-sm font-semibold">
+                    Buscando música...
+                  </span>
+                </div>
+              ) : soundtrackTrack ? (
+                <>
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_18px_35px_-14px_rgba(0,0,0,0.95)] sm:h-32 sm:w-32">
+                    {soundtrackTrack.artworkUrl ? (
+                      <OptimizedImage
+                        src={soundtrackTrack.artworkUrl}
+                        alt={`Portada de ${soundtrackTrack.trackName}`}
+                        decoding="async"
+                        fetchPriority="high"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Music2
+                          className="h-10 w-10 text-amber-300/60"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1 truncate text-[0.62rem] font-bold uppercase tracking-[0.18em] text-white/45 sm:text-[0.68rem]">
+                      {title}
+                    </p>
+                    <h4 className="line-clamp-2 text-base font-black leading-tight text-white drop-shadow-md sm:text-xl">
+                      {soundtrackTrack.trackName}
+                    </h4>
+                    {soundtrackTrack.artistName && (
+                      <p className="mt-1 line-clamp-1 text-xs font-medium text-white/65 sm:text-sm">
+                        {soundtrackTrack.artistName}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleToggleSoundtrackPlayback}
+                      className="mt-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[0_10px_30px_-12px_rgba(255,255,255,0.35)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/20 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                      aria-label={
+                        soundtrackPlaying ? "Pausar canción" : "Reproducir canción"
+                      }
+                    >
+                      {soundtrackPlaying ? (
+                        <Pause className="h-5 w-5 fill-current" />
+                      ) : (
+                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                      )}
+                    </button>
+
+                    <audio
+                      ref={audioRef}
+                      src={soundtrackTrack.previewUrl}
+                      autoPlay
+                      loop
+                      preload="metadata"
+                      className="hidden"
+                      onLoadedMetadata={(event) => {
+                        event.currentTarget.volume = 0.3;
+                      }}
+                      onPlay={() => setSoundtrackPlaying(true)}
+                      onPause={() => setSoundtrackPlaying(false)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="flex min-h-24 w-full flex-col items-center justify-center gap-2 text-center text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Music2 className="h-8 w-8 text-amber-300/50" />
+                  <p className="max-w-72 text-sm font-medium">
+                    {soundtrackError ||
+                      "No se encontró música para este título."}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
+
+    {/* Valoración de episodios (solo series) — mismo modal que la ficha
+        completa y DetailModal. Fuera del área clicable de la card. */}
+    {mediaType === "tv" && (
+      <EpisodeRatingsModal
+        open={episodeRatingsOpen}
+        onClose={() => setEpisodeRatingsOpen(false)}
+        showId={Number(item.id)}
+        title={title}
+      />
+    )}
+    </>
   );
 }
 

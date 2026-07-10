@@ -161,6 +161,10 @@ import {
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
 
+// Arte para el hero MÓVIL: póster CON idioma, priorizando INGLÉS (el propio
+// póster ya trae el título rotulado, por eso no se superpone logo ni texto).
+import { fetchBestPoster } from "@/lib/dashboard/media";
+
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
   slugifyForSeriesGraph,
@@ -1377,6 +1381,14 @@ export default function DetailsClient({
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
 
+  // Arte para el HERO MÓVIL: mejor póster CON idioma (prioriza inglés). Como el
+  // póster ya lleva el título rotulado, NO se superpone logo ni texto.
+  // `heroPosterReady` marca que la búsqueda terminó (con o sin éxito): hasta
+  // entonces no se pinta ninguna imagen, para no mostrar primero el póster base
+  // y sustituirlo después (evita el parpadeo de "aparecen otras cosas").
+  const [heroPosterPath, setHeroPosterPath] = useState(null);
+  const [heroPosterReady, setHeroPosterReady] = useState(false);
+
   /**
    * Extrae un ID consistente de una lista (puede venir como objeto o como valor directo).
    * Soporta formatos de TMDb y Trakt.
@@ -1422,6 +1434,29 @@ export default function DetailsClient({
       else mqMobile.removeListener(updateMobile);
     };
   }, []);
+
+  // Póster del HERO MÓVIL: `fetchBestPoster` prioriza INGLÉS (y si no hay, cae a
+  // uno sin idioma y por último a cualquiera). Marcamos `heroPosterReady` al
+  // terminar —haya o no resultado— para pintar la portada UNA sola vez.
+  useEffect(() => {
+    let cancelled = false;
+    setHeroPosterPath(null);
+    setHeroPosterReady(false);
+    (async () => {
+      let path = null;
+      try {
+        path = await fetchBestPoster(id, endpointType);
+      } catch {
+        // sin arte: caeremos al póster base del componente
+      }
+      if (cancelled) return;
+      if (path) setHeroPosterPath(path);
+      setHeroPosterReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, endpointType]);
 
   // Si pasamos a desktop, cerramos el boton de limpiar rating movil
   useEffect(() => {
@@ -2702,6 +2737,18 @@ export default function DetailsClient({
   // Imagen principal del poster: en modo preview muestra backdrop, si no el poster
   const displayPosterPath =
     posterViewMode === "preview" ? previewBackdropPath : basePosterDisplayPath;
+
+  // Origen de imagen para el HERO MÓVIL. Solo se resuelve cuando la búsqueda del
+  // póster ha terminado (`heroPosterReady`): así se pinta la portada definitiva
+  // de una vez, en lugar de mostrar el póster base y sustituirlo después. Si no
+  // hubo póster en inglés, cae al póster base ya calculado por el componente.
+  const mobileHeroPosterSrc = !heroPosterReady
+    ? null
+    : heroPosterPath
+      ? `https://image.tmdb.org/t/p/w780${heroPosterPath}`
+      : basePosterDisplayPath
+        ? `https://image.tmdb.org/t/p/w780${basePosterDisplayPath}`
+        : null;
 
   // Precarga ambas variantes para que el cambio entre poster y preview sea instantáneo.
   useEffect(() => {
@@ -7667,7 +7714,11 @@ export default function DetailsClient({
   return (
     <div
       data-details-root
-      className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
+      /* -mt-16 (solo móvil): sube la página los 64px de la navbar sticky para que
+         el hero de portada arranque pegado arriba y la navbar quede SUPERPUESTA y
+         sin fondo (mismo patrón que FeaturedHero). En sm+ se anula con sm:mt-0,
+         así el layout de escritorio no cambia. */
+      className="relative -mt-16 min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30 sm:mt-0"
     >
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
@@ -7753,6 +7804,43 @@ export default function DetailsClient({
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
         >
+          {/* =================================================================
+              HERO MÓVIL (solo <640px): póster textless a pantalla completa con
+              el logo del título superpuesto. Espeja el hero móvil de DetailModal
+              (mismas clases). En sm+ se oculta por completo (sm:hidden), por lo
+              que el layout de escritorio queda intacto. Sustituye visualmente a
+              la tarjeta de póster y al <h1>, que se ocultan en móvil más abajo.
+             ================================================================= */}
+          {/* A SANGRE: el contenedor padre tiene px-4 (16px) y pt-8 (32px). Un
+              `w-full` con margen negativo NO ensancha (solo desplaza), así que se
+              fuerza el ancho a 100%+2rem y se desplaza -ml-4 para llegar a ambos
+              bordes; -mt-8 cancela el padding superior para pegarlo arriba. */}
+          <div className="relative -ml-4 -mt-8 aspect-[2/3] w-[calc(100%_+_2rem)] overflow-hidden bg-[#101010] sm:hidden">
+            {/* SOLO la portada. Mientras se resuelve el póster no se pinta nada
+                (el fondo del contenedor ya es #101010): así no aparecen
+                placeholders ni un póster intermedio que luego se sustituye. */}
+            {mobileHeroPosterSrc && (
+              <OptimizedImage
+                key={mobileHeroPosterSrc}
+                src={mobileHeroPosterSrc}
+                alt={title}
+                className="block h-full w-full object-contain"
+                style={{
+                  WebkitMaskImage:
+                    "linear-gradient(to bottom, black 72%, transparent 100%)",
+                  maskImage:
+                    "linear-gradient(to bottom, black 72%, transparent 100%)",
+                }}
+                priority
+                fetchPriority="high"
+                unoptimized
+              />
+            )}
+
+            {/* Degradado inferior: funde el hero con el fondo (#101010) de la página */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#101010] via-[#101010]/70 to-transparent z-10" />
+          </div>
+
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
             className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 ${
@@ -7764,7 +7852,9 @@ export default function DetailsClient({
               transition: "max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)",
             }}
           >
-            {/* Poster Card */}
+            {/* Poster Card — OCULTA en móvil (<640px): allí se muestra el HERO
+                MÓVIL de arriba. En sm+ (`sm:block`) se comporta igual que antes,
+                por lo que el layout de escritorio no cambia. */}
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -7773,7 +7863,7 @@ export default function DetailsClient({
                 delay: 0.08,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="relative"
+              className="relative hidden sm:block"
             >
               {/* Wrapper: solo perspectiva + captura puntero. Ya NO cicla al
                   pulsar en toda la portada: el cambio póster/backdrop se hace
@@ -8263,7 +8353,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <FadeIn delay={0.06} className="mb-6 px-1 flex flex-col items-center md:items-start text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              {/* Título de texto — OCULTO en móvil (<640px): allí el título va
+                  como logo sobre el HERO MÓVIL. En sm+ (`sm:block`) se renderiza
+                  igual que antes, sin cambios en escritorio. */}
+              <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
 

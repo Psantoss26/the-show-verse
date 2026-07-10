@@ -119,7 +119,7 @@ import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 // deadlock → TimeoutError y página congelada). Por eso sondeamos con setTimeout
 // (macrotask, no ligado al render). Resuelve al detectar [data-details-root] o
 // al agotar `maxMs` (fallback a crossfade; nunca cuelga).
-function waitForDetailsRoot(maxMs = 450) {
+function waitForDetailsRoot(maxMs = 120) {
   if (typeof document === "undefined") return Promise.resolve();
   return new Promise((resolve) => {
     const start = Date.now();
@@ -201,8 +201,8 @@ const backdropVariants = {
     transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
   },
   navigate: {
-    opacity: 0,
-    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+    opacity: 1,
+    transition: { duration: 0.2 },
   },
   exit: {
     opacity: 0,
@@ -1179,9 +1179,6 @@ export default function DetailModal({ item, onClose }) {
 
     setNavigatingToFullDetails(true);
 
-    // OJO: NO tocamos el cristal ni el velo blur: ambos se capturan como una
-    // sola capa del modal y bajan juntos en la transición (ver globals.css).
-
     if (typeof document !== "undefined" && document.startViewTransition) {
       // El callback espera (breve) a que DetailsClient pinte para capturarlo ya
       // renderizado detrás; si no, se revelaría un hueco. El prefetch al abrir
@@ -1479,10 +1476,9 @@ export default function DetailModal({ item, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label={title || "Ficha rápida"}
-      style={{ viewTransitionName: "modal-panel" }}
     >
       {/* Backdrop difuminado — clic fuera cierra. Durante la transición a la
-          ficha completa viaja en el mismo snapshot que el panel. */}
+          ficha completa baja unido al preview completo. */}
       <motion.div
         variants={backdropVariants}
         initial="hidden"
@@ -1500,45 +1496,43 @@ export default function DetailModal({ item, onClose }) {
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         onClick={(e) => e.stopPropagation()}
+        style={{ viewTransitionName: "modal-panel" }}
         className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
-        {/* Botón superior izquierdo: cierra el modal */}
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={navigatingToFullDetails}
-          className={`absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition-all duration-300 hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] group ${
-            navigatingToFullDetails ? "opacity-0 pointer-events-none" : "opacity-100"
-          }`}
-          aria-label="Cerrar modal"
-        >
-          <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
-        </button>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          {/* Botón superior izquierdo: cierra el modal */}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={navigatingToFullDetails}
+            className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 opacity-100 backdrop-blur-md transition-all duration-300 hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] group"
+            aria-label="Cerrar modal"
+          >
+            <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
+          </button>
 
-        {/* Botón superior derecho: abre la ficha completa */}
-        <button
-          type="button"
-          onClick={goToFullDetails}
-          disabled={navigatingToFullDetails}
-          className={`absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[158px] items-center justify-start overflow-hidden rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition-all duration-300 ease-out hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] ${
-            navigatingToFullDetails ? "opacity-0 pointer-events-none" : "opacity-100"
-          }`}
-          aria-label="Ver ficha completa"
-          aria-busy={navigatingToFullDetails ? "true" : undefined}
-        >
-          <div className="flex h-full w-10 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
-            <ArrowUpRight className="h-5 w-5" />
-          </div>
-          <span className="whitespace-nowrap text-xs font-bold tracking-wide opacity-0 transition-opacity duration-200 group-hover:opacity-100 pr-4 leading-none">
-            Ver ficha completa
-          </span>
-        </button>
+          {/* Botón superior derecho: abre la ficha completa */}
+          <button
+            type="button"
+            onClick={goToFullDetails}
+            disabled={navigatingToFullDetails}
+            className="absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[158px] items-center justify-start overflow-hidden rounded-full border border-white/10 bg-black/40 text-white/80 opacity-100 backdrop-blur-md transition-all duration-300 ease-out hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+            aria-label="Ver ficha completa"
+            aria-busy={navigatingToFullDetails ? "true" : undefined}
+          >
+            <div className="flex h-full w-10 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+            <span className="whitespace-nowrap text-xs font-bold tracking-wide opacity-0 transition-opacity duration-200 group-hover:opacity-100 pr-4 leading-none">
+              Ver ficha completa
+            </span>
+          </button>
 
-        {/* Contenedor con scroll interno (barra oculta) */}
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-        >
+          {/* Contenedor con scroll interno (barra oculta) */}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
           {/* HERO: póster textless en móvil, backdrop panorámico en sm+. */}
           <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-950 border-b border-white/[0.06] sm:aspect-video">
             <motion.div
@@ -2224,6 +2218,7 @@ export default function DetailModal({ item, onClose }) {
                 )}
               </motion.section>
             )}
+          </div>
           </div>
         </div>
       </motion.div>
