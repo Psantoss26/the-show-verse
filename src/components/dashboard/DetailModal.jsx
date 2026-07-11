@@ -111,8 +111,8 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
-const DETAILS_ROUTE_REVEAL_MIN_MS = 360;
-const DETAILS_ROUTE_CLEANUP_MS = 440;
+const DETAILS_ROUTE_REVEAL_MIN_MS = 500;
+const DETAILS_ROUTE_CLEANUP_MS = 420;
 
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -1832,50 +1832,52 @@ export default function DetailModal({ item, onClose }) {
               )}
             </motion.div>
 
-            {/* Premios / nominaciones: misma línea verde que las previews del
-                dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
-                OMDb (data.awards) formateada con formatDashboardAwards. */}
-            {data.awards && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10px" }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:justify-start sm:text-left sm:text-sm"
-              >
-                <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="line-clamp-1">
-                  {formatDashboardAwards(data.awards)}
-                </span>
-              </motion.div>
-            )}
+            <div className="space-y-3">
+              {/* Premios / nominaciones: misma línea verde que las previews del
+                  dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
+                  OMDb (data.awards) formateada con formatDashboardAwards. */}
+              {data.awards && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-10px" }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:justify-start sm:text-left sm:text-sm"
+                >
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">
+                    {formatDashboardAwards(data.awards)}
+                  </span>
+                </motion.div>
+              )}
 
-            {error && (
-              <p className="line-clamp-1 text-xs font-medium text-red-400">
-                {error}
-              </p>
-            )}
+              {error && (
+                <p className="line-clamp-1 text-xs font-medium text-red-400">
+                  {error}
+                </p>
+              )}
 
-            {/* Fila meta + géneros (componente real compartido con DetailsClient) */}
-            {hasMetaRow ? (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10px" }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <DetailsMetaGenresRow
-                  yearIso={data.year}
-                  displayRuntimeValue={
-                    mediaType === "tv" ? data.seasonEpisodeValue : data.runtime
-                  }
-                  status={data.status}
-                  genres={data.genreObjects}
-                />
-              </motion.div>
-            ) : (
-              loading && <SkeletonBar className="h-4 w-52" />
-            )}
+              {/* Fila meta + géneros (componente real compartido con DetailsClient) */}
+              {hasMetaRow ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-10px" }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <DetailsMetaGenresRow
+                    yearIso={data.year}
+                    displayRuntimeValue={
+                      mediaType === "tv" ? data.seasonEpisodeValue : data.runtime
+                    }
+                    status={data.status}
+                    genres={data.genreObjects}
+                  />
+                </motion.div>
+              ) : (
+                loading && <SkeletonBar className="h-4 w-52" />
+              )}
+            </div>
 
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
