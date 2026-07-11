@@ -175,7 +175,7 @@ export function StatChip({ icon: Icon, label, value }) {
 
 export function DetailsTabsMenu({ tabs, activeTab, onChangeTab, layoutId = "activeTabIndicator" }) {
   return (
-    <div className="flex flex-wrap items-center gap-6 md:gap-8 border-b border-white/10 w-full mb-4 pb-0 relative">
+    <div className="flex flex-wrap items-center gap-6 md:gap-8 border-b border-white/10 w-full mb-4 px-2 pb-0 relative">
       {tabs.map((tab) => (
         <button
           key={tab.id}
