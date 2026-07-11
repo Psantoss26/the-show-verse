@@ -104,19 +104,19 @@ function formatEpisodeRuntimePerEpisode(source) {
 
   if (uniqueValues.length === 1) {
     const value = formatMinutes(uniqueValues[0]);
-    return value ? `${value} por episodio` : null;
+    return value;
   }
 
   if (uniqueValues.length > 1) {
     const min = formatMinutes(uniqueValues[0]);
     const max = formatMinutes(uniqueValues[uniqueValues.length - 1]);
-    return min && max ? `${min}-${max} por episodio` : null;
+    return min && max ? `${min}-${max}` : null;
   }
 
   const lastEpisodeRuntime = formatMinutes(
     source?.last_episode_to_air?.runtime,
   );
-  return lastEpisodeRuntime ? `${lastEpisodeRuntime} por episodio` : null;
+  return lastEpisodeRuntime;
 }
 
 const EMPTY_PRODUCTION = {
@@ -245,7 +245,7 @@ export function useDetailModalData(item) {
         const year = yearOf(source) || yearOf(item) || null;
 
         // Etiquetas meta: duración real para películas; temporadas/episodios
-        // para series en la cabecera, y duración por episodio para "Formato".
+        // para series en la cabecera, y duración media para "Duración".
         let runtime = null;
         let seasonEpisodeValue = null;
         let episodeRuntimeValue = null;

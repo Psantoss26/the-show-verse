@@ -73,7 +73,7 @@ import {
   Building2,
   MapPin,
   Languages,
-  Trophy,
+  Award,
   ListVideo,
   Check,
   X,
@@ -400,19 +400,19 @@ function formatEpisodeRuntimePerEpisode(data) {
 
   if (uniqueRuntimes.length === 1) {
     const value = formatMinutes(uniqueRuntimes[0]);
-    return value ? `${value} por episodio` : null;
+    return value;
   }
 
   if (uniqueRuntimes.length > 1) {
     const min = formatMinutes(uniqueRuntimes[0]);
     const max = formatMinutes(uniqueRuntimes[uniqueRuntimes.length - 1]);
-    return min && max ? `${min}-${max} por episodio` : null;
+    return min && max ? `${min}-${max}` : null;
   }
 
   const lastEpisodeRuntime = formatMinutes(
     data?.last_episode_to_air?.runtime,
   );
-  return lastEpisodeRuntime ? `${lastEpisodeRuntime} por episodio` : null;
+  return lastEpisodeRuntime;
 }
 
 function normalizeProviderName(name = "") {
@@ -1021,6 +1021,8 @@ function getSeasonNumber(season) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// Conservado por si se reactiva la sección detallada de premios en esta vista.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AwardCard({ item }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
@@ -5278,7 +5280,7 @@ export default function DetailsClient({
     rtScore: null,
     mcScore: null,
   });
-  const [awardsLoading, setAwardsLoading] = useState(false);
+  const [, setAwardsLoading] = useState(false);
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
@@ -6243,11 +6245,13 @@ export default function DetailsClient({
 
   const hasProduction = !!production;
   const hasAwards = !!extras?.awards;
+  const headerAwardsValue = hasAwards
+    ? formatDashboardAwards(extras.awards)
+    : null;
   const awardItems = useMemo(
     () => sortAwardItemsForDisplay(flattenAwardItems(extras?.awardsDetails)),
     [extras?.awardsDetails],
   );
-  const hasAwardItems = awardItems.length > 0;
 
   const countries = (() => {
     const pc = Array.isArray(data.production_countries)
@@ -6292,8 +6296,15 @@ export default function DetailsClient({
   const episodeRuntimeValue = type === "tv" ? formatEpisodeRuntime(data) : null;
   const episodeRuntimeFormatValue =
     type === "tv" ? formatEpisodeRuntimePerEpisode(data) : null;
+  const seasonEpisodeValue =
+    type === "tv" && data.number_of_seasons
+      ? `${data.number_of_seasons} Temp.${
+          data.number_of_episodes ? ` · ${data.number_of_episodes} Eps.` : ""
+        }`
+      : null;
 
-  const displayRuntimeValue = runtimeValue || episodeRuntimeValue;
+  const displayRuntimeValue =
+    type === "tv" ? seasonEpisodeValue : runtimeValue || episodeRuntimeValue;
 
   const budgetValue =
     type === "movie" && data.budget > 0
@@ -6696,17 +6707,6 @@ export default function DetailsClient({
       });
     }
 
-    // Premios
-    if (awardsLoading || hasAwardItems) {
-      items.push({
-        id: "awards",
-        label: "Premios",
-        icon: Trophy,
-        count: awardItems.length || undefined,
-        loading: awardsLoading,
-      });
-    }
-
     // Media = Imagenes + Videos (unificado)
     const postersCount = imagesState?.posters?.length || 0;
     const backdropsCount = imagesState?.backdrops?.length || 0;
@@ -6779,9 +6779,6 @@ export default function DetailsClient({
     castDataForUI,
     castSectionLoading,
     recommendations,
-    awardsLoading,
-    hasAwardItems,
-    awardItems.length,
     collectionId,
     collectionData,
     collectionLoading,
@@ -6803,13 +6800,10 @@ export default function DetailsClient({
 
   const priorityCastResolved = !castSectionLoading;
   const priorityRecommendationsResolved = priorityCastResolved;
-  const priorityAwardsResolved =
-    priorityRecommendationsResolved && !awardsLoading;
   const priorityCollectionResolved =
-    priorityAwardsResolved && (!collectionId || !collectionLoading);
+    priorityRecommendationsResolved && (!collectionId || !collectionLoading);
   const canRenderRecommendations = priorityCastResolved;
-  const canRenderAwards = priorityRecommendationsResolved && !awardsLoading;
-  const canRenderCollection = priorityAwardsResolved && !!collectionId;
+  const canRenderCollection = priorityRecommendationsResolved && !!collectionId;
   const canRenderLowerPrioritySections = priorityCollectionResolved;
 
   const registerSection = useCallback(
@@ -8349,6 +8343,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {title}
               </h1>
 
+              {headerAwardsValue && (
+                <div className="mb-3 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:justify-start sm:text-left sm:text-sm">
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{headerAwardsValue}</span>
+                </div>
+              )}
+
               <DetailsMetaGenresRow
                 yearIso={yearIso}
                 displayRuntimeValue={displayRuntimeValue}
@@ -8531,7 +8532,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* =================================================================
                 CONTENEDOR DE TABS Y CONTENIDO - Información detallada
                ================================================================= */}
-            {/* Sistema de tabs para mostrar información adicional: Detalles, Producción, Sinopsis, Premios */}
+            {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
               <FadeIn delay={0.24}>
@@ -8565,6 +8566,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     overview={data.overview}
                     awards={extras.awards}
                     awardItems={awardItems}
+                    showAwardsTab={false}
                   />
                 </div>
               </FadeIn>
@@ -8603,6 +8605,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               overview={data.overview}
               awards={extras.awards}
               awardItems={awardItems}
+              showAwardsTab={false}
             />
           </div>
         </FadeIn>
@@ -9028,49 +9031,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         No hay datos de colección.
                       </div>
                     )}
-                  </section>
-                </AnimatedSection>
-              </section>
-            )}
-
-            {canRenderAwards && hasAwardItems && (
-              <section id="section-awards" ref={registerSection("awards")}>
-                <AnimatedSection delay={0.04}>
-                  <section className="mb-16 group/section">
-                    <SectionTitle title="Premios" icon={Trophy} />
-
-                    <DetailsArrowCarousel
-                      spaceBetween={12}
-                      slidesPerView={3}
-                      breakpoints={{
-                        500: { slidesPerView: 3, spaceBetween: 14 },
-                        768: { slidesPerView: 4, spaceBetween: 16 },
-                        1024: { slidesPerView: 5, spaceBetween: 18 },
-                        1280: { slidesPerView: 6, spaceBetween: 20 },
-                      }}
-                      className="pb-8"
-                    >
-                      {awardItems.map((award, index) => {
-                        const previous = awardItems[index - 1] || null;
-                        const startsNominations =
-                          award?.result === "nominee" &&
-                          previous?.result === "winner";
-
-                        return (
-                          <SwiperSlide key={award.id}>
-                            <div
-                              className={
-                                startsNominations
-                                  ? "relative before:absolute before:-left-2.5 before:top-3 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-yellow-300/80 before:via-yellow-500/45 before:to-transparent"
-                                  : ""
-                              }
-                            >
-                              <AwardCard item={award} />
-                            </div>
-                          </SwiperSlide>
-                        );
-                      })}
-                    </DetailsArrowCarousel>
                   </section>
                 </AnimatedSection>
               </section>

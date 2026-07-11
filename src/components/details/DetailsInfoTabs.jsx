@@ -49,10 +49,12 @@ export default function DetailsInfoTabs({
   overview,
   awards,
   awardItems = [],
+  showAwardsTab = true,
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
+  const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
 
   return (
     <>
@@ -62,9 +64,7 @@ export default function DetailsInfoTabs({
           { id: "details", label: "Detalles" },
           { id: "production", label: "Producción" },
           { id: "synopsis", label: "Sinopsis" },
-          ...(awards || hasAwardItems
-            ? [{ id: "awards", label: "Premios" }]
-            : []),
+          ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
         ]}
         activeTab={activeTab}
         onChangeTab={setActiveTab}
@@ -112,11 +112,11 @@ export default function DetailsInfoTabs({
                   className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                 />
 
-                {/* Formato (solo series) */}
+                {/* Duración (solo series) */}
                 {mediaType !== "movie" ? (
                   <VisualMetaCard
                     icon={Layers}
-                    label="Formato"
+                    label="Duración"
                     value={formatValue}
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                   />
@@ -237,7 +237,7 @@ export default function DetailsInfoTabs({
           )}
 
           {/* ===== TAB: PREMIOS ===== */}
-          {activeTab === "awards" && (awards || hasAwardItems) && (
+          {activeTab === "awards" && hasAwardsTab && (
             <div key="awards">
               {awards ? (
                 <AwardsPanel awards={awards} />

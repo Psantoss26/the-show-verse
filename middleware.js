@@ -32,10 +32,6 @@ function privateAccessKey() {
     return process.env.SHOWVERSE_PRIVATE_ACCESS_KEY || ''
 }
 
-function truthy(value) {
-    return /^(1|true|yes|on)$/i.test(String(value || '').trim())
-}
-
 function requestHost(req) {
     return (
         req.headers.get('x-forwarded-host') ||
@@ -65,16 +61,17 @@ function hostMatches(host, pattern) {
 }
 
 function isPrivateAccessEnabled(req) {
+    // El gate solo actúa si hay llave definida. Así, definiéndola SOLO en el
+    // entorno del NAS (y no en desarrollo local), queda activo en producción y
+    // abierto en local sin más configuración.
     if (!privateAccessKey()) return false
 
-    const host = requestHost(req)
+    // Lista de hosts OPCIONAL: si se define, el gate solo actúa en esos dominios
+    // (útil si el NAS es accesible por varios nombres y quieres restringir a
+    // algunos). Vacía = se activa para cualquier host donde esté la llave.
     const hosts = privateAccessHosts()
     if (hosts.length > 0) {
-        return hosts.some((allowedHost) => hostMatches(host, allowedHost))
-    }
-
-    if (process.env.VERCEL === '1' && !truthy(process.env.SHOWVERSE_PRIVATE_ACCESS_ON_VERCEL)) {
-        return false
+        return hosts.some((allowedHost) => hostMatches(requestHost(req), allowedHost))
     }
 
     return true
