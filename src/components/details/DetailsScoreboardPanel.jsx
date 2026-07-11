@@ -187,10 +187,10 @@ export function DetailsStatsRow({ stats = null }) {
         className="
         overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-x]
         py-2.5
-        pl-[calc(0.75rem+env(safe-area-inset-left))]
+        pl-[calc(1.25rem+env(safe-area-inset-left))]
         pr-[calc(0.75rem+env(safe-area-inset-right))]
-        sm:pl-[calc(1rem+env(safe-area-inset-left))]
-        sm:pr-[calc(1rem+env(safe-area-inset-right))]
+        sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
+        sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
         md:overflow-x-visible
       "
       >
