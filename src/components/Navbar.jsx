@@ -801,7 +801,7 @@ export default function Navbar() {
     } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
 
   const getActiveTabStyle = () => {
-    return "bg-white/10 border border-white/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(255,255,255,0.02)]";
+    return "bg-white/[0.09] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.22),0_8px_20px_-6px_rgba(0,0,0,0.4)]";
   };
 
   const iconLinkClass = (href, tone = "neutral") => {

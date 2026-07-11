@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { X, PlayCircle } from "lucide-react";
 import { videoEmbedUrl, videoExternalUrl } from "@/lib/details/videos";
+import useModalGuard from "@/hooks/useModalGuard";
 
 let youtubeIframeApiPromise = null;
 
@@ -133,33 +134,7 @@ export default function VideoModal({
     };
   }, [open, showNextVideo, video, videoKey]);
 
-  // Bloqueo de scroll
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    const scrollBarWidth =
-      window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = "hidden";
-    // Evita el salto visual de la barra de scroll
-    if (scrollBarWidth > 0)
-      document.body.style.paddingRight = `${scrollBarWidth}px`;
-
-    return () => {
-      document.body.style.overflow = prev;
-      document.body.style.paddingRight = "";
-    };
-  }, [open]);
-
-  // Cerrar con ESC
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  useModalGuard({ open, onClose });
 
   if (!open || !video) return null;
 

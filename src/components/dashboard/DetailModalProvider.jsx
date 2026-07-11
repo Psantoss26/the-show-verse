@@ -25,6 +25,7 @@ import { AnimatePresence } from "framer-motion";
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import DetailModal from "@/components/dashboard/DetailModal";
+import useModalGuard from "@/hooks/useModalGuard";
 
 const DetailModalContext = createContext({
   openDetailModal: null,
@@ -154,26 +155,8 @@ export default function DetailModalProvider({ children }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [clearActive]);
 
-  // Cerrar con Escape.
-  useEffect(() => {
-    if (!activeItem) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") closeDetailModal();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeItem, closeDetailModal]);
-
-  // Bloquear el scroll del body mientras la ficha está abierta (igual que
-  // AddToListModal).
-  useEffect(() => {
-    if (!activeItem) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [activeItem]);
+  // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
+  useModalGuard({ open: !!activeItem, onClose: closeDetailModal });
 
   const value = useMemo(
     () => ({ openDetailModal, closeDetailModal, activeItem }),

@@ -13,6 +13,7 @@
 // hacer hover, ya que la tarjeta de vista previa se monta en ese momento.
 
 import { useEffect, useRef, useState } from "react";
+import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
@@ -902,15 +903,20 @@ function BackdropPreviewCard({
   const isRightBoundary =
     index === activeIdx + visibleCount - 1 || index === totalCount - 1;
 
+  // Ancla vertical: centramos la IMAGEN sobre la tarjeta (no el panel entero) y
+  // la escala de apertura crece desde ese mismo centro. Ver usePreviewImageHalf.
+  const [previewRef, previewImgHalf] = usePreviewImageHalf(true);
+
   let alignmentClass = "left-1/2 -translate-x-1/2";
-  let transformOrigin = "center center";
+  let originX = "center";
   if (isLeftBoundary) {
     alignmentClass = "left-0";
-    transformOrigin = "left center";
+    originX = "left";
   } else if (isRightBoundary) {
     alignmentClass = "right-0";
-    transformOrigin = "right center";
+    originX = "right";
   }
+  const transformOrigin = `${originX} ${previewImgHalf}px`;
 
   const previewWidthPercent =
     visibleCount <= 3
@@ -944,7 +950,8 @@ function BackdropPreviewCard({
         transition: { duration: 0.15, ease: "easeInOut" },
       }}
       transition={{ type: "spring", stiffness: 180, damping: 20, mass: 0.8 }}
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414]/95 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
+      ref={previewRef}
+      className={`absolute top-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414]/95 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
       onClick={() => openDetailModal?.(item)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -952,6 +959,7 @@ function BackdropPreviewCard({
       onMouseLeave={onPreviewMouseLeave}
       style={{
         width: previewMaxWidth,
+        marginTop: -previewImgHalf,
         willChange: "transform, opacity",
         transformOrigin,
       }}

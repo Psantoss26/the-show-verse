@@ -15,6 +15,7 @@ import {
   VolumeX,
   ExternalLink,
 } from "lucide-react";
+import useModalGuard from "@/hooks/useModalGuard";
 
 function sourceIconPath(source) {
   const key = String(source || "").toLowerCase();
@@ -77,31 +78,7 @@ export default function SoundtrackModal({
     setProgress(0);
   }, [initialTrackId, open, trackQueue]);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    const scrollBarWidth =
-      window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = "hidden";
-    if (scrollBarWidth > 0) {
-      document.body.style.paddingRight = `${scrollBarWidth}px`;
-    }
-
-    return () => {
-      document.body.style.overflow = prev;
-      document.body.style.paddingRight = "";
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, open]);
+  useModalGuard({ open, onClose });
 
   // Sincronizar volumen e inicializar el reproductor con el volumen correcto
   useEffect(() => {

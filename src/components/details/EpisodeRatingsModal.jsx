@@ -6,6 +6,7 @@ import { BarChart3, Loader2, RotateCw, X } from "lucide-react";
 
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import { getDetails } from "@/lib/api/tmdb";
+import useModalGuard from "@/hooks/useModalGuard";
 
 const EMPTY_ARRAY = [];
 
@@ -39,34 +40,7 @@ export default function EpisodeRatingsModal({
 
   useEffect(() => setMounted(true), []);
 
-  // Bloqueo de scroll e impedir salto de barra de scroll
-  useEffect(() => {
-    if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    const prevPadding = document.body.style.paddingRight;
-    const scrollBarWidth =
-      window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = "hidden";
-    if (scrollBarWidth > 0) {
-      document.body.style.paddingRight = `${scrollBarWidth}px`;
-    }
-
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.style.paddingRight = prevPadding;
-    };
-  }, [open]);
-
-  // Cerrar con ESC
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  useModalGuard({ open, onClose });
 
   useEffect(() => {
     if (!open || !showId) return undefined;

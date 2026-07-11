@@ -4,6 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import useModalGuard from "@/hooks/useModalGuard";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -375,21 +376,8 @@ export default function WatchNextAssistant({
     }
   }, [messages, loading]);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
+  useModalGuard({ open, onClose: close });
 
   const sendPrompt = async (value = input, options = {}) => {
     const isQuickPick = options.mode === "quick_pick";

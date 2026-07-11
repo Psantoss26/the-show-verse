@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import useModalGuard from "@/hooks/useModalGuard";
 import { createPortal } from "react-dom";
 import { Star, X, Minus, Plus, Loader2, Trash2 } from "lucide-react";
 import LiquidButton from "./LiquidButton";
@@ -51,23 +52,8 @@ export default function StarRating({
     if (hasRating) setValue(rating);
   }, [hasRating, rating]);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
+  useModalGuard({ open, onClose: () => setOpen(false) });
 
   // normaliza a step + clamp
   const normalize = (v) => {

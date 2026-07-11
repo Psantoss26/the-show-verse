@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import useModalGuard from "@/hooks/useModalGuard";
 import {
   Check,
   Eye,
@@ -445,19 +446,8 @@ export default function TraktEpisodesWatchedModal({
     setQuery("");
   }, [open, usableSeasons, isMovie, movieWatchedAt, resolvedOnChangeView]);
 
-  // Shortcuts & Lock Scroll
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  // Bloqueo de scroll de fondo + cierre con Escape
+  useModalGuard({ open, onClose });
 
   useEffect(() => {
     if (!viewMenuOpen) return;
