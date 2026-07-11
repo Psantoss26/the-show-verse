@@ -77,7 +77,10 @@ function saveScrollPosition(pathname) {
 }
 
 function scrollToPageStart() {
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  // "instant" (no "auto"): con `html { scroll-behavior: smooth }` global, un
+  // `behavior: "auto"` heredaría el smooth del CSS y ANIMARÍA el salto al top.
+  // La restauración debe ser instantánea y limpia.
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
 export default function ScrollRestoration() {
@@ -210,6 +213,19 @@ export default function ScrollRestoration() {
     let stableFrames = 0;
     let interrupted = false;
 
+    // Posicionamiento SÍNCRONO inmediato, dentro del layout effect (ANTES del
+    // primer paint): la página se pinta ya en la posición guardada — o lo más
+    // cerca que permita la altura disponible en este instante — en lugar de
+    // pintarse en el top y saltar después desde el rAF. Es lo que elimina el
+    // "salto al inicio". El bucle de rAF de abajo solo AFINA la posición
+    // mientras el contenido asíncrono crece; ya no es quien la fija por primera
+    // vez. `behavior: "instant"` para no heredar el smooth global del CSS.
+    window.scrollTo({
+      top: Math.min(savedPosition.y, maxScrollTop()),
+      left: savedPosition.x,
+      behavior: "instant",
+    });
+
     const onUserIntent = () => {
       // Si el usuario hace scroll/teclea durante la restauración, respetamos su
       // intención y dejamos de reposicionar.
@@ -240,7 +256,10 @@ export default function ScrollRestoration() {
       window.scrollTo({
         top: clampedTarget,
         left: savedPosition.x,
-        behavior: "auto",
+        // "instant": nunca smooth. Cada reaplicación mientras el layout crece es
+        // un ajuste seco (imperceptible a 60fps), no una animación suave que se
+        // reinicia en cada frame (origen del tirón/salto).
+        behavior: "instant",
       });
 
       // ¿El layout ha alcanzado el estado de cuando se guardó? Si conocemos la

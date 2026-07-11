@@ -288,6 +288,7 @@ function pickBestEnglishPoster(list) {
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v47";
+const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
@@ -358,14 +359,18 @@ function formatRuntimeMinutes(minutes) {
   return `${hours}h ${mins}m`;
 }
 
-function formatEpisodeRuntime(data) {
-  const runtimes = Array.isArray(data?.episode_run_time)
+function getEpisodeRuntimeValues(data) {
+  const episodeRuntimes = Array.isArray(data?.episode_run_time)
     ? data.episode_run_time
         .map((value) => Number(value))
         .filter((value) => Number.isFinite(value) && value > 0)
     : [];
 
-  const uniqueRuntimes = [...new Set(runtimes)].sort((a, b) => a - b);
+  return [...new Set(episodeRuntimes)].sort((a, b) => a - b);
+}
+
+function formatEpisodeRuntime(data) {
+  const uniqueRuntimes = getEpisodeRuntimeValues(data);
 
   if (uniqueRuntimes.length === 1) {
     const value = formatRuntimeMinutes(uniqueRuntimes[0]);
@@ -382,6 +387,32 @@ function formatEpisodeRuntime(data) {
     data?.last_episode_to_air?.runtime,
   );
   return lastEpisodeRuntime;
+}
+
+function formatEpisodeRuntimePerEpisode(data) {
+  const uniqueRuntimes = getEpisodeRuntimeValues(data);
+  const formatMinutes = (value) => {
+    const total = Number(value);
+    return Number.isFinite(total) && total > 0
+      ? `${Math.round(total)} min`
+      : null;
+  };
+
+  if (uniqueRuntimes.length === 1) {
+    const value = formatMinutes(uniqueRuntimes[0]);
+    return value ? `${value} por episodio` : null;
+  }
+
+  if (uniqueRuntimes.length > 1) {
+    const min = formatMinutes(uniqueRuntimes[0]);
+    const max = formatMinutes(uniqueRuntimes[uniqueRuntimes.length - 1]);
+    return min && max ? `${min}-${max} por episodio` : null;
+  }
+
+  const lastEpisodeRuntime = formatMinutes(
+    data?.last_episode_to_air?.runtime,
+  );
+  return lastEpisodeRuntime ? `${lastEpisodeRuntime} por episodio` : null;
 }
 
 function normalizeProviderName(name = "") {
@@ -1340,6 +1371,31 @@ export default function DetailsClient({
       ? s
       : `https://${s}`;
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const transitionKey = `${endpointType}:${id}`;
+    let shouldFocus = false;
+
+    try {
+      shouldFocus =
+        window.sessionStorage.getItem(DETAILS_ROUTE_TRANSITION_KEY) ===
+        transitionKey;
+      if (shouldFocus) {
+        window.sessionStorage.removeItem(DETAILS_ROUTE_TRANSITION_KEY);
+      }
+    } catch {
+      shouldFocus = false;
+    }
+
+    if (!shouldFocus) return undefined;
+
+    const focusTimer = window.setTimeout(() => {
+      contentTopRef.current?.focus({ preventScroll: true });
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [endpointType, id]);
 
   // =====================================================================
   // LISTAS DE USUARIO (TMDb) - solo disponible para peliculas
@@ -6234,6 +6290,8 @@ export default function DetailsClient({
     type === "movie" ? formatRuntimeMinutes(data.runtime) : null;
 
   const episodeRuntimeValue = type === "tv" ? formatEpisodeRuntime(data) : null;
+  const episodeRuntimeFormatValue =
+    type === "tv" ? formatEpisodeRuntimePerEpisode(data) : null;
 
   const displayRuntimeValue = runtimeValue || episodeRuntimeValue;
 
@@ -7742,7 +7800,8 @@ export default function DetailsClient({
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div
         ref={contentTopRef}
-        className="relative z-10 px-4 pt-6 pb-8 lg:pt-8 lg:pb-12 max-w-7xl mx-auto"
+        tabIndex={-1}
+        className="relative z-10 px-4 pt-6 pb-8 lg:pt-8 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
       >
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
@@ -8491,9 +8550,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         : data.original_name
                     }
                     formatValue={
-                      data.number_of_seasons
-                        ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                        : "—"
+                      type === "tv" ? episodeRuntimeFormatValue || "—" : "—"
                     }
                     releaseDateValue={releaseDateValue}
                     status={data.status}
@@ -8531,9 +8588,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 type === "movie" ? data.original_title : data.original_name
               }
               formatValue={
-                data.number_of_seasons
-                  ? `${data.number_of_seasons} Temp. / ${data.number_of_episodes} Caps.`
-                  : "—"
+                type === "tv" ? episodeRuntimeFormatValue || "—" : "—"
               }
               releaseDateValue={releaseDateValue}
               status={data.status}

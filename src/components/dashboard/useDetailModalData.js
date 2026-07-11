@@ -88,6 +88,37 @@ function formatSentimentList(items = [], max = 4) {
   return out;
 }
 
+function formatEpisodeRuntimePerEpisode(source) {
+  const values = Array.isArray(source?.episode_run_time)
+    ? source.episode_run_time
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+  const uniqueValues = [...new Set(values)].sort((a, b) => a - b);
+  const formatMinutes = (value) => {
+    const total = Number(value);
+    return Number.isFinite(total) && total > 0
+      ? `${Math.round(total)} min`
+      : null;
+  };
+
+  if (uniqueValues.length === 1) {
+    const value = formatMinutes(uniqueValues[0]);
+    return value ? `${value} por episodio` : null;
+  }
+
+  if (uniqueValues.length > 1) {
+    const min = formatMinutes(uniqueValues[0]);
+    const max = formatMinutes(uniqueValues[uniqueValues.length - 1]);
+    return min && max ? `${min}-${max} por episodio` : null;
+  }
+
+  const lastEpisodeRuntime = formatMinutes(
+    source?.last_episode_to_air?.runtime,
+  );
+  return lastEpisodeRuntime ? `${lastEpisodeRuntime} por episodio` : null;
+}
+
 const EMPTY_PRODUCTION = {
   companies: [],
   networks: [],
@@ -109,6 +140,8 @@ const EMPTY_DATA = {
   heroPosterPath: null,
   year: null,
   runtime: null,
+  seasonEpisodeValue: null,
+  episodeRuntimeValue: null,
   genres: [],
   genreObjects: [],
   status: null,
@@ -211,16 +244,19 @@ export function useDetailModalData(item) {
         const posterPath = source?.poster_path || item?.poster_path || null;
         const year = yearOf(source) || yearOf(item) || null;
 
-        // Etiqueta de duración: minutos para películas; "N Temp. · M Eps." para
-        // series (mismo formato que InlinePreviewCard).
+        // Etiquetas meta: duración real para películas; temporadas/episodios
+        // para series en la cabecera, y duración por episodio para "Formato".
         let runtime = null;
+        let seasonEpisodeValue = null;
+        let episodeRuntimeValue = null;
         if (mediaType === "tv") {
           if (source?.number_of_seasons) {
-            runtime = `${source.number_of_seasons} Temp.`;
+            seasonEpisodeValue = `${source.number_of_seasons} Temp.`;
             if (source?.number_of_episodes) {
-              runtime += ` · ${source.number_of_episodes} Eps.`;
+              seasonEpisodeValue += ` · ${source.number_of_episodes} Eps.`;
             }
           }
+          episodeRuntimeValue = formatEpisodeRuntimePerEpisode(source);
         } else {
           runtime = formatRuntime(source?.runtime) || null;
         }
@@ -350,6 +386,8 @@ export function useDetailModalData(item) {
           posterPath,
           year,
           runtime,
+          seasonEpisodeValue,
+          episodeRuntimeValue,
           genres,
           genreObjects,
           status: details?.status || null,

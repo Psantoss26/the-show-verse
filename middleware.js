@@ -5,17 +5,17 @@ const BOT_UA =
     /WhatsApp|facebookexternalhit|Facebot|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|Pinterest|Googlebot|bingbot/i
 const ACCESS_COOKIE = 'showverse_device_access'
 const ACCESS_ROUTE = '/api/private-access'
-// Rutas de la extensión: van autenticadas por su propio token (Bearer syncToken),
-// no por la cookie del dispositivo. La extensión las llama sin cookies
-// (credentials: "omit"), así que deben quedar exentas del gate de acceso privado;
-// de lo contrario el middleware devuelve 404 antes de llegar a la ruta.
+// Rutas exentas del gate de acceso privado. El gate bloquea TODA la web para
+// dispositivos no autorizados, así que la lista se limita a lo imprescindible:
+//   - /api/health: sonda de monitorización/uptime (no expone contenido).
+//   - Rutas de la extensión: van autenticadas por su propio token (Bearer
+//     syncToken), no por la cookie del dispositivo, y se llaman sin cookies
+//     (credentials: "omit"); sin exención el middleware devolvería 404 antes de
+//     llegar a la ruta.
+// Las rutas de auth (/api/auth/*) NO se eximen a propósito: el bloqueo es por
+// dispositivo, no por login. Un dispositivo AUTORIZADO las usa con normalidad
+// (pasa por su cookie de acceso); uno no autorizado no debe poder tocarlas.
 const PUBLIC_API_ROUTES = new Set([
-    '/api/auth/login',
-    '/api/auth/logout',
-    '/api/auth/me',
-    '/api/auth/register',
-    '/api/auth/google/start',
-    '/api/auth/google/callback',
     '/api/health',
     '/api/netflix/extension-sync',
     '/api/netflix/extension-import',

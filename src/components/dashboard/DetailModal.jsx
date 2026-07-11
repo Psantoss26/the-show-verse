@@ -110,16 +110,22 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 // lógica de toggles, rewatches, plays y persistencia en localStorage.
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 
-// Espera (best-effort) a que DetailsClient haya montado su root en el DOM tras
-// router.push, para que la View Transition capture el estado NUEVO ya pintado y
-// MORFEE los elementos compartidos en vez de hacer un crossfade.
-//
-// IMPORTANTE: durante el callback de startViewTransition el navegador SUSPENDE
-// el pipeline de render, así que requestAnimationFrame NO se dispara (provoca un
-// deadlock → TimeoutError y página congelada). Por eso sondeamos con setTimeout
-// (macrotask, no ligado al render). Resuelve al detectar [data-details-root] o
-// al agotar `maxMs` (fallback a crossfade; nunca cuelga).
-function waitForDetailsRoot(maxMs = 120) {
+const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
+const DETAILS_ROUTE_REVEAL_MIN_MS = 360;
+const DETAILS_ROUTE_CLEANUP_MS = 440;
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function nextAnimationFrame() {
+  return new Promise((resolve) => window.requestAnimationFrame(resolve));
+}
+
+// Espera (best-effort) a que la ruta /details haya montado su superficie. El
+// loading boundary ya expone [data-details-root], así que normalmente resuelve
+// enseguida; el timeout evita que una navegación lenta deje una capa colgada.
+function waitForDetailsRoot(maxMs = 1800) {
   if (typeof document === "undefined") return Promise.resolve();
   return new Promise((resolve) => {
     const start = Date.now();
@@ -136,6 +142,63 @@ function waitForDetailsRoot(maxMs = 120) {
     };
     check();
   });
+}
+
+function startFullDetailsTransition(panelElement) {
+  if (typeof document === "undefined" || !panelElement) return null;
+
+  document
+    .querySelectorAll("[data-details-route-transition]")
+    .forEach((element) => element.remove());
+
+  const rect = panelElement.getBoundingClientRect();
+  const layer = document.createElement("div");
+  layer.className = "sv-detail-route-transition";
+  layer.dataset.detailsRouteTransition = "true";
+  layer.setAttribute("aria-hidden", "true");
+
+  const scrim = document.createElement("div");
+  scrim.className = "sv-detail-route-transition__scrim";
+
+  const panelClone = panelElement.cloneNode(true);
+  panelClone.classList.add("sv-detail-route-transition__panel");
+  panelClone.setAttribute("aria-hidden", "true");
+  panelClone.style.setProperty("--sv-route-panel-top", `${rect.top}px`);
+  panelClone.style.setProperty("--sv-route-panel-left", `${rect.left}px`);
+  panelClone.style.setProperty("--sv-route-panel-width", `${rect.width}px`);
+  panelClone.style.setProperty("--sv-route-panel-height", `${rect.height}px`);
+  panelClone.style.viewTransitionName = "none";
+
+  panelClone
+    .querySelectorAll("iframe, video, audio")
+    .forEach((mediaElement) => mediaElement.remove());
+  panelClone
+    .querySelectorAll("a, button, input, select, textarea, [tabindex]")
+    .forEach((interactiveElement) => {
+      interactiveElement.setAttribute("tabindex", "-1");
+    });
+
+  layer.append(scrim, panelClone);
+  document.body.append(layer);
+
+  layer.classList.add("is-running");
+
+  let cleanupTimer = null;
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (cleanupTimer) window.clearTimeout(cleanupTimer);
+    layer.remove();
+  };
+
+  const reveal = () => {
+    if (cleaned) return;
+    layer.classList.add("is-revealing");
+    cleanupTimer = window.setTimeout(cleanup, DETAILS_ROUTE_CLEANUP_MS);
+  };
+
+  return { reveal, cleanup };
 }
 
 // Resuelve la URL del logo de una plataforma: rutas de TMDb -> buildImg;
@@ -201,8 +264,10 @@ const backdropVariants = {
     transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
   },
   navigate: {
-    opacity: 1,
-    transition: { duration: 0.2 },
+    // El dim real se oculta durante la navegación; la capa temporal usa un
+    // scrim sólido sin backdrop-filter para evitar restos del blur del modal.
+    opacity: 0,
+    transition: { duration: 0 },
   },
   exit: {
     opacity: 0,
@@ -226,11 +291,13 @@ const panelVariants = {
     },
   },
   navigate: {
-    opacity: 1,
+    // El panel real se oculta: el movimiento visible lo hace un clon inerte
+    // montado en body, independiente del ciclo de render de App Router.
+    opacity: 0,
     y: 0,
     scale: 1,
     filter: "blur(0px)",
-    transition: { duration: 0.2 },
+    transition: { duration: 0 },
   },
   exit: {
     opacity: 0,
@@ -437,7 +504,7 @@ export default function DetailModal({ item, onClose }) {
   const { loading, data } = useDetailModalData(item);
 
   const scrollContainerRef = useRef(null);
-  const fullDetailsTimerRef = useRef(null);
+  const panelRef = useRef(null);
   const { scrollY } = useScroll({ container: scrollContainerRef });
 
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
@@ -518,14 +585,6 @@ export default function DetailModal({ item, onClose }) {
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [navigatingToFullDetails, setNavigatingToFullDetails] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      if (fullDetailsTimerRef.current) {
-        window.clearTimeout(fullDetailsTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     let cancel = false;
@@ -1168,29 +1227,37 @@ export default function DetailModal({ item, onClose }) {
     }
   }, [item?.id, mediaType, router]);
 
-  const goToFullDetails = () => {
+  const goToFullDetails = async () => {
     if (navigatingToFullDetails) return;
     const href = dashboardDetailHref(item, mediaType);
+
+    try {
+      window.sessionStorage?.setItem(
+        DETAILS_ROUTE_TRANSITION_KEY,
+        `${mediaType}:${item?.id ?? ""}`,
+      );
+    } catch {
+      // sessionStorage best-effort
+    }
 
     if (prefersReducedMotion) {
       router.push(href);
       return;
     }
 
+    const routeTransition = startFullDetailsTransition(panelRef.current);
     setNavigatingToFullDetails(true);
 
-    if (typeof document !== "undefined" && document.startViewTransition) {
-      // El callback espera (breve) a que DetailsClient pinte para capturarlo ya
-      // renderizado detrás; si no, se revelaría un hueco. El prefetch al abrir
-      // el modal mantiene esta espera al mínimo.
-      document.startViewTransition(() => {
-        router.push(href);
-        return waitForDetailsRoot();
-      });
-    } else {
-      fullDetailsTimerRef.current = window.setTimeout(() => {
-        router.push(href);
-      }, 190);
+    if (routeTransition) {
+      await nextAnimationFrame();
+    }
+
+    router.push(href);
+
+    if (routeTransition) {
+      Promise.all([waitForDetailsRoot(), wait(DETAILS_ROUTE_REVEAL_MIN_MS)])
+        .catch(() => {})
+        .finally(routeTransition.reveal);
     }
   };
 
@@ -1211,7 +1278,11 @@ export default function DetailModal({ item, onClose }) {
     hasScoreStats;
 
   const hasMetaRow =
-    !!data.year || !!data.runtime || !!statusLabel || data.genres?.length > 0;
+    !!data.year ||
+    !!data.runtime ||
+    !!data.seasonEpisodeValue ||
+    !!statusLabel ||
+    data.genres?.length > 0;
 
   const streamingProviders = useMemo(() => {
     const providers = Array.isArray(data.providers) ? data.providers : [];
@@ -1477,8 +1548,9 @@ export default function DetailModal({ item, onClose }) {
       aria-modal="true"
       aria-label={title || "Ficha rápida"}
     >
-      {/* Backdrop difuminado — clic fuera cierra. Durante la transición a la
-          ficha completa baja unido al preview completo. */}
+      {/* Backdrop difuminado — clic fuera cierra. Al ir a la ficha completa el
+          modal real se oculta y la transición la asume una capa temporal sin
+          backdrop-filter, para que el blur no pueda filtrarse bajo la ruta nueva. */}
       <motion.div
         variants={backdropVariants}
         initial="hidden"
@@ -1489,14 +1561,14 @@ export default function DetailModal({ item, onClose }) {
       />
 
       {/* Panel ancho anclado al borde inferior, esquinas superiores redondeadas.
-          En la transición a la ficha completa baja junto con el fondo blur. */}
+          La transición a la ficha completa anima un clon inerte de este panel. */}
       <motion.div
+        ref={panelRef}
         variants={panelVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         onClick={(e) => e.stopPropagation()}
-        style={{ viewTransitionName: "modal-panel" }}
         className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
       >
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
@@ -1794,7 +1866,9 @@ export default function DetailModal({ item, onClose }) {
               >
                 <DetailsMetaGenresRow
                   yearIso={data.year}
-                  displayRuntimeValue={data.runtime}
+                  displayRuntimeValue={
+                    mediaType === "tv" ? data.seasonEpisodeValue : data.runtime
+                  }
                   status={data.status}
                   genres={data.genreObjects}
                 />
@@ -1889,9 +1963,7 @@ export default function DetailModal({ item, onClose }) {
                 mediaType={mediaType}
                 originalTitle={data.originalTitle}
                 formatValue={
-                  data.numberOfSeasons
-                    ? `${data.numberOfSeasons} Temp. / ${data.numberOfEpisodes} Caps.`
-                    : "—"
+                  mediaType === "tv" ? data.episodeRuntimeValue || "—" : "—"
                 }
                 releaseDateValue={data.releaseDateValue}
                 status={data.status}
