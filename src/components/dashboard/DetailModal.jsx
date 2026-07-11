@@ -5,7 +5,7 @@
 // el fondo difuminado. Panel ancho anclado al borde inferior, con esquinas
 // superiores redondeadas y scroll interno (oculto, como AddToListModal). Réplica
 // del lenguaje visual de DetailsClient (paneles glassy, badges de puntuación,
-// pestañas Detalles/Producción/Sinopsis/Premios, reparto, similares y
+// pestañas Detalles/Producción/Sinopsis, reparto, similares y
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -90,7 +90,7 @@ import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
 // completa (DetailsClient) para que la fila sea IDÉNTICA.
 import DetailActionsRow from "@/components/details/DetailActionsRow";
-// Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
+// Sección de pestañas (Detalles/Producción/Sinopsis) compartida con la
 // ficha completa: renderiza EXACTAMENTE las mismas tarjetas que DetailsClient.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
@@ -1952,7 +1952,7 @@ export default function DetailModal({ item, onClose }) {
               </motion.div>
             )}
 
-            {/* Pestañas: Detalles · Producción · Sinopsis · Premios */}
+            {/* Pestañas: Detalles · Producción · Sinopsis */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -1979,6 +1979,7 @@ export default function DetailModal({ item, onClose }) {
                 tagline={data.tagline}
                 overview={data.overview}
                 awards={data.awards}
+                showAwardsTab={false}
               />
             </motion.div>
 

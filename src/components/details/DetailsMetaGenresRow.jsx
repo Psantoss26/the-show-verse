@@ -41,6 +41,7 @@ export default function DetailsMetaGenresRow({
   displayRuntimeValue,
   status,
   genres = [],
+  genresBelowMetaOnMobile = false,
 }) {
   const rowRef = useRef(null);
   const metaProbeRef = useRef(null);
@@ -130,11 +131,35 @@ export default function DetailsMetaGenresRow({
   if (!hasMeta && visibleGenres.length === 0) return null;
 
   const clampedGenreCount = Math.min(visibleGenreCount, visibleGenres.length);
+  const desktopGenreRow = clampedGenreCount > 0 && (
+    <div
+      className={
+        genresBelowMetaOnMobile
+          ? "hidden min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap sm:flex"
+          : "flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap"
+      }
+    >
+      {hasMeta && <span className={metaDotClass} />}
+      {visibleGenres.slice(0, clampedGenreCount).map((genre) => (
+        <span key={genre.id} className={genreChipClass}>
+          <span
+            className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+            style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+          />
+          <span className="relative z-10">{genre.label}</span>
+        </span>
+      ))}
+    </div>
+  );
 
   return (
     <div
       ref={rowRef}
-      className="relative flex w-full min-w-0 max-w-full flex-nowrap items-center justify-center gap-2.5 overflow-hidden text-base font-medium text-zinc-300 md:justify-start md:text-lg [container-type:inline-size]"
+      className={`relative flex w-full min-w-0 max-w-full items-center justify-center overflow-hidden text-base font-medium text-zinc-300 md:justify-start md:text-lg [container-type:inline-size] ${
+        genresBelowMetaOnMobile
+          ? "flex-col gap-2 sm:flex-row sm:flex-nowrap sm:gap-2.5"
+          : "flex-nowrap gap-2.5"
+      }`}
     >
       <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-2.5 whitespace-nowrap">
         {yearIso && (
@@ -166,10 +191,9 @@ export default function DetailsMetaGenresRow({
         )}
       </div>
 
-      {clampedGenreCount > 0 && (
-        <div className="flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
-          {hasMeta && <span className={metaDotClass} />}
-          {visibleGenres.slice(0, clampedGenreCount).map((genre) => (
+      {genresBelowMetaOnMobile && visibleGenres.length > 0 && (
+        <div className="flex max-w-full flex-wrap items-center justify-center gap-2 overflow-hidden sm:hidden">
+          {visibleGenres.map((genre) => (
             <span key={genre.id} className={genreChipClass}>
               <span
                 className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
@@ -180,6 +204,8 @@ export default function DetailsMetaGenresRow({
           ))}
         </div>
       )}
+
+      {desktopGenreRow}
 
       <div
         aria-hidden="true"

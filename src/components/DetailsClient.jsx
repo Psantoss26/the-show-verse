@@ -8355,6 +8355,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 displayRuntimeValue={displayRuntimeValue}
                 status={data.status}
                 genres={data.genres}
+                genresBelowMetaOnMobile
               />
             </FadeIn>
 
