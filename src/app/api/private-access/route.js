@@ -19,11 +19,6 @@ function notFound() {
   })
 }
 
-function safeNextPath(value) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
-  return value
-}
-
 // Protocolo real de la petición: cabecera del proxy → protocolo de la URL.
 // Sirve para el `secure` de la cookie y para el origen del redirect. Es clave
 // en un NAS servido por HTTP: forzar https rompería la cookie (el navegador la
@@ -61,7 +56,7 @@ export async function GET(request) {
   const key = url.searchParams.get('key') || ''
   if (key !== secret) return notFound()
 
-  const redirectUrl = new URL(safeNextPath(url.searchParams.get('next')), publicOrigin(request))
+  const redirectUrl = new URL('/', publicOrigin(request))
   const response = NextResponse.redirect(redirectUrl)
   response.cookies.set(ACCESS_COOKIE, await sha256(secret), {
     httpOnly: true,

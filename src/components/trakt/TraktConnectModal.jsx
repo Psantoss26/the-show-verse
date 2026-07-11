@@ -5,6 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
+import useModalGuard from "@/hooks/useModalGuard";
 
 /**
  * Modal compacto de conexión a Trakt que usa Device Flow.
@@ -24,6 +25,9 @@ export default function TraktConnectModal({ open, onClose, onSuccess }) {
     () => device?.device_code && device?.interval && device?.expires_in,
     [device],
   );
+
+  // Bloqueo de scroll de fondo + cierre con Escape
+  useModalGuard({ open, onClose });
 
   // Limpiar polling al desmontar
   useEffect(() => {

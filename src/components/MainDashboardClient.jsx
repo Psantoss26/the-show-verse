@@ -2077,8 +2077,6 @@ function InlinePreviewCardAnticipated({
       ? "tv"
       : "movie";
 
-  const cardRef = useRef(null);
-
   const openPreviewModal = () => {
     openDetailModal?.(movie);
   };
@@ -2206,27 +2204,39 @@ function InlinePreviewCardAnticipated({
   // `transform` al animar la escala y rompería el centrado.
   let alignmentClass = "left-1/2";
   let alignX = "-50%"; // centrado: desplaza media anchura propia
-  let transformOrigin = "center center";
+  let originX = "center";
 
   if (alignment === "left") {
     alignmentClass = "left-0";
     alignX = "0%";
-    transformOrigin = "left center";
+    originX = "left";
   } else if (alignment === "right") {
     alignmentClass = "right-0";
     alignX = "0%";
-    transformOrigin = "right center";
+    originX = "right";
   }
+  // Ancla la IMAGEN sobre la tarjeta (marginTop = -½ alto de imagen) + origen de
+  // la escala en ese centro. Ancho FIJO (300/350/410/450) → responsive por CSS,
+  // SIN ref (evita el aviso "Accessing element.ref" de React 19 en hijos de
+  // AnimatePresence con ref). `_` en el valor arbitrario de origin = espacio.
+  const previewAnchorClass = `-mt-[84px] sm:-mt-[98px] md:-mt-[115px] xl:-mt-[127px] ${
+    {
+      center:
+        "origin-[center_84px] sm:origin-[center_98px] md:origin-[center_115px] xl:origin-[center_127px]",
+      left: "origin-[left_84px] sm:origin-[left_98px] md:origin-[left_115px] xl:origin-[left_127px]",
+      right:
+        "origin-[right_84px] sm:origin-[right_98px] md:origin-[right_115px] xl:origin-[right_127px]",
+    }[originX]
+  }`;
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92, x: alignX, y: "-50%" }}
-      animate={{ opacity: 1, scale: 1.18, x: alignX, y: "-50%" }}
+      initial={{ opacity: 0, scale: 0.92, x: alignX }}
+      animate={{ opacity: 1, scale: 1.18, x: alignX }}
       exit={{
         opacity: 0,
         scale: 0.92,
         x: alignX,
-        y: "-50%",
         transition: { duration: 0.14, ease: "easeInOut" },
       }}
       transition={{
@@ -2235,10 +2245,9 @@ function InlinePreviewCardAnticipated({
         damping: 22,
         mass: 0.7,
       }}
-      ref={cardRef}
-      className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
+      className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] ${previewAnchorClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
       onClick={openPreviewModal}
-      style={{ willChange: "transform, opacity", transformOrigin }}
+      style={{ willChange: "transform, opacity" }}
     >
       {/* Backdrop de 16:9 */}
       <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
@@ -2602,7 +2611,10 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
 
 /* ---------- Fila reusable ---------- */
 /* ---------- Fila reusable ---------- */
-function Row({
+// Exportado para reutilizarlo como FUENTE ÚNICA en los dashboards de películas y
+// series (misma fila póster + preview al hover que Inicio). Usa useDetailModal()
+// internamente → el consumidor debe estar dentro de un <DetailModalProvider>.
+export function Row({
   title,
   items,
   isMobile,
@@ -3070,16 +3082,30 @@ function Row({
 
               let standardPreviewAlignmentClass = "left-1/2";
               let standardPreviewX = "-50%";
-              let standardPreviewTransformOrigin = "center center";
+              let standardPreviewOriginX = "center";
               if (hoveredAlignment === "left") {
                 standardPreviewAlignmentClass = "left-0";
                 standardPreviewX = "0%";
-                standardPreviewTransformOrigin = "left center";
+                standardPreviewOriginX = "left";
               } else if (hoveredAlignment === "right") {
                 standardPreviewAlignmentClass = "right-0";
                 standardPreviewX = "0%";
-                standardPreviewTransformOrigin = "right center";
+                standardPreviewOriginX = "right";
               }
+              // Ancla la IMAGEN sobre la tarjeta (marginTop = -½ alto de imagen)
+              // y el origen de la escala en ese centro. Ancho FIJO (320/430/480)
+              // → valores responsive por CSS, SIN ref: framer-motion + React 19
+              // avisan ("Accessing element.ref") si un hijo de AnimatePresence
+              // lleva ref. `_` en el valor arbitrario de origin = espacio.
+              const standardPreviewAnchorClass = `-mt-[90px] md:-mt-[121px] xl:-mt-[135px] ${
+                {
+                  center:
+                    "origin-[center_90px] md:origin-[center_121px] xl:origin-[center_135px]",
+                  left: "origin-[left_90px] md:origin-[left_121px] xl:origin-[left_135px]",
+                  right:
+                    "origin-[right_90px] md:origin-[right_121px] xl:origin-[right_135px]",
+                }[standardPreviewOriginX]
+              }`;
 
               return (
                 <SwiperSlide
@@ -3125,7 +3151,6 @@ function Row({
                                       opacity: 0,
                                       scale: 0.92,
                                       x: standardPreviewX,
-                                      y: "-50%",
                                     }
                                   : { opacity: 0, scale: 0.98 }
                               }
@@ -3135,7 +3160,6 @@ function Row({
                                       opacity: 1,
                                       scale: 1,
                                       x: standardPreviewX,
-                                      y: "-50%",
                                     }
                                   : { opacity: 1, scale: 1 }
                               }
@@ -3143,7 +3167,7 @@ function Row({
                                 opacity: 0,
                                 scale: isStandardPopoverPreview ? 0.92 : 0.95,
                                 ...(isStandardPopoverPreview
-                                  ? { x: standardPreviewX, y: "-50%" }
+                                  ? { x: standardPreviewX }
                                   : {}),
                                 transition: { duration: 0.12 },
                               }}
@@ -3153,16 +3177,10 @@ function Row({
                               }}
                               className={
                                 isStandardPopoverPreview
-                                  ? `absolute top-1/2 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} z-[80] hidden sm:block`
+                                  ? `absolute top-1/2 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} ${standardPreviewAnchorClass} z-[80] hidden sm:block`
                                   : "hidden sm:block h-full w-full"
                               }
-                              style={{
-                                willChange: "transform, opacity",
-                                transformOrigin:
-                                  isStandardPopoverPreview
-                                    ? standardPreviewTransformOrigin
-                                    : undefined,
-                              }}
+                              style={{ willChange: "transform, opacity" }}
                             >
                             <InlinePreviewCard
                               movie={m}

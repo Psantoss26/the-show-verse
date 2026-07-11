@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import useModalGuard from "@/hooks/useModalGuard";
 import {
   X,
   Plus,
@@ -114,6 +115,9 @@ function CalendarPickerModal({
     d.setDate(1);
     return d;
   });
+
+  // Bloqueo de scroll de fondo + cierre con Escape
+  useModalGuard({ open, onClose });
 
   useEffect(() => {
     if (!open) return;
@@ -293,6 +297,9 @@ export default function TraktWatchedModal({
   const [calOpen, setCalOpen] = useState(false);
   const [calTarget, setCalTarget] = useState("new"); // 'new' | 'edit'
 
+  // Bloqueo de scroll de fondo + cierre con Escape
+  useModalGuard({ open, onClose });
+
   useEffect(() => {
     if (!open) return;
     setNewDate(todayYmd());
@@ -300,23 +307,7 @@ export default function TraktWatchedModal({
     setEditDate(todayYmd());
     setCalOpen(false);
     setCalTarget("new");
-
-    // Bloquear scroll
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   if (!open) return null;
 

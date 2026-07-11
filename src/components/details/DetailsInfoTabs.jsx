@@ -14,7 +14,7 @@
 //                 y el tagline usa comillas rectas " ".
 
 import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarIcon,
   FilmIcon,
@@ -27,8 +27,63 @@ import {
   Trophy,
 } from "lucide-react";
 
+import OptimizedImage from "@/components/OptimizedImage";
 import { VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
+
+function PlatformLinkCard({ platform, index }) {
+  if (!platform?.icon || !platform?.href) return null;
+
+  return (
+    <motion.a
+      href={platform.href}
+      target={platform.target}
+      rel={platform.rel}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: 0.28,
+        delay: index * 0.04,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      aria-label={`Abrir ${platform.title}`}
+      className="group/platform relative isolate flex h-full min-h-[76px] transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 lg:w-auto lg:min-w-[210px] lg:flex-auto lg:shrink-0"
+    >
+      <div
+        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+      />
+
+      <span className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 shadow-lg">
+        <OptimizedImage
+          src={platform.icon}
+          alt=""
+          className="h-10 w-10 rounded-xl object-contain"
+          onError={(e) => {
+            e.target.style.display = "none";
+          }}
+        />
+        {platform.isPlexProvider && (
+          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
+        )}
+      </span>
+
+      <span className="relative z-10 flex min-w-0 flex-1 flex-col">
+        <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          Plataforma
+        </span>
+        <span className="text-sm font-bold leading-tight text-white">
+          {platform.title}
+        </span>
+        {platform.subtitle && (
+          <span className="mt-1 line-clamp-1 text-[11px] font-semibold text-emerald-300">
+            {platform.subtitle}
+          </span>
+        )}
+      </span>
+    </motion.a>
+  );
+}
 
 export default function DetailsInfoTabs({
   variant = "normal",
@@ -50,11 +105,13 @@ export default function DetailsInfoTabs({
   awards,
   awardItems = [],
   showAwardsTab = true,
+  platforms = [],
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
+  const hasPlatformsTab = Array.isArray(platforms) && platforms.length > 0;
 
   return (
     <>
@@ -64,6 +121,9 @@ export default function DetailsInfoTabs({
           { id: "details", label: "Detalles" },
           { id: "production", label: "Producción" },
           { id: "synopsis", label: "Sinopsis" },
+          ...(hasPlatformsTab
+            ? [{ id: "platforms", label: "Plataformas" }]
+            : []),
           ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
         ]}
         activeTab={activeTab}
@@ -232,6 +292,21 @@ export default function DetailsInfoTabs({
                   expanded={true}
                   className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* ===== TAB: PLATAFORMAS ===== */}
+          {activeTab === "platforms" && hasPlatformsTab && (
+            <div key="platforms">
+              <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                {platforms.map((platform, index) => (
+                  <PlatformLinkCard
+                    key={platform.key ?? `${platform.title}-${index}`}
+                    platform={platform}
+                    index={index}
+                  />
+                ))}
               </div>
             </div>
           )}

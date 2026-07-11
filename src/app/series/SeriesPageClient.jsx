@@ -37,6 +37,12 @@ import {
 } from "@/lib/api/tmdb";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
+// FUENTE ÚNICA con Inicio: misma fila póster + preview al hover (Row) y fila
+// backdrop, más el provider del modal rápido. Reutilizamos los componentes de
+// MainDashboard para que el diseño sea idéntico.
+import { Row as SharedRow } from "@/components/MainDashboardClient";
+import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import { fetchBestBackdropNoLang, fetchBestLogo } from "@/lib/dashboard/media";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -80,6 +86,10 @@ const scaleIn = {
 const INITIAL_VISIBLE_ROWS = 6;
 const ROW_REVEAL_BATCH_SIZE = 4;
 const EMPTY_ARRAY = [];
+// Overrides de artwork vacíos y ESTABLES para los componentes compartidos de
+// MainDashboard (que esperan mapas por id). En series no propagamos overrides;
+// el artwork lo resuelven los propios componentes.
+const EMPTY_OBJECT = {};
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -1783,6 +1793,10 @@ export default function SeriesPageClient({
   const posterCacheRef = useRef(new Map());
   const [deferredData, setDeferredData] = useState(null);
   const [visibleRowCount, setVisibleRowCount] = useState(INITIAL_VISIBLE_ROWS);
+  // Los componentes compartidos gatean la vista previa al hover con `hydrated`
+  // (evita hover antes de hidratar). true tras el primer montaje en cliente.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     if (deferredDataPromise) {
@@ -1817,7 +1831,13 @@ export default function SeriesPageClient({
       engineRows.map((row) => ({
         key: row.key,
         title: row.title,
-        items: row.items,
+        // Fijamos media_type="tv" para los componentes compartidos multi-tipo
+        // (Row/DashboardBackdropRow usan getMediaTypeForItem). Solo si falta.
+        items: Array.isArray(row.items)
+          ? row.items.map((it) =>
+              it && it.media_type ? it : { ...it, media_type: "tv" },
+            )
+          : row.items,
       })),
     [engineRows],
   );
@@ -1851,6 +1871,7 @@ export default function SeriesPageClient({
   }
 
   return (
+    <DetailModalProvider>
     <motion.div
       className={`relative min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30 ${
         hasFeaturedHero ? "-mt-16" : "px-4 py-6 sm:px-6"
@@ -1883,19 +1904,64 @@ export default function SeriesPageClient({
               : "space-y-12 pt-2"
           }
         >
-          {visibleRows.map(({ key, title, items }, index) => (
-            <Row
-              key={key}
-              rowKey={key}
-              title={title}
-              items={items}
-              isMobile={isMobile}
-              posterCacheRef={posterCacheRef}
-              replayRevealAtTop={index === 0}
-            />
-          ))}
+          {(() => {
+            // Alternancia poster/backdrop como en Inicio: filas pares en póster
+            // (Row compartido con preview al hover) e impares en backdrop
+            // (DashboardBackdropRow). La fila "Top 10 en tu región" conserva su
+            // render especial (backdrop numerado) con el Row LOCAL y no alterna.
+            const nodes = [];
+            let genericIndex = -1;
+            visibleRows.forEach(({ key, title, items }, index) => {
+              if (key === "region_top") {
+                nodes.push(
+                  <Row
+                    key={key}
+                    rowKey={key}
+                    title={title}
+                    items={items}
+                    isMobile={isMobile}
+                    posterCacheRef={posterCacheRef}
+                    replayRevealAtTop={index === 0}
+                  />,
+                );
+                return;
+              }
+              genericIndex += 1;
+              // "Tendencias ahora mismo" es la fila DESTACADA (spotlight): se
+              // queda en póster con tamaño mayor (no alterna), como en Inicio.
+              const isSpotlight = title === "Tendencias ahora mismo";
+              const useBackdrop = genericIndex % 2 === 1 && !isSpotlight;
+              nodes.push(
+                useBackdrop ? (
+                  <DashboardBackdropRow
+                    key={key}
+                    title={title}
+                    items={items}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    backdropOverrides={EMPTY_OBJECT}
+                  />
+                ) : (
+                  <SharedRow
+                    key={key}
+                    title={title}
+                    items={items}
+                    isMobile={isMobile}
+                    hydrated={hydrated}
+                    posterCacheRef={posterCacheRef}
+                    posterOverrides={EMPTY_OBJECT}
+                    backdropOverrides={EMPTY_OBJECT}
+                    overridesReady
+                    spotlight={isSpotlight}
+                  />
+                ),
+              );
+            });
+            return nodes;
+          })()}
         </motion.div>
       </div>
     </motion.div>
+    </DetailModalProvider>
   );
 }

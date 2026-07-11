@@ -45,15 +45,15 @@ function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -1 }}
-      className="relative flex min-w-0 items-center justify-start gap-1 select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:gap-2 sm:px-1.5"
+      className="relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:px-1.5"
       aria-label={tooltip || label}
     >
-      <Icon className="h-4 w-4 shrink-0 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
-      <div className="flex flex-col min-w-0 justify-center">
-        <span className="text-[11px] sm:text-sm font-bold tracking-tight text-white/90 leading-tight">
+      <div className="grid min-w-0 grid-cols-[1rem_auto] grid-rows-[auto_auto] items-center gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2">
+        <Icon className="col-start-1 row-start-1 h-4 w-4 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
+        <span className="col-start-2 row-start-1 block self-center text-[11px] font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] sm:text-sm">
           {value || "-"}
         </span>
-        <span className="hidden sm:block text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5 leading-none transition-colors duration-200 group-hover/statbadge:text-zinc-400">
+        <span className="col-start-2 row-start-2 mt-1 hidden text-[8px] font-bold uppercase leading-none tracking-widest text-zinc-500 transition-colors duration-200 group-hover/statbadge:text-zinc-400 [text-box:trim-both_cap_alphabetic] sm:block sm:text-[9px]">
           {label}
         </span>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   X,
   Plus,
@@ -10,6 +10,7 @@ import {
   ListPlus,
   FileText,
 } from "lucide-react";
+import useModalGuard from "@/hooks/useModalGuard";
 
 export default function AddToListModal(props) {
   const {
@@ -45,15 +46,8 @@ export default function AddToListModal(props) {
     return id != null ? String(id) : null;
   };
 
-  // Bloquear scroll del body al abrir
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
+  useModalGuard({ open, onClose });
 
   // Manejo de errores seguro
   const safeError = useMemo(() => {

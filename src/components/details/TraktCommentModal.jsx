@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { X, Loader2, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import useModalGuard from "@/hooks/useModalGuard";
 
 export default function TraktCommentModal({
   open,
@@ -25,13 +26,13 @@ export default function TraktCommentModal({
 
   const textareaRef = useRef(null);
 
-  // Lock body scroll when open and reset state
+  // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
+  useModalGuard({ open, onClose });
+
+  // Reset fields on modal open
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
 
-    // Reset fields on modal open
     setCommentText("");
     setIsSpoiler(false);
     setError("");
@@ -39,10 +40,6 @@ export default function TraktCommentModal({
     setDeletingCommentId(null);
     setConfirmDeleteId(null);
     setRevealedSpoilers(new Set());
-
-    return () => {
-      document.body.style.overflow = prev;
-    };
   }, [open]);
 
   // Focus textarea on desktop when modal opens

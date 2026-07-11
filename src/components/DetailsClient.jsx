@@ -498,6 +498,71 @@ function dedupeStreamingProviders(providers) {
   return deduped;
 }
 
+function getProviderLogoSrc(provider) {
+  const logoPath = provider?.logo_path || "";
+  if (!logoPath) return "";
+  if (logoPath.startsWith("http")) return logoPath;
+  if (logoPath.startsWith("/logo-")) return logoPath;
+  if (logoPath.startsWith("/")) {
+    return `https://image.tmdb.org/t/p/original${logoPath}`;
+  }
+  return logoPath;
+}
+
+function getPlatformLink(provider, { endpointType, justwatchUrl, title }) {
+  const isPlexProvider = provider?.isPlex === true;
+
+  if (isPlexProvider && provider.url && typeof provider.url === "object") {
+    let rawSlug = "";
+
+    if (provider.url.slug) {
+      const slugMatch = provider.url.slug.match(
+        /plex:\/\/(?:movie|show)\/(.+)$/i,
+      );
+      rawSlug = slugMatch ? slugMatch[1] : provider.url.slug;
+    } else if (provider.url.universal) {
+      const uMatch = provider.url.universal.match(
+        /watch\.plex\.tv\/(?:movie|show)\/(.+)$/i,
+      );
+      rawSlug = uMatch ? uMatch[1] : "";
+    }
+
+    const webUrl = provider.url.web || "";
+
+    if (rawSlug) {
+      const params = new URLSearchParams({
+        slug: rawSlug,
+        type: endpointType === "movie" ? "movie" : "show",
+        webUrl,
+        title: title || "",
+      });
+      return `/api/plex/open?${params.toString()}`;
+    }
+
+    return webUrl || provider.url.universal || "#";
+  }
+
+  return provider?.url || justwatchUrl || "#";
+}
+
+function createPlatformItem(provider, options) {
+  const href = getPlatformLink(provider, options);
+  const isPlexProvider = provider?.isPlex === true;
+  const hasValidLink = Boolean(href && href !== "#");
+
+  return {
+    key: provider?.provider_id ?? provider?.provider_name,
+    title: provider?.provider_name || "Plataforma",
+    subtitle: isPlexProvider ? "Disponible en tu servidor local" : null,
+    icon: getProviderLogoSrc(provider),
+    href,
+    target: isPlexProvider ? "_self" : hasValidLink ? "_blank" : undefined,
+    rel: hasValidLink && !isPlexProvider ? "noreferrer" : undefined,
+    isPlexProvider,
+    hasValidLink,
+  };
+}
+
 function hasResolvedTraktBootstrap(value) {
   if (!value || typeof value.connected !== "boolean") return false;
   if (value.connected === false) return true;
@@ -5994,10 +6059,6 @@ export default function DetailsClient({
     return () => ac.abort();
   }, [id, endpointType, canLoadOfficialSite]);
 
-  const justWatchUrl = title
-    ? `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`
-    : null;
-
   const letterboxdUrl =
     isMovie && title
       ? resolvedImdbId
@@ -6212,14 +6273,24 @@ export default function DetailsClient({
     return items;
   }, [
     officialSiteUrl,
-    justWatchUrl,
-    extLinks.justwatch,
+    jwHref,
     isMovie,
     letterboxdUrl,
     type,
     seriesGraphUrl,
     filmAffinitySearchUrl,
   ]);
+
+  const scoreboardExternalLinks = useMemo(
+    () =>
+      externalLinks.map((link) => ({
+        key: link.id,
+        icon: link.icon,
+        title: link.label,
+        href: link.href,
+      })),
+    [externalLinks],
+  );
 
   // ====== Datos meta / características (reorganizadas) ======
   const directorsOrCreators =
@@ -7324,6 +7395,20 @@ export default function DetailsClient({
     return dedupeStreamingProviders(providers).slice(0, 6);
   }, [streamingProviders, plexAvailable, plexUrl]);
 
+  const platformItems = useMemo(
+    () =>
+      limitedProviders
+        .map((provider) =>
+          createPlatformItem(provider, {
+            endpointType,
+            justwatchUrl,
+            title,
+          }),
+        )
+        .filter((provider) => provider.icon),
+    [limitedProviders, endpointType, justwatchUrl, title],
+  );
+
   // Plataforma principal del overlay de la portada, según orden de prioridad
   // (Netflix, Prime, Crunchyroll, HBO Max, Disney+, Movistar+).
   const primaryStreamingProvider = useMemo(
@@ -8158,175 +8243,54 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             </motion.div>
 
-            {/* Providers Grid + Enlaces Externos (cuando es backdrop) */}
-            {(limitedProviders && limitedProviders.length > 0) ||
-            (isBackdropPoster && externalLinks.length > 0) ? (
+            {/* Providers Grid.
+                En móvil normalmente va oculta (las plataformas viven en el "menú"
+                = pestaña "Plataformas" de DetailsInfoTabs). PERO en modo BACKDROP
+                sí se muestran aquí, como iconos directos debajo de la portada; en
+                ese modo la pestaña "Plataformas" se omite para no duplicar. En
+                escritorio (sm+) se muestra siempre, como hasta ahora. */}
+            {platformItems.length > 0 ? (
               <StaggerContainer
-                className="flex flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-1"
+                className={`${
+                  isBackdropPoster ? "flex" : "hidden"
+                } flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-1 sm:flex`}
                 staggerDelay={0.05}
               >
                 {/* Providers - Solo si hay plataformas */}
-                {limitedProviders && limitedProviders.length > 0 && (
-                  <div className="flex flex-row flex-nowrap items-center gap-2">
-                    {limitedProviders.map((p, index) => {
-                      const isPlexProvider = p.isPlex === true;
-
-                      // Para Plex: enlazar a /api/plex/open (página de redirección
-                      // intermedia que detecta el dispositivo y lanza el deep link
-                      // correcto — mucho más fiable que window.location en onClick).
-                      let providerLink;
-                      let hasValidLink;
-
-                      if (
-                        isPlexProvider &&
-                        p.url &&
-                        typeof p.url === "object"
-                      ) {
-                        // Extraer el slug limpio de la URL plex://movie/{slug} o plex://show/{slug}
-                        // p.url.slug viene de la API como "plex://movie/fight-club" o "plex://show/the-wire"
-                        let rawSlug = "";
-                        if (p.url.slug) {
-                          // Extraer todo lo que hay después del último "/" en plex://type/slug
-                          const slugMatch = p.url.slug.match(
-                            /plex:\/\/(?:movie|show)\/(.+)$/i,
-                          );
-                          rawSlug = slugMatch ? slugMatch[1] : p.url.slug;
-                        } else if (p.url.universal) {
-                          // Fallback: extraer slug de la URL watch.plex.tv
-                          const uMatch = p.url.universal.match(
-                            /watch\.plex\.tv\/(?:movie|show)\/(.+)$/i,
-                          );
-                          rawSlug = uMatch ? uMatch[1] : "";
-                        }
-
-                        const contentType =
-                          endpointType === "movie" ? "movie" : "show";
-                        const webUrl = p.url.web || "";
-
-                        if (rawSlug) {
-                          const params = new URLSearchParams({
-                            slug: rawSlug,
-                            type: contentType,
-                            webUrl,
-                            title: title || "",
-                          });
-                          providerLink = `/api/plex/open?${params.toString()}`;
-                          hasValidLink = true;
-                        } else {
-                          // Sin slug (muy raro): fallback directo a web de Plex
-                          providerLink = webUrl || p.url.universal || "#";
-                          hasValidLink = !!providerLink && providerLink !== "#";
-                        }
-                      } else {
-                        providerLink = p.url || justwatchUrl || "#";
-                        hasValidLink = p.url || justwatchUrl;
-                      }
-
-                      return (
-                        <motion.a
-                          key={p.provider_id}
-                          href={providerLink}
-                          initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          transition={{
-                            duration: 0.28,
-                            delay: 0.03 + index * 0.04,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
-                          target={
-                            // Para Plex: la página /api/plex/open se carga en la
-                            // misma pestaña (navegación completa = más fiable para
-                            // deep links). Para otros providers: nueva pestaña.
-                            isPlexProvider
-                              ? "_self"
-                              : hasValidLink
-                                ? "_blank"
-                                : undefined
-                          }
-                          rel={
-                            hasValidLink && !isPlexProvider
-                              ? "noreferrer"
-                              : undefined
-                          }
-                          aria-label={p.provider_name}
-                          className="group/provider relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10 cursor-pointer"
-                        >
-                          <OptimizedImage
-                            src={
-                              p.logo_path?.startsWith("http")
-                                ? p.logo_path
-                                : p.logo_path?.startsWith("/logo-")
-                                  ? p.logo_path
-                                  : p.logo_path?.startsWith("/")
-                                    ? `https://image.tmdb.org/t/p/original${p.logo_path}`
-                                    : p.logo_path
-                            }
-                            alt=""
-                            className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                            }}
-                          />
-                          {isPlexProvider && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" />
-                          )}
-                          <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
-                            {isPlexProvider
-                              ? "Disponible en tu servidor local"
-                              : p.provider_name}
-                          </div>
-                        </motion.a>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Barra vertical + Enlaces externos (cuando es backdrop) */}
-                {isBackdropPoster && externalLinks.length > 0 && (
-                  <>
-                    {/* Separador solo si hay plataformas */}
-                    {limitedProviders && limitedProviders.length > 0 && (
-                      <div className="w-px h-8 bg-white/20 flex-shrink-0" />
-                    )}
-                    <div className="flex flex-row flex-nowrap items-center gap-2">
-                      {externalLinks.slice(0, 5).map((link, index) => {
-                        // Detectar si es Letterboxd para ajustar escala
-                        const isLetterboxdIcon =
-                          link.icon?.includes("logo-Letterboxd");
-
-                        return (
-                          <motion.a
-                            key={link.id}
-                            href={link.href}
-                            initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{
-                              duration: 0.28,
-                              delay: 0.06 + index * 0.04,
-                              ease: [0.22, 1, 0.36, 1],
-                            }}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label={link.label}
-                            className="group/extlink relative flex-shrink-0 transition-transform transform hover:scale-110 hover:brightness-110 hover:z-10"
-                          >
-                            <OptimizedImage
-                              src={link.icon}
-                              alt=""
-                              className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isLetterboxdIcon ? "scale-[1.2]" : ""}`}
-                              onError={(e) => {
-                                e.target.style.display = "none";
-                              }}
-                            />
-                            <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/extlink:scale-100 group-hover/extlink:opacity-100 group-hover/extlink:delay-[2000ms]">
-                              {link.label}
-                            </div>
-                          </motion.a>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+                <div className="flex flex-row flex-nowrap items-center gap-2">
+                  {platformItems.map((provider, index) => (
+                    <motion.a
+                      key={provider.key ?? `${provider.title}-${index}`}
+                      href={provider.href}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: 0.03 + index * 0.04,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      target={provider.target}
+                      rel={provider.rel}
+                      aria-label={provider.title}
+                      className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                    >
+                      <OptimizedImage
+                        src={provider.icon}
+                        alt=""
+                        className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                      {provider.isPlexProvider && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" />
+                      )}
+                      <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
+                        {provider.subtitle || provider.title}
+                      </div>
+                    </motion.a>
+                  ))}
+                </div>
               </StaggerContainer>
             ) : null}
           </div>
@@ -8483,44 +8447,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? { value: Math.round(extras.mcScore) }
                     : null
                 }
-                externalLinks={
-                  isBackdropPoster
-                    ? null
-                    : [
-                        {
-                          icon: "/logo-Web.png",
-                          href: officialSiteUrl,
-                          wrapperClassName: "hidden sm:block",
-                        },
-                        {
-                          icon: "/logo-JustWatch.png",
-                          title: "JustWatch",
-                          href: jwHref,
-                          fallbackHref: justWatchUrl,
-                        },
-                        ...(isMovie
-                          ? [
-                              {
-                                icon: "/logo-Letterboxd.png",
-                                href: letterboxdUrl,
-                              },
-                            ]
-                          : []),
-                        ...(type === "tv"
-                          ? [
-                              {
-                                icon: "/logoseriesgraph.png",
-                                href: seriesGraphUrl,
-                              },
-                            ]
-                          : []),
-                        {
-                          icon: "/logoFilmaffinity.png",
-                          title: "FilmAffinity",
-                          href: filmAffinitySearchUrl,
-                        },
-                      ]
-                }
+                externalLinks={scoreboardExternalLinks}
                 onMoreLinks={() => setExternalLinksOpen(true)}
                 share={{
                   title,
@@ -8568,6 +8495,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     awards={extras.awards}
                     awardItems={awardItems}
                     showAwardsTab={false}
+                    platforms={platformItems}
                   />
                 </div>
               </FadeIn>
@@ -8607,6 +8535,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               awards={extras.awards}
               awardItems={awardItems}
               showAwardsTab={false}
+              platforms={[]}
             />
           </div>
         </FadeIn>
