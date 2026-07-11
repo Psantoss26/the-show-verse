@@ -45,7 +45,7 @@ function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -1 }}
-      className="relative flex min-w-0 items-center justify-center gap-1 select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:justify-start sm:gap-2 sm:px-1.5"
+      className="relative flex min-w-0 items-center justify-start gap-1 select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:gap-2 sm:px-1.5"
       aria-label={tooltip || label}
     >
       <Icon className="h-4 w-4 shrink-0 text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
@@ -194,8 +194,7 @@ export function DetailsStatsRow({ stats = null }) {
         md:overflow-x-visible
       "
       >
-        {/* En móvil se bloquean cuatro columnas para que las stats no salten de línea. */}
-        <div className="grid grid-cols-4 items-center gap-x-1 gap-y-1.5 sm:flex sm:flex-wrap sm:justify-start sm:gap-x-4">
+        <div className="flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 sm:w-full sm:flex-wrap">
           {/* Watchers - Usuarios que siguen este contenido */}
           <TraktStatBadge
             icon={Eye}
@@ -311,9 +310,11 @@ function DetailsToolbarActions({
       {/* ========== Separador vertical 1 + ENLACES EXTERNOS / STREAMING ========== */}
       {hasInlineActions && (
         <>
-          <ToolbarSeparator />
+          <div className="flex flex-1 items-center justify-center sm:block sm:flex-none">
+            <ToolbarSeparator />
+          </div>
 
-          <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5 sm:gap-3">
+          <div className="min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3">
             {/* Versión Desktop: plataformas primero, enlaces externos después */}
             <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
               {hasStreamingProviders && (
@@ -375,7 +376,7 @@ function DetailsToolbarActions({
 
       {/* ========== Botón de Compartir (anclado a la derecha con ml-auto) ========== */}
       {share && (
-        <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
+        <div className="shrink-0 sm:ml-auto max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
           <ActionShareButton
             title={share.title}
             text={share.text}

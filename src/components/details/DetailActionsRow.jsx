@@ -17,6 +17,7 @@ import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
   Play,
+  X,
   Music2,
   BarChart3,
   Loader2,
@@ -100,6 +101,9 @@ export default function DetailActionsRow({
   // etiqueta) en vez de icono-only. Solo lo usa la preview del dashboard;
   // DetailModal y DetailsClient lo omiten y mantienen el icono.
   trailerLabel = null,
+  // Estado "reproduciendo": cambia el botón a X + "Ocultar" mientras el tráiler
+  // se está reproduciendo (la preview del dashboard lo pasa = showTrailer).
+  trailerPlaying = false,
 
   onSoundtrack,
   soundtrackAvailable = false,
@@ -158,20 +162,30 @@ export default function DetailActionsRow({
           ]
             .filter(Boolean)
             .join(" ")}
-          title={trailerAvailable ? "Ver Tráiler" : "Sin Tráiler"}
+          title={
+            trailerPlaying
+              ? "Ocultar tráiler"
+              : trailerAvailable
+                ? "Ver Tráiler"
+                : "Sin Tráiler"
+          }
         >
-          <Play
-            className={`fill-current ${
-              trailerLabel
-                ? "mr-2 h-4 w-4"
-                : trailerAvailable
-                  ? "ml-0.5 sm:ml-1"
-                  : ""
-            }`}
-          />
+          {trailerPlaying ? (
+            <X className={trailerLabel ? "mr-2 h-4 w-4" : ""} />
+          ) : (
+            <Play
+              className={`fill-current ${
+                trailerLabel
+                  ? "mr-2 h-4 w-4"
+                  : trailerAvailable
+                    ? "ml-0.5 sm:ml-1"
+                    : ""
+              }`}
+            />
+          )}
           {trailerLabel && (
             <span className="whitespace-nowrap text-[13px] font-bold">
-              {trailerLabel}
+              {trailerPlaying ? "Ocultar" : trailerLabel}
             </span>
           )}
         </LiquidButton>

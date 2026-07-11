@@ -1176,7 +1176,7 @@ function InlinePreviewCard({
   };
 
   const handleToggleTrailer = async (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     closeSoundtrackOverlay();
 
     if (showTrailer) {
@@ -1207,6 +1207,25 @@ function InlinePreviewCard({
       setTrailerLoading(false);
     }
   };
+
+  // Autoplay del tráiler ~1s después del hover. Esta tarjeta se MONTA al hacer
+  // hover, así que un temporizador al montar equivale a "poco después del hover".
+  // Si dejas de hacer hover antes, la tarjeta se desmonta y el cleanup cancela el
+  // temporizador (no arranca). El ref lee el estado más reciente para no cerrar
+  // un tráiler que ya hayas abierto manualmente dentro de esa ventana.
+  const autoTrailerRef = useRef(null);
+  autoTrailerRef.current = {
+    showTrailer,
+    trailerLoading,
+    play: handleToggleTrailer,
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const s = autoTrailerRef.current;
+      if (s && !s.showTrailer && !s.trailerLoading) s.play();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleToggleSoundtrack = async (e) => {
     e.stopPropagation();
@@ -1673,6 +1692,7 @@ function InlinePreviewCard({
                 trailerAvailable
                 trailerLoading={trailerLoading}
                 trailerLabel="Ver tráiler"
+                trailerPlaying={showTrailer}
                 onSoundtrack={handleToggleSoundtrack}
                 soundtrackAvailable
                 onEpisodeRatings={
@@ -2124,7 +2144,7 @@ function InlinePreviewCardAnticipated({
   };
 
   const handleToggleTrailer = async (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     if (showTrailer) {
       setShowTrailer(false);
       return;
@@ -2150,6 +2170,22 @@ function InlinePreviewCardAnticipated({
       setTrailerLoading(false);
     }
   };
+
+  // Autoplay del tráiler ~1s tras el hover (la tarjeta se monta al hacer hover;
+  // el cleanup lo cancela si dejas de hacer hover antes).
+  const autoTrailerRef = useRef(null);
+  autoTrailerRef.current = {
+    showTrailer,
+    trailerLoading,
+    play: handleToggleTrailer,
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const s = autoTrailerRef.current;
+      if (s && !s.showTrailer && !s.trailerLoading) s.play();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)

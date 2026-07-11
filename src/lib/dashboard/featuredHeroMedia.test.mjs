@@ -32,3 +32,14 @@ test("uses the server poster only after asset resolution finishes without a post
 
   assert.equal(resolveFeaturedHeroPoster({ poster: null }, movie), "/server.jpg");
 });
+
+test("never falls back to a backdrop as the mobile hero cover", () => {
+  const movie = {
+    poster_path: null,
+    backdrop_path: "/fallback.jpg",
+  };
+
+  // Sin póster textless NI poster_path: debe devolver null (no pintar imagen),
+  // NUNCA el backdrop apaisado. En móvil la portada es siempre de tipo póster.
+  assert.equal(resolveFeaturedHeroPoster({ poster: null }, movie), null);
+});

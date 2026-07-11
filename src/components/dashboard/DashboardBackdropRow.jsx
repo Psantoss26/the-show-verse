@@ -745,7 +745,7 @@ function BackdropPreviewCard({
   };
 
   const handleToggleTrailer = async (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     closeSoundtrackOverlay();
     if (showTrailer) {
       setShowTrailer(false);
@@ -771,6 +771,23 @@ function BackdropPreviewCard({
       setTrailerLoading(false);
     }
   };
+
+  // Autoplay del tráiler ~1s tras el hover: esta tarjeta se MONTA al hacer hover
+  // (se renderiza dentro de {isActive ? …}), así que el temporizador al montar
+  // equivale a "poco después del hover"; el cleanup lo cancela al des-hover.
+  const autoTrailerRef = useRef(null);
+  autoTrailerRef.current = {
+    showTrailer,
+    trailerLoading,
+    play: handleToggleTrailer,
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const s = autoTrailerRef.current;
+      if (s && !s.showTrailer && !s.trailerLoading) s.play();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleToggleSoundtrack = async (e) => {
     e.stopPropagation();
@@ -1030,6 +1047,7 @@ function BackdropPreviewCard({
             trailerAvailable
             trailerLoading={trailerLoading}
             trailerLabel="Ver tráiler"
+            trailerPlaying={showTrailer}
             onSoundtrack={handleToggleSoundtrack}
             soundtrackAvailable
             onEpisodeRatings={
