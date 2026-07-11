@@ -372,45 +372,79 @@ html {
 
 
 /* =============================================================================
-   VIEW TRANSITIONS — preview (DetailModal) → ficha completa (DetailsClient)
-   Efecto "cortina": el panel VIEJO de DetailModal baja como una sola pieza
-   dentro de su propio rectángulo, revelando DetailsClient ya renderizado detrás.
-   Degrada solo (navegación normal) donde no hay soporte.
+   DetailModal → DetailsClient route transition
+   Capa propia fuera de React: el backdrop blur del modal real se oculta antes de
+   navegar y solo queda un scrim oscuro + un clon inerte del panel.
    ========================================================================== */
-@media not (prefers-reduced-motion: reduce) {
-  /* El snapshot se toma del panel, no del wrapper fixed/inset-0. Así evitamos
-     desplazar la viewport completa y mantenemos pegado el fondo blur del panel. */
-  ::view-transition-group(modal-panel) {
-    z-index: 30;
-  }
-  ::view-transition-old(modal-panel) {
-    animation: dm-slide-down-out 560ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  }
-
-  /* La página nueva queda detrás desde el arranque. El movimiento pertenece solo
-     al panel del modal, no al snapshot root de toda la pantalla. */
-  ::view-transition-new(root) {
-    animation: none;
-  }
-  ::view-transition-old(root) {
-    animation: dm-instant-fade-out 1ms linear both;
-  }
+.sv-detail-route-transition {
+  --sv-detail-route-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  isolation: isolate;
+  contain: layout style paint;
 }
 
-@keyframes dm-slide-down-out {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
+.sv-detail-route-transition__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #101010;
+  opacity: 1;
+  transition: opacity 420ms var(--sv-detail-route-ease);
 }
 
-@keyframes dm-instant-fade-out {
-  from {
+.sv-detail-route-transition__panel {
+  position: fixed !important;
+  inset: auto !important;
+  top: var(--sv-route-panel-top) !important;
+  left: var(--sv-route-panel-left) !important;
+  width: var(--sv-route-panel-width) !important;
+  height: var(--sv-route-panel-height) !important;
+  max-width: none !important;
+  margin: 0 !important;
+  z-index: 1;
+  pointer-events: none !important;
+  transform-origin: center bottom;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+.sv-detail-route-transition.is-running .sv-detail-route-transition__panel {
+  animation: sv-detail-route-panel-out 520ms var(--sv-detail-route-ease) both;
+}
+
+.sv-detail-route-transition.is-revealing .sv-detail-route-transition__scrim {
+  opacity: 0;
+}
+
+.sv-detail-route-transition.is-revealing .sv-detail-route-transition__panel {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+@keyframes sv-detail-route-panel-out {
+  0% {
     opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
-  to {
+  45% {
+    opacity: 0.9;
+    transform: translate3d(0, 38px, 0) scale(0.994);
+  }
+  100% {
     opacity: 0;
+    transform: translate3d(0, 88px, 0) scale(0.988);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-detail-route-transition,
+  .sv-detail-route-transition__scrim,
+  .sv-detail-route-transition__panel {
+    animation: none !important;
+    transition: none !important;
   }
 }
