@@ -903,8 +903,8 @@ function BackdropPreviewCard({
   const isRightBoundary =
     index === activeIdx + visibleCount - 1 || index === totalCount - 1;
 
-  // Ancla vertical: centramos la IMAGEN sobre la tarjeta (no el panel entero) y
-  // la escala de apertura crece desde ese mismo centro. Ver usePreviewImageHalf.
+  // Centrado por-imagen: la IMAGEN backdrop del preview queda centrada sobre la
+  // tarjeta (marginTop = -½ alto de imagen) y la escala crece desde ese centro.
   const [previewRef, previewImgHalf] = usePreviewImageHalf(true);
 
   let alignmentClass = "left-1/2 -translate-x-1/2";
@@ -1496,11 +1496,14 @@ export default function DashboardBackdropRow({
                 : false
             }
             modules={[Navigation, FreeMode]}
-            // Padding vertical amplio (con margen negativo que lo compensa) para
-            // reservar el hueco de la vista previa sin que se recorte; el Swiper
-            // es pointer-events-none en escritorio para no robar hover/clic a las
-            // filas vecinas y las tarjetas los reactivan (pointer-events-auto).
-            className={`group relative !py-14 sm:!py-16 md:!py-44 !-my-14 sm:!-my-16 md:!-my-44 ${
+            // Padding vertical amplio (con margen negativo que lo compensa, así
+            // el espaciado entre filas no cambia) para reservar el hueco de la
+            // vista previa sin que se recorte. Es ASIMÉTRICO: más abajo que
+            // arriba, porque el preview se centra por su IMAGEN sobre la tarjeta y
+            // la sección de info cuelga hacia abajo (necesita más hueco inferior).
+            // El Swiper es pointer-events-none en escritorio para no robar
+            // hover/clic a las filas vecinas; las tarjetas los reactivan.
+            className={`group relative !pt-14 sm:!pt-16 md:!pt-44 !pb-40 sm:!pb-52 md:!pb-72 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-40 sm:!-mb-52 md:!-mb-72 ${
               isMobile ? "" : "pointer-events-none"
             }`}
             wrapperClass="flex items-center"
