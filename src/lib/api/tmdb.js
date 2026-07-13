@@ -501,6 +501,16 @@ export async function getExternalIds(type, id) {
   return data || null; // { imdb_id, ... }
 }
 
+// imdb_id de un item lo más rápido posible: usa item.imdb_id si ya viene; si no,
+// lo pide a external_ids (endpoint ligero). Pensado para las previews del
+// dashboard, donde la nota IMDb debe resolverse SIN esperar a la ficha completa.
+export async function resolveImdbId(item, type) {
+  if (item?.imdb_id) return item.imdb_id;
+  if (!item?.id) return null;
+  const ext = await getExternalIds(type, item.id).catch(() => null);
+  return ext?.imdb_id || null;
+}
+
 /* -------------------- Actor -------------------- */
 export async function getActorDetails(id) {
   const data = await tmdb(`/person/${id}`, { language: "es-ES" });

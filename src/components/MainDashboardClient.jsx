@@ -17,10 +17,6 @@ import Link from "next/link";
 import NextImage from "next/image";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
-  Heart,
-  HeartOff,
-  BookmarkPlus,
-  BookmarkMinus,
   Play,
   X,
   FilmIcon,
@@ -30,7 +26,6 @@ import {
   Loader2,
   Music2,
   Pause,
-  Volume2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -39,7 +34,7 @@ import {
   markInWatchlist,
   getMovieDetails,
   getDetails,
-  getExternalIds,
+  resolveImdbId,
 } from "@/lib/api/tmdb";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import {
@@ -56,7 +51,6 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchArtworkOverrides } from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
-import LiquidButton from "@/components/LiquidButton";
 // Fila de acciones + fila meta/géneros COMPARTIDAS con DetailsClient/DetailModal:
 // misma UI y estilo que la ficha rápida del dashboard.
 import DetailActionsRow from "@/components/details/DetailActionsRow";
@@ -71,6 +65,9 @@ import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
 import DetailModalProvider, {
   useDetailModal,
 } from "@/components/dashboard/DetailModalProvider";
+import PreviewTrailerAudioButton, {
+  usePreviewTrailerAudio,
+} from "@/components/dashboard/PreviewTrailerAudioControl";
 import { useEngineRows } from "@/components/dashboard/useEngineRows";
 
 import {
@@ -648,6 +645,11 @@ function InlinePreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  const {
+    muted: trailerMuted,
+    toggle: handleToggleTrailerAudio,
+    sync: syncTrailerAudio,
+  } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
 
   // Si el tráiler está restringido (edad/embedding) o no disponible, ocultarlo
   // (fallback al backdrop) en vez de mostrar el error de YouTube en la tarjeta.
@@ -836,6 +838,27 @@ function InlinePreviewCard({
       if (cachedExtras) {
         if (!abort) setExtras(cachedExtras);
       } else {
+        // imdb_id + nota IMDb se resuelven AL PRINCIPIO y en PARALELO con los
+        // detalles (runtime/overview): así la nota NO espera a la ficha. Se pinta
+        // en cuanto llega (setState incremental) y las promesas se comparten con
+        // la ruta de premios (mismo imdb_id) y con el objeto cacheado (misma
+        // nota), sin duplicar llamadas.
+        const imdbIdPromise = resolveImdbId(movie, mediaType);
+        const imdbRatingPromise = imdbIdPromise.then((imdb) =>
+          imdb
+            ? fetchImdbRatingByImdb(imdb)
+                .then((ds) =>
+                  typeof ds?.rating === "number" ? ds.rating : null,
+                )
+                .catch(() => null)
+            : null,
+        );
+        imdbRatingPromise.then((rating) => {
+          if (rating != null && !abort) {
+            setExtras((prev) => ({ ...prev, imdbRating: rating }));
+          }
+        });
+
         try {
           let runtime = null;
           let overview = null;
@@ -870,19 +893,12 @@ function InlinePreviewCard({
             }
           } catch {}
 
+          // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide).
           let awards = null;
-          let imdbRating = null;
           try {
-            let imdb = movie?.imdb_id;
-            if (!imdb) {
-              const ext = await getExternalIds(mediaType, movie.id);
-              imdb = ext?.imdb_id || null;
-            }
+            const imdb = await imdbIdPromise;
             if (imdb) {
-              const [omdb, imdbDataset] = await Promise.all([
-                fetchOmdbByImdb(imdb),
-                fetchImdbRatingByImdb(imdb),
-              ]);
+              const omdb = await fetchOmdbByImdb(imdb).catch(() => null);
               const rawAwards = omdb?.Awards;
               if (
                 rawAwards &&
@@ -891,12 +907,10 @@ function InlinePreviewCard({
               ) {
                 awards = formatDashboardAwards(rawAwards);
               }
-              if (typeof imdbDataset?.rating === "number") {
-                imdbRating = imdbDataset.rating;
-              }
             }
           } catch {}
 
+          const imdbRating = await imdbRatingPromise;
           const next = { runtime, awards, imdbRating, overview };
           movieExtrasCache.set(movie.id, next);
           if (!abort) setExtras(next);
@@ -918,12 +932,11 @@ function InlinePreviewCard({
     };
   }, [isSpotlight, mediaType, movie, stableBackdropOverride]);
 
-  // Carga perezosa (en hover == al montar) de los datos que alimentan la fila de
-  // acciones y la fila meta compartidas. Best-effort: nunca lanza, degrada en
-  // silencio, se cancela al desmontar y NO bloquea el render inicial de la card.
-  // Solo aplica a la vista previa de portada (no al spotlight, que no usa esta UI).
+  // Carga perezosa (en hover == al montar) de los datos que alimentan la fila
+  // meta compartida. También se usa en spotlight para el mismo diseño de estado
+  // y géneros que FeaturedHero/DetailModal.
   useEffect(() => {
-    if (isSpotlight || !movie?.id) return undefined;
+    if (!movie?.id) return undefined;
 
     let cancelled = false;
     const isTv = mediaType === "tv";
@@ -1338,12 +1351,13 @@ function InlinePreviewCard({
   const tmdbRating = ratingOf(movie);
   const hasTmdbRating = tmdbRating !== "–";
 
-  const genres = (() => {
+  const genreObjects = (() => {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const names = ids.map((id) => GENRES[id]).filter(Boolean);
-    return names.slice(0, 2).join(" • ");
+    return (Array.isArray(ids) ? ids : [])
+      .map((id) => (GENRES[id] ? { id, name: GENRES[id] } : null))
+      .filter(Boolean);
   })();
 
   const trailerSrc = trailer?.key
@@ -1356,11 +1370,6 @@ function InlinePreviewCard({
           : ""
       }`
     : null;
-
-  // Botones de la vista previa: más grandes en la fila destacada (×1,6).
-  const previewBtnClass = isSpotlight
-    ? "!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6"
-    : "!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5";
 
   return (
     <>
@@ -1453,24 +1462,11 @@ function InlinePreviewCard({
                   title={`Trailer - ${movie.title || movie.name}`}
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen={false}
-                  onLoad={() => {
-                    try {
-                      const win = trailerIframeRef.current?.contentWindow;
-                      if (!win) return;
-
-                      const target = "https://www.youtube-nocookie.com";
-                      const cmd = (func, args = []) =>
-                        win.postMessage(
-                          JSON.stringify({ event: "command", func, args }),
-                          target,
-                        );
-
-                      setTimeout(() => {
-                        cmd("unMute");
-                        cmd("setVolume", [30]);
-                      }, 120);
-                    } catch {}
-                  }}
+                  onLoad={syncTrailerAudio}
+                />
+                <PreviewTrailerAudioButton
+                  muted={trailerMuted}
+                  onToggle={handleToggleTrailerAudio}
                 />
               </div>
             )}
@@ -1521,81 +1517,30 @@ function InlinePreviewCard({
               )}
 
               <motion.div
-                className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3"
+                className="mb-3 w-full sm:w-auto"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.12 }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <button
-                  type="button"
-                  onClick={handleToggleTrailer}
-                  disabled={trailerLoading}
-                  aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:px-5 sm:text-base"
-                >
-                  {showTrailer ? (
-                    <X className="h-5 w-5" />
-                  ) : (
-                    <Play className="h-5 w-5 fill-current" />
-                  )}
-                  <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
-                </button>
-
-                <LiquidButton
-                  onClick={handleToggleSoundtrack}
-                  loading={soundtrackLoading}
-                  active={soundtrackOpen}
-                  activeColor="yellow"
-                  groupId="dashboard-spotlight-actions"
-                  title={
-                    soundtrackOpen
-                      ? "Cerrar soundtrack"
-                      : "Reproducir soundtrack"
-                  }
-                  aria-label={
-                    soundtrackOpen
-                      ? "Cerrar soundtrack"
-                      : "Reproducir soundtrack"
-                  }
-                  className={previewBtnClass}
-                >
-                  {soundtrackPlaying ? <Pause /> : <Volume2 />}
-                </LiquidButton>
-
-                <LiquidButton
-                  onClick={handleToggleFavorite}
-                  loading={loadingStates || updating}
-                  active={favorite}
-                  activeColor="red"
-                  groupId="dashboard-spotlight-actions"
-                  title={
-                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
-                  }
-                  aria-label={
-                    favorite ? "Quitar de favoritos" : "Añadir a favoritos"
-                  }
-                  className={previewBtnClass}
-                >
-                  <Heart className={favorite ? "fill-current" : ""} />
-                </LiquidButton>
-
-                <LiquidButton
-                  onClick={handleToggleWatchlist}
-                  loading={loadingStates || updating}
-                  active={watchlist}
-                  activeColor="blue"
-                  groupId="dashboard-spotlight-actions"
-                  title={
-                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-                  }
-                  aria-label={
-                    watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-                  }
-                  className={previewBtnClass}
-                >
-                  <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-                </LiquidButton>
-
+                <DetailActionsRow
+                  size="lg"
+                  className="labeled-row"
+                  showSeparator={false}
+                  onTrailer={handleToggleTrailer}
+                  trailerAvailable
+                  trailerLoading={trailerLoading}
+                  trailerLabel="Ver trailer"
+                  trailerPlaying={showTrailer}
+                  onSoundtrack={handleToggleSoundtrack}
+                  soundtrackAvailable
+                  favorite={favorite}
+                  favoriteLoading={loadingStates || updating}
+                  onToggleFavorite={handleToggleFavorite}
+                  watchlist={watchlist}
+                  watchlistLoading={loadingStates || updating}
+                  onToggleWatchlist={handleToggleWatchlist}
+                />
               </motion.div>
 
               {extras?.awards && (
@@ -1605,78 +1550,47 @@ function InlinePreviewCard({
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.68rem] font-semibold text-zinc-200 sm:text-xs">
+              <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
                 {(() => {
                   const badge = getSpotlightBadge(movie);
                   return badge ? (
-                    <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
                       {badge}
                     </span>
                   ) : null;
                 })()}
-                {(() => {
-                  // Año y duración separados por "•" (mismo separador que FeaturedHero).
-                  const parts = [];
-                  if (yearOf(movie))
-                    parts.push(<span key="year">{yearOf(movie)}</span>);
-                  if (extras?.runtime)
-                    parts.push(
-                      <span key="runtime">
-                        {typeof extras.runtime === "number"
-                          ? formatRuntime(extras.runtime)
-                          : extras.runtime}
-                      </span>,
-                    );
-                  return parts.reduce((acc, item, index) => {
-                    if (index === 0) return [item];
-                    return [
-                      ...acc,
-                      <span
-                        key={`sep-${index}`}
-                        className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                        aria-hidden="true"
-                      >
-                        •
-                      </span>,
-                      item,
-                    ];
-                  }, []);
-                })()}
+                <DetailsMetaGenresRow
+                  yearIso={yearOf(movie)}
+                  displayRuntimeValue={
+                    previewDetails.runtimeFallback ||
+                    (typeof extras?.runtime === "number"
+                      ? formatRuntime(extras.runtime)
+                      : extras?.runtime)
+                  }
+                  status={previewDetails.status}
+                  genres={
+                    previewDetails.genreObjects.length
+                      ? previewDetails.genreObjects
+                      : genreObjects
+                  }
+                />
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:text-sm">
-                {genres && <span>{genres}</span>}
-                {hasTmdbRating && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <NextImage
-                      src="/logo-TMDb.png"
-                      alt="TMDb"
-                      className="h-3 w-auto"
-                      width={2560}
-                      height={1846}
-                      sizes="32px"
-                      loading="lazy"
-                    />
-                    <span className="font-bold">{tmdbRating}</span>
-                  </span>
-                )}
-                {typeof extras?.imdbRating === "number" && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <NextImage
-                      src="/logo-IMDb.svg"
-                      alt="IMDb"
-                      className="h-4 w-auto"
-                      width={575}
-                      height={290}
-                      sizes="40px"
-                      loading="lazy"
-                    />
-                    <span className="font-bold">
-                      {extras.imdbRating.toFixed(1)}
-                    </span>
-                  </span>
-                )}
-              </div>
+              <DetailsRatingsBadges
+                tmdb={
+                  hasTmdbRating
+                    ? {
+                        value: tmdbRating,
+                        sub: formatCountShort(movie.vote_count),
+                      }
+                    : null
+                }
+                imdb={
+                  typeof extras?.imdbRating === "number"
+                    ? { value: extras.imdbRating.toFixed(1), sub: null }
+                    : null
+                }
+              />
 
               {error && (
                 <p className="mt-2 line-clamp-1 text-xs text-red-300">
@@ -1763,14 +1677,24 @@ function InlinePreviewCard({
             )}
 
             {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
-                año · duración · estado · géneros (mismo componente y diseño).
-                Se alimenta igual que useDetailModalData. */}
-            <DetailsMetaGenresRow
-              yearIso={yearOf(movie)}
-              displayRuntimeValue={previewDetails.runtimeFallback}
-              status={previewDetails.status}
-              genres={previewDetails.genreObjects}
-            />
+                badge contextual · año · duración · estado · géneros. Misma
+                composición que FeaturedHero para las tarjetas x1.6. */}
+            <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
+              {(() => {
+                const badge = getSpotlightBadge(movie);
+                return badge ? (
+                  <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                    {badge}
+                  </span>
+                ) : null;
+              })()}
+              <DetailsMetaGenresRow
+                yearIso={yearOf(movie)}
+                displayRuntimeValue={previewDetails.runtimeFallback}
+                status={previewDetails.status}
+                genres={previewDetails.genreObjects}
+              />
+            </div>
 
             {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que
                 usa DetailModal (mismo diseño). Orden espejo del modal:
@@ -1986,19 +1910,24 @@ function InlinePreviewCardAnticipated({
   const [error, setError] = useState("");
 
   // Datos para el panel de info COMPARTIDO (mismo que InlinePreviewCard): fila
-  // meta (estado · géneros · duración de respaldo) + premios + puntuación IMDb.
-  // Sin trakt/puntuación/soundtrack: son títulos por estrenar ("Más esperadas").
+  // meta (estado · géneros · duración de respaldo) + premios. Sin Trakt,
+  // puntuaciones ni soundtrack: son títulos por estrenar ("Más esperadas").
   const [previewDetails, setPreviewDetails] = useState({
     status: null,
     genreObjects: [],
     runtimeFallback: null,
   });
-  const [extras, setExtras] = useState({ awards: null, imdbRating: null });
+  const [extras, setExtras] = useState({ awards: null });
 
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  const {
+    muted: trailerMuted,
+    toggle: handleToggleTrailerAudio,
+    sync: syncTrailerAudio,
+  } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
 
   // Tráiler restringido/no disponible → ocultarlo (fallback al backdrop).
   useTrailerAutoDismiss({
@@ -2068,13 +1997,17 @@ function InlinePreviewCardAnticipated({
   }, [mediaType, movie, session, account]);
 
   // Carga (best-effort) de los datos que alimentan el panel compartido: detalles
-  // TMDb (estado · géneros · duración) + IMDb/premios. Espejo de InlinePreviewCard.
+  // TMDb (estado · géneros · duración) + premios.
   useEffect(() => {
     if (!movie?.id) return undefined;
     let cancelled = false;
     const isTv = mediaType === "tv";
 
     (async () => {
+      // imdb_id resuelto una sola vez para premios (OMDb). Las puntuaciones no se
+      // muestran en "Más esperadas", así que no se pide la nota IMDb.
+      const imdbIdPromise = resolveImdbId(movie, mediaType);
+
       // Detalles TMDb: estado crudo, géneros [{id,name}] y duración de respaldo.
       try {
         const details = await getDetails(mediaType, movie.id).catch(() => null);
@@ -2111,28 +2044,19 @@ function InlinePreviewCardAnticipated({
         }
       } catch {}
 
-      // IMDb (nota) + premios (OMDb) por imdb_id — igual que InlinePreviewCard.
+      // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide).
       try {
-        let imdb = movie?.imdb_id;
-        if (!imdb) {
-          const ext = await getExternalIds(mediaType, movie.id);
-          imdb = ext?.imdb_id || null;
-        }
+        const imdb = await imdbIdPromise;
+        let awards = null;
         if (imdb) {
-          const [omdb, imdbDataset] = await Promise.all([
-            fetchOmdbByImdb(imdb).catch(() => null),
-            fetchImdbRatingByImdb(imdb).catch(() => null),
-          ]);
-          if (cancelled) return;
+          const omdb = await fetchOmdbByImdb(imdb).catch(() => null);
           const rawAwards = omdb?.Awards;
-          const awards =
+          awards =
             rawAwards && typeof rawAwards === "string" && rawAwards.trim()
               ? formatDashboardAwards(rawAwards)
               : null;
-          const imdbRating =
-            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
-          setExtras({ awards, imdbRating });
         }
+        if (!cancelled) setExtras({ awards });
       } catch {}
     })();
 
@@ -2305,8 +2229,6 @@ function InlinePreviewCardAnticipated({
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
   const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
-  const tmdbRating = ratingOf(movie);
-  const hasTmdbRating = tmdbRating !== "–";
   // Géneros como objetos [{id,name}] para <DetailsMetaGenresRow> (fallback
   // síncrono mientras cargan los detalles TMDb en previewDetails).
   const syncGenreObjects = (() => {
@@ -2424,6 +2346,11 @@ function InlinePreviewCardAnticipated({
                   title={`Trailer - ${movie.title || movie.name}`}
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen={false}
+                  onLoad={syncTrailerAudio}
+                />
+                <PreviewTrailerAudioButton
+                  muted={trailerMuted}
+                  onToggle={handleToggleTrailerAudio}
                 />
               </div>
             )}
@@ -2500,31 +2427,28 @@ function InlinePreviewCardAnticipated({
           </div>
         )}
 
-        {/* Fila meta + géneros COMPARTIDA: año · duración · estado · géneros. */}
-        <DetailsMetaGenresRow
-          yearIso={yearOf(movie)}
-          displayRuntimeValue={previewDetails.runtimeFallback}
-          status={previewDetails.status}
-          genres={
-            previewDetails.genreObjects.length
-              ? previewDetails.genreObjects
-              : syncGenreObjects
-          }
-        />
-
-        {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
-        <DetailsRatingsBadges
-          tmdb={
-            hasTmdbRating
-              ? { value: tmdbRating, sub: formatCountShort(movie.vote_count) }
-              : null
-          }
-          imdb={
-            typeof extras?.imdbRating === "number"
-              ? { value: extras.imdbRating.toFixed(1), sub: null }
-              : null
-          }
-        />
+        {/* Fila meta + géneros COMPARTIDA: badge contextual · año · duración ·
+            estado · géneros, igual que FeaturedHero. */}
+        <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
+          {(() => {
+            const badge = getSpotlightBadge(movie);
+            return badge ? (
+              <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+                {badge}
+              </span>
+            ) : null;
+          })()}
+          <DetailsMetaGenresRow
+            yearIso={yearOf(movie)}
+            displayRuntimeValue={previewDetails.runtimeFallback}
+            status={previewDetails.status}
+            genres={
+              previewDetails.genreObjects.length
+                ? previewDetails.genreObjects
+                : syncGenreObjects
+            }
+          />
+        </div>
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
@@ -3415,14 +3339,14 @@ export function Row({
               exit={{ opacity: 0 }}
               type="button"
               onClick={handlePrevClick}
-              className="absolute inset-y-0 left-0 w-32 z-30
+              className="absolute inset-y-0 -left-6 w-32 z-30
                   hidden sm:flex items-center justify-start
                   bg-gradient-to-r from-black/90 via-black/70 to-transparent
                   hover:from-black/95 hover:via-black/80
                   transition-all duration-300 pointer-events-auto group/nav"
             >
               <motion.span
-                className="ml-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                className="ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -3439,14 +3363,14 @@ export function Row({
               exit={{ opacity: 0 }}
               type="button"
               onClick={handleNextClick}
-              className="absolute inset-y-0 right-0 w-32 z-30
+              className="absolute inset-y-0 -right-6 w-32 z-30
                   hidden sm:flex items-center justify-end
                   bg-gradient-to-l from-black/90 via-black/70 to-transparent
                   hover:from-black/95 hover:via-black/80
                   transition-all duration-300 pointer-events-auto group/nav"
             >
               <motion.span
-                className="mr-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                className="mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: 4 }}
               >
                 ›
@@ -4154,14 +4078,14 @@ function TopRatedHero({
                 exit={{ opacity: 0 }}
                 type="button"
                 onClick={handlePrevClick}
-                className="absolute inset-y-0 left-0 w-32 z-20
+                className="absolute inset-y-0 -left-6 w-32 z-20
                                 hidden sm:flex items-center justify-start
                                 bg-gradient-to-r from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
                                 hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
                                 transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
               >
                 <motion.span
-                  className="ml-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  className="ml-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: -5 }}
                 >
                   ‹
@@ -4178,14 +4102,14 @@ function TopRatedHero({
                 exit={{ opacity: 0 }}
                 type="button"
                 onClick={handleNextClick}
-                className="absolute inset-y-0 right-0 w-32 z-20
+                className="absolute inset-y-0 -right-6 w-32 z-20
                                 hidden sm:flex items-center justify-end
                                 bg-gradient-to-l from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
                                 hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
                                 transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
               >
                 <motion.span
-                  className="mr-5 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  className="mr-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: 5 }}
                 >
                   ›

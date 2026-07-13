@@ -9,8 +9,6 @@ import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Heart,
-  BookmarkPlus,
   Play,
   Pause,
   Award,
@@ -28,6 +26,7 @@ import {
   getDetails,
   markAsFavorite,
   markInWatchlist,
+  resolveImdbId,
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -44,6 +43,9 @@ import OptimizedImage from "@/components/OptimizedImage";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import PreviewTrailerAudioButton, {
+  usePreviewTrailerAudio,
+} from "@/components/dashboard/PreviewTrailerAudioControl";
 // Filas de acciones + meta/géneros + puntuaciones COMPARTIDAS con
 // DetailsClient/DetailModal y con DashboardBackdropRow: misma UI de ficha rápida.
 import DetailActionsRow from "@/components/details/DetailActionsRow";
@@ -52,13 +54,8 @@ import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPane
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   traktGetItemStatus,
-  traktGetShowWatched,
   traktSetRating,
 } from "@/lib/api/traktClient";
-import {
-  getWatchedEpisodeCountForSeason,
-  getAvailableEpisodeTotal,
-} from "@/lib/hooks/useTraktEpisodesWatched";
 import {
   buildImg,
   fetchBestWatchingBackdrop,
@@ -255,14 +252,7 @@ const CONTINUE_WATCHING_TRAILER_CACHE_PREFIX =
   "showverse:dashboard:continue-watching:trailer-videos:v2:";
 const CONTINUE_WATCHING_TRAILER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PREVIEW_TRAILER_PREWARM_AHEAD = 4;
-const PREVIEW_TRAILER_REVEAL_DELAY_MS = 80;
-// YouTube solo se revela cuando confirma PLAYING; si no llega ese estado, el
-// intento queda oculto y se prueba el siguiente trailer para no mostrar errores.
-const PREVIEW_TRAILER_YOUTUBE_REVEAL_DELAY_MS = 120;
-const PREVIEW_TRAILER_YOUTUBE_PLAY_TIMEOUT_MS = 3000;
-const PREVIEW_TRAILER_FALLBACK_REVEAL_MS = 700;
 const PREVIEW_TRAILER_YOUTUBE_ORIGIN = "https://www.youtube-nocookie.com";
-const PREVIEW_TRAILER_VIMEO_ORIGIN = "https://player.vimeo.com";
 
 let youtubeIframeApiPromise = null;
 const previewTrailerVideosCache = new Map();
@@ -270,8 +260,8 @@ const verifiedPreviewTrailerKeys = new Map();
 const continueWatchingBackdropPathMemory = new Map();
 const loadedContinueWatchingBackdropSrcs = new Set();
 // Extras del panel ampliado (nota TMDb, nota IMDb, premios, temporadas, año) que
-// no vienen en el item de "Continuar viendo": se cargan al hacer hover y se
-// cachean por serie (igual que el spotlight) para no repetir peticiones.
+// no vienen en el item de "Continuar viendo": se cargan al hacer hover. En TV se
+// cachean por episodio para no mezclar puntuaciones de serie y episodio.
 const continueWatchingExtrasCache = new Map();
 
 const cwBackdropFadeStyle = {
@@ -858,12 +848,28 @@ function ContinueWatchingPreviewCard({
   const { openDetailModal } = useDetailModal();
   const router = useRouter();
   const mediaType = mediaTypeOf(show);
+  const showId = show?.id;
   const { backdropPath, ready } = useShowBackdrop(show);
   const posterPath = useShowPoster(show);
 
   const isCalendar = mode === "calendar";
+  const isContinuePreview = !isCalendar;
   const ep = show?.nextEpisode;
+  const episodeSeason = Number(ep?.season);
+  const episodeNumber = Number(ep?.number);
+  const hasEpisodeRef =
+    mediaType === "tv" &&
+    Number.isFinite(episodeSeason) &&
+    episodeSeason > 0 &&
+    Number.isFinite(episodeNumber) &&
+    episodeNumber > 0;
   const calendar = show?.calendar || null;
+  const extrasCacheKey =
+    showId == null
+      ? null
+      : hasEpisodeRef
+        ? `${isContinuePreview ? "continue" : "calendar"}:${showId}:${episodeSeason}:${episodeNumber}`
+        : `${isContinuePreview ? "continue" : "calendar"}:${showId}`;
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -874,7 +880,10 @@ function ContinueWatchingPreviewCard({
   // estado y géneros. Se pintan al instante desde caché si ya se cargaron; si no,
   // se piden al hacer hover (cuando la tarjeta se monta) con un fundido suave.
   const [extras, setExtras] = useState(
-    () => continueWatchingExtrasCache.get(show?.id) || null,
+    () =>
+      (extrasCacheKey
+        ? continueWatchingExtrasCache.get(extrasCacheKey)
+        : null) || null,
   );
 
   // Tráiler: MISMO modelo que BackdropPreviewCard. Un único tráiler resuelto con
@@ -884,6 +893,11 @@ function ContinueWatchingPreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  const {
+    muted: trailerMuted,
+    toggle: handleToggleTrailerAudio,
+    sync: syncTrailerAudio,
+  } = usePreviewTrailerAudio(trailerIframeRef, { volume: 35 });
 
   useTrailerAutoDismiss({
     open: showTrailer,
@@ -948,43 +962,75 @@ function ContinueWatchingPreviewCard({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [soundtrackOpen]);
 
-  // Carga de extras (nota, IMDb, premios, temporadas, año). Un único getDetails de
-  // TV ya trae vote_average, número de temporadas/episodios, first_air_date y
-  // external_ids.imdb_id; con el imdb_id pedimos premios (OMDb) y nota IMDb, igual
-  // que el spotlight. Cacheado por serie para no repetir peticiones entre hovers.
+  // Carga de extras (nota, IMDb, premios, temporadas, año). Solo en Continuar
+  // viendo las puntuaciones salen del episodio concreto; Calendario conserva el
+  // diseño/datos anteriores de título.
   useEffect(() => {
-    const id = show?.id;
-    if (!id) return;
-    const ep = show?.nextEpisode;
-    // La clave incluye el episodio: el nombre del episodio es específico de T·E.
-    const cacheKey =
-      mediaType === "tv" && ep ? `${id}:${ep.season}:${ep.number}` : String(id);
-    const cached = continueWatchingExtrasCache.get(cacheKey);
+    const id = showId;
+    if (!id || !extrasCacheKey) return;
+    const isEpisodePreview = isContinuePreview && hasEpisodeRef;
+    const cached = continueWatchingExtrasCache.get(extrasCacheKey);
     if (cached) {
       setExtras(cached);
       return;
     }
     let abort = false;
     (async () => {
+      // imdb_id (rápido, endpoint ligero) + nota IMDb del episodio/título resueltos
+      // AL PRINCIPIO y en PARALELO con los detalles: la nota se pinta EN CUANTO
+      // llega (setState incremental), sin esperar a temporadas/géneros/premios.
+      const imdbIdPromise = resolveImdbId(show, mediaType);
+      const imdbRatingPromise = imdbIdPromise.then((imdb) => {
+        if (!imdb) return null;
+        if (isEpisodePreview) {
+          const qs = new URLSearchParams({
+            season: String(episodeSeason),
+            episode: String(episodeNumber),
+            imdbId: String(imdb),
+          });
+          return fetch(`/api/tv/${id}/episode-imdb?${qs.toString()}`, {
+            cache: "force-cache",
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) =>
+              typeof json?.imdb?.rating === "number" ? json.imdb.rating : null,
+            )
+            .catch(() => null);
+        }
+        return fetchImdbRatingByImdb(imdb)
+          .then((ds) => (typeof ds?.rating === "number" ? ds.rating : null))
+          .catch(() => null);
+      });
+      imdbRatingPromise.then((r) => {
+        if (r != null && !abort) {
+          setExtras((prev) => ({ ...prev, imdbRating: r }));
+        }
+      });
+
       try {
         const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-        // Detalles y nombre del episodio EN PARALELO, para que todos los extras
-        // (incluido el episodio) aparezcan a la vez y no haya un salto extra.
+        // Detalles de título + episodio EN PARALELO, para que todos los extras
+        // aparezcan juntos y no haya un salto extra en la preview.
         const [details, epData] = await Promise.all([
           getDetails(mediaType, id, { language: "es-ES" }).catch(() => null),
-          mediaType === "tv" && ep && apiKey
+          isEpisodePreview && apiKey
             ? fetch(
-                `https://api.themoviedb.org/3/tv/${id}/season/${ep.season}/episode/${ep.number}?api_key=${apiKey}&language=es-ES`,
+                `https://api.themoviedb.org/3/tv/${id}/season/${episodeSeason}/episode/${episodeNumber}?api_key=${apiKey}&language=es-ES`,
               )
                 .then((r) => (r.ok ? r.json() : null))
                 .catch(() => null)
             : Promise.resolve(null),
         ]);
         const episodeName = epData?.name || null;
-        const rating =
+        const episodeTmdbRating =
+          typeof epData?.vote_average === "number" && epData.vote_average > 0
+            ? epData.vote_average
+            : null;
+        const titleTmdbRating =
           typeof details?.vote_average === "number" && details.vote_average > 0
             ? details.vote_average
             : null;
+        const rating = isEpisodePreview ? episodeTmdbRating : titleTmdbRating;
         // Solo series: nº de temporadas/episodios. Las películas usan la duración.
         let seasons = null;
         if (mediaType === "tv" && details?.number_of_seasons) {
@@ -1018,21 +1064,18 @@ function ContinueWatchingPreviewCard({
               .map((g) => ({ id: g.id ?? g.name, name: g.name }))
           : [];
         const status = details?.status || null;
-        const imdbId = details?.external_ids?.imdb_id || null;
-
+        // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide). La nota
+        // IMDb ya viene de la promesa compartida (ya pintada arriba al llegar).
         let awards = null;
-        let imdbRating = null;
-        if (imdbId) {
-          const [omdb, ds] = await Promise.all([
-            fetchOmdbByImdb(imdbId).catch(() => null),
-            fetchImdbRatingByImdb(imdbId).catch(() => null),
-          ]);
-          if (typeof ds?.rating === "number") imdbRating = ds.rating;
+        const imdb = await imdbIdPromise;
+        if (imdb) {
+          const omdb = await fetchOmdbByImdb(imdb).catch(() => null);
           const rawAwards = omdb?.Awards;
           if (rawAwards && typeof rawAwards === "string" && rawAwards.trim()) {
             awards = formatDashboardAwards(rawAwards);
           }
         }
+        const imdbRating = await imdbRatingPromise;
 
         const next = {
           rating,
@@ -1045,7 +1088,7 @@ function ContinueWatchingPreviewCard({
           status,
           genreObjects,
         };
-        continueWatchingExtrasCache.set(cacheKey, next);
+        continueWatchingExtrasCache.set(extrasCacheKey, next);
         if (!abort) setExtras(next);
       } catch {
         if (!abort)
@@ -1065,7 +1108,16 @@ function ContinueWatchingPreviewCard({
     return () => {
       abort = true;
     };
-  }, [show?.id, mediaType, show?.nextEpisode?.season, show?.nextEpisode?.number]);
+  }, [
+    showId,
+    show,
+    mediaType,
+    isContinuePreview,
+    episodeSeason,
+    episodeNumber,
+    hasEpisodeRef,
+    extrasCacheKey,
+  ]);
 
   const prefetchHref = () => {
     if (prefetchedRef.current) return;
@@ -1103,14 +1155,18 @@ function ContinueWatchingPreviewCard({
     };
   }, [show, session, account, mediaType]);
 
-  // Estado de Trakt del título (visto/plays/puntuación) y, para series, el badge
-  // de progreso (%) calculado con las temporadas de TMDb. Portado de
-  // BackdropPreviewCard: alimenta <TraktWatchedControl> y <StarRating>.
+  // Estado del título para acciones: Trakt aporta conexión/puntuación del
+  // usuario; en "Continuar viendo" el botón de visto muestra el progreso local
+  // del episodio/película actual, no el porcentaje global de una serie.
   useEffect(() => {
     const id = show?.id;
     if (!id) return undefined;
     let cancelled = false;
     const isTv = mediaType === "tv";
+    const episodeProgress = clampPct(show?.pct);
+    const progressBadge = !isCalendar && episodeProgress > 0
+      ? `${episodeProgress}%`
+      : null;
 
     (async () => {
       try {
@@ -1131,74 +1187,11 @@ function ContinueWatchingPreviewCard({
         setRating(ratingValue);
         setRatingLoading(false);
 
-        if (!isTv) {
-          setTraktInfo({
-            connected,
-            watched: !!status?.watched,
-            plays: Number(status?.plays || 0),
-            badge: null,
-            loading: false,
-          });
-          return;
-        }
-
-        if (!connected) {
-          setTraktInfo({
-            connected: false,
-            watched: false,
-            plays: 0,
-            badge: null,
-            loading: false,
-          });
-          return;
-        }
-
-        const [watchedRes, details] = await Promise.all([
-          traktGetShowWatched({ tmdbId: id }).catch(() => null),
-          getDetails("tv", id).catch(() => null),
-        ]);
-        if (cancelled) return;
-
-        const watchedBySeason = watchedRes?.watchedBySeason || {};
-        const seasonsList = Array.isArray(details?.seasons)
-          ? details.seasons
-          : [];
-        const usable = seasonsList.filter(
-          (s) => typeof s?.season_number === "number" && s.season_number > 0,
-        );
-        const totalEpisodes = usable.reduce(
-          (acc, s) => acc + getAvailableEpisodeTotal(s),
-          0,
-        );
-        const watchedEpisodes = usable.reduce((acc, s) => {
-          const total = getAvailableEpisodeTotal(s);
-          return (
-            acc +
-            getWatchedEpisodeCountForSeason(
-              watchedBySeason,
-              s.season_number,
-              total,
-            )
-          );
-        }, 0);
-        const pctWatched =
-          totalEpisodes > 0
-            ? Math.min(
-                100,
-                Math.max(0, Math.round((watchedEpisodes / totalEpisodes) * 100)),
-              )
-            : 0;
-        const badge = pctWatched > 0 ? `${pctWatched}%` : null;
-
-        const hasAnyWatched = Object.values(watchedBySeason || {}).some(
-          (eps) => Array.isArray(eps) && eps.length > 0,
-        );
-
         setTraktInfo({
-          connected: true,
-          watched: hasAnyWatched,
-          plays: 0,
-          badge,
+          connected: connected || !!progressBadge,
+          watched: !!progressBadge || !!status?.watched,
+          plays: progressBadge ? 0 : Number(status?.plays || 0),
+          badge: progressBadge,
           loading: false,
         });
       } catch {
@@ -1212,7 +1205,7 @@ function ContinueWatchingPreviewCard({
     return () => {
       cancelled = true;
     };
-  }, [show?.id, mediaType]);
+  }, [show?.id, show?.pct, mediaType, isCalendar]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -1356,11 +1349,13 @@ function ContinueWatchingPreviewCard({
   // así que el temporizador al montar equivale a "poco después del hover"; el
   // cleanup lo cancela al des-hover.
   const autoTrailerRef = useRef(null);
-  autoTrailerRef.current = {
-    showTrailer,
-    trailerLoading,
-    play: handleToggleTrailer,
-  };
+  useEffect(() => {
+    autoTrailerRef.current = {
+      showTrailer,
+      trailerLoading,
+      play: handleToggleTrailer,
+    };
+  });
   useEffect(() => {
     const timer = setTimeout(() => {
       const s = autoTrailerRef.current;
@@ -1606,22 +1601,11 @@ function ContinueWatchingPreviewCard({
                   title={`Trailer - ${show?.title || ""}`}
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen={false}
-                  onLoad={() => {
-                    try {
-                      const win = trailerIframeRef.current?.contentWindow;
-                      if (!win) return;
-                      const target = "https://www.youtube-nocookie.com";
-                      const cmd = (func, args = []) =>
-                        win.postMessage(
-                          JSON.stringify({ event: "command", func, args }),
-                          target,
-                        );
-                      setTimeout(() => {
-                        cmd("unMute");
-                        cmd("setVolume", [30]);
-                      }, 120);
-                    } catch {}
-                  }}
+                  onLoad={syncTrailerAudio}
+                />
+                <PreviewTrailerAudioButton
+                  muted={trailerMuted}
+                  onToggle={handleToggleTrailerAudio}
                 />
               </div>
             )}
@@ -1656,7 +1640,7 @@ function ContinueWatchingPreviewCard({
       </div>
 
       {/* Panel de info (mismo lenguaje visual que BackdropPreviewCard):
-          [Continuar] Reanudar + progreso · acciones compartidas · premios ·
+          [Continuar] reproducir episodio + progreso · acciones compartidas · premios ·
           [Calendario] línea de episodio · meta/géneros · puntuaciones. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -1664,7 +1648,7 @@ function ContinueWatchingPreviewCard({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        {/* "Continuar viendo": acción principal Reanudar + progreso circular.
+        {/* "Continuar viendo": acción principal de reproducción + progreso circular.
             Se conserva como acción destacada del panel. Corta la propagación
             para no abrir la ficha rápida al pulsar sus controles. */}
         {!isCalendar && (
@@ -1679,7 +1663,9 @@ function ContinueWatchingPreviewCard({
             >
               <Play className="h-4 w-4 fill-current" />
               <span>
-                {ep ? `Reanudar T${ep.season}·E${ep.number}` : "Reanudar"}
+                {ep
+                  ? `Reproducir T${ep.season} E${ep.number}`
+                  : "Reproducir"}
               </span>
             </button>
 
@@ -1697,16 +1683,18 @@ function ContinueWatchingPreviewCard({
           </div>
         )}
 
-        {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal (tráiler ·
-            soundtrack · valorar episodios [tv] · Trakt visto · puntuación ·
+        {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal. Calendario
+            mantiene la píldora de tráiler anterior; Continuar viendo arranca
+            desde el botón "Reproducir T/E". (soundtrack · valorar episodios [tv] ·
+            progreso/visto · puntuación ·
             favorito · pendientes). Corta la propagación al onClick de la card. */}
         <div className="mb-3" onClick={(e) => e.stopPropagation()}>
           <DetailActionsRow
-            onTrailer={handleToggleTrailer}
-            trailerAvailable
-            trailerLoading={trailerLoading}
-            trailerLabel="Ver tráiler"
-            trailerPlaying={showTrailer}
+            onTrailer={isCalendar ? handleToggleTrailer : undefined}
+            trailerAvailable={isCalendar}
+            trailerLoading={isCalendar ? trailerLoading : false}
+            trailerLabel={isCalendar ? "Ver tráiler" : null}
+            trailerPlaying={isCalendar && showTrailer}
             onSoundtrack={handleToggleSoundtrack}
             soundtrackAvailable
             onEpisodeRatings={
@@ -2479,13 +2467,14 @@ function ContinueWatchingSection({
                 e.stopPropagation();
                 moveSlides(-1);
               }}
-              // El inset vertical REPLICA el padding del Swiper (py-14/16/44) para
-              // que el degradado cubra solo la fila de tarjetas y no el hueco de la
-              // preview (si no, sobresale por arriba y por abajo de la sección).
-              className="absolute inset-y-14 left-0 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
+              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
+              // bottom=pb) para que la flecha quede CENTRADA sobre la tarjeta base
+              // (no sobre el hueco de la preview). `-left-6` sangra el degradado
+              // 24px (= sm:px-6 de la página) hasta el borde lateral, sin hueco.
+              className="absolute -left-6 top-14 bottom-44 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
               <motion.span
-                className="ml-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -2506,12 +2495,13 @@ function ContinueWatchingSection({
                 e.stopPropagation();
                 moveSlides(1);
               }}
-              // El inset vertical REPLICA el padding del Swiper (py-14/16/44), igual
-              // que la flecha izquierda, para no sobresalir de la fila de tarjetas.
-              className="absolute inset-y-14 right-0 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
+              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
+              // bottom=pb), igual que la flecha izquierda: centra sobre la tarjeta
+              // base. `-right-6` sangra el degradado hasta el borde lateral.
+              className="absolute -right-6 top-14 bottom-44 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
               <motion.span
-                className="mr-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: 4 }}
               >
                 ›

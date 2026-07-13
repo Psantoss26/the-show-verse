@@ -24,7 +24,6 @@ import NextImage from "next/image";
 import {
   Play,
   Pause,
-  Volume2,
   Music2,
   Loader2,
   X,
@@ -39,7 +38,7 @@ import {
   markInWatchlist,
   getMovieDetails,
   getDetails,
-  getExternalIds,
+  resolveImdbId,
 } from "@/lib/api/tmdb";
 import {
   traktGetItemStatus,
@@ -64,6 +63,9 @@ import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import PreviewTrailerAudioButton, {
+  usePreviewTrailerAudio,
+} from "@/components/dashboard/PreviewTrailerAudioControl";
 
 import {
   buildImg,
@@ -323,6 +325,11 @@ function BackdropPreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  const {
+    muted: trailerMuted,
+    toggle: handleToggleTrailerAudio,
+    sync: syncTrailerAudio,
+  } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
 
   // Tráiler restringido (edad/embedding) o no disponible → ocultarlo (fallback
   // al backdrop) en lugar de mostrar el error de YouTube en la tarjeta.
@@ -443,6 +450,23 @@ function BackdropPreviewCard({
       return undefined;
     }
 
+    // imdb_id + nota IMDb resueltos AL PRINCIPIO y en PARALELO con los detalles:
+    // la nota se pinta EN CUANTO llega (setState incremental) y las promesas se
+    // reutilizan para premios (mismo imdb_id) y el objeto cacheado (misma nota).
+    const imdbIdPromise = resolveImdbId(item, mediaType);
+    const imdbRatingPromise = imdbIdPromise.then((imdb) =>
+      imdb
+        ? fetchImdbRatingByImdb(imdb)
+            .then((ds) => (typeof ds?.rating === "number" ? ds.rating : null))
+            .catch(() => null)
+        : null,
+    );
+    imdbRatingPromise.then((rating) => {
+      if (rating != null && !abort) {
+        setExtras((prev) => ({ ...prev, imdbRating: rating }));
+      }
+    });
+
     (async () => {
       try {
         let runtime = null;
@@ -475,29 +499,20 @@ function BackdropPreviewCard({
           }
         } catch {}
 
+        // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide).
         let awards = null;
-        let imdbRating = null;
         try {
-          let imdb = item?.imdb_id;
-          if (!imdb) {
-            const ext = await getExternalIds(mediaType, item.id);
-            imdb = ext?.imdb_id || null;
-          }
+          const imdb = await imdbIdPromise;
           if (imdb) {
-            const [omdb, imdbDataset] = await Promise.all([
-              fetchOmdbByImdb(imdb),
-              fetchImdbRatingByImdb(imdb),
-            ]);
+            const omdb = await fetchOmdbByImdb(imdb).catch(() => null);
             const rawAwards = omdb?.Awards;
             if (rawAwards && typeof rawAwards === "string" && rawAwards.trim()) {
               awards = formatDashboardAwards(rawAwards);
             }
-            if (typeof imdbDataset?.rating === "number") {
-              imdbRating = imdbDataset.rating;
-            }
           }
         } catch {}
 
+        const imdbRating = await imdbRatingPromise;
         const next = { runtime, awards, imdbRating, overview };
         movieExtrasCache.set(item.id, next);
         if (!abort) setExtras(next);
@@ -1047,22 +1062,11 @@ function BackdropPreviewCard({
                   title={`Trailer - ${title}`}
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen={false}
-                  onLoad={() => {
-                    try {
-                      const win = trailerIframeRef.current?.contentWindow;
-                      if (!win) return;
-                      const target = "https://www.youtube-nocookie.com";
-                      const cmd = (func, args = []) =>
-                        win.postMessage(
-                          JSON.stringify({ event: "command", func, args }),
-                          target,
-                        );
-                      setTimeout(() => {
-                        cmd("unMute");
-                        cmd("setVolume", [30]);
-                      }, 120);
-                    } catch {}
-                  }}
+                  onLoad={syncTrailerAudio}
+                />
+                <PreviewTrailerAudioButton
+                  muted={trailerMuted}
+                  onToggle={handleToggleTrailerAudio}
                 />
               </div>
             )}
@@ -1665,10 +1669,14 @@ export default function DashboardBackdropRow({
                 e.stopPropagation();
                 moveSlides(-1);
               }}
-              className="absolute inset-y-14 left-0 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
+              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
+              // bottom=pb) para CENTRAR la flecha sobre la tarjeta backdrop base
+              // (no sobre el hueco inferior de la preview). `-left-6` sangra el
+              // degradado 24px (= sm:px-6 de la página) hasta el borde lateral.
+              className="absolute -left-6 top-14 bottom-40 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
               <motion.span
-                className="ml-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -1689,10 +1697,13 @@ export default function DashboardBackdropRow({
                 e.stopPropagation();
                 moveSlides(1);
               }}
-              className="absolute inset-y-14 right-0 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:inset-y-16 sm:flex md:inset-y-44 group/nav"
+              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
+              // bottom=pb), igual que la flecha izquierda: centra sobre la tarjeta
+              // base. `-right-6` sangra el degradado hasta el borde lateral.
+              className="absolute -right-6 top-14 bottom-40 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
               <motion.span
-                className="mr-6 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: 4 }}
               >
                 ›

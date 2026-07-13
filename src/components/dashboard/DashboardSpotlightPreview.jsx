@@ -4,21 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Award,
-  BookmarkPlus,
-  Heart,
   Loader2,
   Music2,
   Pause,
   Play,
-  Volume2,
   X,
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
-import LiquidButton from "@/components/LiquidButton";
 import { getSpotlightBadge } from "@/lib/dashboard/media";
-
-const spotlightActionClass =
-  "!h-11 !w-11 sm:!h-12 sm:!w-12 [&_svg]:!h-6 [&_svg]:!w-6";
+import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
+import { formatCountShort } from "@/lib/details/formatters";
 
 export default function DashboardSpotlightPreview({
   item,
@@ -29,7 +26,10 @@ export default function DashboardSpotlightPreview({
   year,
   runtime,
   genres,
+  genreObjects = [],
+  status,
   tmdbRating,
+  tmdbVotes,
   imdbRating,
   awards,
   trailerVisible,
@@ -177,6 +177,16 @@ export default function DashboardSpotlightPreview({
 
   const hasTmdbRating = Boolean(tmdbRating && tmdbRating !== "–");
   const badge = getSpotlightBadge(item);
+  const normalizedGenres =
+    Array.isArray(genreObjects) && genreObjects.length
+      ? genreObjects
+      : typeof genres === "string" && genres.trim()
+        ? genres
+            .split("•")
+            .map((name) => name.trim())
+            .filter(Boolean)
+            .map((name) => ({ id: name, name }))
+        : [];
 
   return (
     <>
@@ -199,72 +209,30 @@ export default function DashboardSpotlightPreview({
           )}
 
           <motion.div
-            className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3"
+            className="mb-3 w-full sm:w-auto"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.12 }}
+            onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={onToggleTrailer}
-              disabled={trailerLoading}
-              aria-label={trailerVisible ? "Cerrar trailer" : "Ver trailer"}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:px-5 sm:text-base"
-            >
-              {trailerVisible ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Play className="h-5 w-5 fill-current" />
-              )}
-              <span>{trailerVisible ? "Cerrar" : "Ver trailer"}</span>
-            </button>
-
-            <LiquidButton
-              onClick={handleToggleSoundtrack}
-              loading={soundtrackLoading}
-              active={soundtrackOpen}
-              activeColor="yellow"
-              groupId="dashboard-spotlight-actions"
-              title={
-                soundtrackOpen ? "Cerrar soundtrack" : "Reproducir soundtrack"
-              }
-              aria-label={
-                soundtrackOpen ? "Cerrar soundtrack" : "Reproducir soundtrack"
-              }
-              className={spotlightActionClass}
-            >
-              {soundtrackPlaying ? <Pause /> : <Volume2 />}
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={onToggleFavorite}
-              loading={actionLoading}
-              active={favorite}
-              activeColor="red"
-              groupId="dashboard-spotlight-actions"
-              title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              aria-label={
-                favorite ? "Quitar de favoritos" : "Añadir a favoritos"
-              }
-              className={spotlightActionClass}
-            >
-              <Heart className={favorite ? "fill-current" : ""} />
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={onToggleWatchlist}
-              loading={actionLoading}
-              active={watchlist}
-              activeColor="blue"
-              groupId="dashboard-spotlight-actions"
-              title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              aria-label={
-                watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-              }
-              className={spotlightActionClass}
-            >
-              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-            </LiquidButton>
+            <DetailActionsRow
+              size="lg"
+              className="labeled-row"
+              showSeparator={false}
+              onTrailer={onToggleTrailer}
+              trailerAvailable
+              trailerLoading={trailerLoading}
+              trailerLabel="Ver trailer"
+              trailerPlaying={trailerVisible}
+              onSoundtrack={handleToggleSoundtrack}
+              soundtrackAvailable
+              favorite={favorite}
+              favoriteLoading={actionLoading}
+              onToggleFavorite={onToggleFavorite}
+              watchlist={watchlist}
+              watchlistLoading={actionLoading}
+              onToggleWatchlist={onToggleWatchlist}
+            />
           </motion.div>
 
           {awards && (
@@ -274,59 +242,38 @@ export default function DashboardSpotlightPreview({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.68rem] font-semibold text-zinc-200 sm:text-xs">
+          <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
             {badge && (
-              <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
+              <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
                 {badge}
               </span>
             )}
-            {(() => {
-              // Año y duración separados por "•" (mismo separador que FeaturedHero).
-              const parts = [];
-              if (year) parts.push(<span key="year">{year}</span>);
-              if (runtime) parts.push(<span key="runtime">{runtime}</span>);
-              return parts.reduce((acc, item, index) => {
-                if (index === 0) return [item];
-                return [
-                  ...acc,
-                  <span
-                    key={`sep-${index}`}
-                    className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                    aria-hidden="true"
-                  >
-                    •
-                  </span>,
-                  item,
-                ];
-              }, []);
-            })()}
+            <DetailsMetaGenresRow
+              yearIso={year}
+              displayRuntimeValue={runtime}
+              status={status}
+              genres={normalizedGenres}
+            />
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-200 sm:text-sm">
-            {genres && <span>{genres}</span>}
-            {hasTmdbRating && (
-              <span className="inline-flex items-center gap-1.5">
-                <OptimizedImage
-                  src="/logo-TMDb.png"
-                  alt="TMDb"
-                  decoding="async"
-                  className="h-3 w-auto"
-                />
-                <span className="font-bold">{tmdbRating}</span>
-              </span>
-            )}
-            {typeof imdbRating === "number" && (
-              <span className="inline-flex items-center gap-1.5">
-                <OptimizedImage
-                  src="/logo-IMDb.svg"
-                  alt="IMDb"
-                  decoding="async"
-                  className="h-4 w-auto"
-                />
-                <span className="font-bold">{imdbRating.toFixed(1)}</span>
-              </span>
-            )}
-          </div>
+          <DetailsRatingsBadges
+            tmdb={
+              hasTmdbRating
+                ? {
+                    value: tmdbRating,
+                    sub:
+                      typeof tmdbVotes === "number"
+                        ? formatCountShort(tmdbVotes)
+                        : null,
+                  }
+                : null
+            }
+            imdb={
+              typeof imdbRating === "number"
+                ? { value: imdbRating.toFixed(1), sub: null }
+                : null
+            }
+          />
 
           {error && (
             <p className="mt-2 line-clamp-1 text-xs text-red-300">{error}</p>
