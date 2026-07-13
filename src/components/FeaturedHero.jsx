@@ -1341,9 +1341,9 @@ function FeaturedSlide({
             {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
                 Contenedor relativo: el indicador "ahora sonando" se posiciona de
                 forma absoluta debajo para no desplazar la información. */}
-            <div className="relative mb-4 w-full sm:mb-6 sm:w-auto">
+            <div className="relative mb-4 w-full max-w-full sm:mb-6 sm:w-auto">
             <div
-              className="hero-reveal flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-start sm:gap-3"
+              className="hero-reveal flex flex-nowrap items-center justify-center gap-1.5 sm:justify-start sm:gap-3 w-full max-w-full"
               style={{ "--hero-delay": "130ms" }}
             >
               {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las
@@ -1353,12 +1353,14 @@ function FeaturedSlide({
                   corta la propagación al onClick del hero (que abre la ficha). */}
               <div className="min-w-0 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <DetailActionsRow
-                  size="lg"
+                  size={isMobile ? "md" : "lg"}
+                  className="labeled-row"
+                  mobileGapClass="gap-1.5"
                   showSeparator={false}
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
                   trailerLoading={trailerLoading}
-                  trailerLabel="Ver trailer"
+                  trailerLabel={isMobile ? null : "Ver trailer"}
                   trailerPlaying={showTrailer}
                 />
               </div>
@@ -1378,7 +1380,11 @@ function FeaturedSlide({
                 title={
                   soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
                 }
-                className={`shrink-0 !h-12 !w-12 [&_svg]:!h-6 [&_svg]:!w-6 ${
+                className={`shrink-0 ${
+                  isMobile
+                    ? "!h-10 !w-10 [&_svg]:!h-5 [&_svg]:!w-5"
+                    : "!h-12 !w-12 [&_svg]:!h-6 [&_svg]:!w-6"
+                } ${
                   soundtrackVisible ? "!bg-white !text-black" : ""
                 } ${
                   soundtrackPreferenceReady ? "" : "invisible pointer-events-none"
@@ -1393,8 +1399,9 @@ function FeaturedSlide({
                   control de "visto" lo aporta ya Trakt (no se duplica). */}
               <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                 <DetailActionsRow
-                  size="lg"
+                  size={isMobile ? "md" : "lg"}
                   className="labeled-row"
+                  mobileGapClass="gap-1.5"
                   showSeparator={mediaType === "tv"}
                   onEpisodeRatings={
                     mediaType === "tv" ? openEpisodeRatings : undefined
@@ -1456,62 +1463,111 @@ function FeaturedSlide({
             </div>
             </div>
 
-            {/* Premios (OMDb, texto esmeralda) + Puntuaciones TMDb·IMDb en la
-                MISMA línea, sobre los metadatos. El hueco se RESERVA con una
-                altura mínima fija para que la carga tardía de premios no
-                desplace el logo. Entra con la misma animación de la cascada
-                (hero-reveal, --hero-delay 140ms). */}
-            <div
-              className="hero-reveal mb-2 flex min-h-[1.25rem] flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:mb-2.5 sm:min-h-[1.5rem] sm:flex-nowrap sm:justify-start"
-              style={{ "--hero-delay": "140ms" }}
-            >
-              {extras.awards && (
-                <span
-                  key={extras.awards}
-                  className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm"
+            {isMobile ? (
+              <>
+                {/* Fila 1: Puntuaciones TMDb e IMDb */}
+                <div
+                  className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
+                  style={{ "--hero-delay": "140ms" }}
                 >
-                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="line-clamp-1">{extras.awards}</span>
-                </span>
-              )}
-              <DetailsRatingsBadges
-                tmdb={
-                  ratingOf(movie) !== "–"
-                    ? {
-                        value: ratingOf(movie),
-                        sub: null,
-                      }
-                    : null
-                }
-                imdb={
-                  typeof extras.imdbRating === "number"
-                    ? { value: extras.imdbRating.toFixed(1), sub: null }
-                    : null
-                }
-              />
-            </div>
+                  <DetailsRatingsBadges
+                    tmdb={
+                      ratingOf(movie) !== "–"
+                        ? {
+                            value: ratingOf(movie),
+                            sub: null,
+                          }
+                        : null
+                    }
+                    imdb={
+                      typeof extras.imdbRating === "number"
+                        ? { value: extras.imdbRating.toFixed(1), sub: null }
+                        : null
+                    }
+                  />
+                </div>
 
-            {/* Fila meta COMPARTIDA con DetailModal/DetailsClient y las vistas
-                previas (mismo componente y diseño): año · duración/temporadas ·
-                estado · géneros. Se conserva el badge del hero (Estreno / Mejor
-                valorado) delante, la animación de entrada (hero-reveal) y la
-                alineación (centro en móvil, izquierda en escritorio). */}
-            <div
-              className="hero-reveal mb-2 flex w-full max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 sm:mb-2.5 sm:flex-nowrap sm:justify-start"
-              style={{ "--hero-delay": "170ms" }}
-            >
-              {featuredBadge && (
-                <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.72rem] font-black uppercase tracking-wide text-black sm:text-[0.8rem]">
-                  {featuredBadge}
-                </span>
-              )}
-              <DetailsMetaGenresRow
-                yearIso={yearOf(movie)}
-                displayRuntimeValue={extras.runtime}
-                status={extras.status}
-                genres={genreObjects}
-              />
-            </div>
+                {/* Fila 2: Premios y nominaciones */}
+                {extras.awards && (
+                  <div
+                    className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
+                    style={{ "--hero-delay": "155ms" }}
+                  >
+                    <span
+                      key={extras.awards}
+                      className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md"
+                    >
+                      <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-1">{extras.awards}</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Fila 3: Año, duración, estado y género */}
+                <div
+                  className="hero-reveal mb-2 flex w-full max-w-full items-center justify-center"
+                  style={{ "--hero-delay": "170ms" }}
+                >
+                  <DetailsMetaGenresRow
+                    yearIso={yearOf(movie)}
+                    displayRuntimeValue={extras.runtime}
+                    status={extras.status}
+                    genres={genreObjects}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Premios + Puntuaciones en la misma línea en escritorio */}
+                <div
+                  className="hero-reveal mb-2.5 flex min-h-[1.5rem] flex-row flex-nowrap justify-start gap-x-4 items-center"
+                  style={{ "--hero-delay": "140ms" }}
+                >
+                  {extras.awards && (
+                    <span
+                      key={extras.awards}
+                      className="flex min-w-0 items-center gap-2 text-sm font-bold text-emerald-300 drop-shadow-md"
+                    >
+                      <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-1">{extras.awards}</span>
+                    </span>
+                  )}
+                  <DetailsRatingsBadges
+                    tmdb={
+                      ratingOf(movie) !== "–"
+                        ? {
+                            value: ratingOf(movie),
+                            sub: null,
+                          }
+                        : null
+                    }
+                    imdb={
+                      typeof extras.imdbRating === "number"
+                        ? { value: extras.imdbRating.toFixed(1), sub: null }
+                        : null
+                    }
+                  />
+                </div>
+
+                {/* Badge contextual + Metadatos en la misma línea en escritorio */}
+                <div
+                  className="hero-reveal mb-2.5 flex w-full max-w-full flex-row flex-nowrap justify-start gap-x-2 items-center"
+                  style={{ "--hero-delay": "170ms" }}
+                >
+                  {featuredBadge && (
+                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.8rem] font-black uppercase tracking-wide text-black">
+                      {featuredBadge}
+                    </span>
+                  )}
+                  <DetailsMetaGenresRow
+                    yearIso={yearOf(movie)}
+                    displayRuntimeValue={extras.runtime}
+                    status={extras.status}
+                    genres={genreObjects}
+                  />
+                </div>
+              </>
+            )}
 
             {overview && !isMobile && (
               <p
