@@ -505,6 +505,12 @@ const TITLE_MATCH_DESCRIPTOR_TOKENS = new Set([
   "movie", "music", "official", "original", "ost", "picture", "playlist",
   "score", "season", "seasons", "series", "songs", "sonora", "soundtrack",
   "soundtracks", "television", "temporada", "temporadas", "tv",
+  // Cadenas / estudios que suelen aparecer en el nombre del soundtrack junto al
+  // título (p. ej. "From (MGM+ Original Series)"): son descriptores, NO otro
+  // título. Se listan los inequívocos (se evitan palabras comunes tipo "fox").
+  "mgm", "epix", "hbo", "netflix", "amazon", "disney", "hulu", "showtime",
+  "starz", "peacock", "paramount", "bbc", "cbs", "nbc", "abc", "amc",
+  "marvel", "lucasfilm", "pixar", "lionsgate", "dreamworks",
 ]);
 
 const TITLE_MATCH_CONTEXTUAL_TOKENS = new Set([
@@ -890,10 +896,24 @@ function isTitleFallbackPlaylist(playlist, ctx) {
     norm(primaryTitle).replace(/\s+/g, "").length <= 3 ||
     sigTokens(primaryTitle).length === 0;
 
+  // La #1 LISTA del search del TÍTULO EXACTO es, por la relevancia de Spotify, la
+  // correcta para la serie/película. Es clave en títulos cortos como "From",
+  // donde las consultas con sufijo "soundtrack" no ayudan y la playlist correcta
+  // puede no llevar palabras explícitas de banda sonora en su nombre. Se confía en
+  // ella aunque falte ese contexto, SIEMPRE que coincida ESTRICTAMENTE con el
+  // título (lo que sigue evitando "From Dusk Till Dawn…") y no sea un bad-match.
+  // Para títulos de <=3 letras se mantiene la exigencia de contexto (más abajo)
+  // como salvaguarda ante palabras muy comunes.
+  const isTopPrimaryResult =
+    playlist.primaryTitleSearch === true &&
+    Number(playlist.searchRank ?? 999) === 1;
+
   if (!name || containsAny(name, BAD_MATCH_WORDS)) return false;
   if (totalTracks > 0 && totalTracks < 3) return false;
   if (!albumMatchesTitle({ name }, ctx)) return false;
-  if (!hasPlaylistSoundtrackContext(name, ctx)) return false;
+  if (!hasPlaylistSoundtrackContext(name, ctx) && !isTopPrimaryResult) {
+    return false;
+  }
   if (
     shortOrGenericTitle &&
     !/soundtrack|music|songs|playlist|score|ost|banda sonora/.test(name)
