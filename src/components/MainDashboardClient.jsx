@@ -3779,6 +3779,8 @@ function TopRatedHero({
 }) {
   const [activeTab, setActiveTab] = useState("movies");
   const { openDetailModal } = useDetailModal();
+  const { showHoverBackdrop, clearHoverBackdrop } =
+    useDashboardHoverBackdrop();
   const items = activeTab === "movies" ? movieItems : tvItems;
 
   if (
@@ -3914,6 +3916,19 @@ function TopRatedHero({
   // Sin `hydrated` en la key (remontaría el Swiper al hidratar y bloquearía el
   // primer desliz). Solo cambia con el tab y el layout.
   const heroKey = `hero-${activeTab}-${isMobile ? "m" : "d"}`;
+  const handleTopRatedTabChange = (tab) => {
+    clearHoverBackdrop();
+    setActiveTab(tab);
+  };
+
+  const handleTopRatedCardEnter = (movie) => {
+    if (isMobile) return;
+    showHoverBackdrop(movie);
+  };
+  const handleTopRatedCardLeave = (movie) => {
+    if (isMobile) return;
+    clearHoverBackdrop(movie);
+  };
 
   return (
     <motion.div
@@ -3938,7 +3953,7 @@ function TopRatedHero({
           <div className={dashboardSegmentGroupClass}>
             {movieItems?.length > 0 && (
               <button
-                onClick={() => setActiveTab("movies")}
+                onClick={() => handleTopRatedTabChange("movies")}
                 className={dashboardSegmentButtonClass(activeTab === "movies")}
               >
                 Películas
@@ -3946,7 +3961,7 @@ function TopRatedHero({
             )}
             {tvItems?.length > 0 && (
               <button
-                onClick={() => setActiveTab("series")}
+                onClick={() => handleTopRatedTabChange("series")}
                 className={dashboardSegmentButtonClass(activeTab === "series")}
               >
                 Series
@@ -3959,7 +3974,10 @@ function TopRatedHero({
       <div
         className="relative"
         onMouseEnter={() => setIsHoveredHero(true)}
-        onMouseLeave={() => setIsHoveredHero(false)}
+        onMouseLeave={() => {
+          setIsHoveredHero(false);
+          clearHoverBackdrop();
+        }}
       >
         <>
           <div>
@@ -4020,6 +4038,10 @@ function TopRatedHero({
                         <button
                           type="button"
                           className="block w-full cursor-pointer text-left"
+                          onMouseEnter={() => handleTopRatedCardEnter(movie)}
+                          onMouseLeave={() => handleTopRatedCardLeave(movie)}
+                          onFocus={() => handleTopRatedCardEnter(movie)}
+                          onBlur={() => handleTopRatedCardLeave(movie)}
                           onClick={() => openDetailModal?.(movie)}
                           aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
                         >
@@ -4034,6 +4056,10 @@ function TopRatedHero({
                       <button
                         type="button"
                         className="block w-full cursor-pointer text-left"
+                        onMouseEnter={() => handleTopRatedCardEnter(movie)}
+                        onMouseLeave={() => handleTopRatedCardLeave(movie)}
+                        onFocus={() => handleTopRatedCardEnter(movie)}
+                        onBlur={() => handleTopRatedCardLeave(movie)}
                         onClick={() => openDetailModal?.(movie)}
                         aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
                       >
