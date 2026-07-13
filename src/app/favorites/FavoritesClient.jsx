@@ -48,6 +48,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1866,6 +1867,11 @@ const FavoriteCard = memo(function FavoriteCard({
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
 
+  // Al pulsar la tarjeta se abre la ficha rápida (drawer desde la derecha) en vez
+  // de navegar. Sin provider, el <Link> navega con normalidad.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: type });
+
   // Determine which image mode to use based on viewMode and imageMode preference
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
 
@@ -1963,6 +1969,7 @@ const FavoriteCard = memo(function FavoriteCard({
         <Link
           href={href}
           prefetch={false}
+          onClick={onPreviewClick}
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-red-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -2012,7 +2019,7 @@ const FavoriteCard = memo(function FavoriteCard({
         }}
         layout={!isBackNav}
       >
-        <Link href={href} prefetch={false} className="block">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
             whileHover={{
@@ -2135,7 +2142,7 @@ const FavoriteCard = memo(function FavoriteCard({
         delay: shouldAnimate ? animDelay : 0,
       }}
     >
-      <Link href={href} prefetch={false} className="block">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
           onMouseEnter={handleHover}

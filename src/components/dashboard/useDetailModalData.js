@@ -35,6 +35,7 @@ import {
   fetchBestLogo,
   fetchBestPosterNoLang,
 } from "@/lib/dashboard/media";
+import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
 // Mapa estado (TMDb) -> etiqueta ES, espejo de `getStatusLabel` en DetailsClient.
 function statusLabelEs(status) {
@@ -176,26 +177,16 @@ const EMPTY_DATA = {
   showReleaseDate: null,
 };
 
-function providerFamilyKey(provider) {
-  if (provider?.isPlex) return "plex";
-  return String(provider?.provider_name || provider?.name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
 function mergeModalProviders(...lists) {
-  const byKey = new Map();
+  const merged = [];
 
   for (const list of lists) {
     for (const provider of Array.isArray(list) ? list : []) {
-      const key = providerFamilyKey(provider);
-      if (!key) continue;
-      byKey.set(key, { ...byKey.get(key), ...provider });
+      if (provider) merged.push(provider);
     }
   }
 
-  const providers = [...byKey.values()];
+  const providers = dedupeStreamingProviders(merged);
   const plexProvider = providers.find((provider) => provider?.isPlex);
   const regularProviders = providers.filter((provider) => !provider?.isPlex);
 
@@ -610,7 +601,7 @@ export function useDetailModalData(item) {
         const res = await fetch(`/api/streaming?${params.toString()}`);
         if (!res.ok || cancelled) return;
         const json = await res.json();
-        const providers = normalizeProviders(json?.providers, 6);
+        const providers = normalizeProviders(json?.providers, 10);
         if (!cancelled && providers.length) {
           setData((prev) => ({
             ...prev,

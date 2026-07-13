@@ -1,5 +1,6 @@
 // src/app/favorites/page.jsx
 import FavoritesClient from './FavoritesClient'
+import DetailModalProvider from '@/components/dashboard/DetailModalProvider'
 
 export const metadata = {
     title: 'Favoritos',
@@ -7,5 +8,10 @@ export const metadata = {
 }
 
 export default function FavoritesPage() {
-    return <FavoritesClient />
+    // Ficha rápida (DetailModal) como drawer desde la derecha al pulsar una tarjeta.
+    return (
+        <DetailModalProvider placement="right">
+            <FavoritesClient />
+        </DetailModalProvider>
+    )
 }

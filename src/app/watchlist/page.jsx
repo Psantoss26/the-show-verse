@@ -1,5 +1,6 @@
 // src/app/watchlist/page.jsx
 import WatchlistClient from './WatchlistClient'
+import DetailModalProvider from '@/components/dashboard/DetailModalProvider'
 
 export const metadata = {
     title: 'Pendientes',
@@ -7,5 +8,10 @@ export const metadata = {
 }
 
 export default function WatchlistPage() {
-    return <WatchlistClient />
+    // Ficha rápida (DetailModal) como drawer desde la derecha al pulsar una tarjeta.
+    return (
+        <DetailModalProvider placement="right">
+            <WatchlistClient />
+        </DetailModalProvider>
+    )
 }

@@ -104,13 +104,16 @@ export const GENRES = {
 /* --------- precargar una imagen --------- */
 export const imagePreloadCache = new Map();
 
-export function preloadImage(src) {
+export function preloadImage(src, options = {}) {
   if (!src) return Promise.resolve(false);
   if (imagePreloadCache.has(src)) return imagePreloadCache.get(src);
 
   const promise = new Promise((resolve) => {
     const img = new Image();
     img.decoding = "async";
+    if (options.fetchPriority) {
+      img.fetchPriority = options.fetchPriority;
+    }
     img.onload = async () => {
       try {
         if (typeof img.decode === "function") {

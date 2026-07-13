@@ -1,5 +1,6 @@
 // src/app/in-progress/page.jsx
 import InProgressClient from './InProgressClient'
+import DetailModalProvider from '@/components/dashboard/DetailModalProvider'
 
 export const metadata = {
     title: 'En progreso',
@@ -7,5 +8,10 @@ export const metadata = {
 }
 
 export default function InProgressPage() {
-    return <InProgressClient />
+    // Ficha rápida (DetailModal) como drawer desde la derecha al pulsar una tarjeta.
+    return (
+        <DetailModalProvider placement="right">
+            <InProgressClient />
+        </DetailModalProvider>
+    )
 }

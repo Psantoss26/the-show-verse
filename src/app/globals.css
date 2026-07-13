@@ -415,6 +415,17 @@ html {
   animation: sv-detail-route-panel-out 500ms linear both;
 }
 
+/* Drawer derecho (páginas de usuario): en vez de salir hacia abajo, la tarjeta se
+   AMPLÍA hacia dentro (crece desde el borde derecho) y se difumina, morfeando a la
+   ficha completa que aparece debajo. Mayor especificidad + orden posterior para
+   ganar a la regla base .is-running de arriba. */
+.sv-detail-route-transition.is-running.sv-detail-route-transition--right
+  .sv-detail-route-transition__panel {
+  transform-origin: right center;
+  will-change: transform, opacity, filter;
+  animation: sv-detail-route-panel-zoom 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .sv-detail-route-transition.is-revealing .sv-detail-route-transition__scrim {
   opacity: 0;
 }
@@ -427,6 +438,19 @@ html {
   100% {
     opacity: 0;
     transform: translate3d(0, 96px, 0) scale(0.988);
+  }
+}
+
+@keyframes sv-detail-route-panel-zoom {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(1.12);
+    filter: blur(16px);
   }
 }
 

@@ -17,6 +17,7 @@ import {
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -96,7 +97,6 @@ const scaleIn = {
 const INITIAL_VISIBLE_ROWS = 6;
 const ROW_REVEAL_BATCH_SIZE = 4;
 const EMPTY_ARRAY = [];
-const PREVIEW_CLOSE_DELAY_MS = 220;
 // Overrides de artwork vacíos y ESTABLES para los componentes compartidos de
 // MainDashboard (que esperan mapas por id). En series no propagamos overrides;
 // el artwork lo resuelven los propios componentes.
@@ -1600,7 +1600,7 @@ function Row({
             setHoveredId(null);
             setHoveredIndex(null);
             if (isTop10) clearHoverBackdrop();
-          }, PREVIEW_CLOSE_DELAY_MS);
+          }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
         }}
       >
         <Swiper
@@ -1708,7 +1708,7 @@ function Row({
                     hoverIntentRef.current += 1;
                     setHoveredId((prev) => (prev === itemKey ? null : prev));
                     if (!isTop10) setHoveredIndex(null);
-                  }, PREVIEW_CLOSE_DELAY_MS);
+                  }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                 }}
               >
                 <AnimatePresence initial={false} mode="popLayout">
@@ -1759,7 +1759,7 @@ function Row({
                                 prev === itemKey ? null : prev,
                               );
                               if (!isTop10) setHoveredIndex(null);
-                            }, PREVIEW_CLOSE_DELAY_MS);
+                            }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                           }}
                         />
                       ) : (
@@ -1847,7 +1847,7 @@ function Row({
                         closeTimeoutRef.current = null;
                         setHoveredIndex(null);
                         clearHoverBackdrop(s);
-                      }, PREVIEW_CLOSE_DELAY_MS);
+                      }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                     }}
                   >
                     <DashboardRankNumber

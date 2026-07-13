@@ -54,6 +54,7 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { formatCountShort } from "@/lib/details/formatters";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import OptimizedImage from "@/components/OptimizedImage";
 // Fila de acciones + fila meta/géneros + puntuaciones COMPARTIDAS con
@@ -88,7 +89,6 @@ import {
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
-const PREVIEW_CLOSE_DELAY_MS = 220;
 // Mismo tamaño de backdrop que las previews del resto del dashboard, para que
 // las imágenes ya cacheadas se reutilicen sin volver a descargar.
 const BACKDROP_SIZE = PREVIEW_BACKDROP_SIZE;
@@ -1438,7 +1438,7 @@ export default function DashboardBackdropRow({
     clearHoverCloseTimer();
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
       closePreview(itemKey);
-    }, PREVIEW_CLOSE_DELAY_MS);
+    }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
 
   const updateNav = (swiper) => {

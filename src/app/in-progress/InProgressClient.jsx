@@ -40,6 +40,7 @@ import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 
 // ----------------------------
 // HELPERS
@@ -748,6 +749,10 @@ const InProgressCard = memo(function InProgressCard({
   const title = item.title_es || item.title || "Sin título";
   const href =
     item.detailsHref || `/details/${itemType}/${item.tmdbId || item.id}`;
+  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
+  // la derecha). Sin provider, el <Link> navega con normalidad.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: itemType });
   const progressPct = getProgressPct(item);
   const colors = getProgressColor(progressPct);
   const nextEpCode = item.nextEpisode
@@ -775,6 +780,7 @@ const InProgressCard = memo(function InProgressCard({
         <Link
           href={href}
           prefetch={false}
+          onClick={onPreviewClick}
           className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -831,12 +837,12 @@ const InProgressCard = memo(function InProgressCard({
                 </motion.div>
               </div>
 
-              <div className="text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
-                <Clock className="w-3 h-3" /> {lastWatched}
+              <div className="text-xs text-zinc-300 flex items-center gap-1.5 font-semibold">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" /> {lastWatched}
                 {remaining > 0 && (
                   <>
                     <span className="text-zinc-600">•</span>
-                    <span className="text-zinc-500">
+                    <span className="text-zinc-300 font-semibold">
                       {remaining} eps restantes
                     </span>
                   </>
@@ -858,7 +864,7 @@ const InProgressCard = memo(function InProgressCard({
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
-        <Link href={href} prefetch={false} className="block">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-emerald-900/20 transition-all">
             <SmartPoster item={item} title={title} />
 
@@ -873,6 +879,11 @@ const InProgressCard = memo(function InProgressCard({
               <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                 {activeTab === "completed" ? (
                   <CheckCircle2 className="w-6 h-6 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
+                ) : nextEpCode ? (
+                  <div className="px-2.5 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+                    <Play className="w-2.5 h-2.5" fill="currentColor" />
+                    <span className="text-white drop-shadow-sm">{nextEpCode}</span>
+                  </div>
                 ) : (
                   <div />
                 )}
@@ -902,19 +913,12 @@ const InProgressCard = memo(function InProgressCard({
                     </h3>
 
                     <div className="space-y-0.5">
-                      {nextEpCode && (
-                        <p className="text-emerald-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
-                          <Play className="w-2.5 h-2.5" fill="currentColor" />
-                          {nextEpCode}
-                        </p>
-                      )}
-
                       <p className="text-sky-400 text-xs font-bold drop-shadow-md">
                         {episodeProgress.label}
                       </p>
 
-                      <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5" />
+                      <p className="text-zinc-300 text-xs font-semibold drop-shadow-md flex items-center gap-1.5 mt-0.5">
+                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
                         {lastWatched}
                       </p>
                     </div>
@@ -945,7 +949,7 @@ const InProgressCard = memo(function InProgressCard({
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
     >
-      <Link href={href} prefetch={false} className="block group">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
           onMouseEnter={(e) => {
@@ -995,12 +999,12 @@ const InProgressCard = memo(function InProgressCard({
 
             {/* Next episode badge - solid dark bg */}
             {nextEpCode && (
-              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
+              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
                 <Play
                   className="w-3 h-3 text-emerald-400"
                   fill="currentColor"
                 />
-                <span className="text-[11px] font-bold text-white">
+                <span className="text-white drop-shadow-sm">
                   {nextEpCode}
                 </span>
               </div>
@@ -1091,9 +1095,9 @@ const InProgressCard = memo(function InProgressCard({
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3 text-zinc-600" />
-                <span className="text-[10px] text-zinc-500">{lastWatched}</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="text-xs text-zinc-300 font-semibold">{lastWatched}</span>
               </div>
             </div>
           </div>

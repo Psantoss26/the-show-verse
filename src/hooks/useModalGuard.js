@@ -18,9 +18,12 @@ export default function useModalGuard({
   open = true,
   onClose,
   closeOnEsc = true,
+  // Si es false NO se bloquea el scroll de fondo (p. ej. el drawer derecho de las
+  // páginas de usuario, que permite seguir navegando por debajo). Esc sigue activo.
+  lockScroll = true,
 } = {}) {
   // Debe llamarse SIEMPRE (regla de hooks); internamente solo bloquea si `open`.
-  useBodyScrollLock(open);
+  useBodyScrollLock(open && lockScroll);
 
   useEffect(() => {
     if (!open || !closeOnEsc || typeof onClose !== "function") return undefined;

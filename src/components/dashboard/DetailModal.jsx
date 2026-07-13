@@ -93,6 +93,10 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 // Sección de pestañas (Detalles/Producción/Sinopsis) compartida con la
 // ficha completa: renderiza EXACTAMENTE las mismas tarjetas que DetailsClient.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
+import {
+  createPlatformItem,
+  dedupeStreamingProviders,
+} from "@/lib/streaming/providers";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
 import {
   traktAddComment,
@@ -144,7 +148,7 @@ function waitForDetailsRoot(maxMs = 1800) {
   });
 }
 
-function startFullDetailsTransition(panelElement) {
+function startFullDetailsTransition(panelElement, variant = "center") {
   if (typeof document === "undefined" || !panelElement) return null;
 
   document
@@ -154,6 +158,11 @@ function startFullDetailsTransition(panelElement) {
   const rect = panelElement.getBoundingClientRect();
   const layer = document.createElement("div");
   layer.className = "sv-detail-route-transition";
+  // El drawer derecho no sale hacia abajo: la tarjeta se AMPLÍA hacia dentro y se
+  // difumina para morfear a la ficha completa (ver CSS --right).
+  if (variant === "right") {
+    layer.classList.add("sv-detail-route-transition--right");
+  }
   layer.dataset.detailsRouteTransition = "true";
   layer.setAttribute("aria-hidden", "true");
 
@@ -199,72 +208,6 @@ function startFullDetailsTransition(panelElement) {
   };
 
   return { reveal, cleanup };
-}
-
-// Resuelve la URL del logo de una plataforma: rutas de TMDb -> buildImg;
-// URLs absolutas o assets locales (/logo-*) se usan tal cual.
-function providerLogoSrc(provider) {
-  const lp = provider?.logo_path || provider?.logo || null;
-  if (!lp) return null;
-  if (/^https?:\/\//.test(lp)) return lp;
-  if (lp.startsWith("/logo") || lp.startsWith("/_next")) return lp;
-  return buildImg(lp, "w45");
-}
-
-function resolvePlexProviderHref(provider, { mediaType, title }) {
-  const url = provider?.url;
-  if (!provider?.isPlex || !url || typeof url !== "object") return null;
-
-  let rawSlug = "";
-  if (url.slug) {
-    const slugMatch = String(url.slug).match(/plex:\/\/(?:movie|show)\/(.+)$/i);
-    rawSlug = slugMatch ? slugMatch[1] : String(url.slug);
-  } else if (url.universal) {
-    const universalMatch = String(url.universal).match(
-      /watch\.plex\.tv\/(?:movie|show)\/(.+)$/i,
-    );
-    rawSlug = universalMatch ? universalMatch[1] : "";
-  }
-
-  const webUrl = url.web || "";
-  if (rawSlug) {
-    const params = new URLSearchParams({
-      slug: rawSlug,
-      type: mediaType === "tv" ? "show" : "movie",
-      webUrl,
-      title: title || "",
-    });
-    return `/api/plex/open?${params.toString()}`;
-  }
-
-  return webUrl || url.universal || null;
-}
-
-function createModalStreamingProvider(provider, { mediaType, title }) {
-  const icon = providerLogoSrc(provider);
-  if (!icon) return null;
-
-  const providerName =
-    provider?.provider_name || provider?.name || provider?.title || "Plataforma";
-  const isPlexProvider = provider?.isPlex === true;
-  const href = isPlexProvider
-    ? resolvePlexProviderHref(provider, { mediaType, title })
-    : typeof provider?.url === "string"
-      ? provider.url
-      : null;
-
-  if (!href) return null;
-
-  return {
-    key: provider?.provider_id ?? `${providerName}-${href}`,
-    title: providerName,
-    subtitle: isPlexProvider ? "Disponible en tu servidor local" : null,
-    href,
-    icon,
-    target: isPlexProvider ? "_self" : "_blank",
-    rel: isPlexProvider ? undefined : "noopener noreferrer",
-    isPlexProvider,
-  };
 }
 
 function normalizeUrl(url) {
@@ -363,6 +306,41 @@ const panelVariants = {
     scale: 0.985,
     transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
   },
+};
+
+// Placement "right" (páginas de usuario): drawer anclado al borde derecho que
+// entra deslizándose desde la derecha hacia el centro, con el mismo ancho. Se
+// anima solo `x` (transform en GPU); ease-out sin overshoot para que no asome
+// hueco tras el borde derecho.
+// `custom` = switching: true cuando se cambia de un título a otro con el drawer YA
+// abierto. En ese caso NO se desliza (dejaría ver el fondo un instante): se hace un
+// fundido cruzado en el sitio entre la ficha saliente y la entrante. En la apertura
+// inicial (switching false) sí entra deslizando desde el borde derecho.
+const panelVariantsRight = {
+  hidden: (switching) =>
+    switching ? { opacity: 0 } : { opacity: 0, x: "100%" },
+  visible: (switching) => ({
+    opacity: 1,
+    x: 0,
+    transition: switching
+      ? { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
+      : { duration: 0.44, ease: [0.22, 1, 0.36, 1] },
+  }),
+  navigate: {
+    // Igual que en el centrado: el panel real se oculta y el movimiento a la
+    // ficha completa lo hace el clon inerte.
+    opacity: 0,
+    x: 0,
+    transition: { duration: 0 },
+  },
+  exit: (switching) =>
+    switching
+      ? { opacity: 0, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }
+      : {
+          opacity: 0,
+          x: "100%",
+          transition: { duration: 0.26, ease: [0.4, 0, 1, 1] },
+        },
 };
 
 /* ============================== SUBCOMPONENTES ============================== */
@@ -553,7 +531,17 @@ const MODAL_ARROW_PROPS = {
 };
 
 /* ================================== MODAL ================================== */
-export default function DetailModal({ item, onClose }) {
+export default function DetailModal({
+  item,
+  onClose,
+  placement = "center",
+  // true cuando este panel entra por un CAMBIO de título (drawer ya abierto):
+  // en ese caso la entrada es un fundido cruzado sin transform, así que el
+  // backdrop-blur puede ir activo desde el primer frame (sin coste de recalcular
+  // el desenfoque por transform) y no "aparece" al terminar la animación.
+  switching = false,
+}) {
+  const isRightPlacement = placement === "right";
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
   const { session, account } = useAuth();
@@ -634,7 +622,12 @@ export default function DetailModal({ item, onClose }) {
   // entrada: durante la entrada el panel se transforma (y/scale) y tener el
   // backdrop-filter activo obligaría a recalcular el desenfoque en cada frame
   // (muy lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
-  const [panelSettled, setPanelSettled] = useState(false);
+  // EXCEPCIÓN: al CAMBIAR de título en el drawer derecho la entrada es un fundido
+  // cruzado (sin transform), así que el blur va activo desde el inicio para que no
+  // "aparezca" a mitad de la transición.
+  const [panelSettled, setPanelSettled] = useState(
+    () => isRightPlacement && switching,
+  );
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [officialSiteState, setOfficialSiteState] = useState({
     itemKey: "",
@@ -1307,7 +1300,10 @@ export default function DetailModal({ item, onClose }) {
       return;
     }
 
-    const routeTransition = startFullDetailsTransition(panelRef.current);
+    const routeTransition = startFullDetailsTransition(
+      panelRef.current,
+      isRightPlacement ? "right" : "center",
+    );
     setNavigatingToFullDetails(true);
 
     if (routeTransition) {
@@ -1348,11 +1344,16 @@ export default function DetailModal({ item, onClose }) {
 
   const streamingProviders = useMemo(() => {
     const providers = Array.isArray(data.providers) ? data.providers : [];
-    return providers
+    return dedupeStreamingProviders(providers)
+      .slice(0, 6)
       .map((provider) =>
-        createModalStreamingProvider(provider, { mediaType, title }),
+        createPlatformItem(provider, {
+          endpointType: mediaType,
+          justwatchUrl: null,
+          title,
+        }),
       )
-      .filter(Boolean);
+      .filter((provider) => provider.icon && provider.hasValidLink);
   }, [data.providers, mediaType, title]);
   const hasProviders = streamingProviders.length > 0;
 
@@ -1598,28 +1599,36 @@ export default function DetailModal({ item, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex justify-center"
+      className={`fixed inset-0 z-[9999] flex ${
+        isRightPlacement
+          ? "justify-end pointer-events-none"
+          : "justify-center"
+      }`}
       role="dialog"
-      aria-modal="true"
+      aria-modal={isRightPlacement ? undefined : "true"}
       aria-label={title || "Ficha rápida"}
     >
       {/* Backdrop difuminado — clic fuera cierra. Al ir a la ficha completa el
           modal real se oculta y la transición la asume una capa temporal sin
-          backdrop-filter, para que el blur no pueda filtrarse bajo la ruta nueva. */}
-      <motion.div
-        variants={backdropVariants}
-        initial="hidden"
-        animate={navigatingToFullDetails ? "navigate" : "visible"}
-        exit="exit"
-        className="fixed inset-0 bg-black/70 backdrop-blur-xl"
-        onClick={navigatingToFullDetails ? undefined : onClose}
-      />
+          backdrop-filter, para que el blur no pueda filtrarse bajo la ruta nueva.
+          En el drawer derecho NO hay backdrop: se ve y se puede usar la página de
+          fondo (scroll + pulsar otro título). */}
+      {!isRightPlacement && (
+        <motion.div
+          variants={backdropVariants}
+          initial="hidden"
+          animate={navigatingToFullDetails ? "navigate" : "visible"}
+          exit="exit"
+          className="fixed inset-0 bg-black/70 backdrop-blur-xl"
+          onClick={navigatingToFullDetails ? undefined : onClose}
+        />
+      )}
 
       {/* Panel ancho anclado al borde inferior, esquinas superiores redondeadas.
           La transición a la ficha completa anima un clon inerte de este panel. */}
       <motion.div
         ref={panelRef}
-        variants={panelVariants}
+        variants={isRightPlacement ? panelVariantsRight : panelVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
@@ -1628,9 +1637,11 @@ export default function DetailModal({ item, onClose }) {
         }}
         onClick={(e) => e.stopPropagation()}
         style={{ willChange: "transform, opacity" }}
-        className={`relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
-          panelSettled ? "backdrop-blur-3xl" : ""
-        }`}
+        className={`relative z-10 flex w-[95vw] max-w-[1080px] flex-col overflow-hidden bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+          isRightPlacement
+            ? "h-full rounded-l-2xl pointer-events-auto"
+            : "mt-[4vh] h-[96vh] rounded-t-2xl"
+        } ${panelSettled ? "backdrop-blur-3xl" : ""}`}
       >
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
           {/* Botón superior izquierdo: cierra el modal */}

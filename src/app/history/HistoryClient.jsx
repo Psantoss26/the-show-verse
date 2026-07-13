@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 
@@ -1515,6 +1516,13 @@ const HistoryItemCard = memo(function HistoryItemCard({
 
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
+  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
+  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(entry, {
+    previewId: getTmdbId(entry),
+    mediaType: type === "movie" ? "movie" : "tv",
+  });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
   const [posterSrc, setPosterSrc] = useState(null);
@@ -1743,6 +1751,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       <Link
         href={href}
         prefetch
+        onClick={onPreviewClick}
         className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
@@ -1772,6 +1781,13 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const groupCount = isGroup ? entry._group.length : 0;
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
+  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
+  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(entry, {
+    previewId: getTmdbId(entry),
+    mediaType: type === "movie" ? "movie" : "tv",
+  });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -1946,7 +1962,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       }}
       layout={!isBackNav}
     >
-      <Link href={href} prefetch className="block">
+      <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}
       </Link>
     </motion.div>
@@ -1977,6 +1993,13 @@ const HistoryGridCard = memo(function HistoryGridCard({
 
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
+  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
+  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(entry, {
+    previewId: getTmdbId(entry),
+    mediaType: type === "movie" ? "movie" : "tv",
+  });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -2198,7 +2221,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
-      <Link href={href} prefetch className="block">
+      <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}
       </Link>
     </motion.div>

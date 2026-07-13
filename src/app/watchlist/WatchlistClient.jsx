@@ -44,6 +44,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 
 // ================== UTILS & CACHE ==================
 
@@ -1584,6 +1585,11 @@ const WatchlistCard = memo(function WatchlistCard({
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
 
+  // Al pulsar la tarjeta se abre la ficha rápida (drawer desde la derecha) en vez
+  // de navegar. Sin provider, el <Link> navega con normalidad.
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: type });
+
   // Determine which image mode to use based on viewMode and imageMode preference
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
 
@@ -1678,6 +1684,7 @@ const WatchlistCard = memo(function WatchlistCard({
         <Link
           href={href}
           prefetch={false}
+          onClick={onPreviewClick}
           className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
@@ -1726,7 +1733,7 @@ const WatchlistCard = memo(function WatchlistCard({
         }}
         layout={!isBackNav}
       >
-        <Link href={href} prefetch={false} className="block">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
             className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300`}
             whileHover={{
@@ -1841,7 +1848,7 @@ const WatchlistCard = memo(function WatchlistCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
     >
-      <Link href={href} prefetch={false} className="block">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
           onMouseEnter={handleHover}
