@@ -176,6 +176,45 @@ const EMPTY_DATA = {
   showReleaseDate: null,
 };
 
+function providerFamilyKey(provider) {
+  if (provider?.isPlex) return "plex";
+  return String(provider?.provider_name || provider?.name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function mergeModalProviders(...lists) {
+  const byKey = new Map();
+
+  for (const list of lists) {
+    for (const provider of Array.isArray(list) ? list : []) {
+      const key = providerFamilyKey(provider);
+      if (!key) continue;
+      byKey.set(key, { ...byKey.get(key), ...provider });
+    }
+  }
+
+  const providers = [...byKey.values()];
+  const plexProvider = providers.find((provider) => provider?.isPlex);
+  const regularProviders = providers.filter((provider) => !provider?.isPlex);
+
+  if (!plexProvider) return regularProviders.slice(0, 6);
+  return [...regularProviders.slice(0, 5), plexProvider];
+}
+
+function buildPlexProvider(plexUrl) {
+  if (!plexUrl) return null;
+  return {
+    provider_id: "plex",
+    provider_name: "Plex",
+    name: "Plex",
+    logo_path: "/logo-Plex.png",
+    url: plexUrl,
+    isPlex: true,
+  };
+}
+
 // Normaliza la respuesta de /api/streaming (JustWatch) a la forma mínima que
 // consume la ficha rápida: { name, logo_path, url }. Dedupe por nombre y recorta
 // a los primeros ~6. `logo_path` viene como ruta de TMDb (p. ej. "/abc.jpg").
@@ -189,7 +228,13 @@ function normalizeProviders(list, max = 6) {
     const key = String(name).toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ name, logo_path: p?.logo_path || p?.logo || null, url });
+    out.push({
+      provider_id: p?.provider_id ?? name,
+      provider_name: name,
+      name,
+      logo_path: p?.logo_path || p?.logo || null,
+      url,
+    });
     if (out.length >= max) break;
   }
   return out;
@@ -567,10 +612,60 @@ export function useDetailModalData(item) {
         const json = await res.json();
         const providers = normalizeProviders(json?.providers, 6);
         if (!cancelled && providers.length) {
-          setData((prev) => ({ ...prev, providers }));
+          setData((prev) => ({
+            ...prev,
+            providers: mergeModalProviders(providers, prev.providers),
+          }));
         }
       } catch {
         // sin plataformas: no se muestra la fila
+      }
+    })();
+
+    // Plex local: mismo endpoint que DetailsClient. Si está disponible, se
+    // combina con JustWatch reservándole hueco para que no desaparezca si hay
+    // muchos providers externos.
+    (async () => {
+      try {
+        const streamTitle = (item.title || item.name || "").trim();
+        if (!streamTitle) return;
+        const params = new URLSearchParams({
+          title: streamTitle,
+          type: mediaType === "tv" ? "tv" : "movie",
+          tmdbId: String(id),
+        });
+        const y = yearOf(item);
+        if (y) params.append("year", String(y));
+        if (item.imdb_id) params.append("imdbId", item.imdb_id);
+
+        const res = await fetch(`/api/plex?${params.toString()}`);
+        if (!res.ok || cancelled) return;
+        const result = await res.json();
+        if (!result?.available) return;
+
+        const plexProvider = buildPlexProvider({
+          web: result.plexUrl || null,
+          mobile: result.plexMobileUrl || null,
+          mobileAlt: result.plexMobileAltUrl || null,
+          mobileRaw: result.plexMobileRawUrl || null,
+          play: result.plexPlayUrl || null,
+          playLegacy: result.plexPlayLegacyUrl || null,
+          playRaw: result.plexPlayRawUrl || null,
+          androidIntent: result.plexAndroidIntentUrl || null,
+          androidIntentPlay: result.plexAndroidIntentPlayUrl || null,
+          universal: result.plexUniversalUrl || null,
+          slug: result.plexSlugUrl || null,
+          androidSlugIntent: result.plexAndroidSlugIntentUrl || null,
+        });
+
+        if (!cancelled && plexProvider) {
+          setData((prev) => ({
+            ...prev,
+            providers: mergeModalProviders(prev.providers, [plexProvider]),
+          }));
+        }
+      } catch {
+        // Plex es best-effort: si no está conectado/disponible, se omite.
       }
     })();
 

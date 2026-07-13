@@ -211,6 +211,62 @@ function providerLogoSrc(provider) {
   return buildImg(lp, "w45");
 }
 
+function resolvePlexProviderHref(provider, { mediaType, title }) {
+  const url = provider?.url;
+  if (!provider?.isPlex || !url || typeof url !== "object") return null;
+
+  let rawSlug = "";
+  if (url.slug) {
+    const slugMatch = String(url.slug).match(/plex:\/\/(?:movie|show)\/(.+)$/i);
+    rawSlug = slugMatch ? slugMatch[1] : String(url.slug);
+  } else if (url.universal) {
+    const universalMatch = String(url.universal).match(
+      /watch\.plex\.tv\/(?:movie|show)\/(.+)$/i,
+    );
+    rawSlug = universalMatch ? universalMatch[1] : "";
+  }
+
+  const webUrl = url.web || "";
+  if (rawSlug) {
+    const params = new URLSearchParams({
+      slug: rawSlug,
+      type: mediaType === "tv" ? "show" : "movie",
+      webUrl,
+      title: title || "",
+    });
+    return `/api/plex/open?${params.toString()}`;
+  }
+
+  return webUrl || url.universal || null;
+}
+
+function createModalStreamingProvider(provider, { mediaType, title }) {
+  const icon = providerLogoSrc(provider);
+  if (!icon) return null;
+
+  const providerName =
+    provider?.provider_name || provider?.name || provider?.title || "Plataforma";
+  const isPlexProvider = provider?.isPlex === true;
+  const href = isPlexProvider
+    ? resolvePlexProviderHref(provider, { mediaType, title })
+    : typeof provider?.url === "string"
+      ? provider.url
+      : null;
+
+  if (!href) return null;
+
+  return {
+    key: provider?.provider_id ?? `${providerName}-${href}`,
+    title: providerName,
+    subtitle: isPlexProvider ? "Disponible en tu servidor local" : null,
+    href,
+    icon,
+    target: isPlexProvider ? "_self" : "_blank",
+    rel: isPlexProvider ? undefined : "noopener noreferrer",
+    isPlexProvider,
+  };
+}
+
 function normalizeUrl(url) {
   if (!url) return null;
   const value = String(url).trim();
@@ -1287,18 +1343,11 @@ export default function DetailModal({ item, onClose }) {
   const streamingProviders = useMemo(() => {
     const providers = Array.isArray(data.providers) ? data.providers : [];
     return providers
-      .map((provider) => {
-        const icon = providerLogoSrc(provider);
-        if (!icon || !provider?.url || !provider?.name) return null;
-        return {
-          key: `${provider.name}-${provider.url}`,
-          title: `Ver en ${provider.name}`,
-          href: provider.url,
-          icon,
-        };
-      })
+      .map((provider) =>
+        createModalStreamingProvider(provider, { mediaType, title }),
+      )
       .filter(Boolean);
-  }, [data.providers]);
+  }, [data.providers, mediaType, title]);
   const hasProviders = streamingProviders.length > 0;
 
   const titleQuery = title.trim();
@@ -1816,16 +1865,20 @@ export default function DetailModal({ item, onClose }) {
                     <a
                       key={prov.key}
                       href={prov.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={prov.title}
-                      className="transition-transform duration-300 hover:scale-110 active:scale-95 shrink-0"
+                      target={prov.target}
+                      rel={prov.rel}
+                      title={prov.subtitle || prov.title}
+                      aria-label={`Abrir ${prov.title}`}
+                      className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
                     >
                       <img
                         src={prov.icon}
-                        alt={prov.title}
+                        alt=""
                         className="h-11 w-11 rounded-xl object-contain shadow-lg"
                       />
+                      {prov.isPlexProvider && (
+                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
+                      )}
                     </a>
                   ))}
                 </div>
@@ -1980,6 +2033,7 @@ export default function DetailModal({ item, onClose }) {
                 overview={data.overview}
                 awards={data.awards}
                 showAwardsTab={false}
+                platforms={streamingProviders}
               />
             </motion.div>
 

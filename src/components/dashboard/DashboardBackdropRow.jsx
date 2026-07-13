@@ -62,6 +62,7 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
@@ -332,8 +333,9 @@ function BackdropPreviewCard({
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
 
   // Tráiler restringido (edad/embedding) o no disponible → ocultarlo (fallback
-  // al backdrop) en lugar de mostrar el error de YouTube en la tarjeta.
-  useTrailerAutoDismiss({
+  // al backdrop). Hasta que `trailerPlaying` sea true el backdrop cubre el iframe,
+  // así el mensaje de "no disponible" de YouTube nunca llega a verse.
+  const { playing: trailerPlaying } = useTrailerAutoDismiss({
     open: showTrailer,
     iframeRef: trailerIframeRef,
     videoKey: trailer?.key,
@@ -1027,12 +1029,14 @@ function BackdropPreviewCard({
           </div>
         )}
 
-        {!showTrailer && bgSrc && (
+        {bgSrc && (
           <motion.div
             initial={{ scale: 1 }}
             animate={{ scale: 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
-            className="absolute inset-0 h-full w-full"
+            className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-300 ${
+              showTrailer ? "z-[5]" : ""
+            } ${showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"}`}
           >
             <NextImage
               key={bgSrc}
@@ -1064,16 +1068,18 @@ function BackdropPreviewCard({
                   allowFullScreen={false}
                   onLoad={syncTrailerAudio}
                 />
-                <PreviewTrailerAudioButton
-                  muted={trailerMuted}
-                  onToggle={handleToggleTrailerAudio}
-                />
+                {trailerPlaying && (
+                  <PreviewTrailerAudioButton
+                    muted={trailerMuted}
+                    onToggle={handleToggleTrailerAudio}
+                  />
+                )}
               </div>
             )}
           </>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
       </div>
 
       {/* Panel de info: acciones · metadatos */}
@@ -1345,6 +1351,8 @@ export default function DashboardBackdropRow({
   labelText,
 }) {
   const { openDetailModal } = useDetailModal();
+  const { showHoverBackdrop, clearHoverBackdrop } =
+    useDashboardHoverBackdrop();
   const revealProps = useScrollRevealProps();
 
   const swiperRef = useRef(null);
@@ -1365,8 +1373,9 @@ export default function DashboardBackdropRow({
       if (hoverCloseTimeoutRef.current) {
         clearTimeout(hoverCloseTimeoutRef.current);
       }
+      clearHoverBackdrop();
     };
-  }, []);
+  }, [clearHoverBackdrop]);
 
   useEffect(() => {
     hoveredIdRef.current = hoveredId;
@@ -1377,6 +1386,9 @@ export default function DashboardBackdropRow({
   const sectionLabel = deriveSectionLabel(title, labelText);
   if (displayItems.length === 0) return null;
 
+  const getDisplayItemKey = (item) =>
+    item?.id ? `${getMediaTypeForItem(item)}:${item.id}` : "";
+
   const clearHoverCloseTimer = () => {
     if (hoverCloseTimeoutRef.current) {
       clearTimeout(hoverCloseTimeoutRef.current);
@@ -1386,6 +1398,7 @@ export default function DashboardBackdropRow({
 
   const openPreview = (itemKey, index) => {
     clearHoverCloseTimer();
+    const item = displayItems[index];
     const prev = hoveredIdRef.current;
     if (prev && prev !== itemKey) {
       setAnimatingOutId(prev);
@@ -1395,14 +1408,17 @@ export default function DashboardBackdropRow({
     hoveredIdRef.current = itemKey;
     setHoveredId(itemKey);
     if (typeof index === "number") setHoveredIndex(index);
+    showHoverBackdrop(item);
   };
 
   const closePreview = (itemKey) => {
     if (hoveredIdRef.current !== itemKey) return;
+    const item = displayItems.find((entry) => getDisplayItemKey(entry) === itemKey);
     hoveredIdRef.current = null;
     setAnimatingOutId(itemKey);
     setHoveredId(null);
     setHoveredIndex(null);
+    clearHoverBackdrop(item);
   };
 
   const handleMouseEnterItem = (itemKey, index) => {
@@ -1524,6 +1540,7 @@ export default function DashboardBackdropRow({
           setIsHoveredRow(false);
           const currentHoveredId = hoveredIdRef.current;
           if (currentHoveredId) handleMouseLeaveItem(currentHoveredId);
+          clearHoverBackdrop();
         }}
       >
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
@@ -1565,7 +1582,7 @@ export default function DashboardBackdropRow({
             breakpoints={breakpoints}
           >
             {displayItems.map((item, i) => {
-              const itemKey = `${getMediaTypeForItem(item)}:${item.id}`;
+              const itemKey = getDisplayItemKey(item);
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = animatingOutId === itemKey;
               const backdropOverride = backdropOverrides[item.id];

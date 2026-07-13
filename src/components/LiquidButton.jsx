@@ -622,7 +622,7 @@ export default function LiquidButton({
           <Loader2 className="w-6 h-6 animate-spin" />
         ) : playsCount > 0 ? (
           <span
-            className={`font-black leading-none ${
+            className={`font-black leading-none translate-y-[0.05em] ${
               String(playsCount).length === 1
                 ? "text-2xl"
                 : "text-xl tracking-tighter"
@@ -645,10 +645,10 @@ export default function LiquidButton({
                   ? "text-xl tracking-tight"
                   : "text-2xl";
             return (
-              <div className="flex items-baseline leading-none gap-[1px]">
-                <span className={`font-black ${fontSizeClass} drop-shadow-md`}>
-                  {numberPart}
-                </span>
+              <div
+                className={`flex items-baseline leading-none gap-[1px] translate-y-[0.05em] ${fontSizeClass}`}
+              >
+                <span className="font-black drop-shadow-md">{numberPart}</span>
                 <span className="font-bold text-xs text-white drop-shadow-sm">
                   %
                 </span>

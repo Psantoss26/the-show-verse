@@ -511,6 +511,19 @@ const TITLE_MATCH_CONTEXTUAL_TOKENS = new Set([
   "chapter", "episode", "part", "pt", "vol", "volume",
 ]);
 
+// Tokens que marcan de forma FIABLE el inicio de la "cola" de descriptores del
+// nombre del álbum (a partir de aquí lo que venga es descriptor: compositor,
+// cadena, edición…). Se EXCLUYEN palabras ambiguas que también pueden formar
+// parte de un título ("from", "music", "original", "the", "movie", "film"…),
+// para no partir títulos como "The Sound of Music" o "From".
+const SOUNDTRACK_TAIL_TOKENS = new Set([
+  "soundtrack", "soundtracks", "score", "ost", "motion", "picture",
+  "banda", "sonora", "colonna", "bande", "originale", "filmmusik", "trilha",
+  "series", "season", "seasons", "temporada", "temporadas",
+  "volume", "vol", "deluxe", "expanded", "complete", "definitive",
+  "anniversary", "remastered", "remaster", "collection", "selections",
+]);
+
 function hasStrongCanonicalTitleContext(text) {
   return (
     /music from .*motion picture/.test(text) ||
@@ -538,29 +551,55 @@ function hasStrictTitlePhrase(text, title, allTitles = []) {
     textTokens.some((token) => TITLE_MATCH_DESCRIPTOR_TOKENS.has(token));
   const strongCanonicalContext = hasStrongCanonicalTitleContext(text);
 
+  // Inicio de la COLA de descriptores del álbum (primer token descriptor fiable).
+  // Todo lo que esté antes es la "región del título"; lo que esté a partir de aquí
+  // es la cola (soundtrack, compositor, cadena, edición…).
+  let tailStart = textTokens.length;
+  for (let i = 0; i < textTokens.length; i += 1) {
+    if (SOUNDTRACK_TAIL_TOKENS.has(textTokens[i])) {
+      tailStart = i;
+      break;
+    }
+  }
+
   return textTokens.some((_, index) => {
+    if (index + titleTokens.length > textTokens.length) return false;
     const matches = titleTokens.every(
       (token, offset) => textTokens[index + offset] === token,
     );
     if (!matches) return false;
 
-    const extraTokens = [
-      ...textTokens.slice(0, index),
-      ...textTokens.slice(index + titleTokens.length),
-    ];
+    const phraseStart = index;
+    const phraseEnd = index + titleTokens.length; // exclusivo
 
-    return extraTokens.every((token) => {
-      if (!token) return true;
-      if (/^\d+$/.test(token)) return true;
-      if (GENERIC_WORDS.has(token)) return true;
-      if (titleTokenSet.has(token)) return true;
-      if (TITLE_MATCH_DESCRIPTOR_TOKENS.has(token)) return true;
-      if (TITLE_MATCH_CONTEXTUAL_TOKENS.has(token)) return hasSoundtrackContext;
-      if (strongCanonicalContext && !/game|karaoke|tribute|cover/.test(token)) {
-        return true;
+    for (let i = 0; i < textTokens.length; i += 1) {
+      if (i >= phraseStart && i < phraseEnd) continue; // forma parte del título
+      const token = textTokens[i];
+      if (!token) continue;
+      if (/^\d+$/.test(token) || /^[ivx]+$/.test(token)) continue;
+      if (GENERIC_WORDS.has(token)) continue;
+      if (titleTokenSet.has(token)) continue;
+      if (TITLE_MATCH_DESCRIPTOR_TOKENS.has(token)) continue;
+      if (TITLE_MATCH_CONTEXTUAL_TOKENS.has(token) && hasSoundtrackContext) {
+        continue;
+      }
+
+      // Token de CONTENIDO ajeno al título. En la COLA de descriptores
+      // (compositor, cadena…) se tolera con contexto canónico fuerte. Pero en la
+      // REGIÓN DEL TÍTULO (antes de la cola) significa que el álbum es OTRO título
+      // que solo CONTIENE al buscado o lo extiende → se RECHAZA. Así se evitan
+      // casos como "Pride and Prejudice" → "…and Zombies" o "From" → "From Dusk
+      // Till Dawn: Music From The Original Series".
+      if (
+        i >= tailStart &&
+        strongCanonicalContext &&
+        !/game|karaoke|tribute|cover/.test(token)
+      ) {
+        continue;
       }
       return false;
-    });
+    }
+    return true;
   });
 }
 
