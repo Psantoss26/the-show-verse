@@ -2770,18 +2770,35 @@ export function Row({
   const [anticipatedAnimatingOutId, setAnticipatedAnimatingOutId] = useState(null);
   const [hoveredAlignment, setHoveredAlignment] = useState("center");
   const hoverTimeoutRef = useRef(null);
+  // Cierre DIFERIDO de la vista previa. Al salir de una tarjeta no se cierra al
+  // instante: se programa el cierre con un pequeño retardo. Si el cursor entra en
+  // otra tarjeta dentro de ese margen, handleMouseEnterItem cancela el cierre y la
+  // vista previa pasa de una tarjeta a otra SIN que `hoveredIndex` llegue a null,
+  // por lo que las vecinas no rehacen su posición inicial (evita el salto).
+  const closeTimeoutRef = useRef(null);
+  const PREVIEW_CLOSE_DELAY_MS = 180;
 
-  // Limpiar temporizador al desmontar
+  // Limpiar temporizadores al desmontar
   useEffect(() => {
     return () => {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
+      }
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
       }
     };
   }, []);
 
   const handleMouseEnterItem = (e, itemKey, index, m, backdropOverride) => {
     if (isMobile) return;
+    // Cancela cualquier cierre diferido pendiente: al entrar en otra tarjeta la
+    // vista previa se mueve directamente de una a otra sin pasar por "cerrada",
+    // manteniendo el empuje de las vecinas (sin salto).
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
@@ -2830,18 +2847,28 @@ export function Row({
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    hoverIntentRef.current += 1;
-    setHoveredId((prev) => {
-      if (prev === itemKey) {
-        if (previewKind === "anticipated") {
-          setAnticipatedAnimatingOutId(itemKey);
+    // Cierre DIFERIDO: mantenemos abierta la vista previa (y el empuje de las
+    // vecinas) durante un instante. Si el cursor entra en otra tarjeta dentro de
+    // ese margen, handleMouseEnterItem cancela este cierre y la preview cambia de
+    // tarjeta sin resetear posiciones. Si no, se cierra al agotarse el retardo.
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = setTimeout(() => {
+      closeTimeoutRef.current = null;
+      hoverIntentRef.current += 1;
+      setHoveredId((prev) => {
+        if (prev === itemKey) {
+          if (previewKind === "anticipated") {
+            setAnticipatedAnimatingOutId(itemKey);
+          }
+          return null;
         }
-        return null;
-      }
-      return prev;
-    });
-    setHoveredIndex(null);
-    setHoveredAlignment("center");
+        return prev;
+      });
+      setHoveredIndex(null);
+      setHoveredAlignment("center");
+    }, PREVIEW_CLOSE_DELAY_MS);
   };
   // Montamos la fila un poco ANTES de que entre en pantalla (margen positivo) para
   // que el Swiper esté listo sin huecos al hacer scroll, pero NO todas a la vez.
@@ -3047,6 +3074,12 @@ export function Row({
           if (hoverTimeoutRef.current) {
             clearTimeout(hoverTimeoutRef.current);
             hoverTimeoutRef.current = null;
+          }
+          // Al salir de la fila entera cerramos ya (sin diferir) y cancelamos
+          // cualquier cierre diferido pendiente de las tarjetas.
+          if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
           }
           hoverIntentRef.current += 1;
           setIsHoveredRow(false);
