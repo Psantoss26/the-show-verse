@@ -613,6 +613,7 @@ function InlinePreviewCard({
     awards: null,
     imdbRating: null,
     overview: null,
+    ratingsReady: false,
   });
   const mediaIdentity = `${mediaType}:${movie?.id || "empty"}`;
   const [stableBackdropState, setStableBackdropState] = useState(() => ({
@@ -844,13 +845,12 @@ function InlinePreviewCard({
 
       const cachedExtras = movieExtrasCache.get(movie.id);
       if (cachedExtras) {
-        if (!abort) setExtras(cachedExtras);
+        if (!abort) setExtras({ ...cachedExtras, ratingsReady: true });
       } else {
         // imdb_id + nota IMDb se resuelven AL PRINCIPIO y en PARALELO con los
-        // detalles (runtime/overview): así la nota NO espera a la ficha. Se pinta
-        // en cuanto llega (setState incremental) y las promesas se comparten con
-        // la ruta de premios (mismo imdb_id) y con el objeto cacheado (misma
-        // nota), sin duplicar llamadas.
+        // detalles (runtime/overview). La UI de puntuaciones espera al paquete
+        // final para que TMDb e IMDb aparezcan a la vez, y las promesas se
+        // comparten con premios y caché sin duplicar llamadas.
         const imdbIdPromise = resolveImdbId(movie, mediaType);
         const imdbRatingPromise = imdbIdPromise.then((imdb) =>
           imdb
@@ -861,12 +861,6 @@ function InlinePreviewCard({
                 .catch(() => null)
             : null,
         );
-        imdbRatingPromise.then((rating) => {
-          if (rating != null && !abort) {
-            setExtras((prev) => ({ ...prev, imdbRating: rating }));
-          }
-        });
-
         try {
           let runtime = null;
           let overview = null;
@@ -919,7 +913,13 @@ function InlinePreviewCard({
           } catch {}
 
           const imdbRating = await imdbRatingPromise;
-          const next = { runtime, awards, imdbRating, overview };
+          const next = {
+            runtime,
+            awards,
+            imdbRating,
+            overview,
+            ratingsReady: true,
+          };
           movieExtrasCache.set(movie.id, next);
           if (!abort) setExtras(next);
         } catch {
@@ -929,6 +929,7 @@ function InlinePreviewCard({
               awards: null,
               imdbRating: null,
               overview: null,
+              ratingsReady: true,
             });
         }
       }
@@ -1584,21 +1585,23 @@ function InlinePreviewCard({
                 </div>
               )}
 
-              <DetailsRatingsBadges
-                tmdb={
-                  hasTmdbRating
-                    ? {
-                        value: tmdbRating,
-                        sub: formatCountShort(movie.vote_count),
-                      }
-                    : null
-                }
-                imdb={
-                  typeof extras?.imdbRating === "number"
-                    ? { value: extras.imdbRating.toFixed(1), sub: null }
-                    : null
-                }
-              />
+              {extras?.ratingsReady && (
+                <DetailsRatingsBadges
+                  tmdb={
+                    hasTmdbRating
+                      ? {
+                          value: tmdbRating,
+                          sub: formatCountShort(movie.vote_count),
+                        }
+                      : null
+                  }
+                  imdb={
+                    typeof extras?.imdbRating === "number"
+                      ? { value: extras.imdbRating.toFixed(1), sub: null }
+                      : null
+                  }
+                />
+              )}
 
               {error && (
                 <p className="mt-2 line-clamp-1 text-xs text-red-300">
@@ -1699,21 +1702,23 @@ function InlinePreviewCard({
             {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que
                 usa DetailModal (mismo diseño). Orden espejo del modal:
                 acciones → meta → premios → puntuaciones. */}
-            <DetailsRatingsBadges
-              tmdb={
-                hasTmdbRating
-                  ? {
-                      value: tmdbRating,
-                      sub: formatCountShort(movie.vote_count),
-                    }
-                  : null
-              }
-              imdb={
-                typeof extras?.imdbRating === "number"
-                  ? { value: extras.imdbRating.toFixed(1), sub: null }
-                  : null
-              }
-            />
+            {extras?.ratingsReady && (
+              <DetailsRatingsBadges
+                tmdb={
+                  hasTmdbRating
+                    ? {
+                        value: tmdbRating,
+                        sub: formatCountShort(movie.vote_count),
+                      }
+                    : null
+                }
+                imdb={
+                  typeof extras?.imdbRating === "number"
+                    ? { value: extras.imdbRating.toFixed(1), sub: null }
+                    : null
+                }
+              />
+            )}
 
             {error && (
               <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">

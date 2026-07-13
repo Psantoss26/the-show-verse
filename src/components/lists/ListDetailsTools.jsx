@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import ListPosterCard, { listPosterGridClass } from "@/components/lists/ListPosterCard";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 const INITIAL_RENDER_COUNT = 60;
 const RENDER_BATCH_SIZE = 60;
@@ -220,7 +221,15 @@ export default function FilterableListItems({
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
+  // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
+  // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
+  const isBackNav = useIsHistoryNavigation();
+  const [visibleCount, setVisibleCount] = useState(
+    isBackNav ? Number.MAX_SAFE_INTEGER : INITIAL_RENDER_COUNT,
+  );
+  // Evita que el efecto de reinicio (que fija visibleCount a INITIAL_RENDER_COUNT)
+  // se ejecute en el PRIMER render tras volver: mantendría el render completo.
+  const skipInitialResetRef = useRef(isBackNav);
   const loadMoreRef = useRef(null);
 
   const entries = useMemo(
@@ -246,6 +255,10 @@ export default function FilterableListItems({
   const hasMoreEntries = visibleCount < entries.length;
 
   useEffect(() => {
+    if (skipInitialResetRef.current) {
+      skipInitialResetRef.current = false;
+      return;
+    }
     setVisibleCount(INITIAL_RENDER_COUNT);
   }, [q, typeFilter, sortBy, groupBy, viewMode]);
 
@@ -290,7 +303,7 @@ export default function FilterableListItems({
     <div className="space-y-7">
       <motion.div
         className="sticky top-20 z-[70] mb-4 space-y-1 transition-all duration-300"
-        initial={{ opacity: 0, y: 10 }}
+        initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >

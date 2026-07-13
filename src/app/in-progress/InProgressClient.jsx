@@ -39,6 +39,7 @@ import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 // ----------------------------
 // HELPERS
@@ -760,11 +761,13 @@ const InProgressCard = memo(function InProgressCard({
   const remaining = episodeProgress.remaining;
 
   const animDelay = Math.min(index * 0.06, 0.5);
+  // Al VOLVER (atrás/adelante) la tarjeta se pinta estática, sin animación de entrada.
+  const isBackNav = useIsHistoryNavigation();
 
   if (viewMode === "compact") {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={isBackNav ? false : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
@@ -850,7 +853,7 @@ const InProgressCard = memo(function InProgressCard({
   if (viewMode === "poster") {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={isBackNav ? false : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
@@ -933,7 +936,7 @@ const InProgressCard = memo(function InProgressCard({
   // ==== CARDS VIEW (default) ====
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      initial={isBackNav ? false : { opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{

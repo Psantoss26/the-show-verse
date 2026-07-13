@@ -40,6 +40,7 @@ import {
   MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 // ================== UTILS & CACHE ==================
 
@@ -1651,9 +1652,12 @@ const WatchlistCard = memo(function WatchlistCard({
     }
   }, [imdbScore, traktScore, loadingScores, item, type]);
 
+  // En navegación de historial (atrás/adelante) NO se anima la entrada: la página
+  // debe verse estática, tal cual estaba antes de salir.
+  const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 24;
+  const shouldAnimate = !isBackNav && index < 24;
 
   if (viewMode === "list") {
     return (
@@ -1970,7 +1974,12 @@ export default function WatchlistClient() {
   // those first cards animate in immediately — same fluid entrance as the other
   // pages. The remaining cards fill in during idle time. Starts small on every
   // mount, so the entrance feels consistent every visit.
-  const [renderLimit, setRenderLimit] = useState(WATCHLIST_INITIAL_RENDER_LIMIT);
+  // Al VOLVER (atrás/adelante) se renderiza todo de golpe (sin trocear) para que
+  // la altura sea correcta al instante y el scroll se restaure sin saltos.
+  const isBackNav = useIsHistoryNavigation();
+  const [renderLimit, setRenderLimit] = useState(
+    isBackNav ? Number.MAX_SAFE_INTEGER : WATCHLIST_INITIAL_RENDER_LIMIT,
+  );
 
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialWatchlistViewMode);

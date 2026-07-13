@@ -975,19 +975,19 @@ function ContinueWatchingPreviewCard({
     const isEpisodePreview = isContinuePreview && hasEpisodeRef;
     const cached = continueWatchingExtrasCache.get(extrasCacheKey);
     if (cached) {
-      setExtras(cached);
+      setExtras({ ...cached, ratingsReady: true });
       return;
     }
     let abort = false;
     (async () => {
-      // imdb_id (rápido, endpoint ligero) + nota IMDb del episodio/título resueltos
-      // AL PRINCIPIO y en PARALELO con los detalles: la nota se pinta EN CUANTO
-      // llega (setState incremental), sin esperar a temporadas/géneros/premios.
+      // imdb_id (rápido, endpoint ligero) + nota IMDb del episodio/título se
+      // resuelven en paralelo con detalles; la UI de puntuaciones se pinta
+      // cuando el paquete está completo para que TMDb e IMDb aparezcan juntas.
       const imdbIdPromise = resolveImdbId(show, mediaType);
       // Nota IMDb (rápida). Para EPISODIOS: tconst del episodio (TMDB, ligero) →
       // dataset IMDb directo (rápido); si no hay tconst/nota, fallback al endpoint
       // episode-imdb (más cobertura pero más lento). Para película/título: nota del
-      // título por su imdb_id. Se pinta EN CUANTO llega (setState incremental).
+      // título por su imdb_id.
       const imdbRatingPromise = (async () => {
         if (isEpisodePreview) {
           const epTconst = await resolveEpisodeImdbId(
@@ -1022,12 +1022,6 @@ function ContinueWatchingPreviewCard({
         const ds = await fetchImdbRatingByImdb(imdb).catch(() => null);
         return typeof ds?.rating === "number" ? ds.rating : null;
       })();
-      imdbRatingPromise.then((r) => {
-        if (r != null && !abort) {
-          setExtras((prev) => ({ ...prev, imdbRating: r }));
-        }
-      });
-
       try {
         const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
         // Detalles de título + episodio EN PARALELO, para que todos los extras
@@ -1086,7 +1080,7 @@ function ContinueWatchingPreviewCard({
           : [];
         const status = details?.status || null;
         // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide). La nota
-        // IMDb ya viene de la promesa compartida (ya pintada arriba al llegar).
+        // IMDb viene de la promesa compartida y se pinta junto a TMDb al final.
         let awards = null;
         const imdb = await imdbIdPromise;
         if (imdb) {
@@ -1108,6 +1102,7 @@ function ContinueWatchingPreviewCard({
           episodeName,
           status,
           genreObjects,
+          ratingsReady: true,
         };
         continueWatchingExtrasCache.set(extrasCacheKey, next);
         if (!abort) setExtras(next);
@@ -1123,6 +1118,7 @@ function ContinueWatchingPreviewCard({
             episodeName: null,
             status: null,
             genreObjects: [],
+            ratingsReady: true,
           });
       }
     })();
@@ -1791,14 +1787,16 @@ function ContinueWatchingPreviewCard({
         )}
 
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
-        <DetailsRatingsBadges
-          tmdb={tmdbRating ? { value: tmdbRating, sub: null } : null}
-          imdb={
-            typeof extras?.imdbRating === "number"
-              ? { value: extras.imdbRating.toFixed(1), sub: null }
-              : null
-          }
-        />
+        {extras?.ratingsReady && (
+          <DetailsRatingsBadges
+            tmdb={tmdbRating ? { value: tmdbRating, sub: null } : null}
+            imdb={
+              typeof extras?.imdbRating === "number"
+                ? { value: extras.imdbRating.toFixed(1), sub: null }
+                : null
+            }
+          />
+        )}
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>

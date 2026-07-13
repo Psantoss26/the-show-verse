@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Film, Heart, ListVideo, Star } from 'lucide-react'
+import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 
 function Badge({ children }) {
     return (
@@ -90,6 +91,8 @@ export default function UnifiedListDetailsLayout({
     children
 }) {
     const router = useRouter()
+    // Al VOLVER (atrás/adelante) el header se pinta estático, sin animación de entrada.
+    const isBackNav = useIsHistoryNavigation()
     const hasTabs = Array.isArray(tabs) && tabs.length > 0 && !!activeTab && typeof onTabChange === 'function'
 
     return (
@@ -135,7 +138,7 @@ export default function UnifiedListDetailsLayout({
 
                 {/* --- HERO, misma base visual que ActorDetails --- */}
                 <motion.div
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={isBackNav ? false : { opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                     className="mb-12 flex flex-col items-start gap-8 lg:flex-row lg:gap-12"

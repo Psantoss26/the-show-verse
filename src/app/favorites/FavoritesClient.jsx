@@ -44,6 +44,7 @@ import {
   MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1933,9 +1934,12 @@ const FavoriteCard = memo(function FavoriteCard({
     }
   }, [imdbScore, traktScore, loadingScores, item, type]);
 
+  // En navegación de historial (atrás/adelante) NO se anima la entrada: la página
+  // debe verse estática, tal cual estaba antes de salir.
+  const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 24;
+  const shouldAnimate = !isBackNav && index < 24;
   const shellClassName =
     "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
 
@@ -2268,12 +2272,21 @@ export default function FavoritesClient() {
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
 
+  // Navegación de historial (atrás/adelante): la página debe verse ESTÁTICA, tal
+  // como estaba. En ese caso se renderiza el contenido COMPLETO desde el primer
+  // frame (sin trocear), para que la altura del documento sea la correcta de
+  // inmediato y <ScrollRestoration> restaure la posición sin saltos ni "chase".
+  const isBackNav = useIsHistoryNavigation();
+
   // Render the cards in chunks: only the first batch mounts on the initial
   // render, so navigating into the page commits cheaply (instant redirect) while
   // those first cards animate in immediately — same fluid entrance as the other
   // pages. The remaining cards fill in during idle time. Starts small on every
-  // mount, so the entrance feels consistent every visit.
-  const [renderLimit, setRenderLimit] = useState(FAVORITES_INITIAL_RENDER_LIMIT);
+  // mount, so the entrance feels consistent every visit. Al VOLVER (atrás) se
+  // renderiza todo de golpe (sin trocear) para no mover el layout.
+  const [renderLimit, setRenderLimit] = useState(
+    isBackNav ? Number.MAX_SAFE_INTEGER : FAVORITES_INITIAL_RENDER_LIMIT,
+  );
 
   // Watch history for sorting
   const [watchDates, setWatchDates] = useState(new Map());
@@ -4001,7 +4014,7 @@ export default function FavoritesClient() {
                     key={group.key}
                     ref={(node) => setGroupSectionRef(group.key, node)}
                     className="overflow-visible scroll-mt-[148px]"
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={isBackNav ? false : { opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
                   >
