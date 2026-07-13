@@ -40,7 +40,10 @@ import {
   MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
-import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  useIsHistoryNavigation,
+  useBackNavOrderFreeze,
+} from "@/lib/hooks/useIsHistoryNavigation";
 
 // ================== UTILS & CACHE ==================
 
@@ -1670,7 +1673,7 @@ const WatchlistCard = memo(function WatchlistCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={!isBackNav}
       >
         <Link
           href={href}
@@ -1721,7 +1724,7 @@ const WatchlistCard = memo(function WatchlistCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={!isBackNav}
       >
         <Link href={href} prefetch={false} className="block">
           <motion.div
@@ -2051,6 +2054,14 @@ export default function WatchlistClient() {
     subGroupBy === "trakt_rating" ||
     sortBy === "rating-asc" ||
     sortBy === "rating-desc";
+
+  // Al VOLVER (atrás/adelante) el orden se mantiene CONGELADO —tal cual lo dejó el
+  // usuario— hasta que cambie la ordenación: se saltan los refrescos asíncronos de
+  // puntuaciones que reordenarían el listado.
+  const freezeOrder = useBackNavOrderFreeze(
+    `${sortBy}|${groupBy}|${subGroupBy}`,
+  );
+
   // Persist filter states
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2202,6 +2213,9 @@ export default function WatchlistClient() {
   useEffect(() => {
     if (items.length === 0) return;
     if (!needsImdbScores) return;
+    // Al volver (atrás) con el orden congelado: no refrescar puntuaciones para no
+    // reordenar. El orden permanece exactamente como lo dejó el usuario.
+    if (freezeOrder) return;
 
     let cancelled = false;
 
@@ -2270,12 +2284,14 @@ export default function WatchlistClient() {
     return () => {
       cancelled = true;
     };
-  }, [items, needsImdbScores]);
+  }, [items, needsImdbScores, freezeOrder]);
 
   // Prefetch Trakt scores in background (non-blocking)
   useEffect(() => {
     if (items.length === 0) return;
     if (!needsTraktScores) return;
+    // Al volver (atrás) con el orden congelado: no refrescar puntuaciones (ver arriba).
+    if (freezeOrder) return;
 
     let cancelled = false;
 
@@ -2360,7 +2376,7 @@ export default function WatchlistClient() {
     return () => {
       cancelled = true;
     };
-  }, [items, needsTraktScores]);
+  }, [items, needsTraktScores, freezeOrder]);
 
   // Filter and sort
   const filtered = useMemo(() => {

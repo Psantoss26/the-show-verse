@@ -74,6 +74,7 @@ import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
+const PREVIEW_CLOSE_DELAY_MS = 220;
 
 // Caché local para que la sección NO desaparezca al recargar: se pinta al
 // instante lo último conocido mientras se refresca en segundo plano.
@@ -1965,7 +1966,7 @@ function ContinueWatchingSection({
 }) {
   const { authenticated, hydrated: authReady } = useAuth();
   const { openDetailModal } = useDetailModal();
-  const { showHoverBackdrop, clearHoverBackdrop } =
+  const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
   // Igual que las demás filas: oculta al cargar, se revela con animación al
   // hacer scroll y entrar en la ventana.
@@ -2123,6 +2124,7 @@ function ContinueWatchingSection({
     }
     clearHoverCloseTimer();
     clearHoverOpenTimer();
+    prewarmHoverBackdrop(displayShows?.[index]);
     openPreview(itemKey, index);
   };
 
@@ -2132,7 +2134,7 @@ function ContinueWatchingSection({
     clearHoverCloseTimer();
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
       closePreview(itemKey);
-    }, 120);
+    }, PREVIEW_CLOSE_DELAY_MS);
   };
 
 

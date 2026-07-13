@@ -1719,7 +1719,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={!isBackNav}
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
@@ -1738,7 +1738,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         delay: shouldAnimate ? animDelay : 0,
         ease: [0.25, 0.1, 0.25, 1],
       }}
-      layout
+      layout={!isBackNav}
     >
       <Link
         href={href}
@@ -1928,7 +1928,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
           delay: shouldAnimate ? animDelay : 0,
           ease: [0.25, 0.1, 0.25, 1],
         }}
-        layout
+        layout={!isBackNav}
       >
         <div className="block cursor-pointer">{CardInner}</div>
       </motion.div>
@@ -1944,7 +1944,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         delay: shouldAnimate ? animDelay : 0,
         ease: [0.25, 0.1, 0.25, 1],
       }}
-      layout
+      layout={!isBackNav}
     >
       <Link href={href} prefetch className="block">
         {CardInner}
