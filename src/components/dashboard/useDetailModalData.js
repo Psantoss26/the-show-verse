@@ -17,6 +17,7 @@ import {
   getCredits,
   getRecommendations,
   getExternalIds,
+  resolveEpisodeImdbId,
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
@@ -132,6 +133,11 @@ const EMPTY_SENTIMENT = { pros: [], cons: [] };
 
 const EMPTY_DATA = {
   mediaType: null,
+  // Preview de EPISODIO: cuando true, el modal pinta la variante de episodio
+  // (still, T{n}·E{n}·fecha·duración, secciones Reparto + navegador). `episodeMeta`
+  // lleva los datos propios del episodio para la cabecera y el enlace a ficha.
+  isEpisode: false,
+  episodeMeta: null,
   title: null,
   homepage: null,
   logoPath: null,
@@ -241,6 +247,144 @@ export function useDetailModalData(item) {
       setLoading(false);
       return undefined;
     }
+
+    // ===================== RAMA EPISODIO (aditiva) =====================
+    // Datos propios del episodio (still, nombre, fecha, duración, sinopsis,
+    // valoración), reparto + invitados, temporadas de la serie (para el navegador)
+    // y nota IMDb del episodio. El camino movie/tv de abajo NO se toca.
+    if (item.media_type === "episode") {
+      const showId = item.showId ?? item.id;
+      const seasonNumber = item.seasonNumber;
+      const episodeNumber = item.episodeNumber;
+      let cancelledEp = false;
+
+      setLoading(true);
+      setData({
+        ...EMPTY_DATA,
+        mediaType: "tv",
+        isEpisode: true,
+        title: item.name || item.title || null,
+        backdropPath: item.still_path || item.backdrop_path || null,
+        episodeMeta: {
+          showId,
+          seasonNumber,
+          episodeNumber,
+          showName: item.showName || null,
+          airDate: null,
+          runtime: null,
+        },
+      });
+
+      (async () => {
+        try {
+          const [showDetails, epRes, epCreditsRes] = await Promise.all([
+            getDetails("tv", showId).catch(() => null),
+            fetch(
+              `/api/tmdb/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
+              { cache: "no-store" },
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+            fetch(
+              `/api/tmdb/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}/credits`,
+              { cache: "no-store" },
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ]);
+          if (cancelledEp) return;
+
+          const ep = epRes || {};
+          const showName = showDetails?.name || item.showName || null;
+          // Reparto del episodio = cast + invitados (mismo criterio que EpisodeDetails).
+          const cast = [
+            ...(Array.isArray(epCreditsRes?.cast) ? epCreditsRes.cast : []),
+            ...(Array.isArray(epCreditsRes?.guest_stars)
+              ? epCreditsRes.guest_stars
+              : []),
+          ].slice(0, 20);
+
+          const tmdbRatingStr = ratingOf(ep);
+          const tmdbRating = tmdbRatingStr !== "–" ? tmdbRatingStr : null;
+          const tmdbVotes =
+            typeof ep?.vote_count === "number" && ep.vote_count > 0
+              ? ep.vote_count
+              : null;
+          const runtime = formatRuntime(ep?.runtime) || null;
+
+          setData((prev) => ({
+            ...prev,
+            mediaType: "tv",
+            isEpisode: true,
+            title: ep?.name || item.name || `Episodio ${episodeNumber}`,
+            overview:
+              (typeof ep?.overview === "string" && ep.overview.trim()) || null,
+            backdropPath:
+              ep?.still_path ||
+              showDetails?.backdrop_path ||
+              item.still_path ||
+              null,
+            posterPath: showDetails?.poster_path || null,
+            year: ep?.air_date ? String(ep.air_date).slice(0, 4) : null,
+            runtime,
+            tmdbRating,
+            tmdbVotes,
+            cast,
+            seasons: Array.isArray(showDetails?.seasons)
+              ? showDetails.seasons
+              : [],
+            episodeMeta: {
+              showId,
+              seasonNumber,
+              episodeNumber,
+              showName,
+              airDate: ep?.air_date ? formatDateEs(ep.air_date) : null,
+              runtime,
+            },
+          }));
+        } catch {
+          // degradamos: nos quedamos con la semilla
+        } finally {
+          if (!cancelledEp) setLoading(false);
+        }
+      })();
+
+      // Nota IMDb del episodio (independiente, en paralelo).
+      (async () => {
+        try {
+          const imdb = await resolveEpisodeImdbId(
+            showId,
+            seasonNumber,
+            episodeNumber,
+          ).catch(() => null);
+          if (!imdb || cancelledEp) return;
+          const [omdb, imdbDataset] = await Promise.all([
+            fetchOmdbByImdb(imdb).catch(() => null),
+            fetchImdbRatingByImdb(imdb).catch(() => null),
+          ]);
+          if (cancelledEp) return;
+          const datasetRating =
+            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
+          const datasetVotes =
+            typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null;
+          const { imdbRating: omdbImdbRating, imdbVotes: omdbImdbVotes } =
+            extractOmdbImdbScore(omdb);
+          setData((prev) => ({
+            ...prev,
+            imdbId: imdb ?? prev.imdbId,
+            imdbRating: (datasetRating ?? omdbImdbRating) ?? prev.imdbRating,
+            imdbVotes: (datasetVotes ?? omdbImdbVotes) ?? prev.imdbVotes,
+          }));
+        } catch {
+          // sin nota IMDb del episodio
+        }
+      })();
+
+      return () => {
+        cancelledEp = true;
+      };
+    }
+    // =================== FIN RAMA EPISODIO ===================
 
     let cancelled = false;
     const mediaType = getMediaTypeForItem(item);
