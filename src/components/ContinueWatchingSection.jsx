@@ -1665,7 +1665,7 @@ function ContinueWatchingPreviewCard({
       </div>
 
       {/* Panel de info (mismo lenguaje visual que BackdropPreviewCard):
-          [Continuar] reproducir episodio + progreso · acciones compartidas · premios ·
+          [Continuar] reproducir episodio + progreso · acciones compartidas · meta/géneros · premios ·
           [Calendario] línea de episodio · meta/géneros · puntuaciones. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -1742,26 +1742,6 @@ function ContinueWatchingPreviewCard({
           />
         </div>
 
-        {/* Premios (OMDb) — hueco reservado para que la carga tardía no desplace.
-            En Calendario NO se muestra: la línea de episodio/fecha (abajo) ocupa
-            su lugar, en vez de mostrar ambas. */}
-        {!isCalendar && (
-          <div className="mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
-            {extras?.awards && (
-              <motion.span
-                key={extras.awards}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="flex min-w-0 items-center gap-1.5"
-              >
-                <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="line-clamp-1">{extras.awards}</span>
-              </motion.span>
-            )}
-          </div>
-        )}
-
         {/* Calendario: LÍNEA DE EPISODIO justo encima de la fila meta.
             Formato: T{season}·E{number} · {nombre episodio} · {fecha/cuenta atrás}.
             Estilo discreto (como la línea de premios). */}
@@ -1789,6 +1769,26 @@ function ContinueWatchingPreviewCard({
           status={extras?.status || null}
           genres={extras?.genreObjects || EMPTY_ARRAY}
         />
+
+        {/* Premios (OMDb) — se muestran debajo de la fila meta para mantener el
+            mismo orden visual en todas las vistas previas. En Calendario NO se
+            muestra: la línea de episodio/fecha ocupa su lugar. */}
+        {!isCalendar && (
+          <div className="mt-1.5 mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+            {extras?.awards && (
+              <motion.span
+                key={extras.awards}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+                className="flex min-w-0 items-center gap-1.5"
+              >
+                <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="line-clamp-1">{extras.awards}</span>
+              </motion.span>
+            )}
+          </div>
+        )}
 
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
         <DetailsRatingsBadges

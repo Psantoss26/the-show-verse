@@ -235,13 +235,6 @@ export default function DashboardSpotlightPreview({
             />
           </motion.div>
 
-          {awards && (
-            <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
-              <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="line-clamp-1">{awards}</span>
-            </div>
-          )}
-
           <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
             {badge && (
               <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
@@ -255,6 +248,13 @@ export default function DashboardSpotlightPreview({
               genres={normalizedGenres}
             />
           </div>
+
+          {awards && (
+            <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
+              <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="line-clamp-1">{awards}</span>
+            </div>
+          )}
 
           <DetailsRatingsBadges
             tmdb={

@@ -1557,13 +1557,6 @@ function InlinePreviewCard({
                 />
               </motion.div>
 
-              {extras?.awards && (
-                <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
-                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="line-clamp-1">{extras.awards}</span>
-                </div>
-              )}
-
               {/* Sin badge de contexto (DESTACADO / MEJOR VALORADO / Estreno) en
                   las secciones spotlight, por preferencia de diseño. */}
               <div className="mb-2 w-full max-w-full">
@@ -1583,6 +1576,13 @@ function InlinePreviewCard({
                   }
                 />
               </div>
+
+              {extras?.awards && (
+                <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{extras.awards}</span>
+                </div>
+              )}
 
               <DetailsRatingsBadges
                 tmdb={
@@ -1669,6 +1669,18 @@ function InlinePreviewCard({
               />
             </div>
 
+            {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
+                año · duración · estado · géneros. Los badges contextuales se
+                reservan para FeaturedHero y filas x1.6. */}
+            <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
+              <DetailsMetaGenresRow
+                yearIso={yearOf(movie)}
+                displayRuntimeValue={previewDetails.runtimeFallback}
+                status={previewDetails.status}
+                genres={previewDetails.genreObjects}
+              />
+            </div>
+
             {extras?.awards && (
               <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
                 <motion.span
@@ -1684,21 +1696,9 @@ function InlinePreviewCard({
               </div>
             )}
 
-            {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
-                año · duración · estado · géneros. Los badges contextuales se
-                reservan para FeaturedHero y filas x1.6. */}
-            <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
-              <DetailsMetaGenresRow
-                yearIso={yearOf(movie)}
-                displayRuntimeValue={previewDetails.runtimeFallback}
-                status={previewDetails.status}
-                genres={previewDetails.genreObjects}
-              />
-            </div>
-
             {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que
                 usa DetailModal (mismo diseño). Orden espejo del modal:
-                acciones → premios → meta → puntuaciones. */}
+                acciones → meta → premios → puntuaciones. */}
             <DetailsRatingsBadges
               tmdb={
                 hasTmdbRating

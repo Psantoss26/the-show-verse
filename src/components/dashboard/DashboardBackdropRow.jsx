@@ -1141,8 +1141,18 @@ export function BackdropPreviewCard({
           />
         </div>
 
+        {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
+            año · duración · estado · géneros (mismo componente y diseño).
+            Se alimenta igual que useDetailModalData. */}
+        <DetailsMetaGenresRow
+          yearIso={yearOf(item)}
+          displayRuntimeValue={previewDetails.runtimeFallback}
+          status={previewDetails.status}
+          genres={previewDetails.genreObjects}
+        />
+
         {extras?.awards && (
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+          <div className="mt-1.5 mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
             <motion.span
               key={extras.awards}
               initial={{ opacity: 0 }}
@@ -1156,19 +1166,9 @@ export function BackdropPreviewCard({
           </div>
         )}
 
-        {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
-            año · duración · estado · géneros (mismo componente y diseño).
-            Se alimenta igual que useDetailModalData. */}
-        <DetailsMetaGenresRow
-          yearIso={yearOf(item)}
-          displayRuntimeValue={previewDetails.runtimeFallback}
-          status={previewDetails.status}
-          genres={previewDetails.genreObjects}
-        />
-
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que usa
             DetailModal (mismo diseño). Orden espejo del modal: acciones →
-            premios → meta → puntuaciones. */}
+            meta → premios → puntuaciones. */}
         <DetailsRatingsBadges
           tmdb={
             hasTmdbRating
