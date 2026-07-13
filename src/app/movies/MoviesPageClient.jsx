@@ -43,6 +43,9 @@ import { useEngineRows } from "@/components/dashboard/useEngineRows";
 import { Row as SharedRow } from "@/components/MainDashboardClient";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
 import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
+import PreviewTrailerAudioButton, {
+  usePreviewTrailerAudio,
+} from "@/components/dashboard/PreviewTrailerAudioControl";
 import { fetchBestBackdropNoLang, fetchBestLogo } from "@/lib/dashboard/media";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -755,6 +758,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     awards: null,
     imdbRating: null,
     overview: null,
+    status: null,
+    genreObjects: [],
   });
   const [backdropPath, setBackdropPath] = useState(null);
   const [backdropReady, setBackdropReady] = useState(false);
@@ -770,6 +775,11 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  const {
+    muted: trailerMuted,
+    toggle: handleToggleTrailerAudio,
+    sync: syncTrailerAudio,
+  } = usePreviewTrailerAudio(trailerIframeRef, { volume: 10 });
 
   useEffect(() => {
     setShowTrailer(false);
@@ -883,9 +893,27 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
         try {
           let runtime = null;
           let overview = null;
+          let status = null;
+          let genreObjects = [];
           try {
             const details = await getMovieDetails(movie.id);
             runtime = details?.runtime ?? null;
+            status = details?.status || null;
+            if (Array.isArray(details?.genres) && details.genres.length) {
+              genreObjects = details.genres
+                .filter((genre) => genre && genre.name)
+                .map((genre) => ({
+                  id: genre.id ?? genre.name,
+                  name: genre.name,
+                }));
+            } else {
+              const ids = movie.genre_ids || [];
+              genreObjects = (Array.isArray(ids) ? ids : [])
+                .map((id) =>
+                  MOVIE_GENRES[id] ? { id, name: MOVIE_GENRES[id] } : null,
+                )
+                .filter(Boolean);
+            }
             overview =
               (typeof details?.overview === "string" &&
                 details.overview.trim()) ||
@@ -919,7 +947,14 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
             }
           } catch {}
 
-          const next = { runtime, awards, imdbRating, overview };
+          const next = {
+            runtime,
+            awards,
+            imdbRating,
+            overview,
+            status,
+            genreObjects,
+          };
           movieExtrasCache.set(movie.id, next);
           if (!abort) setExtras(next);
         } catch {
@@ -929,6 +964,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
               awards: null,
               imdbRating: null,
               overview: null,
+              status: null,
+              genreObjects: [],
             });
         }
       }
@@ -1144,24 +1181,11 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                   title={`Trailer - ${movie.title || movie.name}`}
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen={false}
-                  onLoad={() => {
-                    try {
-                      const win = trailerIframeRef.current?.contentWindow;
-                      if (!win) return;
-
-                      const target = "https://www.youtube-nocookie.com";
-                      const cmd = (func, args = []) =>
-                        win.postMessage(
-                          JSON.stringify({ event: "command", func, args }),
-                          target,
-                        );
-
-                      setTimeout(() => {
-                        cmd("unMute");
-                        cmd("setVolume", [10]);
-                      }, 120);
-                    } catch {}
-                  }}
+                  onLoad={syncTrailerAudio}
+                />
+                <PreviewTrailerAudioButton
+                  muted={trailerMuted}
+                  onToggle={handleToggleTrailerAudio}
                 />
               </div>
             )}
@@ -1188,7 +1212,10 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
           year={yearOf(movie)}
           runtime={formatRuntime(extras?.runtime)}
           genres={genres}
+          genreObjects={extras?.genreObjects}
+          status={extras?.status}
           tmdbRating={tmdbRating}
+          tmdbVotes={movie.vote_count}
           imdbRating={extras?.imdbRating}
           awards={extras?.awards}
           trailerVisible={showTrailer}

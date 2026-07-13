@@ -35,6 +35,7 @@ Thumbs.db
 .idea/
 .vscode/
 .claude/
+.codex/
 tmpclaude*
 *.swp
 
@@ -45,6 +46,7 @@ coverage/
 # --- Herramientas locales de agentes / specs ---
 .agents/
 .gstack/
+.superpowers/
 .specify/
 specs/
 
@@ -53,3 +55,9 @@ specs/
 
 # Obsidian (configuración local del editor, no versionar)
 .obsidian/
+
+# --- Android local ---
+android-companion/.gradle/
+android-companion/.idea/
+android-companion/local.properties
+android-companion/app/build/
