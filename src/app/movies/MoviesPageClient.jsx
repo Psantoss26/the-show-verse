@@ -47,6 +47,7 @@ import DashboardBackdropRow, {
 import {
   DashboardHoverBackdropLayer,
   DashboardHoverBackdropProvider,
+  useDashboardHoverBackdrop,
 } from "@/components/dashboard/DashboardHoverBackdrop";
 import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
@@ -1336,6 +1337,8 @@ function Row({
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
   const hoverIntentRef = useRef(0);
+  const { showHoverBackdrop, clearHoverBackdrop } =
+    useDashboardHoverBackdrop();
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -1358,6 +1361,10 @@ function Row({
     ? topResetRevealProps
     : standardRevealProps;
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
+
+  useEffect(() => {
+    return () => clearHoverBackdrop();
+  }, [clearHoverBackdrop]);
 
   useEffect(() => {
     if (!isHoveredRow || !hasItems || isMobile) return;
@@ -1578,6 +1585,7 @@ function Row({
           setIsHoveredRow(false);
           setHoveredId(null);
           setHoveredIndex(null);
+          if (isTop10) clearHoverBackdrop();
         }}
       >
         <Swiper
@@ -1662,6 +1670,7 @@ function Row({
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
+                    if (isTop10) showHoverBackdrop(m);
                     preparePreviewBackdrop(m).finally(() => {
                       if (hoverIntentRef.current === hoverToken) {
                         setHoveredId(itemKey);
@@ -1707,6 +1716,7 @@ function Row({
                             hoverIntentRef.current += 1;
                             setHoveredId(itemKey);
                             setHoveredIndex(i);
+                            showHoverBackdrop(m);
                           }}
                           onPreviewMouseLeave={() => {
                             hoverIntentRef.current += 1;
@@ -1780,11 +1790,21 @@ function Row({
                 }`}
               >
                 {isTop10 ? (
-                  <div className="flex items-center">
+                  <div
+                    className="flex items-center"
+                    onMouseEnter={() => {
+                      if (!isMobile) showHoverBackdrop(m);
+                    }}
+                    onMouseLeave={() => {
+                      if (!isMobile) clearHoverBackdrop(m);
+                    }}
+                  >
                     <DashboardRankNumber
                       rank={i + 1}
                       tone="movies"
-                      className="z-0 ml-[0.1em] mr-[-0.15em] hidden text-[9.375rem] leading-[0.8] md:inline-grid lg:text-[11.25rem] xl:text-[13.75rem] 2xl:text-[16.25rem]"
+                      interactive
+                      hovered={hoveredIndex === i}
+                      className="ml-[0.1em] mr-[-0.15em] hidden text-[9.375rem] leading-[0.8] md:inline-grid lg:text-[11.25rem] xl:text-[13.75rem] 2xl:text-[16.25rem]"
                     />
                     {cardElement}
                   </div>
