@@ -113,6 +113,28 @@ function platformLabel(platform) {
   return PLATFORM_LABELS[key] || String(platform);
 }
 
+const PLATFORM_ICONS = {
+  netflix: "/netflix.png",
+  primevideo: "/amazonprimevideo.png",
+  prime: "/amazonprimevideo.png",
+  amazonprimevideo: "/amazonprimevideo.png",
+  max: "/hbomax.png",
+  hbomax: "/hbomax.png",
+  hbo: "/hbomax.png",
+  disney: "/disney.png",
+  disneyplus: "/disney.png",
+  plex: "/plex.png",
+  spotify: "/spotify.png",
+  movistar: "/movistar-text.png",
+  crunchyroll: "/crunchyroll-text.png",
+  appletv: "/appletv-text.png",
+};
+function platformIcon(platform) {
+  if (!platform) return null;
+  const key = String(platform).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return PLATFORM_ICONS[key] || null;
+}
+
 function formatRemainingTime(runtimeSeconds, positionSeconds) {
   if (!runtimeSeconds || !positionSeconds) return null;
   const remainingSeconds = runtimeSeconds - positionSeconds;
@@ -430,7 +452,9 @@ const ProgressCard = memo(function ProgressCard({
   const pct = clampPct(item.pct);
   const colors = getProgressColor(pct);
   const code = epCode(item);
+  const labelText = code ? (item.remainingLabel ? `${code} · ${item.remainingLabel}` : code) : item.remainingLabel;
   const platform = platformLabel(item.platform);
+  const platformIconUrl = platformIcon(item.platform);
   const lastWatched = formatLastWatched(item.lastWatchedAt);
   const animDelay = Math.min(index * 0.05, 0.4);
 
@@ -500,8 +524,8 @@ const ProgressCard = memo(function ProgressCard({
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]" style={{ animationDelay: `${animDelay}s` }} />
                 </motion.div>
               </div>
-              <div className="text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
-                <Clock className="w-3 h-3" /> {lastWatched}
+              <div className="text-xs text-zinc-300 flex items-center gap-1.5 font-semibold">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" /> {lastWatched}
               </div>
             </div>
             {canDelete && (
@@ -536,7 +560,14 @@ const ProgressCard = memo(function ProgressCard({
             {/* Overlay con gradientes - desktop hover (igual que En progreso) */}
             <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div />
+                {labelText ? (
+                  <div className="px-2.5 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+                    <Play className="w-2.5 h-2.5" fill="currentColor" />
+                    <span className="text-white drop-shadow-sm">{labelText}</span>
+                  </div>
+                ) : (
+                  <div />
+                )}
                 {/* En modo borrar, el hueco superior derecho lo ocupa la papelera:
                     ocultamos el porcentaje para que no se solapen. */}
                 {!canDelete && (
@@ -549,25 +580,28 @@ const ProgressCard = memo(function ProgressCard({
               <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">{title}</h3>
                 <div className="space-y-0.5">
-                  {code && (
-                    <p className="text-emerald-400 text-xs font-bold drop-shadow-md flex items-center gap-1">
-                      <Play className="w-2.5 h-2.5" fill="currentColor" />
-                      {code}
-                    </p>
-                  )}
-                  {platform && (
-                    <p className="text-sky-400 text-xs font-bold drop-shadow-md">{platform}</p>
-                  )}
-                  {item.remainingLabel && (
-                    <p className="text-emerald-400 text-xs font-bold drop-shadow-md">{item.remainingLabel}</p>
-                  )}
-                  <p className="text-zinc-400 text-[10px] font-medium drop-shadow-md flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5" />
+                  <p className="text-zinc-300 text-xs font-semibold drop-shadow-md flex items-center gap-1.5 mt-0.5">
+                    <Clock className="w-3.5 h-3.5 text-zinc-400" />
                     {lastWatched}
                   </p>
                 </div>
               </div>
             </div>
+
+            {/* Platform logo badge - bottom right corner */}
+            {platform && (
+              platformIconUrl ? (
+                <img
+                  src={platformIconUrl}
+                  alt={platform}
+                  className="absolute bottom-3 right-3 z-15 w-7 h-7 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.6)] object-contain brightness-110 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute bottom-3 right-3 z-15 px-2 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] border-none text-[10px] font-black uppercase tracking-wider text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  {platform}
+                </div>
+              )
+            )}
             {canDelete && (
               <DeleteTrigger
                 onClick={handleTrash}
@@ -615,24 +649,29 @@ const ProgressCard = memo(function ProgressCard({
                 </div>
               )}
             </div>
-            {code ? (
-              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
+            {labelText ? (
+              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
                 <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
-                <span className="text-[11px] font-bold text-white">
-                  {code}
-                  {item.remainingLabel ? ` · ${item.remainingLabel}` : ""}
-                </span>
-              </div>
-            ) : item.remainingLabel ? (
-              <div className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
-                <span className="text-[11px] font-bold text-white">{item.remainingLabel}</span>
+                <span className="text-white drop-shadow-sm">{labelText}</span>
               </div>
             ) : null}
-            <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="absolute bottom-0 left-0 right-0 p-4 pr-16">
               <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">{title}</h3>
-              {platform && <span className="text-xs text-zinc-300">{platform}</span>}
             </div>
+            {/* Platform logo badge - bottom right corner */}
+            {platform && (
+              platformIconUrl ? (
+                <img
+                  src={platformIconUrl}
+                  alt={platform}
+                  className="absolute bottom-3 right-3 z-10 w-7 h-7 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.6)] object-contain brightness-110 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] border-none text-[10px] font-black uppercase tracking-wider text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  {platform}
+                </div>
+              )
+            )}
           </div>
           <div className="p-4 space-y-3">
             <div>
@@ -659,8 +698,8 @@ const ProgressCard = memo(function ProgressCard({
                 {mediaTypeOf(item) === "movie" ? <Film className="w-3 h-3 text-zinc-500" /> : <Tv className="w-3 h-3 text-zinc-500" />}
                 {mediaTypeOf(item) === "movie" ? "Película" : "Serie"}
               </span>
-              <span className="text-[10px] text-zinc-500 inline-flex items-center gap-1.5">
-                <Clock className="w-3 h-3 text-zinc-600" />
+              <span className="text-xs text-zinc-300 font-semibold inline-flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" />
                 {lastWatched}
               </span>
             </div>

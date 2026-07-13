@@ -70,11 +70,11 @@ import {
   preloadImage,
   GENRES,
 } from "@/lib/dashboard/media";
+import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
-const PREVIEW_CLOSE_DELAY_MS = 220;
 
 // Caché local para que la sección NO desaparezca al recargar: se pinta al
 // instante lo último conocido mientras se refresca en segundo plano.
@@ -2134,7 +2134,7 @@ function ContinueWatchingSection({
     clearHoverCloseTimer();
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
       closePreview(itemKey);
-    }, PREVIEW_CLOSE_DELAY_MS);
+    }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
 
 

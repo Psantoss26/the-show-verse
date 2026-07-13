@@ -1,0 +1,1 @@
+export const DASHBOARD_PREVIEW_CLOSE_DELAY_MS = 280;

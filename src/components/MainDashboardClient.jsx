@@ -11,6 +11,7 @@ import {
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -2671,7 +2672,6 @@ export function Row({
   // vista previa pasa de una tarjeta a otra SIN que `hoveredIndex` llegue a null,
   // por lo que las vecinas no rehacen su posición inicial (evita el salto).
   const closeTimeoutRef = useRef(null);
-  const PREVIEW_CLOSE_DELAY_MS = 280;
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
 
@@ -2769,7 +2769,7 @@ export function Row({
       setHoveredIndex(null);
       setHoveredAlignment("center");
       clearHoverBackdrop(item);
-    }, PREVIEW_CLOSE_DELAY_MS);
+    }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
   // Montamos la fila un poco ANTES de que entre en pantalla (margen positivo) para
   // que el Swiper esté listo sin huecos al hacer scroll, pero NO todas a la vez.

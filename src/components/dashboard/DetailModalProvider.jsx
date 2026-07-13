@@ -75,8 +75,13 @@ function readPreviewFromLocation() {
   return { id, media_type: match[1] };
 }
 
-export default function DetailModalProvider({ children }) {
+export default function DetailModalProvider({ children, placement = "center" }) {
   const [activeItem, setActiveItem] = useState(null);
+  // ¿La apertura actual es un CAMBIO de un título a otro con la ficha ya abierta?
+  // En el drawer derecho esto dispara un fundido cruzado en el sitio (en vez de
+  // deslizar). Se pasa como `custom` a <AnimatePresence> para que lo lean tanto la
+  // tarjeta entrante como la saliente.
+  const [switching, setSwitching] = useState(false);
 
   // Refs para que los listeners globales (popstate/keydown) lean siempre el
   // estado más reciente sin re-registrarse ni arrastrar cierres obsoletos.
@@ -89,12 +94,15 @@ export default function DetailModalProvider({ children }) {
   const clearActive = useCallback(() => {
     activeItemRef.current = null;
     setActiveItem(null);
+    setSwitching(false);
   }, []);
 
   // Abre la ficha. `push` controla si tocamos el historial: true en aperturas
   // desde la UI; false al hidratar un deep-link (la URL ya tiene el parámetro).
   const applyOpen = useCallback((item, { push }) => {
     if (!item || item.id == null) return;
+    // Hay ya una ficha abierta => es un cambio de título (fundido cruzado).
+    setSwitching(!!activeItemRef.current);
     if (push && typeof window !== "undefined") {
       const url = buildPreviewUrl(item);
       if (activeItemRef.current && pushedRef.current) {
@@ -155,8 +163,13 @@ export default function DetailModalProvider({ children }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [clearActive]);
 
-  // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
-  useModalGuard({ open: !!activeItem, onClose: closeDetailModal });
+  // Comportamiento común del modal: cierre con Esc y bloqueo de scroll de fondo.
+  // El drawer derecho NO bloquea el scroll: se puede seguir navegando por debajo.
+  useModalGuard({
+    open: !!activeItem,
+    onClose: closeDetailModal,
+    lockScroll: placement !== "right",
+  });
 
   const value = useMemo(
     () => ({ openDetailModal, closeDetailModal, activeItem }),
@@ -167,12 +180,14 @@ export default function DetailModalProvider({ children }) {
     <DetailModalContext.Provider value={value}>
       {children}
 
-      <AnimatePresence>
+      <AnimatePresence custom={switching}>
         {activeItem && (
           <DetailModal
             key={`${getMediaTypeForItem(activeItem)}-${activeItem.id}`}
             item={activeItem}
             onClose={closeDetailModal}
+            placement={placement}
+            switching={switching}
           />
         )}
       </AnimatePresence>

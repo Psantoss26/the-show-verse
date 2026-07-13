@@ -19,7 +19,9 @@ import {
 const DashboardHoverBackdropContext = createContext(null);
 const hoverBackdropCache = new Map();
 const hoverBackdropPending = new Map();
-const HOVER_BACKDROP_SIZE = "w1280";
+const hoverBackdropPreloaded = new Set();
+const HOVER_BACKDROP_SIZE = "original";
+const HOVER_BACKDROP_PRELOAD_LIMIT = 8;
 
 function getHoverBackdropKey(item) {
   if (!item?.id) return null;
@@ -74,23 +76,32 @@ export function DashboardHoverBackdropProvider({ children }) {
     }
 
     if (backdropPath) {
-      preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE)).catch(() => {});
+      preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE), {
+        fetchPriority: "high",
+      }).catch(() => {});
     }
 
     setActiveBackdrop(
       backdropPath
-        ? { key, path: backdropPath, size: HOVER_BACKDROP_SIZE }
+        ? { key, path: backdropPath }
         : null,
     );
   }, []);
 
   const prewarmHoverBackdrop = useCallback(async (item) => {
     const backdropPath = await resolveHoverBackdropPath(item);
-    if (backdropPath) {
-      await preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE)).catch(
-        () => {},
-      );
+    if (!backdropPath) return;
+
+    const url = buildImg(backdropPath, HOVER_BACKDROP_SIZE);
+    if (
+      !hoverBackdropPreloaded.has(url) &&
+      hoverBackdropPreloaded.size >= HOVER_BACKDROP_PRELOAD_LIMIT
+    ) {
+      return;
     }
+
+    hoverBackdropPreloaded.add(url);
+    await preloadImage(url, { fetchPriority: "low" }).catch(() => {});
   }, []);
 
   const clearHoverBackdrop = useCallback((item = null) => {
@@ -139,7 +150,7 @@ export function DashboardHoverBackdropLayer() {
   const { activeBackdrop } = useDashboardHoverBackdrop();
   const shouldReduceMotion = useReducedMotion();
   const imageUrl = activeBackdrop?.path
-    ? buildImg(activeBackdrop.path, activeBackdrop.size || HOVER_BACKDROP_SIZE)
+    ? buildImg(activeBackdrop.path, HOVER_BACKDROP_SIZE)
     : null;
 
   return (

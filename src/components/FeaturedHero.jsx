@@ -1316,7 +1316,7 @@ function FeaturedSlide({
       <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
         <div className="flex max-w-full flex-col items-center text-center sm:block sm:max-w-xl sm:text-left">
             {/* Solo el logo del título; no se muestra el título en texto. */}
-            {logoSrc && (
+            {logoSrc ? (
               <div
                 className="hero-reveal hero-logo-reveal relative mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
                 style={{ "--hero-delay": "80ms" }}
@@ -1330,12 +1330,21 @@ function FeaturedSlide({
                   style={{
                     // SOLO si el logo es oscuro lo pasamos a blanco para que sea
                     // legible sobre el fondo oscuro; si no, sombra normal.
+                    // Se añade un drop-shadow blanco de 1.2px para dar un efecto de trazo
+                    // y hacer más negrita la tipografía muy fina en logos invertidos.
                     filter: logoIsDark
-                      ? "brightness(0) invert(1) drop-shadow(0 3px 12px rgba(0,0,0,0.7))"
+                      ? "brightness(0) invert(1) drop-shadow(0 0 1.2px rgba(255,255,255,0.85)) drop-shadow(0 3px 12px rgba(0,0,0,0.75))"
                       : "drop-shadow(0 4px 20px rgba(0,0,0,0.8))",
                   }}
                 />
               </div>
+            ) : (
+              <h2 
+                className="hero-reveal hero-title-reveal mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:mb-8 sm:text-5xl lg:text-6xl text-center sm:text-left"
+                style={{ "--hero-delay": "80ms" }}
+              >
+                {title}
+              </h2>
             )}
 
             {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
@@ -1555,9 +1564,12 @@ function FeaturedSlide({
                   style={{ "--hero-delay": "170ms" }}
                 >
                   {featuredBadge && (
-                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.8rem] font-black uppercase tracking-wide text-black">
-                      {featuredBadge}
-                    </span>
+                    <>
+                      <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.8rem] font-black uppercase tracking-wide text-black">
+                        {featuredBadge}
+                      </span>
+                      <span className="w-1 h-1 rounded-full bg-white/30 shrink-0" />
+                    </>
                   )}
                   <DetailsMetaGenresRow
                     yearIso={yearOf(movie)}
