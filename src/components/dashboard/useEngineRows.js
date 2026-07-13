@@ -25,6 +25,7 @@ export function toTmdbShape(card) {
     name: card.title,
     original_title: card.title,
     original_name: card.title,
+    logo_path: card.logoPath || card.logo_path || null,
     poster_path: card.posterPath || null,
     backdrop_path: card.backdropPath || null,
     vote_average: typeof card.voteAverage === "number" ? card.voteAverage : 0,

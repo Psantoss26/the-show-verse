@@ -8,7 +8,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, BookmarkPlus, Play, Award, CalendarDays, ChevronRight } from "lucide-react";
+import {
+  Heart,
+  BookmarkPlus,
+  Play,
+  Pause,
+  Award,
+  CalendarDays,
+  ChevronRight,
+  Music2,
+  Loader2,
+  X,
+} from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { getLocalInProgress } from "@/lib/api/progressClient";
@@ -29,7 +40,25 @@ import {
   videoEmbedUrl,
 } from "@/lib/details/videos";
 import LiquidButton from "@/components/LiquidButton";
+import OptimizedImage from "@/components/OptimizedImage";
+import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
+import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+// Filas de acciones + meta/géneros + puntuaciones COMPARTIDAS con
+// DetailsClient/DetailModal y con DashboardBackdropRow: misma UI de ficha rápida.
+import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
+import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import {
+  traktGetItemStatus,
+  traktGetShowWatched,
+  traktSetRating,
+} from "@/lib/api/traktClient";
+import {
+  getWatchedEpisodeCountForSeason,
+  getAvailableEpisodeTotal,
+} from "@/lib/hooks/useTraktEpisodesWatched";
 import {
   buildImg,
   fetchBestWatchingBackdrop,
@@ -38,6 +67,7 @@ import {
   movieBackdropCache,
   getBackdropCacheKey,
   getPreviewBackdropFallback,
+  getBestTrailerCached,
   preloadImage,
   GENRES,
 } from "@/lib/dashboard/media";
@@ -323,24 +353,6 @@ function writeStoredPreviewTrailerVideos(tvId, videos) {
   }
 }
 
-function rememberPlayablePreviewTrailer(tvId, video, videos) {
-  const preferredKey = getVideoIdentity(video);
-  if (!tvId || !preferredKey || !Array.isArray(videos)) return videos;
-
-  const tvKey = String(tvId);
-  const alreadyPreferred =
-    verifiedPreviewTrailerKeys.get(tvKey) === preferredKey &&
-    getVideoIdentity(videos[0]) === preferredKey;
-  if (alreadyPreferred) return videos;
-
-  const prioritized = prioritizePreviewTrailer(videos, preferredKey);
-  const cacheKey = `tv:${tvId}`;
-  verifiedPreviewTrailerKeys.set(tvKey, preferredKey);
-  previewTrailerVideosCache.set(cacheKey, prioritized);
-  writeStoredPreviewTrailerVideos(tvId, prioritized);
-  return prioritized;
-}
-
 async function fetchPreviewTrailerVideos(tvId) {
   if (!tvId) return EMPTY_ARRAY;
   const cacheKey = `tv:${tvId}`;
@@ -495,23 +507,6 @@ async function resolvePreviewTrailerVideos(tvId) {
   return videos;
 }
 
-function pickNextPreviewTrailer(videos, currentVideo, skippedKeys) {
-  if (!Array.isArray(videos) || !videos.length) return null;
-  const currentKey = getVideoIdentity(currentVideo);
-  const currentIndex = videos.findIndex(
-    (candidate) => getVideoIdentity(candidate) === currentKey,
-  );
-
-  for (let i = 1; i <= videos.length; i += 1) {
-    const candidate = videos[(Math.max(currentIndex, 0) + i) % videos.length];
-    const candidateKey = getVideoIdentity(candidate);
-    if (candidateKey && !skippedKeys.has(candidateKey)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
 function buildPreviewTrailerSrc(video) {
   const embedUrl = videoEmbedUrl(video, true);
   if (!embedUrl) return null;
@@ -552,12 +547,6 @@ function buildPreviewTrailerSrc(video) {
   }
 
   return embedUrl;
-}
-
-function previewTrailerMessageOrigin(video) {
-  if (video?.site === "YouTube") return PREVIEW_TRAILER_YOUTUBE_ORIGIN;
-  if (video?.site === "Vimeo") return PREVIEW_TRAILER_VIMEO_ORIGIN;
-  return "*";
 }
 
 function loadYouTubeIframeApi() {
@@ -611,9 +600,21 @@ function nextEpisodeHref(show) {
   return `/details/tv/${show.id}`;
 }
 
-function genresText(show) {
-  const names = Array.isArray(show?.genres) ? show.genres : EMPTY_ARRAY;
-  return names.slice(0, 2).join(" • ");
+// Fecha de estreno del episodio del calendario, en español y de forma discreta.
+// Solo se usa como respaldo cuando el item no trae `calendar.countdown`.
+function formatEpisodeAirDate(airDate) {
+  if (!airDate) return null;
+  const d = new Date(`${airDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  try {
+    return d.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return airDate;
+  }
 }
 
 // Carga el backdrop con el mismo criterio visual de En progreso/Completadas.
@@ -860,47 +861,92 @@ function ContinueWatchingPreviewCard({
   const { backdropPath, ready } = useShowBackdrop(show);
   const posterPath = useShowPoster(show);
 
+  const isCalendar = mode === "calendar";
+  const ep = show?.nextEpisode;
+  const calendar = show?.calendar || null;
+
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  // Extras del panel ampliado: nota TMDb, nota IMDb, premios, temporadas y año.
-  // Se pintan al instante desde caché si ya se cargaron; si no, se piden al hacer
-  // hover (que es cuando esta tarjeta se monta) y aparecen con un fundido suave.
+  // Extras del panel ampliado: nota TMDb, nota IMDb, premios, temporadas, año,
+  // estado y géneros. Se pintan al instante desde caché si ya se cargaron; si no,
+  // se piden al hacer hover (cuando la tarjeta se monta) con un fundido suave.
   const [extras, setExtras] = useState(
     () => continueWatchingExtrasCache.get(show?.id) || null,
   );
 
-  // Resolvemos el trailer de forma SÍNCRONA desde la caché ya precalentada (la
-  // fila precalienta los trailers visibles), de modo que el iframe esté presente
-  // desde el primer render: el trailer se muestra al instante, sin esperas,
-  // intentos ni parpadeos. Solo si no estuviera en caché se carga después.
-  const initialTrailerVideos = readCachedPreviewTrailerVideos(show?.id) || EMPTY_ARRAY;
-  const [trailer, setTrailer] = useState(initialTrailerVideos[0] || null);
-  // El iframe se mantiene OCULTO (con el backdrop fijo debajo) hasta que el
-  // vídeo realmente empieza a reproducirse. Así los intentos fallidos (trailers
-  // no embebibles que obligan a probar el siguiente) ocurren de forma invisible:
-  // no se ve ningún parpadeo, solo el backdrop estable, y el trailer aparece
-  // cuando uno funciona.
-  const [trailerVisible, setTrailerVisible] = useState(false);
+  // Tráiler: MISMO modelo que BackdropPreviewCard. Un único tráiler resuelto con
+  // `getBestTrailerCached`, autoplay ~1s tras el hover y `useTrailerAutoDismiss`
+  // para ocultarlo (volver al backdrop) si está restringido o no es embebible.
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [trailer, setTrailer] = useState(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const trailerIframeRef = useRef(null);
+
+  useTrailerAutoDismiss({
+    open: showTrailer,
+    iframeRef: trailerIframeRef,
+    videoKey: trailer?.key,
+    onUnavailable: () => setShowTrailer(false),
+  });
+
+  // Soundtrack (mismo mecanismo que BackdropPreviewCard/InlinePreviewCard):
+  // búsqueda de la canción con preview y reproducción en un overlay interno.
+  const [soundtrackTrack, setSoundtrackTrack] = useState(null);
+  const [soundtrackLoading, setSoundtrackLoading] = useState(false);
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
+  const [soundtrackOpen, setSoundtrackOpen] = useState(false);
+  const [soundtrackError, setSoundtrackError] = useState("");
+  const audioRef = useRef(null);
+  const soundtrackAbortRef = useRef(null);
+
+  // Estado de Trakt para el control de "visto" (<TraktWatchedControl>): conexión,
+  // visto, plays y badge de progreso (%) para series.
+  const [traktInfo, setTraktInfo] = useState({
+    connected: false,
+    watched: false,
+    plays: 0,
+    badge: null,
+    loading: false,
+  });
+  // Puntuación del usuario (Trakt) para el <StarRating> de la fila de acciones.
+  const [rating, setRating] = useState(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
+  // Modal de valoración de episodios (solo series).
+  const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
 
   const href = nextEpisodeHref(show);
   const prefetchedRef = useRef(false);
-  const trailerIframeRef = useRef(null);
-  const trailerPlayerRef = useRef(null);
-  const trailerRevealTimerRef = useRef(null);
-  const trailerPlayTimeoutRef = useRef(null);
-  const trailerVideosRef = useRef(initialTrailerVideos);
-  const skippedTrailerKeysRef = useRef(new Set());
 
+  // Reinicio del soundtrack al cambiar de título.
   useEffect(() => {
-    const cachedVideos = readCachedPreviewTrailerVideos(show?.id) || EMPTY_ARRAY;
-    trailerVideosRef.current = cachedVideos;
-    skippedTrailerKeysRef.current = new Set();
-    setTrailer(cachedVideos[0] || null);
-    setTrailerVisible(false);
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackTrack(null);
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+    setSoundtrackError("");
   }, [show?.id]);
+
+  // Cierre del overlay de soundtrack con Escape.
+  useEffect(() => {
+    if (!soundtrackOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      soundtrackAbortRef.current?.abort();
+      soundtrackAbortRef.current = null;
+      audioRef.current?.pause();
+      setSoundtrackLoading(false);
+      setSoundtrackPlaying(false);
+      setSoundtrackOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [soundtrackOpen]);
 
   // Carga de extras (nota, IMDb, premios, temporadas, año). Un único getDetails de
   // TV ya trae vote_average, número de temporadas/episodios, first_air_date y
@@ -964,6 +1010,14 @@ function ContinueWatchingPreviewCard({
               .slice(0, 2)
               .join(" • ")
           : null;
+        // Géneros como objetos {id,name} para <DetailsMetaGenresRow> (mismo
+        // formato que DashboardBackdropRow); la fila los traduce y recorta sola.
+        const genreObjects = Array.isArray(details?.genres)
+          ? details.genres
+              .filter((g) => g && (g.id != null || g.name))
+              .map((g) => ({ id: g.id ?? g.name, name: g.name }))
+          : [];
+        const status = details?.status || null;
         const imdbId = details?.external_ids?.imdb_id || null;
 
         let awards = null;
@@ -980,7 +1034,17 @@ function ContinueWatchingPreviewCard({
           }
         }
 
-        const next = { rating, imdbRating, awards, seasons, year, genresEs, episodeName };
+        const next = {
+          rating,
+          imdbRating,
+          awards,
+          seasons,
+          year,
+          genresEs,
+          episodeName,
+          status,
+          genreObjects,
+        };
         continueWatchingExtrasCache.set(cacheKey, next);
         if (!abort) setExtras(next);
       } catch {
@@ -993,6 +1057,8 @@ function ContinueWatchingPreviewCard({
             year: null,
             genresEs: null,
             episodeName: null,
+            status: null,
+            genreObjects: [],
           });
       }
     })();
@@ -1037,164 +1103,116 @@ function ContinueWatchingPreviewCard({
     };
   }, [show, session, account, mediaType]);
 
-  // Solo si el trailer NO estaba resuelto lo esperamos desde la misma promesa
-  // de precalentamiento. Así un hover temprano no dispara una segunda ruta lenta.
+  // Estado de Trakt del título (visto/plays/puntuación) y, para series, el badge
+  // de progreso (%) calculado con las temporadas de TMDb. Portado de
+  // BackdropPreviewCard: alimenta <TraktWatchedControl> y <StarRating>.
   useEffect(() => {
-    if (trailer || !show?.id) return;
-    let cancel = false;
+    const id = show?.id;
+    if (!id) return undefined;
+    let cancelled = false;
+    const isTv = mediaType === "tv";
+
     (async () => {
       try {
-        const videos = await resolvePreviewTrailerVideos(show.id);
-        if (cancel) return;
-        trailerVideosRef.current = videos;
-        setTrailer(videos[0] || null);
+        setTraktInfo((prev) => ({ ...prev, loading: true }));
+        setRatingLoading(true);
+
+        const status = await traktGetItemStatus({
+          type: isTv ? "show" : "movie",
+          tmdbId: id,
+        });
+        if (cancelled) return;
+
+        const connected = !!status?.connected;
+        const ratingValue =
+          status?.rating == null || !Number.isFinite(Number(status.rating))
+            ? null
+            : Number(status.rating);
+        setRating(ratingValue);
+        setRatingLoading(false);
+
+        if (!isTv) {
+          setTraktInfo({
+            connected,
+            watched: !!status?.watched,
+            plays: Number(status?.plays || 0),
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        if (!connected) {
+          setTraktInfo({
+            connected: false,
+            watched: false,
+            plays: 0,
+            badge: null,
+            loading: false,
+          });
+          return;
+        }
+
+        const [watchedRes, details] = await Promise.all([
+          traktGetShowWatched({ tmdbId: id }).catch(() => null),
+          getDetails("tv", id).catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        const watchedBySeason = watchedRes?.watchedBySeason || {};
+        const seasonsList = Array.isArray(details?.seasons)
+          ? details.seasons
+          : [];
+        const usable = seasonsList.filter(
+          (s) => typeof s?.season_number === "number" && s.season_number > 0,
+        );
+        const totalEpisodes = usable.reduce(
+          (acc, s) => acc + getAvailableEpisodeTotal(s),
+          0,
+        );
+        const watchedEpisodes = usable.reduce((acc, s) => {
+          const total = getAvailableEpisodeTotal(s);
+          return (
+            acc +
+            getWatchedEpisodeCountForSeason(
+              watchedBySeason,
+              s.season_number,
+              total,
+            )
+          );
+        }, 0);
+        const pctWatched =
+          totalEpisodes > 0
+            ? Math.min(
+                100,
+                Math.max(0, Math.round((watchedEpisodes / totalEpisodes) * 100)),
+              )
+            : 0;
+        const badge = pctWatched > 0 ? `${pctWatched}%` : null;
+
+        const hasAnyWatched = Object.values(watchedBySeason || {}).some(
+          (eps) => Array.isArray(eps) && eps.length > 0,
+        );
+
+        setTraktInfo({
+          connected: true,
+          watched: hasAnyWatched,
+          plays: 0,
+          badge,
+          loading: false,
+        });
       } catch {
-        // Sin trailer: queda el backdrop como fondo.
+        if (!cancelled) {
+          setTraktInfo((prev) => ({ ...prev, loading: false }));
+          setRatingLoading(false);
+        }
       }
     })();
-    return () => {
-      cancel = true;
-    };
-  }, [show?.id, trailer]);
-
-  useEffect(() => {
-    if (!trailer?.key) return;
-
-    // Cada vez que cambia el vídeo (incluido un reintento tras fallo) ocultamos
-    // el iframe: solo se revelará cuando ESE vídeo empiece a reproducirse, de
-    // modo que los reintentos no producen ningún parpadeo (queda el backdrop).
-    setTrailerVisible(false);
-
-    const clearReveal = () => {
-      if (trailerRevealTimerRef.current) {
-        window.clearTimeout(trailerRevealTimerRef.current);
-        trailerRevealTimerRef.current = null;
-      }
-    };
-    const clearPlayTimeout = () => {
-      if (trailerPlayTimeoutRef.current) {
-        window.clearTimeout(trailerPlayTimeoutRef.current);
-        trailerPlayTimeoutRef.current = null;
-      }
-    };
-    const skipCurrentTrailer = () => {
-      clearReveal();
-      clearPlayTimeout();
-      setTrailer((currentTrailer) => {
-        const currentKey = getVideoIdentity(currentTrailer);
-        if (currentKey) skippedTrailerKeysRef.current.add(currentKey);
-        return pickNextPreviewTrailer(
-          trailerVideosRef.current,
-          currentTrailer,
-          skippedTrailerKeysRef.current,
-        );
-      });
-    };
-    const revealTrailer = (delay = 0) => {
-      clearReveal();
-      trailerRevealTimerRef.current = window.setTimeout(() => {
-        setTrailerVisible(true);
-        trailerRevealTimerRef.current = null;
-      }, delay);
-    };
-    clearReveal();
-    clearPlayTimeout();
-
-    if (trailer.site !== "YouTube") {
-      // Vimeo no expone el mismo estado PLAYING mediante la API actual; para
-      // estos embeds mantenemos el respaldo visual sobre el backdrop.
-      revealTrailer(PREVIEW_TRAILER_FALLBACK_REVEAL_MS);
-      return () => {
-        clearReveal();
-        clearPlayTimeout();
-      };
-    }
-
-    let cancelled = false;
-    trailerPlayTimeoutRef.current = window.setTimeout(() => {
-      if (!cancelled) skipCurrentTrailer();
-    }, PREVIEW_TRAILER_YOUTUBE_PLAY_TIMEOUT_MS);
-
-    loadYouTubeIframeApi().then((YT) => {
-      if (cancelled || !YT?.Player || !trailerIframeRef.current) return;
-
-      trailerPlayerRef.current = new YT.Player(trailerIframeRef.current, {
-        events: {
-          onReady: (event) => {
-            if (cancelled) return;
-            try {
-              // Reproducción SILENCIADA: no desmuteamos (el navegador bloquearía
-              // el autoplay con sonido y dejaría el vídeo en pausa). Solo
-              // aseguramos que arranque.
-              event.target.mute?.();
-              event.target.playVideo?.();
-            } catch {
-              // La URL ya incluye autoplay=1&mute=1.
-            }
-          },
-          onStateChange: (event) => {
-            if (cancelled) return;
-            // PLAYING (1): ya hay fotograma. En YouTube esperamos un poco más
-            // para no mostrar su chrome inicial ni overlays internos.
-            if (Number(event?.data) === 1) {
-              clearPlayTimeout();
-              trailerVideosRef.current = rememberPlayablePreviewTrailer(
-                show?.id,
-                trailer,
-                trailerVideosRef.current,
-              );
-              revealTrailer(
-                trailer.site === "YouTube"
-                  ? PREVIEW_TRAILER_YOUTUBE_REVEAL_DELAY_MS
-                  : PREVIEW_TRAILER_REVEAL_DELAY_MS,
-              );
-              return;
-            }
-            // Si YouTube pausa o termina por su cuenta, recuperamos el backdrop
-            // antes de que pueda dibujar su icono central o la pantalla final.
-            if (Number(event?.data) === 0 || Number(event?.data) === 2) {
-              clearReveal();
-              setTrailerVisible(false);
-              try {
-                if (Number(event?.data) === 0) event.target.seekTo?.(0, true);
-                event.target.playVideo?.();
-              } catch {
-                // El parámetro loop sigue actuando como respaldo.
-              }
-            }
-          },
-          onError: () => {
-            if (cancelled) return;
-            // Salta al siguiente vídeo SIN revelar el actual (sigue oculto), así
-            // el intento fallido no se ve. El efecto se relanza con el nuevo
-            // vídeo y vuelve a esperar a su reproducción.
-            skipCurrentTrailer();
-          },
-          onAutoplayBlocked: () => {
-            if (cancelled) return;
-            // El bloqueo de autoplay afecta al reproductor, no al vídeo elegido:
-            // mantenemos el backdrop y evitamos descargar todos los candidatos.
-            clearReveal();
-            clearPlayTimeout();
-            setTrailerVisible(false);
-          },
-        },
-      });
-    });
 
     return () => {
       cancelled = true;
-      clearReveal();
-      clearPlayTimeout();
-      try {
-        trailerPlayerRef.current?.destroy?.();
-      } catch {
-        // El iframe puede haber sido desmontado por React.
-      } finally {
-        trailerPlayerRef.current = null;
-      }
     };
-  }, [show?.id, trailer]);
+  }, [show?.id, mediaType]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -1261,20 +1279,204 @@ function ContinueWatchingPreviewCard({
     }
   };
 
+  const closeSoundtrackOverlay = (e) => {
+    e?.stopPropagation();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = null;
+    audioRef.current?.pause();
+    setSoundtrackLoading(false);
+    setSoundtrackPlaying(false);
+    setSoundtrackOpen(false);
+  };
+
+  // Puntuación optimista en Trakt (StarRating). Revierte la nota local si falla.
+  const handleRatePreview = async (value) => {
+    if (!traktInfo.connected) {
+      requireLogin();
+      return false;
+    }
+    if (ratingLoading || !show) return false;
+
+    const previousRating = rating;
+    const optimisticRating = value == null ? null : Number(value);
+
+    try {
+      setRatingLoading(true);
+      setError("");
+      setRating(optimisticRating);
+      const res = await traktSetRating({
+        type: mediaType === "tv" ? "show" : "movie",
+        tmdbId: show.id,
+        rating: value,
+      });
+      const saved =
+        res?.rating == null || !Number.isFinite(Number(res.rating))
+          ? optimisticRating
+          : Number(res.rating);
+      setRating(saved);
+      return true;
+    } catch {
+      setRating(previousRating);
+      setError("No se pudo guardar la puntuación.");
+      return false;
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
+  const handleToggleTrailer = async (e) => {
+    e?.stopPropagation?.();
+    closeSoundtrackOverlay();
+    if (showTrailer) {
+      setShowTrailer(false);
+      return;
+    }
+    try {
+      setTrailerLoading(true);
+      setError("");
+      const t = await getBestTrailerCached(show.id, mediaType);
+      if (!t?.key) {
+        setTrailer(null);
+        setShowTrailer(false);
+        setError("No hay trailer disponible para este título.");
+        return;
+      }
+      setTrailer(t);
+      setShowTrailer(true);
+    } catch {
+      setTrailer(null);
+      setShowTrailer(false);
+      setError("No se pudo cargar el trailer.");
+    } finally {
+      setTrailerLoading(false);
+    }
+  };
+
+  // Autoplay del tráiler ~1s tras el hover: esta tarjeta se MONTA al hacer hover,
+  // así que el temporizador al montar equivale a "poco después del hover"; el
+  // cleanup lo cancela al des-hover.
+  const autoTrailerRef = useRef(null);
+  autoTrailerRef.current = {
+    showTrailer,
+    trailerLoading,
+    play: handleToggleTrailer,
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const s = autoTrailerRef.current;
+      if (s && !s.showTrailer && !s.trailerLoading) s.play();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleToggleSoundtrack = async (e) => {
+    e.stopPropagation();
+    if (soundtrackLoading) return;
+
+    if (soundtrackOpen) {
+      closeSoundtrackOverlay();
+      return;
+    }
+
+    if (showTrailer) setShowTrailer(false);
+    setSoundtrackOpen(true);
+    setSoundtrackError("");
+
+    if (soundtrackTrack?.previewUrl) return;
+
+    const controller = new AbortController();
+    soundtrackAbortRef.current?.abort();
+    soundtrackAbortRef.current = controller;
+    setSoundtrackLoading(true);
+
+    try {
+      const title = show.title || show.name || "";
+      const params = new URLSearchParams({
+        title,
+        type: mediaType,
+        country: "ES",
+        tmdbId: String(show.id),
+      });
+      const originalTitle = show.original_title || show.original_name;
+      if (originalTitle && originalTitle !== title) {
+        params.set("originalTitle", originalTitle);
+      }
+      if (extras?.year) params.set("year", String(extras.year));
+
+      const response = await fetch(`/api/soundtrack?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`Soundtrack HTTP ${response.status}`);
+
+      const data = await response.json();
+      const track = Array.isArray(data?.tracks)
+        ? data.tracks.find((entry) => entry?.previewUrl)
+        : null;
+
+      if (!track?.previewUrl) {
+        setSoundtrackError(
+          "No se encontró una canción con preview para este título.",
+        );
+        return;
+      }
+
+      setSoundtrackTrack({
+        id: track.id || track.previewUrl,
+        previewUrl: track.previewUrl,
+        trackName: track.trackName || track.name || "Soundtrack",
+        artistName: track.artistName || "",
+        artworkUrl: track.artworkUrl || "",
+        source: track.source || "",
+      });
+    } catch (requestError) {
+      if (requestError?.name !== "AbortError") {
+        setSoundtrackError("No se pudo cargar el soundtrack.");
+      }
+    } finally {
+      if (soundtrackAbortRef.current === controller) {
+        soundtrackAbortRef.current = null;
+        setSoundtrackLoading(false);
+      }
+    }
+  };
+
+  const handleToggleSoundtrackPlayback = async (e) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio || !soundtrackTrack?.previewUrl) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+
+    audio.volume = 0.3;
+    try {
+      await audio.play();
+    } catch {
+      setSoundtrackPlaying(false);
+    }
+  };
+
   const bgSrc = backdropPath
     ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
     : null;
-  const trailerSrc = buildPreviewTrailerSrc(trailer);
+  const trailerSrc = trailer?.key
+    ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
+      `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
+      `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
+      `&enablejsapi=1&origin=${
+        typeof window !== "undefined"
+          ? encodeURIComponent(window.location.origin)
+          : ""
+      }`
+    : null;
   const pct = clampPct(show?.pct);
-  const ep = show?.nextEpisode;
-  const isCalendar = mode === "calendar";
-  const calendar = show?.calendar || null;
-  const genres = genresText(show);
-
-  const progressLabel =
-    Number.isFinite(show?.completed) && Number.isFinite(show?.aired)
-      ? `${show.completed}/${show.aired} eps`
-      : "";
+  const tmdbRating =
+    typeof extras?.rating === "number" ? extras.rating.toFixed(1) : null;
+  const episodeAirLabel =
+    calendar?.countdown || formatEpisodeAirDate(ep?.airDate);
+  const episodeTitle = ep?.title || extras?.episodeName || null;
 
   // Determinar la alineación horizontal de la tarjeta absoluta
   const activeIdx = typeof activeIndex === "number" ? activeIndex : 0;
@@ -1283,16 +1485,22 @@ function ContinueWatchingPreviewCard({
   const isRightBoundary =
     index === activeIdx + visibleCount - 1 || index === totalCount - 1;
 
+  // Preview anclada por la IMAGEN (igual que las filas backdrop): el panel va con
+  // top:50% y marginTop=-½ alto de imagen, así el CENTRO del backdrop cae sobre el
+  // centro de la tarjeta base y la escala crece desde ese mismo centro.
+  const [previewRef, previewImgHalf] = usePreviewImageHalf(true);
+
   let alignmentClass = "left-1/2 -translate-x-1/2";
-  let transformOrigin = "center center";
+  let originX = "center";
 
   if (isLeftBoundary) {
     alignmentClass = "left-0";
-    transformOrigin = "left center";
+    originX = "left";
   } else if (isRightBoundary) {
     alignmentClass = "right-0";
-    transformOrigin = "right center";
+    originX = "right";
   }
+  const transformOrigin = `${originX} ${previewImgHalf}px`;
 
   // Vista previa ~1,6× la tarjeta base (como el spotlight): más ancha que antes
   // para que el backdrop se vea más grande y quepa el panel de info ampliado.
@@ -1317,6 +1525,7 @@ function ContinueWatchingPreviewCard({
           : "(min-width:1536px) 560px, (min-width:1280px) 500px, 420px";
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, scale: 0.9, y: 0 }}
       animate={{ opacity: 1, scale: previewScale, y: -8 }}
@@ -1327,9 +1536,10 @@ function ContinueWatchingPreviewCard({
         damping: 20,
         mass: 0.8
       }}
+      ref={previewRef}
       // El ancho se calcula según las tarjetas visibles del breakpoint activo:
       // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
-      className={`absolute top-1/2 -translate-y-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
+      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
       onClick={() => openDetailModal?.(show)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -1339,13 +1549,14 @@ function ContinueWatchingPreviewCard({
       onFocus={prefetchHref}
       style={{
         width: previewMaxWidth,
+        marginTop: -previewImgHalf,
         willChange: "transform, opacity",
         transformOrigin,
       }}
     >
-      {/* Backdrop de 16:9 */}
+      {/* Backdrop de 16:9 (+ tráiler al reproducir) */}
       <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
-        {!ready && (
+        {!showTrailer && !ready && (
           <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
@@ -1356,7 +1567,7 @@ function ContinueWatchingPreviewCard({
           </div>
         )}
 
-        {bgSrc && (
+        {!showTrailer && bgSrc && (
           <motion.div
             initial={{ scale: 1 }}
             animate={{ scale: 1.08 }}
@@ -1380,83 +1591,49 @@ function ContinueWatchingPreviewCard({
           </motion.div>
         )}
 
-        {trailerSrc && (
-          <motion.div
-            // Oculto hasta que el vídeo se reproduce de verdad: durante la carga
-            // y los reintentos queda el backdrop estable (sin parpadeos) y el
-            // trailer aparece con un fundido suave cuando empieza a reproducirse.
-            initial={{ opacity: 0 }}
-            animate={{ opacity: trailerVisible ? 1 : 0 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-          >
-            <iframe
-              key={getVideoIdentity(trailer)}
-              ref={trailerIframeRef}
-              className="pointer-events-none absolute inset-0 block h-full w-full border-0 bg-black"
-              src={trailerSrc}
-              title={`Trailer - ${show?.title || ""}`}
-              width="1280"
-              height="720"
-              loading="eager"
-              tabIndex={-1}
-              aria-hidden="true"
-              allow="autoplay; encrypted-media"
-              allowFullScreen={false}
-              referrerPolicy="strict-origin-when-cross-origin"
-              onLoad={() => {
-                // Respaldo de autoplay/volumen para iframes que ya aceptan
-                // comandos por postMessage antes de que la API termine de montar.
-                try {
-                  const win = trailerIframeRef.current?.contentWindow;
-                  if (!win) return;
-                  const targetOrigin = previewTrailerMessageOrigin(trailer);
-                  if (trailer.site === "YouTube") {
-                    // Reproducción silenciada: reforzamos mute + play (NO
-                    // desmuteamos, el navegador bloquearía el autoplay con sonido
-                    // y el vídeo se quedaría en pausa con todo el chrome visible).
-                    win.postMessage(
-                      JSON.stringify({
-                        event: "command",
-                        func: "mute",
-                        args: [],
-                      }),
-                      targetOrigin,
-                    );
-                    win.postMessage(
-                      JSON.stringify({
-                        event: "command",
-                        func: "playVideo",
-                        args: [],
-                      }),
-                      targetOrigin,
-                    );
-                    return;
-                  }
-                  if (trailer.site === "Vimeo") {
-                    win.postMessage(
-                      JSON.stringify({ method: "setVolume", value: 0 }),
-                      targetOrigin,
-                    );
-                    win.postMessage(
-                      JSON.stringify({ method: "play" }),
-                      targetOrigin,
-                    );
-                  }
-                } catch {
-                  // ignorar
-                }
-              }}
-            />
-          </motion.div>
+        {showTrailer && (
+          <>
+            {(trailerLoading || !trailerSrc) && (
+              <div className="absolute inset-0 animate-pulse bg-neutral-900" />
+            )}
+            {trailerSrc && (
+              <div className="absolute inset-0 overflow-hidden">
+                <iframe
+                  key={trailer.key}
+                  ref={trailerIframeRef}
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
+                  src={trailerSrc}
+                  title={`Trailer - ${show?.title || ""}`}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen={false}
+                  onLoad={() => {
+                    try {
+                      const win = trailerIframeRef.current?.contentWindow;
+                      if (!win) return;
+                      const target = "https://www.youtube-nocookie.com";
+                      const cmd = (func, args = []) =>
+                        win.postMessage(
+                          JSON.stringify({ event: "command", func, args }),
+                          target,
+                        );
+                      setTimeout(() => {
+                        cmd("unMute");
+                        cmd("setVolume", [30]);
+                      }, 120);
+                    } catch {}
+                  }}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {/* Estado de la tarjeta superpuesto al pie del backdrop */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-black/85" />
         {isCalendar ? (
           // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
-          // abajo en los metadatos (junto a Temporada·Episodio y año). Aquí solo
-          // se conserva el badge "Estreno" para los estrenos (S1E1).
+          // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
+          // "Estreno" para los estrenos (S1E1).
           calendar?.isPremiere ? (
             <div className="absolute inset-x-3 bottom-2">
               <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
@@ -1465,6 +1642,8 @@ function ContinueWatchingPreviewCard({
             </div>
           ) : null
         ) : (
+          // Barra de progreso de "Continuar viendo": se conserva sobre el pie del
+          // backdrop (aunque haya tráiler) para no perder la referencia visual.
           <div className="absolute inset-x-3 bottom-2">
             <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
               <div
@@ -1476,59 +1655,35 @@ function ContinueWatchingPreviewCard({
         )}
       </div>
 
-      {/* Panel de info ampliado (debajo del backdrop), en el lenguaje visual de
-          FeaturedHero/spotlight: acciones arriba, premios, metadatos (episodio ·
-          progreso · año · temporadas), géneros + notas y sinopsis. */}
+      {/* Panel de info (mismo lenguaje visual que BackdropPreviewCard):
+          [Continuar] Reanudar + progreso · acciones compartidas · premios ·
+          [Calendario] línea de episodio · meta/géneros · puntuaciones. */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
       >
-        {/* Título (serie/película) y, si es serie, el episodio (T·E · nombre),
-            ENCIMA de los botones. Una línea cada uno (truncan) para que el panel
-            no cambie de alto cuando llega el nombre del episodio. */}
-        <div className="mb-2.5 min-w-0">
-          <h3 className="truncate text-base font-black leading-tight text-white sm:text-lg">
-            {show?.title || "Sin título"}
-          </h3>
-          {ep && (
-            <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-300 sm:text-xs">
-              <span className="text-amber-300">
-                T{ep.season}·E{ep.number}
-              </span>
-              {ep.title || extras?.episodeName
-                ? ` · ${ep.title || extras.episodeName}`
-                : ""}
-            </p>
-          )}
-        </div>
-
-        {/* Fila de acciones: acción principal + favorito + pendientes */}
-        <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
-          <button
-            type="button"
-            onClick={handleContinue}
-            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-4 sm:text-sm"
+        {/* "Continuar viendo": acción principal Reanudar + progreso circular.
+            Se conserva como acción destacada del panel. Corta la propagación
+            para no abrir la ficha rápida al pulsar sus controles. */}
+        {!isCalendar && (
+          <div
+            className="mb-3 flex items-center gap-2 sm:gap-2.5"
+            onClick={(e) => e.stopPropagation()}
           >
-            {isCalendar ? (
-              <CalendarDays className="h-4 w-4" />
-            ) : (
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-10 sm:px-4 sm:text-sm"
+            >
               <Play className="h-4 w-4 fill-current" />
-            )}
-            <span>
-              {isCalendar
-                ? ep
-                  ? `Ver T${ep.season}·E${ep.number}`
-                  : "Ver serie"
-                : ep
-                  ? `Reanudar T${ep.season}·E${ep.number}`
-                  : "Reanudar"}
-            </span>
-          </button>
+              <span>
+                {ep ? `Reanudar T${ep.season}·E${ep.number}` : "Reanudar"}
+              </span>
+            </button>
 
-          {/* Botón de progreso de visionado (círculo con % y relleno). */}
-          {!isCalendar && (
+            {/* Botón de progreso de visionado (círculo con % y relleno). */}
             <LiquidButton
               onClick={handleContinue}
               active
@@ -1539,146 +1694,268 @@ function ContinueWatchingPreviewCard({
               fillPercentage={pct}
               className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_div>span:first-child]:!text-base sm:[&_div>span:first-child]:!text-lg [&_div>span:last-child]:!text-[9px] sm:[&_div>span:last-child]:!text-[10px] [&_span]:!text-white"
             />
-          )}
+          </div>
+        )}
 
-          <LiquidButton
-            onClick={handleToggleFavorite}
-            loading={loadingStates || updating}
-            active={favorite}
-            activeColor="red"
-            groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
-            title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-          >
-            <Heart className={favorite ? "fill-current" : ""} />
-          </LiquidButton>
-
-          <LiquidButton
-            onClick={handleToggleWatchlist}
-            loading={loadingStates || updating}
-            active={watchlist}
-            activeColor="blue"
-            groupId={isCalendar ? "calendar-preview-actions" : "continue-watching-actions"}
-            title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-            className="!h-10 !w-10 sm:!h-11 sm:!w-11 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-          >
-            <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-          </LiquidButton>
-
-        </div>
-
-        {/* Premios — hueco reservado (min-height) para que la carga tardía de
-            OMDb no desplace el resto; aparece con un fundido suave. */}
-        <div className="mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
-          {extras?.awards && (
-            <motion.span
-              key={extras.awards}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex min-w-0 items-center gap-1.5"
-            >
-              <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="line-clamp-1">{extras.awards}</span>
-            </motion.span>
-          )}
-        </div>
-
-        {/* Metadatos: episodio · progreso · año · temporadas (separadores "•").
-            Si es un rewatch, se antepone una etiqueta que lo indica (el progreso
-            mostrado es el del rewatch, no el del visionado original). */}
-        <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
-          {show?.isRewatch && (
-            <span className="mr-1 inline-flex items-center rounded bg-emerald-500/90 px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-              Rewatch
-            </span>
-          )}
-          {(() => {
-            const parts = [];
-            if (ep)
-              parts.push(
-                <span key="ep" className="text-white">
-                  T{ep.season} · E{ep.number}
-                </span>,
-              );
-            if (isCalendar && calendar?.countdown) {
-              parts.push(
-                <span key="air" className="text-white">
-                  {calendar.countdown}
-                </span>,
-              );
+        {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal (tráiler ·
+            soundtrack · valorar episodios [tv] · Trakt visto · puntuación ·
+            favorito · pendientes). Corta la propagación al onClick de la card. */}
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <DetailActionsRow
+            onTrailer={handleToggleTrailer}
+            trailerAvailable
+            trailerLoading={trailerLoading}
+            trailerLabel="Ver tráiler"
+            trailerPlaying={showTrailer}
+            onSoundtrack={handleToggleSoundtrack}
+            soundtrackAvailable
+            onEpisodeRatings={
+              mediaType === "tv"
+                ? (e) => {
+                    e?.stopPropagation?.();
+                    setEpisodeRatingsOpen(true);
+                  }
+                : undefined
             }
-            if (progressLabel) parts.push(<span key="prog">{progressLabel}</span>);
-            if (show?.remainingLabel)
-              parts.push(
-                <span key="remain" className="text-emerald-400 font-bold">
-                  {show.remainingLabel}
-                </span>,
-              );
-            if (extras?.year) parts.push(<span key="year">{extras.year}</span>);
-            if (extras?.seasons)
-              parts.push(<span key="seasons">{extras.seasons}</span>);
-            return parts.reduce((acc, item, index) => {
-              if (index === 0) return [item];
-              return [
-                ...acc,
-                <span
-                  key={`sep-${index}`}
-                  className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                  aria-hidden="true"
-                >
-                  •
-                </span>,
-                item,
-              ];
-            }, []);
-          })()}
+            episodeRatingsOpen={episodeRatingsOpen}
+            trakt={{
+              connected: traktInfo.connected,
+              watched: traktInfo.watched,
+              plays: traktInfo.plays,
+              badge: traktInfo.badge,
+              busy: false,
+              loading: traktInfo.loading,
+              onOpen: (e) => {
+                e?.stopPropagation?.();
+                openDetailModal?.(show);
+              },
+            }}
+            rate={{
+              rating,
+              max: 10,
+              loading: ratingLoading,
+              onRate: handleRatePreview,
+              connected: traktInfo.connected,
+              onConnect: () => requireLogin(),
+            }}
+            favorite={favorite}
+            favoriteLoading={loadingStates || updating}
+            onToggleFavorite={handleToggleFavorite}
+            watchlist={watchlist}
+            watchlistLoading={loadingStates || updating}
+            onToggleWatchlist={handleToggleWatchlist}
+          />
         </div>
 
-        {/* Géneros (en español, de los detalles es-ES) + notas TMDb/IMDb.
-            Hueco reservado (min-height) igual que la fila de premios: los géneros
-            y las notas llegan con `extras` (tarde), así que sin reservar altura la
-            fila crecía de 0 a una línea y, al estar la tarjeta centrada, daba el
-            saltito. Con el hueco, el tamaño del hover ya es el final desde el inicio. */}
-        <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
-          {(extras?.genresEs || genres) && (
-            <span className="truncate">{extras?.genresEs || genres}</span>
-          )}
-          {extras?.rating && (
-            <span className="inline-flex shrink-0 items-center gap-1.5">
-              <NextImage
-                src="/logo-TMDb.png"
-                alt="TMDb"
-                width={2560}
-                height={1846}
-                sizes="28px"
-                className="h-2.5 w-auto"
-                loading="lazy"
-              />
-              <span className="font-bold">{extras.rating.toFixed(1)}</span>
+        {/* Premios (OMDb) — hueco reservado para que la carga tardía no desplace.
+            En Calendario NO se muestra: la línea de episodio/fecha (abajo) ocupa
+            su lugar, en vez de mostrar ambas. */}
+        {!isCalendar && (
+          <div className="mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+            {extras?.awards && (
+              <motion.span
+                key={extras.awards}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+                className="flex min-w-0 items-center gap-1.5"
+              >
+                <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="line-clamp-1">{extras.awards}</span>
+              </motion.span>
+            )}
+          </div>
+        )}
+
+        {/* Calendario: LÍNEA DE EPISODIO justo encima de la fila meta.
+            Formato: T{season}·E{number} · {nombre episodio} · {fecha/cuenta atrás}.
+            Estilo discreto (como la línea de premios). */}
+        {isCalendar && ep && (
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-300 sm:text-xs">
+            <CalendarDays
+              className="h-3.5 w-3.5 shrink-0 text-amber-300"
+              aria-hidden="true"
+            />
+            <span className="line-clamp-1">
+              <span className="text-amber-300">
+                T{ep.season}·E{ep.number}
+              </span>
+              {episodeTitle ? ` · ${episodeTitle}` : ""}
+              {episodeAirLabel ? ` · ${episodeAirLabel}` : ""}
             </span>
-          )}
-          {typeof extras?.imdbRating === "number" && (
-            <span className="inline-flex shrink-0 items-center gap-1.5">
-              <NextImage
-                src="/logo-IMDb.svg"
-                alt="IMDb"
-                width={575}
-                height={290}
-                sizes="34px"
-                className="h-3 w-auto"
-                loading="lazy"
-              />
-              <span className="font-bold">{extras.imdbRating.toFixed(1)}</span>
-            </span>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
+            año · duración/temporadas · estado · géneros (mismo componente). */}
+        <DetailsMetaGenresRow
+          yearIso={extras?.year || ""}
+          displayRuntimeValue={extras?.seasons || null}
+          status={extras?.status || null}
+          genres={extras?.genreObjects || EMPTY_ARRAY}
+        />
+
+        {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
+        <DetailsRatingsBadges
+          tmdb={tmdbRating ? { value: tmdbRating, sub: null } : null}
+          imdb={
+            typeof extras?.imdbRating === "number"
+              ? { value: extras.imdbRating.toFixed(1), sub: null }
+              : null
+          }
+        />
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>
         )}
       </motion.div>
+
+      {/* Overlay de soundtrack (mismo diseño que BackdropPreviewCard): se pinta
+          dentro de la propia tarjeta y corta la propagación de clics. */}
+      <AnimatePresence>
+        {soundtrackOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden rounded-[inherit] p-4"
+            role="dialog"
+            aria-label={`Soundtrack de ${show?.title || ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {bgSrc && (
+              <NextImage
+                src={bgSrc}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes={previewImageSizes}
+                className="scale-110 object-cover opacity-55 blur-2xl"
+              />
+            )}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl" />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="relative flex min-h-32 w-full max-w-[32rem] items-center gap-4 overflow-hidden rounded-[1.75rem] bg-black/45 bg-gradient-to-br from-white/15 via-white/[0.06] to-black/35 p-4 pr-12 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.16),0_24px_50px_-18px_rgba(0,0,0,0.95)] backdrop-blur-3xl sm:gap-5 sm:p-5 sm:pr-14"
+            >
+              <button
+                type="button"
+                onClick={closeSoundtrackOverlay}
+                autoFocus
+                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/70 transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:h-10 sm:w-10"
+                aria-label="Cerrar soundtrack"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+
+              {soundtrackLoading ? (
+                <div
+                  className="flex min-h-24 w-full items-center justify-center gap-3 text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Loader2 className="h-7 w-7 animate-spin text-amber-300" />
+                  <span className="text-sm font-semibold">
+                    Buscando música...
+                  </span>
+                </div>
+              ) : soundtrackTrack ? (
+                <>
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_18px_35px_-14px_rgba(0,0,0,0.95)] sm:h-32 sm:w-32">
+                    {soundtrackTrack.artworkUrl ? (
+                      <OptimizedImage
+                        src={soundtrackTrack.artworkUrl}
+                        alt={`Portada de ${soundtrackTrack.trackName}`}
+                        decoding="async"
+                        fetchPriority="high"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Music2
+                          className="h-10 w-10 text-amber-300/60"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1 truncate text-[0.62rem] font-bold uppercase tracking-[0.18em] text-white/45 sm:text-[0.68rem]">
+                      {show?.title || ""}
+                    </p>
+                    <h4 className="line-clamp-2 text-base font-black leading-tight text-white drop-shadow-md sm:text-xl">
+                      {soundtrackTrack.trackName}
+                    </h4>
+                    {soundtrackTrack.artistName && (
+                      <p className="mt-1 line-clamp-1 text-xs font-medium text-white/65 sm:text-sm">
+                        {soundtrackTrack.artistName}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleToggleSoundtrackPlayback}
+                      className="mt-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-[0_10px_30px_-12px_rgba(255,255,255,0.35)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/20 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                      aria-label={
+                        soundtrackPlaying ? "Pausar canción" : "Reproducir canción"
+                      }
+                    >
+                      {soundtrackPlaying ? (
+                        <Pause className="h-5 w-5 fill-current" />
+                      ) : (
+                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                      )}
+                    </button>
+
+                    <audio
+                      ref={audioRef}
+                      src={soundtrackTrack.previewUrl}
+                      autoPlay
+                      loop
+                      preload="metadata"
+                      className="hidden"
+                      onLoadedMetadata={(event) => {
+                        event.currentTarget.volume = 0.3;
+                      }}
+                      onPlay={() => setSoundtrackPlaying(true)}
+                      onPause={() => setSoundtrackPlaying(false)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="flex min-h-24 w-full flex-col items-center justify-center gap-2 text-center text-zinc-300"
+                  aria-live="polite"
+                >
+                  <Music2 className="h-8 w-8 text-amber-300/50" />
+                  <p className="max-w-72 text-sm font-medium">
+                    {soundtrackError ||
+                      "No se encontró música para este título."}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
+
+    {/* Valoración de episodios (solo series) — mismo modal que la ficha completa
+        y DetailModal. Fuera del área clicable de la card. */}
+    {mediaType === "tv" && (
+      <EpisodeRatingsModal
+        open={episodeRatingsOpen}
+        onClose={() => setEpisodeRatingsOpen(false)}
+        showId={Number(show.id)}
+        title={show?.title || ""}
+      />
+    )}
+    </>
   );
 }
 
@@ -2090,13 +2367,17 @@ function ContinueWatchingSection({
             }
             modules={[Navigation, FreeMode]}
             // En escritorio el padding vertical amplio crea el espacio para que
-            // la vista previa NUNCA se recorte por arriba/abajo (el truco
-            // py + -my no altera la altura de fila). `pointer-events-none` en el
-            // Swiper hace que ese padding transparente sea atravesable: así no
-            // roba el hover/clic a las filas vecinas; las tarjetas reactivan los
-            // eventos (pointer-events es heredado y el arrastre sigue funcionando
-            // por propagación desde la tarjeta).
-            className={`group relative !py-14 sm:!py-16 md:!py-44 !-my-14 sm:!-my-16 md:!-my-44 ${
+            // la vista previa NUNCA se recorte (el truco padding + -margin no
+            // altera la altura de fila). Es ASIMÉTRICO: más abajo que arriba,
+            // porque el preview se centra por su IMAGEN sobre la tarjeta y el
+            // panel de info crece hacia abajo; y el fondo es algo mayor que en
+            // las filas backdrop porque aquí el panel lleva la fila
+            // Reanudar+progreso extra. `pointer-events-none` en el Swiper hace
+            // que ese padding transparente sea atravesable: así no roba el
+            // hover/clic a las filas vecinas; las tarjetas reactivan los eventos
+            // (pointer-events es heredado y el arrastre sigue funcionando por
+            // propagación desde la tarjeta).
+            className={`group relative !pt-14 sm:!pt-16 md:!pt-44 !pb-44 sm:!pb-56 md:!pb-80 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-44 sm:!-mb-56 md:!-mb-80 ${
               isMobile ? "" : "pointer-events-none"
             }`}
             wrapperClass="flex items-center"

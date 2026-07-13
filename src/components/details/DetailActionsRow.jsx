@@ -35,7 +35,7 @@ import {
 // ningún hijo `.labeled` el comportamiento es idéntico al anterior.
 const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
                 [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
-                [&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
+                [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
                 [&_[data-liquid-button]:not(.labeled)]:!w-full [&_[data-liquid-button]:not(.labeled)]:!h-auto [&_[data-liquid-button]:not(.labeled)]:aspect-square [&_[data-liquid-button]:not(.labeled)]:[container-type:inline-size]
                 [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
@@ -93,6 +93,10 @@ export default function DetailActionsRow({
   // Separación entre botones en móvil (en sm+ siempre es gap-3). Por defecto
   // gap-1 (como DetailsClient); el modal la sube un poco para no verlos pegados.
   mobileGapClass = "gap-1",
+  // Tamaño de los botones-icono en modo "labeled-row" (píldora de tráiler +
+  // iconos): "md" es el tamaño original de las previews del dashboard; "lg" los
+  // agranda (usado en FeaturedHero, una superficie grande).
+  size = "md",
 
   onTrailer,
   trailerAvailable = false,
@@ -134,8 +138,15 @@ export default function DetailActionsRow({
   const mobileCapClass = fillMobile
     ? ""
     : "[&>*:not(.separator)]:max-w-[60px]";
+  // Tamaño de los botones-icono en labeled-row (w-10/h-10 por defecto; w-12/h-12
+  // + icono mayor en "lg"). Se aplica solo cuando la fila es labeled-row.
+  const labeledSizeClass =
+    size === "lg"
+      ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6"
+      : "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10";
   const rowClass = [
     BASE_ROW_CLASS,
+    labeledSizeClass,
     mobileGapClass,
     mobileCapClass,
     trailerLabel ? "labeled-row" : "",
@@ -157,7 +168,9 @@ export default function DetailActionsRow({
           className={[
             trailerAvailable ? "!bg-white !text-black" : "",
             trailerLabel
-              ? "labeled shrink-0 !aspect-auto !h-10 !w-auto !max-w-none px-4"
+              ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none ${
+                  size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
+                }`
               : "",
           ]
             .filter(Boolean)
@@ -171,12 +184,22 @@ export default function DetailActionsRow({
           }
         >
           {trailerPlaying ? (
-            <X className={trailerLabel ? "mr-2 h-4 w-4" : ""} />
+            <X
+              className={
+                trailerLabel
+                  ? size === "lg"
+                    ? "mr-2 h-5 w-5"
+                    : "mr-2 h-4 w-4"
+                  : ""
+              }
+            />
           ) : (
             <Play
               className={`fill-current ${
                 trailerLabel
-                  ? "mr-2 h-4 w-4"
+                  ? size === "lg"
+                    ? "mr-2 h-5 w-5"
+                    : "mr-2 h-4 w-4"
                   : trailerAvailable
                     ? "ml-0.5 sm:ml-1"
                     : ""
@@ -184,7 +207,11 @@ export default function DetailActionsRow({
             />
           )}
           {trailerLabel && (
-            <span className="whitespace-nowrap text-[13px] font-bold">
+            <span
+              className={`whitespace-nowrap font-bold ${
+                size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
+              }`}
+            >
               {trailerPlaying ? "Ocultar" : trailerLabel}
             </span>
           )}

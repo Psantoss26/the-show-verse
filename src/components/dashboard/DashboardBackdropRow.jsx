@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
+import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
@@ -53,6 +54,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { formatCountShort } from "@/lib/details/formatters";
+import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import OptimizedImage from "@/components/OptimizedImage";
 // Fila de acciones + fila meta/géneros + puntuaciones COMPARTIDAS con
@@ -86,6 +88,30 @@ const EMPTY_ARRAY = [];
 // Mismo tamaño de backdrop que las previews del resto del dashboard, para que
 // las imágenes ya cacheadas se reutilicen sin volver a descargar.
 const BACKDROP_SIZE = PREVIEW_BACKDROP_SIZE;
+const SECTION_ACCENTS = {
+  amber: {
+    line: "bg-amber-500",
+    text: "text-amber-400",
+    dot: "text-amber-500",
+    chevron: "text-amber-400",
+    hover: "hover:from-amber-100 hover:via-white hover:to-amber-200",
+  },
+  sky: {
+    line: "bg-sky-500",
+    text: "text-sky-400",
+    dot: "text-sky-400",
+    chevron: "text-sky-400",
+    hover: "hover:from-sky-100 hover:via-white hover:to-sky-200",
+  },
+  fuchsia: {
+    line: "bg-fuchsia-500",
+    text: "text-fuchsia-400",
+    dot: "text-fuchsia-400",
+    chevron: "text-fuchsia-400",
+    hover: "hover:from-fuchsia-100 hover:via-white hover:to-fuchsia-200",
+  },
+};
+
 // Set a nivel de módulo con las URLs de backdrop ya cargadas: evita el shimmer
 // cuando una imagen ya se pintó antes (al volver a montar la tarjeta).
 const loadedBackdropSrcs = new Set();
@@ -297,6 +323,15 @@ function BackdropPreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+
+  // Tráiler restringido (edad/embedding) o no disponible → ocultarlo (fallback
+  // al backdrop) en lugar de mostrar el error de YouTube en la tarjeta.
+  useTrailerAutoDismiss({
+    open: showTrailer,
+    iframeRef: trailerIframeRef,
+    videoKey: trailer?.key,
+    onUnavailable: () => setShowTrailer(false),
+  });
 
   // Soundtrack (mismo mecanismo que InlinePreviewCard): búsqueda de la canción
   // con preview, reproducción en un overlay dentro de la propia tarjeta.
@@ -1302,6 +1337,8 @@ export default function DashboardBackdropRow({
   isMobile,
   hydrated,
   backdropOverrides = {},
+  accent = "amber",
+  labelText,
 }) {
   const { openDetailModal } = useDetailModal();
   const revealProps = useScrollRevealProps();
@@ -1332,6 +1369,8 @@ export default function DashboardBackdropRow({
   }, [hoveredId]);
 
   const displayItems = Array.isArray(items) ? items : EMPTY_ARRAY;
+  const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
+  const sectionLabel = deriveSectionLabel(title, labelText);
   if (displayItems.length === 0) return null;
 
   const clearHoverCloseTimer = () => {
@@ -1434,20 +1473,32 @@ export default function DashboardBackdropRow({
       variants={scaleIn}
       className="relative z-20 mb-5 px-1 pointer-events-none sm:px-0"
     >
+      {sectionLabel && (
+        <div className="mb-1.5 flex items-center gap-2">
+          <div className={`h-px w-8 ${sectionAccent.line}`} />
+          <span
+            className={`text-[10px] font-bold uppercase tracking-widest ${sectionAccent.text}`}
+          >
+            {sectionLabel}
+          </span>
+        </div>
+      )}
       {href ? (
         <Link
           href={href}
-          className="group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 sm:text-2xl md:text-3xl"
+          className={`group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition-all duration-200 ${sectionAccent.hover} active:scale-[0.98] active:opacity-90 sm:text-2xl md:text-3xl`}
           aria-label={`Ver todos los títulos de ${title}`}
         >
           <span>{title}</span>
-          <span className="text-amber-500">.</span>
-          <ChevronRight className="ml-1 h-5 w-5 translate-x-[-4px] text-amber-400 opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
+          <span className={sectionAccent.dot}>.</span>
+          <ChevronRight
+            className={`ml-1 h-5 w-5 translate-x-[-4px] opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6 ${sectionAccent.chevron}`}
+          />
         </Link>
       ) : (
         <h3 className="inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent sm:text-2xl md:text-3xl">
           <span>{title}</span>
-          <span className="text-amber-500">.</span>
+          <span className={sectionAccent.dot}>.</span>
         </h3>
       )}
     </motion.div>

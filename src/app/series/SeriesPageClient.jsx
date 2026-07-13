@@ -1940,6 +1940,7 @@ export default function SeriesPageClient({
                     isMobile={isMobile}
                     hydrated={hydrated}
                     backdropOverrides={EMPTY_OBJECT}
+                    accent="fuchsia"
                   />
                 ) : (
                   <SharedRow

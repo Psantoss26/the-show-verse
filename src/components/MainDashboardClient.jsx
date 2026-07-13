@@ -2,6 +2,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
+import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useInView } from "framer-motion";
@@ -610,7 +611,7 @@ function InlinePreviewCard({
     imdbRating: null,
     overview: null,
   });
-  const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
+  const mediaIdentity = `${mediaType}:${movie?.id || "empty"}`;
   const [stableBackdropState, setStableBackdropState] = useState(() => ({
     mediaIdentity,
     value: backdropOverride,
@@ -647,6 +648,15 @@ function InlinePreviewCard({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+
+  // Si el tráiler está restringido (edad/embedding) o no disponible, ocultarlo
+  // (fallback al backdrop) en vez de mostrar el error de YouTube en la tarjeta.
+  useTrailerAutoDismiss({
+    open: showTrailer,
+    iframeRef: trailerIframeRef,
+    videoKey: trailer?.key,
+    onUnavailable: () => setShowTrailer(false),
+  });
 
   // Datos enriquecidos para la fila meta compartida (<DetailsMetaGenresRow>):
   // estado TMDb crudo, géneros [{id,name}], temporadas y duración de respaldo.
@@ -723,7 +733,7 @@ function InlinePreviewCard({
     return () => {
       cancel = true;
     };
-  }, [movie, session, account]);
+  }, [mediaType, movie, session, account]);
 
   useEffect(() => {
     let cancel = false;
@@ -778,15 +788,19 @@ function InlinePreviewCard({
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const chosen =
-              await fetchBestBackdropNoLang(movie.id, mediaType, {
-                allowLanguageFallback: false,
-              });
+            // Preferimos backdrop textless; si el título no tiene uno (frecuente
+            // en "Más esperadas"/estrenos), caemos al backdrop/póster del propio
+            // item en lugar de dejarlo NEGRO (mismo fallback que la rama normal).
+            const preferred = await fetchBestBackdropNoLang(movie.id, mediaType, {
+              allowLanguageFallback: false,
+            });
+            const chosen = preferred || getPreviewBackdropFallback(movie);
             spotlightBackdropCache.set(backdropCacheKey, chosen);
             revealBackdrop(chosen);
           } catch {
-            spotlightBackdropCache.set(backdropCacheKey, null);
-            revealBackdrop(null);
+            const fallback = getPreviewBackdropFallback(movie);
+            spotlightBackdropCache.set(backdropCacheKey, fallback);
+            revealBackdrop(fallback);
           }
         }
       } else {
@@ -1946,8 +1960,9 @@ function InlinePreviewCardAnticipated({
 }) {
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
+  const mediaType = getMediaTypeForItem(movie);
 
-  const mediaIdentity = `${getMediaTypeForItem(movie)}:${movie?.id || "empty"}`;
+  const mediaIdentity = `${mediaType}:${movie?.id || "empty"}`;
   const [stableBackdropState, setStableBackdropState] = useState(() => ({
     mediaIdentity,
     value: backdropOverride,
@@ -1960,6 +1975,9 @@ function InlinePreviewCardAnticipated({
     getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
   );
   const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
+  const [logoPath, setLogoPath] = useState(
+    () => movie?.logoPath || movie?.logo_path || null,
+  );
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -1967,10 +1985,28 @@ function InlinePreviewCardAnticipated({
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
+  // Datos para el panel de info COMPARTIDO (mismo que InlinePreviewCard): fila
+  // meta (estado · géneros · duración de respaldo) + premios + puntuación IMDb.
+  // Sin trakt/puntuación/soundtrack: son títulos por estrenar ("Más esperadas").
+  const [previewDetails, setPreviewDetails] = useState({
+    status: null,
+    genreObjects: [],
+    runtimeFallback: null,
+  });
+  const [extras, setExtras] = useState({ awards: null, imdbRating: null });
+
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+
+  // Tráiler restringido/no disponible → ocultarlo (fallback al backdrop).
+  useTrailerAutoDismiss({
+    open: showTrailer,
+    iframeRef: trailerIframeRef,
+    videoKey: trailer?.key,
+    onUnavailable: () => setShowTrailer(false),
+  });
 
   useEffect(() => {
     setStableBackdropState((prev) =>
@@ -1987,6 +2023,25 @@ function InlinePreviewCardAnticipated({
   }, [movie?.id]);
 
   useEffect(() => {
+    let cancelled = false;
+    const seedLogoPath = movie?.logoPath || movie?.logo_path || null;
+    setLogoPath(seedLogoPath);
+    if (!movie?.id) return undefined;
+
+    fetchBestLogo(movie.id, mediaType, ["en", null, "es"])
+      .then((path) => {
+        if (!cancelled) setLogoPath(path || seedLogoPath || null);
+      })
+      .catch(() => {
+        if (!cancelled) setLogoPath(seedLogoPath || null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaType, movie?.id, movie?.logoPath, movie?.logo_path]);
+
+  useEffect(() => {
     let cancel = false;
     const load = async () => {
       if (!movie || !session || !account?.id) {
@@ -1996,12 +2051,6 @@ function InlinePreviewCardAnticipated({
       }
       try {
         setLoadingStates(true);
-        const mediaType =
-          movie.media_type === "tv" ||
-          (movie.name && !movie.title) ||
-          movie.first_air_date
-            ? "tv"
-            : "movie";
         const st = await getBackendItemStatus({ type: mediaType, tmdbId: movie.id });
         if (!cancel) {
           setFavorite(!!st.favorite);
@@ -2016,7 +2065,81 @@ function InlinePreviewCardAnticipated({
     return () => {
       cancel = true;
     };
-  }, [movie, session, account]);
+  }, [mediaType, movie, session, account]);
+
+  // Carga (best-effort) de los datos que alimentan el panel compartido: detalles
+  // TMDb (estado · géneros · duración) + IMDb/premios. Espejo de InlinePreviewCard.
+  useEffect(() => {
+    if (!movie?.id) return undefined;
+    let cancelled = false;
+    const isTv = mediaType === "tv";
+
+    (async () => {
+      // Detalles TMDb: estado crudo, géneros [{id,name}] y duración de respaldo.
+      try {
+        const details = await getDetails(mediaType, movie.id).catch(() => null);
+        if (!cancelled && details) {
+          let genreObjects = [];
+          if (Array.isArray(details?.genres) && details.genres.length) {
+            genreObjects = details.genres
+              .filter((g) => g && g.name)
+              .map((g) => ({ id: g.id ?? g.name, name: g.name }));
+          } else {
+            const ids = movie.genre_ids || [];
+            genreObjects = (Array.isArray(ids) ? ids : [])
+              .map((gid) => (GENRES[gid] ? { id: gid, name: GENRES[gid] } : null))
+              .filter(Boolean);
+          }
+
+          let runtimeFallback = null;
+          if (isTv) {
+            if (details?.number_of_seasons) {
+              runtimeFallback = `${details.number_of_seasons} Temp.`;
+              if (details?.number_of_episodes) {
+                runtimeFallback += ` · ${details.number_of_episodes} Eps.`;
+              }
+            }
+          } else {
+            runtimeFallback = formatRuntime(details?.runtime) || null;
+          }
+
+          setPreviewDetails({
+            status: details?.status || null,
+            genreObjects,
+            runtimeFallback,
+          });
+        }
+      } catch {}
+
+      // IMDb (nota) + premios (OMDb) por imdb_id — igual que InlinePreviewCard.
+      try {
+        let imdb = movie?.imdb_id;
+        if (!imdb) {
+          const ext = await getExternalIds(mediaType, movie.id);
+          imdb = ext?.imdb_id || null;
+        }
+        if (imdb) {
+          const [omdb, imdbDataset] = await Promise.all([
+            fetchOmdbByImdb(imdb).catch(() => null),
+            fetchImdbRatingByImdb(imdb).catch(() => null),
+          ]);
+          if (cancelled) return;
+          const rawAwards = omdb?.Awards;
+          const awards =
+            rawAwards && typeof rawAwards === "string" && rawAwards.trim()
+              ? formatDashboardAwards(rawAwards)
+              : null;
+          const imdbRating =
+            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
+          setExtras({ awards, imdbRating });
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaType, movie?.genre_ids, movie?.id, movie?.imdb_id]);
 
   useEffect(() => {
     let abort = false;
@@ -2070,15 +2193,8 @@ function InlinePreviewCardAnticipated({
     };
   }, [movie, stableBackdropOverride]);
 
-  const mediaType =
-    movie.media_type === "tv" ||
-    (movie.name && !movie.title) ||
-    movie.first_air_date
-      ? "tv"
-      : "movie";
-
   const openPreviewModal = () => {
-    openDetailModal?.(movie);
+    openDetailModal?.({ ...movie, logo_path: logoPath || movie?.logo_path || null });
   };
 
   const requireLogin = () => {
@@ -2188,14 +2304,18 @@ function InlinePreviewCardAnticipated({
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
+  const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
   const tmdbRating = ratingOf(movie);
   const hasTmdbRating = tmdbRating !== "–";
-  const genres = (() => {
+  // Géneros como objetos [{id,name}] para <DetailsMetaGenresRow> (fallback
+  // síncrono mientras cargan los detalles TMDb en previewDetails).
+  const syncGenreObjects = (() => {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const names = ids.map((id) => GENRES[id]).filter(Boolean);
-    return names.slice(0, 2).join(" • ");
+    return (Array.isArray(ids) ? ids : [])
+      .map((gid) => (GENRES[gid] ? { id: gid, name: GENRES[gid] } : null))
+      .filter(Boolean);
   })();
 
   // Determinar la alineación horizontal de la tarjeta absoluta.
@@ -2316,6 +2436,25 @@ function InlinePreviewCardAnticipated({
           transition={{ delay: 0.2 }}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70"
         />
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
+          {logoSrc ? (
+            <div className="relative h-12 w-full max-w-[14rem]">
+              <NextImage
+                src={logoSrc}
+                alt={movie.title || movie.name || ""}
+                fill
+                sizes="224px"
+                className="object-contain object-left drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]"
+                loading="eager"
+              />
+            </div>
+          ) : (
+            <h3 className="line-clamp-2 max-w-[90%] text-xl font-black leading-none text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
+              {movie.title || movie.name}
+            </h3>
+          )}
+        </div>
       </div>
 
       {/* Panel de info (debajo del backdrop) */}
@@ -2325,91 +2464,67 @@ function InlinePreviewCardAnticipated({
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
         className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
       >
-        <div className="mb-3 flex items-center gap-2 sm:gap-2.5">
-            <LiquidButton
-              onClick={handleToggleTrailer}
-              loading={trailerLoading}
-              active
-              activeColor="yellow"
-              groupId="dashboard-preview-actions"
-              title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-              className="!h-9 !w-9 !bg-white !text-black [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              {showTrailer ? (
-                <X className="text-black" />
-              ) : (
-                <Play className="ml-0.5 fill-current text-black" />
-              )}
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={handleToggleFavorite}
-              loading={loadingStates || updating}
-              active={favorite}
-              activeColor="red"
-              groupId="dashboard-preview-actions"
-              title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <Heart className={favorite ? "fill-current" : ""} />
-            </LiquidButton>
-
-            <LiquidButton
-              onClick={handleToggleWatchlist}
-              loading={loadingStates || updating}
-              active={watchlist}
-              activeColor="blue"
-              groupId="dashboard-preview-actions"
-              title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              aria-label={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-              className="!h-9 !w-9 [&_svg]:!h-5 [&_svg]:!w-5"
-            >
-              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-            </LiquidButton>
-
+        {/* Fila de acciones COMPARTIDA (mismo estilo que las demás previews):
+            tráiler + favorito + pendiente. Sin trakt/puntuar/soundtrack/episodios
+            (irrelevantes en títulos por estrenar), por eso showSeparator={false}.
+            El contenedor corta la propagación al onClick de la card. */}
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <DetailActionsRow
+            onTrailer={handleToggleTrailer}
+            trailerAvailable
+            trailerLoading={trailerLoading}
+            trailerLabel="Ver tráiler"
+            trailerPlaying={showTrailer}
+            favorite={favorite}
+            favoriteLoading={loadingStates || updating}
+            onToggleFavorite={handleToggleFavorite}
+            watchlist={watchlist}
+            watchlistLoading={loadingStates || updating}
+            onToggleWatchlist={handleToggleWatchlist}
+            showSeparator={false}
+          />
         </div>
 
-        <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden text-[11px] font-semibold text-zinc-200 sm:text-xs">
-          {(() => {
-            const parts = [];
-            if (yearOf(movie)) parts.push(<span key="year">{yearOf(movie)}</span>);
-            if (hasTmdbRating)
-              parts.push(
-                <span key="tmdb" className="inline-flex items-center gap-1.5">
-                  <NextImage
-                    src="/logo-TMDb.png"
-                    alt="TMDb"
-                    width={2560}
-                    height={1846}
-                    sizes="28px"
-                    className="h-2.5 w-auto"
-                    loading="lazy"
-                  />
-                  <span className="font-bold">{tmdbRating}</span>
-                </span>,
-              );
-            return parts.reduce((acc, part, index) => {
-              if (index === 0) return [part];
-              return [
-                ...acc,
-                <span
-                  key={`sep-${index}`}
-                  className="select-none text-[0.8em] font-bold text-zinc-500/70"
-                  aria-hidden="true"
-                >
-                  •
-                </span>,
-                part,
-              ];
-            }, []);
-          })()}
-        </div>
+        {extras?.awards && (
+          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+            <motion.span
+              key={extras.awards}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex min-w-0 items-center gap-1.5"
+            >
+              <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="line-clamp-1">{extras.awards}</span>
+            </motion.span>
+          </div>
+        )}
 
-        <div className="mt-1.5 flex min-h-[1.1rem] flex-nowrap items-center gap-x-3 overflow-hidden text-[11px] text-zinc-200 sm:text-xs">
-          {genres && <span className="truncate">{genres}</span>}
-        </div>
+        {/* Fila meta + géneros COMPARTIDA: año · duración · estado · géneros. */}
+        <DetailsMetaGenresRow
+          yearIso={yearOf(movie)}
+          displayRuntimeValue={previewDetails.runtimeFallback}
+          status={previewDetails.status}
+          genres={
+            previewDetails.genreObjects.length
+              ? previewDetails.genreObjects
+              : syncGenreObjects
+          }
+        />
+
+        {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
+        <DetailsRatingsBadges
+          tmdb={
+            hasTmdbRating
+              ? { value: tmdbRating, sub: formatCountShort(movie.vote_count) }
+              : null
+          }
+          imdb={
+            typeof extras?.imdbRating === "number"
+              ? { value: extras.imdbRating.toFixed(1), sub: null }
+              : null
+          }
+        />
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
@@ -2674,11 +2789,12 @@ export function Row({
     if (rowRef.current && e.currentTarget) {
       const slideRect = e.currentTarget.getBoundingClientRect();
       const rowRect = rowRef.current.getBoundingClientRect();
-      // El popover es ~2.3x el ancho del póster; centrado sobresale ~0.65x el
-      // ancho de la tarjeta a cada lado. Detectamos si, centrado, se saldría de
-      // los límites de la fila para alinearlo hacia dentro (funciona con
-      // cualquier número de tarjetas por fila, no solo 6).
-      const overflowHalf = slideRect.width * 1.2;
+      // El preview mide ~2.9x el ancho del póster (su imagen 16:9 tiene el alto
+      // de la tarjeta), así que CENTRADO sobresale ~previewWidth/2 ≈ 1.5-1.65x el
+      // ancho de la tarjeta a cada lado del centro. Detectamos si, centrado, se
+      // saldría de la fila para alinearlo hacia dentro (izq/der) y empujar solo
+      // hacia dentro (funciona con cualquier nº de tarjetas por fila).
+      const overflowHalf = slideRect.width * 1.6;
       const slideCenter = slideRect.left + slideRect.width / 2;
       const margin = 8;
       const wouldClipLeft = slideCenter - overflowHalf < rowRect.left + margin;
@@ -2777,8 +2893,10 @@ export function Row({
     "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
   const spotlightPreviewWidthClass =
     "w-[604px] sm:w-[711px] md:w-[818px] xl:w-[924px]";
+  // Ancho del preview = alto de la tarjeta póster × 16/9, para que su imagen
+  // backdrop (16:9) mida JUSTO el alto de las tarjetas (220/260/300/340).
   const normalPreviewWidthClass =
-    "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px]";
+    "w-[391px] sm:w-[462px] md:w-[533px] xl:w-[604px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
 
   if (!hasItems) {
@@ -2896,7 +3014,10 @@ export function Row({
       variants={fadeInUp}
       // Las previews superpuestas no pueden convivir con `content-visibility`:
       // el navegador puede recortar el popover al límite de la sección.
-      className={`relative group ${
+      // Con preview activo elevamos el z-index de TODA la fila (como en backdrop)
+      // para que el preview quede SIEMPRE superpuesto y la fila siguiente no lo
+      // tape / recorte por abajo.
+      className={`relative group ${hasActivePreview ? "z-[100]" : ""} ${
         previewKind === "anticipated" || hasActivePreview
           ? ""
           : "sv-deferred-row"
@@ -2920,7 +3041,7 @@ export function Row({
       )}
 
       <div
-        className="relative"
+        className={`relative ${hasActivePreview ? "z-30" : ""}`}
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
           if (hoverTimeoutRef.current) {
@@ -3018,35 +3139,52 @@ export function Row({
                   ? "overflow-visible"
                   : "overflow-hidden";
 
-              // Determinar si el item activo está cerca del borde y calcular transformación
+              // Empuje de vecinos para hacer hueco al preview que se abre.
               let transformClass = "";
               if (
                 !isMobile &&
                 hoveredIndex !== null &&
                 hoveredIndex >= 0 &&
-                previewKind !== "anticipated" &&
-                isSpotlight
+                previewKind !== "anticipated"
               ) {
-                const activeIndex = hoveredIndex;
-                const totalItems = normalizedItems.length;
-
-                // Si el item activo está en los últimos 3 items, desplazar todo hacia la izquierda
-                if (activeIndex >= totalItems - 3) {
-                  if (i <= activeIndex) {
-                    // Items antes o igual al activo se desplazan a la izquierda
+                if (isSpotlight) {
+                  // Spotlight: si el activo está en los últimos 3, desplaza el
+                  // activo (y los previos) a la izquierda para no salirse.
+                  const activeIndex = hoveredIndex;
+                  const totalItems = normalizedItems.length;
+                  if (activeIndex >= totalItems - 3 && i <= activeIndex) {
                     if (activeIndex === totalItems - 1) {
-                      transformClass = isSpotlight
-                        ? "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]"
-                        : "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
+                      transformClass =
+                        "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]";
                     } else if (activeIndex === totalItems - 2) {
-                      transformClass = isSpotlight
-                        ? "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]"
-                        : "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
+                      transformClass =
+                        "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]";
                     } else if (activeIndex === totalItems - 3) {
-                      transformClass = isSpotlight
-                        ? "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]"
-                        : "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
+                      transformClass =
+                        "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]";
                     }
+                  }
+                } else if (i !== hoveredIndex) {
+                  // Filas póster normales: los vecinos se APARTAN para dejar el
+                  // hueco justo del preview (ancho = alto tarjeta × 16/9).
+                  //   HALF = (anchoPreview − anchoTarjeta)/2  (alineado CENTRO,
+                  //          simétrico a ambos lados).
+                  //   FULL = anchoPreview − anchoTarjeta      (pegado a un BORDE:
+                  //          empuja solo hacia dentro, el doble).
+                  const HALF_L =
+                    "sm:-translate-x-[161px] md:-translate-x-[172px] xl:-translate-x-[197px]";
+                  const HALF_R =
+                    "sm:translate-x-[161px] md:translate-x-[172px] xl:translate-x-[197px]";
+                  const FULL_L =
+                    "sm:-translate-x-[322px] md:-translate-x-[343px] xl:-translate-x-[394px]";
+                  const FULL_R =
+                    "sm:translate-x-[322px] md:translate-x-[343px] xl:translate-x-[394px]";
+                  if (hoveredAlignment === "left") {
+                    if (i > hoveredIndex) transformClass = FULL_R;
+                  } else if (hoveredAlignment === "right") {
+                    if (i < hoveredIndex) transformClass = FULL_L;
+                  } else {
+                    transformClass = i < hoveredIndex ? HALF_L : HALF_R;
                   }
                 }
               }
@@ -3092,20 +3230,19 @@ export function Row({
                 standardPreviewX = "0%";
                 standardPreviewOriginX = "right";
               }
-              // Ancla la IMAGEN sobre la tarjeta (marginTop = -½ alto de imagen)
-              // y el origen de la escala en ese centro. Ancho FIJO (320/430/480)
-              // → valores responsive por CSS, SIN ref: framer-motion + React 19
-              // avisan ("Accessing element.ref") si un hijo de AnimatePresence
-              // lleva ref. `_` en el valor arbitrario de origin = espacio.
-              const standardPreviewAnchorClass = `-mt-[90px] md:-mt-[121px] xl:-mt-[135px] ${
-                {
-                  center:
-                    "origin-[center_90px] md:origin-[center_121px] xl:origin-[center_135px]",
-                  left: "origin-[left_90px] md:origin-[left_121px] xl:origin-[left_135px]",
-                  right:
-                    "origin-[right_90px] md:origin-[right_121px] xl:origin-[right_135px]",
-                }[standardPreviewOriginX]
-              }`;
+              // Imagen alineada al borde SUPERIOR de la tarjeta (el panel va con
+              // top-0), así ocupa su MISMO alto; la info cuelga debajo. El origen
+              // de la escala va en el CENTRO de la tarjeta (alto/2 =
+              // 110/130/150/170px) para crecer desde ahí. Valores responsive por
+              // CSS, SIN ref (framer + React 19 avisan si un hijo de
+              // AnimatePresence lleva ref). `_` en el origin arbitrario = espacio.
+              const standardPreviewAnchorClass = {
+                center:
+                  "origin-[center_110px] sm:origin-[center_130px] md:origin-[center_150px] xl:origin-[center_170px]",
+                left: "origin-[left_110px] sm:origin-[left_130px] md:origin-[left_150px] xl:origin-[left_170px]",
+                right:
+                  "origin-[right_110px] sm:origin-[right_130px] md:origin-[right_150px] xl:origin-[right_170px]",
+              }[standardPreviewOriginX];
 
               return (
                 <SwiperSlide
@@ -3177,7 +3314,7 @@ export function Row({
                               }}
                               className={
                                 isStandardPopoverPreview
-                                  ? `absolute top-1/2 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} ${standardPreviewAnchorClass} z-[80] hidden sm:block`
+                                  ? `absolute top-0 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} ${standardPreviewAnchorClass} z-[80] hidden sm:block`
                                   : "hidden sm:block h-full w-full"
                               }
                               style={{ willChange: "transform, opacity" }}
