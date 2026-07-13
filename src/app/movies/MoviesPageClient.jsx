@@ -1958,6 +1958,7 @@ export default function MoviesPageClient({
                     isMobile={isMobile}
                     hydrated={hydrated}
                     backdropOverrides={EMPTY_OBJECT}
+                    accent="sky"
                   />
                 ) : (
                   <SharedRow

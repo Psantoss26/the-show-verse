@@ -11,19 +11,12 @@ import {
 } from "react";
 import NextImage from "next/image";
 import {
-  Play,
-  X,
-  Heart,
-  BookmarkPlus,
-  Eye,
-  EyeOff,
   Award,
   Volume2,
   VolumeX,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  BarChart3,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 import HeroSoundtrackPlayer from "@/components/dashboard/HeroSoundtrackPlayer";
@@ -42,6 +35,11 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { resolveFeaturedHeroPoster } from "@/lib/dashboard/featuredHeroMedia";
+import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
+import { traktGetItemStatus, traktSetRating } from "@/lib/api/traktClient";
+import { formatCountShort } from "@/lib/details/formatters";
 
 import {
   buildImg,
@@ -441,7 +439,18 @@ function FeaturedSlide({
     runtime: null,
     imdbRating: null,
     awards: null,
+    status: null,
   });
+  // Estado de Trakt para el control de "visto" y la puntuación (fila compartida).
+  const [traktInfo, setTraktInfo] = useState({
+    connected: false,
+    watched: false,
+    plays: 0,
+    badge: null,
+    loading: false,
+  });
+  const [rating, setRating] = useState(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
   const [watched, setWatched] = useState(false);
@@ -821,17 +830,20 @@ function FeaturedSlide({
     const load = async () => {
       try {
         let runtime = null;
+        let status = null;
         let imdbId = movie?.imdb_id || null;
 
         if (mediaType === "movie") {
           const details = await getMovieDetails(movie.id).catch(() => null);
           runtime = details?.runtime ? formatRuntime(details.runtime) : null;
+          status = details?.status || null;
         } else {
           const r = await fetch(
             `https://api.themoviedb.org/3/tv/${movie.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
           ).catch(() => null);
           if (r?.ok) {
             const d = await r.json();
+            status = d?.status || null;
             if (d?.number_of_seasons) {
               runtime = `${d.number_of_seasons} Temp.`;
               if (d.number_of_episodes)
@@ -866,16 +878,72 @@ function FeaturedSlide({
           }
         } catch { }
 
-        if (!abort) setExtras({ runtime, imdbRating, awards });
+        if (!abort) setExtras({ runtime, imdbRating, awards, status });
       } catch {
         if (!abort)
-          setExtras({ runtime: null, imdbRating: null, awards: null });
+          setExtras({
+            runtime: null,
+            imdbRating: null,
+            awards: null,
+            status: null,
+          });
       }
     };
 
     load();
     return () => {
       abort = true;
+    };
+  }, [isActive, secondaryReady, movie, mediaType]);
+
+  // Estado de Trakt (visto/plays/puntuación) para la fila de acciones compartida.
+  // Versión ligera del que usa la preview del dashboard: sin el badge de progreso
+  // (%) de series para no cargar temporadas/episodios en el hero.
+  useEffect(() => {
+    let cancel = false;
+    if (!isActive || !secondaryReady || !movie) {
+      setTraktInfo({
+        connected: false,
+        watched: false,
+        plays: 0,
+        badge: null,
+        loading: false,
+      });
+      setRating(null);
+      return;
+    }
+    (async () => {
+      try {
+        setTraktInfo((prev) => ({ ...prev, loading: true }));
+        setRatingLoading(true);
+        const status = await traktGetItemStatus({
+          type: mediaType === "tv" ? "show" : "movie",
+          tmdbId: movie.id,
+        });
+        if (cancel) return;
+        const connected = !!status?.connected;
+        const ratingValue =
+          status?.rating == null || !Number.isFinite(Number(status.rating))
+            ? null
+            : Number(status.rating);
+        setRating(ratingValue);
+        setRatingLoading(false);
+        setTraktInfo({
+          connected,
+          watched: !!status?.watched,
+          plays: Number(status?.plays || 0),
+          badge: null,
+          loading: false,
+        });
+      } catch {
+        if (!cancel) {
+          setRatingLoading(false);
+          setTraktInfo((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    })();
+    return () => {
+      cancel = true;
     };
   }, [isActive, secondaryReady, movie, mediaType]);
 
@@ -890,6 +958,42 @@ function FeaturedSlide({
   };
 
   const openPreviewModal = () => openDetailModal?.(movie);
+
+  // Puntuación en Trakt para el <StarRating> de la fila compartida (optimista,
+  // mismo patrón que la preview del dashboard).
+  const handleRate = async (value) => {
+    if (!traktInfo.connected) {
+      requireLogin();
+      return false;
+    }
+    if (ratingLoading || !movie) return false;
+
+    const previousRating = rating;
+    const optimisticRating = value == null ? null : Number(value);
+
+    try {
+      setRatingLoading(true);
+      setError("");
+      setRating(optimisticRating);
+      const res = await traktSetRating({
+        type: mediaType === "tv" ? "show" : "movie",
+        tmdbId: movie.id,
+        rating: value,
+      });
+      const saved =
+        res?.rating == null || !Number.isFinite(Number(res.rating))
+          ? optimisticRating
+          : Number(res.rating);
+      setRating(saved);
+      return true;
+    } catch {
+      setRating(previousRating);
+      setError("No se pudo guardar la puntuación.");
+      return false;
+    } finally {
+      setRatingLoading(false);
+    }
+  };
 
   const handleToggleTrailer = async (e) => {
     e.stopPropagation();
@@ -975,16 +1079,16 @@ function FeaturedSlide({
     }
   };
 
-  const genresList = useMemo(() => {
+  // Géneros como objetos [{id,name}] para la fila meta compartida
+  // (<DetailsMetaGenresRow>), que ya limita/recorta según el ancho disponible.
+  const genreObjects = useMemo(() => {
     const ids =
       movie.genre_ids ||
       (Array.isArray(movie.genres) ? movie.genres.map((g) => g.id) : []);
-    const limit = isMobile ? 2 : 3;
-    return ids
-      .map((id) => GENRES[id])
-      .filter(Boolean)
-      .slice(0, limit);
-  }, [movie, isMobile]);
+    return (Array.isArray(ids) ? ids : [])
+      .map((id) => (GENRES[id] ? { id, name: GENRES[id] } : null))
+      .filter(Boolean);
+  }, [movie]);
 
   // Etiqueta contextual de la casilla (antes fija "MEJOR VALORADO"). Misma lógica
   // compartida que las tarjetas spotlight de los 3 dashboards (Estreno / Mejor
@@ -1243,25 +1347,25 @@ function FeaturedSlide({
               className="hero-reveal flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:justify-start sm:gap-3"
               style={{ "--hero-delay": "130ms" }}
             >
-              {/* Píldora "Ver trailer" — mismo diseño que la sección de
-                  información del spotlight (×1,6): blanca, icono + texto. */}
-              <button
-                type="button"
-                onClick={handleToggleTrailer}
-                disabled={trailerLoading}
-                aria-label={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className="featured-info-button inline-flex min-h-10 cursor-default items-center justify-center gap-1.5 rounded-lg bg-white px-3.5 text-[13px] font-bold text-black shadow-[0_10px_30px_-12px_rgba(255,255,255,0.8)] transition hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:min-h-12 sm:gap-2 sm:px-5 sm:text-base"
-              >
-                {showTrailer ? (
-                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                ) : (
-                  <Play className="h-4 w-4 fill-current sm:h-5 sm:w-5" />
-                )}
-                <span>{showTrailer ? "Cerrar" : "Ver trailer"}</span>
-              </button>
+              {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las
+                  vistas previas (MISMO componente y estilo, size="lg" para el
+                  hero). Va en DOS bloques para intercalar el botón de sonido justo
+                  tras el tráiler: 1) solo la píldora de tráiler. El contenedor
+                  corta la propagación al onClick del hero (que abre la ficha). */}
+              <div className="min-w-0 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <DetailActionsRow
+                  size="lg"
+                  showSeparator={false}
+                  onTrailer={handleToggleTrailer}
+                  trailerAvailable
+                  trailerLoading={trailerLoading}
+                  trailerLabel="Ver trailer"
+                  trailerPlaying={showTrailer}
+                />
+              </div>
 
-              {/* Botones de acción: MISMO diseño liquid glass que la sección
-                  spotlight (componente LiquidButton). */}
+              {/* Sonido: toggle del reproductor de soundtrack de fondo (extra
+                  propio del hero), colocado JUSTO tras el tráiler. */}
               <LiquidButton
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1275,7 +1379,7 @@ function FeaturedSlide({
                 title={
                   soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
                 }
-                className={`!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6 ${
+                className={`shrink-0 !h-12 !w-12 [&_svg]:!h-6 [&_svg]:!w-6 ${
                   soundtrackVisible ? "!bg-white !text-black" : ""
                 } ${
                   soundtrackPreferenceReady ? "" : "invisible pointer-events-none"
@@ -1283,6 +1387,48 @@ function FeaturedSlide({
               >
                 {soundtrackVisible ? <Volume2 /> : <VolumeX />}
               </LiquidButton>
+
+              {/* 2) Resto de acciones compartidas: valoración episodios · Trakt ·
+                  puntuar · favorito · pendiente. `labeled-row` mantiene el tamaño
+                  uniforme de los iconos (igual que la píldora de arriba). El
+                  control de "visto" lo aporta ya Trakt (no se duplica). */}
+              <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+                <DetailActionsRow
+                  size="lg"
+                  className="labeled-row"
+                  showSeparator={mediaType === "tv"}
+                  onEpisodeRatings={
+                    mediaType === "tv" ? openEpisodeRatings : undefined
+                  }
+                  episodeRatingsOpen={episodeRatingsOpen}
+                  trakt={{
+                    connected: traktInfo.connected,
+                    watched: traktInfo.watched,
+                    plays: traktInfo.plays,
+                    badge: traktInfo.badge,
+                    busy: false,
+                    loading: traktInfo.loading,
+                    onOpen: (e) => {
+                      e?.stopPropagation?.();
+                      openPreviewModal();
+                    },
+                  }}
+                  rate={{
+                    rating,
+                    max: 10,
+                    loading: ratingLoading,
+                    onRate: handleRate,
+                    connected: traktInfo.connected,
+                    onConnect: () => requireLogin(),
+                  }}
+                  favorite={favorite}
+                  favoriteLoading={updating === "favorite"}
+                  onToggleFavorite={handleToggleFavorite}
+                  watchlist={watchlist}
+                  watchlistLoading={updating === "watchlist"}
+                  onToggleWatchlist={handleToggleWatchlist}
+                />
+              </div>
 
               {soundtrackVisible && soundtrackTrack?.previewUrl && (
                 <audio
@@ -1308,179 +1454,64 @@ function FeaturedSlide({
                   onPause={() => setSoundtrackPlaying(false)}
                 />
               )}
-
-              {/* Valoración de episodios (solo series): mismo diseño (blanco) y
-                  posición (junto al soundtrack) que en DetailsClient. */}
-              {mediaType === "tv" && (
-                <LiquidButton
-                  onClick={openEpisodeRatings}
-                  active
-                  activeColor="yellow"
-                  groupId="featured-hero-actions"
-                  title="Valoración de episodios"
-                  aria-haspopup="dialog"
-                  aria-expanded={episodeRatingsOpen}
-                  className="!bg-white !text-black !h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-                >
-                  <BarChart3 />
-                </LiquidButton>
-              )}
-
-              <LiquidButton
-                onClick={handleToggleFavorite}
-                loading={updating === "favorite"}
-                active={favorite}
-                activeColor="red"
-                groupId="featured-hero-actions"
-                title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className="!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-              >
-                <Heart className={favorite ? "fill-current" : ""} />
-              </LiquidButton>
-
-              <LiquidButton
-                onClick={handleToggleWatchlist}
-                loading={updating === "watchlist"}
-                active={watchlist}
-                activeColor="blue"
-                groupId="featured-hero-actions"
-                title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
-                className="!h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-              >
-                <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </LiquidButton>
-
-              {/* Indicador de visionado: solo informativo. No se puede accionar
-                  desde aquí para evitar borrar el historial de visionado con un
-                  único clic. */}
-              <LiquidButton
-                active={watched}
-                activeColor="green"
-                groupId="featured-hero-actions"
-                title={watched ? "Visto" : "No visto"}
-                className="pointer-events-none !h-10 !w-10 sm:!h-12 sm:!w-12 [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-6 sm:[&_svg]:!w-6"
-              >
-                {watched ? <Eye /> : <EyeOff />}
-              </LiquidButton>
             </div>
             </div>
 
-            {/* Premios — mismo estilo que el spotlight (icono + texto esmeralda),
-                situado sobre los metadatos. El hueco se RESERVA siempre con una
-                altura mínima fija: los premios llegan de OMDb con un pequeño
-                retraso y, como el bloque de contenido está anclado abajo, antes
-                empujaban el logo hacia arriba al aparecer. Con el hueco reservado
-                el logo no se desplaza (ni en escritorio ni en móvil), y el
-                contenido entra con la MISMA animación de entrada que el resto de
-                la información (hero-reveal) y en su misma posición de la cascada
-                (--hero-delay 140ms, entre los botones y los metadatos), para que
-                aparezca a la vez y al mismo ritmo, no antes ni más rápido. */}
-            <div className="mb-2 flex min-h-[1.25rem] items-center justify-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:mb-2.5 sm:min-h-[1.5rem] sm:justify-start sm:text-sm">
+            {/* Premios (OMDb, texto esmeralda) + Puntuaciones TMDb·IMDb en la
+                MISMA línea, sobre los metadatos. El hueco se RESERVA con una
+                altura mínima fija para que la carga tardía de premios no
+                desplace el logo. Entra con la misma animación de la cascada
+                (hero-reveal, --hero-delay 140ms). */}
+            <div
+              className="hero-reveal mb-2 flex min-h-[1.25rem] flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:mb-2.5 sm:min-h-[1.5rem] sm:flex-nowrap sm:justify-start"
+              style={{ "--hero-delay": "140ms" }}
+            >
               {extras.awards && (
                 <span
                   key={extras.awards}
-                  className="hero-reveal flex min-w-0 items-center gap-2"
-                  style={{ "--hero-delay": "140ms" }}
+                  className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm"
                 >
                   <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span className="line-clamp-1">{extras.awards}</span>
                 </span>
               )}
+              <DetailsRatingsBadges
+                tmdb={
+                  ratingOf(movie) !== "–"
+                    ? {
+                        value: ratingOf(movie),
+                        sub: formatCountShort(movie.vote_count),
+                      }
+                    : null
+                }
+                imdb={
+                  typeof extras.imdbRating === "number"
+                    ? { value: extras.imdbRating.toFixed(1), sub: null }
+                    : null
+                }
+              />
             </div>
 
-            {/* Metadatos — MISMO estilo que la sección de información de las
-                tarjetas ×1,6 (DashboardSpotlightPreview): fila 1 con badge
-                "Mejor valorado" + tipo + año + duración; fila 2 con géneros +
-                puntuaciones, tipografía/colores (zinc). Se conservan la
-                animación de entrada del hero, la alineación (centro en móvil,
-                izquierda en escritorio) y la ubicación del bloque. */}
+            {/* Fila meta COMPARTIDA con DetailModal/DetailsClient y las vistas
+                previas (mismo componente y diseño): año · duración/temporadas ·
+                estado · géneros. Se conserva el badge del hero (Estreno / Mejor
+                valorado) delante, la animación de entrada (hero-reveal) y la
+                alineación (centro en móvil, izquierda en escritorio). */}
             <div
-              className="hero-reveal mb-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs font-semibold text-zinc-200 sm:mb-2.5 sm:justify-start sm:text-sm"
+              className="hero-reveal mb-2 flex w-full max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1.5 sm:mb-2.5 sm:flex-nowrap sm:justify-start"
               style={{ "--hero-delay": "170ms" }}
             >
               {featuredBadge && (
-                <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-[0.72rem] font-black uppercase tracking-wide text-black sm:text-[0.8rem]">
+                <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.72rem] font-black uppercase tracking-wide text-black sm:text-[0.8rem]">
                   {featuredBadge}
                 </span>
               )}
-              {(() => {
-                const items = [];
-                items.push(<span key="type">{mediaType === "tv" ? "Serie" : "Película"}</span>);
-                if (yearOf(movie)) {
-                  items.push(<span key="year">{yearOf(movie)}</span>);
-                }
-                if (extras.runtime) {
-                  items.push(<span key="runtime">{extras.runtime}</span>);
-                }
-                return items.reduce((acc, item, index) => {
-                  if (index === 0) return [item];
-                  return [
-                    ...acc,
-                    <span key={`sep-${index}`} className="text-zinc-500/70 select-none font-bold text-[0.8em]" aria-hidden="true">•</span>,
-                    item
-                  ];
-                }, []);
-              })()}
-            </div>
-
-            <div
-              className="hero-reveal mb-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-zinc-200 sm:mb-4 sm:justify-start sm:text-sm"
-              style={{ "--hero-delay": "230ms" }}
-            >
-              {(() => {
-                const items = [];
-                if (Array.isArray(genresList)) {
-                  genresList.forEach((genre, idx) => {
-                    items.push(<span key={`genre-${idx}`}>{genre}</span>);
-                  });
-                }
-                const ratings = [];
-                ratings.push(
-                  <span key="tmdb" className="inline-flex items-center gap-1.5">
-                    <NextImage
-                      src="/logo-TMDb.png"
-                      alt="TMDb"
-                      className="h-3 w-auto"
-                      width={2560}
-                      height={1846}
-                      sizes="32px"
-                      loading="lazy"
-                    />
-                    <span className="font-bold">{ratingOf(movie)}</span>
-                  </span>
-                );
-                if (typeof extras.imdbRating === "number") {
-                  ratings.push(
-                    <span key="imdb" className="inline-flex items-center gap-1.5">
-                      <NextImage
-                        src="/logo-IMDb.svg"
-                        alt="IMDb"
-                        className="h-4 w-auto"
-                        width={575}
-                        height={290}
-                        sizes="40px"
-                        loading="lazy"
-                      />
-                      <span className="font-bold">
-                        {extras.imdbRating.toFixed(1)}
-                      </span>
-                    </span>
-                  );
-                }
-                items.push(
-                  <span key="ratings" className="inline-flex items-center gap-x-3">
-                    {ratings}
-                  </span>
-                );
-                return items.reduce((acc, item, index) => {
-                  if (index === 0) return [item];
-                  return [
-                    ...acc,
-                    <span key={`sep-${index}`} className="text-zinc-500/70 select-none font-bold text-[0.8em]" aria-hidden="true">•</span>,
-                    item
-                  ];
-                }, []);
-              })()}
+              <DetailsMetaGenresRow
+                yearIso={yearOf(movie)}
+                displayRuntimeValue={extras.runtime}
+                status={extras.status}
+                genres={genreObjects}
+              />
             </div>
 
             {overview && !isMobile && (

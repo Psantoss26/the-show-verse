@@ -209,6 +209,7 @@ export function useDetailModalData(item) {
     let cancelled = false;
     const mediaType = getMediaTypeForItem(item);
     const id = item.id;
+    const seedLogoPath = item.logoPath || item.logo_path || null;
 
     setLoading(true);
     // Semilla inmediata con lo que ya trae el item (evita salto en cabecera).
@@ -216,6 +217,7 @@ export function useDetailModalData(item) {
       ...EMPTY_DATA,
       mediaType,
       title: item.title || item.name || null,
+      logoPath: seedLogoPath,
       backdropPath: item.backdrop_path || null,
       posterPath: item.poster_path || null,
       year: yearOf(item) || null,
@@ -522,8 +524,8 @@ export function useDetailModalData(item) {
     (async () => {
       try {
         const logoPath = await fetchBestLogo(id, mediaType, ["en", null, "es"]);
-        if (!cancelled && logoPath) {
-          setData((prev) => ({ ...prev, logoPath }));
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, logoPath: logoPath || prev.logoPath }));
         }
       } catch {
         // sin logo: la cabecera cae al título de texto
