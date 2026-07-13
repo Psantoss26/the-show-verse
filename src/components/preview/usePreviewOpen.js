@@ -20,7 +20,10 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 export default function usePreviewOpen() {
   const { openDetailModal } = useDetailModal();
 
-  return function previewClick(item, { mediaType, previewId } = {}) {
+  // opts.episode = { showId, seasonNumber, episodeNumber, name?, still_path?, showName? }
+  // Si se pasa (con temporada y episodio), se abre la preview del EPISODIO en vez
+  // de la de la serie/película.
+  return function previewClick(item, { mediaType, previewId, episode } = {}) {
     return (event) => {
       if (
         event.metaKey ||
@@ -31,9 +34,31 @@ export default function usePreviewOpen() {
       ) {
         return;
       }
+      if (!openDetailModal) return; // sin provider → navega el <Link>
+
+      if (
+        episode &&
+        episode.seasonNumber != null &&
+        episode.episodeNumber != null
+      ) {
+        const showId = episode.showId ?? previewId ?? item?.tmdbId ?? item?.id;
+        if (showId == null) return;
+        event.preventDefault();
+        openDetailModal({
+          media_type: "episode",
+          id: showId,
+          showId,
+          seasonNumber: episode.seasonNumber,
+          episodeNumber: episode.episodeNumber,
+          name: episode.name ?? null,
+          still_path: episode.still_path ?? null,
+          showName: episode.showName ?? null,
+        });
+        return;
+      }
 
       const id = previewId ?? item?.tmdbId ?? item?.id;
-      if (!openDetailModal || id == null) return;
+      if (id == null) return;
 
       event.preventDefault();
       openDetailModal({

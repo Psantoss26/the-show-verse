@@ -343,6 +343,36 @@ const panelVariantsRight = {
         },
 };
 
+// ---- Redimensionado del drawer derecho -------------------------------------
+// El usuario puede arrastrar el borde izquierdo para agrandar/encoger el ancho.
+// Se persiste en localStorage y se acota a límites seguros que no rompen el
+// layout (mínimo cómodo, y como mucho casi todo el viewport).
+const RESIZE_STORAGE_KEY = "showverse:detailModalWidth";
+
+function clampDrawerWidth(width, viewportWidth) {
+  const vw = viewportWidth || 1280;
+  // En pantallas estrechas el mínimo se adapta para no desbordar.
+  const min = Math.min(420, Math.max(300, vw - 24));
+  const max = Math.round(vw * 0.98);
+  return Math.max(min, Math.min(Math.round(width || 0), max));
+}
+
+function initialDrawerWidth() {
+  if (typeof window === "undefined") return 1080;
+  const vw = window.innerWidth;
+  let stored = NaN;
+  try {
+    stored = Number(window.localStorage.getItem(RESIZE_STORAGE_KEY));
+  } catch {
+    // localStorage no disponible
+  }
+  const base =
+    Number.isFinite(stored) && stored > 0
+      ? stored
+      : Math.min(Math.round(vw * 0.95), 1080);
+  return clampDrawerWidth(base, vw);
+}
+
 /* ============================== SUBCOMPONENTES ============================== */
 function SkeletonBar({ className = "" }) {
   return (
@@ -531,16 +561,7 @@ const MODAL_ARROW_PROPS = {
 };
 
 /* ================================== MODAL ================================== */
-export default function DetailModal({
-  item,
-  onClose,
-  placement = "center",
-  // true cuando este panel entra por un CAMBIO de título (drawer ya abierto):
-  // en ese caso la entrada es un fundido cruzado sin transform, así que el
-  // backdrop-blur puede ir activo desde el primer frame (sin coste de recalcular
-  // el desenfoque por transform) y no "aparece" al terminar la animación.
-  switching = false,
-}) {
+export default function DetailModal({ item, onClose, placement = "center" }) {
   const isRightPlacement = placement === "right";
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
@@ -567,7 +588,15 @@ export default function DetailModal({
   // Degradado oscuro: se oscurece sutilmente al hacer scroll
   const darkOverlayOpacity = useTransform(scrollY, [0, 300], [0, 0.5]);
 
-  const mediaType = data.mediaType || getMediaTypeForItem(item);
+  // Preview de EPISODIO: variante que reutiliza el mismo diseño (hero, valoraciones,
+  // reparto, navegador de temporadas) pero con datos del episodio. Se detecta desde
+  // el propio item (no solo desde `data`) para que la variante esté activa DESDE EL
+  // PRIMER FRAME (evita un flash del layout de película antes de cargar los datos).
+  const isEpisode = !!data.isEpisode || item?.media_type === "episode";
+  const mediaType = isEpisode
+    ? "tv"
+    : data.mediaType || getMediaTypeForItem(item);
+  const episodeMeta = data.episodeMeta || null;
   const title = data.title || item?.title || item?.name || "";
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
   const posterPath = data.posterPath || item?.poster_path || null;
@@ -604,7 +633,9 @@ export default function DetailModal({
     () => availableSeasons.map((season) => season.season_number).join(","),
     [availableSeasons],
   );
-  const preferredSeasonNumber = normalizeSeasonNumber(item?.nextEpisode?.season);
+  const preferredSeasonNumber = normalizeSeasonNumber(
+    item?.nextEpisode?.season ?? item?.seasonNumber,
+  );
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(null);
   const [seasonPreview, setSeasonPreview] = useState({
     loading: false,
@@ -618,16 +649,72 @@ export default function DetailModal({
   const [loadingStates, setLoadingStates] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  // El backdrop-blur del panel solo se aplica una vez TERMINADA la animación de
-  // entrada: durante la entrada el panel se transforma (y/scale) y tener el
-  // backdrop-filter activo obligaría a recalcular el desenfoque en cada frame
-  // (muy lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
-  // EXCEPCIÓN: al CAMBIAR de título en el drawer derecho la entrada es un fundido
-  // cruzado (sin transform), así que el blur va activo desde el inicio para que no
-  // "aparezca" a mitad de la transición.
-  const [panelSettled, setPanelSettled] = useState(
-    () => isRightPlacement && switching,
-  );
+  // Modal CENTRADO: el backdrop-blur del panel solo se aplica una vez TERMINADA la
+  // animación de entrada; durante la entrada el panel se transforma (y/scale) y
+  // tener el backdrop-filter activo obligaría a recalcular el desenfoque en cada
+  // frame (lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
+  // Drawer DERECHO: no hay dim de fondo, así que el blur del panel debe estar
+  // presente desde el primer frame (tanto en la apertura inicial como al cambiar
+  // de título); si no, la tarjeta se ve sin fondo durante la animación.
+  const [panelSettled, setPanelSettled] = useState(() => isRightPlacement);
+
+  // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
+  const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
+  const panelWidthRef = useRef(panelWidth);
+
+  // Reajusta el ancho si cambia el tamaño de la ventana (no desbordar / no romper).
+  useEffect(() => {
+    if (!isRightPlacement || typeof window === "undefined") return undefined;
+    const onResize = () => {
+      setPanelWidth((w) => {
+        const next = clampDrawerWidth(w, window.innerWidth);
+        panelWidthRef.current = next;
+        return next;
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [isRightPlacement]);
+
+  // Arrastre del borde izquierdo. Durante el gesto se escribe el ancho DIRECTAMENTE
+  // en el DOM del panel (sin re-render del modal, para que sea fluido); al soltar se
+  // reconcilia el estado y se persiste.
+  const beginResize = (event) => {
+    if (!isRightPlacement || typeof window === "undefined") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const vw = window.innerWidth;
+    panelWidthRef.current = panelWidth;
+    const prevUserSelect = document.body.style.userSelect;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const onMove = (moveEvent) => {
+      // Drawer anclado a la derecha: el ancho = distancia del puntero al borde dcho.
+      const next = clampDrawerWidth(vw - moveEvent.clientX, vw);
+      panelWidthRef.current = next;
+      if (panelRef.current) panelRef.current.style.width = `${next}px`;
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = prevUserSelect;
+      document.body.style.cursor = prevCursor;
+      setPanelWidth(panelWidthRef.current);
+      try {
+        window.localStorage.setItem(
+          RESIZE_STORAGE_KEY,
+          String(panelWidthRef.current),
+        );
+      } catch {
+        // localStorage no disponible
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [officialSiteState, setOfficialSiteState] = useState({
     itemKey: "",
@@ -1636,13 +1723,31 @@ export default function DetailModal({
           if (definition === "visible") setPanelSettled(true);
         }}
         onClick={(e) => e.stopPropagation()}
-        style={{ willChange: "transform, opacity" }}
-        className={`relative z-10 flex w-[95vw] max-w-[1080px] flex-col overflow-hidden bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        style={{
+          willChange: "transform, opacity",
+          // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
+          ...(isRightPlacement ? { width: panelWidth } : null),
+        }}
+        className={`relative z-10 flex flex-col overflow-hidden bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
-            ? "h-full rounded-l-2xl pointer-events-auto"
-            : "mt-[4vh] h-[96vh] rounded-t-2xl"
+            ? "h-full max-w-[98vw] rounded-l-2xl pointer-events-auto"
+            : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         } ${panelSettled ? "backdrop-blur-3xl" : ""}`}
       >
+        {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
+        {isRightPlacement && (
+          <div
+            onPointerDown={beginResize}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionar panel"
+            title="Arrastra para redimensionar"
+            className="group absolute inset-y-0 left-0 z-40 flex w-3 cursor-col-resize touch-none items-center justify-center"
+          >
+            <div className="h-16 w-1 rounded-full bg-white/15 transition-colors duration-200 group-hover:bg-white/45" />
+          </div>
+        )}
+
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
           {/* Botón superior izquierdo: cierra el modal */}
           <button
@@ -1806,6 +1911,7 @@ export default function DetailModal({
                 en el hero; el resto abre los modales reutilizables. Se omiten el
                 control de "visto" de Trakt y la valoración de episodios (no se
                 pasan sus handlers), por lo que no se renderizan. */}
+            {!isEpisode && (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1907,6 +2013,7 @@ export default function DetailModal({
                 </div>
               )}
             </motion.div>
+            )}
 
             <div className="space-y-3">
               {/* Premios / nominaciones: misma línea verde que las previews del
@@ -1933,8 +2040,44 @@ export default function DetailModal({
                 </p>
               )}
 
-              {/* Fila meta + géneros (componente real compartido con DetailsClient) */}
-              {hasMetaRow ? (
+              {/* Fila meta + géneros (componente real compartido con DetailsClient).
+                  En EPISODIO: serie · T{n}·E{n} · fecha · duración. */}
+              {isEpisode ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-10px" }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-zinc-300 sm:justify-start"
+                >
+                  {episodeMeta?.showName && (
+                    <span className="text-zinc-400">{episodeMeta.showName}</span>
+                  )}
+                  {episodeMeta?.seasonNumber != null &&
+                    episodeMeta?.episodeNumber != null && (
+                      <>
+                        {episodeMeta?.showName && (
+                          <span className="text-zinc-600">·</span>
+                        )}
+                        <span>
+                          T{episodeMeta.seasonNumber} · E{episodeMeta.episodeNumber}
+                        </span>
+                      </>
+                    )}
+                  {episodeMeta?.airDate && (
+                    <>
+                      <span className="text-zinc-600">·</span>
+                      <span>{episodeMeta.airDate}</span>
+                    </>
+                  )}
+                  {episodeMeta?.runtime && (
+                    <>
+                      <span className="text-zinc-600">·</span>
+                      <span>{episodeMeta.runtime}</span>
+                    </>
+                  )}
+                </motion.div>
+              ) : hasMetaRow ? (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -2028,37 +2171,57 @@ export default function DetailModal({
               </motion.div>
             )}
 
-            {/* Pestañas: Detalles · Producción · Sinopsis */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-10px" }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <DetailsInfoTabs
-                variant="normal"
-                layoutId="detailModalTab"
-                mediaType={mediaType}
-                originalTitle={data.originalTitle}
-                formatValue={
-                  mediaType === "tv" ? data.episodeRuntimeValue || "—" : "—"
-                }
-                releaseDateValue={data.releaseDateValue}
-                status={data.status}
-                lastAirDateValue={data.lastAirDateValue}
-                budgetValue={data.budgetValue}
-                revenueValue={data.revenueValue}
-                director={data.director}
-                creators={data.creators}
-                network={data.network}
-                productionText={data.productionText}
-                tagline={data.tagline}
-                overview={data.overview}
-                awards={data.awards}
-                showAwardsTab={false}
-                platforms={streamingProviders}
-              />
-            </motion.div>
+            {/* EPISODIO: sinopsis simple (las pestañas Detalles/Producción son de
+                serie y no aplican). Resto: pestañas Detalles · Producción · Sinopsis */}
+            {isEpisode ? (
+              data.overview ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-10px" }}
+                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-2"
+                >
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Sinopsis
+                  </h3>
+                  <p className="text-sm leading-relaxed text-zinc-300">
+                    {data.overview}
+                  </p>
+                </motion.div>
+              ) : null
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <DetailsInfoTabs
+                  variant="normal"
+                  layoutId="detailModalTab"
+                  mediaType={mediaType}
+                  originalTitle={data.originalTitle}
+                  formatValue={
+                    mediaType === "tv" ? data.episodeRuntimeValue || "—" : "—"
+                  }
+                  releaseDateValue={data.releaseDateValue}
+                  status={data.status}
+                  lastAirDateValue={data.lastAirDateValue}
+                  budgetValue={data.budgetValue}
+                  revenueValue={data.revenueValue}
+                  director={data.director}
+                  creators={data.creators}
+                  network={data.network}
+                  productionText={data.productionText}
+                  tagline={data.tagline}
+                  overview={data.overview}
+                  awards={data.awards}
+                  showAwardsTab={false}
+                  platforms={streamingProviders}
+                />
+              </motion.div>
+            )}
 
             {/* Reparto */}
             {data.cast?.length > 0 && (
@@ -2310,6 +2473,36 @@ export default function DetailModal({
                         <Link
                           href={episodeHref}
                           prefetch={false}
+                          onClick={(e) => {
+                            if (
+                              e.metaKey ||
+                              e.ctrlKey ||
+                              e.shiftKey ||
+                              e.altKey ||
+                              e.button === 1 ||
+                              !openDetailModal
+                            ) {
+                              return;
+                            }
+                            // Apila la preview del episodio sobre la actual
+                            // (Atrás vuelve a la serie).
+                            e.preventDefault();
+                            openDetailModal(
+                              {
+                                media_type: "episode",
+                                id: item.id,
+                                showId: item.id,
+                                seasonNumber: selectedSeasonNumber,
+                                episodeNumber,
+                                name: episodeTitle,
+                                still_path: episode?.still_path || null,
+                                showName: isEpisode
+                                  ? episodeMeta?.showName
+                                  : title,
+                              },
+                              { drill: true },
+                            );
+                          }}
                           onMouseEnter={() =>
                             prefetchEpisodeDetails(episodeNumber)
                           }

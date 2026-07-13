@@ -1516,12 +1516,29 @@ const HistoryItemCard = memo(function HistoryItemCard({
 
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
-  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
-  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  // Al pulsar la tarjeta se abre la ficha rápida (drawer derecho): la del EPISODIO
+  // si la entrada es un episodio, o la de la serie/película en otro caso. Sin
+  // provider, el <Link> navega con normalidad.
   const previewClick = usePreviewOpen();
+  const episodeMetaForPreview = isEpisodeEntry(entry)
+    ? getEpisodeMeta(entry)
+    : null;
   const onPreviewClick = previewClick(entry, {
     previewId: getTmdbId(entry),
     mediaType: type === "movie" ? "movie" : "tv",
+    // Entradas de episodio: abren la preview del EPISODIO (no la de la serie).
+    episode:
+      episodeMetaForPreview &&
+      episodeMetaForPreview.season != null &&
+      episodeMetaForPreview.episode != null
+        ? {
+            showId: getTmdbId(entry),
+            seasonNumber: episodeMetaForPreview.season,
+            episodeNumber: episodeMetaForPreview.episode,
+            name: episodeMetaForPreview.title ?? null,
+            showName: entry?.show?.title ?? entry?.showTitle ?? null,
+          }
+        : undefined,
   });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1781,12 +1798,29 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const groupCount = isGroup ? entry._group.length : 0;
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
-  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
-  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  // Al pulsar la tarjeta se abre la ficha rápida (drawer derecho): la del EPISODIO
+  // si la entrada es un episodio, o la de la serie/película en otro caso. Sin
+  // provider, el <Link> navega con normalidad.
   const previewClick = usePreviewOpen();
+  const episodeMetaForPreview = isEpisodeEntry(entry)
+    ? getEpisodeMeta(entry)
+    : null;
   const onPreviewClick = previewClick(entry, {
     previewId: getTmdbId(entry),
     mediaType: type === "movie" ? "movie" : "tv",
+    // Entradas de episodio: abren la preview del EPISODIO (no la de la serie).
+    episode:
+      episodeMetaForPreview &&
+      episodeMetaForPreview.season != null &&
+      episodeMetaForPreview.episode != null
+        ? {
+            showId: getTmdbId(entry),
+            seasonNumber: episodeMetaForPreview.season,
+            episodeNumber: episodeMetaForPreview.episode,
+            name: episodeMetaForPreview.title ?? null,
+            showName: entry?.show?.title ?? entry?.showTitle ?? null,
+          }
+        : undefined,
   });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -1993,12 +2027,29 @@ const HistoryGridCard = memo(function HistoryGridCard({
 
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
   const href = useMemo(() => getDetailsHref(entry), [entry]);
-  // Al pulsar la tarjeta se abre la ficha rápida de la serie/película (drawer desde
-  // la derecha) por su tmdbId, ignorando el episodio concreto. Sin provider, navega.
+  // Al pulsar la tarjeta se abre la ficha rápida (drawer derecho): la del EPISODIO
+  // si la entrada es un episodio, o la de la serie/película en otro caso. Sin
+  // provider, el <Link> navega con normalidad.
   const previewClick = usePreviewOpen();
+  const episodeMetaForPreview = isEpisodeEntry(entry)
+    ? getEpisodeMeta(entry)
+    : null;
   const onPreviewClick = previewClick(entry, {
     previewId: getTmdbId(entry),
     mediaType: type === "movie" ? "movie" : "tv",
+    // Entradas de episodio: abren la preview del EPISODIO (no la de la serie).
+    episode:
+      episodeMetaForPreview &&
+      episodeMetaForPreview.season != null &&
+      episodeMetaForPreview.episode != null
+        ? {
+            showId: getTmdbId(entry),
+            seasonNumber: episodeMetaForPreview.season,
+            episodeNumber: episodeMetaForPreview.episode,
+            name: episodeMetaForPreview.title ?? null,
+            showName: entry?.show?.title ?? entry?.showTitle ?? null,
+          }
+        : undefined,
   });
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
