@@ -313,6 +313,7 @@ export function BackdropPreviewCard({
         awards: null,
         imdbRating: null,
         overview: null,
+        ratingsReady: false,
       },
   );
 
@@ -448,13 +449,13 @@ export function BackdropPreviewCard({
 
     const cachedExtras = movieExtrasCache.get(item.id);
     if (cachedExtras) {
-      setExtras(cachedExtras);
+      setExtras({ ...cachedExtras, ratingsReady: true });
       return undefined;
     }
 
-    // imdb_id + nota IMDb resueltos AL PRINCIPIO y en PARALELO con los detalles:
-    // la nota se pinta EN CUANTO llega (setState incremental) y las promesas se
-    // reutilizan para premios (mismo imdb_id) y el objeto cacheado (misma nota).
+    // imdb_id + nota IMDb resueltos AL PRINCIPIO y en PARALELO con los detalles.
+    // La UI de puntuaciones espera al paquete final para que TMDb e IMDb
+    // aparezcan a la vez, reutilizando las promesas para premios y caché.
     const imdbIdPromise = resolveImdbId(item, mediaType);
     const imdbRatingPromise = imdbIdPromise.then((imdb) =>
       imdb
@@ -463,12 +464,6 @@ export function BackdropPreviewCard({
             .catch(() => null)
         : null,
     );
-    imdbRatingPromise.then((rating) => {
-      if (rating != null && !abort) {
-        setExtras((prev) => ({ ...prev, imdbRating: rating }));
-      }
-    });
-
     (async () => {
       try {
         let runtime = null;
@@ -515,7 +510,13 @@ export function BackdropPreviewCard({
         } catch {}
 
         const imdbRating = await imdbRatingPromise;
-        const next = { runtime, awards, imdbRating, overview };
+        const next = {
+          runtime,
+          awards,
+          imdbRating,
+          overview,
+          ratingsReady: true,
+        };
         movieExtrasCache.set(item.id, next);
         if (!abort) setExtras(next);
       } catch {
@@ -525,6 +526,7 @@ export function BackdropPreviewCard({
             awards: null,
             imdbRating: null,
             overview: null,
+            ratingsReady: true,
           });
         }
       }
@@ -1169,18 +1171,20 @@ export function BackdropPreviewCard({
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que usa
             DetailModal (mismo diseño). Orden espejo del modal: acciones →
             meta → premios → puntuaciones. */}
-        <DetailsRatingsBadges
-          tmdb={
-            hasTmdbRating
-              ? { value: tmdbRating, sub: formatCountShort(item.vote_count) }
-              : null
-          }
-          imdb={
-            typeof extras?.imdbRating === "number"
-              ? { value: extras.imdbRating.toFixed(1), sub: null }
-              : null
-          }
-        />
+        {extras?.ratingsReady && (
+          <DetailsRatingsBadges
+            tmdb={
+              hasTmdbRating
+                ? { value: tmdbRating, sub: formatCountShort(item.vote_count) }
+                : null
+            }
+            imdb={
+              typeof extras?.imdbRating === "number"
+                ? { value: extras.imdbRating.toFixed(1), sub: null }
+                : null
+            }
+          />
+        )}
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>

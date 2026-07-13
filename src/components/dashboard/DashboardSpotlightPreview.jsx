@@ -31,6 +31,7 @@ export default function DashboardSpotlightPreview({
   tmdbRating,
   tmdbVotes,
   imdbRating,
+  ratingsReady = true,
   awards,
   trailerVisible,
   trailerLoading,
@@ -256,24 +257,26 @@ export default function DashboardSpotlightPreview({
             </div>
           )}
 
-          <DetailsRatingsBadges
-            tmdb={
-              hasTmdbRating
-                ? {
-                    value: tmdbRating,
-                    sub:
-                      typeof tmdbVotes === "number"
-                        ? formatCountShort(tmdbVotes)
-                        : null,
-                  }
-                : null
-            }
-            imdb={
-              typeof imdbRating === "number"
-                ? { value: imdbRating.toFixed(1), sub: null }
-                : null
-            }
-          />
+          {ratingsReady && (
+            <DetailsRatingsBadges
+              tmdb={
+                hasTmdbRating
+                  ? {
+                      value: tmdbRating,
+                      sub:
+                        typeof tmdbVotes === "number"
+                          ? formatCountShort(tmdbVotes)
+                          : null,
+                    }
+                  : null
+              }
+              imdb={
+                typeof imdbRating === "number"
+                  ? { value: imdbRating.toFixed(1), sub: null }
+                  : null
+              }
+            />
+          )}
 
           {error && (
             <p className="mt-2 line-clamp-1 text-xs text-red-300">{error}</p>

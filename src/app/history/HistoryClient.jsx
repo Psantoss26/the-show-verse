@@ -38,6 +38,7 @@ import {
   traktDisconnect,
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 
@@ -1699,9 +1700,11 @@ const HistoryItemCard = memo(function HistoryItemCard({
   );
 
   // Reduce animation delay for large lists
+  const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 20 ? Math.min(index * 0.02, 0.3) : index * 0.05;
-  const shouldAnimate = index < 50; // Only animate first 50 items
+  // En navegación de historial (atrás/adelante) no se anima la entrada.
+  const shouldAnimate = !isBackNav && index < 50;
 
   if (!href || isGroup)
     return (
@@ -1909,9 +1912,10 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
     </motion.div>
   );
 
+  const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  const shouldAnimate = !isBackNav && index < 60;
 
   if (!href || isGroup)
     return (
@@ -2171,9 +2175,10 @@ const HistoryGridCard = memo(function HistoryGridCard({
     </div>
   );
 
+  const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  const shouldAnimate = !isBackNav && index < 60;
 
   if (!href || isGroup)
     return (

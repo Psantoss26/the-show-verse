@@ -732,6 +732,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     overview: null,
     status: null,
     genreObjects: [],
+    ratingsReady: false,
   });
   const [backdropPath, setBackdropPath] = useState(null);
   const [backdropReady, setBackdropReady] = useState(false);
@@ -860,7 +861,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
 
       const cachedExtras = movieExtrasCache.get(movie.id);
       if (cachedExtras) {
-        if (!abort) setExtras(cachedExtras);
+        if (!abort) setExtras({ ...cachedExtras, ratingsReady: true });
       } else {
         try {
           let runtime = null;
@@ -926,6 +927,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
             overview,
             status,
             genreObjects,
+            ratingsReady: true,
           };
           movieExtrasCache.set(movie.id, next);
           if (!abort) setExtras(next);
@@ -938,6 +940,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
               overview: null,
               status: null,
               genreObjects: [],
+              ratingsReady: true,
             });
         }
       }
@@ -1189,6 +1192,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
           tmdbRating={tmdbRating}
           tmdbVotes={movie.vote_count}
           imdbRating={extras?.imdbRating}
+          ratingsReady={extras?.ratingsReady}
           awards={extras?.awards}
           trailerVisible={showTrailer}
           trailerLoading={trailerLoading}
@@ -1211,7 +1215,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                   <span>• {formatRuntime(extras.runtime)}</span>
                 )}
 
-                {hasTmdbRating && (
+                {extras?.ratingsReady && hasTmdbRating && (
                   <span className="inline-flex items-center gap-1.5">
                     <OptimizedImage
                       src="/logo-TMDb.png"
@@ -1224,7 +1228,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                   </span>
                 )}
 
-                {typeof extras?.imdbRating === "number" && (
+                {extras?.ratingsReady &&
+                  typeof extras?.imdbRating === "number" && (
                   <span className="inline-flex items-center gap-1.5">
                     <OptimizedImage
                       src="/logo-IMDb.svg"
@@ -1682,7 +1687,7 @@ function Row({
                   hoverIntentRef.current += 1;
                   if (!isMobile)
                     setHoveredId((prev) => (prev === itemKey ? null : prev));
-                  setHoveredIndex(null);
+                  if (!isTop10) setHoveredIndex(null);
                 }}
               >
                 <AnimatePresence initial={false} mode="popLayout">
@@ -1723,7 +1728,7 @@ function Row({
                             setHoveredId((prev) =>
                               prev === itemKey ? null : prev,
                             );
-                            setHoveredIndex(null);
+                            if (!isTop10) setHoveredIndex(null);
                           }}
                         />
                       ) : (
@@ -1793,10 +1798,16 @@ function Row({
                   <div
                     className="flex items-center"
                     onMouseEnter={() => {
-                      if (!isMobile) showHoverBackdrop(m);
+                      if (!isMobile) {
+                        setHoveredIndex(i);
+                        showHoverBackdrop(m);
+                      }
                     }}
                     onMouseLeave={() => {
-                      if (!isMobile) clearHoverBackdrop(m);
+                      if (!isMobile) {
+                        setHoveredIndex(null);
+                        clearHoverBackdrop(m);
+                      }
                     }}
                   >
                     <DashboardRankNumber
