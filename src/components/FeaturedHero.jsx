@@ -39,7 +39,6 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import { traktGetItemStatus, traktSetRating } from "@/lib/api/traktClient";
-import { formatCountShort } from "@/lib/details/formatters";
 
 import {
   buildImg,
@@ -1480,7 +1479,7 @@ function FeaturedSlide({
                   ratingOf(movie) !== "–"
                     ? {
                         value: ratingOf(movie),
-                        sub: formatCountShort(movie.vote_count),
+                        sub: null,
                       }
                     : null
                 }
