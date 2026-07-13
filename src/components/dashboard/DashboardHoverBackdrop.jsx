@@ -18,10 +18,37 @@ import {
 
 const DashboardHoverBackdropContext = createContext(null);
 const hoverBackdropCache = new Map();
+const hoverBackdropPending = new Map();
+const HOVER_BACKDROP_SIZE = "w1280";
 
 function getHoverBackdropKey(item) {
   if (!item?.id) return null;
   return `${getMediaTypeForItem(item)}:${item.id}`;
+}
+
+async function resolveHoverBackdropPath(item) {
+  const key = getHoverBackdropKey(item);
+  if (!key) return null;
+
+  const cached = hoverBackdropCache.get(key);
+  if (cached !== undefined) return cached;
+
+  let pending = hoverBackdropPending.get(key);
+  if (!pending) {
+    pending = fetchBestBackdropNoLang(item.id, getMediaTypeForItem(item), {
+      allowLanguageFallback: false,
+    })
+      .then((path) => path || null)
+      .catch(() => null)
+      .then((path) => {
+        hoverBackdropCache.set(key, path);
+        hoverBackdropPending.delete(key);
+        return path;
+      });
+    hoverBackdropPending.set(key, pending);
+  }
+
+  return pending;
 }
 
 export function DashboardHoverBackdropProvider({ children }) {
@@ -37,22 +64,7 @@ export function DashboardHoverBackdropProvider({ children }) {
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
 
-    let backdropPath = hoverBackdropCache.get(key);
-    if (backdropPath === undefined) {
-      try {
-        backdropPath =
-          (await fetchBestBackdropNoLang(item.id, getMediaTypeForItem(item), {
-            allowLanguageFallback: false,
-          })) || null;
-      } catch {
-        backdropPath = null;
-      }
-      hoverBackdropCache.set(key, backdropPath);
-    }
-
-    if (backdropPath) {
-      await preloadImage(buildImg(backdropPath, "original")).catch(() => {});
-    }
+    const backdropPath = await resolveHoverBackdropPath(item);
 
     if (
       requestSeqRef.current !== requestSeq ||
@@ -61,7 +73,24 @@ export function DashboardHoverBackdropProvider({ children }) {
       return;
     }
 
-    setActiveBackdrop(backdropPath ? { key, path: backdropPath } : null);
+    if (backdropPath) {
+      preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE)).catch(() => {});
+    }
+
+    setActiveBackdrop(
+      backdropPath
+        ? { key, path: backdropPath, size: HOVER_BACKDROP_SIZE }
+        : null,
+    );
+  }, []);
+
+  const prewarmHoverBackdrop = useCallback(async (item) => {
+    const backdropPath = await resolveHoverBackdropPath(item);
+    if (backdropPath) {
+      await preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE)).catch(
+        () => {},
+      );
+    }
   }, []);
 
   const clearHoverBackdrop = useCallback((item = null) => {
@@ -74,8 +103,18 @@ export function DashboardHoverBackdropProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ activeBackdrop, showHoverBackdrop, clearHoverBackdrop }),
-    [activeBackdrop, showHoverBackdrop, clearHoverBackdrop],
+    () => ({
+      activeBackdrop,
+      showHoverBackdrop,
+      clearHoverBackdrop,
+      prewarmHoverBackdrop,
+    }),
+    [
+      activeBackdrop,
+      showHoverBackdrop,
+      clearHoverBackdrop,
+      prewarmHoverBackdrop,
+    ],
   );
 
   return (
@@ -91,6 +130,7 @@ export function useDashboardHoverBackdrop() {
       activeBackdrop: null,
       showHoverBackdrop: () => {},
       clearHoverBackdrop: () => {},
+      prewarmHoverBackdrop: () => {},
     }
   );
 }
@@ -99,7 +139,7 @@ export function DashboardHoverBackdropLayer() {
   const { activeBackdrop } = useDashboardHoverBackdrop();
   const shouldReduceMotion = useReducedMotion();
   const imageUrl = activeBackdrop?.path
-    ? buildImg(activeBackdrop.path, "original")
+    ? buildImg(activeBackdrop.path, activeBackdrop.size || HOVER_BACKDROP_SIZE)
     : null;
 
   return (
@@ -107,7 +147,7 @@ export function DashboardHoverBackdropLayer() {
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-black"
       aria-hidden="true"
     >
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false}>
         {imageUrl && (
           <motion.div
             key={activeBackdrop.key}
@@ -115,7 +155,7 @@ export function DashboardHoverBackdropLayer() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: shouldReduceMotion ? 0.01 : 0.45,
+              duration: shouldReduceMotion ? 0.01 : 0.32,
               ease: [0.22, 1, 0.36, 1],
             }}
             className="absolute inset-0"

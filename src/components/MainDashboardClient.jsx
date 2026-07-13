@@ -2671,8 +2671,8 @@ export function Row({
   // vista previa pasa de una tarjeta a otra SIN que `hoveredIndex` llegue a null,
   // por lo que las vecinas no rehacen su posición inicial (evita el salto).
   const closeTimeoutRef = useRef(null);
-  const PREVIEW_CLOSE_DELAY_MS = 180;
-  const { showHoverBackdrop, clearHoverBackdrop } =
+  const PREVIEW_CLOSE_DELAY_MS = 280;
+  const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
 
   // Limpiar temporizadores al desmontar
@@ -2722,6 +2722,7 @@ export function Row({
     const hoverToken = hoverIntentRef.current + 1;
     hoverIntentRef.current = hoverToken;
     setHoveredIndex(index);
+    prewarmHoverBackdrop(m);
 
     const revealWhenReady = () => {
       preparePreviewBackdrop(m, backdropOverride).finally(() => {
@@ -2791,6 +2792,7 @@ export function Row({
 
       for (const movie of toPreload) {
         const backdropOverride = backdropOverrides?.[movie.id];
+        prewarmHoverBackdrop(movie);
         await preparePreviewBackdrop(movie, backdropOverride);
         setPreloadedBackdrops((prev) => new Set([...prev, movie.id]));
       }
@@ -2804,6 +2806,7 @@ export function Row({
     normalizedItems,
     isMobile,
     backdropOverrides,
+    prewarmHoverBackdrop,
     preloadedBackdrops,
   ]);
 
@@ -3735,7 +3738,7 @@ function TopRatedHero({
 }) {
   const [activeTab, setActiveTab] = useState("movies");
   const { openDetailModal } = useDetailModal();
-  const { showHoverBackdrop, clearHoverBackdrop } =
+  const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
   const items = activeTab === "movies" ? movieItems : tvItems;
 
@@ -3775,6 +3778,10 @@ function TopRatedHero({
 
     const load = async () => {
       try {
+        allItems.slice(0, 6).forEach((movie) => {
+          prewarmHoverBackdrop(movie);
+        });
+
         const entries = await Promise.all(
           allItems.map(async (movie) => {
             const id = movie?.id;
@@ -3834,7 +3841,7 @@ function TopRatedHero({
     return () => {
       canceled = true;
     };
-  }, [allItems, backdropOverrides]);
+  }, [allItems, backdropOverrides, prewarmHoverBackdrop]);
 
   const updateNav = (swiper) => {
     if (!swiper) return;

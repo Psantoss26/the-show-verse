@@ -96,6 +96,7 @@ const scaleIn = {
 const INITIAL_VISIBLE_ROWS = 6;
 const ROW_REVEAL_BATCH_SIZE = 4;
 const EMPTY_ARRAY = [];
+const PREVIEW_CLOSE_DELAY_MS = 220;
 // Overrides de artwork vacíos y ESTABLES para los componentes compartidos de
 // MainDashboard (que esperan mapas por id). En series no propagamos overrides;
 // el artwork lo resuelven los propios componentes.
@@ -1326,7 +1327,8 @@ function Row({
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
   const hoverIntentRef = useRef(0);
-  const { showHoverBackdrop, clearHoverBackdrop } =
+  const closeTimeoutRef = useRef(null);
+  const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
@@ -1351,7 +1353,12 @@ function Row({
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   useEffect(() => {
-    return () => clearHoverBackdrop();
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+      clearHoverBackdrop();
+    };
   }, [clearHoverBackdrop]);
 
   useEffect(() => {
@@ -1363,6 +1370,7 @@ function Row({
         .filter((show) => !preloadedBackdrops.has(show.id));
 
       for (const show of toPreload) {
+        prewarmHoverBackdrop(show);
         await preparePreviewBackdrop(show);
         setPreloadedBackdrops((prev) => new Set([...prev, show.id]));
       }
@@ -1370,7 +1378,14 @@ function Row({
 
     const timer = window.setTimeout(preloadBackdrops, 300);
     return () => window.clearTimeout(timer);
-  }, [isHoveredRow, hasItems, safeItems, isMobile, preloadedBackdrops]);
+  }, [
+    isHoveredRow,
+    hasItems,
+    safeItems,
+    isMobile,
+    prewarmHoverBackdrop,
+    preloadedBackdrops,
+  ]);
 
   // Fila "Top ... en España": estilo ranking con número. Se identifica por la
   // KEY estable de la engine (region_top), no por el título —así el título se
@@ -1567,13 +1582,25 @@ function Row({
 
       <div
         className={`relative ${hasActivePreview ? "z-30" : ""}`}
-        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseEnter={() => {
+          if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+          }
+          setIsHoveredRow(true);
+        }}
         onMouseLeave={() => {
-          hoverIntentRef.current += 1;
           setIsHoveredRow(false);
-          setHoveredId(null);
-          setHoveredIndex(null);
-          if (isTop10) clearHoverBackdrop();
+          if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+          }
+          closeTimeoutRef.current = window.setTimeout(() => {
+            closeTimeoutRef.current = null;
+            hoverIntentRef.current += 1;
+            setHoveredId(null);
+            setHoveredIndex(null);
+            if (isTop10) clearHoverBackdrop();
+          }, PREVIEW_CLOSE_DELAY_MS);
         }}
       >
         <Swiper
@@ -1655,10 +1682,15 @@ function Row({
                 className={`${base} ${sizeClasses} ${cardBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                 onMouseEnter={() => {
                   if (!isMobile) {
+                    if (closeTimeoutRef.current) {
+                      clearTimeout(closeTimeoutRef.current);
+                      closeTimeoutRef.current = null;
+                    }
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
                     if (isTop10) showHoverBackdrop(s);
+                    else prewarmHoverBackdrop(s);
                     preparePreviewBackdrop(s).finally(() => {
                       if (hoverIntentRef.current === hoverToken) {
                         setHoveredId(itemKey);
@@ -1667,10 +1699,16 @@ function Row({
                   }
                 }}
                 onMouseLeave={() => {
-                  hoverIntentRef.current += 1;
-                  if (!isMobile)
+                  if (isMobile) return;
+                  if (closeTimeoutRef.current) {
+                    clearTimeout(closeTimeoutRef.current);
+                  }
+                  closeTimeoutRef.current = window.setTimeout(() => {
+                    closeTimeoutRef.current = null;
+                    hoverIntentRef.current += 1;
                     setHoveredId((prev) => (prev === itemKey ? null : prev));
-                  if (!isTop10) setHoveredIndex(null);
+                    if (!isTop10) setHoveredIndex(null);
+                  }, PREVIEW_CLOSE_DELAY_MS);
                 }}
               >
                 <AnimatePresence initial={false} mode="popLayout">
@@ -1701,17 +1739,27 @@ function Row({
                           activeIndex={activeIndex}
                           perView={perView}
                           onPreviewMouseEnter={() => {
+                            if (closeTimeoutRef.current) {
+                              clearTimeout(closeTimeoutRef.current);
+                              closeTimeoutRef.current = null;
+                            }
                             hoverIntentRef.current += 1;
                             setHoveredId(itemKey);
                             setHoveredIndex(i);
                             showHoverBackdrop(s);
                           }}
                           onPreviewMouseLeave={() => {
-                            hoverIntentRef.current += 1;
-                            setHoveredId((prev) =>
-                              prev === itemKey ? null : prev,
-                            );
-                            if (!isTop10) setHoveredIndex(null);
+                            if (closeTimeoutRef.current) {
+                              clearTimeout(closeTimeoutRef.current);
+                            }
+                            closeTimeoutRef.current = window.setTimeout(() => {
+                              closeTimeoutRef.current = null;
+                              hoverIntentRef.current += 1;
+                              setHoveredId((prev) =>
+                                prev === itemKey ? null : prev,
+                              );
+                              if (!isTop10) setHoveredIndex(null);
+                            }, PREVIEW_CLOSE_DELAY_MS);
                           }}
                         />
                       ) : (
@@ -1782,15 +1830,24 @@ function Row({
                     className="flex items-center"
                     onMouseEnter={() => {
                       if (!isMobile) {
+                        if (closeTimeoutRef.current) {
+                          clearTimeout(closeTimeoutRef.current);
+                          closeTimeoutRef.current = null;
+                        }
                         setHoveredIndex(i);
                         showHoverBackdrop(s);
                       }
                     }}
                     onMouseLeave={() => {
-                      if (!isMobile) {
+                      if (isMobile) return;
+                      if (closeTimeoutRef.current) {
+                        clearTimeout(closeTimeoutRef.current);
+                      }
+                      closeTimeoutRef.current = window.setTimeout(() => {
+                        closeTimeoutRef.current = null;
                         setHoveredIndex(null);
                         clearHoverBackdrop(s);
-                      }
+                      }, PREVIEW_CLOSE_DELAY_MS);
                     }}
                   >
                     <DashboardRankNumber

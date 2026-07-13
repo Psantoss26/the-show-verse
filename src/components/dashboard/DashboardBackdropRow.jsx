@@ -88,6 +88,7 @@ import {
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
+const PREVIEW_CLOSE_DELAY_MS = 220;
 // Mismo tamaño de backdrop que las previews del resto del dashboard, para que
 // las imágenes ya cacheadas se reutilicen sin volver a descargar.
 const BACKDROP_SIZE = PREVIEW_BACKDROP_SIZE;
@@ -1355,7 +1356,7 @@ export default function DashboardBackdropRow({
   labelText,
 }) {
   const { openDetailModal } = useDetailModal();
-  const { showHoverBackdrop, clearHoverBackdrop } =
+  const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
   const revealProps = useScrollRevealProps();
 
@@ -1428,6 +1429,7 @@ export default function DashboardBackdropRow({
   const handleMouseEnterItem = (itemKey, index) => {
     if (isMobile) return;
     clearHoverCloseTimer();
+    prewarmHoverBackdrop(displayItems[index]);
     openPreview(itemKey, index);
   };
 
@@ -1436,7 +1438,7 @@ export default function DashboardBackdropRow({
     clearHoverCloseTimer();
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
       closePreview(itemKey);
-    }, 120);
+    }, PREVIEW_CLOSE_DELAY_MS);
   };
 
   const updateNav = (swiper) => {
