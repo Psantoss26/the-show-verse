@@ -602,6 +602,7 @@ function InlinePreviewCard({
   heightClass,
   backdropOverride,
   isSpotlight = false,
+  showContextBadge = false,
 }) {
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
@@ -1563,15 +1564,9 @@ function InlinePreviewCard({
                 </div>
               )}
 
-              <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
-                {(() => {
-                  const badge = getSpotlightBadge(movie);
-                  return badge ? (
-                    <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-                      {badge}
-                    </span>
-                  ) : null;
-                })()}
+              {/* Sin badge de contexto (DESTACADO / MEJOR VALORADO / Estreno) en
+                  las secciones spotlight, por preferencia de diseño. */}
+              <div className="mb-2 w-full max-w-full">
                 <DetailsMetaGenresRow
                   yearIso={yearOf(movie)}
                   displayRuntimeValue={
@@ -1690,17 +1685,9 @@ function InlinePreviewCard({
             )}
 
             {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
-                badge contextual · año · duración · estado · géneros. Misma
-                composición que FeaturedHero para las tarjetas x1.6. */}
+                año · duración · estado · géneros. Los badges contextuales se
+                reservan para FeaturedHero y filas x1.6. */}
             <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
-              {(() => {
-                const badge = getSpotlightBadge(movie);
-                return badge ? (
-                  <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-                    {badge}
-                  </span>
-                ) : null;
-              })()}
               <DetailsMetaGenresRow
                 yearIso={yearOf(movie)}
                 displayRuntimeValue={previewDetails.runtimeFallback}
@@ -1930,7 +1917,6 @@ function InlinePreviewCardAnticipated({
     genreObjects: [],
     runtimeFallback: null,
   });
-  const [extras, setExtras] = useState({ awards: null });
 
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
@@ -2010,19 +1996,16 @@ function InlinePreviewCardAnticipated({
     };
   }, [mediaType, movie, session, account]);
 
-  // Carga (best-effort) de los datos que alimentan el panel compartido: detalles
-  // TMDb (estado · géneros · duración) + premios.
+  // Carga (best-effort) de la fila meta compartida: detalles TMDb (estado ·
+  // géneros · duración). "Más esperadas" NO muestra premios ni puntuaciones (son
+  // títulos por estrenar), así que NO se pide imdb_id/OMDb: menos llamadas por
+  // hover.
   useEffect(() => {
     if (!movie?.id) return undefined;
     let cancelled = false;
     const isTv = mediaType === "tv";
 
     (async () => {
-      // imdb_id resuelto una sola vez para premios (OMDb). Las puntuaciones no se
-      // muestran en "Más esperadas", así que no se pide la nota IMDb.
-      const imdbIdPromise = resolveImdbId(movie, mediaType);
-
-      // Detalles TMDb: estado crudo, géneros [{id,name}] y duración de respaldo.
       try {
         const details = await getDetails(mediaType, movie.id).catch(() => null);
         if (!cancelled && details) {
@@ -2056,21 +2039,6 @@ function InlinePreviewCardAnticipated({
             runtimeFallback,
           });
         }
-      } catch {}
-
-      // Premios (OMDb): reutiliza el imdb_id ya resuelto (no re-pide).
-      try {
-        const imdb = await imdbIdPromise;
-        let awards = null;
-        if (imdb) {
-          const omdb = await fetchOmdbByImdb(imdb).catch(() => null);
-          const rawAwards = omdb?.Awards;
-          awards =
-            rawAwards && typeof rawAwards === "string" && rawAwards.trim()
-              ? formatDashboardAwards(rawAwards)
-              : null;
-        }
-        if (!cancelled) setExtras({ awards });
       } catch {}
     })();
 
@@ -2430,32 +2398,11 @@ function InlinePreviewCardAnticipated({
           />
         </div>
 
-        {extras?.awards && (
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
-            <motion.span
-              key={extras.awards}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex min-w-0 items-center gap-1.5"
-            >
-              <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="line-clamp-1">{extras.awards}</span>
-            </motion.span>
-          </div>
-        )}
+        {/* "Más esperadas": SIN premios/nominaciones ni puntuaciones (son títulos
+            por estrenar) y sin badge de contexto. Solo botones + indicadores. */}
 
-        {/* Fila meta + géneros COMPARTIDA: badge contextual · año · duración ·
-            estado · géneros, igual que FeaturedHero. */}
+        {/* Fila meta + géneros COMPARTIDA: año · duración · estado · géneros. */}
         <div className="mb-2 flex w-full max-w-full flex-wrap items-center justify-start gap-x-2 gap-y-1.5">
-          {(() => {
-            const badge = getSpotlightBadge(movie);
-            return badge ? (
-              <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-wide text-black sm:text-[0.68rem]">
-                {badge}
-              </span>
-            ) : null;
-          })()}
           <DetailsMetaGenresRow
             yearIso={yearOf(movie)}
             displayRuntimeValue={previewDetails.runtimeFallback}
@@ -2687,6 +2634,7 @@ export function Row({
   sectionHref,
   reserveWhileEmpty = false,
   spotlight = false, // Fila DESTACADA (×1,6). La elige el padre (una por dashboard).
+  showContextBadge = false,
 }) {
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
@@ -3307,6 +3255,9 @@ export function Row({
                               }
                               backdropOverride={backdropOverride}
                               isSpotlight={isSpotlight}
+                              showContextBadge={
+                                isSpotlight && showContextBadge
+                              }
                             />
                           </motion.div>
                         )

@@ -291,7 +291,7 @@ function BackdropBaseCard({ item, backdropOverride }) {
  * ampliado (16:9) + panel de info (logo/título · metadatos · acciones).
  * Acciones GENÉRICAS: ▶ trailer · ❤ favorito · 🔖 pendientes.
  * ==================================================================== */
-function BackdropPreviewCard({
+export function BackdropPreviewCard({
   item,
   backdropOverride,
   index,
