@@ -150,7 +150,7 @@ export default function LiquidButton({
     setTimeout(() => {
       explosionParticlesRef.current = [];
       setIsExploding(false);
-    }, 800);
+    }, 500);
   }, []);
 
   // Propagar evento a otros botones del grupo
@@ -507,9 +507,10 @@ export default function LiquidButton({
   const primaryColor = toRgba(currentColors.rgb, 1);
   const secondaryColor = toRgba(currentColors.secondary, 1);
   const bgColor = toRgba(currentColors.rgb, 0.3);
-  const hoverScale = isHovered && !disabled ? 1.12 : 1;
-  const proximityScale = proximityGlow > 0 ? 1 + proximityGlow * 0.08 : 1;
-  const explosionScale = isExploding ? 1.18 : 1;
+  const isLabeled = className.includes("labeled");
+  const hoverScale = isHovered && !disabled ? (isLabeled ? 1.03 : 1.06) : 1;
+  const proximityScale = proximityGlow > 0 ? 1 + proximityGlow * 0.04 : 1;
+  const explosionScale = isExploding ? (isLabeled ? 1.05 : 1.08) : 1;
   const finalScale = Math.max(hoverScale, proximityScale) * explosionScale;
 
   return (
@@ -539,9 +540,9 @@ export default function LiquidButton({
         ${className}
       `}
       style={{
-        transform: `scale(${finalScale}) ${isExploding ? "rotate(3deg)" : ""}`,
+        transform: `scale(${finalScale}) ${isExploding ? (isLabeled ? "rotate(0.5deg)" : "rotate(1.5deg)") : ""}`,
         transition: isExploding
-          ? "transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1)"
+          ? "transform 0.12s cubic-bezier(0.25, 1, 0.5, 1)"
           : undefined,
         backgroundColor: active && !disabled ? bgColor : undefined,
         color: active && !disabled ? secondaryColor : undefined,

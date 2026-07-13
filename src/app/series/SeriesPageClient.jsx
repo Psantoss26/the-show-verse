@@ -41,7 +41,9 @@ import { useEngineRows } from "@/components/dashboard/useEngineRows";
 // backdrop, más el provider del modal rápido. Reutilizamos los componentes de
 // MainDashboard para que el diseño sea idéntico.
 import { Row as SharedRow } from "@/components/MainDashboardClient";
-import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import DashboardBackdropRow, {
+  BackdropPreviewCard,
+} from "@/components/dashboard/DashboardBackdropRow";
 import {
   DashboardHoverBackdropLayer,
   DashboardHoverBackdropProvider,
@@ -601,7 +603,6 @@ function Top10MobileBackdropCardTV({
   imageClassName = "object-contain",
 }) {
   const [backdropPath, setBackdropPath] = useState(null);
-  const [extraBackdropPath, setExtraBackdropPath] = useState(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -609,7 +610,6 @@ function Top10MobileBackdropCardTV({
 
     const load = async () => {
       if (!show?.id) return;
-      if (!abort) setExtraBackdropPath(null);
 
       const revealBackdrop = (path) => {
         if (abort) return;
@@ -617,31 +617,16 @@ function Top10MobileBackdropCardTV({
         setReady(!!path);
       };
 
-      const revealExtraBackdrop = async (path, primaryPath) => {
-        if (!path || path === primaryPath) {
-          if (!abort) setExtraBackdropPath(null);
-          return;
-        }
-        await preloadImage(buildImg(path, "w780"));
-        if (!abort) setExtraBackdropPath(path);
-      };
-
       const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
       if (userBackdrop) {
         tvBackdropCache.set(show.id, userBackdrop);
         revealBackdrop(userBackdrop);
-        fetchBestTVBackdrop(show.id, { offset: 1 })
-          .then((extra) => revealExtraBackdrop(extra, userBackdrop))
-          .catch(() => {});
         return;
       }
 
       const cached = tvBackdropCache.get(show.id);
       if (cached !== undefined) {
         revealBackdrop(cached);
-        fetchBestTVBackdrop(show.id, { offset: 1 })
-          .then((extra) => revealExtraBackdrop(extra, cached))
-          .catch(() => {});
         return;
       }
 
@@ -650,13 +635,10 @@ function Top10MobileBackdropCardTV({
         const chosen = preferred || getPreviewBackdropFallback(show);
         tvBackdropCache.set(show.id, chosen);
         revealBackdrop(chosen);
-        const extra = await fetchBestTVBackdrop(show.id, { offset: 1 });
-        await revealExtraBackdrop(extra, chosen);
       } catch {
         const fallback = getPreviewBackdropFallback(show);
         tvBackdropCache.set(show.id, fallback);
         revealBackdrop(fallback);
-        setExtraBackdropPath(null);
       }
     };
 
@@ -668,9 +650,6 @@ function Top10MobileBackdropCardTV({
 
   const href = `/details/tv/${show.id}`;
   const src = backdropPath ? buildImg(backdropPath, "w1280") : null;
-  const extraSrc = extraBackdropPath
-    ? buildImg(extraBackdropPath, "w1280")
-    : null;
 
   return (
     <Link href={href} prefetch={false} className="block w-full h-full">
@@ -692,22 +671,10 @@ function Top10MobileBackdropCardTV({
             <OptimizedImage
               src={src}
               alt={show.name || show.title}
-              className={`absolute inset-0 h-full w-full transition-[opacity,transform] duration-700 ease-out group-hover/top10:scale-[1.025] ${
-                extraSrc ? "group-hover/top10:opacity-0" : ""
-              } motion-reduce:transition-none ${imageClassName}`}
+              className={`absolute inset-0 h-full w-full transition-transform duration-700 ease-out group-hover/top10:scale-[1.025] motion-reduce:transition-none ${imageClassName}`}
               priority={rank === 1}
               decoding="async"
             />
-            {extraSrc && (
-              <OptimizedImage
-                src={extraSrc}
-                alt=""
-                aria-hidden="true"
-                className={`absolute inset-0 h-full w-full opacity-0 transition-[opacity,transform] duration-700 ease-out group-hover/top10:scale-[1.025] group-hover/top10:opacity-100 motion-reduce:transition-none ${imageClassName}`}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
           </>
         )}
 
@@ -1358,6 +1325,8 @@ function Row({
   const [canNext, setCanNext] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [perView, setPerView] = useState(6);
   // Montamos la fila un poco antes de que entre en pantalla, no todas a la vez.
   const isInView = useInView(rowRef, { once: true, margin: "600px" });
   // Revelado: la fila se monta antes pero permanece oculta y solo se anima al
@@ -1500,6 +1469,9 @@ function Row({
     const hasOverflow = !swiper.isLocked;
     setCanPrev(hasOverflow && !swiper.isBeginning);
     setCanNext(hasOverflow && !swiper.isEnd);
+    setActiveIndex(swiper.activeIndex);
+    const spv = swiper?.params?.slidesPerView;
+    if (typeof spv === "number" && Number.isFinite(spv)) setPerView(spv);
   };
 
   const handleSwiper = (swiper) => {
@@ -1560,7 +1532,7 @@ function Row({
       ref={rowRef}
       {...revealProps}
       variants={fadeInUp}
-      className="relative group sv-deferred-row"
+      className={`relative group ${hasActivePreview ? "z-[100]" : "sv-deferred-row"}`}
     >
       <motion.div
         {...revealProps}
@@ -1582,7 +1554,7 @@ function Row({
       </motion.div>
 
       <div
-        className="relative"
+        className={`relative ${hasActivePreview ? "z-30" : ""}`}
         onMouseEnter={() => setIsHoveredRow(true)}
         onMouseLeave={() => {
           hoverIntentRef.current += 1;
@@ -1614,12 +1586,17 @@ function Row({
               : false
           }
           modules={[Navigation, FreeMode]}
-          className="group relative"
+          className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
+            isTop10
+              ? "!pt-14 sm:!pt-16 md:!pt-44 !pb-40 sm:!pb-52 md:!pb-72 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-40 sm:!-mb-52 md:!-mb-72"
+              : ""
+          }`}
+          wrapperClass={isTop10 ? "flex items-center" : undefined}
           breakpoints={breakpointsRow}
         >
           {safeItems.map((s, i) => {
             const itemKey = `tv:${s.id}:${i}`;
-            const isActive = !isTop10 && !isMobile && hoveredId === itemKey;
+            const isActive = !isMobile && hoveredId === itemKey;
 
             const base =
               "relative flex-shrink-0 transition-all duration-300 ease-in-out";
@@ -1632,10 +1609,10 @@ function Row({
 
             const sizeClasses = isMobile
               ? "w-full"
-              : isActive
+              : isTop10
+                ? "w-[280px] sm:w-[320px] md:w-[390px] xl:w-[440px] z-10"
+                : isActive
                 ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
-                : isTop10
-                  ? "w-[280px] sm:w-[320px] md:w-[390px] xl:w-[440px] z-10"
                   : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
 
             let transformClass = "";
@@ -1664,7 +1641,7 @@ function Row({
               <div
                 className={`${base} ${sizeClasses} ${cardBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
                 onMouseEnter={() => {
-                  if (!isMobile && !isTop10) {
+                  if (!isMobile) {
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
                     setHoveredIndex(i);
@@ -1702,13 +1679,35 @@ function Row({
                       className="w-full h-full hidden sm:block"
                       style={{ willChange: "transform, opacity" }}
                     >
-                      <InlinePreviewCard
-                        show={s}
-                        heightClass={
-                          isSpotlight ? "h-full" : heightClassDesktop
-                        }
-                        isSpotlight={isSpotlight}
-                      />
+                      {isTop10 ? (
+                        <BackdropPreviewCard
+                          item={s}
+                          index={i}
+                          totalCount={safeItems.length}
+                          activeIndex={activeIndex}
+                          perView={perView}
+                          onPreviewMouseEnter={() => {
+                            hoverIntentRef.current += 1;
+                            setHoveredId(itemKey);
+                            setHoveredIndex(i);
+                          }}
+                          onPreviewMouseLeave={() => {
+                            hoverIntentRef.current += 1;
+                            setHoveredId((prev) =>
+                              prev === itemKey ? null : prev,
+                            );
+                            setHoveredIndex(null);
+                          }}
+                        />
+                      ) : (
+                        <InlinePreviewCard
+                          show={s}
+                          heightClass={
+                            isSpotlight ? "h-full" : heightClassDesktop
+                          }
+                          isSpotlight={isSpotlight}
+                        />
+                      )}
                     </motion.div>
                   ) : (
                     <motion.div
@@ -1756,7 +1755,11 @@ function Row({
               <SwiperSlide
                 key={itemKey}
                 className={`select-none md:!w-auto ${
-                  isSpotlight ? "md:!flex md:!items-center" : ""
+                  isSpotlight || isTop10 ? "md:!flex md:!items-center" : ""
+                } ${
+                  isActive
+                    ? "!relative !z-[100] !overflow-visible"
+                    : "!relative !z-10"
                 }`}
               >
                 {isTop10 ? (
@@ -1988,6 +1991,7 @@ export default function SeriesPageClient({
                     backdropOverrides={EMPTY_OBJECT}
                     overridesReady
                     spotlight={isSpotlight}
+                    showContextBadge={isSpotlight}
                   />
                 ),
               );

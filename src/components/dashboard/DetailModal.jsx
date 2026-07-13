@@ -332,13 +332,16 @@ const backdropVariants = {
 };
 
 // Panel anclado abajo: entra como una hoja de preview y sale hacia la ficha.
+// NO se anima `filter: blur` (re-desenfocaba el panel en cada frame, carísimo):
+// solo opacity + y + scale, que se componen en GPU. Además el backdrop-blur del
+// panel se DESACTIVA durante la entrada (ver `panelSettled`) para que el
+// transform no obligue a recalcular el backdrop-filter frame a frame.
 const panelVariants = {
-  hidden: { opacity: 0, y: 86, scale: 0.965, filter: "blur(10px)" },
+  hidden: { opacity: 0, y: 86, scale: 0.965 },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
       type: "spring",
       stiffness: 170,
@@ -352,14 +355,12 @@ const panelVariants = {
     opacity: 0,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: { duration: 0 },
   },
   exit: {
     opacity: 0,
     y: 52,
     scale: 0.985,
-    filter: "blur(6px)",
     transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
   },
 };
@@ -629,6 +630,11 @@ export default function DetailModal({ item, onClose }) {
   const [loadingStates, setLoadingStates] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  // El backdrop-blur del panel solo se aplica una vez TERMINADA la animación de
+  // entrada: durante la entrada el panel se transforma (y/scale) y tener el
+  // backdrop-filter activo obligaría a recalcular el desenfoque en cada frame
+  // (muy lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
+  const [panelSettled, setPanelSettled] = useState(false);
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [officialSiteState, setOfficialSiteState] = useState({
     itemKey: "",
@@ -1617,8 +1623,14 @@ export default function DetailModal({ item, onClose }) {
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
+        onAnimationComplete={(definition) => {
+          if (definition === "visible") setPanelSettled(true);
+        }}
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+        style={{ willChange: "transform, opacity" }}
+        className={`relative z-10 mt-[4vh] flex h-[96vh] w-[95vw] max-w-[1080px] flex-col overflow-hidden rounded-t-2xl bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+          panelSettled ? "backdrop-blur-3xl" : ""
+        }`}
       >
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
           {/* Botón superior izquierdo: cierra el modal */}
