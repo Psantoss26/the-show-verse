@@ -109,6 +109,11 @@ export default function DetailActionsRow({
   // se está reproduciendo (la preview del dashboard lo pasa = showTrailer).
   trailerPlaying = false,
 
+  // Píldora de REPRODUCCIÓN (Continuar viendo): { label, onPlay, title }. Ocupa el
+  // MISMO slot que el tráiler (mutuamente excluyente con onTrailer): en vez de "Ver
+  // tráiler" muestra "Reproducir T·E" y reproduce el episodio/película en curso.
+  play = null,
+
   onSoundtrack,
   soundtrackAvailable = false,
 
@@ -149,13 +154,42 @@ export default function DetailActionsRow({
     labeledSizeClass,
     mobileGapClass,
     mobileCapClass,
-    trailerLabel ? "labeled-row" : "",
+    trailerLabel || play ? "labeled-row" : "",
     className,
   ]
     .filter(Boolean)
     .join(" ");
   return (
     <div className={rowClass}>
+      {/* Píldora de REPRODUCCIÓN (Continuar viendo): ocupa el slot del tráiler y
+          reproduce el episodio/película en curso. Mismo estilo que la píldora de
+          tráiler (blanca, icono + etiqueta). */}
+      {play && (
+        <LiquidButton
+          onClick={play.onPlay}
+          active
+          activeColor="yellow"
+          groupId="details-actions"
+          className={`labeled shrink-0 !aspect-auto !w-auto !max-w-none !bg-white !text-black ${
+            size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
+          }`}
+          title={play.title || play.label || "Reproducir"}
+        >
+          <Play
+            className={`fill-current ${
+              size === "lg" ? "mr-2 h-5 w-5" : "mr-2 h-4 w-4"
+            }`}
+          />
+          <span
+            className={`whitespace-nowrap font-bold ${
+              size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
+            }`}
+          >
+            {play.label}
+          </span>
+        </LiquidButton>
+      )}
+
       {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
       {onTrailer && (
         <LiquidButton
@@ -267,6 +301,7 @@ export default function DetailActionsRow({
           busy={!!trakt.busy}
           loading={trakt.loading}
           onOpen={trakt.onOpen}
+          progressOverride={trakt.progressOverride}
         />
       )}
 

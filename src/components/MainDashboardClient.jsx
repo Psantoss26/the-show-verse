@@ -62,6 +62,11 @@ import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import {
+  DashboardHoverBackdropLayer,
+  DashboardHoverBackdropProvider,
+  useDashboardHoverBackdrop,
+} from "@/components/dashboard/DashboardHoverBackdrop";
 import DetailModalProvider, {
   useDetailModal,
 } from "@/components/dashboard/DetailModalProvider";
@@ -653,7 +658,9 @@ function InlinePreviewCard({
 
   // Si el tráiler está restringido (edad/embedding) o no disponible, ocultarlo
   // (fallback al backdrop) en vez de mostrar el error de YouTube en la tarjeta.
-  useTrailerAutoDismiss({
+  // `trailerPlaying` = el vídeo se reproduce DE VERDAD: hasta entonces el backdrop
+  // sigue cubriendo el iframe, así el mensaje de "no disponible" nunca se ve.
+  const { playing: trailerPlaying } = useTrailerAutoDismiss({
     open: showTrailer,
     iframeRef: trailerIframeRef,
     videoKey: trailer?.key,
@@ -1400,7 +1407,7 @@ function InlinePreviewCard({
           </div>
         )}
 
-        {!showTrailer && bgSrc && (
+        {bgSrc && (
           <NextImage
             key={bgSrc}
             src={bgSrc}
@@ -1411,10 +1418,14 @@ function InlinePreviewCard({
                 ? "(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
                 : "(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
             }
-            className={`object-cover transition-opacity duration-200 ${
+            className={`pointer-events-none object-cover transition-opacity duration-300 ${
               isSpotlight ? "" : "scale-[1.015]"
-            } ${
-              backdropReady ? "opacity-100" : "opacity-0"
+            } ${showTrailer ? "z-[5]" : ""} ${
+              showTrailer && trailerPlaying
+                ? "opacity-0"
+                : backdropReady
+                  ? "opacity-100"
+                  : "opacity-0"
             }`}
             style={
               isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle
@@ -1464,10 +1475,12 @@ function InlinePreviewCard({
                   allowFullScreen={false}
                   onLoad={syncTrailerAudio}
                 />
-                <PreviewTrailerAudioButton
-                  muted={trailerMuted}
-                  onToggle={handleToggleTrailerAudio}
-                />
+                {trailerPlaying && (
+                  <PreviewTrailerAudioButton
+                    muted={trailerMuted}
+                    onToggle={handleToggleTrailerAudio}
+                  />
+                )}
               </div>
             )}
           </>
@@ -1475,15 +1488,15 @@ function InlinePreviewCard({
 
         {isSpotlight ? (
           <>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </>
         ) : (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-24
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24
                         bg-gradient-to-b from-transparent via-black/35 to-black/70"
           />
         )}
@@ -1929,8 +1942,9 @@ function InlinePreviewCardAnticipated({
     sync: syncTrailerAudio,
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
 
-  // Tráiler restringido/no disponible → ocultarlo (fallback al backdrop).
-  useTrailerAutoDismiss({
+  // Tráiler restringido/no disponible → ocultarlo (fallback al backdrop). Hasta
+  // que `trailerPlaying` sea true el backdrop cubre el iframe (no se ve el error).
+  const { playing: trailerPlaying } = useTrailerAutoDismiss({
     open: showTrailer,
     iframeRef: trailerIframeRef,
     videoKey: trailer?.key,
@@ -2297,12 +2311,14 @@ function InlinePreviewCardAnticipated({
           <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
         )}
 
-        {!showTrailer && bgSrc && (
+        {bgSrc && (
           <motion.div
             initial={{ scale: 1 }}
             animate={{ scale: 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
-            className="absolute inset-0 w-full h-full"
+            className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-300 ${
+              showTrailer ? "z-[5]" : ""
+            } ${showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"}`}
           >
             <NextImage
               key={bgSrc}
@@ -2348,10 +2364,12 @@ function InlinePreviewCardAnticipated({
                   allowFullScreen={false}
                   onLoad={syncTrailerAudio}
                 />
-                <PreviewTrailerAudioButton
-                  muted={trailerMuted}
-                  onToggle={handleToggleTrailerAudio}
-                />
+                {trailerPlaying && (
+                  <PreviewTrailerAudioButton
+                    muted={trailerMuted}
+                    onToggle={handleToggleTrailerAudio}
+                  />
+                )}
               </div>
             )}
           </>
@@ -2361,7 +2379,7 @@ function InlinePreviewCardAnticipated({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70"
         />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
@@ -2701,6 +2719,8 @@ export function Row({
   // por lo que las vecinas no rehacen su posición inicial (evita el salto).
   const closeTimeoutRef = useRef(null);
   const PREVIEW_CLOSE_DELAY_MS = 180;
+  const { showHoverBackdrop, clearHoverBackdrop } =
+    useDashboardHoverBackdrop();
 
   // Limpiar temporizadores al desmontar
   useEffect(() => {
@@ -2711,8 +2731,9 @@ export function Row({
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current);
       }
+      clearHoverBackdrop();
     };
-  }, []);
+  }, [clearHoverBackdrop]);
 
   const handleMouseEnterItem = (e, itemKey, index, m, backdropOverride) => {
     if (isMobile) return;
@@ -2754,6 +2775,7 @@ export function Row({
         if (hoverIntentRef.current === hoverToken) {
           setHoveredId(itemKey);
           setHoveredIndex(index);
+          showHoverBackdrop(m);
         }
       });
     };
@@ -2765,7 +2787,7 @@ export function Row({
     }
   };
 
-  const handleMouseLeaveItem = (itemKey) => {
+  const handleMouseLeaveItem = (itemKey, item) => {
     if (isMobile) return;
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -2792,6 +2814,7 @@ export function Row({
       });
       setHoveredIndex(null);
       setHoveredAlignment("center");
+      clearHoverBackdrop(item);
     }, PREVIEW_CLOSE_DELAY_MS);
   };
   // Montamos la fila un poco ANTES de que entre en pantalla (margen positivo) para
@@ -3016,6 +3039,7 @@ export function Row({
             return null;
           });
           setHoveredIndex(null);
+          clearHoverBackdrop();
         }}
       >
         <div>
@@ -3215,7 +3239,7 @@ export function Row({
                   <div
                     className={`${base} ${sizeClasses} ${itemBoxClass} ${transformClass} ${zOverflowClasses}`}
                     onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
-                    onMouseLeave={() => handleMouseLeaveItem(itemKey)}
+                    onMouseLeave={() => handleMouseLeaveItem(itemKey, m)}
                   >
                     <AnimatePresence
                       initial={false}
@@ -4342,32 +4366,34 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
 
   return (
     <DetailModalProvider>
-    <motion.div
-      className="relative -mt-16 min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30"
-      initial="hidden"
-      animate="visible"
-      variants={fadeInUp}
-    >
-      <div className="relative z-10">
-        <div
-          className="relative isolate z-20 sm:-mb-12 sm:pb-12"
-          style={{ contain: "layout paint" }}
+      <DashboardHoverBackdropProvider>
+        <motion.div
+          className="relative -mt-16 min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30"
+          initial="hidden"
+          animate="visible"
+          variants={fadeInUp}
         >
-          <FeaturedHero
-            items={featuredItems}
-            isMobile={isMobile}
-            deferInitialBackdrop
-          />
-        </div>
+          <DashboardHoverBackdropLayer />
+          <div className="relative z-10">
+            <div
+              className="relative isolate z-20 sm:-mb-12 sm:pb-12"
+              style={{ contain: "layout paint" }}
+            >
+              <FeaturedHero
+                items={featuredItems}
+                isMobile={isMobile}
+                deferInitialBackdrop
+              />
+            </div>
 
-        <div className="px-4 pt-4 pb-6 sm:px-6 sm:pt-11 sm:pb-8">
-          <TopRatedHero
-            movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
-            tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
-            isMobile={isMobile}
-            hydrated={hydrated}
-            backdropOverrides={backdropOverrides}
-          />
+            <div className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-11">
+              <TopRatedHero
+                movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
+                tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
+                isMobile={isMobile}
+                hydrated={hydrated}
+                backdropOverrides={backdropOverrides}
+              />
 
           <motion.div
             className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
@@ -4474,10 +4500,11 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
             if (!blockInserted) nodes.unshift(...calendarBlock);
             return nodes;
           })()}
-          </motion.div>
-        </div>
-      </div>
-    </motion.div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </DashboardHoverBackdropProvider>
     </DetailModalProvider>
   );
 }

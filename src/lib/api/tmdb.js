@@ -511,6 +511,20 @@ export async function resolveImdbId(item, type) {
   return ext?.imdb_id || null;
 }
 
+// tconst IMDb de un EPISODIO concreto (endpoint ligero de TMDB). Permite luego
+// consultar su nota directamente en el dataset IMDb (rápido), en vez de calcularla
+// con fuentes más lentas. Devuelve el imdb_id (tt…) del episodio o null.
+export async function resolveEpisodeImdbId(showId, season, episode) {
+  const s = Number(season);
+  const e = Number(episode);
+  if (!showId || !Number.isFinite(s) || !Number.isFinite(e)) return null;
+  const data = await tmdb(
+    `/tv/${showId}/season/${s}/episode/${e}/external_ids`,
+    { language: undefined },
+  ).catch(() => null);
+  return data?.imdb_id || null;
+}
+
 /* -------------------- Actor -------------------- */
 export async function getActorDetails(id) {
   const data = await tmdb(`/person/${id}`, { language: "es-ES" });

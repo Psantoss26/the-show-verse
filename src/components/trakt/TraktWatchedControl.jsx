@@ -12,6 +12,11 @@ export default function TraktWatchedControl({
   busy,
   loading = false,
   onOpen,
+  // Progreso EXPLÍCITO del episodio/película en curso (ej: "4%"). Cuando se pasa,
+  // el botón muestra ese % (con relleno) y aparece activo (verde) SIN depender del
+  // estado de "visto" de Trakt. Lo usa "Continuar viendo" para reflejar el avance
+  // del episodio/película concretos en el propio botón de visionado.
+  progressOverride,
 }) {
   // Deshabilitar mientras se está resolviendo el estado o hay una operación en curso
   const disabled = !!loading || !!busy;
@@ -20,10 +25,20 @@ export default function TraktWatchedControl({
   const badgeStr = typeof badge === "string" ? badge.trim() : "";
   const isSeries = badgeStr.includes("%");
 
-  const playsCount =
-    !isSeries && visibleWatched && Number(plays || 0) > 0 ? Number(plays) : 0;
-  const progressPercent =
-    isSeries && visibleWatched && badgeStr ? badgeStr : null;
+  const overrideStr =
+    typeof progressOverride === "string" ? progressOverride.trim() : "";
+  const hasOverride = !loading && overrideStr.includes("%");
+
+  const playsCount = hasOverride
+    ? 0
+    : !isSeries && visibleWatched && Number(plays || 0) > 0
+      ? Number(plays)
+      : 0;
+  const progressPercent = hasOverride
+    ? overrideStr
+    : isSeries && visibleWatched && badgeStr
+      ? badgeStr
+      : null;
   const fillPercentage = progressPercent
     ? parseInt(progressPercent, 10)
     : undefined;
@@ -33,18 +48,20 @@ export default function TraktWatchedControl({
       <LiquidButton
         onClick={() => onOpen?.()}
         disabled={disabled}
-        active={visibleWatched}
+        active={hasOverride || visibleWatched}
         activeColor="green"
         groupId="details-actions"
         loading={loading}
         title={
           loading
             ? "Cargando estado de Trakt..."
-            : !connected
-              ? "Inicia sesión para usar Vistos"
-              : visibleWatched
-                ? "Ver historial de vistos (Trakt)"
-                : "Marcar / gestionar vistos (Trakt)"
+            : hasOverride
+              ? `Progreso: ${overrideStr}`
+              : !connected
+                ? "Inicia sesión para usar Vistos"
+                : visibleWatched
+                  ? "Ver historial de vistos (Trakt)"
+                  : "Marcar / gestionar vistos (Trakt)"
         }
         playsCount={playsCount}
         progressPercent={progressPercent}

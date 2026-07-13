@@ -42,6 +42,10 @@ import { useEngineRows } from "@/components/dashboard/useEngineRows";
 // MainDashboard para que el diseño sea idéntico.
 import { Row as SharedRow } from "@/components/MainDashboardClient";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import {
+  DashboardHoverBackdropLayer,
+  DashboardHoverBackdropProvider,
+} from "@/components/dashboard/DashboardHoverBackdrop";
 import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
@@ -1900,38 +1904,40 @@ export default function SeriesPageClient({
 
   return (
     <DetailModalProvider>
-    <motion.div
-      className={`relative min-h-screen overflow-hidden bg-black text-white selection:bg-amber-500/30 ${
-        hasFeaturedHero ? "-mt-16" : "px-4 py-6 sm:px-6"
-      }`}
-      initial="hidden"
-      animate="visible"
-      variants={fadeInUp}
-    >
-      <div className="relative z-10">
-        {hasFeaturedHero && (
-          <div
-            className="relative isolate z-20 sm:-mb-12 sm:pb-12"
-            style={{ contain: "layout paint" }}
-          >
-            <FeaturedHero
-              items={featuredItems}
-              isMobile={isMobile}
-              deferInitialBackdrop
-            />
-          </div>
-        )}
-
+      <DashboardHoverBackdropProvider>
         <motion.div
-          variants={staggerContainer}
+          className={`relative min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30 ${
+            hasFeaturedHero ? "-mt-16" : "px-4 py-6 sm:px-6"
+          }`}
           initial="hidden"
           animate="visible"
-          className={
-            hasFeaturedHero
-              ? "space-y-12 px-4 pt-4 pb-6 sm:px-6 sm:pt-11"
-              : "space-y-12 pt-2"
-          }
+          variants={fadeInUp}
         >
+          <DashboardHoverBackdropLayer />
+          <div className="relative z-10">
+            {hasFeaturedHero && (
+              <div
+                className="relative isolate z-20 sm:-mb-12 sm:pb-12"
+                style={{ contain: "layout paint" }}
+              >
+                <FeaturedHero
+                  items={featuredItems}
+                  isMobile={isMobile}
+                  deferInitialBackdrop
+                />
+              </div>
+            )}
+
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className={
+                hasFeaturedHero
+                  ? "space-y-12 px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-11"
+                  : "space-y-12 pb-8 pt-2 sm:pb-10"
+              }
+            >
           {(() => {
             // Alternancia poster/backdrop como en Inicio: filas pares en póster
             // (Row compartido con preview al hover) e impares en backdrop
@@ -1988,9 +1994,10 @@ export default function SeriesPageClient({
             });
             return nodes;
           })()}
+            </motion.div>
+          </div>
         </motion.div>
-      </div>
-    </motion.div>
+      </DashboardHoverBackdropProvider>
     </DetailModalProvider>
   );
 }

@@ -144,7 +144,7 @@ export default function StarRating({
           <Loader2 className="w-5 h-5 animate-spin" />
         ) : hasRating ? (
           <span
-            className={`font-black leading-none ${
+            className={`font-black leading-none translate-y-[0.05em] ${
               fmt(rating).length === 1
                 ? "text-xl"
                 : "text-xl tracking-tighter"
