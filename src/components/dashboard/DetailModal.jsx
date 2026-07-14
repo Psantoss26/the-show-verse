@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
+import { createPortal } from "react-dom";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   X,
@@ -44,6 +45,9 @@ import {
   ChevronDown,
   Check,
   PlayCircle,
+  Calendar,
+  Clock,
+  Star,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -79,6 +83,12 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
+// Tabs Detalles/Sinopsis + tarjetas meta (Serie/Emisión/Duración/Episodio) que usa
+// EpisodeDetails; se reutilizan para la variante de episodio del modal.
+import {
+  VisualMetaCard,
+  DetailsTabsMenu,
+} from "@/components/details/DetailAtoms";
 // Carrusel horizontal con flechas (Swiper) COMPARTIDO con DetailsClient: mismo
 // desplazamiento, tamaños y organización de tarjetas. Con breakpointsBase
 // "container", el nº de tarjetas se adapta al ancho disponible del modal.
@@ -106,7 +116,11 @@ import {
   traktAddWatchPlay,
   traktUpdateWatchPlay,
   traktRemoveWatchPlay,
+  traktGetEpisodePlays,
+  traktSetEpisodeWatched,
 } from "@/lib/api/traktClient";
+import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import StarRating from "@/components/StarRating";
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
@@ -572,6 +586,11 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   const scrollContainerRef = useRef(null);
   const panelRef = useRef(null);
   const { scrollY } = useScroll({ container: scrollContainerRef });
+  const [modalHostReady, setModalHostReady] = useState(false);
+
+  useEffect(() => {
+    setModalHostReady(true);
+  }, []);
 
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
   const yParallax = useTransform(scrollY, [0, 400], [0, 130]);
@@ -716,6 +735,21 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   };
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
+  // Pestaña activa de la variante de episodio (Detalles / Sinopsis).
+  const [episodeTab, setEpisodeTab] = useState("details");
+  // Acciones de EPISODIO (visto Trakt + puntuación), como en EpisodeDetails.
+  const [epWatch, setEpWatch] = useState({
+    connected: false,
+    watched: false,
+    plays: 0,
+    loading: false,
+    busy: false,
+  });
+  const [epRate, setEpRate] = useState({
+    value: null,
+    loading: false,
+    connected: true,
+  });
   const [officialSiteState, setOfficialSiteState] = useState({
     itemKey: "",
     url: null,
@@ -838,6 +872,125 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
       return true;
     }
     return false;
+  };
+
+  // ===== EPISODIO: carga de estado (visto + puntuación del usuario) =====
+  useEffect(() => {
+    if (item?.media_type !== "episode") return undefined;
+    const showId = item.showId ?? item.id;
+    const season = item.seasonNumber;
+    const episode = item.episodeNumber;
+    if (showId == null || season == null || episode == null) return undefined;
+
+    let alive = true;
+    setEpWatch((s) => ({ ...s, loading: true }));
+    (async () => {
+      try {
+        const plays = await traktGetEpisodePlays({
+          tmdbId: showId,
+          season,
+          episode,
+        });
+        if (alive) {
+          setEpWatch((s) => ({
+            ...s,
+            connected: plays?.connected !== false,
+            watched: (plays?.plays ?? 0) > 0,
+            plays: plays?.plays ?? 0,
+            loading: false,
+          }));
+        }
+      } catch {
+        if (alive) setEpWatch((s) => ({ ...s, loading: false }));
+      }
+      try {
+        const res = await fetch(
+          `/api/trakt/ratings?type=episode&tmdbId=${showId}&season=${season}&episode=${episode}`,
+          { cache: "no-store" },
+        );
+        if (!alive) return;
+        if (res.status === 401) {
+          setEpRate({ value: null, loading: false, connected: false });
+          return;
+        }
+        const j = await res.json().catch(() => ({}));
+        setEpRate({
+          value: typeof j?.rating === "number" ? j.rating : null,
+          loading: false,
+          connected: true,
+        });
+      } catch {
+        // sin puntuación del usuario
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [
+    item?.media_type,
+    item?.id,
+    item?.showId,
+    item?.seasonNumber,
+    item?.episodeNumber,
+  ]);
+
+  const handleEpisodeWatchedToggle = async () => {
+    if (item?.media_type !== "episode" || epWatch.busy) return;
+    if (requireLogin()) return;
+    const showId = item.showId ?? item.id;
+    const next = !epWatch.watched;
+    setEpWatch((s) => ({ ...s, busy: true }));
+    try {
+      await traktSetEpisodeWatched({
+        tmdbId: showId,
+        season: item.seasonNumber,
+        episode: item.episodeNumber,
+        watched: next,
+        title,
+      });
+      setEpWatch((s) => ({
+        ...s,
+        watched: next,
+        plays: next ? Math.max(1, s.plays) : 0,
+        connected: true,
+      }));
+    } catch {
+      // error al marcar
+    } finally {
+      setEpWatch((s) => ({ ...s, busy: false }));
+    }
+  };
+
+  const handleEpisodeRate = async (val) => {
+    if (item?.media_type !== "episode") return;
+    if (requireLogin()) return;
+    const showId = item.showId ?? item.id;
+    const next = val == null || Number(val) <= 0 ? null : Number(val);
+    setEpRate((r) => ({ ...r, loading: true }));
+    try {
+      const res = await fetch("/api/trakt/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "episode",
+          tmdbId: showId,
+          season: item.seasonNumber,
+          episode: item.episodeNumber,
+          rating: next,
+        }),
+      });
+      if (res.status === 401) {
+        requireLogin();
+        return;
+      }
+      if (res.ok) {
+        setEpRate((r) => ({ ...r, value: next, connected: true }));
+      }
+    } catch {
+      // error al puntuar
+    } finally {
+      setEpRate((r) => ({ ...r, loading: false }));
+    }
   };
 
   const posterForMutation =
@@ -1684,6 +1837,133 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     }
   };
 
+  const modalLayer = (
+    <>
+      {/* Modal "Añadir a una lista" — mismo componente que la ficha completa */}
+      <AddToListModal
+        open={listModalOpen}
+        onClose={closeListsModal}
+        lists={userLists}
+        loading={listsLoadingHook}
+        error={listsError || listsHookError}
+        query={listQuery}
+        setQuery={setListQuery}
+        membershipMap={membershipMap}
+        busyListId={busyListId}
+        onAddToList={handleAddToSpecificList}
+        creating={creatingList}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        newName={newListName}
+        setNewName={setNewListName}
+        newDesc={newListDesc}
+        setNewDesc={setNewListDesc}
+        onCreateList={handleCreateListAndAdd}
+      />
+
+      {/* Soundtrack — mismo modal reproductor que la ficha completa */}
+      <SoundtrackModal
+        open={soundtrackOpen}
+        onClose={() => setSoundtrackOpen(false)}
+        title={title}
+        tracks={soundtrackTracks}
+        loading={soundtrackLoading}
+        error={soundtrackError}
+        searchUrl={soundtrackSpotifyUrl}
+      />
+
+      {/* Reseñas en Trakt — mismo modal que la ficha completa */}
+      <TraktCommentModal
+        open={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        onSubmit={handleCommentSubmit}
+        onUpdate={handleCommentUpdate}
+        onDelete={handleCommentDelete}
+        title={title}
+        myComments={[]}
+      />
+
+      {/* Enlaces externos — mismo listado que la ficha completa */}
+      <ExternalLinksModal
+        open={externalLinksOpen}
+        onClose={() => setExternalLinksOpen(false)}
+        links={externalLinks}
+      />
+
+      {/* Visto en Trakt — gestor de reproducciones (mismo modal que la ficha
+          completa para películas). Muestra plays/historial y permite añadir,
+          editar y borrar visionados. */}
+      <TraktWatchedModal
+        open={traktWatchedOpen}
+        onClose={() => {
+          setTraktWatchedOpen(false);
+          setTraktBusy("");
+        }}
+        title={title}
+        connected={traktStatus.connected}
+        found={traktStatus.found}
+        traktUrl={traktStatus.traktUrl}
+        watched={traktStatus.watched}
+        plays={traktStatus.plays}
+        lastWatchedAt={traktStatus.lastWatchedAt}
+        history={traktStatus.history}
+        busyKey={traktBusy}
+        onAddPlay={handleTraktAddPlay}
+        onUpdatePlay={handleTraktUpdatePlay}
+        onRemovePlay={handleTraktRemovePlay}
+      />
+
+      {/* Visto en Trakt (SERIES) — modal de EPISODIOS vistos: temporadas,
+          rewatches y plays. MISMO componente + MISMA lógica (hook compartido)
+          que DetailsClient. */}
+      {mediaType === "tv" && (
+        <TraktEpisodesWatchedModal
+          key={`${item?.id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
+          open={traktEpisodesOpen}
+          onClose={() => {
+            setTraktEpisodesOpen(false);
+            episodesWatched.reconcileAfterClose();
+          }}
+          mediaType={mediaType}
+          tmdbId={Number(item?.id)}
+          title={title}
+          connected={traktConnected || traktStatus.connected}
+          seasons={Array.isArray(data.seasons) ? data.seasons : []}
+          watchedBySeason={episodesWatched.watchedBySeason}
+          busyKey={episodesWatched.episodeBusyKey}
+          episodeBusyKey={episodesWatched.episodeBusyKey}
+          onToggleEpisodeWatched={episodesWatched.toggleEpisodeWatched}
+          onToggleShowWatched={episodesWatched.onToggleShowWatched}
+          showPlays={episodesWatched.showPlays}
+          showReleaseDate={data.showReleaseDate || null}
+          onAddShowPlay={episodesWatched.onAddShowPlay}
+          rewatchRuns={episodesWatched.rewatchRuns}
+          activeView={episodesWatched.activeEpisodesView}
+          activeEpisodesView={episodesWatched.activeEpisodesView}
+          onChangeView={episodesWatched.changeEpisodesView}
+          onChangeEpisodesView={episodesWatched.changeEpisodesView}
+          onCreateRewatchRun={episodesWatched.createRewatchRun}
+          onDeleteRewatchRun={episodesWatched.deleteRewatchRun}
+          rewatchStartAt={episodesWatched.rewatchStartAt}
+          watchedBySeasonRewatch={episodesWatched.rewatchWatchedBySeason}
+          rewatchWatchedBySeason={episodesWatched.rewatchWatchedBySeason}
+          onToggleEpisodeRewatch={episodesWatched.toggleEpisodeRewatch}
+        />
+      )}
+
+      {/* Valoración de episodios (solo series) — mismo modal que la ficha
+          completa; se autoabastece (ratings + temporadas) al abrirse. */}
+      {mediaType === "tv" && (
+        <EpisodeRatingsModal
+          open={episodeRatingsOpen}
+          onClose={() => setEpisodeRatingsOpen(false)}
+          showId={Number(item?.id)}
+          title={title}
+        />
+      )}
+    </>
+  );
+
   return (
     <div
       className={`fixed inset-0 z-[9999] flex ${
@@ -2048,34 +2328,37 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-10px" }}
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-zinc-300 sm:justify-start"
+                  className="space-y-1.5 text-center sm:text-left"
                 >
-                  {episodeMeta?.showName && (
-                    <span className="text-zinc-400">{episodeMeta.showName}</span>
-                  )}
                   {episodeMeta?.seasonNumber != null &&
                     episodeMeta?.episodeNumber != null && (
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                        Episodio {episodeMeta.episodeNumber} · Temporada{" "}
+                        {episodeMeta.seasonNumber}
+                      </div>
+                    )}
+                  <h2 className="text-2xl font-black leading-tight text-white sm:text-3xl">
+                    {title || <SkeletonBar className="h-7 w-52" />}
+                  </h2>
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-zinc-300 sm:justify-start">
+                    {episodeMeta?.showName && (
+                      <span>{episodeMeta.showName}</span>
+                    )}
+                    {episodeMeta?.airDate && (
                       <>
                         {episodeMeta?.showName && (
                           <span className="text-zinc-600">·</span>
                         )}
-                        <span>
-                          T{episodeMeta.seasonNumber} · E{episodeMeta.episodeNumber}
-                        </span>
+                        <span>{episodeMeta.airDate}</span>
                       </>
                     )}
-                  {episodeMeta?.airDate && (
-                    <>
-                      <span className="text-zinc-600">·</span>
-                      <span>{episodeMeta.airDate}</span>
-                    </>
-                  )}
-                  {episodeMeta?.runtime && (
-                    <>
-                      <span className="text-zinc-600">·</span>
-                      <span>{episodeMeta.runtime}</span>
-                    </>
-                  )}
+                    {episodeMeta?.runtime && (
+                      <>
+                        <span className="text-zinc-600">·</span>
+                        <span>{episodeMeta.runtime}</span>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               ) : hasMetaRow ? (
                 <motion.div
@@ -2101,7 +2384,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
-            {(hasRatings || hasExternalLinks) && (
+            {(hasRatings || hasExternalLinks || isEpisode) && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -2155,7 +2438,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                       : null
                   }
                   externalLinks={externalLinks}
-                  streamingProviders={[]}
+                  streamingProviders={isEpisode ? streamingProviders : []}
                   onMoreLinks={() => setExternalLinksOpen(true)}
                   share={{
                     title,
@@ -2166,30 +2449,110 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                         : undefined,
                   }}
                   stats={scoreStats}
+                  showFavoritedStat={!isEpisode}
+                  toolbarActions={
+                    isEpisode ? (
+                      <>
+                        <TraktWatchedControl
+                          connected={epWatch.connected}
+                          watched={epWatch.watched}
+                          plays={epWatch.plays}
+                          badge={null}
+                          busy={epWatch.busy}
+                          loading={epWatch.loading}
+                          onOpen={handleEpisodeWatchedToggle}
+                        />
+                        <StarRating
+                          rating={epRate.value}
+                          loading={epRate.loading}
+                          connected={epRate.connected}
+                          onRate={handleEpisodeRate}
+                          onConnect={requireLogin}
+                        />
+                      </>
+                    ) : undefined
+                  }
                   className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
                 />
               </motion.div>
             )}
 
-            {/* EPISODIO: sinopsis simple (las pestañas Detalles/Producción son de
-                serie y no aplican). Resto: pestañas Detalles · Producción · Sinopsis */}
+            {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
+                EpisodeDetails). Detalles = Serie/Emisión/Duración/Episodio. */}
             {isEpisode ? (
-              data.overview ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-10px" }}
-                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                  className="space-y-2"
-                >
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    Sinopsis
-                  </h3>
-                  <p className="text-sm leading-relaxed text-zinc-300">
-                    {data.overview}
-                  </p>
-                </motion.div>
-              ) : null
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-10px" }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <DetailsTabsMenu
+                  tabs={[
+                    { id: "details", label: "Detalles" },
+                    { id: "synopsis", label: "Sinopsis" },
+                  ]}
+                  activeTab={episodeTab}
+                  onChangeTab={setEpisodeTab}
+                  layoutId="detailModalEpisodeTab"
+                />
+                <div className="relative min-h-[80px] pt-3">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {episodeTab === "synopsis" ? (
+                      <motion.div
+                        key="synopsis"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <p className="text-sm leading-relaxed text-zinc-300 whitespace-pre-line">
+                          {data.overview?.trim() ||
+                            "No hay descripción disponible."}
+                        </p>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="details"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"
+                      >
+                        <VisualMetaCard
+                          icon={MonitorPlay}
+                          label="Serie"
+                          value={episodeMeta?.showName || "—"}
+                          className="w-full sm:w-auto sm:flex-1"
+                        />
+                        <VisualMetaCard
+                          icon={Calendar}
+                          label="Emisión"
+                          value={episodeMeta?.airDate || "—"}
+                          className="w-full sm:w-auto sm:flex-1"
+                        />
+                        <VisualMetaCard
+                          icon={Clock}
+                          label="Duración"
+                          value={episodeMeta?.runtime || "—"}
+                          className="w-full sm:w-auto sm:flex-1"
+                        />
+                        <VisualMetaCard
+                          icon={Star}
+                          label="Episodio"
+                          value={
+                            episodeMeta?.seasonNumber != null &&
+                            episodeMeta?.episodeNumber != null
+                              ? `T${episodeMeta.seasonNumber} · E${episodeMeta.episodeNumber}`
+                              : "—"
+                          }
+                          className="w-full sm:w-auto sm:flex-1"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
             ) : (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
@@ -2568,128 +2931,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
         </div>
       </motion.div>
 
-      {/* Modal "Añadir a una lista" — mismo componente que la ficha completa */}
-      <AddToListModal
-        open={listModalOpen}
-        onClose={closeListsModal}
-        lists={userLists}
-        loading={listsLoadingHook}
-        error={listsError || listsHookError}
-        query={listQuery}
-        setQuery={setListQuery}
-        membershipMap={membershipMap}
-        busyListId={busyListId}
-        onAddToList={handleAddToSpecificList}
-        creating={creatingList}
-        createOpen={createOpen}
-        setCreateOpen={setCreateOpen}
-        newName={newListName}
-        setNewName={setNewListName}
-        newDesc={newListDesc}
-        setNewDesc={setNewListDesc}
-        onCreateList={handleCreateListAndAdd}
-      />
-
-      {/* Soundtrack — mismo modal reproductor que la ficha completa */}
-      <SoundtrackModal
-        open={soundtrackOpen}
-        onClose={() => setSoundtrackOpen(false)}
-        title={title}
-        tracks={soundtrackTracks}
-        loading={soundtrackLoading}
-        error={soundtrackError}
-        searchUrl={soundtrackSpotifyUrl}
-      />
-
-      {/* Reseñas en Trakt — mismo modal que la ficha completa */}
-      <TraktCommentModal
-        open={commentModalOpen}
-        onClose={() => setCommentModalOpen(false)}
-        onSubmit={handleCommentSubmit}
-        onUpdate={handleCommentUpdate}
-        onDelete={handleCommentDelete}
-        title={title}
-        myComments={[]}
-      />
-
-      {/* Enlaces externos — mismo listado que la ficha completa */}
-      <ExternalLinksModal
-        open={externalLinksOpen}
-        onClose={() => setExternalLinksOpen(false)}
-        links={externalLinks}
-      />
-
-      {/* Visto en Trakt — gestor de reproducciones (mismo modal que la ficha
-          completa para películas). Muestra plays/historial y permite añadir,
-          editar y borrar visionados. */}
-      <TraktWatchedModal
-        open={traktWatchedOpen}
-        onClose={() => {
-          setTraktWatchedOpen(false);
-          setTraktBusy("");
-        }}
-        title={title}
-        connected={traktStatus.connected}
-        found={traktStatus.found}
-        traktUrl={traktStatus.traktUrl}
-        watched={traktStatus.watched}
-        plays={traktStatus.plays}
-        lastWatchedAt={traktStatus.lastWatchedAt}
-        history={traktStatus.history}
-        busyKey={traktBusy}
-        onAddPlay={handleTraktAddPlay}
-        onUpdatePlay={handleTraktUpdatePlay}
-        onRemovePlay={handleTraktRemovePlay}
-      />
-
-      {/* Visto en Trakt (SERIES) — modal de EPISODIOS vistos: temporadas,
-          rewatches y plays. MISMO componente + MISMA lógica (hook compartido)
-          que DetailsClient. */}
-      {mediaType === "tv" && (
-        <TraktEpisodesWatchedModal
-          key={`${item?.id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
-          open={traktEpisodesOpen}
-          onClose={() => {
-            setTraktEpisodesOpen(false);
-            episodesWatched.reconcileAfterClose();
-          }}
-          mediaType={mediaType}
-          tmdbId={Number(item?.id)}
-          title={title}
-          connected={traktConnected || traktStatus.connected}
-          seasons={Array.isArray(data.seasons) ? data.seasons : []}
-          watchedBySeason={episodesWatched.watchedBySeason}
-          busyKey={episodesWatched.episodeBusyKey}
-          episodeBusyKey={episodesWatched.episodeBusyKey}
-          onToggleEpisodeWatched={episodesWatched.toggleEpisodeWatched}
-          onToggleShowWatched={episodesWatched.onToggleShowWatched}
-          showPlays={episodesWatched.showPlays}
-          showReleaseDate={data.showReleaseDate || null}
-          onAddShowPlay={episodesWatched.onAddShowPlay}
-          rewatchRuns={episodesWatched.rewatchRuns}
-          activeView={episodesWatched.activeEpisodesView}
-          activeEpisodesView={episodesWatched.activeEpisodesView}
-          onChangeView={episodesWatched.changeEpisodesView}
-          onChangeEpisodesView={episodesWatched.changeEpisodesView}
-          onCreateRewatchRun={episodesWatched.createRewatchRun}
-          onDeleteRewatchRun={episodesWatched.deleteRewatchRun}
-          rewatchStartAt={episodesWatched.rewatchStartAt}
-          watchedBySeasonRewatch={episodesWatched.rewatchWatchedBySeason}
-          rewatchWatchedBySeason={episodesWatched.rewatchWatchedBySeason}
-          onToggleEpisodeRewatch={episodesWatched.toggleEpisodeRewatch}
-        />
-      )}
-
-      {/* Valoración de episodios (solo series) — mismo modal que la ficha
-          completa; se autoabastece (ratings + temporadas) al abrirse. */}
-      {mediaType === "tv" && (
-        <EpisodeRatingsModal
-          open={episodeRatingsOpen}
-          onClose={() => setEpisodeRatingsOpen(false)}
-          showId={Number(item?.id)}
-          title={title}
-        />
-      )}
+      {modalHostReady ? createPortal(modalLayer, document.body) : modalLayer}
     </div>
   );
 }

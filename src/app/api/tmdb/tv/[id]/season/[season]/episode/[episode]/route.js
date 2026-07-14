@@ -42,6 +42,16 @@ export async function GET(_request, context) {
         name: data?.name || null,
         season_number: data?.season_number ?? seasonNumber,
         episode_number: data?.episode_number ?? episodeNumber,
+        // Campos adicionales (aditivo) para la preview de episodio del DetailModal:
+        // sinopsis, imagen still, fecha de emisión, duración y valoración TMDb.
+        overview: data?.overview || null,
+        still_path: data?.still_path || null,
+        air_date: data?.air_date || null,
+        runtime: typeof data?.runtime === "number" ? data.runtime : null,
+        vote_average:
+          typeof data?.vote_average === "number" ? data.vote_average : null,
+        vote_count:
+          typeof data?.vote_count === "number" ? data.vote_count : null,
       },
       {
         status: 200,

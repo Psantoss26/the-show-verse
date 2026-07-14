@@ -13,7 +13,7 @@
 //   - "backdrop": Presupuesto/Recaudación/Canal se muestran SOLO si hay valor
 //                 y el tagline usa comillas rectas " ".
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarIcon,
@@ -112,6 +112,12 @@ export default function DetailsInfoTabs({
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
   const hasPlatformsTab = Array.isArray(platforms) && platforms.length > 0;
+
+  useEffect(() => {
+    if (activeTab === "platforms" && !hasPlatformsTab) {
+      setActiveTab("details");
+    }
+  }, [activeTab, hasPlatformsTab]);
 
   return (
     <>

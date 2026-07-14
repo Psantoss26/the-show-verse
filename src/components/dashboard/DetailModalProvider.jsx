@@ -33,6 +33,7 @@ import { AnimatePresence } from "framer-motion";
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import DetailModal from "@/components/dashboard/DetailModal";
 import useModalGuard from "@/hooks/useModalGuard";
+import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 
 const DetailModalContext = createContext({
   openDetailModal: null,
@@ -111,6 +112,11 @@ function readPreviewFromLocation() {
 }
 
 export default function DetailModalProvider({ children, placement = "center" }) {
+  // En MÓVIL la ficha siempre se muestra CENTRADA (como en Inicio), aunque la
+  // página pida el drawer lateral ("right"). El drawer es solo para escritorio.
+  const isMobile = useIsMobile();
+  const effectivePlacement = placement === "right" && !isMobile ? "right" : "center";
+
   // Pila de niveles abiertos. El item activo es el de arriba.
   const [stack, setStack] = useState([]);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
@@ -217,7 +223,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
   useModalGuard({
     open: activeItem != null,
     onClose: closeDetailModal,
-    lockScroll: placement !== "right",
+    lockScroll: effectivePlacement !== "right",
   });
 
   const value = useMemo(
@@ -235,7 +241,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
             key={previewToken(activeItem)}
             item={activeItem}
             onClose={closeDetailModal}
-            placement={placement}
+            placement={effectivePlacement}
           />
         )}
       </AnimatePresence>
