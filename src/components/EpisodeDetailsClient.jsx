@@ -25,9 +25,7 @@ import {
   Users as UsersIcon,
   MonitorPlay,
   ImageOff,
-  Eye,
   Play as PlayIcon,
-  List as ListIcon,
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
@@ -38,12 +36,11 @@ import {
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
-import { CompactBadge, MiniStat } from "@/components/details/DetailHeaderBits";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   formatDateEs,
-  formatVoteCount,
   formatCountShort,
 } from "@/lib/details/formatters";
 import {
@@ -323,11 +320,6 @@ export default function EpisodeDetailsClient({
     const url = `https://image.tmdb.org/t/p/original${heroBgPath}`;
     return { backgroundImage: `url(${url})` };
   }, [heroBgPath]);
-
-  const fmtStat = useCallback((n) => {
-    const v = typeof n === "number" ? n : 0;
-    return formatVoteCount(v) ?? "0";
-  }, []);
 
   // Tabs
   const [activeTab, setActiveTab] = useState("details");
@@ -1450,74 +1442,40 @@ export default function EpisodeDetailsClient({
             </div>
 
             {/* SCOREBOARD */}
-            <div className="relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[4px] mb-6">
-              <div
-                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                style={{
-                  WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-                }}
-              />
-              <div
-                className="
-      relative z-10
-      py-3
-      pl-[calc(1rem+env(safe-area-inset-left))]
-      pr-[calc(1.25rem+env(safe-area-inset-right))]
-      sm:px-4
-      flex items-center gap-3 sm:gap-4
-      overflow-x-clip overscroll-none [touch-action:pan-y]
-    "
-              >
-                <div className="flex items-center gap-4 sm:gap-5 shrink-0">
-                  <CompactBadge
-                    logo="/logo-TMDb.png"
-                    logoClassName="h-5 sm:h-5"
-                    value={vote?.toFixed(1)}
-                    sub={voteCount ? formatCountShort(voteCount) : undefined}
-                    href={tmdbEpisodeUrl}
-                    disableHoverLift
-                    tooltip={tmdbEpisodeUrl ? "Ver en TMDb" : "TMDb"}
-                  />
-
-                  {/* Trakt (móvil sin sufijo / desktop con %) */}
-                  {traktDecimal && (
-                    <CompactBadge
-                      logo="/logo-Trakt.png"
-                      value={traktDecimal}
-                      sub={
-                        tScoreboard.votes
-                          ? formatCountShort(tScoreboard.votes)
-                          : undefined
-                      }
-                      href={tScoreboard.traktUrl}
-                      disableHoverLift
-                      tooltip={tScoreboard.traktUrl ? "Ver en Trakt" : "Trakt"}
-                    />
-                  )}
-
-                  {imdbData?.rating != null && (
-                    <CompactBadge
-                      logo="/logo-IMDb.svg"
-                      logoWrapClassName="min-w-[28px]"
-                      logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
-                      value={Number(imdbData.rating).toFixed(1)}
-                      sub={
-                        imdbData?.votes
-                          ? formatCountShort(imdbData.votes)
-                          : undefined
-                      }
-                      href={imdbUrl || undefined}
-                      disableHoverLift
-                      tooltip={imdbUrl ? "Ver en IMDb" : "IMDb"}
-                    />
-                  )}
-                </div>
-
-                <div className="w-px h-6 bg-white/35 shrink-0" />
-                <div className="flex-1 min-w-0" />
-                <div className="hidden sm:block w-px h-6 bg-white/35 shrink-0" />
-
-                <div className="flex items-center gap-3 shrink-0 [&_[data-liquid-button]_svg]:!w-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_.text-xl]:!text-[22px]">
+            <DetailsScoreboardPanel
+              className="mb-6"
+              loading={tScoreboard.loading}
+              tmdb={{
+                value: vote?.toFixed(1),
+                sub: voteCount ? formatCountShort(voteCount) : undefined,
+                href: tmdbEpisodeUrl,
+              }}
+              trakt={
+                traktDecimal
+                  ? {
+                      value: traktDecimal,
+                      sub: tScoreboard.votes
+                        ? formatCountShort(tScoreboard.votes)
+                        : undefined,
+                      href: tScoreboard.traktUrl,
+                    }
+                  : null
+              }
+              imdb={
+                imdbData?.rating != null
+                  ? {
+                      value: Number(imdbData.rating).toFixed(1),
+                      sub: imdbData?.votes
+                        ? formatCountShort(imdbData.votes)
+                        : undefined,
+                      href: imdbUrl || undefined,
+                    }
+                  : null
+              }
+              stats={tScoreboard?.stats}
+              showFavoritedStat={false}
+              toolbarActions={
+                <>
                   {/* Botón de visionado — abre modal con historial de plays */}
                   <TraktWatchedControl
                     connected={trakt.connected}
@@ -1545,47 +1503,9 @@ export default function EpisodeDetailsClient({
                     onClose={() => setIsRatingOpen(false)}
                     onRate={handleRate}
                   />
-                </div>
-              </div>
-
-              {!tScoreboard.loading &&
-                hasNumericScoreboardStats(tScoreboard?.stats) && (
-                  <div className="relative z-10 border-t border-white/5 bg-black/[0.06] rounded-b-2xl">
-                    <div
-                      className="
-          overflow-x-clip overscroll-none [touch-action:pan-y]
-          py-2
-          pl-[calc(1rem+env(safe-area-inset-left))]
-          pr-[calc(1rem+env(safe-area-inset-right))]
-        "
-                    >
-                      <div className="flex w-full min-w-0 items-center justify-start gap-2 sm:gap-3">
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={Eye}
-                            value={fmtStat(tScoreboard?.stats?.watchers)}
-                            tooltip="Watchers"
-                          />
-                        </div>
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={PlayIcon}
-                            value={fmtStat(tScoreboard?.stats?.plays)}
-                            tooltip="Plays"
-                          />
-                        </div>
-                        <div className="shrink-0">
-                          <MiniStat
-                            icon={ListIcon}
-                            value={fmtStat(tScoreboard?.stats?.lists)}
-                            tooltip="Lists"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </div>
+                </>
+              }
+            />
 
             {/* Tabs (DETALLES / SINOPSIS) */}
             <div>

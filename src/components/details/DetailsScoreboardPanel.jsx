@@ -19,6 +19,8 @@
 //   rt:          { value } | null               (badge Rotten Tomatoes, solo >= sm)
 //   mc:          { value } | null               (badge Metacritic, solo >= sm)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
+//   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
+//   toolbarActions: ReactNode | null            (acciones inline al final)
 //
 // `value`/`sub` se pasan ya formateados por el llamante (mismos formatters que la
 // ficha: formatCountShort para los sub-labels). Las stats se formatean aquí con
@@ -173,7 +175,7 @@ export function DetailsRatingsBadges({
 // B. FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
 //    Markup VERBATIM del bloque original; los datos vienen por props.
 // ---------------------------------------------------------------------------
-export function DetailsStatsRow({ stats = null }) {
+export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
   // Mostrar cuando hay stats numéricas (incluyendo de cache stale)
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
@@ -225,15 +227,16 @@ export function DetailsStatsRow({ stats = null }) {
             tooltip="En listas"
           />
 
-          {/* Favorited - Usuarios que lo han marcado como favorito */}
-          <TraktStatBadge
-            icon={Heart}
-            value={formatShortNumber(
-              stats?.favorited ?? 0,
-            )?.toUpperCase() || "0"}
-            label="FAVORITOS"
-            tooltip="Favoritos"
-          />
+          {showFavoritedStat && (
+            <TraktStatBadge
+              icon={Heart}
+              value={formatShortNumber(
+                stats?.favorited ?? 0,
+              )?.toUpperCase() || "0"}
+              label="FAVORITOS"
+              tooltip="Favoritos"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -298,6 +301,7 @@ function DetailsToolbarActions({
   streamingProviders = null,
   onMoreLinks,
   share = null,
+  toolbarActions = null,
 }) {
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
@@ -384,6 +388,17 @@ function DetailsToolbarActions({
           />
         </div>
       )}
+
+      {toolbarActions && (
+        <>
+          <ToolbarSeparator />
+          <div className="flex-1 min-w-0" />
+          <ToolbarSeparator className="hidden sm:block" />
+          <div className="flex shrink-0 items-center gap-3 [&_[data-liquid-button]_.text-xl]:!text-[22px] [&_[data-liquid-button]_svg]:!h-[22px] [&_[data-liquid-button]_svg]:!w-[22px]">
+            {toolbarActions}
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -403,10 +418,12 @@ export default function DetailsScoreboardPanel({
   rt = null,
   mc = null,
   stats = null,
+  showFavoritedStat = true,
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
   share = null,
+  toolbarActions = null,
   className = "",
   children = null,
 }) {
@@ -419,7 +436,11 @@ export default function DetailsScoreboardPanel({
   const hasStreamingProviders =
     Array.isArray(streamingProviders) && streamingProviders.length > 0;
   const hasToolbar =
-    hasRatings || hasExternalLinks || hasStreamingProviders || !!share;
+    hasRatings ||
+    hasExternalLinks ||
+    hasStreamingProviders ||
+    !!share ||
+    !!toolbarActions;
 
   if (!hasToolbar && !hasStats && !children) return null;
 
@@ -462,11 +483,12 @@ export default function DetailsScoreboardPanel({
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             share={share}
+            toolbarActions={toolbarActions}
           />
         </div>
       )}
 
-      <DetailsStatsRow stats={stats} />
+      <DetailsStatsRow stats={stats} showFavoritedStat={showFavoritedStat} />
 
       {children}
     </div>

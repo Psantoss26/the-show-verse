@@ -324,7 +324,10 @@ export function useDetailModalData(item) {
               showDetails?.backdrop_path ||
               item.still_path ||
               null,
+            // Los episodios no tienen póster propio: usamos el de la SERIE, para
+            // que la preview (hero móvil centrado) siempre tenga imagen tipo poster.
             posterPath: showDetails?.poster_path || null,
+            heroPosterPath: showDetails?.poster_path || null,
             year: ep?.air_date ? String(ep.air_date).slice(0, 4) : null,
             runtime,
             tmdbRating,
@@ -377,6 +380,99 @@ export function useDetailModalData(item) {
           }));
         } catch {
           // sin nota IMDb del episodio
+        }
+      })();
+
+      // Logo GENERAL de la serie para la cabecera del episodio (best-effort).
+      (async () => {
+        try {
+          const logoPath = await fetchBestLogo(showId, "tv", ["en", null, "es"]);
+          if (!cancelledEp && logoPath) {
+            setData((prev) => ({ ...prev, logoPath }));
+          }
+        } catch {
+          // sin logo: la cabecera cae al nombre de la serie/episodio
+        }
+      })();
+
+      // Póster textless de la serie (mejora el póster con texto del hero móvil).
+      (async () => {
+        try {
+          const heroPosterPath = await fetchBestPosterNoLang(showId, "tv", {
+            fallbackToAny: false,
+          });
+          if (!cancelledEp && heroPosterPath) {
+            setData((prev) => ({ ...prev, heroPosterPath }));
+          }
+        } catch {
+          // sin textless: se mantiene el póster de la serie
+        }
+      })();
+
+      // Comunidad de Trakt del EPISODIO: rating + stats (seguidores/repro/listas).
+      (async () => {
+        try {
+          const sb = await traktGetScoreboard({
+            type: "episode",
+            tmdbId: showId,
+            season: seasonNumber,
+            episode: episodeNumber,
+          });
+          if (cancelledEp || !sb?.found) return;
+          const rating =
+            typeof sb?.community?.rating === "number"
+              ? sb.community.rating
+              : null;
+          const votes =
+            typeof sb?.community?.votes === "number"
+              ? sb.community.votes
+              : null;
+          const st = sb?.stats || {};
+          const stats = {
+            watchers: typeof st.watchers === "number" ? st.watchers : null,
+            plays: typeof st.plays === "number" ? st.plays : null,
+            lists: typeof st.lists === "number" ? st.lists : null,
+            favorited: typeof st.favorited === "number" ? st.favorited : null,
+          };
+          const hasStats = Object.values(stats).some(
+            (v) => typeof v === "number",
+          );
+          if (rating != null || votes != null || hasStats) {
+            setData((prev) => ({ ...prev, scoreboard: { rating, votes, stats } }));
+          }
+        } catch {
+          // sin scoreboard del episodio
+        }
+      })();
+
+      // Plataformas de la SERIE (los episodios se ven en las mismas).
+      (async () => {
+        try {
+          const showDetails = await getDetails("tv", showId).catch(() => null);
+          const streamTitle = (
+            showDetails?.name ||
+            item.showName ||
+            ""
+          ).trim();
+          if (!streamTitle || cancelledEp) return;
+          const params = new URLSearchParams({ title: streamTitle, type: "tv" });
+          const y = showDetails?.first_air_date
+            ? String(showDetails.first_air_date).slice(0, 4)
+            : null;
+          if (y) params.append("year", y);
+          params.append("tmdbId", String(showId));
+          const streamRes = await fetch(`/api/streaming?${params.toString()}`);
+          if (!streamRes.ok || cancelledEp) return;
+          const streamJson = await streamRes.json();
+          const providers = normalizeProviders(streamJson?.providers, 10);
+          if (!cancelledEp && providers.length) {
+            setData((prev) => ({
+              ...prev,
+              providers: mergeModalProviders(providers, prev.providers),
+            }));
+          }
+        } catch {
+          // sin plataformas
         }
       })();
 

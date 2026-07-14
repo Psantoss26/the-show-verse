@@ -19,6 +19,7 @@ import {
   useCallback,
   useTransition,
 } from "react";
+import { createPortal } from "react-dom";
 
 // -- Navegacion de Next.js --
 import { useRouter } from "next/navigation";
@@ -1683,6 +1684,7 @@ export default function DetailsClient({
   const [soundtrackModalOpen, setSoundtrackModalOpen] = useState(false);
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [episodeRatingsModalOpen, setEpisodeRatingsModalOpen] = useState(false);
+  const [modalHostReady, setModalHostReady] = useState(false);
   const [activeSoundtrackId, setActiveSoundtrackId] = useState(null);
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
@@ -1691,6 +1693,10 @@ export default function DetailsClient({
   const soundtrackAbortRef = useRef(null);
   const soundtrackInFlightRef = useRef(null);
   const soundtrackLoadedKeyRef = useRef("");
+
+  useEffect(() => {
+    setModalHostReady(true);
+  }, []);
 
   // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
@@ -7657,6 +7663,138 @@ export default function DetailsClient({
   const favoriteActionLoading = actionStateLoading || favLoading;
   const watchlistActionLoading = actionStateLoading || wlLoading;
 
+  const detailsModalLayer = (
+    <>
+      {/* Modal de reproducción de vídeos y tráilers */}
+      <VideoModal
+        open={videoModalOpen}
+        onClose={closeVideo}
+        video={activeVideo}
+        videos={videos}
+        onVideoChange={setActiveVideo}
+      />
+
+      <SoundtrackModal
+        open={soundtrackModalOpen}
+        onClose={() => setSoundtrackModalOpen(false)}
+        title={title}
+        tracks={soundtrackTracks}
+        loading={soundtrackLoading}
+        error={soundtrackError}
+        initialTrackId={activeSoundtrackId}
+        searchUrl={soundtrackSpotifySearchUrl}
+      />
+
+      {type === "tv" && (
+        <EpisodeRatingsModal
+          open={episodeRatingsModalOpen}
+          onClose={() => setEpisodeRatingsModalOpen(false)}
+          showId={Number(id)}
+          title={title}
+          initialRatings={ratings}
+          initialTmdbSeasons={data?.seasons || []}
+        />
+      )}
+
+      <TraktCommentModal
+        open={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        onSubmit={handleCommentSubmit}
+        onUpdate={handleCommentUpdate}
+        onDelete={handleCommentDelete}
+        title={title}
+        myComments={myComments}
+      />
+
+      {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}
+      {/* Solo visible en móvil, en desktop se muestran inline */}
+      <ExternalLinksModal
+        open={externalLinksOpen}
+        onClose={() => setExternalLinksOpen(false)}
+        links={externalLinks}
+      />
+
+      {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
+      <TraktWatchedModal
+        open={traktWatchedOpen}
+        onClose={() => {
+          setTraktWatchedOpen(false);
+          setTraktBusy("");
+        }}
+        title={title}
+        connected={trakt.connected}
+        found={trakt.found}
+        traktUrl={trakt.traktUrl}
+        watched={trakt.watched}
+        plays={trakt.plays}
+        lastWatchedAt={trakt.lastWatchedAt}
+        history={trakt.history}
+        busyKey={traktBusy}
+        onToggleWatched={toggleTraktWatched}
+        onAddPlay={handleTraktAddPlay}
+        onUpdatePlay={handleTraktUpdatePlay}
+        onRemovePlay={handleTraktRemovePlay}
+      />
+
+      {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}
+      {/* Incluye gestión de runs de rewatch y visualización por temporadas */}
+      <TraktEpisodesWatchedModal
+        key={`${id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
+        open={traktEpisodesOpen}
+        onClose={closeTraktEpisodesModal}
+        mediaType={type}
+        tmdbId={Number(id)}
+        title={title}
+        connected={!!trakt?.connected}
+        seasons={Array.isArray(data?.seasons) ? data.seasons : []}
+        watchedBySeason={watchedBySeason}
+        busyKey={episodeBusyKey}
+        episodeBusyKey={episodeBusyKey}
+        onToggleEpisodeWatched={toggleEpisodeWatched}
+        // serie completa + plays
+        onToggleShowWatched={onToggleShowWatched}
+        showPlays={showPlays}
+        showReleaseDate={data?.first_air_date || data?.release_date || null}
+        onAddShowPlay={onAddShowPlay}
+        // rewatch runs + vista activa
+        rewatchRuns={rewatchRuns}
+        activeView={activeEpisodesView}
+        activeEpisodesView={activeEpisodesView}
+        onChangeView={changeEpisodesView}
+        onChangeEpisodesView={changeEpisodesView}
+        onCreateRewatchRun={createRewatchRun}
+        onDeleteRewatchRun={deleteRewatchRun}
+        rewatchStartAt={rewatchStartAt}
+        watchedBySeasonRewatch={rewatchWatchedBySeason}
+        rewatchWatchedBySeason={rewatchWatchedBySeason}
+        onToggleEpisodeRewatch={toggleEpisodeRewatch}
+      />
+
+      {/* Modal de añadir a lista - Permite agregar el contenido a listas personalizadas del usuario */}
+      {/* Incluye funcionalidad para crear nuevas listas directamente desde el modal */}
+      <AddToListModal
+        open={listModalOpen}
+        onClose={closeListsModal}
+        lists={userLists}
+        loading={listsLoading}
+        error={listsError}
+        query={listQuery}
+        setQuery={setListQuery}
+        membershipMap={membershipMap}
+        busyListId={busyListId}
+        onAddToList={handleAddToSpecificList}
+        creating={creatingList}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        newName={newListName}
+        setNewName={setNewListName}
+        newDesc={newListDesc}
+        setNewDesc={setNewListDesc}
+        onCreateList={handleCreateListAndAdd}
+      />
+    </>
+  );
+
   return (
     <div
       data-details-root
@@ -8100,11 +8238,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             </motion.div>
 
             {/* Providers Grid.
-                En móvil normalmente va oculta (las plataformas viven en el "menú"
-                = pestaña "Plataformas" de DetailsInfoTabs). PERO en modo BACKDROP
-                sí se muestran aquí, como iconos directos debajo de la portada; en
-                ese modo la pestaña "Plataformas" se omite para no duplicar. En
-                escritorio (sm+) se muestra siempre, como hasta ahora. */}
+                En móvil poster se oculta porque las plataformas viven en la
+                pestaña "Plataformas" de DetailsInfoTabs. En móvil backdrop y
+                escritorio se muestran como iconos directos, así que la pestaña
+                se omite para no duplicar. */}
             {platformItems.length > 0 ? (
               <StaggerContainer
                 className={`${
@@ -8351,7 +8488,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     awards={extras.awards}
                     awardItems={awardItems}
                     showAwardsTab={false}
-                    platforms={platformItems}
+                    platforms={
+                      !isBackdropPoster && isMobileViewport ? platformItems : []
+                    }
                   />
                 </div>
               </FadeIn>
@@ -10500,134 +10639,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       {/* =================================================================
           MODALES Y DIÁLOGOS
          ================================================================= */}
-
-      {/* Modal de reproducción de vídeos y tráilers */}
-      <VideoModal
-        open={videoModalOpen}
-        onClose={closeVideo}
-        video={activeVideo}
-        videos={videos}
-        onVideoChange={setActiveVideo}
-      />
-
-      <SoundtrackModal
-        open={soundtrackModalOpen}
-        onClose={() => setSoundtrackModalOpen(false)}
-        title={title}
-        tracks={soundtrackTracks}
-        loading={soundtrackLoading}
-        error={soundtrackError}
-        initialTrackId={activeSoundtrackId}
-        searchUrl={soundtrackSpotifySearchUrl}
-      />
-
-      {type === "tv" && (
-        <EpisodeRatingsModal
-          open={episodeRatingsModalOpen}
-          onClose={() => setEpisodeRatingsModalOpen(false)}
-          showId={Number(id)}
-          title={title}
-          initialRatings={ratings}
-          initialTmdbSeasons={data?.seasons || []}
-        />
-      )}
-
-      <TraktCommentModal
-        open={commentModalOpen}
-        onClose={() => setCommentModalOpen(false)}
-        onSubmit={handleCommentSubmit}
-        onUpdate={handleCommentUpdate}
-        onDelete={handleCommentDelete}
-        title={title}
-        myComments={myComments}
-      />
-
-      {/* Modal de enlaces externos - Muestra todos los enlaces a páginas externas */}
-      {/* Solo visible en móvil, en desktop se muestran inline */}
-      <ExternalLinksModal
-        open={externalLinksOpen}
-        onClose={() => setExternalLinksOpen(false)}
-        links={externalLinks}
-      />
-
-      {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
-      <TraktWatchedModal
-        open={traktWatchedOpen}
-        onClose={() => {
-          setTraktWatchedOpen(false);
-          setTraktBusy("");
-        }}
-        title={title}
-        connected={trakt.connected}
-        found={trakt.found}
-        traktUrl={trakt.traktUrl}
-        watched={trakt.watched}
-        plays={trakt.plays}
-        lastWatchedAt={trakt.lastWatchedAt}
-        history={trakt.history}
-        busyKey={traktBusy}
-        onToggleWatched={toggleTraktWatched}
-        onAddPlay={handleTraktAddPlay}
-        onUpdatePlay={handleTraktUpdatePlay}
-        onRemovePlay={handleTraktRemovePlay}
-      />
-
-      {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}
-      {/* Incluye gestión de runs de rewatch y visualización por temporadas */}
-      <TraktEpisodesWatchedModal
-        key={`${id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
-        open={traktEpisodesOpen}
-        onClose={closeTraktEpisodesModal}
-        mediaType={type}
-        tmdbId={Number(id)}
-        title={title}
-        connected={!!trakt?.connected}
-        seasons={Array.isArray(data?.seasons) ? data.seasons : []}
-        watchedBySeason={watchedBySeason}
-        busyKey={episodeBusyKey}
-        episodeBusyKey={episodeBusyKey}
-        onToggleEpisodeWatched={toggleEpisodeWatched}
-        // serie completa + plays
-        onToggleShowWatched={onToggleShowWatched}
-        showPlays={showPlays}
-        showReleaseDate={data?.first_air_date || data?.release_date || null}
-        onAddShowPlay={onAddShowPlay}
-        // rewatch runs + vista activa
-        rewatchRuns={rewatchRuns}
-        activeView={activeEpisodesView}
-        activeEpisodesView={activeEpisodesView}
-        onChangeView={changeEpisodesView}
-        onChangeEpisodesView={changeEpisodesView}
-        onCreateRewatchRun={createRewatchRun}
-        onDeleteRewatchRun={deleteRewatchRun}
-        rewatchStartAt={rewatchStartAt}
-        watchedBySeasonRewatch={rewatchWatchedBySeason}
-        rewatchWatchedBySeason={rewatchWatchedBySeason}
-        onToggleEpisodeRewatch={toggleEpisodeRewatch}
-      />
-
-      {/* Modal de añadir a lista - Permite agregar el contenido a listas personalizadas del usuario */}
-      {/* Incluye funcionalidad para crear nuevas listas directamente desde el modal */}
-      <AddToListModal
-        open={listModalOpen}
-        onClose={closeListsModal}
-        lists={userLists}
-        loading={listsLoading}
-        error={listsError}
-        query={listQuery}
-        setQuery={setListQuery}
-        membershipMap={membershipMap}
-        busyListId={busyListId}
-        onAddToList={handleAddToSpecificList}
-        creating={creatingList}
-        createOpen={createOpen}
-        setCreateOpen={setCreateOpen}
-        newName={newListName}
-        setNewName={setNewListName}
-        newDesc={newListDesc}
-        setNewDesc={setNewListDesc}
-        onCreateList={handleCreateListAndAdd}
-      />
+      {modalHostReady
+        ? createPortal(detailsModalLayer, document.body)
+        : detailsModalLayer}
     </div>
   );
 }
