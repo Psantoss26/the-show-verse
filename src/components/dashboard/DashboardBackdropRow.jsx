@@ -145,12 +145,11 @@ const shimmer = {
   },
 };
 
-// Fundido de bordes del backdrop (idéntico al de las previews del dashboard).
+// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
+// portada e info sobre el fondo uniforme de la tarjeta, sin línea de corte.
 const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
-  maskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
 };
 
 /* =================== HELPERS =================== */
@@ -1020,7 +1019,7 @@ export function BackdropPreviewCard({
       }}
     >
       {/* Backdrop ampliado 16:9 (+ trailer al pulsar ▶) */}
-      <div className="relative aspect-video w-full overflow-hidden bg-neutral-900">
+      <div className="relative aspect-video w-full overflow-hidden bg-transparent">
         {!showTrailer && !bgSrc && (
           <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
             <motion.div
@@ -1082,7 +1081,7 @@ export function BackdropPreviewCard({
           </>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-transparent via-black/20 to-transparent" />
       </div>
 
       {/* Panel de info: acciones · metadatos */}
@@ -1090,7 +1089,7 @@ export function BackdropPreviewCard({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
-        className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
+        className="w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4"
       >
         {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal. Va
             envuelta en un contenedor que corta la propagación al onClick de la

@@ -267,11 +267,11 @@ const loadedContinueWatchingBackdropSrcs = new Set();
 // cachean por episodio para no mezclar puntuaciones de serie y episodio.
 const continueWatchingExtrasCache = new Map();
 
+// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
+// portada e info sobre el fondo uniforme de la tarjeta, sin línea de corte.
 const cwBackdropFadeStyle = {
-  WebkitMaskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
-  maskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
 };
 
 function normalizePreviewVideos(rawVideos) {
@@ -1568,7 +1568,7 @@ function ContinueWatchingPreviewCard({
       }}
     >
       {/* Backdrop de 16:9 (+ tráiler al reproducir) */}
-      <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
+      <div className="relative w-full aspect-video overflow-hidden bg-transparent">
         {!showTrailer && !ready && (
           <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
             <motion.div
@@ -1635,7 +1635,7 @@ function ContinueWatchingPreviewCard({
         )}
 
         {/* Estado de la tarjeta superpuesto al pie del backdrop */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-b from-transparent to-black/85" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
         {isCalendar ? (
           // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
           // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
@@ -1668,7 +1668,7 @@ function ContinueWatchingPreviewCard({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
-        className="w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4"
+        className="w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4"
       >
         {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las demás
             previews (UN solo layout, como pediste). Calendario: píldora de tráiler.
