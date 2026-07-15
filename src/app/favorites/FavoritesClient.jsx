@@ -2021,18 +2021,16 @@ const FavoriteCard = memo(function FavoriteCard({
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-white/5 shadow-md`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(239,68,68,0.6)]`}
             whileHover={{
               scale: 1.15,
               zIndex: 100,
               boxShadow:
                 "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-              borderColor: "rgba(239, 68, 68, 0.4)",
             }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             style={{
               transformOrigin: "center center",
-              borderColor: "rgba(255, 255, 255, 0.05)",
             }}
             onMouseEnter={handleHover}
           >

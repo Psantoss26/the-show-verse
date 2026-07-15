@@ -865,7 +865,7 @@ const InProgressCard = memo(function InProgressCard({
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-emerald-900/20 transition-all">
+          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(16,185,129,0.6)]">
             <SmartPoster item={item} title={title} />
 
             {/* Tick verde para series completadas (mobile) */}

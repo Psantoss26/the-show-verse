@@ -711,16 +711,15 @@ const ListItemCard = memo(function ListItemCard({
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
     >
       <motion.div
-        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/5 bg-neutral-800/80 shadow-lg transition-colors duration-300 transform-gpu will-change-transform"
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_var(--card-ring-hover)]"
         whileHover={{
           y: -6,
           zIndex: 50,
           boxShadow: hoverShadow,
-          borderColor: accentStyle.borderColor,
         }}
         whileTap={{ y: -2 }}
         transition={{ type: "spring", stiffness: 360, damping: 26 }}
-        style={{ borderColor: "rgba(255, 255, 255, 0.05)" }}
+        style={{ "--card-ring-hover": accentStyle.borderColor }}
       >
         {posterUrl && !imgFailed ? (
           <OptimizedImage

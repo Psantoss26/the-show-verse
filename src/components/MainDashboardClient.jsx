@@ -339,16 +339,19 @@ const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
   ].join(" ");
 
 const dashboardPreviewMediaClass =
-  "relative aspect-video w-full shrink-0 overflow-hidden bg-neutral-900";
+  "relative aspect-video w-full shrink-0 overflow-hidden bg-transparent";
 
+// El panel de info NO lleva fondo ni borde propios: se apoya sobre el fondo
+// uniforme de la tarjeta (bg-[#141414]/95) para que la imagen (enmascarada) se
+// funda con la sección de info SIN línea/escalón, igual que DetailModal.
 const dashboardPreviewInfoClass =
-  "w-full border-t border-white/5 bg-[#141414]/95 px-4 py-3.5 backdrop-blur-md sm:px-5 sm:py-4";
+  "w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4";
 
+// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
+// portada e info; el fondo de la tarjeta queda visible en la zona difuminada.
 const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
-  maskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
 };
 
 const EXPANDABLE_SECTION_HREFS = {
@@ -1500,7 +1503,7 @@ function InlinePreviewCard({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
             className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24
-                        bg-gradient-to-b from-transparent via-black/35 to-black/70"
+                        bg-gradient-to-b from-transparent via-black/25 to-transparent"
           />
         )}
       </div>
@@ -2280,7 +2283,7 @@ function InlinePreviewCardAnticipated({
       style={{ willChange: "transform, opacity" }}
     >
       {/* Backdrop de 16:9 */}
-      <div className="relative w-full aspect-video overflow-hidden bg-neutral-900">
+      <div className="relative w-full aspect-video overflow-hidden bg-transparent">
         {!showTrailer && !backdropReady && (
           <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
         )}
@@ -2353,7 +2356,7 @@ function InlinePreviewCardAnticipated({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/70"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-b from-transparent via-black/40 to-transparent"
         />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
@@ -2381,7 +2384,7 @@ function InlinePreviewCardAnticipated({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
-        className="w-full bg-[#141414]/95 backdrop-blur-md px-3.5 py-3 sm:px-4 sm:py-3.5 border-t border-white/5"
+        className="w-full bg-transparent px-3.5 py-3 sm:px-4 sm:py-3.5"
       >
         {/* Fila de acciones COMPARTIDA (mismo estilo que las demás previews):
             tráiler + favorito + pendiente. Sin trakt/puntuar/soundtrack/episodios

@@ -1858,7 +1858,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       }}
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/50 transition-all duration-300" />
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2px_rgba(16,185,129,0.6)]" />
       <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
         {/* Poster Image */}
         <Poster entry={entry} className="w-full h-full" />

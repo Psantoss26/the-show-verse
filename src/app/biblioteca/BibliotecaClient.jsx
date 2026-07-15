@@ -936,7 +936,7 @@ function LibraryMediaCard({
       >
         <div className="block">
           <motion.article
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md transition-[border-color] duration-300 ${canOpen ? "cursor-pointer" : ""}`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(245,158,11,0.6)] ${canOpen ? "cursor-pointer" : ""}`}
             whileHover={
               canOpen && enableHoverLift
                 ? {
@@ -944,7 +944,6 @@ function LibraryMediaCard({
                     zIndex: 50,
                     boxShadow:
                       "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-                    borderColor: "rgba(245, 158, 11, 0.4)",
                   }
                 : undefined
             }
@@ -955,7 +954,6 @@ function LibraryMediaCard({
             }
             style={{
               transformOrigin: "center center",
-              borderColor: "rgba(39, 39, 42, 0.8)",
             }}
             onClick={openItem}
           >
