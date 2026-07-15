@@ -616,18 +616,18 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   const episodeMeta = data.episodeMeta || null;
   const title = data.title || item?.title || item?.name || "";
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
-  const posterPath = data.posterPath || item?.poster_path || null;
-  const mobilePosterPath = data.heroPosterPath || null;
-  const desktopHeroSrc = backdropPath
-    ? buildImg(backdropPath, "w1280")
-    : posterPath
-      ? buildImg(posterPath, "w780")
-      : null;
-  const mobileHeroSrc = mobilePosterPath
-    ? buildImg(mobilePosterPath, "w780")
-    : backdropPath
-      ? buildImg(backdropPath, "w1280")
-      : null;
+  // HERO: usa SOLO el arte FINAL (heroBackdropPath / heroPosterPath), que se fija
+  // una única vez y YA PRECARGADO en useDetailModalData. Nunca la semilla del item:
+  // hasta que el arte final existe se muestra el esqueleto, así se ve una sola
+  // imagen (sin el parpadeo de cargar antes otra backdrop).
+  const heroBackdropSrc = data.heroBackdropPath
+    ? buildImg(data.heroBackdropPath, "w1280")
+    : null;
+  const heroPosterSrc = data.heroPosterPath
+    ? buildImg(data.heroPosterPath, "w780")
+    : null;
+  const desktopHeroSrc = heroBackdropSrc;
+  const mobileHeroSrc = heroPosterSrc || heroBackdropSrc;
   const hasHeroArt = !!(desktopHeroSrc || mobileHeroSrc);
   const seasonSelectId = useId();
   const availableSeasons = useMemo(() => {

@@ -35,6 +35,9 @@ import {
   getMediaTypeForItem,
   fetchBestLogo,
   fetchBestPosterNoLang,
+  fetchBestBackdropNoLang,
+  preloadImage,
+  buildImg,
 } from "@/lib/dashboard/media";
 import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
@@ -145,6 +148,10 @@ const EMPTY_DATA = {
   backdropPath: null,
   posterPath: null,
   heroPosterPath: null,
+  // Backdrop FINAL del hero (textless), fijado UNA sola vez y ya precargado. El
+  // hero lo usa en exclusiva: hasta que existe muestra el esqueleto (nunca la
+  // backdrop de la semilla), así se ve solo la imagen final (sin parpadeo).
+  heroBackdropPath: null,
   year: null,
   runtime: null,
   seasonEpisodeValue: null,
@@ -264,7 +271,9 @@ export function useDetailModalData(item) {
         mediaType: "tv",
         isEpisode: true,
         title: item.name || item.title || null,
-        backdropPath: item.still_path || item.backdrop_path || null,
+        // Semilla: solo el still del episodio si viene en el item (NO el backdrop
+        // de la serie, que provocaría un salto cuando llega el still real).
+        backdropPath: item.still_path || null,
         episodeMeta: {
           showId,
           seasonNumber,
@@ -326,8 +335,8 @@ export function useDetailModalData(item) {
               null,
             // Los episodios no tienen póster propio: usamos el de la SERIE, para
             // que la preview (hero móvil centrado) siempre tenga imagen tipo poster.
+            // `heroPosterPath`/`heroBackdropPath` se fijan aparte, ya precargados.
             posterPath: showDetails?.poster_path || null,
-            heroPosterPath: showDetails?.poster_path || null,
             year: ep?.air_date ? String(ep.air_date).slice(0, 4) : null,
             runtime,
             tmdbRating,
@@ -345,6 +354,34 @@ export function useDetailModalData(item) {
               runtime,
             },
           }));
+
+          // Arte FINAL del hero (precargado, fijado una vez, sin parpadeo):
+          //  - desktop: still del episodio (o backdrop de la serie de respaldo).
+          //  - móvil: póster de la serie textless (o el normal de respaldo).
+          const stillForHero =
+            ep?.still_path || showDetails?.backdrop_path || null;
+          if (stillForHero) {
+            preloadImage(buildImg(stillForHero, "w1280"))
+              .catch(() => {})
+              .then(() => {
+                if (!cancelledEp) {
+                  setData((prev) => ({ ...prev, heroBackdropPath: stillForHero }));
+                }
+              });
+          }
+          (async () => {
+            const finalPoster =
+              (await fetchBestPosterNoLang(showId, "tv", {
+                fallbackToAny: false,
+              }).catch(() => null)) ||
+              showDetails?.poster_path ||
+              null;
+            if (!finalPoster || cancelledEp) return;
+            await preloadImage(buildImg(finalPoster, "w780")).catch(() => {});
+            if (!cancelledEp) {
+              setData((prev) => ({ ...prev, heroPosterPath: finalPoster }));
+            }
+          })();
         } catch {
           // degradamos: nos quedamos con la semilla
         } finally {
@@ -395,19 +432,6 @@ export function useDetailModalData(item) {
         }
       })();
 
-      // Póster textless de la serie (mejora el póster con texto del hero móvil).
-      (async () => {
-        try {
-          const heroPosterPath = await fetchBestPosterNoLang(showId, "tv", {
-            fallbackToAny: false,
-          });
-          if (!cancelledEp && heroPosterPath) {
-            setData((prev) => ({ ...prev, heroPosterPath }));
-          }
-        } catch {
-          // sin textless: se mantiene el póster de la serie
-        }
-      })();
 
       // Comunidad de Trakt del EPISODIO: rating + stats (seguidores/repro/listas).
       (async () => {
@@ -517,8 +541,10 @@ export function useDetailModalData(item) {
         const overview =
           (typeof source?.overview === "string" && source.overview.trim()) ||
           null;
+        // No pisar el backdrop de la semilla con el de getDetails (evita el flash).
+        // El backdrop FINAL (textless) se fija aparte y YA PRECARGADO más abajo.
         const backdropPath =
-          source?.backdrop_path || item?.backdrop_path || null;
+          item?.backdrop_path || source?.backdrop_path || null;
         const posterPath = source?.poster_path || item?.poster_path || null;
         const year = yearOf(source) || yearOf(item) || null;
 
@@ -808,18 +834,40 @@ export function useDetailModalData(item) {
       }
     })();
 
-    // Póster textless para el hero móvil. En modo estricto no se sustituye por
-    // pósters con idioma si TMDb no tiene arte sin texto.
+    // Póster para el hero móvil: textless si existe, si no el del item. Precargado
+    // y fijado una vez (el hero móvil lo usa en exclusiva, sin parpadeo).
     (async () => {
       try {
-        const heroPosterPath = await fetchBestPosterNoLang(id, mediaType, {
-          fallbackToAny: false,
-        });
-        if (!cancelled && heroPosterPath) {
-          setData((prev) => ({ ...prev, heroPosterPath }));
-        }
+        const finalPoster =
+          (await fetchBestPosterNoLang(id, mediaType, {
+            fallbackToAny: false,
+          }).catch(() => null)) ||
+          item?.poster_path ||
+          null;
+        if (cancelled || !finalPoster) return;
+        await preloadImage(buildImg(finalPoster, "w780"));
+        if (cancelled) return;
+        setData((prev) => ({ ...prev, heroPosterPath: finalPoster }));
       } catch {
-        // sin póster textless: se mantiene el fallback visual, nunca uno con texto
+        // sin póster: el hero móvil mantiene el esqueleto
+      }
+    })();
+
+    // Backdrop FINAL del hero: textless (el logo va superpuesto) o, si no hay, el
+    // del propio item. Se PRECARGA y se fija en `heroBackdropPath` (que el hero usa
+    // en exclusiva), así aparece de una sola vez, sin parpadeo de una imagen previa.
+    (async () => {
+      try {
+        const finalBackdrop =
+          (await fetchBestBackdropNoLang(id, mediaType).catch(() => null)) ||
+          item?.backdrop_path ||
+          null;
+        if (cancelled || !finalBackdrop) return;
+        await preloadImage(buildImg(finalBackdrop, "w1280"));
+        if (cancelled) return;
+        setData((prev) => ({ ...prev, heroBackdropPath: finalBackdrop }));
+      } catch {
+        // sin backdrop: el hero mantiene el esqueleto
       }
     })();
 
