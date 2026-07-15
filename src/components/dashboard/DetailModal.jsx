@@ -119,8 +119,6 @@ import {
   traktGetEpisodePlays,
   traktSetEpisodeWatched,
 } from "@/lib/api/traktClient";
-import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
-import StarRating from "@/components/StarRating";
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
@@ -1262,16 +1260,18 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   const [soundtrackError, setSoundtrackError] = useState("");
 
   // Consulta de búsqueda igual que DetailsClient (título + año + "soundtrack").
+  // En EPISODIO el soundtrack es el de la SERIE (no el del episodio concreto).
+  const soundtrackTitle = isEpisode ? episodeMeta?.showName || title : title;
   const soundtrackSearchQuery = useMemo(() => {
-    if (!title) return "";
+    if (!soundtrackTitle) return "";
     return [
-      title,
-      data.year,
+      soundtrackTitle,
+      isEpisode ? null : data.year,
       mediaType === "tv" ? "series soundtrack" : "movie soundtrack",
     ]
       .filter(Boolean)
       .join(" ");
-  }, [title, data.year, mediaType]);
+  }, [soundtrackTitle, data.year, mediaType, isEpisode]);
 
   const soundtrackSpotifyUrl = soundtrackSearchQuery
     ? `https://open.spotify.com/search/${encodeURIComponent(
@@ -1282,19 +1282,23 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   // Versión mínima de la carga de soundtrack de DetailsClient: pide a
   // /api/soundtrack y alimenta el SoundtrackModal (que ya reproduce previews).
   const loadSoundtrack = async () => {
-    if (!title) return;
+    if (!soundtrackTitle) return;
     setSoundtrackLoading(true);
     setSoundtrackError("");
     try {
       const params = new URLSearchParams({
-        title,
+        title: soundtrackTitle,
         type: mediaType === "tv" ? "tv" : "movie",
         country: "ES",
       });
-      if (data.originalTitle && data.originalTitle !== title) {
+      if (
+        !isEpisode &&
+        data.originalTitle &&
+        data.originalTitle !== soundtrackTitle
+      ) {
         params.set("originalTitle", data.originalTitle);
       }
-      if (data.year) params.set("year", String(data.year));
+      if (!isEpisode && data.year) params.set("year", String(data.year));
       if (item?.id) params.set("tmdbId", String(item.id));
 
       const res = await fetch(`/api/soundtrack?${params.toString()}`);
@@ -1958,7 +1962,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           open={episodeRatingsOpen}
           onClose={() => setEpisodeRatingsOpen(false)}
           showId={Number(item?.id)}
-          title={title}
+          title={isEpisode ? episodeMeta?.showName || title : title}
         />
       )}
     </>
@@ -2300,6 +2304,74 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
             </motion.div>
             )}
 
+            {/* EPISODIO: fila de acciones FUERA del ScoreboardBar (como en pelis/
+                series): botones de visionado + puntuación a la izquierda y las
+                plataformas de streaming a la derecha. */}
+            {isEpisode && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
+              >
+                <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
+                  <DetailActionsRow
+                    fillMobile
+                    mobileGapClass="gap-1.5"
+                    onTrailer={handleToggleTrailer}
+                    trailerAvailable
+                    trailerLoading={trailerLoading}
+                    onSoundtrack={openSoundtrack}
+                    soundtrackAvailable={!!soundtrackSearchQuery}
+                    onEpisodeRatings={() => setEpisodeRatingsOpen(true)}
+                    episodeRatingsOpen={episodeRatingsOpen}
+                    trakt={{
+                      connected: epWatch.connected,
+                      watched: epWatch.watched,
+                      plays: epWatch.plays,
+                      badge: null,
+                      busy: epWatch.busy,
+                      loading: epWatch.loading,
+                      onOpen: handleEpisodeWatchedToggle,
+                    }}
+                    rate={{
+                      rating: epRate.value,
+                      max: 10,
+                      loading: epRate.loading,
+                      onRate: handleEpisodeRate,
+                      connected: epRate.connected,
+                      onConnect: requireLogin,
+                    }}
+                  />
+                </div>
+
+                {hasProviders && (
+                  <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
+                    {streamingProviders.map((prov) => (
+                      <a
+                        key={prov.key}
+                        href={prov.href}
+                        target={prov.target}
+                        rel={prov.rel}
+                        title={prov.subtitle || prov.title}
+                        aria-label={`Abrir ${prov.title}`}
+                        className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
+                      >
+                        <img
+                          src={prov.icon}
+                          alt=""
+                          className="h-11 w-11 rounded-xl object-contain shadow-lg"
+                        />
+                        {prov.isPlexProvider && (
+                          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
             <div className="space-y-3">
               {/* Premios / nominaciones: misma línea verde que las previews del
                   dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
@@ -2345,25 +2417,6 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   <h2 className="text-2xl font-black leading-tight text-white sm:text-3xl">
                     {title || <SkeletonBar className="h-7 w-52" />}
                   </h2>
-                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-zinc-300 sm:justify-start">
-                    {episodeMeta?.showName && (
-                      <span>{episodeMeta.showName}</span>
-                    )}
-                    {episodeMeta?.airDate && (
-                      <>
-                        {episodeMeta?.showName && (
-                          <span className="text-zinc-600">·</span>
-                        )}
-                        <span>{episodeMeta.airDate}</span>
-                      </>
-                    )}
-                    {episodeMeta?.runtime && (
-                      <>
-                        <span className="text-zinc-600">·</span>
-                        <span>{episodeMeta.runtime}</span>
-                      </>
-                    )}
-                  </div>
                 </motion.div>
               ) : hasMetaRow ? (
                 <motion.div
@@ -2443,7 +2496,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                       : null
                   }
                   externalLinks={externalLinks}
-                  streamingProviders={isEpisode ? streamingProviders : []}
+                  streamingProviders={[]}
                   onMoreLinks={() => setExternalLinksOpen(true)}
                   share={{
                     title,
@@ -2455,28 +2508,6 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   }}
                   stats={scoreStats}
                   showFavoritedStat={!isEpisode}
-                  toolbarActions={
-                    isEpisode ? (
-                      <>
-                        <TraktWatchedControl
-                          connected={epWatch.connected}
-                          watched={epWatch.watched}
-                          plays={epWatch.plays}
-                          badge={null}
-                          busy={epWatch.busy}
-                          loading={epWatch.loading}
-                          onOpen={handleEpisodeWatchedToggle}
-                        />
-                        <StarRating
-                          rating={epRate.value}
-                          loading={epRate.loading}
-                          connected={epRate.connected}
-                          onRate={handleEpisodeRate}
-                          onConnect={requireLogin}
-                        />
-                      </>
-                    ) : undefined
-                  }
                   className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
                 />
               </motion.div>
