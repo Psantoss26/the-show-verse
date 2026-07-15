@@ -2008,11 +2008,11 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
-        className={`relative z-10 flex flex-col overflow-hidden bg-black/50 bg-gradient-to-br from-white/10 to-white/[0.03] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
             ? "h-full max-w-[98vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
-        } ${panelSettled ? "backdrop-blur-3xl" : ""}`}
+        } ${panelSettled ? "backdrop-blur-md" : ""}`}
       >
         {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
         {isRightPlacement && (
@@ -2062,8 +2062,11 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-          {/* HERO: póster textless en móvil, backdrop panorámico en sm+. */}
-          <div className="relative aspect-[2/3] w-full overflow-hidden bg-neutral-950 border-b border-white/[0.06] sm:aspect-video">
+          {/* HERO: póster textless en móvil, backdrop panorámico en sm+.
+              El fondo se desvanece a transparente por abajo (sin borde) para que la
+              imagen (enmascarada) se funda con el panel translúcido de contenido y
+              NO se vea una línea/escalón entre portada e información. */}
+          <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent sm:aspect-video">
             <motion.div
               style={{
                 y: yParallax,
@@ -2153,10 +2156,12 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
               className="pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
 
-            {/* Bottom shadow gradient (fades with logo) */}
+            {/* Sombra para el logo. TRANSPARENTE justo en el límite inferior (para
+                no crear escalón con el panel) y oscura un poco más arriba, detrás
+                del logo: se funde suavemente por ambos lados. */}
             <motion.div
               style={{ opacity: logoOpacity }}
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-neutral-950 via-neutral-950/70 to-transparent z-10"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-transparent via-black/45 via-45% to-transparent z-10"
             />
 
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
