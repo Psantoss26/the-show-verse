@@ -1685,10 +1685,10 @@ const WatchlistCard = memo(function WatchlistCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="block bg-zinc-900/40 border border-zinc-800/80 rounded-xl hover:border-blue-500/35 hover:bg-zinc-900/65 transition-[background-color,border-color] duration-300 group overflow-hidden"
+          className="relative block bg-zinc-900/40 rounded-xl hover:bg-zinc-900/65 transition-colors duration-300 group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartPoster
                 item={item}
                 title={title}
@@ -1735,7 +1735,7 @@ const WatchlistCard = memo(function WatchlistCard({
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(59,130,246,0.6)]`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
             whileHover={{
               scale: 1.15,
               zIndex: 50,
@@ -1848,7 +1848,7 @@ const WatchlistCard = memo(function WatchlistCard({
     >
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-blue-900/20 hover:border-blue-500/30 transition-[border-color,box-shadow] duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-blue-900/20 transition-shadow duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />

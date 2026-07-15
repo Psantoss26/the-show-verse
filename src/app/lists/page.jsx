@@ -711,7 +711,7 @@ const ListItemCard = memo(function ListItemCard({
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
     >
       <motion.div
-        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_var(--card-ring-hover)]"
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_var(--card-ring-hover)]"
         whileHover={{
           y: -6,
           zIndex: 50,

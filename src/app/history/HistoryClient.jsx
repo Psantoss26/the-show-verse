@@ -1376,13 +1376,13 @@ function Poster({ entry, className = "" }) {
   }, [entry, hasBeenInView, type, id]);
 
   const src = posterPath
-    ? `https://image.tmdb.org/t/p/w342${posterPath}`
+    ? `https://image.tmdb.org/t/p/w500${posterPath}`
     : null;
 
   return (
     <div
       ref={ref}
-      className={`overflow-hidden bg-zinc-800 border border-white/5 shrink-0 relative shadow-lg ${className}`}
+      className={`overflow-hidden bg-neutral-900 shrink-0 relative ${className}`}
     >
       {src ? (
         <OptimizedImage
@@ -1448,7 +1448,7 @@ function SmartPoster({ entry, title, mode = "poster" }) {
       // POSTER MODE
       const finalPath = await resolveFinalPosterPath({ type, id, entry });
       if (finalPath) {
-        const url = `https://image.tmdb.org/t/p/w342${finalPath}`;
+        const url = `https://image.tmdb.org/t/p/w500${finalPath}`;
         await preloadImage(url);
         if (!abort) {
           setSrc(url);
@@ -1615,8 +1615,8 @@ const HistoryItemCard = memo(function HistoryItemCard({
     >
       <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md bg-zinc-900 shrink-0">
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/30 transition-colors duration-300" />
-        <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+        <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
           <div className="absolute inset-0 w-full h-full">
             <div
               className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
@@ -1660,7 +1660,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
             )}
           </div>
         </div>
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 group-hover:border-emerald-500/30 transition-colors duration-300" />
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2">
@@ -1747,7 +1747,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         layout={!isBackNav}
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         <div className="block">{Content}</div>
       </motion.div>
     );
@@ -1772,7 +1772,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-emerald-500/30 transition-colors duration-300" />
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         {Content}
       </Link>
     </motion.div>
@@ -1858,8 +1858,8 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       }}
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2px_rgba(16,185,129,0.6)]" />
-      <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+      <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {/* Poster Image */}
         <Poster entry={entry} className="w-full h-full" />
 
@@ -2114,8 +2114,8 @@ const HistoryGridCard = memo(function HistoryGridCard({
       ].join(" ")}
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/10 lg:group-hover:border-emerald-500/50 transition-all duration-300" />
-      <div className="absolute inset-[1px] rounded-[inherit] overflow-hidden">
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+      <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         <Poster entry={entry} className="w-full h-full" />
 
         {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
