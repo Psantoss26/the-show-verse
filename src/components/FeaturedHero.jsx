@@ -419,6 +419,7 @@ function FeaturedSlide({
   backdropPath,
   posterPath,
   logoPath,
+  logoResolved,
   isActive,
   isMobile,
   shouldLoadMedia,
@@ -1338,13 +1339,21 @@ function FeaturedSlide({
                   }}
                 />
               </div>
-            ) : (
-              <h2 
+            ) : logoResolved ? (
+              <h2
                 className="hero-reveal hero-title-reveal mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:mb-8 sm:text-5xl lg:text-6xl text-center sm:text-left"
                 style={{ "--hero-delay": "80ms" }}
               >
                 {title}
               </h2>
+            ) : (
+              /* Cargando el logo: reservamos su hueco SIN mostrar texto, para
+                 evitar el parpadeo texto→logo y el salto de layout (el título
+                 de texto solo aparece si se confirma que NO hay logo). */
+              <div
+                aria-hidden="true"
+                className="mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+              />
             )}
 
             {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
@@ -1474,10 +1483,26 @@ function FeaturedSlide({
 
             {isMobile ? (
               <>
-                {/* Fila 1: Puntuaciones TMDb e IMDb */}
+                {/* Fila 1: Premios y nominaciones */}
+                {extras.awards && (
+                  <div
+                    className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
+                    style={{ "--hero-delay": "140ms" }}
+                  >
+                    <span
+                      key={extras.awards}
+                      className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md"
+                    >
+                      <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-1">{extras.awards}</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Fila 2: Puntuaciones TMDb e IMDb */}
                 <div
                   className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
-                  style={{ "--hero-delay": "140ms" }}
+                  style={{ "--hero-delay": "155ms" }}
                 >
                   <DetailsRatingsBadges
                     tmdb={
@@ -1493,35 +1518,6 @@ function FeaturedSlide({
                         ? { value: extras.imdbRating.toFixed(1), sub: null }
                         : null
                     }
-                  />
-                </div>
-
-                {/* Fila 2: Premios y nominaciones */}
-                {extras.awards && (
-                  <div
-                    className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
-                    style={{ "--hero-delay": "155ms" }}
-                  >
-                    <span
-                      key={extras.awards}
-                      className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md"
-                    >
-                      <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span className="line-clamp-1">{extras.awards}</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Fila 3: Año, duración, estado y género */}
-                <div
-                  className="hero-reveal mb-2 flex w-full max-w-full items-center justify-center"
-                  style={{ "--hero-delay": "170ms" }}
-                >
-                  <DetailsMetaGenresRow
-                    yearIso={yearOf(movie)}
-                    displayRuntimeValue={extras.runtime}
-                    status={extras.status}
-                    genres={genreObjects}
                   />
                 </div>
               </>
@@ -2283,6 +2279,7 @@ export default function FeaturedHero({
           backdropPath={activeBackdrop}
           posterPath={activePoster}
           logoPath={activeAssets.logo || null}
+          logoResolved={!!resolvedActiveAssets}
           isActive
           isMobile={isMobile}
           shouldLoadMedia

@@ -65,7 +65,6 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
   ChevronRight,
   MonitorPlay,
   TrendingUp,
@@ -161,6 +160,7 @@ import {
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
+import { fetchBestLogo } from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
@@ -1357,6 +1357,14 @@ export default function DetailsClient({
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
 
+  // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
+  // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
+  const [heroLogoPath, setHeroLogoPath] = useState(null);
+  // ¿Ya terminó el fetch del logo? El título de TEXTO solo se muestra cuando el
+  // logo se ha resuelto y NO existe; durante la carga no se muestra nada (el
+  // 99% de los títulos tienen logo, así que evitamos el parpadeo texto→logo).
+  const [heroLogoResolved, setHeroLogoResolved] = useState(false);
+
   /**
    * Extrae un ID consistente de una lista (puede venir como objeto o como valor directo).
    * Soporta formatos de TMDb y Trakt.
@@ -1407,6 +1415,30 @@ export default function DetailsClient({
   useEffect(() => {
     if (supportsHover) setMobileClearOpen(false);
   }, [supportsHover]);
+
+  // Logo del título (best-effort) para la cabecera móvil. Prioriza inglés, luego
+  // sin idioma, luego español (mismo criterio que DetailModal).
+  useEffect(() => {
+    const showId = data?.id;
+    if (!showId) return undefined;
+    let alive = true;
+    // Al cambiar de título reseteamos: ni texto ni logo previo mientras se
+    // resuelve el nuevo logo.
+    setHeroLogoPath(null);
+    setHeroLogoResolved(false);
+    fetchBestLogo(showId, endpointType, ["en", null, "es"])
+      .then((logo) => {
+        if (!alive) return;
+        if (logo) setHeroLogoPath(logo);
+        setHeroLogoResolved(true);
+      })
+      .catch(() => {
+        if (alive) setHeroLogoResolved(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [data?.id, endpointType]);
 
   // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
@@ -2382,18 +2414,12 @@ export default function DetailsClient({
    * Se ejecuta antes del paint para evitar flashes visuales.
    */
   useLayoutEffect(() => {
-    try {
-      const savedMode =
-        window.localStorage.getItem(globalViewModeStorageKey) || "poster";
-      setPosterViewMode(savedMode);
-      setPosterLayoutMode(savedMode);
-    } catch {
-      setPosterViewMode("poster");
-      setPosterLayoutMode("poster");
-    } finally {
-      setPosterModeHydrated(true);
-    }
-  }, [globalViewModeStorageKey]);
+    // La vista de portada queda FIJA en modo "poster": se retiró el cambio a
+    // backdrop, así que ignoramos cualquier preferencia global persistida.
+    setPosterViewMode("poster");
+    setPosterLayoutMode("poster");
+    setPosterModeHydrated(true);
+  }, []);
 
   useLayoutEffect(() => {
     setPosterResolved(false);
@@ -7468,20 +7494,29 @@ export default function DetailsClient({
       ? isBackdropPath(prevPosterPath)
       : isBackdropPoster;
 
+  // MÓVIL (modo poster, sin preview): usar el poster SIN IDIOMA (textless), como en
+  // DetailModal. En escritorio o preview se mantiene el poster normal.
+  const mobilePosterPath =
+    isMobileViewport && !isBackdropPoster ? mobileNeutralPosterPath : null;
+
   // URLs basadas en el modo de vista
   const posterLowUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
-      : displayPosterPath
-        ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
-        : null;
+      : mobilePosterPath
+        ? `https://image.tmdb.org/t/p/w342${mobilePosterPath}`
+        : displayPosterPath
+          ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
+          : null;
 
   const posterHighUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
-      : displayPosterPath
-        ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
-        : null;
+      : mobilePosterPath
+        ? `https://image.tmdb.org/t/p/w780${mobilePosterPath}`
+        : displayPosterPath
+          ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
+          : null;
   const posterLoadToken = posterLoadTokenRef.current;
 
   // Estados unificados: usar backdrop states si estamos en preview, sino poster states
@@ -7883,14 +7918,14 @@ export default function DetailsClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
+          className="-mt-6 sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
-            className={`w-full mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 lg:gap-7 relative z-10 ${
+            className={`flex-shrink-0 flex flex-col gap-5 lg:gap-7 relative z-10 w-[calc(100%+2rem)] -mx-4 max-w-none sm:w-full sm:mx-auto lg:mx-0 ${
               isBackdropPoster
-                ? "max-w-full lg:max-w-[600px]"
-                : "max-w-[320px] lg:max-w-[320px]"
+                ? "sm:max-w-full lg:max-w-[600px]"
+                : "sm:max-w-[320px] lg:max-w-[320px]"
             }`}
             style={{
               transition: "max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)",
@@ -7945,22 +7980,24 @@ export default function DetailsClient({
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
-                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 will-change-transform"
+                  className="relative rounded-none sm:rounded-2xl overflow-hidden sm:shadow-2xl sm:shadow-black/80 bg-transparent sm:bg-black/40 will-change-transform"
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
-                    WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+                    WebkitMaskImage: isMobileViewport
+                      ? "none"
+                      : "-webkit-radial-gradient(white, black)",
                     // NO transition en transform - manejado por requestAnimationFrame
                   }}
                 >
                   {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30 hidden sm:block" />
 
                   <div
-                    className="relative bg-neutral-950 will-change-auto overflow-hidden w-full h-0"
+                    className="relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-0"
                     style={{
                       paddingBottom: isBackdropPoster ? "56.25%" : "150%",
                       transition: "padding-bottom 500ms cubic-bezier(0.25, 1, 0.5, 1), opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)",
@@ -7977,7 +8014,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0"
+                            className="absolute inset-0 z-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -7992,7 +8029,7 @@ export default function DetailsClient({
                     </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
@@ -8086,6 +8123,27 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </div>
                     )}
 
+                    {/* MÓVIL (solo cuando la portada es textless): logo del título
+                        sobre la portada (o título de texto si no hay logo), igual
+                        que DetailModal. Ligado a `mobilePosterPath` para que nunca
+                        se superponga a una portada CON texto. */}
+                    {mobilePosterPath && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center p-4">
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-transparent via-black/45 via-45% to-transparent" />
+                        {heroLogoPath ? (
+                          <img
+                            src={`https://image.tmdb.org/t/p/w500${heroLogoPath}`}
+                            alt={title}
+                            className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
+                          />
+                        ) : heroLogoResolved ? (
+                          <h2 className="relative z-10 max-w-[90%] text-center text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+                            {title}
+                          </h2>
+                        ) : null}
+                      </div>
+                    )}
+
                     {/* Overlay VISUAL DENTRO del marco: se inclina con la imagen
                         (integrado). Sin eventos: los clics los recibe la capa
                         FIJA de abajo (hermana del contexto 3D), que no se mueve
@@ -8098,48 +8156,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         part="visual"
                       />
 
-                      {/* Visual de las flechas (degradado + chevron) DENTRO del
-                          marco: se inclina/flota con la imagen = integrado. El
-                          clic lo recibe la zona transparente de la capa fija. */}
-                      <AnimatePresence>
-                        {supportsHover &&
-                          isPosterHovered &&
-                          posterViewMode === "poster" && (
-                            <motion.div
-                              key="arrow-visual-right"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.2, ease: "easeInOut" }}
-                              className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-1/3 items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4"
-                            >
-                              <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
-                            </motion.div>
-                          )}
-                      </AnimatePresence>
-                      <AnimatePresence>
-                        {supportsHover &&
-                          isPosterHovered &&
-                          posterViewMode === "preview" && (
-                            <motion.div
-                              key="arrow-visual-left"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.2, ease: "easeInOut" }}
-                              className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-1/3 items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4"
-                            >
-                              <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
-                            </motion.div>
-                          )}
-                      </AnimatePresence>
+                      {/* Cambio de vista póster↔backdrop retirado: sin flechas. */}
                     </div>
 
                     {/* Barra de progreso de "Continuar viendo": SIEMPRE visible
                         (no depende del hover), integrada en el poster. % + barra
                         verde para los titulos que se estan reproduciendo. */}
                     {inProgressPct != null && (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden sm:block">
                         <div className="bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-2.5 pt-9 sm:px-4 sm:pb-3">
                           <div className="mb-1.5 flex items-end justify-between gap-2">
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -8164,75 +8188,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </div>
 
                 {/* Capa CLICABLE FIJA (hermana del contexto 3D, fuera del
-                    preserve-3d): no se inclina ni se mueve, así el clic siempre
-                    se registra. El botón play va centrado = eje de giro, por lo
-                    que coincide con el botón visible; las flechas laterales
-                    cambian el modo de imagen. */}
+                    preserve-3d): no se inclina ni se mueve, así el clic del botón
+                    play (centrado = eje de giro) siempre se registra. Ya no hay
+                    zonas para alternar póster↔backdrop (funcionalidad retirada). */}
                 <div className="pointer-events-none absolute inset-0 z-40">
                   <StreamingHoverOverlay
                     provider={primaryStreamingProvider}
                     mode="button"
                     part="hit"
                   />
-
-                  {/* Zonas laterales CLICABLES (transparentes): la parte visible
-                      (degradado + chevron) va dentro del marco, integrada. Aquí
-                      solo está el área de clic, fija, para que siempre registre. */}
-                  {supportsHover &&
-                    isPosterHovered &&
-                    posterViewMode === "poster" && (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Ver imagen de fondo"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCyclePoster();
-                        }}
-                        className="pointer-events-auto absolute inset-y-0 right-0 z-20 w-1/3 cursor-pointer"
-                      />
-                    )}
-
-                  {supportsHover &&
-                    isPosterHovered &&
-                    posterViewMode === "preview" && (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Ver póster"
-                        title="Ver póster"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCyclePoster();
-                        }}
-                        className="pointer-events-auto absolute inset-y-0 left-0 z-20 w-1/3 cursor-pointer"
-                      />
-                    )}
-
-                  {/* MÓVIL (táctil): una pulsación en cualquier parte del póster
-                      alterna entre póster y backdrop. En móvil el botón central de
-                      reproducir no es visible, así que no hay conflicto. Solo se
-                      renderiza sin hover, para no alterar el comportamiento de
-                      escritorio (que sigue usando las zonas laterales). */}
-                  {!supportsHover && (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-label={
-                        posterViewMode === "preview"
-                          ? "Ver póster"
-                          : "Ver imagen de fondo"
-                      }
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCyclePoster();
-                      }}
-                      className="pointer-events-auto absolute inset-0 z-30 cursor-pointer"
-                    />
-                  )}
                 </div>
               </div>
             </motion.div>
@@ -8296,7 +8260,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           >
             {/* 1. TÍTULO Y CABECERA */}
             <FadeIn delay={0.06} className="mb-6 px-1 flex flex-col items-center md:items-start text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              {/* En MÓVIL (&lt;640) el título va como LOGO sobre la portada (ver poster
+                  card); el h1 de texto se muestra de sm: en adelante. */}
+              <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
                 {title}
               </h1>
 
@@ -8320,8 +8286,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 BARRA DE ACCIONES PRINCIPALES
                ================================================================= */}
             {/* Sección de botones de acción rápida: reproducir tráiler, marcar como visto,
-                puntuar, agregar a favoritos, watchlist y listas, cambiar portada */}
-            <div>
+                puntuar, agregar a favoritos, watchlist y listas, cambiar portada.
+                En MÓVIL (&lt;640) van ANTES de premios/info (order-first), como en
+                DetailModal; de sm: en adelante se mantiene el orden original. */}
+            <div className="order-first sm:order-none">
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
                 <DetailActionsRow
                 onTrailer={() => openVideo(preferredVideo)}

@@ -545,7 +545,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className={`absolute top-full left-0 w-full text-white ${isMobile ? "mt-3" : "mt-2"} z-[99999] max-h-[70vh] overflow-y-auto no-scrollbar
-              rounded-2xl bg-black/95 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-[100px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)]`}
+              rounded-2xl bg-black/85 bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)]`}
           >
             {!query.trim() ? (
               <div className="p-2">

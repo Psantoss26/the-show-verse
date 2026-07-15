@@ -2278,7 +2278,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
               </div>
 
               {hasProviders && (
-                <div className="hidden shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:flex sm:justify-end">
+                <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
                   {streamingProviders.map((prov) => (
                     <a
                       key={prov.key}
@@ -2617,7 +2617,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   overview={data.overview}
                   awards={data.awards}
                   showAwardsTab={false}
-                  platforms={streamingProviders}
+                  platforms={[]}
                 />
               </motion.div>
             )}

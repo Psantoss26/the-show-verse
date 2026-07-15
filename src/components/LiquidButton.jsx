@@ -639,13 +639,10 @@ export default function LiquidButton({
               );
             }
             const numberPart = progressPercent.replace("%", "");
-            // Con 2 dígitos ("25%") el conjunto número+% se hacía demasiado ancho
-            // y tocaba los bordes del círculo. Se reduce el número a text-lg (en
-            // vez de text-xl) y, sobre todo, el "%" pasa a ser RELATIVO al número
-            // (0.5em): se encoge en proporción y deja hueco a los lados. Al ser
-            // relativo, sigue escalando con el botón en móvil (container queries).
+            // El "%" es relativo al número para mantener aire lateral, pero el
+            // valor principal conserva el tamaño de la puntuación de usuario.
             const fontSizeClass =
-              numberPart.length >= 2 ? "text-lg tracking-tighter" : "text-2xl";
+              numberPart.length >= 2 ? "text-xl tracking-tighter" : "text-2xl";
             return (
               <div
                 className={`flex items-baseline leading-none gap-px translate-y-[0.05em] ${fontSizeClass}`}

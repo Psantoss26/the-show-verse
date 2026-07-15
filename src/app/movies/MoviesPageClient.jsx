@@ -1724,7 +1724,8 @@ function Row({
                     closeTimeoutRef.current = null;
                     hoverIntentRef.current += 1;
                     setHoveredId((prev) => (prev === itemKey ? null : prev));
-                    if (!isTop10) setHoveredIndex(null);
+                    setHoveredIndex(null);
+                    if (isTop10) clearHoverBackdrop();
                   }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                 }}
               >
@@ -1775,7 +1776,8 @@ function Row({
                               setHoveredId((prev) =>
                                 prev === itemKey ? null : prev,
                               );
-                              if (!isTop10) setHoveredIndex(null);
+                              setHoveredIndex(null);
+                              if (isTop10) clearHoverBackdrop();
                             }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                           }}
                         />
@@ -1843,30 +1845,7 @@ function Row({
                 }`}
               >
                 {isTop10 ? (
-                  <div
-                    className="flex items-center"
-                    onMouseEnter={() => {
-                      if (!isMobile) {
-                        if (closeTimeoutRef.current) {
-                          clearTimeout(closeTimeoutRef.current);
-                          closeTimeoutRef.current = null;
-                        }
-                        setHoveredIndex(i);
-                        showHoverBackdrop(m);
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      if (isMobile) return;
-                      if (closeTimeoutRef.current) {
-                        clearTimeout(closeTimeoutRef.current);
-                      }
-                      closeTimeoutRef.current = window.setTimeout(() => {
-                        closeTimeoutRef.current = null;
-                        setHoveredIndex(null);
-                        clearHoverBackdrop(m);
-                      }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
-                    }}
-                  >
+                  <div className="flex items-center">
                     <DashboardRankNumber
                       rank={i + 1}
                       tone="movies"
