@@ -7552,12 +7552,14 @@ export default function DetailsClient({
     }
   }, [currentLowLoaded, prevPosterPath]);
 
-  // Icono NO IMAGE solo si ya hemos resuelto, NO hay imagen (o falló) y NO estamos esperando carga inicial en modo preview
+  // Icono NO IMAGE solo cuando el artwork ya se ha inicializado por completo y se
+  // ha resuelto que NO hay imagen (o falló). Requerir `artworkInitialized` en
+  // TODOS los modos evita que el icono parpadee durante el proceso de carga
+  // (antes podía mostrarse un instante antes de que apareciera el póster).
   const showNoPoster =
+    artworkInitialized &&
     currentResolved &&
-    (!currentImagePath || currentImgError) &&
-    // Si estamos en preview, esperar a que termine initArtwork antes de declarar "No Image"
-    (posterViewMode !== "preview" || artworkInitialized);
+    (!currentImagePath || currentImgError);
 
   // ====== Poster 3D Tilt / Shine ======
   const posterWrapRef = useRef(null);
@@ -7980,17 +7982,17 @@ export default function DetailsClient({
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
-                  className="relative rounded-none sm:rounded-2xl overflow-hidden sm:shadow-2xl sm:shadow-black/80 bg-transparent sm:bg-black/40 will-change-transform"
+                  className="relative rounded-none sm:rounded-2xl overflow-hidden sm:shadow-2xl sm:shadow-black/80 bg-transparent sm:bg-black/40 will-change-transform poster-tilt-corner-mask"
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
-                    WebkitMaskImage: isMobileViewport
-                      ? "none"
-                      : "-webkit-radial-gradient(white, black)",
-                    // NO transition en transform - manejado por requestAnimationFrame
+                    // Máscara radial (suavizado de esquinas) SOLO en escritorio, vía
+                    // clase CSS `sm:` para que sea consistente desde el primer frame
+                    // (antes dependía de isMobileViewport y "marcaba" los bordes al
+                    // cargar, cuando pasaba de false→true). NO transition en transform.
                   }}
                 >
                   {/* Borde premium suavizado en la capa superior para evitar entrecortados */}

@@ -462,3 +462,14 @@ html {
     transition: none !important;
   }
 }
+
+/* Suavizado de esquinas del póster (tilt 3D) SOLO en escritorio. Se aplica por
+   media query (no por estado JS) para que sea consistente desde el primer frame
+   y NO "marque" los bordes al cargar. En móvil el póster es full-bleed sin
+   máscara radial. */
+@media (min-width: 640px) {
+  .poster-tilt-corner-mask {
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
+  }
+}

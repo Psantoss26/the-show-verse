@@ -1970,10 +1970,10 @@ const FavoriteCard = memo(function FavoriteCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-red-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartPoster
                 item={item}
                 title={title}
@@ -2021,7 +2021,7 @@ const FavoriteCard = memo(function FavoriteCard({
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(239,68,68,0.6)]`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]`}
             whileHover={{
               scale: 1.15,
               zIndex: 100,
@@ -2146,7 +2146,7 @@ const FavoriteCard = memo(function FavoriteCard({
           onMouseEnter={handleHover}
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-red-500/40 transition-colors duration-300" />
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
           <SmartPoster
             item={item}
             title={title}

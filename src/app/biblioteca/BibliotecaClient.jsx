@@ -936,7 +936,7 @@ function LibraryMediaCard({
       >
         <div className="block">
           <motion.article
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(245,158,11,0.6)] ${canOpen ? "cursor-pointer" : ""}`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)] ${canOpen ? "cursor-pointer" : ""}`}
             whileHover={
               canOpen && enableHoverLift
                 ? {

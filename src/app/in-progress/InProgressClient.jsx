@@ -781,11 +781,11 @@ const InProgressCard = memo(function InProgressCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             {/* Backdrop image - same size as History list view */}
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartBackdrop item={item} title={title} />
             </div>
 
@@ -865,7 +865,7 @@ const InProgressCard = memo(function InProgressCard({
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.10)] after:transition-shadow after:duration-300 group-hover:after:shadow-[inset_0_0_0_2px_rgba(16,185,129,0.6)]">
+          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartPoster item={item} title={title} />
 
             {/* Tick verde para series completadas (mobile) */}
