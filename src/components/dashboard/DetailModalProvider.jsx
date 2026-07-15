@@ -30,7 +30,10 @@ import {
 } from "react";
 import { AnimatePresence } from "framer-motion";
 
+import { useRouter } from "next/navigation";
+
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
+import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import DetailModal from "@/components/dashboard/DetailModal";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
@@ -112,9 +115,12 @@ function readPreviewFromLocation() {
 }
 
 export default function DetailModalProvider({ children, placement = "center" }) {
-  // En MÓVIL la ficha siempre se muestra CENTRADA (como en Inicio), aunque la
-  // página pida el drawer lateral ("right"). El drawer es solo para escritorio.
+  const router = useRouter();
+  // En MÓVIL NO se abre el modal de preview en ningún caso: se navega a la ficha
+  // completa (DetailsClient / EpisodeDetails). El modal es solo escritorio.
   const isMobile = useIsMobile();
+  const isMobileRef = useRef(isMobile);
+  isMobileRef.current = isMobile;
   const effectivePlacement = placement === "right" && !isMobile ? "right" : "center";
 
   // Pila de niveles abiertos. El item activo es el de arriba.
@@ -146,6 +152,24 @@ export default function DetailModalProvider({ children, placement = "center" }) 
   const openDetailModal = useCallback(
     (item, opts = {}) => {
       if (!item || item.id == null || typeof window === "undefined") return;
+
+      // MÓVIL: no se abre el modal; se navega a la ficha completa.
+      if (isMobileRef.current) {
+        let href;
+        if (
+          item.media_type === "episode" &&
+          item.seasonNumber != null &&
+          item.episodeNumber != null
+        ) {
+          const showId = item.showId ?? item.id;
+          href = `/details/tv/${showId}/season/${item.seasonNumber}/episode/${item.episodeNumber}`;
+        } else {
+          href = dashboardDetailHref(item);
+        }
+        if (href) router.push(href);
+        return;
+      }
+
       const cur = stackRef.current;
       const url = buildPreviewUrl(item);
 
@@ -173,7 +197,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
         commit([item]);
       }
     },
-    [commit],
+    [commit, router],
   );
 
   const closeDetailModal = useCallback(() => {

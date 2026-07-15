@@ -14,7 +14,7 @@
 //                 y el tagline usa comillas rectas " ".
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   CalendarIcon,
   FilmIcon,
@@ -31,57 +31,52 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
 
-function PlatformLinkCard({ platform, index }) {
+// Tarjeta de plataforma con el MISMO estilo/diseño/comportamiento que
+// <VisualMetaCard> (pestañas Detalles/Producción): idéntico shell (fondo, blur,
+// capa de luz, icono + etiqueta + valor), sin animación de entrada ni hover
+// propios. Se mantiene como enlace (<a>) para poder abrir la plataforma.
+function PlatformLinkCard({ platform }) {
   if (!platform?.icon || !platform?.href) return null;
 
   return (
-    <motion.a
+    <a
       href={platform.href}
       target={platform.target}
       rel={platform.rel}
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        duration: 0.28,
-        delay: index * 0.04,
-        ease: [0.22, 1, 0.36, 1],
-      }}
       aria-label={`Abrir ${platform.title}`}
-      className="group/platform relative isolate flex h-full min-h-[76px] transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 lg:w-auto lg:min-w-[210px] lg:flex-auto lg:shrink-0"
+      className="relative isolate flex h-full w-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 lg:w-auto lg:flex-auto lg:shrink-0"
     >
+      {/* Capa de luz estilo ScoreboardBar (igual que VisualMetaCard) */}
       <div
         className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
         style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
       />
 
-      <span className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 shadow-lg">
+      {/* Icono: logo de la plataforma en el mismo hueco que el icono de las
+          tarjetas de Detalles/Producción */}
+      <div className="relative z-10 shrink-0">
         <OptimizedImage
           src={platform.icon}
           alt=""
-          className="h-10 w-10 rounded-xl object-contain"
+          className="h-8 w-8 rounded object-contain"
           onError={(e) => {
             e.target.style.display = "none";
           }}
         />
         {platform.isPlexProvider && (
-          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
+          <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-black" />
         )}
-      </span>
+      </div>
 
-      <span className="relative z-10 flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
           Plataforma
         </span>
-        <span className="text-sm font-bold leading-tight text-white">
+        <span className="text-sm font-bold leading-tight text-white whitespace-normal break-words">
           {platform.title}
         </span>
-        {platform.subtitle && (
-          <span className="mt-1 line-clamp-1 text-[11px] font-semibold text-emerald-300">
-            {platform.subtitle}
-          </span>
-        )}
-      </span>
-    </motion.a>
+      </div>
+    </a>
   );
 }
 
@@ -310,7 +305,6 @@ export default function DetailsInfoTabs({
                   <PlatformLinkCard
                     key={platform.key ?? `${platform.title}-${index}`}
                     platform={platform}
-                    index={index}
                   />
                 ))}
               </div>
