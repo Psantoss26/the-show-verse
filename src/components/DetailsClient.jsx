@@ -7504,16 +7504,18 @@ export default function DetailsClient({
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w780${previewBackdropPath}`
       : mobilePosterPath
-        ? `https://image.tmdb.org/t/p/w342${mobilePosterPath}`
+        ? `https://image.tmdb.org/t/p/w500${mobilePosterPath}`
         : displayPosterPath
           ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
           : null;
 
+  // MÓVIL: máxima calidad para el póster de portada (original). Escritorio
+  // mantiene w780.
   const posterHighUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
       : mobilePosterPath
-        ? `https://image.tmdb.org/t/p/w780${mobilePosterPath}`
+        ? `https://image.tmdb.org/t/p/original${mobilePosterPath}`
         : displayPosterPath
           ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
           : null;
@@ -8006,7 +8008,7 @@ export default function DetailsClient({
                       botones + navbar inferior; `env(safe-area-inset-bottom)`
                       cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
                   <div
-                    className="relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]"
+                    className={`relative ${currentLowLoaded ? "bg-transparent" : "bg-neutral-950"} sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]`}
                     style={{
                       contain: "layout paint",
                     }}
