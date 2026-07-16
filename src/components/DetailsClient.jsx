@@ -7998,11 +7998,16 @@ export default function DetailsClient({
                   {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30 hidden sm:block" />
 
+                  {/* MÓVIL: el póster ocupa casi toda la pantalla para que en la
+                      primera vista SOLO se vean póster + logo + fila de botones,
+                      quedando los botones justo encima del navbar inferior y el
+                      resto (premios/info/scoreboard/tabs) por debajo (scroll).
+                      El hueco reservado (13.5rem) = navbar superior + fila de
+                      botones + navbar inferior; `env(safe-area-inset-bottom)`
+                      cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
                   <div
-                    className="relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-0"
+                    className="relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]"
                     style={{
-                      paddingBottom: isBackdropPoster ? "56.25%" : "150%",
-                      transition: "padding-bottom 500ms cubic-bezier(0.25, 1, 0.5, 1), opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)",
                       contain: "layout paint",
                     }}
                   >
@@ -8016,7 +8021,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]"
+                            className="absolute inset-0 z-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -8031,7 +8036,7 @@ export default function DetailsClient({
                     </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_65%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
@@ -8291,9 +8296,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada.
                 En MÓVIL (&lt;640) van ANTES de premios/info (order-first), como en
                 DetailModal; de sm: en adelante se mantiene el orden original. */}
-            <div className="order-first sm:order-none">
+            <div className="order-first sm:order-none -mx-1 w-[calc(100%+0.5rem)] sm:mx-0 sm:w-full">
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
                 <DetailActionsRow
+                mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
                 onSoundtrack={() => openSoundtrack()}
