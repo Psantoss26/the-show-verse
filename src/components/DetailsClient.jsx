@@ -7537,11 +7537,12 @@ export default function DetailsClient({
   const currentLoadTokenRef =
     posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
 
-  // En la primera entrada no queremos ocultar la portada correcta y revelarla
-  // un frame después, porque rompe la animación del hero y produce microparpadeo.
-  // Solo mantenemos la nueva imagen oculta cuando hay un swap real con crossfade.
-  const shouldRevealCurrentPosterImmediately =
-    !!currentImagePath && (!posterTransitioning || !prevPosterPath);
+  // Aquí vivía `shouldRevealCurrentPosterImmediately`, que en la primera entrada
+  // mostraba el póster ya visible para no romper la animación de entrada del
+  // hero. Esa animación está desactivada (`initial={false}` en el poster card),
+  // así que lo único que quedaba de la bandera era el efecto secundario: la
+  // opacidad nunca cambiaba, la transición de 500ms no se disparaba y el póster
+  // aparecía de golpe. Retirada: ya no la usa nadie.
 
   // Limpiar transicion suavemente solo despues de cargar (evita destellos en internet lento)
   useEffect(() => {
@@ -8055,11 +8056,28 @@ export default function DetailsClient({
                       botones + navbar inferior; `env(safe-area-inset-bottom)`
                       cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
                   <div
-                    className={`relative ${currentLowLoaded ? "bg-transparent" : "bg-neutral-950"} sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]`}
+                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]`}
                     style={{
                       contain: "layout paint",
                     }}
                   >
+                    {/* Fondo de carga MÓVIL. Antes era `bg-neutral-950` en ESTE
+                        contenedor, que NO lleva máscara (solo la llevan los divs
+                        de las imágenes): resultaba un rectángulo sólido de bordes
+                        duros, con el canto inferior cortado en seco contra el
+                        fondo de página. De ahí el "rectángulo" y el marcado del
+                        borde inferior al recargar.
+
+                        Ahora es una capa hermana con la MISMA clase de máscara,
+                        así que se difumina abajo exactamente igual que el póster:
+                        no cambia el estilo de la transición, solo deja de haber
+                        un borde duro donde no debía haberlo. Sigue tapando el
+                        póster de FONDO mientras carga, que es para lo que estaba.
+                        Desaparece en cuanto la imagen entra (crossfade). */}
+                    {!currentLowLoaded && (
+                      <div className="sm:hidden absolute inset-0 z-0 bg-neutral-950 poster-mobile-fade" />
+                    )}
+
                     {/* Imagen anterior (permanece visible hasta que la nueva carga) */}
                     <AnimatePresence>
                       {prevPosterPath &&
@@ -8128,8 +8146,13 @@ export default function DetailsClient({
                               setPosterResolved(true);
                             }
                           }}
+                          // Entra SIEMPRE con el fundido de 500ms: parte de
+                          // opacity-0 y sube a opacity-100 al cargar. Antes se
+                          // saltaba ese fundido en la primera entrada y por eso
+                          // aparecía de golpe (ver nota donde estaba la bandera
+                          // `shouldRevealCurrentPosterImmediately`, ya retirada).
                           className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
-${currentHighLoaded ? "opacity-0" : shouldRevealCurrentPosterImmediately || currentLowLoaded ? "opacity-100" : "opacity-0"}`}
+${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
                           }}
