@@ -42,6 +42,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 160;
@@ -497,7 +498,7 @@ function pickBestBackdropByLangResVotes(list) {
 async function fetchBestBackdropEN(type, id) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
@@ -557,7 +558,7 @@ function pickBestPosterEN(posters) {
 async function fetchBestPosterEN(type, id) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&include_image_language=en,en-US,null`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();

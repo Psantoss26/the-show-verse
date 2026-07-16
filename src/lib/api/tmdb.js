@@ -6,6 +6,14 @@ import {
   cacheAddWatchlist,
   cacheRemoveWatchlist,
 } from "@/lib/userLists/optimisticListCache";
+import {
+  getTmdbErrorCode,
+  getTmdbRetryDelayMs,
+  isHeavyTmdbPayload,
+  isTmdbNotFound,
+  isTmdbTransientError,
+  isTmdbTransientStatus,
+} from "@/lib/api/tmdbRetry";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -55,7 +63,14 @@ async function tmdb(path, params = {}, options = {}) {
 
   // En servidor: timeout más corto, caching por defecto
   // En cliente: dejamos más margen al usuario
-  const { timeoutMs = 8000, retries = 1, ...fetchOptions } = options;
+  const defaultTimeoutMs = isHeavyTmdbPayload(path, params)
+    ? IS_SERVER
+      ? 15000
+      : 12000
+    : IS_SERVER
+      ? 8000
+      : 12000;
+  const { timeoutMs = defaultTimeoutMs, retries = 2, ...fetchOptions } = options;
   const attempts = Math.max(1, Number(retries || 0) + 1);
   let lastError = null;
 
@@ -95,13 +110,19 @@ async function tmdb(path, params = {}, options = {}) {
 
       if (!res.ok) {
         // 404 / status_code 34 => recurso inexistente
-        if (res.status === 404 || json?.status_code === 34) {
+        if (isTmdbNotFound(res.status, json)) {
           return null;
         }
 
-        if (res.status >= 500 && attempt < attempts - 1) {
+        if (isTmdbTransientStatus(res.status) && attempt < attempts - 1) {
           await new Promise((resolve) =>
-            setTimeout(resolve, 250 * (attempt + 1)),
+            setTimeout(
+              resolve,
+              getTmdbRetryDelayMs({
+                attempt,
+                retryAfter: res.headers?.get?.("retry-after"),
+              }),
+            ),
           );
           continue;
         }
@@ -114,15 +135,11 @@ async function tmdb(path, params = {}, options = {}) {
     } catch (e) {
       clearTimeout(timeoutId);
       lastError = e;
-      const code = e?.code || e?.cause?.code;
+      const code = getTmdbErrorCode(e);
 
-      if (
-        attempt < attempts - 1 &&
-        e?.name !== "AbortError" &&
-        code !== "UND_ERR_ABORTED"
-      ) {
+      if (attempt < attempts - 1 && isTmdbTransientError(e)) {
         await new Promise((resolve) =>
-          setTimeout(resolve, 250 * (attempt + 1)),
+          setTimeout(resolve, getTmdbRetryDelayMs({ attempt })),
         );
         continue;
       }

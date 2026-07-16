@@ -3,6 +3,8 @@
 // Funciones puras y cachés a nivel de módulo: al importarse en varios componentes
 // comparten la misma instancia de caché.
 
+import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+
 /* ---------- helpers de formato ---------- */
 export const yearOf = (m) =>
   m?.release_date?.slice(0, 4) || m?.first_air_date?.slice(0, 4) || "";
@@ -257,6 +259,11 @@ export async function getMovieImages(itemId, mediaType = "movie") {
       `?api_key=${apiKey}`;
 
     const r = await fetch(url, { cache: "force-cache" });
+    // Igual que en getTitleLogos: un 429/5xx daba un JSON sin `.backdrops`, se
+    // convertía en [] y se cacheaba permanentemente. El llamador acababa cayendo
+    // al `backdrop_path` por defecto de TMDb (sin idioma). No cacheamos fallos
+    // transitorios: se reintenta en la siguiente llamada.
+    if (!r.ok) return { posters: [], backdrops: [], logos: [] };
     const j = await r.json();
     const posters = Array.isArray(j?.posters) ? j.posters : [];
     const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
@@ -266,9 +273,7 @@ export async function getMovieImages(itemId, mediaType = "movie") {
     movieImagesCache.set(cacheKey, data);
     return data;
   } catch {
-    const fallback = { posters: [], backdrops: [], logos: [] };
-    movieImagesCache.set(cacheKey, fallback);
-    return fallback;
+    return { posters: [], backdrops: [], logos: [] };
   }
 }
 
@@ -449,7 +454,7 @@ async function fetchWatchingImages(itemId, mediaType = "movie") {
     const type = mediaType === "tv" ? "tv" : "movie";
     const url =
       `https://api.themoviedb.org/3/${type}/${itemId}/images` +
-      `?api_key=${apiKey}&include_image_language=en,en-US,null`;
+      `?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return { posters: [], backdrops: [] };
     const j = await r.json();
@@ -574,12 +579,17 @@ export async function getTitleLogos(itemId, mediaType = "movie") {
     const type = mediaType === "tv" ? "tv" : "movie";
     const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
     const r = await fetch(url, { cache: "force-cache" });
+    // Sin este `r.ok`, un 429 (los dashboards disparan decenas de peticiones a
+    // la vez y TMDb limita) o un 5xx devolvía un JSON de error sin `.logos`,
+    // que se convertía en [] y se cacheaba abajo PARA SIEMPRE: ese título se
+    // quedaba sin logo el resto de la sesión. Los fallos transitorios no se
+    // cachean, así que el siguiente render reintenta.
+    if (!r.ok) return [];
     const j = await r.json();
     const logos = Array.isArray(j?.logos) ? j.logos : [];
     movieLogosCache.set(cacheKey, logos);
     return logos;
   } catch {
-    movieLogosCache.set(cacheKey, []);
     return [];
   }
 }

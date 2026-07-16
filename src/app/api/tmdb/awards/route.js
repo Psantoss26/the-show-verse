@@ -1,7 +1,17 @@
 import { json } from "@/app/api/tmdb/utils";
+import {
+  AWARDS_NEGATIVE_TTL_MS,
+  AWARDS_REQUEST_TIMEOUT_MS,
+  awardsRetryDelayMs,
+  emptyAwardsResponse,
+  isTransientAwardsError,
+  isTransientAwardsStatus,
+} from "./awardsHttp";
 
 const TMDB_WEB_BASE = "https://www.themoviedb.org";
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const STALE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_ATTEMPTS = 2;
 
 const g = globalThis;
 g.__tmdbAwardsCache = g.__tmdbAwardsCache || new Map();
@@ -228,40 +238,96 @@ async function fetchAwards(type, id) {
     const url = `${TMDB_WEB_BASE}/${type}/${encodeURIComponent(
       id,
     )}/awards?language=en-US`;
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: {
-        accept: "text/html,application/xhtml+xml",
-        "user-agent": "TheShowVerse/1.0 (+https://www.themoviedb.org)",
-      },
+    let lastError = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const res = await fetch(url, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(AWARDS_REQUEST_TIMEOUT_MS),
+          headers: {
+            accept: "text/html,application/xhtml+xml",
+            "user-agent": "TheShowVerse/1.0 (+https://www.themoviedb.org)",
+          },
+        });
+
+        if (res.status === 404) {
+          const empty = emptyAwardsResponse({ sourceUrl: url, type, id });
+          cache.set(cacheKey, { t: now, data: empty });
+          return empty;
+        }
+
+        if (!res.ok) {
+          const error = Object.assign(
+            new Error(`TMDb awards page failed with ${res.status}`),
+            { status: res.status },
+          );
+          if (
+            isTransientAwardsStatus(res.status) &&
+            attempt < MAX_ATTEMPTS - 1
+          ) {
+            lastError = error;
+            await new Promise((resolve) =>
+              setTimeout(resolve, awardsRetryDelayMs(attempt)),
+            );
+            continue;
+          }
+          throw error;
+        }
+
+        const html = await res.text();
+        const parsed = parseAwardsHtml(html);
+        const data = {
+          source: "tmdb",
+          sourceUrl: url,
+          type,
+          id: String(id),
+          ...parsed,
+        };
+        cache.set(cacheKey, { t: now, data });
+        return data;
+      } catch (error) {
+        lastError = error;
+        if (
+          isTransientAwardsError(error) &&
+          attempt < MAX_ATTEMPTS - 1
+        ) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, awardsRetryDelayMs(attempt)),
+          );
+          continue;
+        }
+        break;
+      }
+    }
+
+    if (cached && now - cached.t < STALE_CACHE_TTL_MS) {
+      console.warn("[TMDb awards] serving stale cache", {
+        type,
+        id,
+        error: lastError?.message,
+      });
+      return cached.data;
+    }
+
+    console.warn("[TMDb awards] unavailable", {
+      type,
+      id,
+      error: lastError?.message,
+      status: lastError?.status,
     });
 
-    if (res.status === 404) {
-      return {
-        wins: 0,
-        nominations: 0,
-        total: 0,
-        summary: null,
-        groups: [],
-        hasAwards: false,
-      };
-    }
-
-    if (!res.ok) {
-      throw new Error(`TMDb awards page failed with ${res.status}`);
-    }
-
-    const html = await res.text();
-    const parsed = parseAwardsHtml(html);
-    const data = {
-      source: "tmdb",
+    const empty = emptyAwardsResponse({
       sourceUrl: url,
       type,
-      id: String(id),
-      ...parsed,
-    };
-    cache.set(cacheKey, { t: now, data });
-    return data;
+      id,
+      unavailable: true,
+    });
+    cache.set(cacheKey, {
+      t: now - CACHE_TTL_MS + AWARDS_NEGATIVE_TTL_MS,
+      data: empty,
+    });
+    return empty;
   })().finally(() => {
     inflight.delete(cacheKey);
   });
