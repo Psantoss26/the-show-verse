@@ -183,7 +183,7 @@ export default function VideoModal({
         </div>
 
         {/* VIDEO AREA: Aspect Ratio cinematográfico */}
-        <div className="relative w-full aspect-video bg-black/40 group">
+        <div className="relative w-full aspect-[4/3] sm:aspect-video max-h-[50dvh] sm:max-h-none bg-black/40 group">
           {embed ? (
             <iframe
               ref={iframeRef}
