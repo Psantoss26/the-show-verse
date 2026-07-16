@@ -7935,9 +7935,13 @@ export default function DetailsClient({
               transition: "max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)",
             }}
           >
-            {/* Poster Card */}
+            {/* Poster Card. SIN animación de entrada (`initial={false}`): el
+                `scale`/`opacity` de entrada, en móvil full-bleed, encogía y hacía
+                semitransparente la tarjeta dejando ver el póster de FONDO (atenuado
+                + viñetas) durante la carga = "bordes marcados". Ahora aparece
+                sólida y a tamaño completo desde el primer frame. */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              initial={false}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{
                 duration: 0.64,

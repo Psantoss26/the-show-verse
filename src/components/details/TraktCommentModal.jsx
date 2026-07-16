@@ -136,7 +136,7 @@ export default function TraktCommentModal({
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-xl flex flex-col max-h-[80dvh] sm:max-h-[85vh] overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out">
+      <div className="relative w-full max-w-xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out">
         {/* Header */}
         <div className="flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 bg-white/[0.025] shrink-0">
           <div>
@@ -176,7 +176,7 @@ export default function TraktCommentModal({
                   if (error) setError("");
                 }}
                 placeholder="Escribe tu reseña o comentario aquí..."
-                className="w-full min-h-[90px] sm:min-h-[120px] rounded-2xl bg-black/30 border border-white/10 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 resize-none transition"
+                className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 border border-white/10 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 resize-none transition"
                 disabled={submitting}
               />
 
