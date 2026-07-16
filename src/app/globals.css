@@ -474,6 +474,24 @@ html {
   }
 }
 
+/* Caja del póster de DetailsClient en ESCRITORIO.
+
+   La altura sale de `padding-bottom` (truco de ratio) y NO de `aspect-ratio`,
+   porque el cambio de forma entre póster (2:3 = 150%) y backdrop (16:9 = 56.25%)
+   se ANIMA: ese morph de 500ms es parte del diseño original del botón de cambio
+   de portada. El valor llega por `--poster-pb` desde el componente.
+
+   Va en media query `min-width: 640px` porque en MÓVIL la caja tiene altura fija
+   (póster a pantalla casi completa) y el modo es siempre póster: allí un
+   padding-bottom sumaría altura y rompería ese cálculo. La altura la pone
+   Tailwind (`h-[...]` en móvil, `sm:h-0` aquí), así que no compiten. */
+@media (min-width: 640px) {
+  .poster-aspect-box {
+    padding-bottom: var(--poster-pb, 150%);
+    transition: padding-bottom 500ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+}
+
 /* Fusión del póster full-bleed de DetailsClient en MÓVIL.
 
    ARRIBA: sin desvanecido. La máscara anterior empezaba en

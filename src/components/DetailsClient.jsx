@@ -65,6 +65,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   ChevronRight,
   MonitorPlay,
   TrendingUp,
@@ -211,9 +212,14 @@ import {
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import {
+  ExternalLinkButton,
   UnifiedRateButton,
 } from "@/components/details/DetailHeaderBits";
-import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+// `ToolbarSeparator`: la MISMA línea vertical que usa el scoreboard, reutilizada
+// para separar plataformas de enlaces externos en el modo de portada backdrop.
+import DetailsScoreboardPanel, {
+  ToolbarSeparator,
+} from "@/components/details/DetailsScoreboardPanel";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
 // ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
@@ -2414,10 +2420,31 @@ export default function DetailsClient({
    * Se ejecuta antes del paint para evitar flashes visuales.
    */
   useLayoutEffect(() => {
-    // La vista de portada queda FIJA en modo "poster": se retiró el cambio a
-    // backdrop, así que ignoramos cualquier preferencia global persistida.
-    setPosterViewMode("poster");
-    setPosterLayoutMode("poster");
+    // Recupera el modo de portada guardado, como hacía originalmente… pero SOLO
+    // en dispositivos con puntero. En táctil se fuerza "poster": allí no existen
+    // las zonas para alternar, así que si heredara un "preview" guardado desde
+    // escritorio la portada se quedaría en backdrop sin forma de volver.
+    //
+    // Se consulta `matchMedia` directamente y no el estado `supportsHover`
+    // porque ese arranca en false y se resuelve en un efecto posterior: aquí
+    // haría creer que todo es táctil y nunca se restauraría la preferencia.
+    // matchMedia es síncrono, así que en el montaje ya da el valor correcto.
+    const canHover =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(hover: hover)")?.matches === true;
+
+    let savedMode = "poster";
+    if (canHover) {
+      try {
+        savedMode =
+          window.localStorage.getItem(globalViewModeStorageKey) || "poster";
+      } catch {
+        // localStorage no disponible
+      }
+    }
+
+    setPosterViewMode(savedMode);
+    setPosterLayoutMode(savedMode);
     setPosterModeHydrated(true);
   }, []);
 
@@ -8079,9 +8106,17 @@ export default function DetailsClient({
                       botones + navbar inferior; `env(safe-area-inset-bottom)`
                       cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
                   <div
-                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-auto sm:aspect-[2/3]`}
+                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
                     style={{
                       contain: "layout paint",
+                      // ESCRITORIO: la forma de la caja sigue al modo de portada
+                      // (2:3 póster ↔ 16:9 backdrop) y el cambio se anima desde
+                      // `.poster-aspect-box`. Antes esto era `sm:aspect-[2/3]`
+                      // FIJO —lo dejé así al rehacer la caja para el póster
+                      // full-bleed de móvil—, así que al alternar a backdrop la
+                      // caja seguía vertical y recortaba la imagen.
+                      // En móvil la media query no aplica: manda `h-[...]`.
+                      "--poster-pb": isBackdropPoster ? "56.25%" : "150%",
                     }}
                   >
                     {/* Aquí había una capa de carga `bg-neutral-950` enmascarada,
@@ -8266,7 +8301,42 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         part="visual"
                       />
 
-                      {/* Cambio de vista póster↔backdrop retirado: sin flechas. */}
+                      {/* Visual de las flechas (degradado + chevron) DENTRO del
+                          marco: se inclina/flota con la imagen = integrado. El
+                          clic lo recibe la zona transparente de la capa fija.
+                          Solo escritorio (`supportsHover`), igual que esas zonas. */}
+                      <AnimatePresence>
+                        {supportsHover &&
+                          isPosterHovered &&
+                          posterViewMode === "poster" && (
+                            <motion.div
+                              key="arrow-visual-right"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-1/3 items-center justify-end bg-gradient-to-l from-black/70 to-transparent pr-4"
+                            >
+                              <ChevronRight className="h-8 w-8 text-white drop-shadow-lg" />
+                            </motion.div>
+                          )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {supportsHover &&
+                          isPosterHovered &&
+                          posterViewMode === "preview" && (
+                            <motion.div
+                              key="arrow-visual-left"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                              className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-1/3 items-center justify-start bg-gradient-to-r from-black/70 to-transparent pl-4"
+                            >
+                              <ChevronLeft className="h-8 w-8 text-white drop-shadow-lg" />
+                            </motion.div>
+                          )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Barra de progreso de "Continuar viendo": SIEMPRE visible
@@ -8299,14 +8369,55 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                 {/* Capa CLICABLE FIJA (hermana del contexto 3D, fuera del
                     preserve-3d): no se inclina ni se mueve, así el clic del botón
-                    play (centrado = eje de giro) siempre se registra. Ya no hay
-                    zonas para alternar póster↔backdrop (funcionalidad retirada). */}
+                    play (centrado = eje de giro) siempre se registra. */}
                 <div className="pointer-events-none absolute inset-0 z-40">
                   <StreamingHoverOverlay
                     provider={primaryStreamingProvider}
                     mode="button"
                     part="hit"
                   />
+
+                  {/* Zonas laterales CLICABLES para alternar póster↔backdrop
+                      (transparentes): la parte visible (degradado + chevron) va
+                      dentro del marco, integrada; aquí solo está el área de clic,
+                      fija, para que siempre registre.
+
+                      SOLO ESCRITORIO: van tras `supportsHover`, así que en táctil
+                      ni se montan y la portada se queda siempre en modo póster.
+                      La variante que existía para móvil (pulsar en cualquier parte
+                      del póster para alternar) NO se restaura a propósito. */}
+                  {supportsHover &&
+                    isPosterHovered &&
+                    posterViewMode === "poster" && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Ver imagen de fondo"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCyclePoster();
+                        }}
+                        className="pointer-events-auto absolute inset-y-0 right-0 z-20 w-1/3 cursor-pointer"
+                      />
+                    )}
+
+                  {supportsHover &&
+                    isPosterHovered &&
+                    posterViewMode === "preview" && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Ver póster"
+                        title="Ver póster"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCyclePoster();
+                        }}
+                        className="pointer-events-auto absolute inset-y-0 left-0 z-20 w-1/3 cursor-pointer"
+                      />
+                    )}
                 </div>
               </div>
             </motion.div>
@@ -8358,6 +8469,30 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     </motion.a>
                   ))}
                 </div>
+
+                {/* Enlaces externos JUNTO a las plataformas, separados por una
+                    línea vertical. Solo en modo backdrop: ahí se retiran de la
+                    barra de puntuaciones (ver `externalLinks` del scoreboard)
+                    para que no salgan duplicados, así que esto los mueve, no los
+                    copia. En modo póster siguen viviendo en el scoreboard.
+                    Se reutilizan `ToolbarSeparator` y `ExternalLinkButton`, los
+                    mismos que usa el scoreboard, para que el aspecto sea idéntico. */}
+                {isBackdropPoster && scoreboardExternalLinks.length > 0 && (
+                  <>
+                    <ToolbarSeparator className="mx-0.5" />
+                    <div className="flex flex-row flex-nowrap items-center gap-2">
+                      {scoreboardExternalLinks.map((link) => (
+                        <ExternalLinkButton
+                          key={link.key}
+                          icon={link.icon}
+                          title={link.title}
+                          href={link.href}
+                          fallbackHref={link.fallbackHref}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </StaggerContainer>
             ) : null}
           </div>
@@ -8519,7 +8654,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? { value: Math.round(extras.mcScore) }
                     : null
                 }
-                externalLinks={scoreboardExternalLinks}
+                // En modo backdrop los enlaces se muestran junto a las
+                // plataformas (bajo la portada), así que aquí se omiten para no
+                // duplicarlos. En modo póster siguen aquí, como siempre.
+                externalLinks={isBackdropPoster ? null : scoreboardExternalLinks}
                 onMoreLinks={() => setExternalLinksOpen(true)}
                 share={{
                   title,

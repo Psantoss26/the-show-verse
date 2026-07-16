@@ -1,4 +1,5 @@
 "use client";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -763,7 +764,7 @@ export default function TraktEpisodesWatchedModal({
   if (!open) return null;
 
   const PanelClass =
-    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 bg-black/45 bg-gradient-to-br from-white/10 via-white/5 to-black/55 backdrop-blur-3xl sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]";
+    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 ${LIQUID_GLASS_PANEL} sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]";
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -1791,7 +1792,7 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-lg overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+                className={`relative w-full max-w-lg overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label={
@@ -1997,7 +1998,7 @@ export default function TraktEpisodesWatchedModal({
                 exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.18 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl"
+                className={`relative w-full max-w-2xl overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Historial de visionados"
