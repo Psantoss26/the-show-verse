@@ -426,7 +426,7 @@ function SimilarBackdrop({ rec, onOpen }) {
 
   return (
     <div
-      className="group relative aspect-video w-full cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-neutral-800 shadow-md transition duration-300 hover:border-white/30 hover:shadow-lg hover:shadow-black/40"
+      className="group relative aspect-video w-full cursor-pointer overflow-hidden rounded-xl bg-neutral-800 shadow-md transition duration-300 hover:shadow-lg hover:shadow-black/40 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
       role="button"
       tabIndex={onOpen ? 0 : -1}
       title={recTitle}
@@ -2655,7 +2655,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                       <SwiperSlide key={person?.id ?? person?.credit_id ?? person?.name}>
                         <Link
                           href={`/details/person/${person.id}`}
-                          className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                          className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                         >
                           <div className="aspect-[2/3] overflow-hidden relative">
                             {photo ? (
@@ -2909,7 +2909,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                           onTouchStart={() =>
                             prefetchEpisodeDetails(episodeNumber)
                           }
-                          className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left transition hover:border-white/25 hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40"
+                          className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl bg-white/[0.03] text-left transition hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                           title={episodeTitle}
                         >
                           <div className="relative aspect-video overflow-hidden bg-white/[0.04]">
