@@ -703,10 +703,19 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   // animación de entrada; durante la entrada el panel se transforma (y/scale) y
   // tener el backdrop-filter activo obligaría a recalcular el desenfoque en cada
   // frame (lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
-  // Drawer DERECHO: no hay dim de fondo, así que el blur del panel debe estar
-  // presente desde el primer frame (tanto en la apertura inicial como al cambiar
-  // de título); si no, la tarjeta se ve sin fondo durante la animación.
-  const [panelSettled, setPanelSettled] = useState(() => isRightPlacement);
+  // Drawer DERECHO: antes esto arrancaba en `true` porque, al no haber dim de
+  // fondo, quitar el blur dejaba ver el panel casi transparente (es bg-black/35)
+  // durante la animación. El coste era que el drawer deslizaba CON el
+  // backdrop-filter activo y el navegador recalculaba el desenfoque de todo lo
+  // que hay detrás en cada frame del recorrido: justo la operación que este
+  // mismo mecanismo existe para evitar. Esa era la falta de fluidez.
+  //
+  // Ahora arranca en `false` también en el drawer, y el "se ve sin fondo" se
+  // resuelve por otra vía: mientras dura el movimiento el panel usa un fondo casi
+  // opaco (ver `className`), que es gratis, y al asentarse cambia al cristal
+  // real con una transición. El blur solo se calcula con el panel ya quieto, así
+  // que se resuelve una vez en lugar de en cada frame.
+  const [panelSettled, setPanelSettled] = useState(false);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
@@ -2045,11 +2054,23 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
-        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        className={`relative z-10 flex flex-col overflow-hidden bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] transition-[background-color,backdrop-filter] duration-300 ease-out ${
           isRightPlacement
             ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
-        } ${panelSettled ? "backdrop-blur-md" : ""}`}
+        } ${
+          panelSettled
+            ? // Ya quieto: cristal real. El blur se resuelve UNA vez, no por frame.
+              "bg-black/[0.35] backdrop-blur-md"
+            : isRightPlacement
+              ? // En movimiento y sin dim detrás: se compensa con opacidad (gratis)
+                // en vez de con blur (un recálculo del fondo por frame). Al
+                // asentarse, la transición de arriba funde este color hacia el
+                // cristal, así que el cambio no se aprecia como un salto.
+                "bg-neutral-950/[0.92]"
+              : // Centrado: el dim de fondo ya difumina, no hace falta compensar.
+                "bg-black/[0.35]"
+        }`}
       >
         {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
         {isRightPlacement && (
