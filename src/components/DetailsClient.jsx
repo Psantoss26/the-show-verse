@@ -7871,27 +7871,46 @@ export default function DetailsClient({
               </>
             )}
 
-            {/* Capa base: siempre cubre (evita marcos laterales) */}
+            {/* Capa base: siempre cubre (evita marcos laterales).
+
+                MÓVIL: oculta hasta que carga el póster de portada. Antes pintaba
+                con opacity:1 desde el primer frame sin esperar a nada, mientras
+                que la portada espera a su `onLoad` y encima hace 500ms de
+                fundido: el fondo ganaba siempre la carrera y se veía la MISMA
+                imagen atenuada antes que la portada. Además, al desvanecerse la
+                portada por encima, este fondo asomaba a través y causaba el
+                parpadeo. Oculto, detrás queda el `bg-[#0a0a0a]` del contenedor,
+                que es exactamente el mismo color que la caja del póster: fondo
+                uniforme, sin rectángulo ni destello.
+
+                La condición va por CSS (`max-sm:`) y NO por `isMobileViewport`:
+                ese estado arranca en false y provocaría el destello que estamos
+                eliminando. Escritorio (>=sm) no se toca: siempre visible.
+                Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
+                ternario muerto (siempre 1). */}
             <div
-              className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
+              className={`absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100 ${
+                currentLowLoaded ? "" : "max-sm:opacity-0"
+              }`}
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: "scale(1)",
                 filter: "brightness(0.75) saturate(1.03)",
-                opacity: isTransitioning ? 1 : 1,
                 willChange: "opacity",
               }}
             />
 
-            {/* Capa detalle: zoom OUT (scale < 1) */}
+            {/* Capa detalle: zoom OUT (scale < 1). Mismo gateo que la capa base:
+                si esta se mostrara antes, el problema seguiría igual. */}
             <div
-              className="absolute inset-0 bg-cover transition-opacity duration-500"
+              className={`absolute inset-0 bg-cover transition-opacity duration-500 opacity-100 ${
+                currentLowLoaded ? "" : "max-sm:opacity-0"
+              }`}
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 backgroundPosition: "center top",
                 transform: "scale(1)",
                 transformOrigin: "center top",
-                opacity: isTransitioning ? 1 : 1,
                 willChange: "opacity",
               }}
             />
@@ -7976,7 +7995,11 @@ export default function DetailsClient({
                   franja llegaría tarde y la línea asomaría durante ese frame,
                   que es exactamente lo que estamos eliminando. */}
               {posterLowUrl && !currentImgError && (
-                <div className="sm:hidden absolute bottom-full inset-x-0 h-16 overflow-hidden pointer-events-none z-0">
+                <div
+                  className={`sm:hidden absolute bottom-full inset-x-0 h-16 overflow-hidden pointer-events-none z-0 transition-opacity duration-500 ease-out ${
+                    currentLowLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                >
                   <div className="absolute inset-x-0 top-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] origin-top scale-y-[-1]">
                     <OptimizedImage
                       src={posterLowUrl}
@@ -8061,22 +8084,19 @@ export default function DetailsClient({
                       contain: "layout paint",
                     }}
                   >
-                    {/* Fondo de carga MÓVIL. Antes era `bg-neutral-950` en ESTE
-                        contenedor, que NO lleva máscara (solo la llevan los divs
-                        de las imágenes): resultaba un rectángulo sólido de bordes
-                        duros, con el canto inferior cortado en seco contra el
-                        fondo de página. De ahí el "rectángulo" y el marcado del
-                        borde inferior al recargar.
+                    {/* Aquí había una capa de carga `bg-neutral-950` enmascarada,
+                        para tapar el póster de FONDO mientras cargaba la portada.
+                        Ya no hace falta y además era la causante del parpadeo:
+                        desaparecía de golpe al cargar la imagen, pero la portada
+                        tarda 500ms en opacar, así que en ese hueco el fondo
+                        asomaba a través de la portada semitransparente.
 
-                        Ahora es una capa hermana con la MISMA clase de máscara,
-                        así que se difumina abajo exactamente igual que el póster:
-                        no cambia el estilo de la transición, solo deja de haber
-                        un borde duro donde no debía haberlo. Sigue tapando el
-                        póster de FONDO mientras carga, que es para lo que estaba.
-                        Desaparece en cuanto la imagen entra (crossfade). */}
-                    {!currentLowLoaded && (
-                      <div className="sm:hidden absolute inset-0 z-0 bg-neutral-950 poster-mobile-fade" />
-                    )}
+                        Ahora el fondo va oculto en móvil hasta que carga la
+                        portada, y detrás queda el `bg-[#0a0a0a]` del contenedor
+                        del fondo fijo, que es EXACTAMENTE el mismo color que
+                        `neutral-950`. El resultado visual durante la carga es
+                        idéntico, pero sin capa que quitar y, por tanto, sin
+                        parpadeo. */}
 
                     {/* Imagen anterior (permanece visible hasta que la nueva carga) */}
                     <AnimatePresence>
