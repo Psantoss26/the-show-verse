@@ -737,6 +737,43 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     return () => window.removeEventListener("resize", onResize);
   }, [isRightPlacement]);
 
+  const resizingRef = useRef(false);
+
+  // Cierre al pulsar FUERA del drawer.
+  //
+  // El centrado ya se cierra así mediante su backdrop, pero el drawer derecho no
+  // tiene backdrop a propósito: su contenedor es `pointer-events-none` para poder
+  // seguir usando la página de fondo (hacer scroll y pulsar otro título). Por eso
+  // el cierre se resuelve escuchando en el documento en vez de con una capa que
+  // taparía la página y rompería justo eso.
+  //
+  // Se escucha en `click` (no en `pointerdown`) porque el descarte clave depende
+  // de `defaultPrevented`, y eso solo está disponible una vez el clic ha burbujeado.
+  useEffect(() => {
+    if (!isRightPlacement || typeof document === "undefined") return undefined;
+
+    const onDocumentClick = (event) => {
+      // 1) Otra tarjeta de preview: `usePreviewOpen` llama a preventDefault() justo
+      //    en ese caso, así que el drawer CAMBIA de título en vez de cerrarse, que
+      //    es el comportamiento que el diseño actual permite. Un clic con
+      //    cmd/ctrl (que sí navega) no llega aquí como preventDefault y sí cierra.
+      if (event.defaultPrevented) return;
+      // 2) Se acaba de soltar un arrastre del tirador de redimensionado.
+      if (resizingRef.current) return;
+      // 3) Clic dentro del propio panel.
+      if (panelRef.current?.contains(event.target)) return;
+      // 4) Modales anidados (listas, soundtrack, tráiler, comentarios…): se montan
+      //    con createPortal en document.body, así que quedan FUERA del panel y sin
+      //    esto un clic dentro de ellos cerraría el drawer entero.
+      if (event.target?.closest?.("[data-detail-modal-layer]")) return;
+
+      onClose?.();
+    };
+
+    document.addEventListener("click", onDocumentClick);
+    return () => document.removeEventListener("click", onDocumentClick);
+  }, [isRightPlacement, onClose]);
+
   // Arrastre del borde izquierdo. Durante el gesto se escribe el ancho DIRECTAMENTE
   // en el DOM del panel (sin re-render del modal, para que sea fluido); al soltar se
   // reconcilia el estado y se persiste.
@@ -744,6 +781,11 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     if (!isRightPlacement || typeof window === "undefined") return;
     event.preventDefault();
     event.stopPropagation();
+    // El cierre por clic fuera debe ignorar este gesto: si arrastras el tirador y
+    // sueltas el puntero fuera del panel, el `click` resultante se dispara en el
+    // ancestro común (el documento), que cuenta como "fuera" y cerraría el drawer
+    // justo al terminar de redimensionar.
+    resizingRef.current = true;
     const vw = window.innerWidth;
     panelWidthRef.current = panelWidth;
     const prevUserSelect = document.body.style.userSelect;
@@ -762,6 +804,11 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
       window.removeEventListener("pointerup", onUp);
       document.body.style.userSelect = prevUserSelect;
       document.body.style.cursor = prevCursor;
+      // El `click` llega DESPUÉS del pointerup, así que la bandera no puede
+      // limpiarse aquí mismo: se libera en el siguiente tick, ya pasado ese click.
+      window.setTimeout(() => {
+        resizingRef.current = false;
+      }, 0);
       setPanelWidth(panelWidthRef.current);
       try {
         window.localStorage.setItem(
@@ -2052,27 +2099,20 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
         }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          willChange: "transform, opacity",
+          // El drawer NO anima opacidad (solo `x`), así que anunciar `opacity`
+          // aquí era contraproducente: `will-change: opacity` fuerza por sí solo
+          // una capa con alfa, y esa capa es justo la que encarece el
+          // backdrop-filter en cada frame del recorrido. El centrado sí anima
+          // opacidad, así que ahí se mantiene.
+          willChange: isRightPlacement ? "transform" : "transform, opacity",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
-        className={`relative z-10 flex flex-col overflow-hidden bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] transition-[background-color,backdrop-filter] duration-300 ease-out ${
+        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
             ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
-        } ${
-          panelSettled
-            ? // Ya quieto: cristal real. El blur se resuelve UNA vez, no por frame.
-              "bg-black/[0.35] backdrop-blur-md"
-            : isRightPlacement
-              ? // En movimiento y sin dim detrás: se compensa con opacidad (gratis)
-                // en vez de con blur (un recálculo del fondo por frame). Al
-                // asentarse, la transición de arriba funde este color hacia el
-                // cristal, así que el cambio no se aprecia como un salto.
-                "bg-neutral-950/[0.92]"
-              : // Centrado: el dim de fondo ya difumina, no hace falta compensar.
-                "bg-black/[0.35]"
-        }`}
+        } ${panelSettled ? "backdrop-blur-md" : ""}`}
       >
         {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
         {isRightPlacement && (
@@ -3023,7 +3063,19 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
         </div>
       </motion.div>
 
-      {modalHostReady ? createPortal(modalLayer, document.body) : modalLayer}
+      {/* `data-detail-modal-layer` marca esta capa para que el cierre por clic
+          fuera del drawer la reconozca como "dentro". Al ir portada a
+          document.body queda fuera del panel, y sin esta marca un clic en
+          cualquiera de estos modales cerraría el drawer que hay debajo.
+          El div envoltorio es inerte: no crea contexto de apilamiento (sin
+          transform/opacity/z-index) y todos sus hijos son `fixed`, así que no
+          altera su posicionamiento. */}
+      {modalHostReady
+        ? createPortal(
+            <div data-detail-modal-layer="">{modalLayer}</div>,
+            document.body,
+          )
+        : modalLayer}
     </div>
   );
 }
