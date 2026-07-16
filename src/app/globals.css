@@ -491,26 +491,13 @@ html {
    Va en media query (no en clase `sm:` de Tailwind) para que sea consistente
    desde el primer frame y porque los valores arbitrarios multi-stop de Tailwind
    no generan de forma fiable. */
-/* Rebote de overscroll en MÓVIL.
-
-   El fondo del hero es `position: fixed`, así que NO se mueve con el rebote
-   elástico; el póster, que está en el flujo, SÍ. Al hacer tope, ambos se
-   desincronizan. Eso solo se nota donde los dos se mezclan, que es la zona de
-   difuminado del póster: existe únicamente en el borde INFERIOR, y por eso el
-   marcado aparecía solo ahí. Sin rebote no hay desincronía.
-
-   Se limita a móvil (en escritorio no hay rebote elástico) y no toca la máscara
-   ni el estilo de la transición.
-
-   CONTRAPARTIDA: `overscroll-behavior-y: none` desactiva también el
-   pull-to-refresh nativo de Chrome en Android. La app no lo usa (la recarga va
-   por navegación), pero es un cambio de comportamiento a nivel de documento. */
-@media (max-width: 639px) {
-  html,
-  body {
-    overscroll-behavior-y: none;
-  }
-}
+/* NOTA: aquí hubo un `overscroll-behavior-y: none` en móvil para eliminar el
+   rebote de overscroll (el fondo del hero es `fixed` y no se mueve con el
+   rebote, mientras que el póster sí, y al desincronizarse se marcaba el borde
+   inferior del difuminado). Se RETIRÓ: desactivaba también el pull-to-refresh
+   nativo de Chrome en Android, y poder recargar deslizando hacia abajo importa
+   más que un artefacto visual transitorio durante un gesto intencionado.
+   No volver a añadirlo sin resolver antes esa contrapartida. */
 
 /* Velo de la navbar sobre el póster full-bleed de las fichas, en MÓVIL.
 
