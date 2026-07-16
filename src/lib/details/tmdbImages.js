@@ -1,4 +1,4 @@
-// src/lib/details/tmdbImages.js
+import { TMDB_IMAGE_LANGS_PARAM } from '@/lib/tmdb/imageLanguages'
 
 export const mergeUniqueImages = (current = [], incoming = []) => {
     const map = new Map()
@@ -34,7 +34,7 @@ export const preloadTmdb = (filePath, size = 'w780') => {
 
 export async function fetchTVImages({ showId, apiKey }) {
     if (!apiKey) return { posters: [], backdrops: [] }
-    const url = `https://api.themoviedb.org/3/tv/${showId}/images?api_key=${apiKey}&include_image_language=en,en-US,es,es-ES,null`
+    const url = `https://api.themoviedb.org/3/tv/${showId}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`
     const res = await fetch(url)
     const json = await res.json()
     if (!res.ok) throw new Error(json?.status_message || 'Error al cargar imágenes')

@@ -38,6 +38,8 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
 
 
 // ================== CONSTANTS ==================
@@ -187,35 +189,18 @@ function pickBestPosterPath(posters) {
   );
 }
 
-// Misma lógica que pickBestBackdropByLangResVotes en Favoritos
-function pickBestBackdropPath(backdrops) {
-  if (!Array.isArray(backdrops) || !backdrops.length) return null;
-  const minWidth = 1200;
-  const pool0 = backdrops.filter((b) => (b?.width || 0) >= minWidth);
-  const pool = pool0.length ? pool0 : backdrops;
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set(["en"]);
-  const isPreferred = (b) => {
-    if (b?.iso_639_1 == null) return false;
-    return preferSet.has(norm(b.iso_639_1));
-  };
-  const top3 = [];
-  for (const b of pool) {
-    if (isPreferred(b)) top3.push(b);
-    if (top3.length === 3) break;
-  }
-  if (!top3.length) return null;
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
-  return (
-    (
-      top3.find((b) => isRes(b, 1920, 1080)) ||
-      top3.find((b) => isRes(b, 2560, 1440)) ||
-      top3.find((b) => isRes(b, 3840, 2160)) ||
-      top3.find((b) => isRes(b, 1280, 720)) ||
-      top3[0]
-    )?.file_path || null
-  );
-}
+// Antes había aquí una copia local que decía ser "la misma lógica que
+// pickBestBackdropByLangResVotes", pero se había desviado: solo aceptaba
+// inglés y devolvía null si no lo había, sin escalón para otros idiomas ni
+// para textless. Un título sin backdrop en inglés acababa cayendo al
+// backdrop_path por defecto (sin idioma). Las tarjetas de Biblioteca no
+// superponen logo, así que aquí SÍ queremos idioma: usamos el selector
+// compartido, que aplica en → es → textless (último recurso).
+const pickBestBackdropPath = (backdrops) =>
+  pickBestBackdropByLangResVotes(backdrops, {
+    preferLangs: ["en", "en-US"],
+    minWidth: 1200,
+  })?.file_path || null;
 
 // Llamada directa a TMDB desde el navegador (mismo patrón que SmartPoster en Favoritos)
 // Obtiene poster y backdrop en una sola petición y los cachea juntos
@@ -228,7 +213,7 @@ async function loadTmdbImages(type, id) {
     try {
       const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
       if (!apiKey) return { poster: null, backdrop: null };
-      const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US,null`;
+      const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
       const r = await fetch(url, { cache: "force-cache" });
       if (!r.ok) return { poster: null, backdrop: null };
       const j = await r.json();

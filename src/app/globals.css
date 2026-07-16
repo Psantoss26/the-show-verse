@@ -473,3 +473,68 @@ html {
     mask-image: radial-gradient(white, black);
   }
 }
+
+/* Fusión del póster full-bleed de DetailsClient en MÓVIL.
+
+   ARRIBA: sin desvanecido. La máscara anterior empezaba en
+   `transparent 0% → black 8%`, así que el 8% superior del póster se fundía con
+   el fondo OSCURO que hay detrás. En un póster oscuro no se nota, pero en uno
+   claro (p. ej. Forrest Gump) pintaba una banda oscura bajo el navbar: el
+   "borde marcado". El póster llega opaco hasta su borde superior y pasa por
+   debajo del navbar, que aporta él mismo el velo.
+
+   ABAJO: caída con puntos intermedios en vez de rampa lineal. Una rampa lineal
+   de alfa sobre imagen clara se percibe como un corte donde arranca; con la
+   curva suavizada la transición hacia la sección de información es continua.
+   Se mantiene el inicio al ~78% para no perder más imagen de la cuenta.
+
+   Va en media query (no en clase `sm:` de Tailwind) para que sea consistente
+   desde el primer frame y porque los valores arbitrarios multi-stop de Tailwind
+   no generan de forma fiable. */
+/* Velo de la navbar sobre el póster full-bleed de las fichas, en MÓVIL.
+
+   La navbar arranca justo en el borde superior del póster. Con el fondo glass,
+   su velo (bg-black/20 + to-black/40) cortaba en seco en ese borde: oscurecía
+   la franja de arriba y no el póster de abajo, dejando un escalón de brillo =
+   la línea horizontal.
+
+   Este velo MUERE en alfa 0 justo en el borde inferior, así que no hay escalón.
+   Y la caída lleva puntos intermedios en vez de ser una rampa lineal: una rampa
+   lineal termina en 0 con pendiente seca y deja un "pliegue" perceptible; con la
+   curva suavizada la transición hacia el póster es continua de verdad.
+
+   Solo por debajo de `lg` (1024px): en escritorio la navbar de fichas conserva
+   su fondo glass intacto. */
+@media (max-width: 1023px) {
+  .details-nav-veil-mobile {
+    background-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.65) 0%,
+      rgba(0, 0, 0, 0.52) 32%,
+      rgba(0, 0, 0, 0.3) 58%,
+      rgba(0, 0, 0, 0.12) 80%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  }
+}
+
+@media (max-width: 639px) {
+  .poster-mobile-fade {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 78%,
+      rgba(0, 0, 0, 0.72) 87%,
+      rgba(0, 0, 0, 0.3) 95%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 78%,
+      rgba(0, 0, 0, 0.72) 87%,
+      rgba(0, 0, 0, 0.3) 95%,
+      transparent 100%
+    );
+  }
+}

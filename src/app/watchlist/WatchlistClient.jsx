@@ -45,6 +45,7 @@ import {
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 // ================== UTILS & CACHE ==================
 
@@ -150,7 +151,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v4";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v5";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -905,7 +906,7 @@ async function fetchBestBackdropEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
@@ -939,7 +940,7 @@ async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&include_image_language=en,en-US`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
@@ -1059,7 +1060,14 @@ function SmartPoster({ item, title, mode = "poster" }) {
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
         if (url) await preloadImage(url);
         if (!abort) {
-          writeImageChoice("backdrop", imageKey, finalPath);
+          // Persistimos SOLO la elección real del selector, nunca el fallback.
+          // `finalPath` puede ser `item.backdrop_path`, el backdrop por defecto
+          // de TMDb (normalmente textless): si el selector fallaba una vez, ese
+          // textless quedaba grabado 7 días y el efecto de arriba corta antes de
+          // reintentar, así que la tarjeta se quedaba sin idioma de forma
+          // permanente. Pasando `bestBackdrop` (null si falló) no se graba nada
+          // y la siguiente visita vuelve a intentarlo.
+          writeImageChoice("backdrop", imageKey, bestBackdrop);
           setSrc(url);
           setReady(!!url);
         }
@@ -1071,7 +1079,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
       const url = finalPath ? buildImg(finalPath, "w500") : null;
       if (url) await preloadImage(url);
       if (!abort) {
-        writeImageChoice("poster", imageKey, finalPath);
+        writeImageChoice("poster", imageKey, best);
         setSrc(url);
         setReady(!!url);
       }

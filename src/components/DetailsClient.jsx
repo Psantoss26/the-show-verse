@@ -7950,6 +7950,49 @@ export default function DetailsClient({
               }}
               className="relative"
             >
+              {/* MÓVIL: continuación ESPEJADA del póster bajo el navbar (4rem).
+                  El póster arranca justo bajo el navbar (borde con borde, sin
+                  pasar por debajo ni ocultar imagen). El problema era que encima
+                  quedaba el fondo fijo (mismo póster pero atenuado y con otro
+                  encuadre) bajo el cristal del navbar: nunca casaba con la fila
+                  superior del póster y se veía la línea horizontal.
+
+                  Aquí se refleja el póster sobre su propio borde superior con la
+                  MISMA geometría (mismo ancho, misma altura de caja, mismo
+                  object-cover y mismo overscan), así que la fila inferior del
+                  espejo ES la fila superior del póster: continuidad exacta, sin
+                  línea posible, sea cual sea el póster.
+
+                  Cómo: el div interior se ancla con `top-full` (su borde superior
+                  = borde inferior de la franja = borde superior del póster) y se
+                  voltea sobre ese mismo borde con `origin-top scale-y-[-1]`, de
+                  modo que sube reflejado y la franja lo recorta a 4rem.
+                  Va con LOW (no HIGH): queda tras el blur del navbar, así que la
+                  resolución es irrelevante y el color —lo único que importa para
+                  que no haya línea— es idéntico. Escritorio: oculto. */}
+              {/* Gateado por CSS (`sm:hidden`), NO por `isMobileViewport`: ese
+                  estado arranca en false y pasa a true tras montar, así que la
+                  franja llegaría tarde y la línea asomaría durante ese frame,
+                  que es exactamente lo que estamos eliminando. */}
+              {posterLowUrl && !currentImgError && (
+                <div className="sm:hidden absolute bottom-full inset-x-0 h-16 overflow-hidden pointer-events-none z-0">
+                  <div className="absolute inset-x-0 top-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] origin-top scale-y-[-1]">
+                    <OptimizedImage
+                      src={posterLowUrl}
+                      alt=""
+                      aria-hidden="true"
+                      unoptimized
+                      loading="eager"
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{
+                        transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Wrapper: solo perspectiva + captura puntero. Ya NO cicla al
                   pulsar en toda la portada: el cambio póster/backdrop se hace
                   solo en las zonas laterales (flechas), y el botón play del
@@ -8027,7 +8070,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]"
+                            className="absolute inset-0 z-0 poster-mobile-fade"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -8042,7 +8085,7 @@ export default function DetailsClient({
                     </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,black_8%,black_80%,transparent_100%)] sm:[-webkit-mask-image:none] sm:[mask-image:none]">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}

@@ -741,6 +741,17 @@ export default function Navbar() {
   // El fondo difuminado aparece al hacer scroll.
   const heroNavMode = isFeaturedHeroRoute && !isScrolled;
 
+  // Fichas (/movie/… y /tv/…): en MÓVIL el póster es full-bleed y arranca justo
+  // bajo la navbar, borde con borde. Con el fondo glass, su velo cortaba en seco
+  // en ese borde y dejaba un escalón de brillo (línea horizontal) contra la fila
+  // superior del póster. Arriba del todo usamos el mismo velo degradado que el
+  // hero, que MUERE en transparente: así el borde no existe. Solo móvil
+  // (`max-lg:`): en escritorio la navbar de fichas sigue siendo glass, intacta.
+  // Las fichas viven en /details/movie/<id> y /details/tv/<id>. Se excluye
+  // /details/person/<id>: no tiene póster full-bleed y debe conservar el glass.
+  const isDetailsRoute = /^\/details\/(movie|tv)\//.test(pathname || "");
+  const detailsHeroNavMobile = isDetailsRoute && !isScrolled;
+
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
     activePath === href || (href !== "/" && activePath?.startsWith(href));
@@ -932,7 +943,13 @@ export default function Navbar() {
         className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
-            : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+            : detailsHeroNavMobile
+              ? // Móvil: velo con caída suavizada que muere en alfa 0 en el
+                // borde inferior (clase `.details-nav-veil-mobile` en
+                // globals.css), para fundir con la fila superior del póster sin
+                // línea. Escritorio (lg:): glass idéntico al de siempre.
+                "details-nav-veil-mobile lg:bg-black/20 lg:bg-gradient-to-br lg:from-white/10 lg:via-transparent lg:to-black/40 lg:backdrop-blur-[50px] lg:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+              : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
         }`}
       >
         {/* ---------------- Desktop ---------------- */}

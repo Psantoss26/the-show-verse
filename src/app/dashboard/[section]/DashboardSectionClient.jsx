@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { formatPageTitle } from "@/lib/pageTitle";
+import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -234,7 +235,7 @@ async function fetchDashboardBackdrop(type, id) {
   try {
     const url =
       `https://api.themoviedb.org/3/${type}/${id}/images` +
-      `?api_key=${TMDB_API_KEY}&include_image_language=en,en-US,null`;
+      `?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
     const response = await fetch(url, { cache: "force-cache" });
     if (!response.ok) return null;
     const json = await response.json();
