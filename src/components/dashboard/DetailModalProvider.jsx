@@ -171,6 +171,24 @@ export default function DetailModalProvider({ children, placement = "center" }) 
       }
 
       const cur = stackRef.current;
+
+      // Pulsar el MISMO título que ya está abierto no debe hacer nada.
+      // Sin esto se entraba por la rama de "cambio de título": `replaceState` +
+      // sustituir el nivel por un objeto `item` NUEVO. El `key` no cambia (mismo
+      // token, así que el modal no remonta), pero la identidad del objeto sí, y
+      // eso re-renderiza el modal, vuelve a disparar sus cargas y activa
+      // `switching`. Resultado: un parpadeo para acabar mostrando exactamente lo
+      // mismo que ya había.
+      //
+      // Se compara por `previewToken`, que es la identidad real de un nivel
+      // (contempla los episodios: serie+temporada+episodio), no solo `id`.
+      // El drill queda fuera a propósito: apilar es una acción explícita con su
+      // propia semántica de historial (Atrás vuelve al nivel anterior).
+      const active = cur.length > 0 ? cur[cur.length - 1] : null;
+      if (active && !opts.drill && previewToken(item) === previewToken(active)) {
+        return;
+      }
+
       const url = buildPreviewUrl(item);
 
       if (opts.push === false) {

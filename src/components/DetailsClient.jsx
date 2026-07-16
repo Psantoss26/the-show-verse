@@ -7933,7 +7933,7 @@ export default function DetailsClient({
       <div
         ref={contentTopRef}
         tabIndex={-1}
-        className="relative z-10 px-4 pt-6 pb-8 lg:pt-8 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
+        className="relative z-10 px-4 pt-6 pb-8 sm:pt-8 lg:pt-10 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
       >
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
