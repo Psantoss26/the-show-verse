@@ -8653,7 +8653,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
-                              className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                              className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {actor.profile_path ? (
@@ -8766,8 +8766,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const showAccountBadge =
                             enableHover && (recIsFavorite || recIsWatchlist);
                           const recCardClass = enableHover
-                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
-                            : "block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
+                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const recImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
@@ -8958,8 +8958,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const colCardClass = enableHover
-                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
-                            : "block relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md";
+                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const colImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
@@ -9599,12 +9599,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 );
                                             }
                                           }}
+                                          // El borde esmeralda NO es decorativo: marca la imagen
+                                          // seleccionada, así que se conserva. Solo se neutraliza el
+                                          // de reposo (`border-white/10` → transparente), manteniendo
+                                          // `border-2` para que seleccionar no provoque salto de
+                                          // layout. El hover pasa al anillo nítido, como el resto.
                                           className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
+                        after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]
                         ${
                           isActive
                             ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-white/10 bg-black/25 hover:bg-black/35 hover:border-yellow-500/40"
+                            : "border-transparent bg-black/25 hover:bg-black/35"
                         }`}
                                           aria-label="Seleccionar"
                                           style={{
@@ -9779,7 +9785,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => openVideo(v)}
                                       aria-label={v.name || "Ver vídeo"}
-                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
                                         <OptimizedImage
@@ -9906,7 +9912,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {!soundtrackLoading &&
                             soundtrackResolved &&
                             soundtrackTracks.length === 0 && (
-                              <div className="relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu p-5 text-sm text-zinc-400">
+                              // Sin borde en reposo, igual que las tarjetas de pista
+                              // de al lado. Sin anillo de hover: no es interactivo.
+                              <div className="relative isolate overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu p-5 text-sm text-zinc-400">
                                 <div className="relative z-10">
                                   {soundtrackError ||
                                     "No se encontraron canciones de Spotify para este título."}
@@ -9952,7 +9960,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       aria-label={
                                         track.trackName || "Reproducir música"
                                       }
-                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-yellow-500/30 group"
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                                     >
                                       <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
                                         {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
@@ -10220,7 +10228,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   onMouseEnter={() => prefetchSeasonDetails(sn)}
                                   onFocus={() => prefetchSeasonDetails(sn)}
                                   onTouchStart={() => prefetchSeasonDetails(sn)}
-                                  className="group relative isolate overflow-hidden rounded-2xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:-translate-y-1 hover:border-yellow-500/30 hover:bg-white/5 hover:shadow-2xl text-left w-full"
+                                  className="group relative isolate overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:-translate-y-1 hover:bg-white/5 hover:shadow-2xl after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)] text-left w-full"
                                   aria-label={`Ver ${titleSeason}`}
                                 >
                                   {/* Fondo decorativo del número de temporada */}
@@ -10600,8 +10608,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
                                   className={[
-                                    "group relative isolate flex flex-col overflow-hidden rounded-3xl border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
-                                    "hover:border-indigo-500/30 hover:bg-white/5",
+                                    // Conserva su acento índigo propio (no el amarillo
+                                    // de la ficha): aquí solo cambia la CALIDAD del
+                                    // borde, no el color que ya tenía.
+                                    "group relative isolate flex flex-col overflow-hidden rounded-3xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
+                                    "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(99,102,241,0.95)]",
+                                    "hover:bg-white/5",
                                     disabled
                                       ? "pointer-events-none opacity-60"
                                       : "",
