@@ -328,15 +328,27 @@ const panelVariants = {
 // abierto. En ese caso NO se desliza (dejaría ver el fondo un instante): se hace un
 // fundido cruzado en el sitio entre la ficha saliente y la entrante. En la apertura
 // inicial (switching false) sí entra deslizando desde el borde derecho.
+// Curva de apertura: [0.32, 0.72, 0, 1], la misma que usan las hojas de iOS y
+// Vaul. Arranca rápido y asienta suave SIN overshoot (requisito: un rebote
+// dejaría asomar hueco tras el borde derecho). Sustituye a [0.22, 1, 0.36, 1]
+// (easeOutQuint), cuya cola era tan larga y lenta que el panel parecía seguir
+// flotando al final en vez de asentarse.
+//
+// En la apertura NO se anima ya `opacity`: un drawer sólido que entra deslizando
+// se lee más nítido y directo que uno que además aparece de la nada, y se anima
+// una propiedad menos. El fundido se conserva SOLO para `switching` (cambio de
+// título con el drawer abierto), donde el crossfade sí es el efecto buscado.
+const DRAWER_EASE = [0.32, 0.72, 0, 1];
+
 const panelVariantsRight = {
   hidden: (switching) =>
-    switching ? { opacity: 0 } : { opacity: 0, x: "100%" },
+    switching ? { opacity: 0 } : { opacity: 1, x: "100%" },
   visible: (switching) => ({
     opacity: 1,
     x: 0,
     transition: switching
       ? { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
-      : { duration: 0.44, ease: [0.22, 1, 0.36, 1] },
+      : { duration: 0.42, ease: DRAWER_EASE },
   }),
   navigate: {
     // Igual que en el centrado: el panel real se oculta y el movimiento a la
@@ -349,9 +361,12 @@ const panelVariantsRight = {
     switching
       ? { opacity: 0, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }
       : {
-          opacity: 0,
+          // Sale deslizando sólido, sin desvanecerse: simétrico con la entrada.
+          // Antes se difuminaba a la vez que salía, lo que dejaba ver el panel
+          // medio transparente sobre la página durante el recorrido.
+          opacity: 1,
           x: "100%",
-          transition: { duration: 0.26, ease: [0.4, 0, 1, 1] },
+          transition: { duration: 0.28, ease: DRAWER_EASE },
         },
 };
 
@@ -361,11 +376,29 @@ const panelVariantsRight = {
 // layout (mínimo cómodo, y como mucho casi todo el viewport).
 const RESIZE_STORAGE_KEY = "showverse:detailModalWidth";
 
+// Límites del drawer.
+//
+// MÁXIMO: media pantalla.
+//
+// MÍNIMO: el punto exacto en el que la fila de Reparto pasa de 6 a 5 tarjetas.
+// Ese Swiper usa `breakpointsBase="container"`, así que sus breakpoints miden el
+// CONTENEDOR (no la ventana) — por eso el ancho del drawer cambia el número de
+// tarjetas. El breakpoint de 6 tarjetas es 840px de contenedor; por debajo caen
+// a 5. El contenedor es el panel menos el padding horizontal del área de
+// secciones (`p-7` en >=sm = 28px por lado = 56px). Luego:
+//     840 (breakpoint 6 tarjetas) + 56 (padding) = 896px de panel
+// Si se cambia el breakpoint del Swiper o ese padding, hay que recalcular aquí.
+const CAST_SIX_CARDS_CONTAINER_PX = 840;
+const PANEL_SECTIONS_PADDING_X_PX = 56;
+const DRAWER_MIN_PX = CAST_SIX_CARDS_CONTAINER_PX + PANEL_SECTIONS_PADDING_X_PX;
+
 function clampDrawerWidth(width, viewportWidth) {
   const vw = viewportWidth || 1280;
-  // En pantallas estrechas el mínimo se adapta para no desbordar.
-  const min = Math.min(420, Math.max(300, vw - 24));
-  const max = Math.round(vw * 0.98);
+  const max = Math.round(vw * 0.5);
+  // En pantallas donde media pantalla no llega al mínimo (vw < 1792) el mínimo
+  // cedería por encima del máximo e invertiría el rango, así que se acota. En
+  // esos casos el drawer queda fijado al máximo en lugar de romperse.
+  const min = Math.min(DRAWER_MIN_PX, max);
   return Math.max(min, Math.min(Math.round(width || 0), max));
 }
 
@@ -2014,7 +2047,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
         }}
         className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
-            ? "h-full max-w-[98vw] rounded-l-2xl pointer-events-auto"
+            ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         } ${panelSettled ? "backdrop-blur-md" : ""}`}
       >
