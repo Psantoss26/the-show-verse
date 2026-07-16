@@ -518,22 +518,52 @@ html {
   }
 }
 
+/* Curva S (smoothstep: 3t²-2t³) muestreada cada 4%, de alfa 1 en el 60% a alfa 0
+   en el 100%.
+
+   POR QUÉ ASÍ Y NO UNA RAMPA: la versión anterior (opaco hasta el 78% y caída
+   rápida) pasaba de alfa CONSTANTE a alfa decreciente de golpe. Esa
+   discontinuidad de pendiente se percibe como un pliegue —la "línea"— justo
+   donde arranca el difuminado, y además aceleraba hacia abajo (pendiente
+   0.031 → 0.053 → 0.06), por eso parecía agresivo y repentino.
+
+   La smoothstep entra y sale con pendiente CERO: el difuminado no tiene ni
+   principio ni final perceptibles, es progresivo de verdad y queda integrado.
+
+   Arranca antes (60% en vez de 78%) pero se pierde MENOS imagen de lo que
+   parece: la curva mantiene el alfa alto al principio (0.97 en el 64%, 0.90 en
+   el 68%), mientras que una rampa lineal desde el 60% ya estaría en 0.5 en el
+   80%. */
 @media (max-width: 639px) {
   .poster-mobile-fade {
     -webkit-mask-image: linear-gradient(
       to bottom,
       #000 0%,
-      #000 78%,
-      rgba(0, 0, 0, 0.72) 87%,
-      rgba(0, 0, 0, 0.3) 95%,
+      #000 60%,
+      rgba(0, 0, 0, 0.972) 64%,
+      rgba(0, 0, 0, 0.896) 68%,
+      rgba(0, 0, 0, 0.784) 72%,
+      rgba(0, 0, 0, 0.648) 76%,
+      rgba(0, 0, 0, 0.5) 80%,
+      rgba(0, 0, 0, 0.352) 84%,
+      rgba(0, 0, 0, 0.216) 88%,
+      rgba(0, 0, 0, 0.104) 92%,
+      rgba(0, 0, 0, 0.028) 96%,
       transparent 100%
     );
     mask-image: linear-gradient(
       to bottom,
       #000 0%,
-      #000 78%,
-      rgba(0, 0, 0, 0.72) 87%,
-      rgba(0, 0, 0, 0.3) 95%,
+      #000 60%,
+      rgba(0, 0, 0, 0.972) 64%,
+      rgba(0, 0, 0, 0.896) 68%,
+      rgba(0, 0, 0, 0.784) 72%,
+      rgba(0, 0, 0, 0.648) 76%,
+      rgba(0, 0, 0, 0.5) 80%,
+      rgba(0, 0, 0, 0.352) 84%,
+      rgba(0, 0, 0, 0.216) 88%,
+      rgba(0, 0, 0, 0.104) 92%,
+      rgba(0, 0, 0, 0.028) 96%,
       transparent 100%
     );
   }

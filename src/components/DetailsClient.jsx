@@ -8185,7 +8185,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         se superponga a una portada CON texto. */}
                     {mobilePosterPath && (
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center p-4">
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-transparent via-black/45 via-45% to-transparent" />
+                        {/* Aquí había una sombra de 10rem para el logo. No era un
+                            degradado anclado sino una FRANJA flotante: negro al
+                            45% en su punto medio y transparente por arriba Y por
+                            abajo. Sobre pósters claros se leía como una mancha
+                            oscura suspendida (la "línea negra"), y encima
+                            oscurecía por segunda vez la zona que ya difumina la
+                            máscara. Ya no hace falta: la máscara deja el fondo
+                            casi a alfa 0 donde va el logo, así que detrás queda
+                            el fondo oscuro de la página, y el logo/título llevan
+                            su propio drop-shadow fuerte para el contraste local.
+                            (Sin citar las clases: el escáner de Tailwind no
+                            distingue comentarios y volvería a emitir ese CSS.) */}
                         {heroLogoPath ? (
                           <img
                             src={`https://image.tmdb.org/t/p/w500${heroLogoPath}`}
