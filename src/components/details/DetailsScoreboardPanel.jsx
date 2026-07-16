@@ -253,7 +253,10 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
 //    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
 //       derecha con ml-auto (siempre visible si se pasa).
 // ---------------------------------------------------------------------------
-function ToolbarSeparator({ className = "" }) {
+// Exportado: DetailsClient lo reutiliza para separar plataformas de enlaces
+// externos en el modo de portada backdrop, y así la línea es la MISMA en ambos
+// sitios en vez de dos copias que puedan divergir.
+export function ToolbarSeparator({ className = "" }) {
   return (
     <div
       aria-hidden="true"

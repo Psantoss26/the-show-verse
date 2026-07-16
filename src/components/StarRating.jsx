@@ -1,4 +1,5 @@
 "use client";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -169,7 +170,7 @@ export default function StarRating({
             />
 
             <div
-              className="relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out"
+              className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
               role="dialog"
               aria-modal="true"
               aria-label="Puntuación del usuario"

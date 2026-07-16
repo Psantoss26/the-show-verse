@@ -1,4 +1,5 @@
 "use client";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useMemo } from "react";
 import {
@@ -95,7 +96,7 @@ export default function AddToListModal(props) {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl animate-in zoom-in-95 duration-300 ease-out">
+      <div className={`relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
         {/* Header */}
         <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 bg-white/[0.025] shrink-0">
           <div>
