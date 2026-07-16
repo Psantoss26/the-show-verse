@@ -547,14 +547,33 @@ export async function fetchBestPosterNoLang(
 }
 
 /* =================== LOGOS (arte del título) =================== */
+const isPngLogo = (logo) => /\.png$/i.test(logo?.file_path || "");
+
+// Prioridad: PNG > idioma > votos.
+//
+// POR QUÉ EL PNG MANDA SOBRE TODO LO DEMÁS
+// Los logos SVG de TMDb suelen ser versiones vectoriales monocromas pensadas
+// para recolorear, y muchas traen la letra en NEGRO: sobre los fondos oscuros de
+// la app quedan invisibles. Los PNG llevan el arte tal cual (blanco/color) con
+// transparencia, así que siempre se ven. Por eso el peso del formato (1e6)
+// domina sobre el de idioma (miles): un PNG gana SIEMPRE, aunque el SVG esté en
+// mejor idioma o tenga más votos. Si un título solo tiene SVG, todos puntúan 0
+// en formato y la elección recae en idioma+votos como antes: nunca nos quedamos
+// sin logo.
+//
+// El comentario que había aquí afirmaba que se prefería el formato, pero el
+// scoring NO miraba la extensión: solo idioma y votos. Un SVG con más votos que
+// los PNG de su mismo idioma se llevaba la elección. Verificado contra la API:
+// ocurre en ~4% de los títulos (2 de 49 barridos; p. ej. los IDs 510 y 769,
+// donde el SVG en inglés ganaba por tener 6 y 4 votos).
 function pickBestLogoByLang(logos, order = ["es", "en", null]) {
   if (!Array.isArray(logos) || logos.length === 0) return null;
   const score = (l) => {
     const langIdx = order.indexOf(l?.iso_639_1 ?? null);
     const langScore = langIdx === -1 ? 0 : (order.length - langIdx) * 1000;
-    return langScore + (l?.vote_count || 0);
+    const formatScore = isPngLogo(l) ? 1_000_000 : 0;
+    return formatScore + langScore + (l?.vote_count || 0);
   };
-  // Prefiere PNG/SVG con fondo transparente; TMDb sirve .svg y .png.
   return [...logos].sort((a, b) => score(b) - score(a))[0] || null;
 }
 

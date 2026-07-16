@@ -703,19 +703,21 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   // animación de entrada; durante la entrada el panel se transforma (y/scale) y
   // tener el backdrop-filter activo obligaría a recalcular el desenfoque en cada
   // frame (lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
-  // Drawer DERECHO: antes esto arrancaba en `true` porque, al no haber dim de
-  // fondo, quitar el blur dejaba ver el panel casi transparente (es bg-black/35)
-  // durante la animación. El coste era que el drawer deslizaba CON el
-  // backdrop-filter activo y el navegador recalculaba el desenfoque de todo lo
-  // que hay detrás en cada frame del recorrido: justo la operación que este
-  // mismo mecanismo existe para evitar. Esa era la falta de fluidez.
+  // Drawer DERECHO: el blur va activo desde el primer frame, para que el cristal
+  // difumine EN DIRECTO lo que el panel va pisando durante el recorrido y no
+  // aparezca de golpe al terminar. Además, sin dim detrás, un panel sin blur se
+  // vería casi transparente (es bg-black/35).
   //
-  // Ahora arranca en `false` también en el drawer, y el "se ve sin fondo" se
-  // resuelve por otra vía: mientras dura el movimiento el panel usa un fondo casi
-  // opaco (ver `className`), que es gratis, y al asentarse cambia al cristal
-  // real con una transición. El blur solo se calcula con el panel ya quieto, así
-  // que se resuelve una vez en lugar de en cada frame.
-  const [panelSettled, setPanelSettled] = useState(false);
+  // Que esto sea asumible depende de dos cosas, ambas resueltas más abajo:
+  //   1) NO animar `opacity` a la vez (ver panelVariantsRight). Animar opacidad
+  //      sobre un elemento con backdrop-filter es patológico: obliga a pintarlo
+  //      en un búfer aparte y recomponer el desenfoque con alfa cada frame.
+  //   2) NO declarar `will-change: opacity` en el drawer, que forzaba esa misma
+  //      capa con alfa aunque ya no animemos la opacidad.
+  //
+  // Centrado: mantiene la optimización de apagar el blur durante la entrada (ahí
+  // sí se transforma y/scale, y el dim de fondo ya difumina, así que no se nota).
+  const [panelSettled, setPanelSettled] = useState(() => isRightPlacement);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
