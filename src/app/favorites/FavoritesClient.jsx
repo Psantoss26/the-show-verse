@@ -1953,8 +1953,15 @@ const FavoriteCard = memo(function FavoriteCard({
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = !isBackNav && index < 24;
+  // El hover DEBE ganar al foco. Antes ambos valían z-50: al pulsar una tarjeta
+  // para abrir la preview, su <Link> conserva el foco y su envoltorio se quedaba
+  // clavado en 50; al pasar luego el ratón por otra, esa también subía a 50 y el
+  // empate lo resolvía el orden del DOM, así que la tarjeta con la preview
+  // abierta seguía tapando a la que estabas señalando si iba después.
+  // Con el foco por debajo del hover, la tarjeta señalada gana siempre, y el foco
+  // sigue elevándose sobre las tarjetas en reposo (navegación por teclado).
   const shellClassName =
-    "relative z-0 overflow-visible hover:z-[50] focus-within:z-[50]";
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   if (viewMode === "list") {
     return (
