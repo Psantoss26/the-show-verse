@@ -7990,7 +7990,11 @@ export default function DetailsClient({
       <div
         ref={contentTopRef}
         tabIndex={-1}
-        className="relative z-10 px-4 pt-6 pb-8 sm:pt-8 lg:pt-10 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
+        // El margen superior se ajusta SOLO en `sm:`/`lg:` (vista normal). El
+        // `pt-6` de móvil no se toca: lo cancela el `-mt-6` del hero de abajo
+        // para que el póster full-bleed arranque pegado al navbar, borde con
+        // borde. Subirlo aquí despegaría el póster y rompería esa fusión.
+        className="relative z-10 px-4 pt-6 pb-8 sm:pt-12 lg:pt-14 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
       >
         {/* =================================================================
             HEADER HERO SECTION (Diseño Final Solicitado)
