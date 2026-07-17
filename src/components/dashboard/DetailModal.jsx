@@ -706,7 +706,13 @@ export default function DetailModal({
   /* --------------------------- favorito / pendientes --------------------------- */
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
-  const [loadingStates, setLoadingStates] = useState(false);
+  // Arranca en `true`: el modal MONTA FRESCO por apertura (key en el provider), y
+  // el estado favorito/pendiente se resuelve con un fetch post-montaje. Si empezara
+  // en `false`, el botón mostraría icono → (efecto pone true) spinner → icono, es
+  // decir un PARPADEO. Empezando en `true` es un único asentamiento spinner→icono
+  // (normalmente ya resuelto durante la animación de apertura). La rama sin sesión
+  // del efecto lo vuelve a poner en `false` para no quedarse colgado.
+  const [loadingStates, setLoadingStates] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
   // Modal CENTRADO: el backdrop-blur del panel solo se aplica una vez TERMINADA la
@@ -902,6 +908,9 @@ export default function DetailModal({
       if (!item || !session || !account?.id) {
         setFavorite(false);
         setWatchlist(false);
+        // Sin sesión no hay fetch: salimos del estado de carga inicial (que arranca
+        // en `true`) para que los botones no se queden con el spinner.
+        setLoadingStates(false);
         return;
       }
       try {
@@ -1506,7 +1515,10 @@ export default function DetailModal({
     history: [],
     rating: null,
   });
-  const [traktStatusLoading, setTraktStatusLoading] = useState(false);
+  // Arranca en `true` por el mismo motivo que `loadingStates`: evita el parpadeo
+  // icono→spinner→icono en los botones de "visto" y valoración al abrir. El efecto
+  // de montaje siempre hace el fetch y lo cierra a `false` (item garantizado aquí).
+  const [traktStatusLoading, setTraktStatusLoading] = useState(true);
   const [traktBusy, setTraktBusy] = useState("");
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false);
   // Modal de episodios vistos (solo series). Su máquina de estado vive en el
