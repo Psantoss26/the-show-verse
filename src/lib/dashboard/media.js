@@ -1,3 +1,4 @@
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 // /src/lib/dashboard/media.js
 // Helpers compartidos del dashboard de Inicio (MainDashboardClient + FeaturedHero).
 // Funciones puras y cachés a nivel de módulo: al importarse en varios componentes
@@ -254,17 +255,8 @@ export async function getMovieImages(itemId, mediaType = "movie") {
     // No restringimos `include_image_language`: para las previews necesitamos
     // poder caer en cualquier backdrop con idioma si no existe versión inglesa.
     // El selector prioriza inglés y deja las imágenes sin idioma para el final.
-    const url =
-      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
-      `?api_key=${apiKey}`;
-
-    const r = await fetch(url, { cache: "force-cache" });
-    // Igual que en getTitleLogos: un 429/5xx daba un JSON sin `.backdrops`, se
-    // convertía en [] y se cacheaba permanentemente. El llamador acababa cayendo
-    // al `backdrop_path` por defecto de TMDb (sin idioma). No cacheamos fallos
-    // transitorios: se reintenta en la siguiente llamada.
-    if (!r.ok) return { posters: [], backdrops: [], logos: [] };
-    const j = await r.json();
+    const j = await fetchTmdbImages(type, itemId, { allLanguages: true });
+    if (!j) return { posters: [], backdrops: [], logos: [] };
     const posters = Array.isArray(j?.posters) ? j.posters : [];
     const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
     const logos = Array.isArray(j?.logos) ? j.logos : [];
@@ -438,12 +430,8 @@ async function fetchWatchingImages(itemId, mediaType = "movie") {
 
   try {
     const type = mediaType === "tv" ? "tv" : "movie";
-    const url =
-      `https://api.themoviedb.org/3/${type}/${itemId}/images` +
-      `?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return { posters: [], backdrops: [] };
-    const j = await r.json();
+    const j = await fetchTmdbImages(type, itemId);
+    if (!j) return { posters: [], backdrops: [] };
     return {
       posters: Array.isArray(j?.posters) ? j.posters : [],
       backdrops: Array.isArray(j?.backdrops) ? j.backdrops : [],
@@ -582,15 +570,8 @@ export async function getTitleLogos(itemId, mediaType = "movie") {
 
   try {
     const type = mediaType === "tv" ? "tv" : "movie";
-    const url = `https://api.themoviedb.org/3/${type}/${itemId}/images?api_key=${apiKey}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    // Sin este `r.ok`, un 429 (los dashboards disparan decenas de peticiones a
-    // la vez y TMDb limita) o un 5xx devolvía un JSON de error sin `.logos`,
-    // que se convertía en [] y se cacheaba abajo PARA SIEMPRE: ese título se
-    // quedaba sin logo el resto de la sesión. Los fallos transitorios no se
-    // cachean, así que el siguiente render reintenta.
-    if (!r.ok) return [];
-    const j = await r.json();
+    const j = await fetchTmdbImages(type, itemId, { allLanguages: true });
+    if (!j) return [];
     const logos = Array.isArray(j?.logos) ? j.logos : [];
     movieLogosCache.set(cacheKey, logos);
     return logos;
