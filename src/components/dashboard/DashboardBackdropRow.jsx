@@ -1472,10 +1472,20 @@ export default function DashboardBackdropRow({
     hoveredIndex !== null &&
     hoveredIndex >= activeIndex + Math.floor(perView) - 1;
 
+  // Con una preview ACTIVA ignoramos la supresión por tarjeta-de-borde
+  // (isHoveringFirst/LastVisible): así, al hacer preview de la primera/última
+  // tarjeta visible, la flecha correspondiente sigue visible SUPERPUESTA sobre la
+  // preview (z-[110]) y se puede seguir desplazando con el cursor en esa zona.
+  // Sin preview conservamos la supresión (evita que la flecha tape la tarjeta de
+  // borde en simple hover).
   const showPrev =
-    (isHoveredRow || hasActivePreview) && canPrev && !isHoveringFirstVisible;
+    (isHoveredRow || hasActivePreview) &&
+    canPrev &&
+    (hasActivePreview || !isHoveringFirstVisible);
   const showNext =
-    (isHoveredRow || hasActivePreview) && canNext && !isHoveringLastVisible;
+    (isHoveredRow || hasActivePreview) &&
+    canNext &&
+    (hasActivePreview || !isHoveringLastVisible);
 
   const breakpoints = isMobile
     ? {
@@ -1691,14 +1701,22 @@ export default function DashboardBackdropRow({
                 e.stopPropagation();
                 moveSlides(-1);
               }}
-              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
-              // bottom=pb) para CENTRAR la flecha sobre la tarjeta backdrop base
-              // (no sobre el hueco inferior de la preview). `-left-6` sangra el
-              // degradado 24px (= sm:px-6 de la página) hasta el borde lateral.
-              className="absolute -left-6 top-14 bottom-40 z-30 hidden w-32 items-center justify-start bg-gradient-to-r from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
+              // El botón es solo zona de pulsación (sin fondo). Inset vertical
+              // ASIMÉTRICO (top=pt, bottom=pb) para centrar sobre la tarjeta base.
+              // `-left-6` extiende el área hasta el borde lateral. z-[110] > z-[100]
+              // de la preview activa: flecha y panel ENCIMA de la vista previa.
+              className="absolute -left-6 top-14 bottom-40 z-[110] hidden w-32 items-center justify-start sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
+              {/* Panel difuminado REDONDEADO (inset-y-2 + rounded-3xl): oscuro en el
+                  borde del contenido y fundido hacia la tarjeta. `left-6 right-2`
+                  deja un hueco transparente hacia el borde de pantalla, para que NO
+                  haya zona oscura sólida en ese lateral. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-2 left-6 right-2 rounded-3xl bg-gradient-to-r from-black/75 via-black/45 to-transparent transition-colors duration-300 group-hover/nav:from-black/85"
+              />
               <motion.span
-                className="ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -1719,13 +1737,20 @@ export default function DashboardBackdropRow({
                 e.stopPropagation();
                 moveSlides(1);
               }}
-              // Inset vertical ASIMÉTRICO = padding real del Swiper (top=pt,
-              // bottom=pb), igual que la flecha izquierda: centra sobre la tarjeta
-              // base. `-right-6` sangra el degradado hasta el borde lateral.
-              className="absolute -right-6 top-14 bottom-40 z-30 hidden w-32 items-center justify-end bg-gradient-to-l from-black/90 via-black/70 to-transparent transition-all duration-300 hover:from-black/95 hover:via-black/80 sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
+              // Espejo de la izquierda: botón solo zona de pulsación (sin fondo).
+              // `-right-6` extiende el área hasta el borde lateral. z-[110] > z-[100]
+              // de la preview activa: flecha y panel ENCIMA de la vista previa.
+              className="absolute -right-6 top-14 bottom-40 z-[110] hidden w-32 items-center justify-end sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
+              {/* Panel difuminado REDONDEADO: oscuro en el borde del contenido,
+                  fundido hacia la tarjeta; `right-6 left-2` deja el hueco transparente
+                  hacia el borde de pantalla (sin zona oscura sólida en el lateral). */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-2 right-6 left-2 rounded-3xl bg-gradient-to-l from-black/75 via-black/45 to-transparent transition-colors duration-300 group-hover/nav:from-black/85"
+              />
               <motion.span
-                className="mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
+                className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: 4 }}
               >
                 ›
