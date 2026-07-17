@@ -5281,7 +5281,11 @@ export default function DetailsClient({
     rtScore: null,
     mcScore: null,
   });
-  const [, setAwardsLoading] = useState(false);
+  // Se recupera el getter (antes descartado). Arranca en `true`: los premios se
+  // piden SIEMPRE al montar, así que desde el primer frame el menú puede
+  // reservar el hueco de "Premios" en estado de carga, en vez de que aparezca
+  // tarde (cuando termina el scraping) y desplace las demás secciones.
+  const [awardsLoading, setAwardsLoading] = useState(true);
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
   const [resolvedImdbId, setResolvedImdbId] = useState(null);
 
@@ -6714,14 +6718,17 @@ export default function DetailsClient({
       });
     }
 
-    // Premios. Misma condición que la sección (id "awards"): solo si hay
-    // premios que mostrar. Va tras Colección, igual que en el render.
-    if (awardItems.length > 0) {
+    // Premios. Aparece desde el primer frame, a la vez que las demás secciones:
+    // mientras se cargan (scraping), se reserva el hueco en estado `loading`
+    // (mismo patrón que Colección) en vez de aparecer tarde y desplazar el menú.
+    // Al resolver: si hay premios se queda con su `count`; si no, se retira.
+    if (awardsLoading || awardItems.length > 0) {
       items.push({
         id: "awards",
         label: "Premios",
         icon: Trophy,
-        count: awardItems.length,
+        count: awardItems.length || undefined,
+        loading: awardsLoading && awardItems.length === 0,
       });
     }
 
@@ -6801,6 +6808,7 @@ export default function DetailsClient({
     collectionData,
     collectionLoading,
     awardItems,
+    awardsLoading,
   ]);
 
   // Menu global (scroll + sticky + spy)
