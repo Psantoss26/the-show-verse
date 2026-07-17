@@ -14,6 +14,12 @@ const fmt = (v) => {
   return v.toFixed(1).replace(/\.0$/, "");
 };
 
+function stopModalEvent(event, { preventDefault = false } = {}) {
+  if (preventDefault) event?.preventDefault?.();
+  event?.stopPropagation?.();
+  event?.nativeEvent?.stopImmediatePropagation?.();
+}
+
 export default function StarRating({
   rating,
   max = 10,
@@ -74,7 +80,8 @@ export default function StarRating({
 
   const adjust = (delta) => updateValue(value + delta);
 
-  const handleOpen = () => {
+  const handleOpen = (event) => {
+    stopModalEvent(event, { preventDefault: true });
     if (effectiveDisabled) return;
     if (!connected) {
       onConnect?.();
@@ -82,6 +89,11 @@ export default function StarRating({
     }
     if (!open && !hasRating) setValue(clamp(8, min, max));
     setOpen(true);
+  };
+
+  const closeFromEvent = (event) => {
+    stopModalEvent(event, { preventDefault: true });
+    setOpen(false);
   };
 
   const handleSave = async () => {
@@ -162,10 +174,16 @@ export default function StarRating({
       {mounted &&
         open &&
         createPortal(
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+          <div
+            data-detail-modal-layer=""
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+            onPointerDown={stopModalEvent}
+            onMouseDown={stopModalEvent}
+            onClick={stopModalEvent}
+          >
             <div
               className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
-              onClick={() => setOpen(false)}
+              onClick={closeFromEvent}
               aria-hidden="true"
             />
 
@@ -181,7 +199,7 @@ export default function StarRating({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={closeFromEvent}
                   className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
                   aria-label="Cerrar (Esc)"
                 >
