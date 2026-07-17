@@ -11,6 +11,11 @@ import useModalGuard from "@/hooks/useModalGuard";
 
 const EMPTY_ARRAY = [];
 
+function stopModalEvent(event) {
+  event.stopPropagation();
+  event.nativeEvent?.stopImmediatePropagation?.();
+}
+
 function hasEpisodeRatings(ratings) {
   return (
     Array.isArray(ratings?.seasons) &&
@@ -116,12 +121,23 @@ export default function EpisodeRatingsModal({
 
   if (!mounted || !open) return null;
 
+  const closeFromEvent = (event) => {
+    stopModalEvent(event);
+    onClose?.();
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+    <div
+      data-detail-modal-layer=""
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+      onPointerDown={stopModalEvent}
+      onMouseDown={stopModalEvent}
+      onClick={stopModalEvent}
+    >
       {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
-        onClick={onClose}
+        onClick={closeFromEvent}
         aria-hidden="true"
       />
 
@@ -132,7 +148,6 @@ export default function EpisodeRatingsModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        onMouseDown={(event) => event.stopPropagation()}
       >
         <div
           className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(245,158,11,0.13),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_42%)]"
@@ -165,7 +180,7 @@ export default function EpisodeRatingsModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeFromEvent}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
             aria-label="Cerrar valoraciones de episodios"
             title="Cerrar (Esc)"

@@ -1931,6 +1931,10 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
       fetch(href, { priority: "low" }).catch(() => {});
     }
   };
+  const stopNestedModalEvent = (event) => {
+    event.stopPropagation();
+    event.nativeEvent?.stopImmediatePropagation?.();
+  };
 
   const modalLayer = (
     <>
@@ -3190,7 +3194,14 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           altera su posicionamiento. */}
       {modalHostReady
         ? createPortal(
-            <div data-detail-modal-layer="">{modalLayer}</div>,
+            <div
+              data-detail-modal-layer=""
+              onPointerDown={stopNestedModalEvent}
+              onMouseDown={stopNestedModalEvent}
+              onClick={stopNestedModalEvent}
+            >
+              {modalLayer}
+            </div>,
             document.body,
           )
         : modalLayer}

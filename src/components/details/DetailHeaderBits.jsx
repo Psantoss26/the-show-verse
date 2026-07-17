@@ -126,7 +126,6 @@ export function ExternalLinkButton({
 }) {
   const finalHref = href || fallbackHref || null;
   const disabled = !finalHref && !loading;
-  const isWebIcon = icon?.includes("logo-Web");
   const isLetterboxdIcon = icon?.includes("logo-Letterboxd");
 
   return (
@@ -161,7 +160,7 @@ export function ExternalLinkButton({
               : { width: iconSize, height: iconSize }
             : undefined
         }
-        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isWebIcon ? "relative top-[3px]" : ""} ${isLetterboxdIcon ? "scale-[1.2]" : ""} ${iconClassName}`}
+        className={`w-7 h-7 lg:w-8 lg:h-8 rounded-xl shadow-lg object-contain ${isLetterboxdIcon ? "scale-[1.2]" : ""} ${iconClassName}`}
         draggable="false"
       />
 

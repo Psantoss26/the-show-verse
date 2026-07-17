@@ -1000,7 +1000,9 @@ export default function WatchNextAssistant({
                 // Mismo tratamiento que los iconos del navbar: en la fase
                 // inicial sobre el hero (heroNavMode) se aclara el icono y se le
                 // añade una sombra para que destaque sobre backdrops claros.
-                heroNavMode ? "text-neutral-100" : "text-neutral-400",
+                isMobile
+                  ? (heroNavMode ? "text-neutral-100" : "text-neutral-300")
+                  : (heroNavMode ? "text-neutral-100" : "text-neutral-400"),
                 "hover:text-cyan-300 hover:bg-cyan-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(34,211,238,0.15)]",
                 heroNavMode ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]" : "",
               ].join(" "),
