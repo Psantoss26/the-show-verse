@@ -568,37 +568,62 @@ html {
    máscara, lo que puede asomar por el borde inferior es transparente en vez de
    imagen cruda (que en pósters claros se veía como una línea blanca).
    Es imperceptible: 0.027 de alfa no se distingue de 0. */
+/* Ambas curvas son la MISMA función (smoothstep, 3t²-2t³, muestreada cada 10%
+   del tramo). Comparten la forma —entra y sale con pendiente cero, así que no
+   tiene ni principio ni final perceptibles— y solo cambia LO LARGAS que son,
+   porque resuelven cosas distintas:
+     · póster móvil: la transición ES el diseño; funde la portada con la sección
+       de información a lo largo de casi media pantalla.
+     · hero del modal: solo hay que ESCONDER EL CANTO inferior de la imagen. Un
+       tramo largo se comería el logo y taparía imagen sin motivo. */
+
+:root {
+  /* Póster móvil de DetailsClient: fundido largo, del 60% al 100%. */
+  --sv-poster-fade: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 60%,
+    rgba(0, 0, 0, 0.972) 64%,
+    rgba(0, 0, 0, 0.896) 68%,
+    rgba(0, 0, 0, 0.784) 72%,
+    rgba(0, 0, 0, 0.648) 76%,
+    rgba(0, 0, 0, 0.5) 80%,
+    rgba(0, 0, 0, 0.352) 84%,
+    rgba(0, 0, 0, 0.216) 88%,
+    rgba(0, 0, 0, 0.104) 92%,
+    transparent 96%,
+    transparent 100%
+  );
+
+  /* Hero de DetailModal: fundido corto, del 85% al 100%. Solo los últimos 15%
+     de la imagen se tocan: esconde el borde sin llegar al logo ni comerse
+     encuadre. */
+  --sv-hero-fade: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 85%,
+    rgba(0, 0, 0, 0.972) 86.5%,
+    rgba(0, 0, 0, 0.896) 88%,
+    rgba(0, 0, 0, 0.784) 89.5%,
+    rgba(0, 0, 0, 0.648) 91%,
+    rgba(0, 0, 0, 0.5) 92.5%,
+    rgba(0, 0, 0, 0.352) 94%,
+    rgba(0, 0, 0, 0.216) 95.5%,
+    rgba(0, 0, 0, 0.104) 97%,
+    transparent 98.5%,
+    transparent 100%
+  );
+}
+
+/* Hero de DetailModal. Sin media query: aplica en todos los tamaños. */
+.sv-hero-fade {
+  -webkit-mask-image: var(--sv-hero-fade);
+  mask-image: var(--sv-hero-fade);
+}
+
 @media (max-width: 639px) {
   .poster-mobile-fade {
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      #000 0%,
-      #000 60%,
-      rgba(0, 0, 0, 0.972) 64%,
-      rgba(0, 0, 0, 0.896) 68%,
-      rgba(0, 0, 0, 0.784) 72%,
-      rgba(0, 0, 0, 0.648) 76%,
-      rgba(0, 0, 0, 0.5) 80%,
-      rgba(0, 0, 0, 0.352) 84%,
-      rgba(0, 0, 0, 0.216) 88%,
-      rgba(0, 0, 0, 0.104) 92%,
-      transparent 96%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      #000 0%,
-      #000 60%,
-      rgba(0, 0, 0, 0.972) 64%,
-      rgba(0, 0, 0, 0.896) 68%,
-      rgba(0, 0, 0, 0.784) 72%,
-      rgba(0, 0, 0, 0.648) 76%,
-      rgba(0, 0, 0, 0.5) 80%,
-      rgba(0, 0, 0, 0.352) 84%,
-      rgba(0, 0, 0, 0.216) 88%,
-      rgba(0, 0, 0, 0.104) 92%,
-      transparent 96%,
-      transparent 100%
-    );
+    -webkit-mask-image: var(--sv-poster-fade);
+    mask-image: var(--sv-poster-fade);
   }
 }

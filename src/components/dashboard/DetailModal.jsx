@@ -2216,13 +2216,38 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
               El fondo se desvanece a transparente por abajo (sin borde) para que la
               imagen (enmascarada) se funda con el panel translúcido de contenido y
               NO se vea una línea/escalón entre portada e información. */}
+          {/* La máscara va en ESTE contenedor, no en la capa de parallax de
+              dentro.
+
+              Motivo: esa capa se traslada con el scroll (`y: yParallax`). Si la
+              máscara viaja con ella, el difuminado se despega del borde inferior
+              del contenedor y deja de coincidir con él: a partir de ahí manda el
+              `overflow-hidden`, que recorta la imagen EN SECO. Eso es la línea
+              horizontal de corte que aparecía al hacer scroll.
+
+              En el contenedor, la máscara es fija respecto al borde: el parallax
+              mueve la imagen por debajo, pero el difuminado se queda siempre
+              donde debe. Enmascarar también su degradado de fondo es inocuo:
+              abajo ya es transparente.
+
+              `sv-hero-fade` usa la misma CURVA (smoothstep) que el póster móvil de
+              DetailsClient, pero corta (85%-100%): aquí solo hay que esconder el canto,
+              no fundir media imagen. Sustituye a una rampa lineal inline: una rampa pasa
+              de alfa constante a decreciente de golpe, y esa discontinuidad de
+              pendiente se percibe como un corte donde arranca el difuminado. */}
           <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent sm:aspect-video">
+            {/* Wrapper ESTÁTICO y enmascarado: contiene SOLO la imagen.
+                - Estático (no lleva el parallax): la máscara queda fija
+                  respecto al borde inferior, así que al hacer scroll el
+                  difuminado no se despega y no aparece el corte en seco.
+                - Envuelve solo la imagen: el logo y las demás capas quedan
+                  FUERA, así que no se difuminan. Antes la máscara estaba en
+                  el contenedor y se comía el logo, que es su hermano. */}
+            <div className="absolute inset-0 sv-hero-fade">
             <motion.div
               style={{
                 y: yParallax,
                 scale,
-                WebkitMaskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
-                maskImage: "linear-gradient(to bottom, black 65%, transparent 100%)",
               }}
               className="absolute inset-0 w-full h-full"
             >
@@ -2299,6 +2324,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                 </>
               )}
             </motion.div>
+            </div>
 
             {/* Dark overlay that increases as we scroll */}
             <motion.div
