@@ -1,5 +1,6 @@
 // src/app/watchlist/WatchlistClient.jsx
 "use client";
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import {
@@ -906,10 +907,11 @@ async function fetchBestBackdropEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return null;
-    const j = await r.json();
+    // Pasa por la cola compartida: limita concurrencia y reintenta los 429.
+    // Antes cada tarjeta pedía por su cuenta y una lista larga provocaba
+    // 429 en ~13% de las tarjetas, que acababan en el backdrop crudo.
+    const j = await fetchTmdbImages(type, id);
+    if (!j) return null;
     const best = pickBestBackdropByLangResVotes(j?.backdrops, {
       preferLangs: ["en", "en-US"],
       minWidth: 1200,
@@ -940,10 +942,11 @@ async function fetchBestPosterEN(type, id) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${apiKey}&${TMDB_IMAGE_LANGS_PARAM}`;
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) return null;
-    const j = await r.json();
+    // Pasa por la cola compartida: limita concurrencia y reintenta los 429.
+    // Antes cada tarjeta pedía por su cuenta y una lista larga provocaba
+    // 429 en ~13% de las tarjetas, que acababan en el backdrop crudo.
+    const j = await fetchTmdbImages(type, id);
+    if (!j) return null;
     return pickBestPosterEN(j?.posters)?.file_path || null;
   } catch {
     return null;
