@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSeeds, libraryBasisHash } from './library.js';
 
-test('buildSeeds weights ratings above favorites above history/watchlist', () => {
+test('buildSeeds weights watchlist above ratings/favorites/history', () => {
   const seeds = buildSeeds({
     favorites: [{ tmdbId: 10, mediaType: 'movie' }],
     ratings: [
@@ -16,16 +16,18 @@ test('buildSeeds weights ratings above favorites above history/watchlist', () =>
     watchlist: [{ tmdbId: 5, mediaType: 'movie' }],
   });
   const w = (id, mt = 'movie') => seeds.find((s) => s.tmdbId === id && s.mediaType === mt)?.weight;
-  assert.equal(w(1), 10);       // rating 9
-  assert.equal(w(2, 'tv'), 7);  // rating 8
-  assert.equal(w(10), 6);       // favorito
-  assert.equal(w(3), 4);        // rating 7
-  assert.equal(w(4), 2);        // historial
-  assert.equal(w(5), 1);        // watchlist
+  assert.equal(w(5), 10);       // watchlist (SEÑAL PRINCIPAL)
+  assert.equal(w(1), 6);        // rating 9
+  assert.equal(w(2, 'tv'), 4);  // rating 8
+  assert.equal(w(10), 4);       // favorito
+  assert.equal(w(3), 2);        // rating 7
+  assert.equal(w(4), 1);        // historial
   assert.equal(w(9), undefined); // rating 4 no genera semilla
-  // jerarquía: rating9 > rating8 > favorito > rating7 > historial > watchlist
-  assert.ok(w(1) > w(2, 'tv') && w(2, 'tv') > w(10) && w(10) > w(3) && w(3) > w(4) && w(4) > w(5));
+  // jerarquía: watchlist > rating9 > rating8 = favorito > rating7 > historial
+  assert.ok(w(5) > w(1) && w(1) > w(2, 'tv') && w(2, 'tv') === w(10) && w(10) > w(3) && w(3) > w(4));
   assert.ok(seeds[0].weight >= seeds[seeds.length - 1].weight); // ordenado desc
+  // la watchlist es ahora la semilla de más peso → encabeza la lista
+  assert.equal(seeds[0].tmdbId, 5);
   assert.ok(seeds.length <= 25);
 });
 
@@ -57,7 +59,7 @@ test('buildSeeds combines signals and flags strongPositive when any qualifies', 
     watchlist: [],
   });
   const s1 = seeds.find((s) => s.tmdbId === 1);
-  assert.equal(s1.weight, 9);          // rating8(7) + historial(2)
+  assert.equal(s1.weight, 5);          // rating8(4) + historial(1)
   assert.equal(s1.strongPositive, true);
 });
 
