@@ -2120,7 +2120,22 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           // una capa con alfa, y esa capa es justo la que encarece el
           // backdrop-filter en cada frame del recorrido. El centrado sí anima
           // opacidad, así que ahí se mantiene.
-          willChange: isRightPlacement ? "transform" : "transform, opacity",
+          // Se RETIRA al asentarse (`auto`), no solo se ajusta por placement.
+          //
+          // `will-change: opacity` crea un Backdrop Root: los descendientes dejan
+          // de poder muestrear más allá de este panel. Como el centrado sí anima
+          // opacidad, lo declaraba — y `will-change` no se quita solo, así que el
+          // Root quedaba PERMANENTE y las tarjetas de info (casi transparentes,
+          // viven de ver el fondo) se quedaban planas y oscuras. El drawer no lo
+          // declara, y por eso allí sí se veían bien: esa era toda la diferencia.
+          //
+          // Mantenerlo tras la animación tampoco aporta nada: `will-change` es
+          // una pista para lo que está POR animarse. Ya quieto, sobra.
+          willChange: panelSettled
+            ? "auto"
+            : isRightPlacement
+              ? "transform"
+              : "transform, opacity",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
@@ -2378,11 +2393,17 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   loading="eager"
                   priority
                 />
-              ) : (
+              ) : data.logoResolved ? (
+                // El título de texto SOLO cuando la búsqueda del logo ha
+                // TERMINADO y no hay ninguno. Antes colgaba solo de
+                // `data.logoPath`, que empieza en null: mientras el logo
+                // cargaba se mostraba el texto y luego saltaba al logo.
+                // Con `logoPath` a secas no se distingue "aún no llegó" de
+                // "no existe"; `logoResolved` sí.
                 <h2 className="mx-auto max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:mx-0 sm:text-5xl">
                   {title || <SkeletonBar className="h-8 w-64" />}
                 </h2>
-              )}
+              ) : null}
             </motion.div>
           </div>
 
