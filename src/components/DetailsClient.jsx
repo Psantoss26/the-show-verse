@@ -7441,17 +7441,26 @@ export default function DetailsClient({
         setPrevPosterPath(prev);
       }
 
-      // Verificar si la nueva imagen ya esta precargada
+      // Verificar si la nueva imagen ya esta precargada.
+      //
+      // Se prueban las URLs REALES que se van a pintar (`posterLowUrl` /
+      // `posterHighUrl`). Antes esto construía la URL a mano con tamaños fijos
+      // (w342/w780) sobre `displayPosterPath`, pero en móvil la portada usa
+      // w500/original de `mobileNeutralPosterPath`: probaba una URL que no se
+      // renderiza nunca, el test fallaba siempre y se caía al `else`, que hace
+      // `setPosterLowLoaded(false)` y BORRA el `true` que ya había puesto el
+      // `onLoad` → la imagen se veía un instante y desaparecía en negro.
       if (displayPosterPath) {
-        const checkIfLoaded = (size) => {
+        const checkIfLoaded = (url) => {
+          if (!url) return false;
           const testImg = new Image();
-          testImg.src = `https://image.tmdb.org/t/p/${size}${displayPosterPath}`;
+          testImg.src = url;
           return testImg.complete && testImg.naturalWidth > 0;
         };
 
         if (posterViewMode === "preview") {
-          const isLowPreloaded = checkIfLoaded("w780");
-          const isHighPreloaded = checkIfLoaded("w1280");
+          const isLowPreloaded = checkIfLoaded(posterLowUrl);
+          const isHighPreloaded = checkIfLoaded(posterHighUrl);
 
           if (isLowPreloaded) {
             setBackdropLowLoaded(true);
@@ -7463,8 +7472,8 @@ export default function DetailsClient({
           }
           setBackdropImgError(false);
         } else {
-          const isLowPreloaded = checkIfLoaded("w342");
-          const isHighPreloaded = checkIfLoaded("w780");
+          const isLowPreloaded = checkIfLoaded(posterLowUrl);
+          const isHighPreloaded = checkIfLoaded(posterHighUrl);
 
           if (isLowPreloaded) {
             setPosterLowLoaded(true);
@@ -8205,6 +8214,31 @@ export default function DetailsClient({
                           loading="eager"
                           fetchPriority="high"
                           decoding="async"
+                          // RED DE SEGURIDAD PARA IMÁGENES EN CACHÉ.
+                          // Si la imagen ya está en caché, el navegador puede
+                          // completar la carga ANTES de que React enganche
+                          // `onLoad`, así que ese evento no llega nunca. Como
+                          // `currentLowLoaded` gobierna la opacidad de la portada,
+                          // la del fondo Y el montaje de la imagen HIGH, quedarse
+                          // en false deja la pantalla en NEGRO de forma permanente
+                          // — justo al reentrar en un título ya visitado.
+                          // `complete` + `naturalWidth` detectan ese caso. El ref
+                          // se ejecuta en la fase de commit, así que aquí sí se
+                          // puede actualizar estado.
+                          ref={(el) => {
+                            if (!el || !el.complete || !el.naturalWidth) return;
+                            if (
+                              currentLoadTokenRef.current !== currentLoadToken
+                            )
+                              return;
+                            if (posterViewMode === "preview") {
+                              setBackdropLowLoaded(true);
+                              setBackdropResolved(true);
+                            } else {
+                              setPosterLowLoaded(true);
+                              setPosterResolved(true);
+                            }
+                          }}
                           onLoad={() => {
                             if (
                               currentLoadTokenRef.current !== currentLoadToken
