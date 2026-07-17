@@ -10,7 +10,9 @@ import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import { fetchUpcomingEpisodes } from "@/lib/api/calendarEpisodes";
 
 const EMPTY_ARRAY = [];
-const CALENDAR_CACHE_KEY = "showverse:dashboard:calendar:v2";
+// v3: el backend ahora devuelve UNA entrada por serie (antes una por episodio).
+// Subir la versión descarta la caché vieja con duplicados por serie.
+const CALENDAR_CACHE_KEY = "showverse:dashboard:calendar:v3";
 const CALENDAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function readCalendarCache() {
