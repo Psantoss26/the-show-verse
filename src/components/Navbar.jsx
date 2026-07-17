@@ -910,7 +910,7 @@ export default function Navbar() {
     (isScrolled ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5");
 
   const mobileBottomLabelClass =
-    "pointer-events-none absolute inset-x-0 bottom-1.5 z-10 block truncate px-0.5 text-center text-[9px] font-semibold leading-[11px] tracking-tight " +
+    "pointer-events-none absolute inset-x-0 bottom-1.5 z-10 block truncate px-0.5 text-center text-[10px] font-semibold leading-[12px] tracking-tight " +
     "transition-[opacity,transform] duration-200 ease-out " +
     (isScrolled
       ? "translate-y-1 opacity-0"

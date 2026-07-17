@@ -8150,7 +8150,7 @@ export default function DetailsClient({
                               alt={title}
                               className="absolute inset-0 w-full h-full object-cover"
                               style={{
-                                transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                                transform: `scale(${POSTER_OVERSCAN})`,
                               }}
                             />
                           </motion.div>
@@ -8158,6 +8158,17 @@ export default function DetailsClient({
                     </AnimatePresence>
 
                     {posterLowUrl && !currentImgError && (
+                      // Las imágenes de dentro NO llevan `translateZ(0)`, solo
+                      // `scale()`. Con él se promovían a su PROPIA capa de
+                      // composición, separada de esta —que es la que tiene la
+                      // máscara—. Al hacer tope, el compositor estira el contenido
+                      // y no garantiza que capa-máscara y capa-hija se estiren
+                      // igual: si la imagen se desplazaba unos píxeles respecto a
+                      // su máscara, asomaba su borde crudo por abajo (una línea
+                      // blanca en pósters claros). Sin ese `translateZ(0)`,
+                      // `scale()` es un transform 2D que NO promueve, así que la
+                      // imagen rasteriza dentro de esta capa y la máscara siempre
+                      // la cubre. No se pierde GPU: el wrapper ya es transform-gpu.
                       <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade">
                         {/* LOW */}
                         <OptimizedImage
@@ -8209,7 +8220,7 @@ export default function DetailsClient({
                           className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
-                            transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                            transform: `scale(${POSTER_OVERSCAN})`,
                           }}
                         />
 
@@ -8244,7 +8255,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                             className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
-                              transform: `translateZ(0) scale(${POSTER_OVERSCAN})`,
+                              transform: `scale(${POSTER_OVERSCAN})`,
                             }}
                           />
                         )}
