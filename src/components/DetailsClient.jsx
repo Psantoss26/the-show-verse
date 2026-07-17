@@ -7946,13 +7946,33 @@ export default function DetailsClient({
                 Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
                 ternario muerto (siempre 1). */}
             <div
-              className={`absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100 ${
+              className={`hero-bg-base absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100 ${
                 currentLowLoaded ? "" : "max-sm:opacity-0"
               }`}
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
-                transform: "scale(1)",
-                filter: "brightness(0.75) saturate(1.03)",
+                // MÓVIL: desenfoque + un punto de escala.
+                //
+                // En móvil este fondo es el MISMO póster (atenuado y con otro
+                // encuadre) contra el que funde el difuminado inferior de la
+                // portada. Al hacer tope, el navegador estira el contenido del
+                // flujo pero NO los elementos `fixed`: las dos copias se
+                // desalinean y, en la zona de mezcla, el desajuste se lee como una
+                // línea. Solo se nota en imágenes claras, donde contrasta.
+                //
+                // La desincronía no se puede evitar sin quitar el `fixed`. Pero un
+                // fondo desenfocado no tiene detalle que pueda fantasmear: aunque
+                // se desplace, no hay bordes que delaten el desajuste. Sigue
+                // siendo el póster y sigue siendo `fixed`.
+                //
+                // El `scale` compensa el halo transparente que `blur()` deja en
+                // los bordes del elemento.
+                //
+                // Va por CSS (`.hero-bg-base`, media query) y NO por
+                // `isMobileViewport`: ese estado arranca en false y se resuelve
+                // tras montar, así que el fondo entraría nítido y se
+                // desenfocaría después — el mismo patrón que causó los bordes
+                // marcados que estamos persiguiendo.
                 willChange: "opacity",
               }}
             />

@@ -636,3 +636,34 @@ html {
     mask-image: var(--sv-poster-fade);
   }
 }
+
+/* Capa base del fondo del hero de DetailsClient.
+
+   MÓVIL: va DESENFOCADA. Aquí el fondo es el MISMO póster (atenuado y con otro
+   encuadre) contra el que funde el difuminado inferior de la portada. Al hacer
+   tope, el navegador estira el contenido del flujo pero NO los elementos
+   `fixed`: las dos copias se desalinean y, justo en la zona donde se mezclan,
+   el desajuste se lee como una línea en el borde inferior. Solo se percibe en
+   pósters claros, donde contrasta.
+
+   La desincronía no se puede evitar sin renunciar al `fixed`. Pero un fondo
+   desenfocado no tiene detalle que pueda fantasmear: aunque se desplace, no hay
+   bordes que delaten el desajuste. Sigue siendo el póster y sigue siendo fijo.
+
+   El `scale` compensa el halo transparente que `blur()` deja en los bordes.
+
+   Va en media query y NO en un estado JS: `isMobileViewport` arranca en false y
+   se resuelve tras montar, así que el fondo entraría nítido y se desenfocaría
+   después — justo el patrón que provoca los marcados que esto viene a arreglar.
+   ESCRITORIO: sin desenfoque, el fondo es el backdrop y no se mezcla con nada. */
+.hero-bg-base {
+  transform: scale(1);
+  filter: brightness(0.75) saturate(1.03);
+}
+
+@media (max-width: 639px) {
+  .hero-bg-base {
+    transform: scale(1.12);
+    filter: brightness(0.75) saturate(1.03) blur(28px);
+  }
+}
