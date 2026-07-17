@@ -958,7 +958,7 @@ function AwardCard({ item }) {
   const groupLabel = formatAwardGroupName(item?.groupName);
 
   return (
-    <article className="block group relative rounded-xl overflow-hidden shadow-md border border-transparent hover:border-yellow-500/30 lg:hover:shadow-yellow-900/20 transition-all duration-300">
+    <article className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]">
       <div
         className="aspect-[2/3] overflow-hidden relative flex flex-col"
         style={{ background: visual.background }}
@@ -9317,7 +9317,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         1024: { slidesPerView: 5, spaceBetween: 18 },
                         1280: { slidesPerView: 6, spaceBetween: 20 },
                       }}
-                      className="pb-8"
+                      className="pb-8 !overflow-visible"
                     >
                       {awardItems.map((award, index) => {
                         const previous = awardItems[index - 1] || null;

@@ -284,6 +284,12 @@ export default function DetailModalProvider({ children, placement = "center" }) 
             item={activeItem}
             onClose={closeDetailModal}
             placement={effectivePlacement}
+            // `custom` de AnimatePresence solo llega al panel que SALE. El que
+            // ENTRA usa el `custom` de su propio motion.div, así que hay que
+            // pasarle `switching` explícitamente; sin esto, al cambiar de título
+            // el panel entrante caía en la rama `else` (deslizar) en vez de hacer
+            // el fundido cruzado que corresponde a un cambio con el drawer abierto.
+            switching={switching}
           />
         )}
       </AnimatePresence>

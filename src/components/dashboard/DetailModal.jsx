@@ -611,7 +611,12 @@ const MODAL_ARROW_PROPS = {
 };
 
 /* ================================== MODAL ================================== */
-export default function DetailModal({ item, onClose, placement = "center" }) {
+export default function DetailModal({
+  item,
+  onClose,
+  placement = "center",
+  switching = false,
+}) {
   const isRightPlacement = placement === "right";
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
@@ -2174,6 +2179,10 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           La transición a la ficha completa anima un clon inerte de este panel. */}
       <motion.div
         ref={panelRef}
+        // `custom` alimenta las variantes del panel ENTRANTE (hidden/visible).
+        // Con `switching` true → fundido cruzado (opacity); false → deslizar.
+        // El panel SALIENTE recibe su `custom` del AnimatePresence del provider.
+        custom={switching}
         variants={isRightPlacement ? panelVariantsRight : panelVariants}
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
