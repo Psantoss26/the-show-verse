@@ -1688,6 +1688,10 @@ function GroupDivider({
   onPreviousGroup,
   onNextGroup,
 }) {
+  // El divisor es sticky y entra animándose: al retroceder eso recoloca la
+  // lista. Se consulta aquí porque este componente vive FUERA del cliente
+  // principal y no recibe `isBackNav` por props.
+  const isBackNav = useIsHistoryNavigation();
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
@@ -1732,7 +1736,11 @@ function GroupDivider({
       className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
         mobileFiltersOpen ? "top-[232px]" : "top-[128px]"
       }`}
-      initial={{ opacity: 0, y: 20 }}
+      // `initial={false}` al retroceder. Es un elemento STICKY que entraba
+      // desde 20px abajo: al volver de una ficha se recolocaba tras cargar, y
+      // al ser sticky el movimiento se arrastra por toda la lista. Cualquier
+      // animación de entrada rompe el requisito de "estático al retroceder".
+      initial={isBackNav ? false : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >

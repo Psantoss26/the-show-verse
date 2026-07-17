@@ -160,12 +160,17 @@ function waitForDetailsRoot(maxMs = 1800) {
   });
 }
 
-function startFullDetailsTransition(panelElement, variant = "center") {
-  if (typeof document === "undefined" || !panelElement) return null;
-
+function cleanupFullDetailsTransitionLayers() {
+  if (typeof document === "undefined") return;
   document
     .querySelectorAll("[data-details-route-transition]")
     .forEach((element) => element.remove());
+}
+
+function startFullDetailsTransition(panelElement, variant = "center") {
+  if (typeof document === "undefined" || !panelElement) return null;
+
+  cleanupFullDetailsTransitionLayers();
 
   const rect = panelElement.getBoundingClientRect();
   const layer = document.createElement("div");
@@ -873,6 +878,18 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [navigatingToFullDetails, setNavigatingToFullDetails] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const restorePreviewAfterBackNavigation = () => {
+      cleanupFullDetailsTransitionLayers();
+      setNavigatingToFullDetails(false);
+    };
+    window.addEventListener("pageshow", restorePreviewAfterBackNavigation);
+    return () => {
+      window.removeEventListener("pageshow", restorePreviewAfterBackNavigation);
+    };
+  }, []);
 
   useEffect(() => {
     let cancel = false;
