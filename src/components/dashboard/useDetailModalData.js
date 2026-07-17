@@ -521,6 +521,7 @@ export function useDetailModalData(item) {
     const mediaType = getMediaTypeForItem(item);
     const id = item.id;
     const seedLogoPath = item.logoPath || item.logo_path || null;
+    const detailsPromise = getDetails(mediaType, id).catch(() => null);
 
     setLoading(true);
     // Semilla inmediata con lo que ya trae el item (evita salto en cabecera).
@@ -540,7 +541,7 @@ export function useDetailModalData(item) {
       let details = null;
       try {
         const [detailsRes, credits, recs] = await Promise.all([
-          getDetails(mediaType, id).catch(() => null),
+          detailsPromise,
           getCredits(mediaType, id).catch(() => null),
           getRecommendations(mediaType, id).catch(() => null),
         ]);
@@ -860,12 +861,14 @@ export function useDetailModalData(item) {
     // y fijado una vez (el hero móvil lo usa en exclusiva, sin parpadeo).
     (async () => {
       try {
-        const finalPoster =
-          (await fetchBestPosterNoLang(id, mediaType, {
+        const [detailsForArt, bestPoster] = await Promise.all([
+          detailsPromise,
+          fetchBestPosterNoLang(id, mediaType, {
             fallbackToAny: false,
-          }).catch(() => null)) ||
-          item?.poster_path ||
-          null;
+          }).catch(() => null),
+        ]);
+        const finalPoster =
+          bestPoster || item?.poster_path || detailsForArt?.poster_path || null;
         if (cancelled || !finalPoster) return;
         await preloadImage(buildImg(finalPoster, "w780"));
         if (cancelled) return;
@@ -880,9 +883,14 @@ export function useDetailModalData(item) {
     // en exclusiva), así aparece de una sola vez, sin parpadeo de una imagen previa.
     (async () => {
       try {
+        const [detailsForArt, bestBackdrop] = await Promise.all([
+          detailsPromise,
+          fetchBestBackdropNoLang(id, mediaType).catch(() => null),
+        ]);
         const finalBackdrop =
-          (await fetchBestBackdropNoLang(id, mediaType).catch(() => null)) ||
+          bestBackdrop ||
           item?.backdrop_path ||
+          detailsForArt?.backdrop_path ||
           null;
         if (cancelled || !finalBackdrop) return;
         await preloadImage(buildImg(finalBackdrop, "w1280"));
