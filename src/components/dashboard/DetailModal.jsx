@@ -738,6 +738,15 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   }, [isRightPlacement]);
 
   const resizingRef = useRef(false);
+  const nestedModalOpenRef = useRef(false);
+
+  const stopNestedModalOpeningEvent = (event) => {
+    if (!isRightPlacement) return;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+    nestedModalOpenRef.current = true;
+  };
 
   // Cierre al pulsar FUERA del drawer.
   //
@@ -760,9 +769,13 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
       if (event.defaultPrevented) return;
       // 2) Se acaba de soltar un arrastre del tirador de redimensionado.
       if (resizingRef.current) return;
-      // 3) Clic dentro del propio panel.
+      // 3) Hay un modal hijo abierto o acaba de abrirse/cerrarse con este mismo
+      //    click. En el drawer lateral esos modales viven en document.body, fuera
+      //    del panel, así que el listener global debe ignorarlos.
+      if (nestedModalOpenRef.current) return;
+      // 4) Clic dentro del propio panel.
       if (panelRef.current?.contains(event.target)) return;
-      // 4) Modales anidados (listas, soundtrack, tráiler, comentarios…): se montan
+      // 5) Modales anidados (listas, soundtrack, tráiler, comentarios…): se montan
       //    con createPortal en document.body, así que quedan FUERA del panel y sin
       //    esto un clic dentro de ellos cerraría el drawer entero.
       if (event.target?.closest?.("[data-detail-modal-layer]")) return;
@@ -1231,7 +1244,8 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     setMembershipMap({});
   }, [item]);
 
-  const openListsModal = () => {
+  const openListsModal = (event) => {
+    stopNestedModalOpeningEvent(event);
     if (requireLogin() || !item) return;
     setListsError("");
     setListQuery("");
@@ -1412,7 +1426,8 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     }
   };
 
-  const openSoundtrack = () => {
+  const openSoundtrack = (event) => {
+    stopNestedModalOpeningEvent(event);
     setSoundtrackOpen(true);
     void loadSoundtrack();
   };
@@ -1534,7 +1549,8 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item, traktType]);
 
-  const openTraktWatched = () => {
+  const openTraktWatched = (event) => {
+    stopNestedModalOpeningEvent(event);
     if (!traktStatus.connected && !traktConnected) {
       requireLogin();
       return;
@@ -1935,6 +1951,27 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     event.stopPropagation();
     event.nativeEvent?.stopImmediatePropagation?.();
   };
+  const hasNestedModalOpen =
+    listModalOpen ||
+    soundtrackOpen ||
+    commentModalOpen ||
+    externalLinksOpen ||
+    traktWatchedOpen ||
+    traktEpisodesOpen ||
+    episodeRatingsOpen;
+
+  useEffect(() => {
+    if (hasNestedModalOpen) {
+      nestedModalOpenRef.current = true;
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      nestedModalOpenRef.current = false;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [hasNestedModalOpen]);
 
   const modalLayer = (
     <>
@@ -2432,11 +2469,15 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
                   trailerLoading={trailerLoading}
+                  trailerPlaying={showTrailer}
                   onSoundtrack={openSoundtrack}
                   soundtrackAvailable={!!soundtrackSearchQuery}
                   onEpisodeRatings={
                     mediaType === "tv"
-                      ? () => setEpisodeRatingsOpen(true)
+                      ? (event) => {
+                          stopNestedModalOpeningEvent(event);
+                          setEpisodeRatingsOpen(true);
+                        }
                       : undefined
                   }
                   episodeRatingsOpen={episodeRatingsOpen}
@@ -2491,7 +2532,10 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   }
                   showComments={traktConnected || traktStatus.connected}
                   commentsActive={false}
-                  onComments={() => setCommentModalOpen(true)}
+                  onComments={(event) => {
+                    stopNestedModalOpeningEvent(event);
+                    setCommentModalOpen(true);
+                  }}
                 />
               </div>
 
@@ -2539,9 +2583,13 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                     onTrailer={handleToggleTrailer}
                     trailerAvailable
                     trailerLoading={trailerLoading}
+                    trailerPlaying={showTrailer}
                     onSoundtrack={openSoundtrack}
                     soundtrackAvailable={!!soundtrackSearchQuery}
-                    onEpisodeRatings={() => setEpisodeRatingsOpen(true)}
+                    onEpisodeRatings={(event) => {
+                      stopNestedModalOpeningEvent(event);
+                      setEpisodeRatingsOpen(true);
+                    }}
                     episodeRatingsOpen={episodeRatingsOpen}
                     trakt={{
                       connected: epWatch.connected,
@@ -2715,7 +2763,10 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
                   }
                   externalLinks={externalLinks}
                   streamingProviders={[]}
-                  onMoreLinks={() => setExternalLinksOpen(true)}
+                  onMoreLinks={(event) => {
+                    stopNestedModalOpeningEvent(event);
+                    setExternalLinksOpen(true);
+                  }}
                   share={{
                     title,
                     text: `Echa un vistazo a ${title} en The Show Verse`,

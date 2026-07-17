@@ -46,7 +46,7 @@ export default function TraktWatchedControl({
   return (
     <div className="relative flex-shrink-0">
       <LiquidButton
-        onClick={() => onOpen?.()}
+        onClick={(event) => onOpen?.(event)}
         disabled={disabled}
         active={hasOverride || visibleWatched}
         activeColor="green"
