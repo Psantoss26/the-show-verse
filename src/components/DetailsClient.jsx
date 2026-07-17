@@ -8159,8 +8159,22 @@ export default function DetailsClient({
                       El hueco reservado (13.5rem) = navbar superior + fila de
                       botones + navbar inferior; `env(safe-area-inset-bottom)`
                       cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
+                  {/* MÓVIL: fondo OPACO (#101010), no transparente.
+                      La máscara del póster desvanece su borde inferior. Con el box
+                      transparente, ese desvanecido revelaba el FONDO FIJO (mismo
+                      póster atenuado) que está detrás — y el fondo fijo NO se mueve
+                      con el rebote de overscroll mientras el póster SÍ, así que en
+                      el tope superior ambos se desincronizaban y, en pósters
+                      claros, el contenido brillante mal alineado se leía como una
+                      línea en el borde inferior.
+                      Con el box opaco, el desvanecido revela ESTE fondo, que está
+                      en el flujo y viaja con el póster: no hay nada detrás que
+                      pueda desincronizarse, sea cual sea la claridad de la imagen.
+                      #101010 = color de la sección de información de debajo, así
+                      que el póster funde a ella sin escalón. Es lo que ESCRITORIO
+                      ya hacía (`bg-neutral-950` opaco) y por eso allí nunca ocurría. */}
                   <div
-                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
+                    className={`relative bg-[#101010] sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
                     style={{
                       contain: "layout paint",
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
