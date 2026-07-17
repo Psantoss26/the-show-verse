@@ -19,18 +19,23 @@ function fnv1a(str) {
 // ─────────────────────────────────────────────
 // Weight helper: rating → weight contribution
 // ─────────────────────────────────────────────
-// Las valoraciones altas son la señal principal y pesan por encima de favoritos,
-// historial y watchlist. Por debajo de 7 no genera semilla (no gustó lo bastante).
+// PRIORIDAD A LA WATCHLIST (pendientes). Antes la watchlist era la señal más
+// DÉBIL (peso 1) y las valoraciones altas/favoritos dominaban, así que las
+// recomendaciones giraban en torno a lo ya visto/puntuado. Ahora la watchlist es
+// la señal PRINCIPAL: refleja lo que el usuario quiere ver a continuación, que es
+// lo más representativo de su intención actual. Lo visto/puntuado/favorito sigue
+// aportando, pero por debajo, para no dominar.
+// Por debajo de 7 una valoración no genera semilla (no gustó lo bastante).
 function ratingWeight(rating) {
-  if (rating >= 9) return 10; // señal principal
-  if (rating === 8) return 7; // señal positiva
-  if (rating === 7) return 4; // señal secundaria
+  if (rating >= 9) return 6; // muy positiva, pero por debajo de la watchlist
+  if (rating === 8) return 4; // positiva
+  if (rating === 7) return 2; // secundaria
   return 0;
 }
 
-const FAVORITE_WEIGHT = 6;  // fuerte, pero por debajo de valoraciones muy altas
-const HISTORY_WEIGHT = 2;   // visionado sin valoración: señal débil
-const WATCHLIST_WEIGHT = 1; // pendiente: señal muy débil
+const FAVORITE_WEIGHT = 4; // aporta, por debajo de la watchlist
+const HISTORY_WEIGHT = 1; // visionado sin valoración: señal muy débil
+const WATCHLIST_WEIGHT = 10; // pendiente: SEÑAL PRINCIPAL
 
 // ─────────────────────────────────────────────
 // buildSeeds — pure
@@ -39,15 +44,16 @@ const WATCHLIST_WEIGHT = 1; // pendiente: señal muy débil
  * Build a weighted seed list from the user's library.
  *
  * Weights (summed when a title appears in multiple sources):
- *   rating ≥ 9  → 10   (señal principal)
- *   rating = 8  → 7    (señal positiva)
- *   favorite    → 6    (fuerte, bajo valoraciones muy altas)
- *   rating = 7  → 4    (señal secundaria)
- *   history     → 2    (visionado sin valoración)
- *   watchlist   → 1    (pendiente)
+ *   watchlist   → 10   (pendiente: SEÑAL PRINCIPAL — intención actual)
+ *   rating ≥ 9  → 6    (muy positiva, por debajo de la watchlist)
+ *   rating = 8  → 4    (positiva)
+ *   favorite    → 4    (aporta, por debajo de la watchlist)
+ *   rating = 7  → 2    (secundaria)
+ *   history     → 1    (visionado sin valoración)
  *
  * `strongPositive` = el usuario realmente disfrutó el título (rating ≥ 8 o
- * favorito). Solo estas semillas habilitan filas "Porque viste…".
+ * favorito). Solo estas semillas habilitan filas "Porque viste…". La watchlist
+ * NO es strongPositive (es aspiracional, no "disfrutado"), a propósito.
  *
  * @param {{ favorites: {tmdbId, mediaType, title?}[], ratings: {tmdbId, mediaType, rating, title?}[], history: {tmdbId, mediaType, title?}[], watchlist: {tmdbId, mediaType, title?}[] }} param0
  * @returns {{ tmdbId: number, mediaType: string, weight: number, title: string|null, strongPositive: boolean }[]}

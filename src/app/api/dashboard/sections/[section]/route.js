@@ -3,12 +3,11 @@ import {
   getTraktMoviesPopular,
   getTraktMoviesTrending,
   getTraktPopular,
-  getTraktRecommended,
   getTraktShowsPopular,
   getTraktShowsTrending,
   getTraktTrending,
 } from "@/lib/api/traktHelpers";
-import { getBackendBaseUrl } from "@/lib/backend/server";
+import { getBackendBaseUrl, backendFetchJson } from "@/lib/backend/server";
 import { getValidTraktToken } from "@/lib/trakt/server";
 
 export const runtime = "nodejs";
@@ -167,7 +166,12 @@ async function loadBackendAnticipated() {
     ? json.rows.find((candidate) => candidate?.key === "anticipated")
     : null;
 
-  return (Array.isArray(row?.items) ? row.items : [])
+  return mapEngineCards(row?.items, "mas-esperadas");
+}
+
+// Mapea las tarjetas del motor local (backend) a la forma que espera la sección.
+function mapEngineCards(items, section) {
+  return (Array.isArray(items) ? items : [])
     .map((card) =>
       withMeta(
         {
@@ -185,12 +189,48 @@ async function loadBackendAnticipated() {
         },
         {
           source: "tmdb",
-          section: "mas-esperadas",
-          mediaType: "movie",
+          section,
+          mediaType: card.mediaType === "tv" ? "tv" : "movie",
         },
       ),
     )
     .filter(Boolean);
+}
+
+// RECOMENDADOS: motor LOCAL (ya no Trakt).
+// Autenticado → fila personalizada `for_you` del motor (que ahora prioriza la
+// watchlist del usuario). Anónimo → generic pools (`popular`/`top_rated`), porque
+// sin sesión no hay personalización. Antes esta sección usaba getTraktRecommended.
+async function loadBackendRecommended(request) {
+  // 1) Personalizado (reenvía la sesión del usuario al motor).
+  const personal = request
+    ? await backendFetchJson(request, "/v1/dashboard/home", {
+        method: "GET",
+      }).catch(() => null)
+    : null;
+  const personalRows = Array.isArray(personal?.json?.rows)
+    ? personal.json.rows
+    : [];
+  const forYou = personalRows.find((r) => r?.key === "for_you");
+  if (forYou?.items?.length) {
+    return mapEngineCards(forYou.items, "recomendados");
+  }
+
+  // 2) Fallback anónimo: pools genéricos del motor.
+  const baseUrl = getBackendBaseUrl();
+  if (!baseUrl) return [];
+  const response = await fetch(`${baseUrl}/v1/dashboard/home`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  }).catch(() => null);
+  if (!response?.ok) return [];
+  const json = await response.json().catch(() => null);
+  const rows = Array.isArray(json?.rows) ? json.rows : [];
+  const pool =
+    rows.find((r) => r?.key === "popular") ||
+    rows.find((r) => r?.key === "top_rated") ||
+    rows.find((r) => r?.key === "trending");
+  return mapEngineCards(pool?.items, "recomendados");
 }
 
 async function loadTraktSection(section, { traktToken = null } = {}) {
@@ -216,15 +256,8 @@ async function loadTraktSection(section, { traktToken = null } = {}) {
       .filter(Boolean);
   }
 
-  if (section === "recomendados") {
-    return dedupe(
-      await getTraktRecommended(120, "weekly", {
-        token: traktToken,
-      }).catch(() => []),
-    )
-      .map((item) => withMeta(item, { source: "trakt", section }))
-      .filter(Boolean);
-  }
+  // `recomendados` ya NO se sirve desde aquí: lo maneja loadBackendRecommended
+  // (motor local). Se dejó de usar getTraktRecommended.
 
   return [];
 }
@@ -232,6 +265,10 @@ async function loadTraktSection(section, { traktToken = null } = {}) {
 async function loadSectionItems(section, options = {}) {
   if (section === "mas-esperadas") {
     return loadBackendAnticipated();
+  }
+
+  if (section === "recomendados") {
+    return loadBackendRecommended(options.request);
   }
 
   if (section === "tendencias") {
@@ -268,7 +305,7 @@ export async function GET(request, { params }) {
     const { token: traktToken } = await getValidTraktToken(
       request.cookies,
     ).catch(() => ({ token: null }));
-    const items = await loadSectionItems(section, { traktToken });
+    const items = await loadSectionItems(section, { traktToken, request });
     return NextResponse.json({
       section,
       ...config,

@@ -38,7 +38,10 @@ export function dedupeCards(cards) {
 // Piso de votos por tipo para listas amplias. Después se aplica también
 // hasReliablePublicSignal(), que combina votos + nota y endurece animación,
 // documental y anime para evitar títulos con muestras demasiado pequeñas.
-const MIN_VOTES = { movie: 500, tv: 180 };
+// Piso base subido (movie 500→800, tv 180→300) para que las filas por defecto
+// sean más representativas: menos títulos de nicho con pocas muestras. TV sube
+// menos porque acumula menos votos que cine.
+const MIN_VOTES = { movie: 800, tv: 300 };
 
 // Umbrales de vote_count por tipo para cada categoría discover.
 const GENRE_VOTES = { movie: 500, tv: 150 };
@@ -54,8 +57,9 @@ const GEM_VOTES = {
 // - Tendencias: piso modesto (refleja lo que sube ahora sin colar basura).
 // - Populares: piso alto (solo títulos populares realmente reconocibles).
 // - Top en España: piso moderado (contenido reciente tiene menos votos).
-const TRENDING_VOTES = { movie: 500, tv: 180 };
-const POPULAR_VOTES = { movie: 500, tv: 200 };
+// Subidos para filas más representativas (populares es el más exigente).
+const TRENDING_VOTES = { movie: 800, tv: 300 };
+const POPULAR_VOTES = { movie: 1200, tv: 400 };
 const REGION_VOTES = { movie: 500, tv: 180 };
 const CURATED_VOTES = {
   drama: { movie: 700, tv: 180 },

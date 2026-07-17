@@ -207,9 +207,14 @@ export function buildFeatured(
     );
 
     return (
+      // Más peso a POPULARIDAD (demand) y a CONFIANZA (nº de votos) para que el
+      // hero destaque títulos más representativos y masivamente conocidos, no
+      // joyas de nicho bien valoradas pero poco vistas. La calidad sigue siendo
+      // la señal dominante, pero la demanda pasa de 0.42 a 0.9 y la confianza de
+      // 0.72 a 0.9.
       quality * 1.25 +
-      confidence * 0.72 +
-      demand * 0.42 +
+      confidence * 0.9 +
+      demand * 0.9 +
       maturity * 0.6 +
       sourceScore
     );
@@ -227,7 +232,11 @@ export function buildFeatured(
           source.startsWith("popular") ||
           source.startsWith("recognized"),
       );
-      return rating >= 6.6 && (votes >= 700 || hasDemandSource);
+      // Suelo de votos de 700 → 1500: descarta títulos poco vistos aunque tengan
+      // buena nota, para que el hero sea representativo. Se conserva la excepción
+      // `hasDemandSource` (trending/popular/recognized) por si un estreno reciente
+      // aún no acumuló votos pero ya es masivo.
+      return rating >= 6.6 && (votes >= 1500 || hasDemandSource);
     })
     .map((item) => ({ item, score: scoreOf(item) }))
     .sort((a, b) => b.score - a.score);
