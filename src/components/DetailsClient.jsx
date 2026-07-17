@@ -93,6 +93,7 @@ import {
   MessageSquare,
   SlidersHorizontal,
   BarChart3,
+  Trophy,
 } from "lucide-react";
 
 // Boton con efecto liquido para acciones principales
@@ -949,8 +950,7 @@ function getSeasonNumber(season) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-// Conservado por si se reactiva la sección detallada de premios en esta vista.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Tarjeta de un premio (usada por la sección "Premios", tras Colección).
 function AwardCard({ item }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
@@ -6714,6 +6714,17 @@ export default function DetailsClient({
       });
     }
 
+    // Premios. Misma condición que la sección (id "awards"): solo si hay
+    // premios que mostrar. Va tras Colección, igual que en el render.
+    if (awardItems.length > 0) {
+      items.push({
+        id: "awards",
+        label: "Premios",
+        icon: Trophy,
+        count: awardItems.length,
+      });
+    }
+
     // Media = Imagenes + Videos (unificado)
     const postersCount = imagesState?.posters?.length || 0;
     const backdropsCount = imagesState?.backdrops?.length || 0;
@@ -6789,6 +6800,7 @@ export default function DetailsClient({
     collectionId,
     collectionData,
     collectionLoading,
+    awardItems,
   ]);
 
   // Menu global (scroll + sticky + spy)
@@ -9271,6 +9283,55 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         No hay datos de colección.
                       </div>
                     )}
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
+            {/* SECCIÓN: PREMIOS. Va después de Reparto → Recomendaciones →
+                Colección. Se había eliminado su render (el commit db0a685) pero
+                se dejaron intactos los datos (awardItems), los helpers y el
+                componente AwardCard, así que aquí solo se restaura el JSX.
+                Gate: mismos flags progresivos que el resto (aparece cuando la
+                Colección ya resolvió) + que existan premios que mostrar. */}
+            {canRenderLowerPrioritySections && awardItems.length > 0 && (
+              <section id="section-awards" ref={registerSection("awards")}>
+                <AnimatedSection delay={0.04}>
+                  <section className="mb-16 group/section">
+                    <SectionTitle title="Premios" icon={Trophy} />
+
+                    <DetailsArrowCarousel
+                      spaceBetween={12}
+                      slidesPerView={3}
+                      breakpoints={{
+                        500: { slidesPerView: 3, spaceBetween: 14 },
+                        768: { slidesPerView: 4, spaceBetween: 16 },
+                        1024: { slidesPerView: 5, spaceBetween: 18 },
+                        1280: { slidesPerView: 6, spaceBetween: 20 },
+                      }}
+                      className="pb-8"
+                    >
+                      {awardItems.map((award, index) => {
+                        const previous = awardItems[index - 1] || null;
+                        const startsNominations =
+                          award?.result === "nominee" &&
+                          previous?.result === "winner";
+
+                        return (
+                          <SwiperSlide key={award.id}>
+                            <div
+                              className={
+                                startsNominations
+                                  ? "relative before:absolute before:-left-2.5 before:top-3 before:bottom-3 before:w-px before:bg-white/10"
+                                  : ""
+                              }
+                            >
+                              <AwardCard item={award} />
+                            </div>
+                          </SwiperSlide>
+                        );
+                      })}
+                    </DetailsArrowCarousel>
                   </section>
                 </AnimatedSection>
               </section>
