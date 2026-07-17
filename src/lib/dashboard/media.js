@@ -412,38 +412,24 @@ function pickBestWatchingPoster(posters) {
   );
 }
 
+// "Continuar viendo" (dashboard). Delega en el selector COMPARTIDO.
+//
+// Antes esto era una copia solo-inglés y sin escalera: recorría el pool
+// quedándose únicamente con los backdrops `en` y, si no había ninguno, devolvía
+// null. El llamador (ContinueWatchingSection) caía entonces a
+// `getPreviewBackdropFallback`, que es el `backdrop_path` crudo de TMDb: el
+// primario, normalmente TEXTLESS y encima sin metadatos de idioma. Resultado:
+// tarjetas sin idioma en el dashboard aunque el título SÍ tuviera backdrop en
+// español. Mismo defecto que tenía la copia de Biblioteca.
+//
+// El selector compartido aplica la escalera en → otro idioma (es…) → textless,
+// así que el escalón `es` deja de perderse y el fallback crudo casi no se usa.
 function pickBestWatchingBackdrop(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => {
-    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
-    return preferSet.has(norm(img?.iso_639_1));
-  };
-
-  const pool0 =
-    minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list;
-  const pool = pool0.length ? pool0 : list;
-
-  const top3en = [];
-  for (const b of pool) {
-    if (isPreferredLang(b)) top3en.push(b);
-    if (top3en.length === 3) break;
-  }
-  if (!top3en.length) return null;
-
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
-  if (b1080) return b1080;
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
-  if (b1440) return b1440;
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
-  if (b4k) return b4k;
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
-  if (b720) return b720;
-  return top3en[0];
+  return pickBestBackdropByLangResVotes(list, {
+    preferLangs: ["en", "en-US"],
+    minWidth: 1200,
+    ...opts,
+  });
 }
 
 async function fetchWatchingImages(itemId, mediaType = "movie") {
