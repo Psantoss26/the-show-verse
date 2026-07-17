@@ -2081,7 +2081,23 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           initial="hidden"
           animate={navigatingToFullDetails ? "navigate" : "visible"}
           exit="exit"
-          className="fixed inset-0 bg-black/70 backdrop-blur-xl"
+          // SIN velo oscuro: solo desenfoque.
+          //
+          // El drawer de las páginas de usuario no tiene overlay, así que su
+          // cristal muestrea la página directamente y por eso se lee como
+          // cristal. Aquí, cualquier velo se acumula con el 35% del propio fondo
+          // del panel y aplana el efecto: con /70 el cristal veía un 80% de negro
+          // y quedaba muerto; con /40 seguía en 61%. Como el velo entra con
+          // fundido, ese oscurecido se percibía además como algo que "se aplica
+          // al terminar la animación".
+          //
+          // Sin velo, el cristal del panel ve exactamente el mismo 35% que en el
+          // drawer: los dos modales quedan igualados.
+          //
+          // La separación con el fondo la da `backdrop-blur-xl`, que es lo que de
+          // verdad aísla el modal. El elemento se mantiene (sin fondo) porque es
+          // la superficie que captura el clic-fuera para cerrar.
+          className="fixed inset-0 backdrop-blur-xl"
           onClick={navigatingToFullDetails ? undefined : onClose}
         />
       )}
@@ -2108,12 +2124,46 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
+        // OJO: el panel NO lleva `backdrop-blur`. Su desenfoque lo pinta la capa
+        // hermana de abajo. Motivo: un elemento con `backdrop-filter` crea un
+        // "Backdrop Root", y sus DESCENDIENTES ya no pueden muestrear más allá
+        // de él. El scoreboard y las tarjetas de info son casi transparentes
+        // (bg-black/[0.08] + backdrop-blur-[4px]): dependen de ver la página
+        // detrás. Con el blur aquí, solo veían el propio fondo oscuro del panel
+        // y perdían el cristal — y solo al ASENTARSE la animación, que es cuando
+        // se activaba. Con el blur en una capa hermana, el panel deja de ser
+        // backdrop root y los hijos vuelven a muestrear el fondo, igual que en
+        // DetailsClient.
         className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
             ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
-        } ${panelSettled ? "backdrop-blur-md" : ""}`}
+        }`}
       >
+        {/* Cristal del panel — SOLO en el drawer.
+            Va aquí y no en el panel para no convertirlo en Backdrop Root (ver
+            nota arriba). `-z-10` lo deja por detrás del contenido pero por
+            delante del fondo del panel; es hermano, así que no limita el
+            backdrop-filter de las tarjetas de info.
+
+            El CENTRADO no lo lleva: su overlay ya aplica `backdrop-blur-xl` a
+            toda la página, así que el fondo que el panel deja ver YA está
+            desenfocado. Añadir aquí un segundo desenfoque sobre el primero era
+            redundante y ensuciaba el resultado — y como esta capa solo se monta
+            al asentarse, se percibía como "un extra oscuro que se aplica al
+            terminar la carga", mientras que durante la transición (aún sin
+            montar) el cristal se veía correcto.
+
+            El drawer sí la necesita: no tiene overlay detrás, así que sin esto
+            no habría desenfoque ninguno. Ahí `panelSettled` arranca en true, de
+            modo que el cristal está activo desde el primer frame. */}
+        {panelSettled && isRightPlacement && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-md"
+          />
+        )}
+
         {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
         {isRightPlacement && (
           <div
