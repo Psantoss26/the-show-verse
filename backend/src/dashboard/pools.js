@@ -92,7 +92,7 @@ function shouldRefineCachedPool(poolKey) {
   return (
     poolKey !== 'new_releases' &&
     poolKey !== 'anticipated' &&
-    poolKey !== 'calendar_episodes_v2'
+    poolKey !== 'calendar_episodes_v3'
   );
 }
 
@@ -469,7 +469,7 @@ const byEntryAirDate = (a, b) =>
 // calendar_episodes (12h) — base ANÓNIMA: próximos episodios de las series más
 // populares (popular ∪ trending ∪ top España), dentro de la ventana del calendario,
 // VARIOS por serie y ordenados por fecha de emisión.
-addPool('calendar_episodes_v2', 'tv', TTL_12H, async () => {
+addPool('calendar_episodes_v3', 'tv', TTL_12H, async () => {
   const [popular, trending, region, onAir] = await Promise.all([
     getPool('popular', 'tv').catch(() => []),
     getPool('trending', 'tv').catch(() => []),
@@ -481,15 +481,25 @@ addPool('calendar_episodes_v2', 'tv', TTL_12H, async () => {
     tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 4 }).catch(() => []),
   ]);
 
-  // `on_the_air` PRIMERO (dedupeCards conserva la primera aparición): así las
-  // series en emisión no se pierden aunque tengan menos popularidad que las
+  // `on_the_air` PRIMERO (refine→dedupeCards conserva la primera aparición): así
+  // las series en emisión no se pierden aunque tengan menos popularidad que las
   // populares entre temporadas. El resto se ordena por popularidad.
-  const shows = dedupeCards([
-    ...onAir,
-    ...[...popular, ...trending, ...region].sort(
-      (a, b) => (b.popularity || 0) - (a.popularity || 0),
-    ),
-  ]).slice(0, 90);
+  //
+  // FILTRO DE POPULARIDAD/CALIDAD: `refine` aplica el mismo criterio que el resto
+  // de filas — votos + nota vía hasReliablePublicSignal — y excluye infantil y
+  // reality. Sin esto, `/tv/on_the_air` colaba MUCHA serie en emisión sin
+  // relevancia (culebrones diarios, nicho con pocos votos). Con el piso de
+  // "popular" (POPULAR_VOTES.tv) solo pasan series reputadas y masivas.
+  const shows = refine(
+    [
+      ...onAir,
+      ...[...popular, ...trending, ...region].sort(
+        (a, b) => (b.popularity || 0) - (a.popularity || 0),
+      ),
+    ],
+    'tv',
+    POPULAR_VOTES.tv,
+  ).slice(0, 90);
 
   // Concurrencia moderada (5): enriquecer cada serie dispara 2 llamadas TMDB
   // (detalle + temporada); con reintentos en tmdbGet se obtienen varios episodios
