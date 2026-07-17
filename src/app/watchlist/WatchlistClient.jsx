@@ -3528,7 +3528,12 @@ export default function WatchlistClient() {
                   key={group.key}
                   ref={(node) => setGroupSectionRef(group.key, node)}
                   className="overflow-visible scroll-mt-[148px]"
-                  initial={{ opacity: 0, y: 20 }}
+                  // `initial={false}` al retroceder: sin esto cada grupo volvía a
+                  // entrar desde 20px abajo, y con `delay` escalonado por grupo,
+                  // así que al volver de una ficha la lista se recolocaba sola
+                  // tras cargar en lugar de aparecer tal y como estaba.
+                  // Favoritos ya lo hacía así; aquí faltaba.
+                  initial={isBackNav ? false : { opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
                 >
