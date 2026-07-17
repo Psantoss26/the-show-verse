@@ -147,10 +147,10 @@ export default async function calendarRoutes(fastify) {
 
         // Anónimo: series de la base popular (pool cacheado) dentro del rango.
         if (!userId) {
-          const base = await getPool('calendar_episodes', 'tv').catch(() => []);
+          const base = await getPool('calendar_episodes_v2', 'tv').catch(() => []);
           const baseIds = [
             ...new Set(base.map((e) => Number(e?.show?.tmdbId)).filter(Boolean)),
-          ].slice(0, 40);
+          ].slice(0, 80);
           const items = dedupeByShowNearest(
             (
               await mapLimit(baseIds, 6, (id) =>
@@ -192,7 +192,7 @@ export default async function calendarRoutes(fastify) {
     }
 
     try {
-      const base = await getPool('calendar_episodes', 'tv').catch(() => []);
+      const base = await getPool('calendar_episodes_v2', 'tv').catch(() => []);
 
       if (!userId) {
         reply.header('Cache-Control', 'public, max-age=300');
