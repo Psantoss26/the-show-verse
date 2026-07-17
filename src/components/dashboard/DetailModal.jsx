@@ -748,6 +748,16 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
     nestedModalOpenRef.current = true;
   };
 
+  const stopDrawerActionEvent = (event) => {
+    if (!isRightPlacement) {
+      event?.stopPropagation?.();
+      return;
+    }
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+  };
+
   // Cierre al pulsar FUERA del drawer.
   //
   // El centrado ya se cierra así mediante su backdrop, pero el drawer derecho no
@@ -1321,7 +1331,7 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
   const trailerIframeRef = useRef(null);
 
   const handleToggleTrailer = async (e) => {
-    e.stopPropagation();
+    stopDrawerActionEvent(e);
     if (showTrailer) {
       setShowTrailer(false);
       return;
