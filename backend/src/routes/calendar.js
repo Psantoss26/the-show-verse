@@ -50,15 +50,40 @@ function sourceRank(set) {
 const byAirDate = (a, b) =>
   (a?.episode?.airDate || '').localeCompare(b?.episode?.airDate || '');
 
-function dedupeById(list) {
-  const seen = new Set();
-  const out = [];
+function airMs(entry) {
+  const t = Date.parse(entry?.episode?.airDate || '');
+  return Number.isFinite(t) ? t : Infinity;
+}
+
+// UNA entrada por SERIE (no por episodio). Antes se deduplicaba por id de
+// episodio, así que una diaria como "El Señor de los Cielos" aparecía tantas
+// veces como episodios tuviera en el rango. Ahora cada serie sale una sola vez,
+// representada por su episodio de fecha MÁS PRÓXIMA: el próximo por estrenar
+// (airDate ≥ ahora, el más cercano) o, si no hay ninguno futuro en el rango, el
+// más reciente ya emitido. Entre entradas de la misma serie de distinta fuente
+// (raro), gana la de mejor prioridad (`_prio` menor). Como cada serie ocupa un
+// único hueco, además caben MÁS series distintas dentro de MAX_ITEMS.
+function dedupeByShowNearest(list, nowMs) {
+  const byShow = new Map();
+  const better = (a, b) => {
+    const pa = a?._prio ?? 99;
+    const pb = b?._prio ?? 99;
+    if (pa !== pb) return pa < pb; // mejor prioridad (menor) primero
+    const ta = airMs(a);
+    const tb = airMs(b);
+    const aFut = ta >= nowMs;
+    const bFut = tb >= nowMs;
+    if (aFut !== bFut) return aFut; // un futuro gana a un pasado
+    if (aFut) return ta < tb; // dos futuros → el más cercano
+    return ta > tb; // dos pasados → el más reciente
+  };
   for (const entry of list) {
-    if (!entry || seen.has(entry.id)) continue;
-    seen.add(entry.id);
-    out.push(entry);
+    const showId = Number(entry?.show?.tmdbId);
+    if (!Number.isFinite(showId)) continue;
+    const cur = byShow.get(showId);
+    if (!cur || better(entry, cur)) byShow.set(showId, entry);
   }
-  return out;
+  return [...byShow.values()];
 }
 
 // Series TV del usuario (BBDD) → Map<tmdbId, Set<source>>.
@@ -126,10 +151,14 @@ export default async function calendarRoutes(fastify) {
           const baseIds = [
             ...new Set(base.map((e) => Number(e?.show?.tmdbId)).filter(Boolean)),
           ].slice(0, 40);
-          const items = (
-            await mapLimit(baseIds, 6, (id) => getShowEpisodesInRange(id, { startMs, endMs }))
+          const items = dedupeByShowNearest(
+            (
+              await mapLimit(baseIds, 6, (id) =>
+                getShowEpisodesInRange(id, { startMs, endMs }),
+              )
+            ).flat(),
+            startMs,
           )
-            .flat()
             .sort(byAirDate)
             .slice(0, MAX_ITEMS);
           reply.header('Cache-Control', 'public, max-age=300');
@@ -142,7 +171,7 @@ export default async function calendarRoutes(fastify) {
           .sort(([, a], [, b]) => sourceRank(a) - sourceRank(b))
           .map(([id]) => id)
           .slice(0, MAX_USER_ENRICH);
-        const items = dedupeById(
+        const items = dedupeByShowNearest(
           (
             await mapLimit(userIds, 8, async (id) => {
               const eps = await getShowEpisodesInRange(id, { startMs, endMs });
@@ -150,6 +179,7 @@ export default async function calendarRoutes(fastify) {
               return eps.map((e) => ({ ...e, sources: src }));
             })
           ).flat(),
+          startMs,
         )
           .sort(byAirDate)
           .slice(0, MAX_ITEMS);
@@ -167,10 +197,16 @@ export default async function calendarRoutes(fastify) {
       if (!userId) {
         reply.header('Cache-Control', 'public, max-age=300');
         // La base es un pool compartido/cacheado: se copian las entradas y se
-        // normaliza `sources` a [] (el anónimo no tiene fuentes de usuario).
-        return {
-          items: base.slice(0, MAX_ITEMS).map((e) => ({ ...e, sources: [] })),
-        };
+        // normaliza `sources` a [] (el anónimo no tiene fuentes de usuario). Se
+        // deduplica por SERIE (una entrada por serie) antes de acotar, para que
+        // no salga la misma serie varias veces.
+        const items = dedupeByShowNearest(
+          base.map((e) => ({ ...e, sources: [] })),
+          Date.now(),
+        )
+          .sort(byAirDate)
+          .slice(0, MAX_ITEMS);
+        return { items };
       }
 
       // Biblioteca del usuario (una sola carga) para fuentes + recomendaciones.
@@ -249,11 +285,14 @@ export default async function calendarRoutes(fastify) {
       // (progreso/favoritos/pendientes), 1 = recomendadas, 2 = populares.
       const withPriority = (entries, prio) =>
         entries.map((e) => ({ ...e, _prio: prio }));
-      const candidates = dedupeById([
-        ...withPriority(userEntries, 0),
-        ...withPriority([...recOnlyEntries, ...recommendedBaseEntries], 1),
-        ...withPriority(popularBaseEntries, 2),
-      ]);
+      const candidates = dedupeByShowNearest(
+        [
+          ...withPriority(userEntries, 0),
+          ...withPriority([...recOnlyEntries, ...recommendedBaseEntries], 1),
+          ...withPriority(popularBaseEntries, 2),
+        ],
+        Date.now(),
+      );
 
       // Se eligen por prioridad (tus series entran primero si hay más candidatos
       // que el límite) y luego se muestran en ORDEN CRONOLÓGICO GLOBAL por fecha.
