@@ -2134,7 +2134,10 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
         // se activaba. Con el blur en una capa hermana, el panel deja de ser
         // backdrop root y los hijos vuelven a muestrear el fondo, igual que en
         // DetailsClient.
-        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.35] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        // Fondo del cristal: 0.35 → 0.47. El liquid glass dejaba ver demasiado
+        // fondo. Este es el ÚNICO sitio donde se fija, así que sube por igual en
+        // el modal centrado y en el drawer y siguen siendo idénticos.
+        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
             ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
@@ -2235,7 +2238,19 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
               no fundir media imagen. Sustituye a una rampa lineal inline: una rampa pasa
               de alfa constante a decreciente de golpe, y esa discontinuidad de
               pendiente se percibe como un corte donde arranca el difuminado. */}
-          <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent sm:aspect-video">
+          {/* El degradado de fondo muere en el 78%, justo donde ARRANCA el
+              difuminado de la imagen (`--sv-hero-fade`), y no en el 100%.
+
+              Antes llegaba hasta abajo, así que dentro de la zona de difuminado
+              todavía aportaba ~21% de negro que iba cayendo a 0. Al desvanecerse
+              la imagen no aparecía el panel limpio, sino el panel MÁS ese velo:
+              un gradiente oscuro extra que no existe por debajo, y que sobre
+              imágenes claras se leía como una banda/línea oscura. Sobre imágenes
+              oscuras no se notaba, de ahí que solo pasara "en algunos casos".
+
+              Terminándolo en el 85%, la máscara revela el panel y nada más: la
+              transición es la de la imagen al panel, sin oscuros añadidos. */}
+          <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent to-78% sm:aspect-video">
             {/* Wrapper ESTÁTICO y enmascarado: contiene SOLO la imagen.
                 - Estático (no lleva el parallax): la máscara queda fija
                   respecto al borde inferior, así que al hacer scroll el
@@ -2332,13 +2347,19 @@ export default function DetailModal({ item, onClose, placement = "center" }) {
               className="pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
 
-            {/* Sombra para el logo. TRANSPARENTE justo en el límite inferior (para
-                no crear escalón con el panel) y oscura un poco más arriba, detrás
-                del logo: se funde suavemente por ambos lados. */}
-            <motion.div
-              style={{ opacity: logoOpacity }}
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-transparent via-black/45 via-45% to-transparent z-10"
-            />
+            {/* Aquí había una sombra de 10rem para el logo, la MISMA que ya se
+                retiró del póster móvil de DetailsClient por este mismo motivo.
+
+                No era un degradado anclado sino una FRANJA flotante: transparente
+                arriba, 45% de negro en su punto medio y transparente abajo. Al no
+                estar anclada a ningún borde, sobre imágenes claras se leía como
+                una zona/banda oscura suspendida en mitad de la portada — y sobre
+                oscuras pasaba desapercibida, de ahí que solo se viera en algunos
+                títulos.
+
+                No hace falta: el logo lleva su propio drop-shadow fuerte
+                (0.85 alfa, 14px) para el contraste local, exactamente igual que
+                en DetailsClient. */}
 
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
             <motion.div

@@ -595,22 +595,31 @@ html {
     transparent 100%
   );
 
-  /* Hero de DetailModal: fundido corto, del 85% al 100%. Solo los últimos 15%
-     de la imagen se tocan: esconde el borde sin llegar al logo ni comerse
-     encuadre. */
+  /* Hero de DetailModal: del 78% al 100%, con SMOOTHERSTEP (6t⁵-15t⁴+10t³), no
+     con la smoothstep del póster.
+
+     Por qué otra función: acortar el tramo con la misma curva lo vuelve más
+     abrupto y reaparece el canto (pasó con 85%, que solo daba 15% de recorrido).
+     La smootherstep entra con pendiente Y CURVATURA cero, así que aguanta casi
+     opaca mucho más tiempo y permite un tramo más corto sin que el borde se note:
+     conserva la imagen casi intacta (alfa ≥ 0.94) hasta el 82,5%, frente al 74,5%
+     de una smoothstep 70-100. Menos imagen tapada y arranque más suave a la vez.
+
+     OJO: el degradado de fondo del contenedor debe morir en este mismo 78%; si
+     se solapan, vuelve a aparecer la banda oscura. */
   --sv-hero-fade: linear-gradient(
     to bottom,
     #000 0%,
-    #000 85%,
-    rgba(0, 0, 0, 0.972) 86.5%,
-    rgba(0, 0, 0, 0.896) 88%,
-    rgba(0, 0, 0, 0.784) 89.5%,
-    rgba(0, 0, 0, 0.648) 91%,
-    rgba(0, 0, 0, 0.5) 92.5%,
-    rgba(0, 0, 0, 0.352) 94%,
-    rgba(0, 0, 0, 0.216) 95.5%,
-    rgba(0, 0, 0, 0.104) 97%,
-    transparent 98.5%,
+    #000 78%,
+    rgba(0, 0, 0, 0.991) 80.2%,
+    rgba(0, 0, 0, 0.942) 82.4%,
+    rgba(0, 0, 0, 0.837) 84.6%,
+    rgba(0, 0, 0, 0.683) 86.8%,
+    rgba(0, 0, 0, 0.5) 89%,
+    rgba(0, 0, 0, 0.317) 91.2%,
+    rgba(0, 0, 0, 0.163) 93.4%,
+    rgba(0, 0, 0, 0.058) 95.6%,
+    rgba(0, 0, 0, 0.009) 97.8%,
     transparent 100%
   );
 }
