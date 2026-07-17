@@ -144,6 +144,10 @@ const EMPTY_DATA = {
   title: null,
   homepage: null,
   logoPath: null,
+  // ¿Ha TERMINADO ya la búsqueda del logo? La cabecera solo debe caer al
+  // título de texto cuando sepamos que no hay logo, nunca mientras carga:
+  // con `logoPath` a null no se distingue "aún no llegó" de "no existe".
+  logoResolved: false,
   overview: null,
   backdropPath: null,
   posterPath: null,
@@ -424,11 +428,18 @@ export function useDetailModalData(item) {
       (async () => {
         try {
           const logoPath = await fetchBestLogo(showId, "tv", ["en", null, "es"]);
-          if (!cancelledEp && logoPath) {
-            setData((prev) => ({ ...prev, logoPath }));
+          if (!cancelledEp) {
+            setData((prev) => ({
+              ...prev,
+              logoPath: logoPath || prev.logoPath,
+              logoResolved: true,
+            }));
           }
         } catch {
-          // sin logo: la cabecera cae al nombre de la serie/episodio
+          // Ver nota en la rama de película/serie: se marca resuelto aunque falle.
+          if (!cancelledEp) {
+            setData((prev) => ({ ...prev, logoResolved: true }));
+          }
         }
       })();
 
@@ -518,6 +529,8 @@ export function useDetailModalData(item) {
       mediaType,
       title: item.title || item.name || null,
       logoPath: seedLogoPath,
+      // Si el item ya traía logo, no hay nada que esperar.
+      logoResolved: Boolean(seedLogoPath),
       backdropPath: item.backdrop_path || null,
       posterPath: item.poster_path || null,
       year: yearOf(item) || null,
@@ -827,10 +840,19 @@ export function useDetailModalData(item) {
       try {
         const logoPath = await fetchBestLogo(id, mediaType, ["en", null, "es"]);
         if (!cancelled) {
-          setData((prev) => ({ ...prev, logoPath: logoPath || prev.logoPath }));
+          setData((prev) => ({
+            ...prev,
+            logoPath: logoPath || prev.logoPath,
+            logoResolved: true,
+          }));
         }
       } catch {
-        // sin logo: la cabecera cae al título de texto
+        // Sin logo: la cabecera cae al título de texto. Se marca resuelto
+        // IGUALMENTE; si no, el título no aparecería nunca en los títulos que de
+        // verdad no tienen logo.
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, logoResolved: true }));
+        }
       }
     })();
 
