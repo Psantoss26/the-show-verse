@@ -2809,6 +2809,27 @@ export default function DetailsClient({
     );
   }, [endpointType, imagesState?.posters]);
 
+  // ¿La portada que se muestra en móvil trae el título IMPRESO?
+  //
+  // `mobileNeutralPosterPath` no siempre acaba siendo textless: cuando no existe
+  // ningún póster sin idioma, `pickBestNeutralPosterByResVotes` cae a uno CON
+  // idioma (`pool0 = neutral.length ? neutral : list`). En ese caso la portada ya
+  // lleva el título, y superponerle el logo lo duplica.
+  //
+  // Se busca el póster elegido entre los originales para leer su `iso_639_1`.
+  // Solo se considera "con título impreso" cuando ese dato existe y no está
+  // vacío: si no encontramos el póster o no trae metadatos de idioma, NO se
+  // asume nada y se mantiene el logo, que es el comportamiento actual. Ocultarlo
+  // por defecto ante la duda dejaría títulos sin identificar.
+  const mobilePosterHasBurnedTitle = useMemo(() => {
+    if (!mobileNeutralPosterPath) return false;
+    const chosen = (imagesState?.posters || []).find(
+      (p) => p?.file_path === mobileNeutralPosterPath,
+    );
+    const lang = chosen?.iso_639_1;
+    return typeof lang === "string" && lang.trim() !== "";
+  }, [mobileNeutralPosterPath, imagesState?.posters]);
+
   // Selecciona la imagen de fondo del hero segun el viewport:
   // - Desktop: usa el backdrop horizontal
   // - Movil: usa un poster neutro (sin texto) para mejor visualizacion vertical
@@ -8270,9 +8291,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                     {/* MÓVIL (solo cuando la portada es textless): logo del título
                         sobre la portada (o título de texto si no hay logo), igual
-                        que DetailModal. Ligado a `mobilePosterPath` para que nunca
-                        se superponga a una portada CON texto. */}
-                    {mobilePosterPath && (
+                        que DetailModal.
+
+                        Antes esto colgaba solo de `mobilePosterPath`, con la nota
+                        de que así "nunca se superponía a una portada CON texto".
+                        No era cierto: `mobilePosterPath` sale de
+                        `mobileNeutralPosterPath`, que cae a un póster CON idioma
+                        cuando no existe ninguno textless. En esos títulos la
+                        portada ya trae el título impreso y el logo lo duplicaba.
+                        `mobilePosterHasBurnedTitle` comprueba el idioma real del
+                        póster elegido y cubre ese caso. */}
+                    {mobilePosterPath && !mobilePosterHasBurnedTitle && (
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center p-4">
                         {/* Aquí había una sombra de 10rem para el logo. No era un
                             degradado anclado sino una FRANJA flotante: negro al
