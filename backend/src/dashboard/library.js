@@ -123,8 +123,15 @@ export function buildSeeds({ favorites: favs = [], ratings = [], history = [], w
  *
  * @returns {string} hex hash
  */
+// Versión del ALGORITMO de semillas/recomendación. Se incluye en el hash para
+// que un cambio de pesos (que no altera el contenido de la biblioteca) invalide
+// la caché de 24h de `user_recommendations` y se recalcule con el nuevo criterio.
+// SUBIR esta versión cada vez que se cambie buildSeeds/scoring. (v2: watchlist
+// pasó a señal principal.)
+const RECS_ALGO_VERSION = 'v2';
+
 export function libraryBasisHash({ favorites: favs = [], ratings = [], history = [], watchlist: wl = [] }) {
-  const tokens = [];
+  const tokens = [`algo:${RECS_ALGO_VERSION}`];
 
   for (const f of favs) {
     tokens.push(`fav:${f.mediaType}:${f.tmdbId}`);
