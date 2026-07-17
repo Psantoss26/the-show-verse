@@ -559,7 +559,15 @@ html {
    Arranca antes (60% en vez de 78%) pero se pierde MENOS imagen de lo que
    parece: la curva mantiene el alfa alto al principio (0.97 en el 64%, 0.90 en
    el 68%), mientras que una rampa lineal desde el 60% ya estaría en 0.5 en el
-   80%. */
+   80%.
+
+   COLA CLAVADA A 0 DESDE EL 96%: la curva llegaba a alfa 0.027 en el 96% y a 0
+   en el 100%, así que el último 4% era ya invisible. Ahora es transparente puro,
+   lo que deja un MARGEN de guarda al final de la caja: si al hacer tope el
+   estirado de overscroll desalinea unos píxeles la imagen respecto a su propia
+   máscara, lo que puede asomar por el borde inferior es transparente en vez de
+   imagen cruda (que en pósters claros se veía como una línea blanca).
+   Es imperceptible: 0.027 de alfa no se distingue de 0. */
 @media (max-width: 639px) {
   .poster-mobile-fade {
     -webkit-mask-image: linear-gradient(
@@ -574,7 +582,7 @@ html {
       rgba(0, 0, 0, 0.352) 84%,
       rgba(0, 0, 0, 0.216) 88%,
       rgba(0, 0, 0, 0.104) 92%,
-      rgba(0, 0, 0, 0.028) 96%,
+      transparent 96%,
       transparent 100%
     );
     mask-image: linear-gradient(
@@ -589,7 +597,7 @@ html {
       rgba(0, 0, 0, 0.352) 84%,
       rgba(0, 0, 0, 0.216) 88%,
       rgba(0, 0, 0, 0.104) 92%,
-      rgba(0, 0, 0, 0.028) 96%,
+      transparent 96%,
       transparent 100%
     );
   }
