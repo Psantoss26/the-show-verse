@@ -92,7 +92,7 @@ function shouldRefineCachedPool(poolKey) {
   return (
     poolKey !== 'new_releases' &&
     poolKey !== 'anticipated' &&
-    poolKey !== 'calendar_episodes'
+    poolKey !== 'calendar_episodes_v2'
   );
 }
 
@@ -458,7 +458,10 @@ export function buildUpcomingEpisodeEntries(details, show = null, sources = []) 
 
 // Tamaño máximo del pool base del calendario. Con varios episodios por serie hay
 // más entradas; se acota tras ordenar por fecha para no crecer sin límite.
-const CALENDAR_POOL_MAX = 80;
+// Subido de 80 a 200: con más series candidatas (on_the_air incluidas) hay más
+// episodios en la ventana; este tope guarda entradas suficientes para que, tras
+// deduplicar por serie en la ruta, queden bastantes series distintas (>15).
+const CALENDAR_POOL_MAX = 200;
 
 const byEntryAirDate = (a, b) =>
   (a?.episode?.airDate || '').localeCompare(b?.episode?.airDate || '');
@@ -466,22 +469,33 @@ const byEntryAirDate = (a, b) =>
 // calendar_episodes (12h) — base ANÓNIMA: próximos episodios de las series más
 // populares (popular ∪ trending ∪ top España), dentro de la ventana del calendario,
 // VARIOS por serie y ordenados por fecha de emisión.
-addPool('calendar_episodes', 'tv', TTL_12H, async () => {
-  const [popular, trending, region] = await Promise.all([
+addPool('calendar_episodes_v2', 'tv', TTL_12H, async () => {
+  const [popular, trending, region, onAir] = await Promise.all([
     getPool('popular', 'tv').catch(() => []),
     getPool('trending', 'tv').catch(() => []),
     getPool('region_top', 'tv').catch(() => []),
+    // Series EN EMISIÓN AHORA: por definición tienen episodios próximos, así que
+    // son la mejor fuente para llenar el calendario. Las populares/trending están
+    // en su mayoría entre temporadas y no aportan episodios; por eso antes solo
+    // salían ~5 series. `on_the_air` garantiza muchas más candidatas con episodio.
+    tmdbList({ path: '/tv/on_the_air', mediaType: 'tv', pages: 4 }).catch(() => []),
   ]);
 
-  const shows = dedupeCards([...popular, ...trending, ...region])
-    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-    .slice(0, 40);
+  // `on_the_air` PRIMERO (dedupeCards conserva la primera aparición): así las
+  // series en emisión no se pierden aunque tengan menos popularidad que las
+  // populares entre temporadas. El resto se ordena por popularidad.
+  const shows = dedupeCards([
+    ...onAir,
+    ...[...popular, ...trending, ...region].sort(
+      (a, b) => (b.popularity || 0) - (a.popularity || 0),
+    ),
+  ]).slice(0, 90);
 
-  // Concurrencia moderada (4): enriquecer ~40 series dispara 2 llamadas TMDB cada
-  // una (detalle + temporada); en ráfaga alta se rate-limita y el multi-episodio
-  // caía a 1. Con menos concurrencia + reintentos en tmdbGet, se obtienen varios.
+  // Concurrencia moderada (5): enriquecer cada serie dispara 2 llamadas TMDB
+  // (detalle + temporada); con reintentos en tmdbGet se obtienen varios episodios
+  // sin rate-limit. Es un pool cacheado 12h, así que el coste es puntual.
   const entries = (
-    await mapLimit(shows, 4, async (show) => {
+    await mapLimit(shows, 5, async (show) => {
       const details = await getCalendarShowDetails(show.tmdbId);
       return buildUpcomingEpisodeEntries(details, show, []);
     })
