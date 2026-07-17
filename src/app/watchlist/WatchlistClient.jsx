@@ -151,7 +151,7 @@ const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v5";
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v6";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -964,6 +964,28 @@ async function getBestPosterCached(type, id) {
 
   posterInFlight.set(key, p);
   return p;
+}
+
+// Purga las versiones ANTERIORES de la caché de elecciones.
+//
+// Subir la versión de la clave es como invalidamos elecciones ya guardadas
+// (p. ej. al arreglar la persistencia, o para descartar backdrops sin idioma
+// elegidos por una versión antigua del selector). El efecto secundario es que la
+// clave vieja se queda huérfana en localStorage PARA SIEMPRE, y estos blobs
+// crecen con cada título visitado. Al ir ya por la tercera versión, esto limpia
+// cualquier `…:image-choices:vN` que no sea la actual.
+function pruneOldImageChoiceCaches() {
+  if (typeof window === "undefined") return;
+  try {
+    const prefix = IMAGE_CHOICE_CACHE_KEY.replace(/:v\d+$/, ":v");
+    for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+      const key = window.localStorage.key(i);
+      if (!key || key === IMAGE_CHOICE_CACHE_KEY) continue;
+      if (key.startsWith(prefix)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // localStorage no disponible
+  }
 }
 
 function readImageChoiceCache() {
@@ -2055,6 +2077,12 @@ export default function WatchlistClient() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Limpieza única al montar: descarta las versiones antiguas de la caché de
+  // elecciones, que quedarían huérfanas en localStorage tras subir la clave.
+  useEffect(() => {
+    pruneOldImageChoiceCaches();
   }, []);
 
   const needsImdbScores =
