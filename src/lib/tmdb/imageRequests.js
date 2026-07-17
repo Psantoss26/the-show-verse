@@ -75,7 +75,20 @@ async function requestImages(url) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     let response;
     try {
-      response = await fetch(url, { cache: "force-cache" });
+      // NO se usa `force-cache`. Ese modo devuelve SIEMPRE lo que haya en caché
+      // sin tocar la red, así que:
+      //   - si un logo devolvió un error transitorio y quedó en caché, se servía
+      //     ese error indefinidamente (fallo per-navegador, invisible desde el
+      //     servidor: por eso "en muchos casos no aparece el logo");
+      //   - y el bucle de reintentos de abajo era INÚTIL, porque cada reintento
+      //     volvía a leer la misma entrada de caché en vez de la red.
+      // `default` respeta el `Cache-Control: max-age` de TMDb (los éxitos se
+      // cachean ~92 min y se reutilizan, sin perder velocidad) pero no sirve
+      // errores como si fueran válidos. En el reintento del 429 se fuerza
+      // `reload` para saltarse la caché y llegar de verdad a la red.
+      response = await fetch(url, {
+        cache: attempt === 0 ? "default" : "reload",
+      });
     } catch {
       return null; // red caída: no insistimos
     }
