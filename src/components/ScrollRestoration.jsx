@@ -213,6 +213,41 @@ export default function ScrollRestoration() {
     let stableFrames = 0;
     let interrupted = false;
 
+    // RESERVA DE ALTURA para una restauración INSTANTÁNEA (sin el "salto").
+    // Problema: al restaurar (antes del primer paint) el contenido asíncrono/
+    // perezoso aún no tiene la altura guardada, así que `scrollTo(savedY)` se
+    // RECORTA cerca del top y el bucle lo baja después → el parpadeo/movimiento
+    // visible que se ve en muchas páginas al volver.
+    // Solución: un spacer invisible al final del <body> rellena el documento hasta
+    // la altura guardada, de modo que `savedY` ya es una posición válida en el
+    // PRIMER frame. El spacer se ENCOGE conforme el contenido real crece y se
+    // retira al alcanzarlo (o al interrumpir/agotar el tiempo).
+    let spacer = null;
+    // Ajusta el spacer para que el documento mida al menos `savedPosition.h` y
+    // devuelve la altura del contenido REAL (lo que hay por ENCIMA del spacer).
+    const reserveHeight = () => {
+      if (!(savedPosition.h > 0)) return documentScrollHeight();
+      if (!spacer) {
+        spacer = document.createElement("div");
+        spacer.setAttribute("aria-hidden", "true");
+        spacer.style.cssText =
+          "width:1px;height:0;margin:0;padding:0;border:0;flex:0 0 auto;visibility:hidden;pointer-events:none;";
+        document.body.appendChild(spacer);
+      }
+      // `offsetTop` del spacer = altura del contenido que tiene por encima.
+      const contentHeight = spacer.offsetTop;
+      spacer.style.height = `${Math.max(0, savedPosition.h - contentHeight)}px`;
+      return contentHeight;
+    };
+    const removeSpacer = () => {
+      if (spacer && spacer.parentNode) spacer.parentNode.removeChild(spacer);
+      spacer = null;
+    };
+
+    // Reserva ANTES del scroll síncrono: así `savedY` no se recorta y la página se
+    // pinta ya EXACTAMENTE en la posición guardada desde el primer frame.
+    reserveHeight();
+
     // Posicionamiento SÍNCRONO inmediato, dentro del layout effect (ANTES del
     // primer paint): la página se pinta ya en la posición guardada — o lo más
     // cerca que permita la altura disponible en este instante — en lugar de
@@ -235,6 +270,7 @@ export default function ScrollRestoration() {
     const cleanup = () => {
       if (rafId) window.cancelAnimationFrame(rafId);
       rafId = 0;
+      removeSpacer();
       window.removeEventListener("wheel", onUserIntent);
       window.removeEventListener("touchstart", onUserIntent);
       window.removeEventListener("keydown", onUserIntent);
@@ -252,6 +288,9 @@ export default function ScrollRestoration() {
         return;
       }
 
+      // Re-reserva y mide el contenido REAL (por encima del spacer). El spacer se
+      // encoge conforme el contenido crece; cuando lo alcanza, mide 0 y se retira.
+      const contentHeight = reserveHeight();
       const clampedTarget = Math.min(savedPosition.y, maxScrollTop());
       window.scrollTo({
         top: clampedTarget,
@@ -271,7 +310,7 @@ export default function ScrollRestoration() {
       // de que apareciera el contenido superior → nos quedaríamos arriba.)
       const heightCaughtUp =
         savedPosition.h > 0
-          ? documentScrollHeight() >= savedPosition.h - POSITION_TOLERANCE_PX
+          ? contentHeight >= savedPosition.h - POSITION_TOLERANCE_PX
           : maxScrollTop() >= savedPosition.y - POSITION_TOLERANCE_PX;
       const atTarget =
         Math.abs(window.scrollY - clampedTarget) <= POSITION_TOLERANCE_PX;
