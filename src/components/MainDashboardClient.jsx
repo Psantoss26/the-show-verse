@@ -4378,7 +4378,10 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               />
             </div>
 
-            <div className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-11">
+            {/* pb amplio abajo: el pop-out de la vista previa cuelga por debajo de la
+                tarjeta y en la última fila se recortaba fuera del área desplazable.
+                Reservamos el mismo hueco que cada fila reserva para su pop-out. */}
+            <div className="px-4 pb-40 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72">
               <TopRatedHero
                 movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
                 tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}

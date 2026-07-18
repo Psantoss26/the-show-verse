@@ -155,4 +155,27 @@ object ScreenHeuristics {
     fun looksLikeDetail(sawPlay: Boolean, detailSignals: Int): Boolean {
         return sawPlay || detailSignals >= MIN_DETAIL_SIGNALS
     }
+
+    /**
+     * Compara dos pantallas (normalmente de VENTANAS distintas) y decide si A es "más
+     * ficha" que B, para elegir entre varias ventanas la que de verdad muestra la
+     * ficha. Prioridad: (1) la que parece ficha; (2) a igualdad, la que tiene más
+     * señales de detalle; (3) a igualdad, la que tiene más candidatos de título.
+     *
+     * Con esto, overlays/recientes/controladores de ventana (0 señales, 0/1 candidato)
+     * NUNCA ganan a la ficha real de Prime, que tiene varias señales de detalle.
+     * Puro (sin Android) para poder testearlo.
+     */
+    fun isBetterDetail(
+        aLooksDetail: Boolean,
+        aSignals: Int,
+        aCandidates: Int,
+        bLooksDetail: Boolean,
+        bSignals: Int,
+        bCandidates: Int,
+    ): Boolean {
+        if (aLooksDetail != bLooksDetail) return aLooksDetail
+        if (aSignals != bSignals) return aSignals > bSignals
+        return aCandidates > bCandidates
+    }
 }

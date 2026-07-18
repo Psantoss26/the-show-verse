@@ -2020,9 +2020,14 @@ export default function MoviesPageClient({
               initial="hidden"
               animate="visible"
               className={
+                // El pop-out de la vista previa se centra en su imagen y la fila de
+                // acciones cuelga por debajo; en la ÚLTIMA fila ese excedente caía
+                // fuera del área desplazable y se recortaba. Reservamos abajo el mismo
+                // hueco que cada fila reserva para su pop-out (pb-40/52/72) para que la
+                // tarjeta se vea completa.
                 hasFeaturedHero
-                  ? "space-y-12 px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-11"
-                  : "space-y-12 pb-8 pt-2 sm:pb-10"
+                  ? "space-y-12 px-4 pb-40 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72"
+                  : "space-y-12 pb-40 pt-2 sm:pb-52 md:pb-72"
               }
             >
           {(() => {

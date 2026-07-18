@@ -56,27 +56,51 @@ class AccessibilityStreamingService : AccessibilityService() {
     private fun processCurrent() {
         val p = prefs ?: return
         val pkg = pendingPkg ?: return
-        val root = analysisRoot(pkg) ?: return
 
-        val analysis = analyzeScreen(root)
+        // Ventanas candidatas (ver candidateRoots). En Prime pueden ser varias: la
+        // ficha, el inicio de fondo, overlays del sistema… Analizamos cada una y nos
+        // quedamos con la que MÁS parece una ficha (más señales de detalle). Antes se
+        // elegía por capa (layer) y en Prime salían overlays vacíos ("Controlador de
+        // ventana") o la pantalla de recientes → 0 señales → no reconocía nada.
+        val roots = candidateRoots(pkg)
+        if (roots.isEmpty()) return
+
+        var best: ScreenAnalysis? = null
+        val scan = if (isPrime(pkg)) StringBuilder() else null
+        roots.forEachIndexed { idx, r ->
+            val a = analyzeScreen(r)
+            scan?.append(
+                "[w$idx s=${a.detailSignals}${if (a.sawPlay) "+play" else ""}" +
+                    (a.candidates.firstOrNull()?.let { " «$it»" } ?: " —") + "]",
+            )
+            val prev = best
+            if (prev == null ||
+                ScreenHeuristics.isBetterDetail(
+                    a.looksLikeDetail, a.detailSignals, a.candidates.size,
+                    prev.looksLikeDetail, prev.detailSignals, prev.candidates.size,
+                )
+            ) {
+                best = a
+            }
+        }
+        val analysis = best ?: return
+        val winScan = scan?.toString().orEmpty()
+
         // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
         // reconocido O suficientes señales de detalle) y hay algún candidato.
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
-            // Diagnóstico: si había candidatos pero no se clasificó como ficha, se
-            // registra (una vez por texto) para poder afinar la detección por
-            // plataforma (p. ej. si Prime/Max no exponen las señales esperadas).
+            // Diagnóstico (una vez por texto): candidatos, etiquetas de UI y, en Prime,
+            // el barrido de ventanas, para afinar si no se reconoce una ficha.
             val top = analysis.candidates.firstOrNull()
             if (top != null && !top.equals(lastDiagText, ignoreCase = true)) {
                 lastDiagText = top
                 val titles = analysis.candidates.take(3).joinToString(" · ") { "\"$it\"" }
-                // Muestra también las etiquetas de UI cortas de la pantalla (botones,
-                // estados): así, cuando una ficha da señales=0, el registro revela
-                // qué etiquetas usa la plataforma para poder reconocerlas (Prime).
                 val labels = if (analysis.uiLabels.isNotEmpty())
                     " · ui=[" + analysis.uiLabels.joinToString(", ") + "]" else ""
+                val scanTxt = if (winScan.isNotEmpty()) " · win=$winScan" else ""
                 p.addLog(
                     "Ficha no reconocida (${Platforms.nameFor(pkg)}): play=${analysis.sawPlay} " +
-                        "señales=${analysis.detailSignals} · $titles$labels",
+                        "señales=${analysis.detailSignals} · $titles$labels$scanTxt",
                 )
             }
             return
@@ -88,21 +112,9 @@ class AccessibilityStreamingService : AccessibilityService() {
         lastText = primary
         lastAt = now
 
-        // Diagnóstico (solo Prime): revela de qué ventana se leyó (front = ficha en
-        // primer plano; active = la que devuelve rootInActiveWindow), cuántas
-        // ventanas de aplicación hay y los candidatos con su tipo (H = encabezado,
-        // T = texto). Sirve para confirmar el arreglo o afinar si Prime compone la
-        // ficha dentro de la MISMA ventana que el inicio.
-        if (isPrime(pkg)) {
-            val hc = analysis.headingCount.coerceAtMost(analysis.candidates.size)
-            val tagged = analysis.candidates.mapIndexed { i, c ->
-                (if (i < hc) "H:" else "T:") + "«$c»"
-            }.joinToString(" ")
-            p.addLog(
-                "Prime dbg: root=${if (lastRootFront) "front" else "active"} " +
-                    "wins=${appWindowCount()} play=${analysis.sawPlay} " +
-                    "señales=${analysis.detailSignals} → $tagged",
-            )
+        // Diagnóstico (solo Prime): barrido de ventanas y candidato elegido.
+        if (winScan.isNotEmpty()) {
+            p.addLog("Prime dbg: win=$winScan → «$primary»")
         }
 
         val token = p.token ?: return
@@ -201,39 +213,23 @@ class AccessibilityStreamingService : AccessibilityService() {
 
     private fun isPrime(pkg: String): Boolean = Platforms.nameFor(pkg) == "Prime Video"
 
-    // Origen de la última raíz analizada (para el diagnóstico): true si se leyó la
-    // ventana de aplicación en primer plano; false si se cayó a rootInActiveWindow.
-    private var lastRootFront = false
-
-    // Raíz a analizar. Para todas las plataformas se mantiene rootInActiveWindow (sin
-    // cambios). SOLO en Prime Video se prefiere la ventana de aplicación MÁS AL FRENTE
-    // (mayor `layer`): al abrir una ficha, Prime la muestra encima del INICIO —cuyo
-    // banner destacado se autorreproduce—, pero rootInActiveWindow devolvía a veces
-    // esa pantalla de fondo, así que se detectaba siempre el título del banner y nunca
-    // la ficha abierta. Requiere `flagRetrieveInteractiveWindows` en la config.
-    private fun analysisRoot(pkg: String): AccessibilityNodeInfo? {
-        lastRootFront = false
+    // Ventanas a analizar. Para el resto de plataformas: solo la ventana activa
+    // (rootInActiveWindow), sin cambios. En Prime se consideran TODAS las ventanas de
+    // aplicación DE PRIME (filtradas por paquete: excluye recientes, gestor de
+    // archivos, overlays del sistema como "Controlador de ventana"…), porque la
+    // ventana activa/superior no siempre es la ficha; luego processCurrent elige la
+    // que más parece una ficha. Requiere `flagRetrieveInteractiveWindows` en la config.
+    private fun candidateRoots(pkg: String): List<AccessibilityNodeInfo> {
         val active = rootInActiveWindow
-        if (!isPrime(pkg)) return active
-        val wins = try { windows } catch (e: Exception) { null }
-        if (wins.isNullOrEmpty()) return active
-        val frontApp = wins
+        if (!isPrime(pkg)) return listOfNotNull(active)
+        val wins = try { windows } catch (e: Exception) { null } ?: return listOfNotNull(active)
+        val primeRoots = wins.asSequence()
             .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            .maxByOrNull { it.layer }
-        val root = try { frontApp?.root } catch (e: Exception) { null }
-        return if (root != null) {
-            lastRootFront = true
-            root
-        } else {
-            active
-        }
-    }
-
-    /** Nº de ventanas de aplicación visibles (solo para el diagnóstico de Prime). */
-    private fun appWindowCount(): Int = try {
-        windows?.count { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } ?: -1
-    } catch (e: Exception) {
-        -1
+            .mapNotNull { try { it.root } catch (e: Exception) { null } }
+            .filter { it.packageName?.toString() == pkg }
+            .take(MAX_WINDOWS)
+            .toList()
+        return if (primeRoots.isNotEmpty()) primeRoots else listOfNotNull(active)
     }
 
     companion object {
@@ -242,5 +238,6 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val MAX_NODES = 900
         private const val MAX_CANDIDATES = 4
         private const val MAX_LABELS = 8
+        private const val MAX_WINDOWS = 6
     }
 }
