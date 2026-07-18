@@ -919,8 +919,11 @@ export default function ContinueWatchingClient() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Móvil */}
-          <div className="relative z-10 flex gap-2 lg:hidden">
+          {/* Móvil: búsqueda + panel de filtros como OVERLAY absoluto (fuera de
+              flujo): al abrir/cerrar no cambia la altura de la cabecera sticky, así
+              la lista de detrás queda ESTÁTICA (sin empuje ni parpadeo). */}
+          <div className="relative z-10 lg:hidden">
+            <div className="relative flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
@@ -968,13 +971,13 @@ export default function ContinueWatchingClient() {
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="relative z-10 lg:hidden overflow-visible"
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-3 shadow-2xl backdrop-blur-2xl"
               >
-                <div className="space-y-3 pt-1">
+                <div className="space-y-3">
                   {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
                       altura que Ordenar) — diseño móvil de siempre. */}
                   <div className="flex gap-2 items-center">
@@ -1068,6 +1071,7 @@ export default function ContinueWatchingClient() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
 
           {/* Escritorio: Fila única */}
           <div className="hidden lg:flex gap-3 relative z-10">
