@@ -386,6 +386,13 @@ const panelVariantsRight = {
 // layout (mínimo cómodo, y como mucho casi todo el viewport).
 const RESIZE_STORAGE_KEY = "showverse:detailModalWidth";
 
+// Propiedad de la CSS var `--sv-drawer-width` (la publica el efecto de más abajo
+// para que otros overlays se centren en el espacio libre). Un contador de "dueño"
+// evita que, al CAMBIAR de título, el cleanup del drawer SALIENTE (que
+// AnimatePresence mantiene montado) borre la var del nuevo que sigue abierto.
+let drawerWidthVarSeq = 0;
+let drawerWidthVarOwner = 0;
+
 // Límites del drawer.
 //
 // MÁXIMO: media pantalla.
@@ -758,6 +765,29 @@ export default function DetailModal({
     return () => window.removeEventListener("resize", onResize);
   }, [isRightPlacement]);
 
+  // Expone el ancho del drawer en una CSS var global mientras está abierto, para
+  // que otros overlays superpuestos (p. ej. el modal de episodios agrupados del
+  // Historial) puedan centrarse en el espacio libre a la IZQUIERDA sin taparlo.
+  // Se limpia al cerrar (y en centrado/móvil nunca se pone → los overlays ocupan
+  // la ventana completa como siempre).
+  useEffect(() => {
+    if (!isRightPlacement || typeof document === "undefined") return undefined;
+    const root = document.documentElement;
+    const id = ++drawerWidthVarSeq;
+    drawerWidthVarOwner = id;
+    root.style.setProperty("--sv-drawer-width", `${panelWidth}px`);
+    return () => {
+      // Solo limpia si NINGUNA instancia posterior tomó el relevo. Al cambiar de
+      // título, el drawer saliente que AnimatePresence mantiene montado ejecuta su
+      // cleanup DESPUÉS de que el nuevo ya fijó la var; sin este guard borraría la
+      // var del que sigue abierto y el overlay se expandiría tapando la preview.
+      if (drawerWidthVarOwner === id) {
+        drawerWidthVarOwner = 0;
+        root.style.removeProperty("--sv-drawer-width");
+      }
+    };
+  }, [isRightPlacement, panelWidth]);
+
   const resizingRef = useRef(false);
   const nestedModalOpenRef = useRef(false);
 
@@ -842,6 +872,9 @@ export default function DetailModal({
       const next = clampDrawerWidth(vw - moveEvent.clientX, vw);
       panelWidthRef.current = next;
       if (panelRef.current) panelRef.current.style.width = `${next}px`;
+      // Mantiene la CSS var en vivo durante el arrastre (el efecto solo reconcilia
+      // al soltar), para que un overlay a la izquierda siga el ancho del drawer.
+      document.documentElement.style.setProperty("--sv-drawer-width", `${next}px`);
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);

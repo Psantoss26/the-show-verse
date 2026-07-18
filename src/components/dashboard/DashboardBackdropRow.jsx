@@ -12,7 +12,7 @@
 // caché que el resto del dashboard) y los extras/logo/trailer solo se piden al
 // hacer hover, ya que la tarjeta de vista previa se monta en ese momento.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -300,6 +300,7 @@ export function BackdropPreviewCard({
   perView = 6,
   onPreviewMouseEnter,
   onPreviewMouseLeave,
+  onNestedModalOpenChange,
 }) {
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
@@ -379,6 +380,12 @@ export function BackdropPreviewCard({
 
   // Modal de valoración de episodios (solo series).
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+  // Si la preview se desmonta con un modal anidado aún marcado como abierto,
+  // limpiamos la señal para no dejar el cierre de la preview congelado en el row.
+  useEffect(
+    () => () => onNestedModalOpenChange?.(false),
+    [onNestedModalOpenChange],
+  );
 
   // Reinicio del soundtrack al cambiar de título.
   useEffect(() => {
@@ -1109,6 +1116,9 @@ export function BackdropPreviewCard({
               mediaType === "tv"
                 ? (e) => {
                     e?.stopPropagation?.();
+                    // Señala al row que hay un modal anidado abierto ANTES de que
+                    // el mouseleave (al ir al modal) intente cerrar la preview.
+                    onNestedModalOpenChange?.(true);
                     setEpisodeRatingsOpen(true);
                   }
                 : undefined
@@ -1331,7 +1341,10 @@ export function BackdropPreviewCard({
     {mediaType === "tv" && (
       <EpisodeRatingsModal
         open={episodeRatingsOpen}
-        onClose={() => setEpisodeRatingsOpen(false)}
+        onClose={() => {
+          setEpisodeRatingsOpen(false);
+          onNestedModalOpenChange?.(false);
+        }}
         showId={Number(item.id)}
         title={title}
       />
@@ -1371,6 +1384,15 @@ export default function DashboardBackdropRow({
   const [perView, setPerView] = useState(6);
   const hoverCloseTimeoutRef = useRef(null);
   const hoveredIdRef = useRef(null);
+  // Un modal anidado abierto DESDE la vista previa (p. ej. la tabla de valoraciones
+  // de episodios, que se portaliza a body) no debe cerrarse cuando el cursor sale
+  // de la preview para ir a él: ese mouseleave dispararía closePreview y desmontaría
+  // la preview, y con ella el modal (su hijo). Mientras haya uno abierto, congelamos
+  // el cierre de la preview.
+  const nestedPreviewModalOpenRef = useRef(false);
+  const handlePreviewNestedModalChange = useCallback((open) => {
+    nestedPreviewModalOpenRef.current = open;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1416,6 +1438,8 @@ export default function DashboardBackdropRow({
   };
 
   const closePreview = (itemKey) => {
+    // No cerrar la preview si tiene un modal anidado abierto (ver ref arriba).
+    if (nestedPreviewModalOpenRef.current) return;
     if (hoveredIdRef.current !== itemKey) return;
     const item = displayItems.find((entry) => getDisplayItemKey(entry) === itemKey);
     hoveredIdRef.current = null;
@@ -1655,6 +1679,9 @@ export default function DashboardBackdropRow({
                             perView={perView}
                             onPreviewMouseEnter={() => openPreview(itemKey, i)}
                             onPreviewMouseLeave={() => closePreview(itemKey)}
+                            onNestedModalOpenChange={
+                              handlePreviewNestedModalChange
+                            }
                           />
                         </div>
                       ) : (
