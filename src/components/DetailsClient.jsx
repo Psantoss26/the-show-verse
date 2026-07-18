@@ -8321,7 +8321,16 @@ export default function DetailsClient({
                           // saltaba ese fundido en la primera entrada y por eso
                           // aparecía de golpe (ver nota donde estaba la bandera
                           // `shouldRevealCurrentPosterImmediately`, ya retirada).
-                          className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
+                          // SIN `transform-gpu`/`will-change:transform`: eso la
+                          // promovía a su PROPIA capa, separada de la del wrapper
+                          // (la que tiene la máscara). Al hacer tope/overscroll
+                          // (tocar arriba), el compositor estira cada capa por su
+                          // cuenta y la imagen se desplazaba unos px respecto a su
+                          // máscara → asomaba el borde crudo por abajo (línea en
+                          // pósters claros). Sin promoción, rasteriza DENTRO de la
+                          // capa del wrapper y la máscara la cubre siempre. La GPU
+                          // la sigue aportando el wrapper (`transform-gpu`).
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
 ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `scale(${POSTER_OVERSCAN})`,
@@ -8356,7 +8365,10 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                               }
                             }}
                             onError={() => {}}
-                            className={`absolute inset-0 w-full h-full object-cover transform-gpu transition-opacity duration-500 ease-out will-change-[opacity,transform]
+                            // Igual que la LOW: sin promoción a capa propia para
+                            // que rasterice DENTRO de la capa enmascarada del
+                            // wrapper y no asome el borde crudo al hacer overscroll.
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
                               transform: `scale(${POSTER_OVERSCAN})`,
