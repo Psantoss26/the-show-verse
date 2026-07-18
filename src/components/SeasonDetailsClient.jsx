@@ -28,6 +28,10 @@ import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import {
+  buildTraktHref,
+  buildImdbHref,
+} from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 import {
   formatDateEs,
@@ -1188,28 +1192,27 @@ export default function SeasonDetailsClient({
                   : undefined,
                 href: tmdbSeasonUrl,
               }}
-              trakt={
-                traktDecimal
-                  ? {
-                      value: traktDecimal,
-                      sub: tScoreboard.votes
-                        ? formatCountShort(tScoreboard.votes)
-                        : undefined,
-                      href: tScoreboard.traktUrl,
-                    }
-                  : null
-              }
-              imdb={
-                imdbData?.rating != null
-                  ? {
-                      value: Number(imdbData.rating).toFixed(1),
-                      sub: imdbData?.votes
-                        ? formatCountShort(imdbData.votes)
-                        : undefined,
-                      href: imdbUrl || undefined,
-                    }
-                  : null
-              }
+              trakt={{
+                value: traktDecimal || undefined,
+                sub: tScoreboard.votes
+                  ? formatCountShort(tScoreboard.votes)
+                  : undefined,
+                href: buildTraktHref({
+                  href: tScoreboard.traktUrl,
+                  type: "tv",
+                  tmdbId: showId,
+                }),
+              }}
+              imdb={{
+                value:
+                  imdbData?.rating != null
+                    ? Number(imdbData.rating).toFixed(1)
+                    : undefined,
+                sub: imdbData?.votes
+                  ? formatCountShort(imdbData.votes)
+                  : undefined,
+                href: buildImdbHref({ href: imdbUrl, title: showName }),
+              }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
               toolbarActions={
