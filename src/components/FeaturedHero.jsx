@@ -1126,9 +1126,18 @@ function FeaturedSlide({
 
   return (
     <div
-      className="relative w-full h-full bg-black cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
+      className="relative w-full h-full bg-black sm:bg-transparent cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
       onClick={openPreviewModal}
     >
+      {/* FONDO enmascarado (solo desktop): envuelve imagen + sombras + base negra
+          y las funde a TRANSPARENTE en el borde inferior con la MISMA máscara que
+          la portada de DetailModal (`--sv-hero-fade`). Así, al aparecer el hover
+          backdrop del dashboard detrás, el borde inferior NO se ve como un corte
+          (antes fundía a negro sólido, que contra una imagen se marca).
+          `contents` en móvil = sin caja (no altera el layout móvil, que muestra el
+          póster en flujo relativo); en desktop es la caja absoluta enmascarada. El
+          CONTENIDO (logo/botones/indicadores) queda FUERA del wrapper → nítido. */}
+      <div className="contents sm:absolute sm:inset-0 sm:block sm:bg-black sm:[-webkit-mask-image:var(--sv-hero-fade)] sm:[mask-image:var(--sv-hero-fade)]">
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
       <div
         className={`w-full ${
@@ -1302,16 +1311,11 @@ function FeaturedSlide({
         }}
       />
 
-      {/* Difuminado inferior (solo escritorio): negro sólido en el borde para
-          ocultar el corte de la imagen contra el fin de FeaturedHero, fundiendo
-          suavemente hacia arriba y cubriendo los puntos indicadores. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 -bottom-px hidden h-[22%] sm:block"
-        style={{
-          background:
-            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.85) 14%, rgba(0,0,0,0.4) 46%, transparent 100%)",
-        }}
-      />
+      </div>
+      {/* Fin del FONDO enmascarado. El antiguo difuminado inferior NEGRO (que
+          fundía el borde a negro sólido y por eso se marcaba como corte contra el
+          hover backdrop) se sustituye por la máscara `--sv-hero-fade` del wrapper:
+          ahora el borde funde a TRANSPARENTE y revela lo que hay detrás sin corte. */}
 
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
       <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
@@ -2264,7 +2268,7 @@ export default function FeaturedHero({
     <>
       <section
         ref={heroSectionRef}
-        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[var(--hero-desktop-max-height)]"
+        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black sm:bg-transparent h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[var(--hero-desktop-max-height)]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
