@@ -3551,23 +3551,21 @@ export default function FavoritesClient() {
             </button>
           </div>
 
-          {/* Mobile: collapsible filters */}
+          {/* Mobile: panel de filtros. SIEMPRE overlay absoluto (fuera de flujo),
+              nunca en flujo: así abrir/cerrar NO cambia la altura de la cabecera y
+              la rejilla de detrás queda ESTÁTICA. Antes conmutaba absolute↔relative
+              y, al cerrar con el header sticky, insertaba toda su altura en el flujo
+              un instante → el "salto hacia abajo" acumulativo. El grid 0fr→1fr anima
+              el desplegado sobre el propio elemento absoluto (sin empujar). */}
           <div
             className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
               mobileFiltersOpen
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
-            } lg:hidden overflow-hidden ${
-              filtersSticky && mobileFiltersOpen
-                ? "absolute left-0 right-0 z-10"
-                : "relative z-10"
-            }`}
+            } lg:hidden overflow-hidden absolute left-0 right-0 z-[80]`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top:
-                filtersSticky && mobileFiltersOpen
-                  ? "calc(100% + 4px)"
-                  : undefined,
+              top: "calc(100% + 4px)",
             }}
           >
             <div className="min-h-0">
