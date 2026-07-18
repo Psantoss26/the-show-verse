@@ -3052,23 +3052,19 @@ export default function WatchlistClient() {
             </button>
           </div>
 
-          {/* Mobile: collapsible filters */}
+          {/* Mobile: panel de filtros. SIEMPRE overlay absoluto (fuera de flujo),
+              nunca en flujo: abrir/cerrar NO cambia la altura de la cabecera y la
+              rejilla de detrás queda ESTÁTICA (antes conmutaba absolute↔relative y
+              al cerrar insertaba su altura en el flujo → salto hacia abajo). */}
           <div
             className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
               mobileFiltersOpen
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
-            } lg:hidden overflow-hidden ${
-              filtersSticky && mobileFiltersOpen
-                ? "absolute left-0 right-0 z-10"
-                : "relative z-10"
-            }`}
+            } lg:hidden overflow-hidden absolute left-0 right-0 z-[80]`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top:
-                filtersSticky && mobileFiltersOpen
-                  ? "calc(100% + 4px)"
-                  : undefined,
+              top: "calc(100% + 4px)",
             }}
           >
             <div className="min-h-0">
