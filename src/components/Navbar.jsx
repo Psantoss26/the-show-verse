@@ -772,13 +772,12 @@ export default function Navbar() {
     "/watchlist"
   ];
   const anyTabActive = ALL_NAV_PATHS.some((path) => isActive(path));
-  const prevAnyTabActiveRef = useRef(false);
+  const [prevAnyTabActive, setPrevAnyTabActive] = useState(false);
+  if (anyTabActive !== prevAnyTabActive) {
+    setPrevAnyTabActive(anyTabActive);
+  }
 
-  useEffect(() => {
-    prevAnyTabActiveRef.current = anyTabActive;
-  }, [anyTabActive]);
-
-  const shouldAnimateLayout = prevAnyTabActiveRef.current && anyTabActive;
+  const shouldAnimateLayout = prevAnyTabActive && anyTabActive;
 
   const prefetchNavRoute = useCallback(
     (href) => {
