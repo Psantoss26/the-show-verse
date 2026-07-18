@@ -893,7 +893,7 @@ function CalendarWithPosters({
                   : isSelected
                     ? "bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
                     : isToday
-                      ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+                      ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/95 shadow-lg shadow-emerald-500/10"
                       : hasItems
                         ? "bg-zinc-900/40 border-zinc-800/50 hover:border-emerald-500/30 hover:bg-zinc-900/60"
                         : "bg-zinc-900/40 border-zinc-800/50",
@@ -1308,7 +1308,7 @@ function CalendarPanel({
                   selected
                     ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 z-10 scale-110"
                     : isToday
-                      ? "bg-white/10 text-white ring-1 ring-emerald-500/50"
+                      ? "bg-white/10 text-white ring-[2.5px] ring-inset ring-emerald-500/95"
                       : "bg-white/5 hover:bg-white/10 hover:text-white hover:scale-105"
                 }`}
             >
@@ -1615,8 +1615,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
       className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? "opacity-50 pointer-events-none grayscale" : ""}`}
     >
       <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md bg-zinc-900 shrink-0">
-        {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
           <div className="absolute inset-0 w-full h-full">
             <div
@@ -1661,7 +1659,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
             )}
           </div>
         </div>
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2">

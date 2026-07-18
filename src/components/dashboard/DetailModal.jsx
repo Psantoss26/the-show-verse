@@ -71,6 +71,11 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import {
+  buildTmdbHref,
+  buildTraktHref,
+  buildImdbHref,
+} from "@/lib/details/ratingLinks";
+import {
   formatCountShort,
   formatDateEs,
   slugifyForSeriesGraph,
@@ -2765,40 +2770,43 @@ export default function DetailModal({
               >
                 <DetailsScoreboardPanel
                   loading={loading}
-                  tmdb={
-                    data.tmdbRating != null
-                      ? {
-                          value: data.tmdbRating,
-                          sub: formatCountShort(data.tmdbVotes),
-                          href: item?.id
-                            ? `https://www.themoviedb.org/${
-                                mediaType === "tv" ? "tv" : "movie"
-                              }/${item.id}`
-                            : undefined,
-                        }
-                      : null
-                  }
-                  traktPublic={
-                    typeof scoreboard?.rating === "number"
-                      ? {
-                          value: Number(scoreboard.rating).toFixed(1),
-                          sub: scoreboard.votes
-                            ? formatCountShort(scoreboard.votes)
-                            : undefined,
-                        }
-                      : null
-                  }
-                  imdb={
-                    typeof data.imdbRating === "number"
-                      ? {
-                          value: data.imdbRating.toFixed(1),
-                          sub: formatCountShort(data.imdbVotes),
-                          href: data.imdbId
-                            ? `https://www.imdb.com/title/${data.imdbId}`
-                            : undefined,
-                        }
-                      : null
-                  }
+                  tmdb={{
+                    value:
+                      data.tmdbRating != null ? data.tmdbRating : undefined,
+                    sub:
+                      data.tmdbRating != null
+                        ? formatCountShort(data.tmdbVotes)
+                        : undefined,
+                    href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
+                  }}
+                  // Trakt SIEMPRE visible con enlace (canónico o búsqueda por id de
+                  // TMDb). Sustituye al antiguo `traktPublic` (que iba sin enlace).
+                  trakt={{
+                    value:
+                      typeof scoreboard?.rating === "number"
+                        ? Number(scoreboard.rating).toFixed(1)
+                        : undefined,
+                    sub: scoreboard?.votes
+                      ? formatCountShort(scoreboard.votes)
+                      : undefined,
+                    href: buildTraktHref({
+                      href: traktStatus?.traktUrl,
+                      type: mediaType,
+                      tmdbId: item?.id,
+                    }),
+                  }}
+                  traktPublic={null}
+                  imdb={{
+                    value:
+                      typeof data.imdbRating === "number"
+                        ? data.imdbRating.toFixed(1)
+                        : undefined,
+                    sub:
+                      typeof data.imdbRating === "number"
+                        ? formatCountShort(data.imdbVotes)
+                        : undefined,
+                    href: buildImdbHref({ imdbId: data.imdbId, title }),
+                  }}
                   rt={
                     data.rtScore != null
                       ? { value: Math.round(data.rtScore) }

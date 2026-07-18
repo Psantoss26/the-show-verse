@@ -221,6 +221,11 @@ import {
 import DetailsScoreboardPanel, {
   ToolbarSeparator,
 } from "@/components/details/DetailsScoreboardPanel";
+import {
+  buildTmdbHref,
+  buildTraktHref,
+  buildImdbHref,
+} from "@/lib/details/ratingLinks";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
 // ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
@@ -8719,41 +8724,37 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 loading={tScoreboard.loading}
                 tmdb={{
                   value: data.vote_average?.toFixed(1),
-                  sub: formatCountShort(data.vote_count),
-                  href: tmdbDetailUrl,
+                  sub: data.vote_count
+                    ? formatCountShort(data.vote_count)
+                    : undefined,
+                  href: buildTmdbHref({ href: tmdbDetailUrl, type, tmdbId: id }),
                 }}
-                trakt={
-                  traktDecimal
-                    ? {
-                        value: traktDecimal,
-                        sub: tScoreboard.votes
-                          ? formatCountShort(tScoreboard.votes)
-                          : undefined,
-                        href: trakt?.traktUrl,
-                      }
-                    : null
-                }
-                traktPublic={
-                  !traktDecimal && !trakt?.connected && tScoreboard?.rating
-                    ? {
-                        value: Number(tScoreboard.rating).toFixed(1),
-                        sub: tScoreboard.votes
-                          ? formatCountShort(tScoreboard.votes)
-                          : undefined,
-                      }
-                    : null
-                }
-                imdb={
-                  extras.imdbRating
-                    ? {
-                        value: Number(extras.imdbRating).toFixed(1),
-                        sub: formatCountShort(extras.imdbVotes),
-                        href: resolvedImdbId
-                          ? `https://www.imdb.com/title/${resolvedImdbId}`
-                          : undefined,
-                      }
-                    : null
-                }
+                // Trakt SIEMPRE visible (aunque no haya nota todavía): value "-" y
+                // enlace a la ficha de Trakt (canónico o búsqueda por id de TMDb).
+                // Se unifica con el antiguo `traktPublic` (que iba sin enlace).
+                trakt={{
+                  value: traktDecimal || undefined,
+                  sub: tScoreboard.votes
+                    ? formatCountShort(tScoreboard.votes)
+                    : undefined,
+                  href: buildTraktHref({
+                    href: trakt?.traktUrl,
+                    type,
+                    tmdbId: id,
+                  }),
+                }}
+                traktPublic={null}
+                // IMDb SIEMPRE visible con enlace (directo por id, o búsqueda por
+                // título si aún no se resolvió el id de IMDb).
+                imdb={{
+                  value: extras.imdbRating
+                    ? Number(extras.imdbRating).toFixed(1)
+                    : undefined,
+                  sub: extras.imdbRating
+                    ? formatCountShort(extras.imdbVotes)
+                    : undefined,
+                  href: buildImdbHref({ imdbId: resolvedImdbId, title }),
+                }}
                 rt={
                   tScoreboard?.external?.rtAudience != null ||
                   extras.rtScore != null
