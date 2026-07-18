@@ -40,6 +40,7 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
@@ -80,6 +81,11 @@ function readHistoryCache() {
     return {
       items: parsed.items,
       hasMore: !!parsed.hasMore,
+      // Cursor de la SIGUIENTE página a cargar. Se persiste para que, al volver
+      // (atrás/adelante), la paginación continúe donde estaba en vez de re-pedir
+      // desde la página 1. Cachés antiguas sin este campo → 1 (el dedupe evita
+      // duplicados si se re-pide una página ya cargada).
+      nextPage: Number(parsed.nextPage) > 1 ? Number(parsed.nextPage) : 1,
       fresh: age < HISTORY_CACHE_TTL_MS,
     };
   } catch {
@@ -87,7 +93,7 @@ function readHistoryCache() {
   }
 }
 
-function writeHistoryCache(items, { hasMore = false } = {}) {
+function writeHistoryCache(items, { hasMore = false, nextPage } = {}) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
@@ -96,6 +102,8 @@ function writeHistoryCache(items, { hasMore = false } = {}) {
         t: Date.now(),
         items: Array.isArray(items) ? items : [],
         hasMore: !!hasMore,
+        // Cursor de la siguiente página (para reanudar la paginación al volver).
+        nextPage: Number(nextPage) > 1 ? Number(nextPage) : 1,
       }),
     );
   } catch {}
@@ -1197,7 +1205,10 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                 const subHref = getDetailsHref(sub);
                 return (
                   <Link
-                    key={`sub-${getHistoryId(sub) || subIdx}`}
+                    // Mismo motivo que en ExpandedGroupView: getHistoryId(sub) puede
+                    // repetirse dentro de un grupo, así que se añade el índice para
+                    // garantizar una key única.
+                    key={`sub-${getHistoryId(sub) ?? "x"}-${subIdx}`}
                     href={subHref || "#"} prefetch
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
@@ -2282,6 +2293,26 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
   const href = getDetailsHref(entry);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
+  // Al pulsar un episodio se abre su PREVIEW (DetailModal drawer), igual que las
+  // tarjetas del historial, en vez de navegar a la ficha completa. El modal de
+  // grupo queda por encima (z), así que la preview se abre por detrás y se puede
+  // seguir seleccionando episodios.
+  const previewClick = usePreviewOpen();
+  const showTmdbId = getTmdbId(entry);
+  const onPreviewClick = previewClick(entry, {
+    previewId: showTmdbId,
+    mediaType: "tv",
+    episode:
+      meta && meta.season != null && meta.episode != null
+        ? {
+            showId: showTmdbId,
+            seasonNumber: meta.season,
+            episodeNumber: meta.episode,
+            name: meta.title ?? null,
+            showName: entry?.show?.title ?? entry?.showTitle ?? null,
+          }
+        : undefined,
+  });
 
   const handleDeleteClick = (e) => {
     e.preventDefault();
@@ -2303,6 +2334,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
     <div className="relative group/subitem rounded-xl overflow-hidden transition-all hover:bg-white/5 border border-transparent hover:border-white/10">
       <Link
         href={href || "#"} prefetch
+        onClick={onPreviewClick}
         className={`flex items-center gap-3 p-2.5 sm:p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
         <div className="relative w-24 sm:w-28 aspect-video rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
@@ -2376,6 +2408,12 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
   const tmdbId = getTmdbId(entry);
   const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
   const [mounted, setMounted] = useState(false);
+  // Pulsar el título/póster de la serie abre su PREVIEW (drawer), no navega.
+  const previewClick = usePreviewOpen();
+  const onSeriesPreview = previewClick(entry, {
+    previewId: tmdbId,
+    mediaType: "tv",
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -2390,7 +2428,17 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 
   return createPortal(
     <motion.div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-lg"
+      // z-[10000] > z-[9999] de DetailModal: el modal de grupo se superpone SOBRE
+      // la preview. Con el drawer derecho abierto, `right: var(--sv-drawer-width)`
+      // restringe su zona (y su fondo difuminado) al espacio LIBRE a la izquierda,
+      // así se centra ahí y NO tapa la preview. Sin drawer la var es 0px → ventana
+      // completa (centrado normal). El cambio de anchura se anima con transition.
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-lg transition-[right] duration-300 ease-out"
+      style={{ right: "var(--sv-drawer-width, 0px)" }}
+      // Marca de "capa de modal": el drawer derecho de DetailModal se cierra con un
+      // listener global de click salvo dentro de `[data-detail-modal-layer]`. Sin
+      // esto, cualquier clic en este modal (backdrop o panel) cerraría la preview.
+      data-detail-modal-layer=""
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2402,7 +2450,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
       transition={{ duration: 0.3 }}
     >
       <motion.div
-        className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl flex flex-col max-h-[85vh]"
+        className={`relative w-full max-w-xl overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} flex flex-col max-h-[85vh]`}
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -2417,6 +2465,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
             <div className="min-w-0">
               <Link
                 href={href || "#"} prefetch
+                onClick={onSeriesPreview}
                 className="text-base sm:text-lg font-bold text-white hover:text-emerald-300 transition-colors line-clamp-1 drop-shadow-sm"
               >
                 {title}
@@ -2439,7 +2488,11 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
           <div className="p-3 sm:p-4 space-y-1 sm:space-y-1.5">
             {entry._group.map((ep, idx) => (
               <EpisodeSubItem
-                key={getHistoryId(ep) || idx}
+                // `getHistoryId(ep)` puede repetirse dentro de un grupo (para estas
+                // entradas coincide con el tmdbId de la serie, igual en todos los
+                // episodios), así que se combina con el índice para que la key sea
+                // ÚNICA y no dispare el aviso de React de keys duplicadas.
+                key={`ep-${getHistoryId(ep) ?? "x"}-${idx}`}
                 entry={ep}
                 onRemoveFromHistory={onRemoveFromHistory}
                 isBusy={busyId === `del:${getHistoryId(ep)}`}
@@ -2459,6 +2512,14 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 export default function HistoryClient() {
   const { session, account, hydrated: authHydrated, preferences } = useAuth();
   const { t } = useTranslation();
+  // Navegación atrás/adelante: al VOLVER restauramos la lista ya cargada y su
+  // posición en vez de re-pedir desde la página 1. La restauración de la lista se
+  // hace en un efecto (no en el init de estado) para NO romper la hidratación
+  // (en SSR no hay localStorage); <ScrollRestoration> reaplica la posición cuando
+  // la altura del documento vuelve a crecer con la lista restaurada.
+  const isBackNav = useIsHistoryNavigation();
+  const restoredFromHistoryCacheRef = useRef(false);
+
   const [hydrated, setHydrated] = useState(false);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
@@ -2525,12 +2586,18 @@ export default function HistoryClient() {
   }, []);
 
   useEffect(() => {
+    // Restaura la lista ya cargada (todas las páginas), el flag "hay más" y el
+    // cursor de página desde la caché. Al VOLVER (atrás/adelante), esto + saltar el
+    // reset-fetch (más abajo) mantiene la lista completa; <ScrollRestoration>
+    // devuelve la posición porque la altura del documento vuelve a la de antes.
     const cached = readHistoryCache();
     if (cached?.items?.length) {
       setRaw(cached.items);
       setHistoryLoaded(true);
       setHasMoreHistory(cached.hasMore);
       hasMoreHistoryRef.current = cached.hasMore;
+      nextHistoryPageRef.current = cached.nextPage || 1;
+      restoredFromHistoryCacheRef.current = true;
     }
 
     const savedView = window.localStorage.getItem("showverse:history:viewMode");
@@ -2626,7 +2693,10 @@ export default function HistoryClient() {
 
       setRaw((prev) => {
         if (reset) {
-          writeHistoryCache(sorted, { hasMore: nextHasMore });
+          writeHistoryCache(sorted, {
+            hasMore: nextHasMore,
+            nextPage: nextHistoryPageRef.current,
+          });
           return sorted;
         }
 
@@ -2642,7 +2712,10 @@ export default function HistoryClient() {
         const nextItems = merged.sort(
           (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
         );
-        writeHistoryCache(nextItems, { hasMore: nextHasMore });
+        writeHistoryCache(nextItems, {
+          hasMore: nextHasMore,
+          nextPage: nextHistoryPageRef.current,
+        });
         return nextItems;
       });
     } catch (error) {
@@ -2691,8 +2764,14 @@ export default function HistoryClient() {
   }, [loadAuth]);
 
   useEffect(() => {
-    if (!auth.loading && auth.connected) loadHistory({ reset: true });
-  }, [auth.loading, auth.connected, loadHistory]);
+    if (auth.loading || !auth.connected) return;
+    // Al VOLVER (atrás/adelante) con la lista ya cargada desde caché NO reseteamos
+    // a la página 1: eso encogería la lista y rompería la restauración de scroll.
+    // La paginación continúa desde el cursor restaurado y <ScrollRestoration>
+    // devuelve la posición porque la altura del documento vuelve a ser la de antes.
+    if (isBackNav && restoredFromHistoryCacheRef.current) return;
+    loadHistory({ reset: true });
+  }, [auth.loading, auth.connected, loadHistory, isBackNav]);
 
   useEffect(() => {
     if (!auth.connected || !historyLoaded || !hasMoreHistory || loading) return;
@@ -2719,7 +2798,10 @@ export default function HistoryClient() {
         const nextItems = (prev || []).filter(
           (x) => String(getHistoryId(x)) !== String(historyId),
         );
-        writeHistoryCache(nextItems, { hasMore: hasMoreHistoryRef.current });
+        writeHistoryCache(nextItems, {
+          hasMore: hasMoreHistoryRef.current,
+          nextPage: nextHistoryPageRef.current,
+        });
         return nextItems;
       });
     } catch {

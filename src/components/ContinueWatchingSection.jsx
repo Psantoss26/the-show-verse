@@ -1,7 +1,7 @@
 // /src/components/ContinueWatchingSection.jsx
 "use client";
 
-import { useRef, useEffect, useState, memo } from "react";
+import { useCallback, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion } from "framer-motion";
@@ -846,6 +846,7 @@ function ContinueWatchingPreviewCard({
   perView = 6,
   onPreviewMouseEnter,
   onPreviewMouseLeave,
+  onNestedModalOpenChange,
 }) {
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
@@ -935,6 +936,12 @@ function ContinueWatchingPreviewCard({
   const [ratingLoading, setRatingLoading] = useState(false);
   // Modal de valoración de episodios (solo series).
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+  // Limpia la señal de "modal anidado abierto" si la preview se desmonta con él
+  // aún marcado, para no congelar el cierre de la preview en el row.
+  useEffect(
+    () => () => onNestedModalOpenChange?.(false),
+    [onNestedModalOpenChange],
+  );
 
   const href = nextEpisodeHref(show);
   const prefetchedRef = useRef(false);
@@ -1701,6 +1708,7 @@ function ContinueWatchingPreviewCard({
               mediaType === "tv"
                 ? (e) => {
                     e?.stopPropagation?.();
+                    onNestedModalOpenChange?.(true);
                     setEpisodeRatingsOpen(true);
                   }
                 : undefined
@@ -1944,7 +1952,10 @@ function ContinueWatchingPreviewCard({
     {mediaType === "tv" && (
       <EpisodeRatingsModal
         open={episodeRatingsOpen}
-        onClose={() => setEpisodeRatingsOpen(false)}
+        onClose={() => {
+          setEpisodeRatingsOpen(false);
+          onNestedModalOpenChange?.(false);
+        }}
         showId={Number(show.id)}
         title={show?.title || ""}
       />
@@ -2001,6 +2012,12 @@ function ContinueWatchingSection({
   const hoverTimeoutRef = useRef(null);
   const hoverCloseTimeoutRef = useRef(null);
   const hoveredIdRef = useRef(null);
+  // Ver DashboardBackdropRow: un modal anidado abierto desde la preview (tabla de
+  // valoraciones de episodios) no debe cerrarse al mover el cursor hacia él.
+  const nestedPreviewModalOpenRef = useRef(false);
+  const handlePreviewNestedModalChange = useCallback((open) => {
+    nestedPreviewModalOpenRef.current = open;
+  }, []);
 
   // Limpiar temporizador al desmontar
   useEffect(() => {
@@ -2079,6 +2096,8 @@ function ContinueWatchingSection({
   };
 
   const closePreview = (itemKey) => {
+    // No cerrar la preview si tiene un modal anidado abierto (ver ref arriba).
+    if (nestedPreviewModalOpenRef.current) return;
     if (hoveredIdRef.current !== itemKey) return;
     const show = Array.isArray(displayShows)
       ? displayShows.find((entry) => (entry.uid || `${mediaTypeOf(entry)}:${entry.id}`) === itemKey)
@@ -2455,6 +2474,9 @@ function ContinueWatchingSection({
                             perView={perView}
                             onPreviewMouseEnter={() => openPreview(itemKey, i)}
                             onPreviewMouseLeave={() => closePreview(itemKey)}
+                            onNestedModalOpenChange={
+                              handlePreviewNestedModalChange
+                            }
                           />
                         </div>
                       ) : (

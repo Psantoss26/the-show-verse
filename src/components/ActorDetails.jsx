@@ -56,6 +56,14 @@ const ACTOR_LIQUID_CARD_CLASS =
   "relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] transform-gpu";
 const ACTOR_LIQUID_CARD_LAYER_CLASS =
   "pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70";
+// Estilo de "borde" de las tarjetas de contenido: SIN borde en reposo + anillo
+// EMERALD inset (2.5px) en hover, vía pseudo-elemento `after`. Misma receta que las
+// secciones de Reparto y Recomendaciones de DetailsClient, pero con el verde
+// dominante de ActorDetails (emerald-500) en vez del amarillo dorado. Se aplica
+// sobre el elemento redondeado hovereado (por eso `hover:after`, no
+// `group-hover:after`, que es un gotcha conocido con `after`).
+const CARD_HOVER_RING =
+  "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]";
 
 const tmdbImg = (path, size = "original") =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
@@ -1136,7 +1144,9 @@ function PosterCard({ item }) {
       className="group relative block w-full"
       title={title}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-800 border border-white/5 group-hover:border-emerald-500/50 transition-all duration-300">
+      <div
+        className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-800 shadow-md transition-all duration-300 lg:hover:shadow-emerald-900/20 ${CARD_HOVER_RING}`}
+      >
         {poster && !err ? (
           <OptimizedImage
             src={poster}
@@ -1196,7 +1206,9 @@ function AwardCard({ item }) {
   }, [imageCandidateKey]);
 
   return (
-    <article className="mt-3 block group relative rounded-xl overflow-hidden shadow-md border border-transparent hover:border-yellow-500/30 lg:hover:shadow-yellow-900/20 transition-all duration-300">
+    <article
+      className={`mt-3 block group relative rounded-xl overflow-hidden shadow-md lg:hover:shadow-emerald-900/20 transition-all duration-300 ${CARD_HOVER_RING}`}
+    >
       <div
         className="aspect-[2/3] overflow-hidden relative flex flex-col"
         style={{ background: visual.background }}
@@ -1299,7 +1311,7 @@ function PhotoCard({ image }) {
       href={tmdbImg(image.file_path, "original")}
       target="_blank"
       rel="noreferrer"
-      className="group relative z-0 block aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 hover:z-[60] focus:z-[60] focus:outline-none"
+      className={`group relative z-0 block aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-900 hover:z-[60] focus:z-[60] focus:outline-none ${CARD_HOVER_RING}`}
       whileHover={{
         y: -7,
         boxShadow:
@@ -1360,7 +1372,7 @@ function TaggedMediaCard({ image }) {
       href={tmdbImg(image.file_path, "original")}
       target="_blank"
       rel="noreferrer"
-      className="group relative z-0 block aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60 hover:z-[60] focus:z-[60] focus:outline-none"
+      className={`group relative z-0 block aspect-[16/10] overflow-hidden rounded-2xl bg-zinc-900/60 hover:z-[60] focus:z-[60] focus:outline-none ${CARD_HOVER_RING}`}
       whileHover={{
         y: -7,
         boxShadow:
