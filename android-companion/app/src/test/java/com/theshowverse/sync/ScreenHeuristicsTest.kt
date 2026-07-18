@@ -91,4 +91,33 @@ class ScreenHeuristicsTest {
         assertFalse(ScreenHeuristics.isLikelyTitle("2024"))
         assertFalse(ScreenHeuristics.isLikelyTitle(""))
     }
+
+    @Test
+    fun betterDetailPrefersTheRealFichaOverEmptyOverlays() {
+        // Caso del bug real de Prime: la ficha (muchas señales) DEBE ganar al overlay
+        // "Prime Video Controlador de ventana" y a la pantalla de recientes (0 señales).
+        // ficha: looksDetail=true, signals=5, cands=3   ·   overlay: false, 0, 1
+        assertTrue(
+            ScreenHeuristics.isBetterDetail(true, 5, 3, false, 0, 1),
+        )
+        assertFalse(
+            ScreenHeuristics.isBetterDetail(false, 0, 1, true, 5, 3),
+        )
+        // Recientes (0 señales, 3 candidatos "Cerrar todo/YouTube/Mis archivos") no gana
+        // a la ficha.
+        assertFalse(
+            ScreenHeuristics.isBetterDetail(false, 0, 3, true, 4, 2),
+        )
+    }
+
+    @Test
+    fun betterDetailBreaksTiesBySignalsThenCandidates() {
+        // A igualdad de "parece ficha", gana la de más señales de detalle.
+        assertTrue(ScreenHeuristics.isBetterDetail(true, 4, 1, true, 2, 3))
+        assertFalse(ScreenHeuristics.isBetterDetail(true, 2, 3, true, 4, 1))
+        // A igualdad de señales, gana la de más candidatos de título.
+        assertTrue(ScreenHeuristics.isBetterDetail(true, 3, 4, true, 3, 2))
+        // Empate total: no es estrictamente mejor.
+        assertFalse(ScreenHeuristics.isBetterDetail(true, 3, 2, true, 3, 2))
+    }
 }
