@@ -2610,7 +2610,23 @@ export default function HistoryClient() {
     return d;
   });
   const [selectedDay, setSelectedDay] = useState(null);
-  const [isMobile, setIsMobile] = useState(false);
+  // Inicialización SÍNCRONA (no arranca en false y se corrige en un efecto): al
+  // VOLVER (back-nav) el layout debe tener ya en el PRIMER frame el modo correcto
+  // (móvil/escritorio) para que la altura del documento coincida con la guardada y
+  // <ScrollRestoration> restaure la posición exacta en su `scrollTo` SÍNCRONO. Si
+  // arrancara en false, el frame 1 pintaría el layout de ESCRITORIO (altura
+  // distinta) y haría falta el bucle de reajuste, que en móvil el gesto táctil de
+  // "atrás" interrumpe → se quedaba sin restaurar (a diferencia de Favoritos, que
+  // no depende de `isMobile`). En carga fresca el contenido va oculto tras
+  // `hydrated`, así que no hay desajuste de hidratación.
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.matchMedia("(max-width: 1024px)").matches;
+    } catch {
+      return false;
+    }
+  });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
