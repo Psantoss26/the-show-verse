@@ -25,6 +25,12 @@ import {
   extractOmdbExtraScores,
   extractOmdbImdbScore,
 } from "@/lib/details/omdbCache";
+import {
+  buildCastDataForUI,
+  buildCreativeCreditsForCast,
+  getMovieDirectorsFromCrew,
+  normalizeCastFromTmdb,
+} from "@/lib/details/cast";
 import { formatDateEs } from "@/lib/details/formatters";
 import { traktGetSentiments, traktGetScoreboard } from "@/lib/api/traktClient";
 import {
@@ -57,22 +63,10 @@ function statusLabelEs(status) {
   return map[status] || status || null;
 }
 
-// Espejo de `isMainDirectorCredit` + `getMovieDirectorsFromCrew` +
-// `formatCreditNames` en DetailsClient: nombres de los directores (job "Director"
-// / "Co-Director") del equipo de créditos, unidos con ", ".
-const isMainDirectorCredit = (credit) =>
-  credit?.job === "Director" || credit?.job === "Co-Director";
-
-function movieDirectorNames(crew) {
-  const list = Array.isArray(crew) ? crew.filter(isMainDirectorCredit) : [];
-  return list.length
-    ? list.map((p) => p?.name).filter(Boolean).join(", ")
-    : null;
-}
-
 // Deduplica y recorta la lista de sentimientos de Trakt usando `sentiment_es`
 // (espejo de `formatTraktSentimentList` en DetailsClient).
 const DIACRITICS_RE = new RegExp("[\\u0300-\\u036f]", "g");
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function formatSentimentList(items = [], max = 4) {
   const seen = new Set();
@@ -122,6 +116,35 @@ function formatEpisodeRuntimePerEpisode(source) {
     source?.last_episode_to_air?.runtime,
   );
   return lastEpisodeRuntime;
+}
+
+async function fetchModalTmdbCast(mediaType, id) {
+  if (!TMDB_API_KEY || !id || (mediaType !== "tv" && mediaType !== "movie")) {
+    return [];
+  }
+
+  const fetchJson = async (path) => {
+    const url = new URL(`https://api.themoviedb.org/3/${path}`);
+    url.searchParams.set("api_key", TMDB_API_KEY);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.status_message || `TMDb ${res.status}`);
+    return json;
+  };
+
+  if (mediaType === "tv") {
+    const aggregate = await fetchJson(`tv/${id}/aggregate_credits`);
+    const aggregateCast = normalizeCastFromTmdb(aggregate?.cast, {
+      isAggregate: true,
+    });
+    if (aggregateCast.length) return aggregateCast;
+
+    const credits = await fetchJson(`tv/${id}/credits`);
+    return normalizeCastFromTmdb(credits?.cast, { isAggregate: false });
+  }
+
+  const credits = await fetchJson(`movie/${id}/credits`);
+  return normalizeCastFromTmdb(credits?.cast, { isAggregate: false });
 }
 
 const EMPTY_PRODUCTION = {
@@ -569,10 +592,11 @@ export function useDetailModalData(item) {
     (async () => {
       let details = null;
       try {
-        const [detailsRes, credits, recs] = await Promise.all([
+        const [detailsRes, credits, recs, modalTmdbCast] = await Promise.all([
           detailsPromise,
           getCredits(mediaType, id).catch(() => null),
           getRecommendations(mediaType, id).catch(() => null),
+          fetchModalTmdbCast(mediaType, id).catch(() => []),
         ]);
         if (cancelled) return;
 
@@ -640,9 +664,25 @@ export function useDetailModalData(item) {
             ? source.vote_count
             : null;
 
-        const cast = Array.isArray(credits?.cast)
-          ? credits.cast.slice(0, 12)
-          : [];
+        const fallbackCast = normalizeCastFromTmdb(credits?.cast, {
+          isAggregate: false,
+        });
+        const movieDirectors =
+          mediaType === "movie" ? getMovieDirectorsFromCrew(credits?.crew) : [];
+        const creativeCredits = buildCreativeCreditsForCast({
+          type: mediaType,
+          movieDirectors,
+          tvCreators: Array.isArray(details?.created_by)
+            ? details.created_by
+            : [],
+        });
+        const cast = buildCastDataForUI({
+          baseCast:
+            Array.isArray(modalTmdbCast) && modalTmdbCast.length
+              ? modalTmdbCast
+              : fallbackCast,
+          creativeCredits,
+        });
         const recommendations = Array.isArray(recs?.results)
           ? recs.results
           : [];
@@ -696,7 +736,13 @@ export function useDetailModalData(item) {
             : null;
 
         const director =
-          mediaType === "movie" ? movieDirectorNames(credits?.crew) : null;
+          mediaType === "movie"
+            ? movieDirectors
+                .map((person) => person?.name)
+                .filter(Boolean)
+                .join(", ") ||
+              null
+            : null;
         const creators =
           mediaType === "tv" &&
           Array.isArray(details?.created_by) &&

@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Star, Loader2 } from "lucide-react";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
+import { useServerOnline } from "@/context/ServerStatusContext";
 
 export default function TraktActions({ mediaType, tmdbId }) {
   const { ready, isConnected, getValidAccessToken } = useTraktAuth();
+  // Con el servidor propio caído no se puede escribir (visto/puntuar): se atenúan
+  // las acciones (la escritura offline en cola llegará en la Fase 2).
+  const serverOnline = useServerOnline();
 
   const [loading, setLoading] = useState(false);
   const [watched, setWatched] = useState(false);
@@ -14,7 +18,7 @@ export default function TraktActions({ mediaType, tmdbId }) {
   const [rating, setRating] = useState(null); // 1..10 | null
   const [error, setError] = useState("");
 
-  const disabled = !ready || !isConnected || loading;
+  const disabled = !ready || !isConnected || loading || !serverOnline;
 
   const label = useMemo(() => {
     if (!ready) return "…";
@@ -128,7 +132,7 @@ export default function TraktActions({ mediaType, tmdbId }) {
       <div className="flex items-center gap-2">
         <button
           onClick={toggleWatched}
-          disabled={!ready || !isConnected || loading}
+          disabled={disabled}
           className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all duration-300 ${
             watched
               ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"

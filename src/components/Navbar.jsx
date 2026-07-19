@@ -757,28 +757,6 @@ export default function Navbar() {
   const isActive = (href) =>
     activePath === href || (href !== "/" && activePath?.startsWith(href));
 
-  // Rutas que representan pestañas en el navbar (móvil y desktop)
-  const ALL_NAV_PATHS = [
-    "/",
-    "/movies",
-    "/series",
-    "/discover",
-    "/biblioteca",
-    "/lists",
-    "/calendar",
-    "/in-progress",
-    "/history",
-    "/favorites",
-    "/watchlist"
-  ];
-  const anyTabActive = ALL_NAV_PATHS.some((path) => isActive(path));
-  const [prevAnyTabActive, setPrevAnyTabActive] = useState(false);
-  if (anyTabActive !== prevAnyTabActive) {
-    setPrevAnyTabActive(anyTabActive);
-  }
-
-  const shouldAnimateLayout = prevAnyTabActive && anyTabActive;
-
   const prefetchNavRoute = useCallback(
     (href) => {
       if (!href || pathname === href) return;
@@ -992,10 +970,13 @@ export default function Navbar() {
             </Link>
 
             <div className="flex items-center gap-4">
-              <Link href="/" className={navLinkClass("/")}>
+              <Link
+                href="/"
+                onClick={() => setPendingHref("/")}
+                className={navLinkClass("/")}
+              >
                 {isActive("/") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopText" : undefined}
                     className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1007,11 +988,11 @@ export default function Navbar() {
                 prefetch
                 onMouseEnter={() => prefetchNavRoute("/movies")}
                 onFocus={() => prefetchNavRoute("/movies")}
+                onClick={() => setPendingHref("/movies")}
                 className={navLinkClass("/movies")}
               >
                 {isActive("/movies") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopText" : undefined}
                     className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1023,11 +1004,11 @@ export default function Navbar() {
                 prefetch
                 onMouseEnter={() => prefetchNavRoute("/series")}
                 onFocus={() => prefetchNavRoute("/series")}
+                onClick={() => setPendingHref("/series")}
                 className={navLinkClass("/series")}
               >
                 {isActive("/series") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopText" : undefined}
                     className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1042,7 +1023,6 @@ export default function Navbar() {
               >
                 {isActive("/discover") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopText" : undefined}
                     className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1057,7 +1037,6 @@ export default function Navbar() {
               >
                 {isActive("/biblioteca") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopText" : undefined}
                     className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1079,7 +1058,6 @@ export default function Navbar() {
               >
                 {isActive("/lists") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(217,70,239,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1098,7 +1076,6 @@ export default function Navbar() {
               >
                 {isActive("/calendar") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-amber-500/20 border border-amber-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(245,158,11,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1117,7 +1094,6 @@ export default function Navbar() {
               >
                 {isActive("/in-progress") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1139,7 +1115,6 @@ export default function Navbar() {
               >
                 {isActive("/history") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1158,7 +1133,6 @@ export default function Navbar() {
               >
                 {isActive("/favorites") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-red-500/20 border border-red-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(239,68,68,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1177,7 +1151,6 @@ export default function Navbar() {
               >
                 {isActive("/watchlist") && (
                   <motion.div
-                    layoutId={shouldAnimateLayout ? "activeTabDesktopIcon" : undefined}
                     className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.08)]"
                     transition={{ type: "spring", stiffness: 350, damping: 28 }}
                   />
@@ -1291,12 +1264,12 @@ export default function Navbar() {
           prefetch
           onTouchStart={() => prefetchNavRoute("/movies")}
           onFocus={() => prefetchNavRoute("/movies")}
+          onClick={() => setPendingHref("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
           aria-current={isActive("/movies") ? "page" : undefined}
         >
           {isActive("/movies") && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
@@ -1314,12 +1287,12 @@ export default function Navbar() {
           prefetch
           onTouchStart={() => prefetchNavRoute("/series")}
           onFocus={() => prefetchNavRoute("/series")}
+          onClick={() => setPendingHref("/series")}
           className={navLinkClassMobileBottom("/series", "purple")}
           aria-current={isActive("/series") ? "page" : undefined}
         >
           {isActive("/series") && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-fuchsia-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(217,70,239,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
@@ -1341,7 +1314,6 @@ export default function Navbar() {
         >
           {isActive("/in-progress") && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
@@ -1363,7 +1335,6 @@ export default function Navbar() {
         >
           {isActive("/history") && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
@@ -1385,7 +1356,6 @@ export default function Navbar() {
         >
           {isActive(favHref) && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-red-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(239,68,68,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
@@ -1407,7 +1377,6 @@ export default function Navbar() {
         >
           {isActive(watchHref) && (
             <motion.div
-              layoutId={shouldAnimateLayout ? "activeTabMobileBottom" : undefined}
               className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />

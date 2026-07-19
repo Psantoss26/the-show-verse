@@ -3022,7 +3022,7 @@ export default function DetailModal({
                   }}
                   className="!overflow-visible pb-1"
                 >
-                  {data.cast.map((person) => {
+                  {data.cast.slice(0, 20).map((person) => {
                     const photo = person?.profile_path
                       ? buildImg(person.profile_path, "w342")
                       : null;

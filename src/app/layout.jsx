@@ -1,10 +1,12 @@
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
+import { ServerStatusProvider } from "@/context/ServerStatusContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
+import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import { anton, ptSans } from "./fonts";
 
@@ -63,12 +65,15 @@ export default function RootLayout({ children }) {
         <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
         <link rel="dns-prefetch" href="https://player.vimeo.com" />
         <AuthProvider>
-          <ScrollRestoration />
-          <Navbar />
-          <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
-          <PwaManager />
-          <Analytics />
-          <SpeedInsights />
+          <ServerStatusProvider>
+            <ScrollRestoration />
+            <Navbar />
+            <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
+            <PwaManager />
+            <OfflineBanner />
+            <Analytics />
+            <SpeedInsights />
+          </ServerStatusProvider>
         </AuthProvider>
       </body>
     </html>

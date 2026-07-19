@@ -6,8 +6,12 @@
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 
-const ENGINE_ROWS_CACHE_TTL_MS = 5 * 60 * 1000;
-const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v3:";
+const ENGINE_ROWS_CACHE_TTL_MS = 5 * 60 * 1000; // "fresco" en memoria (dedup en sesión)
+// Caducidad larga del cache PERSISTENTE: sirve de fallback OFFLINE (NAS apagado). Se
+// revalida siempre en segundo plano, así que servir algo viejo es stale-while-
+// revalidate correcto; si hay red, se reemplaza al instante.
+const ENGINE_ROWS_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v4:";
 const memoryCache = new Map();
 const inFlight = new Map();
 
@@ -76,14 +80,20 @@ function readMemoryCache(key) {
   return cached;
 }
 
-function readSessionCache(key) {
+// Cache PERSISTENTE en localStorage (sobrevive a cerrar la app), para que los
+// dashboards muestren su última versión con el NAS apagado. Antes era sessionStorage
+// + TTL 5 min → se perdía al cerrar la app y no había nada offline.
+function readPersistentCache(key) {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(`${ENGINE_ROWS_CACHE_PREFIX}${key}`);
+    const raw = window.localStorage.getItem(`${ENGINE_ROWS_CACHE_PREFIX}${key}`);
     if (!raw) return null;
     const cached = JSON.parse(raw);
-    if (!cached || Date.now() - Number(cached.t || 0) > ENGINE_ROWS_CACHE_TTL_MS) {
-      window.sessionStorage.removeItem(`${ENGINE_ROWS_CACHE_PREFIX}${key}`);
+    if (
+      !cached ||
+      Date.now() - Number(cached.t || 0) > ENGINE_ROWS_HARD_MAX_AGE_MS
+    ) {
+      window.localStorage.removeItem(`${ENGINE_ROWS_CACHE_PREFIX}${key}`);
       return null;
     }
     return cached;
@@ -98,7 +108,7 @@ function writeCache(key, value) {
 
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       `${ENGINE_ROWS_CACHE_PREFIX}${key}`,
       JSON.stringify(cached),
     );
@@ -204,7 +214,7 @@ export function useEngineRows(
     if (!surface || !scope) return;
     let cancel = false;
     const key = cacheKey(surface, scope);
-    const cached = readMemoryCache(key) || readSessionCache(key);
+    const cached = readMemoryCache(key) || readPersistentCache(key);
 
     if (cached?.rows?.length) {
       setRowsStable(setRows, cached.rows);
