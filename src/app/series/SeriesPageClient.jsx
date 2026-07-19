@@ -1858,7 +1858,7 @@ function Row({
                 y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/40 to-transparent backdrop-blur-[6px] transition-all duration-300 group-hover/nav:from-black/95"
+              className="pointer-events-none absolute inset-y-0 left-0 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/40 to-transparent backdrop-blur-[6px] sv-scroll-mask-l transition-all duration-300 group-hover/nav:from-black/95"
             />
             <span className="relative ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ‹
@@ -1878,7 +1878,7 @@ function Row({
                 y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/40 to-transparent backdrop-blur-[6px] transition-all duration-300 group-hover/nav:from-black/95"
+              className="pointer-events-none absolute inset-y-0 right-0 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/40 to-transparent backdrop-blur-[6px] sv-scroll-mask-r transition-all duration-300 group-hover/nav:from-black/95"
             />
             <span className="relative mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ›

@@ -2523,11 +2523,11 @@ function ContinueWatchingSection({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -left-6 top-14 bottom-44 z-[110] hidden w-32 items-center justify-start sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
-                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
+              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
+                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+                className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-colors duration-300 group-hover/nav:from-black/75"
               />
               <motion.span
                 className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
@@ -2556,11 +2556,11 @@ function ContinueWatchingSection({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -right-6 top-14 bottom-44 z-[110] hidden w-32 items-center justify-end sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
-                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
+              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
+                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+                className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-colors duration-300 group-hover/nav:from-black/75"
               />
               <motion.span
                 className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
