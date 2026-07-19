@@ -622,12 +622,56 @@ html {
     rgba(0, 0, 0, 0.009) 97.8%,
     transparent 100%
   );
+
+  /* Máscaras para difuminar los extremos internos de los scroll buttons */
+  --sv-scroll-mask-left: linear-gradient(
+    to right,
+    #000 0%,
+    #000 30%,
+    rgba(0, 0, 0, 0.991) 40%,
+    rgba(0, 0, 0, 0.942) 50%,
+    rgba(0, 0, 0, 0.837) 60%,
+    rgba(0, 0, 0, 0.683) 70%,
+    rgba(0, 0, 0, 0.5) 80%,
+    rgba(0, 0, 0, 0.317) 87%,
+    rgba(0, 0, 0, 0.163) 93%,
+    rgba(0, 0, 0, 0.058) 97%,
+    rgba(0, 0, 0, 0.009) 99%,
+    transparent 100%
+  );
+
+  --sv-scroll-mask-right: linear-gradient(
+    to left,
+    #000 0%,
+    #000 30%,
+    rgba(0, 0, 0, 0.991) 40%,
+    rgba(0, 0, 0, 0.942) 50%,
+    rgba(0, 0, 0, 0.837) 60%,
+    rgba(0, 0, 0, 0.683) 70%,
+    rgba(0, 0, 0, 0.5) 80%,
+    rgba(0, 0, 0, 0.317) 87%,
+    rgba(0, 0, 0, 0.163) 93%,
+    rgba(0, 0, 0, 0.058) 97%,
+    rgba(0, 0, 0, 0.009) 99%,
+    transparent 100%
+  );
 }
 
 /* Hero de DetailModal. Sin media query: aplica en todos los tamaños. */
 .sv-hero-fade {
   -webkit-mask-image: var(--sv-hero-fade);
   mask-image: var(--sv-hero-fade);
+}
+
+/* Máscaras de desvanecido de scroll de carruseles */
+.sv-scroll-mask-l {
+  -webkit-mask-image: var(--sv-scroll-mask-left);
+  mask-image: var(--sv-scroll-mask-left);
+}
+
+.sv-scroll-mask-r {
+  -webkit-mask-image: var(--sv-scroll-mask-right);
+  mask-image: var(--sv-scroll-mask-right);
 }
 
 @media (max-width: 639px) {

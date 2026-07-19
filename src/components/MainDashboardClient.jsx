@@ -3329,11 +3329,11 @@ export function Row({
                   hidden sm:flex items-center justify-start
                   transition-all duration-300 pointer-events-auto group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
-                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
+              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
+                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+                className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-colors duration-300 group-hover/nav:from-black/75"
               />
               <motion.span
                 className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
@@ -3357,11 +3357,11 @@ export function Row({
                   hidden sm:flex items-center justify-end
                   transition-all duration-300 pointer-events-auto group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
-                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
+              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
+                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+                className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-colors duration-300 group-hover/nav:from-black/75"
               />
               <motion.span
                 className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
@@ -4110,7 +4110,7 @@ function TopRatedHero({
                     y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-500 group-hover/nav:from-black/95"
+                  className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] sv-scroll-mask-l transition-colors duration-500 group-hover/nav:from-black/95"
                 />
                 <motion.span
                   className="relative ml-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
@@ -4138,7 +4138,7 @@ function TopRatedHero({
                     y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-500 group-hover/nav:from-black/95"
+                  className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] sv-scroll-mask-r transition-colors duration-500 group-hover/nav:from-black/95"
                 />
                 <motion.span
                   className="relative mr-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
