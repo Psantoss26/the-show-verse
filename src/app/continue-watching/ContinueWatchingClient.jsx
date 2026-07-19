@@ -29,6 +29,10 @@ import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
 import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
+import {
   buildImg,
   fetchBestWatchingBackdrop,
   fetchBestWatchingPoster,
@@ -830,8 +834,8 @@ export default function ContinueWatchingClient() {
     let list = Array.isArray(currentItems) ? [...currentItems] : [];
     if (typeFilter !== "all") list = list.filter((x) => mediaTypeOf(x) === typeFilter);
     if (q.trim()) {
-      const query = q.trim().toLowerCase();
-      list = list.filter((x) => (x.title || "").toLowerCase().includes(query));
+      const query = normalizeSearchText(q);
+      list = list.filter((x) => titleMatchesQuery(x, query));
     }
     switch (sortBy) {
       case "recent":

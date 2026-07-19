@@ -31,6 +31,10 @@ import {
   X,
 } from "lucide-react";
 import { formatPageTitle } from "@/lib/pageTitle";
+import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const MOVIE_GENRES = {
@@ -99,11 +103,7 @@ const IMAGE_MODE_STORAGE_KEY = "showverse:dashboard-section:imageMode";
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function normText(value) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+  return normalizeSearchText(value);
 }
 
 function resolveType(item) {
@@ -873,7 +873,7 @@ export default function DashboardSectionClient({ section }) {
       }
       if (!q) return true;
       return (
-        normText(getTitle(item)).includes(q) ||
+        titleMatchesQuery(item, q) ||
         normText(getGenreLabel(item)).includes(q) ||
         normText(getYear(item)).includes(q)
       );

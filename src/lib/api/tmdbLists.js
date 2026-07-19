@@ -226,17 +226,76 @@ export async function clearList({ listId, sessionId, confirm = true }) {
 /**
  * GET /search/movie
  */
-export async function searchMovies({ query, page = 1, language = 'es-ES' }) {
+function addLocalizedMovieTitle(item, language) {
+    const lang = language?.startsWith('en')
+        ? 'en'
+        : language?.startsWith('es')
+            ? 'es'
+            : ''
+    if (!lang) return item
+    return {
+        ...item,
+        media_type: item?.media_type || 'movie',
+        [`title_${lang}`]: item?.title || item?.[`title_${lang}`],
+        [`name_${lang}`]: item?.name || item?.[`name_${lang}`]
+    }
+}
+
+function mergeSearchMoviePages(pages) {
+    const out = []
+    const byKey = new Map()
+
+    for (const { json, language } of pages) {
+        for (const item of json?.results || []) {
+            const next = addLocalizedMovieTitle(item, language)
+            const key = `${next.media_type || 'movie'}:${next.id}`
+            const existing = byKey.get(key)
+            if (existing) {
+                for (const field of [
+                    'title_es',
+                    'name_es',
+                    'title_en',
+                    'name_en',
+                    'original_title',
+                    'original_name'
+                ]) {
+                    if (!existing[field] && next[field]) existing[field] = next[field]
+                }
+                continue
+            }
+            byKey.set(key, next)
+            out.push(next)
+        }
+    }
+
+    return {
+        ...(pages[0]?.json || {}),
+        results: out,
+        total_results: out.length
+    }
+}
+
+export async function searchMovies({ query, page = 1, language = 'es-ES', languages = null }) {
     if (!query?.trim()) {
         return { results: [], page: 1, total_pages: 1, total_results: 0 }
     }
-    const url = buildUrl('/search/movie', {
-        query: query.trim(),
-        page,
-        language,
-        include_adult: 'false'
-    })
-    return tmdbJson(url)
+    const searchLanguages = Array.isArray(languages) && languages.length
+        ? languages
+        : [language]
+    const pages = await Promise.all(
+        searchLanguages.map(async (searchLanguage) => {
+            const url = buildUrl('/search/movie', {
+                query: query.trim(),
+                page,
+                language: searchLanguage,
+                include_adult: 'false'
+            })
+            return { language: searchLanguage, json: await tmdbJson(url) }
+        })
+    )
+
+    if (pages.length === 1) return pages[0].json
+    return mergeSearchMoviePages(pages)
 }
 
 /**

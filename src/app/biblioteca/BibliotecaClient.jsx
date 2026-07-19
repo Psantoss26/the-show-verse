@@ -38,6 +38,10 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
 
@@ -1390,7 +1394,7 @@ export default function BibliotecaClient() {
 
   const filteredItems = useMemo(() => {
     const base = Array.isArray(data?.items) ? data.items : [];
-    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    const normalizedQuery = normalizeSearchText(deferredQuery);
 
     const filtered = base.filter((item) => {
       if (typeFilter !== "all" && item.type !== typeFilter) return false;
@@ -1401,9 +1405,7 @@ export default function BibliotecaClient() {
         if (!resolutions.includes(resFilter)) return false;
       }
       if (!normalizedQuery) return true;
-      return `${item.title || ""} ${item.sectionTitle || ""}`
-        .toLowerCase()
-        .includes(normalizedQuery);
+      return titleMatchesQuery(item, normalizedQuery, ["sectionTitle"]);
     });
 
     return filtered.sort((a, b) => {

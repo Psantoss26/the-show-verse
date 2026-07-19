@@ -41,6 +41,10 @@ import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 // ----------------------------
@@ -1451,10 +1455,9 @@ export default function InProgressClient({
 
     // Search
     if (q.trim()) {
-      const query = q.trim().toLowerCase();
+      const query = normalizeSearchText(q);
       list = list.filter((x) => {
-        const title = (x.title_es || x.title || "").toLowerCase();
-        return title.includes(query);
+        return titleMatchesQuery(x, query);
       });
     }
 

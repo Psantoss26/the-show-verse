@@ -50,6 +50,7 @@ import {
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const containerVariants = {
@@ -2887,8 +2888,7 @@ export default function FavoritesClient() {
       if (typeFilter === "movies" && type !== "movie") return false;
       if (typeFilter === "shows" && type !== "tv") return false;
       if (needle) {
-        const title = normText(item.title || item.name || "");
-        if (!title.includes(needle)) return false;
+        if (!titleMatchesQuery(item, needle)) return false;
       }
       return true;
     });

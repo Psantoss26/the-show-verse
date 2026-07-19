@@ -292,7 +292,11 @@ export default function ListDetailsPage() {
         debounceRef.current = setTimeout(async () => {
             setSearchLoading(true)
             try {
-                const json = await searchMovies({ query, page: 1, language: 'es-ES' })
+                const json = await searchMovies({
+                    query,
+                    page: 1,
+                    languages: ['es-ES', 'en-US']
+                })
                 setSearchRes(Array.isArray(json?.results) ? json.results : [])
             } catch (e) {
                 setErr(e?.message || 'Error buscando películas')

@@ -7,8 +7,11 @@ import { useServerOnline } from "@/context/ServerStatusContext";
 
 export default function TraktActions({ mediaType, tmdbId }) {
   const { ready, isConnected, getValidAccessToken } = useTraktAuth();
-  // Con el servidor propio caído no se puede escribir (visto/puntuar): se atenúan
-  // las acciones (la escritura offline en cola llegará en la Fase 2).
+  // Este widget escribe directo a Trakt con un token Bearer EN VIVO
+  // (getValidAccessToken), que no puede obtenerse con el servidor caído y estaría
+  // caducado al reproducirse desde la cola offline. Por eso NO se encola: se atenúa
+  // mientras no hay servidor. Los botones de acción principales (favorito/pendiente/
+  // visto/puntuación por la capa /api con auth de servidor) sí encolan solos (Fase 2).
   const serverOnline = useServerOnline();
 
   const [loading, setLoading] = useState(false);

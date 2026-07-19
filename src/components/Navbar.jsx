@@ -38,6 +38,11 @@ import {
   readSearchHistory,
   removeSearchHistory,
 } from "@/lib/search/history";
+import {
+  getPrimarySearchTitle,
+  getTitleCandidates,
+  normalizeSearchText,
+} from "@/lib/search/titleMatching";
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
@@ -51,57 +56,44 @@ const SEARCH_FALLBACK_MIN_LEN = 5;
 // Relevancia mínima de título (fuzzy) para conservar un candidato del fallback,
 // y así no colar ruido del prefijo corto (que puede devolver cientos de títulos).
 const FALLBACK_TITLE_MIN_SIMILARITY = 0.6;
-
-function normalizeSearchText(value = "") {
-  return String(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getSearchTitle(item) {
-  return (
-    item?.title ||
-    item?.name ||
-    item?.original_title ||
-    item?.original_name ||
-    ""
-  );
-}
+const SEARCH_LANGUAGES = ["es-ES", "en-US"];
 
 function scoreSearchResult(item, normalizedQuery) {
-  const title = normalizeSearchText(getSearchTitle(item));
-  if (!title || !normalizedQuery) return 0;
-
-  let score = 0;
-  if (title === normalizedQuery) score += 10000;
-  else if (title.startsWith(normalizedQuery)) score += 7000;
-  else if (title.includes(normalizedQuery)) score += 5000;
-  else if (normalizedQuery.length >= FUZZY_MIN_QUERY_LEN) {
-    // Sin coincidencia por substring: puntuación TOLERANTE A ERRATAS para que un
-    // título con 1-2 letras de diferencia siga apareciendo arriba (por debajo de
-    // un acierto por substring, por encima del ruido de "populares no afines").
-    const sim = fuzzySimilarity(normalizedQuery, title);
-    if (sim >= FUZZY_MIN_SIMILARITY) score += sim * 5000;
-  }
+  const titles = getTitleCandidates(item);
+  if (!titles.length || !normalizedQuery) return 0;
 
   const queryTokens = normalizedQuery.split(" ").filter(Boolean);
-  const titleTokens = title.split(" ").filter(Boolean);
-  // Tokens largos casan de forma fuzzy (cubre erratas en consultas multi-palabra);
-  // los muy cortos siguen exigiendo substring exacto para no meter ruido.
-  const matchedTokens = queryTokens.filter((token) =>
-    token.length >= FUZZY_MIN_QUERY_LEN
-      ? tokenFuzzyMatches(token, titleTokens)
-      : title.includes(token),
-  );
-  if (queryTokens.length) {
-    score += (matchedTokens.length / queryTokens.length) * 3000;
+  let bestTitleScore = 0;
+
+  for (const candidate of titles) {
+    const title = normalizeSearchText(candidate);
+    if (!title) continue;
+
+    let titleScore = 0;
+    if (title === normalizedQuery) titleScore += 10000;
+    else if (title.startsWith(normalizedQuery)) titleScore += 7000;
+    else if (title.includes(normalizedQuery)) titleScore += 5000;
+    else if (normalizedQuery.length >= FUZZY_MIN_QUERY_LEN) {
+      // Sin coincidencia por substring: puntuación tolerante a erratas para que
+      // un título en cualquiera de los dos idiomas siga apareciendo arriba.
+      const sim = fuzzySimilarity(normalizedQuery, title);
+      if (sim >= FUZZY_MIN_SIMILARITY) titleScore += sim * 5000;
+    }
+
+    const titleTokens = title.split(" ").filter(Boolean);
+    const matchedTokens = queryTokens.filter((token) =>
+      token.length >= FUZZY_MIN_QUERY_LEN
+        ? tokenFuzzyMatches(token, titleTokens)
+        : title.includes(token),
+    );
+    if (queryTokens.length) {
+      titleScore += (matchedTokens.length / queryTokens.length) * 3000;
+    }
+
+    bestTitleScore = Math.max(bestTitleScore, titleScore);
   }
 
+  let score = bestTitleScore;
   const popularity = Number(item?.popularity || 0);
   const votes = Number(item?.vote_count || 0);
   score += Math.min(popularity, 500) * 6;
@@ -117,15 +109,47 @@ function normalizeSearchResult(item, fallbackMediaType = null) {
   return { ...item, media_type: mediaType };
 }
 
+function addLocalizedSearchTitles(item) {
+  if (!item?._search_language) return item;
+  const lang = item._search_language.startsWith("en")
+    ? "en"
+    : item._search_language.startsWith("es")
+      ? "es"
+      : "";
+  if (!lang) return item;
+  return {
+    ...item,
+    [`title_${lang}`]: item.title || item[`title_${lang}`],
+    [`name_${lang}`]: item.name || item[`name_${lang}`],
+  };
+}
+
 function dedupeSearchResults(results) {
   const seen = new Set();
+  const byKey = new Map();
   const out = [];
   for (const item of results) {
-    const normalized = normalizeSearchResult(item);
+    const normalized = addLocalizedSearchTitles(normalizeSearchResult(item));
     if (!normalized) continue;
     const key = `${normalized.media_type}:${normalized.id}`;
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      const existing = byKey.get(key);
+      for (const field of [
+        "title_es",
+        "name_es",
+        "title_en",
+        "name_en",
+        "original_title",
+        "original_name",
+      ]) {
+        if (!existing[field] && normalized[field]) {
+          existing[field] = normalized[field];
+        }
+      }
+      continue;
+    }
     seen.add(key);
+    byKey.set(key, normalized);
     out.push(normalized);
   }
   return out;
@@ -209,10 +233,10 @@ function SearchBar({ onResultClick, isMobile = false }) {
         // normalizada, así el fuzzy elige el título correcto aunque hayamos buscado
         // por prefijo.
         const fetchAndAssemble = async (searchQuery) => {
-          const buildSearchUrl = (path, page = 1) => {
+          const buildSearchUrl = (path, page = 1, language = "es-ES") => {
             const params = new URLSearchParams({
               api_key: apiKey || "",
-              language: "es-ES",
+              language,
               query: searchQuery,
               page: String(page),
               include_adult: "false",
@@ -220,53 +244,61 @@ function SearchBar({ onResultClick, isMobile = false }) {
             return `https://api.themoviedb.org/3${path}?${params.toString()}`;
           };
 
-          const fetchJson = async (path, page = 1) => {
-            const res = await fetch(buildSearchUrl(path, page), {
+          const fetchJson = async (path, page = 1, language = "es-ES") => {
+            const res = await fetch(buildSearchUrl(path, page, language), {
               signal: controller.signal,
             });
             if (!res.ok) return { results: [] };
             return res.json();
           };
 
+          const fetchResults = async (path, page = 1) => {
+            const payloads = await Promise.all(
+              SEARCH_LANGUAGES.map((language) =>
+                fetchJson(path, page, language).then((payload) => ({
+                  language,
+                  payload,
+                })),
+              ),
+            );
+            return payloads.flatMap(({ language, payload }) =>
+              (payload.results || []).map((item) => ({
+                ...item,
+                _search_language: language,
+              })),
+            );
+          };
+
           const [
-            multiData,
-            moviePage1,
-            moviePage2,
-            tvPage1,
-            tvPage2,
-            personPage1,
-            personPage2,
-            collData,
+            multiRaw,
+            moviePage1Raw,
+            moviePage2Raw,
+            tvPage1Raw,
+            tvPage2Raw,
+            personPage1Raw,
+            personPage2Raw,
+            collRaw,
           ] = await Promise.all([
-            fetchJson("/search/multi"),
-            fetchJson("/search/movie"),
-            fetchJson("/search/movie", 2),
-            fetchJson("/search/tv"),
-            fetchJson("/search/tv", 2),
-            fetchJson("/search/person"),
-            fetchJson("/search/person", 2),
-            fetchJson("/search/collection"),
+            fetchResults("/search/multi"),
+            fetchResults("/search/movie"),
+            fetchResults("/search/movie", 2),
+            fetchResults("/search/tv"),
+            fetchResults("/search/tv", 2),
+            fetchResults("/search/person"),
+            fetchResults("/search/person", 2),
+            fetchResults("/search/collection"),
           ]);
 
-          const multiResults = (multiData.results || [])
+          const multiResults = multiRaw
             .map((item) => normalizeSearchResult(item))
             .filter(Boolean);
-          const movieResults = [
-            ...(moviePage1.results || []),
-            ...(moviePage2.results || []),
-          ]
+          const movieResults = [...moviePage1Raw, ...moviePage2Raw]
             .map((item) => normalizeSearchResult(item, "movie"))
             .filter(Boolean);
-          const tvResults = [
-            ...(tvPage1.results || []),
-            ...(tvPage2.results || []),
-          ]
+          const tvResults = [...tvPage1Raw, ...tvPage2Raw]
             .map((item) => normalizeSearchResult(item, "tv"))
             .filter(Boolean);
-          const personResults = [
-            ...(personPage1.results || []),
-            ...(personPage2.results || []),
-          ]
+          const personResults = [...personPage1Raw, ...personPage2Raw]
             .map((item) => normalizeSearchResult(item, "person"))
             .filter(Boolean);
 
@@ -282,7 +314,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
               (b.popularity || 0) - (a.popularity || 0),
           );
 
-          const collResults = (collData.results || []).map((c) => ({
+          const collResults = collRaw.map((c) => ({
             ...c,
             media_type: "collection",
             title: c.name,
@@ -307,22 +339,28 @@ function SearchBar({ onResultClick, isMobile = false }) {
           if (prefix.length >= 4 && prefix !== trimmedQuery) {
             const alt = await fetchAndAssemble(prefix);
             const isRelevant = (it) => {
-              const t = normalizeSearchText(getSearchTitle(it));
-              if (!t) return false;
-              if (t.includes(normalizedQuery) || t.startsWith(normalizedQuery)) {
-                return true;
-              }
-              if (
-                fuzzySimilarity(normalizedQuery, t) >=
-                FALLBACK_TITLE_MIN_SIMILARITY
-              ) {
-                return true;
-              }
-              const titleTokens = t.split(" ").filter(Boolean);
-              return normalizedQuery
-                .split(" ")
-                .filter((tok) => tok.length >= FUZZY_MIN_QUERY_LEN)
-                .some((tok) => tokenFuzzyMatches(tok, titleTokens));
+              const titles = getTitleCandidates(it)
+                .map((title) => normalizeSearchText(title))
+                .filter(Boolean);
+              return titles.some((title) => {
+                if (
+                  title.includes(normalizedQuery) ||
+                  title.startsWith(normalizedQuery)
+                ) {
+                  return true;
+                }
+                if (
+                  fuzzySimilarity(normalizedQuery, title) >=
+                  FALLBACK_TITLE_MIN_SIMILARITY
+                ) {
+                  return true;
+                }
+                const titleTokens = title.split(" ").filter(Boolean);
+                return normalizedQuery
+                  .split(" ")
+                  .filter((tok) => tok.length >= FUZZY_MIN_QUERY_LEN)
+                  .some((tok) => tokenFuzzyMatches(tok, titleTokens));
+              });
             };
             const filtered = alt.items.filter(isRelevant);
             if (filtered.length) {
@@ -374,7 +412,7 @@ function SearchBar({ onResultClick, isMobile = false }) {
   }, [showCollection]);
 
   const handleResultClick = (item) => {
-    const selectedTitle = getSearchTitle(item) || query;
+    const selectedTitle = getPrimarySearchTitle(item) || query;
     setSearchHistory(addSearchHistory(selectedTitle));
     setShowDropdown(false);
     setQuery("");
