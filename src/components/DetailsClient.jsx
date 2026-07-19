@@ -2873,10 +2873,13 @@ export default function DetailsClient({
     const mobile =
       endpointType === "tv"
         ? mobileNeutralPosterPath
-        : selectedBackgroundPath || // En peliculas respetamos la seleccion manual
+        : // MÓVIL: el héroe full-bleed ES el póster de portada; el fondo de la
+          // transición debe ser ESE MISMO póster (no un backdrop distinto) para
+          // que se perciba UNA sola imagen. Prioriza el póster neutro.
           mobileNeutralPosterPath ||
           basePosterPath ||
           data.poster_path ||
+          selectedBackgroundPath ||
           data.profile_path ||
           desktop ||
           null;
@@ -7958,6 +7961,30 @@ export default function DetailsClient({
                 willChange: "opacity",
               }}
             />
+
+            {/* MÓVIL: PÓSTER NÍTIDO como capa FIJA con el encuadre de la caja de
+                portada (mismo alto, mismo `cover` centrado y overscan, con fundido
+                inferior → botones sobre oscuro). Es la MISMA imagen que el fondo
+                desenfocado (capa base), y al ser también FIJA queda perfectamente
+                alineada con él: el crossfade por opacidad (nítida→difuminada,
+                dirigido por `--sv-hero-scroll`) se percibe como UNA sola imagen
+                que se difumina, sin la segunda imagen desalineada que causaba el
+                scroll de la portada en flujo. Gateada por `currentLowLoaded`
+                (evita destello). El logo y el contenido (en flujo, z-10) se
+                superponen. Solo móvil (`sm:hidden`). */}
+            <div
+              className={`sm:hidden absolute top-0 inset-x-0 bg-cover bg-center poster-mobile-fade ${
+                currentLowLoaded
+                  ? "[opacity:calc(1_-_var(--sv-hero-scroll,0))]"
+                  : "opacity-0"
+              }`}
+              style={{
+                height: "calc(100svh - 9.5rem - env(safe-area-inset-bottom))",
+                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+                transform: `scale(${POSTER_OVERSCAN})`,
+                willChange: "opacity",
+              }}
+            />
           </>
         ) : (
           <div className="absolute inset-0 bg-[#0a0a0a]" />
@@ -8172,7 +8199,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 poster-mobile-fade"
+                            className="absolute inset-0 z-0 poster-mobile-fade max-sm:hidden"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -8198,7 +8225,7 @@ export default function DetailsClient({
                       // `scale()` es un transform 2D que NO promueve, así que la
                       // imagen rasteriza dentro de esta capa y la máscara siempre
                       // la cubre. No se pierde GPU: el wrapper ya es transform-gpu.
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:[opacity:calc(1_-_var(--sv-hero-scroll,0))]">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:opacity-0">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
