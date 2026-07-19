@@ -178,9 +178,11 @@ const EMPTY_DATA = {
   tagline: null,
   tmdbRating: null,
   tmdbVotes: null,
+  tmdbRatingResolved: false,
   imdbRating: null,
   imdbVotes: null,
   imdbId: null,
+  imdbRatingResolved: false,
   rtScore: null,
   mcScore: null,
   awards: null,
@@ -189,6 +191,7 @@ const EMPTY_DATA = {
   production: EMPTY_PRODUCTION,
   sentiment: EMPTY_SENTIMENT,
   scoreboard: null,
+  scoreboardResolved: false,
   providers: [],
   seasons: [],
   showReleaseDate: null,
@@ -345,6 +348,7 @@ export function useDetailModalData(item) {
             runtime,
             tmdbRating,
             tmdbVotes,
+            tmdbRatingResolved: true,
             cast,
             seasons: Array.isArray(showDetails?.seasons)
               ? showDetails.seasons
@@ -388,6 +392,9 @@ export function useDetailModalData(item) {
           })();
         } catch {
           // degradamos: nos quedamos con la semilla
+          if (!cancelledEp) {
+            setData((prev) => ({ ...prev, tmdbRatingResolved: true }));
+          }
         } finally {
           if (!cancelledEp) setLoading(false);
         }
@@ -401,7 +408,12 @@ export function useDetailModalData(item) {
             seasonNumber,
             episodeNumber,
           ).catch(() => null);
-          if (!imdb || cancelledEp) return;
+          if (!imdb || cancelledEp) {
+            if (!cancelledEp) {
+              setData((prev) => ({ ...prev, imdbRatingResolved: true }));
+            }
+            return;
+          }
           const [omdb, imdbDataset] = await Promise.all([
             fetchOmdbByImdb(imdb).catch(() => null),
             fetchImdbRatingByImdb(imdb).catch(() => null),
@@ -418,9 +430,13 @@ export function useDetailModalData(item) {
             imdbId: imdb ?? prev.imdbId,
             imdbRating: (datasetRating ?? omdbImdbRating) ?? prev.imdbRating,
             imdbVotes: (datasetVotes ?? omdbImdbVotes) ?? prev.imdbVotes,
+            imdbRatingResolved: true,
           }));
         } catch {
           // sin nota IMDb del episodio
+          if (!cancelledEp) {
+            setData((prev) => ({ ...prev, imdbRatingResolved: true }));
+          }
         }
       })();
 
@@ -453,7 +469,11 @@ export function useDetailModalData(item) {
             season: seasonNumber,
             episode: episodeNumber,
           });
-          if (cancelledEp || !sb?.found) return;
+          if (cancelledEp) return;
+          if (!sb?.found) {
+            setData((prev) => ({ ...prev, scoreboardResolved: true }));
+            return;
+          }
           const rating =
             typeof sb?.community?.rating === "number"
               ? sb.community.rating
@@ -473,10 +493,19 @@ export function useDetailModalData(item) {
             (v) => typeof v === "number",
           );
           if (rating != null || votes != null || hasStats) {
-            setData((prev) => ({ ...prev, scoreboard: { rating, votes, stats } }));
+            setData((prev) => ({
+              ...prev,
+              scoreboard: { rating, votes, stats },
+              scoreboardResolved: true,
+            }));
+          } else {
+            setData((prev) => ({ ...prev, scoreboardResolved: true }));
           }
         } catch {
           // sin scoreboard del episodio
+          if (!cancelledEp) {
+            setData((prev) => ({ ...prev, scoreboardResolved: true }));
+          }
         }
       })();
 
@@ -723,6 +752,7 @@ export function useDetailModalData(item) {
           tagline,
           tmdbRating,
           tmdbVotes,
+          tmdbRatingResolved: true,
           cast,
           recommendations,
           production,
@@ -734,6 +764,9 @@ export function useDetailModalData(item) {
         }));
       } catch {
         // Degradamos en silencio: nos quedamos con la semilla del item.
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, tmdbRatingResolved: true }));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -751,7 +784,12 @@ export function useDetailModalData(item) {
           const ext = await getExternalIds(mediaType, id).catch(() => null);
           imdb = ext?.imdb_id || null;
         }
-        if (!imdb || cancelled) return;
+        if (!imdb || cancelled) {
+          if (!cancelled) {
+            setData((prev) => ({ ...prev, imdbRatingResolved: true }));
+          }
+          return;
+        }
 
         const [omdb, imdbDataset] = await Promise.all([
           fetchOmdbByImdb(imdb).catch(() => null),
@@ -785,9 +823,13 @@ export function useDetailModalData(item) {
           imdbId: imdb ?? prev.imdbId,
           rtScore: rtScore ?? prev.rtScore,
           mcScore: mcScore ?? prev.mcScore,
+          imdbRatingResolved: true,
         }));
       } catch {
         // sin premios / sin nota IMDb: se queda como está
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, imdbRatingResolved: true }));
+        }
       }
     })();
 
@@ -810,7 +852,11 @@ export function useDetailModalData(item) {
     (async () => {
       try {
         const sb = await traktGetScoreboard({ type: mediaType, tmdbId: id });
-        if (cancelled || !sb?.found) return;
+        if (cancelled) return;
+        if (!sb?.found) {
+          setData((prev) => ({ ...prev, scoreboardResolved: true }));
+          return;
+        }
         const rating =
           typeof sb?.community?.rating === "number" ? sb.community.rating : null;
         const votes =
@@ -827,10 +873,16 @@ export function useDetailModalData(item) {
           setData((prev) => ({
             ...prev,
             scoreboard: { rating, votes, stats },
+            scoreboardResolved: true,
           }));
+        } else {
+          setData((prev) => ({ ...prev, scoreboardResolved: true }));
         }
       } catch {
         // sin scoreboard: se degrada, no se muestra
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, scoreboardResolved: true }));
+        }
       }
     })();
 

@@ -2805,20 +2805,29 @@ export default function DetailModal({
                   loading={loading}
                   tmdb={{
                     value:
-                      data.tmdbRating != null ? data.tmdbRating : undefined,
+                      data.tmdbRating != null
+                        ? data.tmdbRating
+                        : data.tmdbRatingResolved
+                          ? null
+                          : undefined,
                     sub:
                       data.tmdbRating != null
                         ? formatCountShort(data.tmdbVotes)
                         : undefined,
                     href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
+                    pending:
+                      !data.tmdbRatingResolved && data.tmdbRating == null,
                   }}
-                  // Trakt SIEMPRE visible con enlace (canónico o búsqueda por id de
-                  // TMDb). Sustituye al antiguo `traktPublic` (que iba sin enlace).
+                  // Trakt conserva enlace (canónico o búsqueda por TMDb). El badge
+                  // no aparece mientras la nota está pendiente; "-" queda solo
+                  // para ausencia confirmada.
                   trakt={{
                     value:
                       typeof scoreboard?.rating === "number"
                         ? Number(scoreboard.rating).toFixed(1)
-                        : undefined,
+                        : data.scoreboardResolved
+                          ? null
+                          : undefined,
                     sub: scoreboard?.votes
                       ? formatCountShort(scoreboard.votes)
                       : undefined,
@@ -2827,18 +2836,26 @@ export default function DetailModal({
                       type: mediaType,
                       tmdbId: item?.id,
                     }),
+                    pending:
+                      !data.scoreboardResolved &&
+                      typeof scoreboard?.rating !== "number",
                   }}
                   traktPublic={null}
                   imdb={{
                     value:
                       typeof data.imdbRating === "number"
                         ? data.imdbRating.toFixed(1)
-                        : undefined,
+                        : data.imdbRatingResolved
+                          ? null
+                          : undefined,
                     sub:
                       typeof data.imdbRating === "number"
                         ? formatCountShort(data.imdbVotes)
                         : undefined,
                     href: buildImdbHref({ imdbId: data.imdbId, title }),
+                    pending:
+                      !data.imdbRatingResolved &&
+                      typeof data.imdbRating !== "number",
                   }}
                   rt={
                     data.rtScore != null

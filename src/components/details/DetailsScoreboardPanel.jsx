@@ -81,6 +81,13 @@ export function DetailsRatingsBadges({
   rt = null,
   mc = null,
 }) {
+  const isPendingScore = (score) =>
+    !!score && score.pending === true && score.value == null;
+  const resolvedValue = (score) =>
+    score?.value === undefined ? null : score?.value;
+  const scoreStateKey = (name, score) =>
+    `${name}-${score?.value == null ? "empty" : "ready"}`;
+
   return (
     <div className="flex items-center gap-3 sm:gap-5 shrink-0">
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
@@ -91,11 +98,12 @@ export function DetailsRatingsBadges({
       </div>
 
       {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
-      {tmdb && (
+      {tmdb && !isPendingScore(tmdb) && (
         <CompactBadge
+          key={scoreStateKey("tmdb", tmdb)}
           logo="/logo-TMDb.png"
           logoClassName="h-5 sm:h-5"
-          value={tmdb.value}
+          value={resolvedValue(tmdb)}
           sub={tmdb.sub}
           href={tmdb.href}
           disableHoverLift
@@ -104,13 +112,13 @@ export function DetailsRatingsBadges({
       )}
 
       {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
-      {trakt && (
+      {trakt && !isPendingScore(trakt) && (
         <CompactBadge
+          key={scoreStateKey("trakt", trakt)}
           logo="/logo-Trakt.png"
-          value={trakt.value}
+          value={resolvedValue(trakt)}
           sub={trakt.sub}
           href={trakt.href}
-          animateOnMount={false}
           disableHoverLift
           onClick={undefined}
           tooltip={trakt.href ? "Ver en Trakt" : "Trakt"}
@@ -118,12 +126,12 @@ export function DetailsRatingsBadges({
       )}
 
       {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
-      {traktPublic && (
+      {traktPublic && !isPendingScore(traktPublic) && (
         <CompactBadge
+          key={scoreStateKey("trakt-public", traktPublic)}
           logo="/logo-Trakt.png"
-          value={traktPublic.value}
+          value={resolvedValue(traktPublic)}
           sub={traktPublic.sub}
-          animateOnMount={false}
           disableHoverLift
           onClick={undefined}
           tooltip="Ver en Trakt"
@@ -131,12 +139,13 @@ export function DetailsRatingsBadges({
       )}
 
       {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
-      {imdb && (
+      {imdb && !isPendingScore(imdb) && (
         <CompactBadge
+          key={scoreStateKey("imdb", imdb)}
           logo="/logo-IMDb.svg"
           logoWrapClassName="min-w-[28px]"
           logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
-          value={imdb.value}
+          value={resolvedValue(imdb)}
           sub={imdb.sub}
           href={imdb.href}
           disableHoverLift
