@@ -149,6 +149,13 @@ import {
   extractOmdbExtraScores,
   extractOmdbImdbScore,
 } from "@/lib/details/omdbCache";
+import {
+  buildCastDataForUI,
+  buildCreativeCreditsForCast,
+  formatCreditNames,
+  getMovieDirectorsFromCrew,
+  normalizeCastFromTmdb,
+} from "@/lib/details/cast";
 
 // -- Utilidades de imagenes TMDb: seleccion inteligente de poster/backdrop --
 import {
@@ -310,20 +317,6 @@ const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
-
-const isMainDirectorCredit = (credit) =>
-  credit?.job === "Director" || credit?.job === "Co-Director";
-
-const getMovieDirectorsFromCrew = (crew) =>
-  Array.isArray(crew) ? crew.filter(isMainDirectorCredit) : [];
-
-const formatCreditNames = (list) =>
-  Array.isArray(list) && list.length
-    ? list
-        .map((person) => person?.name)
-        .filter(Boolean)
-        .join(", ")
-    : null;
 
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
@@ -6510,53 +6503,6 @@ export default function DetailsClient({
   const [tmdbCastLoading, setTmdbCastLoading] = useState(false);
   const [tmdbCastError, setTmdbCastError] = useState("");
 
-  const pickBestRoleName = (roles) => {
-    const arr = Array.isArray(roles) ? roles : [];
-    if (!arr.length) return "";
-    // coge el rol con más episodios (suele ser el “principal”)
-    const best = [...arr].sort(
-      (a, b) => Number(b?.episode_count || 0) - Number(a?.episode_count || 0),
-    )[0];
-    return best?.character || "";
-  };
-
-  const normalizeCastFromTmdb = (raw = [], { isAggregate = false } = {}) => {
-    const list = Array.isArray(raw) ? raw : [];
-
-    // normaliza a tu shape: { id, name, profile_path, character, order }
-    const normalized = list
-      .filter((p) => p?.id && p?.name)
-      .map((p, idx) => {
-        const order = Number.isFinite(Number(p?.order))
-          ? Number(p.order)
-          : Number.isFinite(Number(p?.cast_id))
-            ? Number(p.cast_id)
-            : idx;
-
-        const character =
-          p?.character || (isAggregate ? pickBestRoleName(p?.roles) : "") || "";
-
-        return {
-          ...p,
-          character,
-          order,
-        };
-      });
-
-    // dedup por id respetando el PRIMER aparecido (que ya viene en orden TMDb)
-    const seen = new Set();
-    const unique = [];
-    for (const item of normalized) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      unique.push(item);
-    }
-
-    // orden TMDb: por `order` asc
-    unique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
-    return unique;
-  };
-
   useEffect(() => {
     let ignore = false;
     const ac = new AbortController();
@@ -6627,22 +6573,14 @@ export default function DetailsClient({
   }, [id, endpointType]);
 
   const creativeCreditsForUI = useMemo(() => {
-    const source =
-      type === "movie" ? movieDirectorsCrew : type === "tv" ? tvCreators : [];
-
-    const role = type === "movie" ? "Director" : "Creador";
-
-    return (Array.isArray(source) ? source : [])
-      .filter((person) => person?.id && person?.name)
-      .map((person, idx) => ({
-        ...person,
-        character: person?.job || role,
-        order: -1000 + idx,
-      }));
+    return buildCreativeCreditsForCast({
+      type,
+      movieDirectors: movieDirectorsCrew,
+      tvCreators,
+    });
   }, [type, movieDirectorsCrew, tvCreators]);
 
   const castDataForUI = useMemo(() => {
-    // 1) Base cast: preferimos TMDb (más completo); si no, usamos castData tal cual
     const base =
       Array.isArray(tmdbCast) && tmdbCast.length
         ? tmdbCast
@@ -6650,44 +6588,10 @@ export default function DetailsClient({
           ? castData
           : [];
 
-    const creativeIds = new Set(
-      creativeCreditsForUI.map((person) => person?.id).filter(Boolean),
-    );
-
-    // 3) ¿Hay order real en el base? (si viene de TMDb normalmente sí)
-    const baseHasOrder = base.some((p) => Number.isFinite(Number(p?.order)));
-
-    // 4) Normalizamos base: filtramos y garantizamos un order numérico
-    const normalizedBase = base
-      .filter((p) => p?.id && p?.name)
-      .filter((p) => !creativeIds.has(p.id))
-      .map((p, idx) => ({
-        ...p,
-        order: Number.isFinite(Number(p?.order))
-          ? Number(p.order)
-          : baseHasOrder
-            ? 1000 + idx
-            : idx, // si hay order, los sin order al final
-      }));
-
-    // 5) Unimos director/creador primero y reparto después, manteniendo el
-    // mismo diseño de tarjeta para toda la fila.
-    const seen = new Set();
-    const mergedUnique = [];
-
-    for (const item of [...creativeCreditsForUI, ...normalizedBase]) {
-      if (!item?.id) continue;
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      mergedUnique.push(item);
-    }
-
-    // 6) Si el cast base tiene order, ordenamos por order (extras quedan arriba por order negativo)
-    if (baseHasOrder) {
-      mergedUnique.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
-    }
-
-    return mergedUnique;
+    return buildCastDataForUI({
+      baseCast: base,
+      creativeCredits: creativeCreditsForUI,
+    });
   }, [tmdbCast, castData, creativeCreditsForUI]);
 
   const creativeCreditsLoading =

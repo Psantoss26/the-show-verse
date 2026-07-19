@@ -19,6 +19,7 @@ const PUBLIC_API_ROUTES = new Set([
     '/api/health',
     '/api/netflix/extension-sync',
     '/api/netflix/extension-import',
+    '/api/netflix/extension-progress',
 ])
 const PUBLIC_FILE_RE = /\.(?:avif|gif|ico|jpg|jpeg|js|json|map|png|svg|txt|webmanifest|webp|woff|woff2)$/i
 

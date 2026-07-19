@@ -179,11 +179,23 @@ export const AuthProvider = ({ children }) => {
   }, [preferences, savePreferences]);
 
   const refreshMe = useCallback(async () => {
-    const res = await fetch("/api/auth/me", {
-      method: "GET",
-      cache: "no-store",
-      credentials: "include",
-    });
+    let res;
+    try {
+      res = await fetch("/api/auth/me", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
+    } catch {
+      // Red caída (p. ej. NAS apagado): conservar la sesión cacheada.
+      setHydrated(true);
+      return readAuthUserCache();
+    }
+    // 5xx del origen (túnel Cloudflare con el NAS caído) → NO cerrar sesión.
+    if (res.status >= 500) {
+      setHydrated(true);
+      return readAuthUserCache();
+    }
     const json = await res.json().catch(() => ({}));
     const nextUser = json?.authenticated ? json.user || null : null;
     applyUser(nextUser);
@@ -224,6 +236,13 @@ export const AuthProvider = ({ children }) => {
           cache: "no-store",
           credentials: "include",
         });
+        // 5xx del origen (NAS apagado tras el túnel Cloudflare) → lanzamos para que
+        // el catch conserve la sesión cacheada; NO es "no autenticado".
+        if (res.status >= 500) {
+          const err = new Error(`auth/me HTTP ${res.status}`);
+          err.status = res.status;
+          throw err;
+        }
         const json = await res.json().catch(() => ({}));
         return json?.authenticated ? json.user || null : null;
       };

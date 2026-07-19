@@ -14,7 +14,7 @@ Puntos clave de la configuración (`next.config.ts`):
 - Optimización de imágenes de Vercel **desactivada** (`images.unoptimized: true`): los pósters/backdrops ya llegan pre-dimensionados desde el CDN de TMDb (`image.tmdb.org`), así que se sirven directos vía `<img>`/`OptimizedImage` en vez de pasar por `/_next/image` (ahorro de coste en Vercel).
 
 `middleware.js` (raíz del repo) aplica, en este orden, a casi toda ruta de página y API:
-1. **Gate de acceso privado**: si `SHOWVERSE_PRIVATE_ACCESS_KEY` está definida (y el host coincide con `SHOWVERSE_PRIVATE_ACCESS_HOSTS` o no estamos en Vercel), exige una cookie `showverse_device_access` válida; si no, responde 404. Las rutas de la extensión Netflix (`/api/netflix/extension-sync`, `/api/netflix/extension-import`) y auth básicas quedan exentas porque se autentican con Bearer token propio.
+1. **Gate de acceso privado**: si `SHOWVERSE_PRIVATE_ACCESS_KEY` está definida (y el host coincide con `SHOWVERSE_PRIVATE_ACCESS_HOSTS` o no estamos en Vercel), exige una cookie `showverse_device_access` válida; si no, responde 404. Las rutas de la extensión Netflix (`/api/netflix/extension-sync`, `/api/netflix/extension-import`, `/api/netflix/extension-progress`) y auth básicas quedan exentas porque se autentican con Bearer token propio.
 2. **Rewrite para bots/crawlers** (WhatsApp, Facebook, Twitter, Slack, Discord, Telegram, LinkedIn, Google, Bing): `/details/{movie|tv|person}/[id]` se reescribe a `/s/{movie|tv|person}/[id]` (ver [[app-router-pages]]) para servirles HTML con metadatos OG/Twitter sin cargar el bundle de React completo.
 
 ## Organización de `src/`
