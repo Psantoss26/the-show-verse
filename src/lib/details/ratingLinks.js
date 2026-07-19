@@ -2,10 +2,9 @@
 //
 // Enlaces de "página correspondiente" para los badges de puntuación (TMDb, Trakt,
 // IMDb) de las páginas de detalles. La idea es que el icono de cada servicio
-// aparezca SIEMPRE con un enlace utilizable, aunque el título todavía no tenga
+// aparezca con un enlace utilizable, aunque el título todavía no tenga
 // puntuación: si el llamante ya conoce la URL canónica se usa esa; si no, se cae a
-// una búsqueda determinista (Trakt por id de TMDb, IMDb por id o por título) para
-// que el icono nunca quede sin destino.
+// una búsqueda por título para los servicios que no permiten URL directa.
 
 function tmdbSegment(type) {
   return type === "tv" || type === "show" ? "tv" : "movie";
@@ -18,13 +17,15 @@ export function buildTmdbHref({ href, type, tmdbId } = {}) {
   return `https://www.themoviedb.org/${tmdbSegment(type)}/${tmdbId}`;
 }
 
-// Trakt: usa la URL canónica si existe; si no, la búsqueda por id de TMDb, que
-// redirige a la ficha del título en Trakt.
-export function buildTraktHref({ href, type, tmdbId } = {}) {
+// Trakt: usa la URL canónica si existe. La web pública de Trakt ya no resuelve
+// de forma fiable `/search/tmdb/:id`, así que el fallback seguro es su búsqueda
+// general por título; las pantallas de detalles deben priorizar `traktUrl` del
+// scoreboard/status cuando esté disponible.
+export function buildTraktHref({ href, title } = {}) {
   if (href) return href;
-  if (tmdbId == null) return undefined;
-  const idType = tmdbSegment(type) === "tv" ? "show" : "movie";
-  return `https://trakt.tv/search/tmdb/${tmdbId}?id_type=${idType}`;
+  const q = (title || "").trim();
+  if (!q) return undefined;
+  return `https://trakt.tv/search?query=${encodeURIComponent(q)}`;
 }
 
 // IMDb: URL directa por id de IMDb; si no se conoce, búsqueda por título (IMDb no

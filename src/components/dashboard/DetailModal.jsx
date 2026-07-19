@@ -2832,9 +2832,8 @@ export default function DetailModal({
                       ? formatCountShort(scoreboard.votes)
                       : undefined,
                     href: buildTraktHref({
-                      href: traktStatus?.traktUrl,
-                      type: mediaType,
-                      tmdbId: item?.id,
+                      href: scoreboard?.traktUrl || traktStatus?.traktUrl,
+                      title,
                     }),
                     pending:
                       !data.scoreboardResolved &&

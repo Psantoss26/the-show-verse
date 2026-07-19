@@ -70,17 +70,27 @@ function ChartFrame({ className = "h-[300px]", children }) {
     const node = ref.current;
     if (!node) return undefined;
 
-    const update = () => {
+    let observer = null;
+    // Latch de UNA SOLA VÍA: en cuanto el contenedor tiene tamaño marcamos "ready" y
+    // DEJAMOS de observar. Antes se hacía setReady(width>0 && height>0) en CADA
+    // callback del ResizeObserver, con lo que `ready` podía alternar true↔false
+    // durante la transición de vistas (AnimatePresence) y realimentarse con el
+    // ResizeObserver interno de Recharts → "Maximum update depth exceeded".
+    const check = () => {
       const rect = node.getBoundingClientRect();
-      setReady(rect.width > 0 && rect.height > 0);
+      if (rect.width > 0 && rect.height > 0) {
+        setReady(true);
+        if (observer) observer.disconnect();
+      }
     };
 
-    update();
-
-    const observer = new ResizeObserver(update);
+    check();
+    observer = new ResizeObserver(check);
     observer.observe(node);
 
-    return () => observer.disconnect();
+    return () => {
+      if (observer) observer.disconnect();
+    };
   }, []);
 
   return (

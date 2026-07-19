@@ -763,8 +763,7 @@ export default function TraktEpisodesWatchedModal({
 
   if (!open) return null;
 
-  const PanelClass =
-    "fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 ${LIQUID_GLASS_PANEL} sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]";
+  const PanelClass = `fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 ${LIQUID_GLASS_PANEL} sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]`;
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
