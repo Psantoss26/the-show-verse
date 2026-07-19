@@ -723,7 +723,7 @@ html {
     );
     transform: scale(calc(1.02 + var(--sv-hero-scroll, 0) * 0.1));
     filter: brightness(calc(1 - var(--sv-hero-scroll, 0) * 0.25)) saturate(1.03)
-      blur(calc(var(--sv-hero-scroll, 0) * 28px));
+      blur(calc(var(--sv-hero-scroll, 0) * 14px));
     /* Máscara de desvanecido inferior igual que la portada (60%→96%), que se relaja
        hasta full-bleed con el scroll. */
     -webkit-mask-image: linear-gradient(
