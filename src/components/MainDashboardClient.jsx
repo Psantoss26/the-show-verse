@@ -3327,12 +3327,16 @@ export function Row({
               onClick={handlePrevClick}
               className="absolute inset-y-0 -left-6 w-32 z-30
                   hidden sm:flex items-center justify-start
-                  bg-gradient-to-r from-black/90 via-black/70 to-transparent
-                  hover:from-black/95 hover:via-black/80
                   transition-all duration-300 pointer-events-auto group/nav"
             >
+              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+              />
               <motion.span
-                className="ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: -4 }}
               >
                 ‹
@@ -3351,12 +3355,16 @@ export function Row({
               onClick={handleNextClick}
               className="absolute inset-y-0 -right-6 w-32 z-30
                   hidden sm:flex items-center justify-end
-                  bg-gradient-to-l from-black/90 via-black/70 to-transparent
-                  hover:from-black/95 hover:via-black/80
                   transition-all duration-300 pointer-events-auto group/nav"
             >
+              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
+              />
               <motion.span
-                className="mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
+                className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: 4 }}
               >
                 ›
@@ -4096,12 +4104,16 @@ function TopRatedHero({
                 onClick={handlePrevClick}
                 className="absolute inset-y-0 -left-6 w-32 z-20
                                 hidden sm:flex items-center justify-start
-                                bg-gradient-to-r from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
-                                hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
-                                transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
+                                transition-all duration-500 pointer-events-auto group/nav"
               >
+                {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                    y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-500 group-hover/nav:from-black/95"
+                />
                 <motion.span
-                  className="ml-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  className="relative ml-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: -5 }}
                 >
                   ‹
@@ -4120,12 +4132,16 @@ function TopRatedHero({
                 onClick={handleNextClick}
                 className="absolute inset-y-0 -right-6 w-32 z-20
                                 hidden sm:flex items-center justify-end
-                                bg-gradient-to-l from-black/70 via-black/40 via-30% via-black/20 via-60% to-transparent
-                                hover:from-black/85 hover:via-black/55 hover:via-30% hover:via-black/30 hover:via-60%
-                                transition-all duration-500 pointer-events-auto group/nav backdrop-blur-[2px]"
+                                transition-all duration-500 pointer-events-auto group/nav"
               >
+                {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                    y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-500 group-hover/nav:from-black/95"
+                />
                 <motion.span
-                  className="mr-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
+                  className="relative mr-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: 5 }}
                 >
                   ›

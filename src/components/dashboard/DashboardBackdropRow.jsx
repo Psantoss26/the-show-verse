@@ -1734,13 +1734,11 @@ export default function DashboardBackdropRow({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -left-6 top-14 bottom-40 z-[110] hidden w-32 items-center justify-start sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
-              {/* Panel difuminado REDONDEADO (inset-y-2 + rounded-3xl): oscuro en el
-                  borde del contenido y fundido hacia la tarjeta. `left-6 right-2`
-                  deja un hueco transparente hacia el borde de pantalla, para que NO
-                  haya zona oscura sólida en ese lateral. */}
+              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-2 left-6 right-2 rounded-3xl bg-gradient-to-r from-black/75 via-black/45 to-transparent transition-colors duration-300 group-hover/nav:from-black/85"
+                className="pointer-events-none absolute inset-y-0 left-6 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
               />
               <motion.span
                 className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
@@ -1769,12 +1767,11 @@ export default function DashboardBackdropRow({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -right-6 top-14 bottom-40 z-[110] hidden w-32 items-center justify-end sm:top-16 sm:bottom-52 sm:flex md:top-44 md:bottom-72 group/nav"
             >
-              {/* Panel difuminado REDONDEADO: oscuro en el borde del contenido,
-                  fundido hacia la tarjeta; `right-6 left-2` deja el hueco transparente
-                  hacia el borde de pantalla (sin zona oscura sólida en el lateral). */}
+              {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                  y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-2 right-6 left-2 rounded-3xl bg-gradient-to-l from-black/75 via-black/45 to-transparent transition-colors duration-300 group-hover/nav:from-black/85"
+                className="pointer-events-none absolute inset-y-0 right-6 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/45 to-transparent backdrop-blur-[6px] transition-colors duration-300 group-hover/nav:from-black/95"
               />
               <motion.span
                 className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
