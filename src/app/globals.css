@@ -713,6 +713,6 @@ html {
      Valores ajustables. */
   .hero-bg-base {
     transform: scale(1.12);
-    filter: brightness(0.88) saturate(1.03) blur(10px);
+    filter: brightness(0.9) saturate(1.03) blur(7px);
   }
 }
