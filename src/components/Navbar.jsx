@@ -979,14 +979,24 @@ export default function Navbar() {
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
           al hacer scroll aparece el fondo glass difuminado. */}
       <nav
-        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
+        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow,opacity] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
             : detailsHeroNavMobile
-              ? // Móvil: navbar TRANSPARENTE sobre el póster nítido (sin velo).
-                // Escritorio (lg:): glass idéntico al de siempre.
+              ? // Escritorio (lg:): glass de siempre. Móvil: el glass y la opacidad
+                // los pone el bloque `isDetailsRoute` de abajo (aparición gradual).
                 "lg:bg-black/20 lg:bg-gradient-to-br lg:from-white/10 lg:via-transparent lg:to-black/40 lg:backdrop-blur-[50px] lg:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
               : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+        }${
+          isDetailsRoute
+            ? // MÓVIL ficha: el navbar aparece GRADUALMENTE con el scroll,
+              // sincronizado con la transición del póster (--sv-hero-scroll: 0→1),
+              // como glass desde el primer píxel de opacidad. Solo captura toques
+              // tras hacer scroll (isScrolled). Escritorio intacto (todo max-sm:).
+              ` max-sm:bg-black/20 max-sm:bg-gradient-to-br max-sm:from-white/10 max-sm:via-transparent max-sm:to-black/40 max-sm:backdrop-blur-[50px] max-sm:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] max-sm:[opacity:var(--sv-hero-scroll,0)] ${
+                isScrolled ? "" : "max-sm:pointer-events-none"
+              }`
+            : ""
         }`}
       >
         {/* ---------------- Desktop ---------------- */}

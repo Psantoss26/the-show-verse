@@ -7915,7 +7915,7 @@ export default function DetailsClient({
                 Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
                 ternario muerto (siempre 1). */}
             <div
-              className="hero-bg-base absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100"
+              className="hero-bg-base absolute inset-0 bg-cover bg-center max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100 sm:transition-opacity sm:duration-500"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 // MÓVIL: desenfoque + un punto de escala.
@@ -7967,7 +7967,7 @@ export default function DetailsClient({
             (`--sv-hero-scroll`): en p=0 el póster está nítido SIN oscurecer (entrada
             intacta); al hacer scroll aparecen para dar legibilidad sobre el fondo.
             Escritorio (>=sm): siempre visibles. */}
-        <div className="absolute inset-0 pointer-events-none sm:opacity-100 max-sm:[opacity:var(--sv-hero-scroll,0)]">
+        <div className="absolute inset-0 pointer-events-none sm:opacity-100 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)]">
           {/* Sombreado superior + laterales (sin "marcos") */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
@@ -7982,10 +7982,11 @@ export default function DetailsClient({
       <div
         ref={contentTopRef}
         tabIndex={-1}
-        // El margen superior se ajusta SOLO en `sm:`/`lg:` (vista normal). El
-        // `pt-6` de móvil no se toca: lo cancela el `-mt-6` del hero de abajo
-        // para que el póster full-bleed arranque pegado al navbar, borde con
-        // borde. Subirlo aquí despegaría el póster y rompería esa fusión.
+        // El margen superior se ajusta SOLO en `sm:`/`lg:` (vista normal). En
+        // móvil el `pt-6` no se toca: el hero de abajo usa `-mt-[5.5rem]`
+        // (1.5rem del pt-6 + 4rem del navbar) para subir el póster BAJO el
+        // navbar superior, que ahora es un overlay oculto en la entrada. Así el
+        // póster full-bleed llena también los 4rem del navbar (sin hueco negro).
         className="relative z-10 px-4 pt-6 pb-8 sm:pt-12 lg:pt-14 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
       >
         {/* =================================================================
@@ -7995,7 +7996,7 @@ export default function DetailsClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="-mt-6 sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
+          className="-mt-[5.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
@@ -8128,11 +8129,13 @@ export default function DetailsClient({
                       primera vista SOLO se vean póster + logo + fila de botones,
                       quedando los botones justo encima del navbar inferior y el
                       resto (premios/info/scoreboard/tabs) por debajo (scroll).
-                      El hueco reservado (13.5rem) = navbar superior + fila de
-                      botones + navbar inferior; `env(safe-area-inset-bottom)`
-                      cubre el indicador home. ESCRITORIO: aspecto 2:3. Ajustable. */}
+                      El hueco reservado (9.5rem) = fila de botones + navbar
+                      inferior (el navbar superior ya NO reserva hueco: es un
+                      overlay y el póster sube bajo él con el `-mt-[5.5rem]` del
+                      hero); `env(safe-area-inset-bottom)` cubre el indicador
+                      home. ESCRITORIO: aspecto 2:3. Ajustable. */}
                   <div
-                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
+                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_9.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
                     style={{
                       contain: "layout paint",
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
@@ -8169,7 +8172,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 poster-mobile-fade max-sm:hidden"
+                            className="absolute inset-0 z-0 poster-mobile-fade"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -8195,7 +8198,7 @@ export default function DetailsClient({
                       // `scale()` es un transform 2D que NO promueve, así que la
                       // imagen rasteriza dentro de esta capa y la máscara siempre
                       // la cubre. No se pierde GPU: el wrapper ya es transform-gpu.
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:hidden">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:[opacity:calc(1_-_var(--sv-hero-scroll,0))]">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
