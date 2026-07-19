@@ -43,6 +43,10 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
+import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -2851,7 +2855,7 @@ export default function HistoryClient() {
   }, []);
 
   const filtered = useMemo(() => {
-    const needle = (q || "").trim().toLowerCase();
+    const needle = normalizeSearchText(q);
     return (raw || []).filter((e) => {
       const t = getItemType(e);
       if (typeFilter === "movies" && t !== "movie") return false;
@@ -2860,8 +2864,7 @@ export default function HistoryClient() {
       if (Number.isNaN(d.getTime())) return false;
       if (selectedDay && ymdLocal(d) !== selectedDay) return false;
       if (needle) {
-        const title = (getMainTitle(e) || "").toLowerCase();
-        if (!title.includes(needle)) return false;
+        if (!titleMatchesQuery(e, needle)) return false;
       }
       return true;
     });

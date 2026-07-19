@@ -7,6 +7,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
 import OfflineBanner from "@/components/OfflineBanner";
+import OfflineQueueBadge from "@/components/OfflineQueueBadge";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import { anton, ptSans } from "./fonts";
 
@@ -71,6 +72,7 @@ export default function RootLayout({ children }) {
             <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
             <PwaManager />
             <OfflineBanner />
+            <OfflineQueueBadge />
             <Analytics />
             <SpeedInsights />
           </ServerStatusProvider>

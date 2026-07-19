@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import ListPosterCard, { listPosterGridClass } from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  normalizeSearchText,
+  titleMatchesQuery,
+} from "@/lib/search/titleMatching";
 
 const INITIAL_RENDER_COUNT = 60;
 const RENDER_BATCH_SIZE = 60;
@@ -132,7 +136,7 @@ const groupLabel = {
 };
 
 function filterAndSortItems(items, getMeta, q, typeFilter, sortBy) {
-  const needle = q.trim().toLowerCase();
+  const needle = normalizeSearchText(q);
 
   return (Array.isArray(items) ? items : [])
     .map((item, index) => ({ item, index, meta: getMeta(item, index) }))
@@ -140,7 +144,7 @@ function filterAndSortItems(items, getMeta, q, typeFilter, sortBy) {
       if (typeFilter === "movies" && meta.mediaType !== "movie") return false;
       if (typeFilter === "shows" && meta.mediaType !== "tv") return false;
       if (!needle) return true;
-      return String(meta.title || "").toLowerCase().includes(needle);
+      return titleMatchesQuery(item, needle) || titleMatchesQuery(meta, needle);
     })
     .sort((a, b) => {
       if (sortBy === "list-order") return a.index - b.index;

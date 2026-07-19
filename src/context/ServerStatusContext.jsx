@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushOfflineMutations } from "@/lib/offline/syncQueue";
 
 const HEALTH_URL = "/api/health";
 const POLL_ONLINE_MS = 120000;
@@ -42,12 +43,23 @@ export function ServerStatusProvider({ children }) {
   const [serverOnline, setServerOnline] = useState(true);
   const timerRef = useRef(null);
   const runRef = useRef(null);
+  // Estado online previo: al pasar de caído→arriba (o en el primer arranque con el
+  // servidor disponible) vaciamos la cola de mutaciones offline (Fase 2).
+  const wasOnlineRef = useRef(null);
+
+  const onReachable = useCallback((ok) => {
+    if (ok && wasOnlineRef.current !== true) {
+      flushOfflineMutations().catch(() => {});
+    }
+    wasOnlineRef.current = ok;
+  }, []);
 
   const checkNow = useCallback(async () => {
     const ok = await pingHealth();
     setServerOnline((prev) => (prev === ok ? prev : ok));
+    onReachable(ok);
     return ok;
-  }, []);
+  }, [onReachable]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +70,7 @@ export function ServerStatusProvider({ children }) {
       const ok = await pingHealth(controller.signal);
       if (cancelled) return;
       setServerOnline((prev) => (prev === ok ? prev : ok));
+      onReachable(ok);
       timerRef.current = window.setTimeout(
         run,
         ok ? POLL_ONLINE_MS : POLL_OFFLINE_MS,
@@ -83,7 +96,7 @@ export function ServerStatusProvider({ children }) {
       window.removeEventListener("online", forceCheck);
       document.removeEventListener("visibilitychange", forceCheck);
     };
-  }, []);
+  }, [onReachable]);
 
   return (
     <ServerStatusContext.Provider value={{ serverOnline, checkNow }}>
