@@ -80,10 +80,11 @@ body {
 }
 
 @supports (content-visibility: auto) {
+
   .sv-deferred-row,
   .sv-deferred-section,
   .sv-deferred-grid,
-  .sv-details-sections > section {
+  .sv-details-sections>section {
     content-visibility: auto;
   }
 
@@ -99,17 +100,18 @@ body {
     contain-intrinsic-size: auto none auto 900px;
   }
 
-  .sv-details-sections > section {
+  .sv-details-sections>section {
     contain-intrinsic-size: auto none auto 620px;
   }
 
 }
 
 @supports not (content-visibility: auto) {
+
   .sv-deferred-row,
   .sv-deferred-section,
   .sv-deferred-grid,
-  .sv-details-sections > section {
+  .sv-details-sections>section {
     contain: layout style paint;
   }
 }
@@ -125,7 +127,7 @@ body {
       contain-intrinsic-size: auto none auto 680px;
     }
 
-    .sv-details-sections > section {
+    .sv-details-sections>section {
       contain-intrinsic-size: auto none auto 540px;
     }
   }
@@ -183,6 +185,7 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -190,12 +193,10 @@ body {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.05) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      transparent 100%);
   background-size: 200% 100%;
 }
 
@@ -207,6 +208,7 @@ body {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -218,6 +220,7 @@ body {
     opacity: 0;
     transform: translateX(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -229,6 +232,7 @@ body {
     opacity: 0;
     transform: translateX(20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -240,6 +244,7 @@ body {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -247,9 +252,12 @@ body {
 }
 
 @keyframes pulse-subtle {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.8;
   }
@@ -331,7 +339,7 @@ html {
   html {
     scroll-behavior: auto;
   }
-  
+
   *,
   *::before,
   *::after {
@@ -340,13 +348,17 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
+
 /* =========================
    Plex Integration Animations
    ========================= */
 @keyframes pulse-slow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.7;
   }
@@ -360,7 +372,7 @@ html {
    Optimización de fondos difuminados (glows) en pantallas móviles
    ==================================================================== */
 @media (max-width: 767px) {
-  div.fixed.inset-0.pointer-events-none.overflow-hidden > div.absolute.rounded-full.aspect-square {
+  div.fixed.inset-0.pointer-events-none.overflow-hidden>div.absolute.rounded-full.aspect-square {
     /* Escalado moderado para que se vean en las esquinas sin inundar la pantalla */
     transform: scale(1.4) !important;
     /* Difuminado suave con saturación y brillo controlados */
@@ -419,8 +431,7 @@ html {
    AMPLÍA hacia dentro (crece desde el borde derecho) y se difumina, morfeando a la
    ficha completa que aparece debajo. Mayor especificidad + orden posterior para
    ganar a la regla base .is-running de arriba. */
-.sv-detail-route-transition.is-running.sv-detail-route-transition--right
-  .sv-detail-route-transition__panel {
+.sv-detail-route-transition.is-running.sv-detail-route-transition--right .sv-detail-route-transition__panel {
   transform-origin: right center;
   will-change: transform, opacity, filter;
   animation: sv-detail-route-panel-zoom 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -435,6 +446,7 @@ html {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
+
   100% {
     opacity: 0;
     transform: translate3d(0, 96px, 0) scale(0.988);
@@ -447,6 +459,7 @@ html {
     transform: translate3d(0, 0, 0) scale(1);
     filter: blur(0px);
   }
+
   100% {
     opacity: 0;
     transform: translate3d(0, 0, 0) scale(1.12);
@@ -455,6 +468,7 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .sv-detail-route-transition,
   .sv-detail-route-transition__scrim,
   .sv-detail-route-transition__panel {
@@ -533,14 +547,12 @@ html {
    su fondo glass intacto. */
 @media (max-width: 1023px) {
   .details-nav-veil-mobile {
-    background-image: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.65) 0%,
-      rgba(0, 0, 0, 0.52) 32%,
-      rgba(0, 0, 0, 0.3) 58%,
-      rgba(0, 0, 0, 0.12) 80%,
-      rgba(0, 0, 0, 0) 100%
-    );
+    background-image: linear-gradient(to bottom,
+        rgba(0, 0, 0, 0.65) 0%,
+        rgba(0, 0, 0, 0.52) 32%,
+        rgba(0, 0, 0, 0.3) 58%,
+        rgba(0, 0, 0, 0.12) 80%,
+        rgba(0, 0, 0, 0) 100%);
   }
 }
 
@@ -579,21 +591,19 @@ html {
 
 :root {
   /* Póster móvil de DetailsClient: fundido largo, del 60% al 100%. */
-  --sv-poster-fade: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 60%,
-    rgba(0, 0, 0, 0.972) 64%,
-    rgba(0, 0, 0, 0.896) 68%,
-    rgba(0, 0, 0, 0.784) 72%,
-    rgba(0, 0, 0, 0.648) 76%,
-    rgba(0, 0, 0, 0.5) 80%,
-    rgba(0, 0, 0, 0.352) 84%,
-    rgba(0, 0, 0, 0.216) 88%,
-    rgba(0, 0, 0, 0.104) 92%,
-    transparent 96%,
-    transparent 100%
-  );
+  --sv-poster-fade: linear-gradient(to bottom,
+      #000 0%,
+      #000 60%,
+      rgba(0, 0, 0, 0.972) 64%,
+      rgba(0, 0, 0, 0.896) 68%,
+      rgba(0, 0, 0, 0.784) 72%,
+      rgba(0, 0, 0, 0.648) 76%,
+      rgba(0, 0, 0, 0.5) 80%,
+      rgba(0, 0, 0, 0.352) 84%,
+      rgba(0, 0, 0, 0.216) 88%,
+      rgba(0, 0, 0, 0.104) 92%,
+      transparent 96%,
+      transparent 100%);
 
   /* Hero de DetailModal: del 78% al 100%, con SMOOTHERSTEP (6t⁵-15t⁴+10t³), no
      con la smoothstep del póster.
@@ -607,54 +617,48 @@ html {
 
      OJO: el degradado de fondo del contenedor debe morir en este mismo 78%; si
      se solapan, vuelve a aparecer la banda oscura. */
-  --sv-hero-fade: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 78%,
-    rgba(0, 0, 0, 0.991) 80.2%,
-    rgba(0, 0, 0, 0.942) 82.4%,
-    rgba(0, 0, 0, 0.837) 84.6%,
-    rgba(0, 0, 0, 0.683) 86.8%,
-    rgba(0, 0, 0, 0.5) 89%,
-    rgba(0, 0, 0, 0.317) 91.2%,
-    rgba(0, 0, 0, 0.163) 93.4%,
-    rgba(0, 0, 0, 0.058) 95.6%,
-    rgba(0, 0, 0, 0.009) 97.8%,
-    transparent 100%
-  );
+  --sv-hero-fade: linear-gradient(to bottom,
+      #000 0%,
+      #000 78%,
+      rgba(0, 0, 0, 0.991) 80.2%,
+      rgba(0, 0, 0, 0.942) 82.4%,
+      rgba(0, 0, 0, 0.837) 84.6%,
+      rgba(0, 0, 0, 0.683) 86.8%,
+      rgba(0, 0, 0, 0.5) 89%,
+      rgba(0, 0, 0, 0.317) 91.2%,
+      rgba(0, 0, 0, 0.163) 93.4%,
+      rgba(0, 0, 0, 0.058) 95.6%,
+      rgba(0, 0, 0, 0.009) 97.8%,
+      transparent 100%);
 
   /* Máscaras para difuminar los extremos internos de los scroll buttons */
-  --sv-scroll-mask-left: linear-gradient(
-    to right,
-    #000 0%,
-    #000 30%,
-    rgba(0, 0, 0, 0.991) 40%,
-    rgba(0, 0, 0, 0.942) 50%,
-    rgba(0, 0, 0, 0.837) 60%,
-    rgba(0, 0, 0, 0.683) 70%,
-    rgba(0, 0, 0, 0.5) 80%,
-    rgba(0, 0, 0, 0.317) 87%,
-    rgba(0, 0, 0, 0.163) 93%,
-    rgba(0, 0, 0, 0.058) 97%,
-    rgba(0, 0, 0, 0.009) 99%,
-    transparent 100%
-  );
+  --sv-scroll-mask-left: linear-gradient(to right,
+      #000 0%,
+      #000 30%,
+      rgba(0, 0, 0, 0.991) 40%,
+      rgba(0, 0, 0, 0.942) 50%,
+      rgba(0, 0, 0, 0.837) 60%,
+      rgba(0, 0, 0, 0.683) 70%,
+      rgba(0, 0, 0, 0.5) 80%,
+      rgba(0, 0, 0, 0.317) 87%,
+      rgba(0, 0, 0, 0.163) 93%,
+      rgba(0, 0, 0, 0.058) 97%,
+      rgba(0, 0, 0, 0.009) 99%,
+      transparent 100%);
 
-  --sv-scroll-mask-right: linear-gradient(
-    to left,
-    #000 0%,
-    #000 30%,
-    rgba(0, 0, 0, 0.991) 40%,
-    rgba(0, 0, 0, 0.942) 50%,
-    rgba(0, 0, 0, 0.837) 60%,
-    rgba(0, 0, 0, 0.683) 70%,
-    rgba(0, 0, 0, 0.5) 80%,
-    rgba(0, 0, 0, 0.317) 87%,
-    rgba(0, 0, 0, 0.163) 93%,
-    rgba(0, 0, 0, 0.058) 97%,
-    rgba(0, 0, 0, 0.009) 99%,
-    transparent 100%
-  );
+  --sv-scroll-mask-right: linear-gradient(to left,
+      #000 0%,
+      #000 30%,
+      rgba(0, 0, 0, 0.991) 40%,
+      rgba(0, 0, 0, 0.942) 50%,
+      rgba(0, 0, 0, 0.837) 60%,
+      rgba(0, 0, 0, 0.683) 70%,
+      rgba(0, 0, 0, 0.5) 80%,
+      rgba(0, 0, 0, 0.317) 87%,
+      rgba(0, 0, 0, 0.163) 93%,
+      rgba(0, 0, 0, 0.058) 97%,
+      rgba(0, 0, 0, 0.009) 99%,
+      transparent 100%);
 }
 
 /* Hero de DetailModal. Sin media query: aplica en todos los tamaños. */
@@ -706,6 +710,7 @@ html {
 }
 
 @media (max-width: 639px) {
+
   /* Capa de FONDO (blur ESTÁTICO): su opacidad la anima el crossfade (en el JSX,
      con `--sv-hero-scroll`). NO se anima el `blur` ni la `height` → todo es
      compositor (opacidad) = 60fps, completamente fluido. Brillo 0.85 y blur 14
@@ -713,6 +718,6 @@ html {
      Valores ajustables. */
   .hero-bg-base {
     transform: scale(1.12);
-    filter: brightness(0.9) saturate(1.03) blur(7px);
+    filter: brightness(0.9) saturate(1.03) blur(4px);
   }
 }
