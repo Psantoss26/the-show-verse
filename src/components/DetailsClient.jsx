@@ -1420,6 +1420,37 @@ export default function DetailsClient({
     if (supportsHover) setMobileClearOpen(false);
   }, [supportsHover]);
 
+  // MÓVIL: progreso de scroll `--sv-hero-scroll` (0→1) que dirige la transición del
+  // póster de portada a fondo (difuminado + escala + máscara, en globals.css). Se
+  // escribe en el <html> con un listener pasivo + rAF (sin re-render de React). La
+  // distancia (~55% de la ventana) es AJUSTABLE. En desktop se limpia y no se usa.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isMobileViewport) {
+      root.style.removeProperty("--sv-hero-scroll");
+      return undefined;
+    }
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const dist = Math.max(1, window.innerHeight * 0.55);
+      const p = Math.min(1, Math.max(0, window.scrollY / dist));
+      root.style.setProperty("--sv-hero-scroll", p.toFixed(4));
+    };
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(apply);
+    };
+    apply();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      root.style.removeProperty("--sv-hero-scroll");
+    };
+  }, [isMobileViewport]);
+
   // Logo del título (best-effort) para la cabecera móvil. Prioriza inglés, luego
   // sin idioma, luego español (mismo criterio que DetailModal).
   useEffect(() => {
@@ -7884,9 +7915,7 @@ export default function DetailsClient({
                 Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
                 ternario muerto (siempre 1). */}
             <div
-              className={`hero-bg-base absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100 ${
-                currentLowLoaded ? "" : "max-sm:opacity-0"
-              }`}
+              className="hero-bg-base absolute inset-0 bg-cover bg-center transition-opacity duration-500 opacity-100"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 // MÓVIL: desenfoque + un punto de escala.
@@ -7918,7 +7947,7 @@ export default function DetailsClient({
             {/* Capa detalle: zoom OUT (scale < 1). Mismo gateo que la capa base:
                 si esta se mostrara antes, el problema seguiría igual. */}
             <div
-              className={`absolute inset-0 bg-cover transition-opacity duration-500 opacity-100 ${
+              className={`absolute inset-0 bg-cover transition-opacity duration-500 opacity-100 max-sm:hidden ${
                 currentLowLoaded ? "" : "max-sm:opacity-0"
               }`}
               style={{
@@ -7934,14 +7963,19 @@ export default function DetailsClient({
           <div className="absolute inset-0 bg-[#0a0a0a]" />
         )}
 
-        {/* Sombreado superior + laterales (sin "marcos") */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-
-        {/* Tus overlays originales */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        {/* Sombreados de legibilidad del fondo. En MÓVIL se desvanecen con el scroll
+            (`--sv-hero-scroll`): en p=0 el póster está nítido SIN oscurecer (entrada
+            intacta); al hacer scroll aparecen para dar legibilidad sobre el fondo.
+            Escritorio (>=sm): siempre visibles. */}
+        <div className="absolute inset-0 pointer-events-none sm:opacity-100 max-sm:[opacity:var(--sv-hero-scroll,0)]">
+          {/* Sombreado superior + laterales (sin "marcos") */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+          {/* Overlays originales */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        </div>
       </div>
 
       {/* --- CONTENIDO PRINCIPAL --- */}
@@ -8015,7 +8049,7 @@ export default function DetailsClient({
                   que es exactamente lo que estamos eliminando. */}
               {posterLowUrl && !currentImgError && (
                 <div
-                  className={`sm:hidden absolute bottom-full inset-x-0 h-16 overflow-hidden pointer-events-none z-0 transition-opacity duration-500 ease-out ${
+                  className={`hidden absolute bottom-full inset-x-0 h-16 overflow-hidden pointer-events-none z-0 transition-opacity duration-500 ease-out ${
                     currentLowLoaded ? "opacity-100" : "opacity-0"
                   }`}
                 >
@@ -8135,7 +8169,7 @@ export default function DetailsClient({
                             initial={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 poster-mobile-fade"
+                            className="absolute inset-0 z-0 poster-mobile-fade max-sm:hidden"
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
@@ -8161,7 +8195,7 @@ export default function DetailsClient({
                       // `scale()` es un transform 2D que NO promueve, así que la
                       // imagen rasteriza dentro de esta capa y la máscara siempre
                       // la cubre. No se pierde GPU: el wrapper ya es transform-gpu.
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade">
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:hidden">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
