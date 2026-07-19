@@ -3298,6 +3298,7 @@ export default function DetailsClient({
       loading: false,
       error: "",
       found: true,
+      traktUrl: r?.traktUrl || null,
       rating:
         typeof r?.community?.rating === "number" ? r.community.rating : null,
       votes: typeof r?.community?.votes === "number" ? r.community.votes : null,
@@ -3322,6 +3323,7 @@ export default function DetailsClient({
     loading: false,
     error: "",
     found: false,
+    traktUrl: null,
     rating: null,
     votes: null,
     stats: {
@@ -3372,6 +3374,7 @@ export default function DetailsClient({
       ...current,
       ...incoming,
       found: incoming?.found || shouldPreserveUsefulData,
+      traktUrl: incoming?.traktUrl || current?.traktUrl || null,
       rating: incomingHasCommunity
         ? incoming.rating
         : currentHasCommunity
@@ -8667,9 +8670,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? formatCountShort(tScoreboard.votes)
                     : undefined,
                   href: buildTraktHref({
-                    href: trakt?.traktUrl,
-                    type,
-                    tmdbId: id,
+                    href: tScoreboard?.traktUrl || trakt?.traktUrl,
+                    title,
                   }),
                   pending: tScoreboard.loading && traktDecimal == null,
                 }}

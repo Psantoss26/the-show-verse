@@ -1,24 +1,8 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
 
-const TRAKT_API = 'https://api.trakt.tv'
-const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID
-
-function traktHeaders(token) {
-    return {
-        'Content-Type': 'application/json',
-        'trakt-api-version': '2',
-        'trakt-api-key': TRAKT_CLIENT_ID,
-        Authorization: `Bearer ${token}`
-    }
-}
-
-async function getAccessToken() {
-    const cookieStore = await cookies()
-    return cookieStore.get('trakt_access_token')?.value || null
-}
-
+// Marcar/quitar episodio visto — ÍNTEGRO en el backend propio
+// (/v1/history/episodes). Sin Trakt.
 export async function POST(req, { params }) {
     try {
         const { tmdbId: tmdbParam } = await params
@@ -57,33 +41,14 @@ export async function POST(req, { params }) {
             setBackendAuthCookies(res, backend, { secure: req.nextUrl.protocol === 'https:' })
             return res
         }
-        if (!backend.skipped && backend.status !== 401) {
-            console.warn('Backend show episode update failed; falling back to Trakt', backend.error)
+
+        if (backend.status === 401) {
+            return NextResponse.json({ connected: false }, { status: 401 })
         }
-
-        const token = await getAccessToken()
-        if (!token) return NextResponse.json({ error: 'Trakt no conectado' }, { status: 401 })
-
-        const payload = {
-            shows: [{
-                ids: { tmdb: tmdbId },
-                seasons: [{ number: season, episodes: [{ number: episode }] }]
-            }]
-        }
-
-        // watched=true => añade a historial (marca visto)
-        // watched=false => quita del historial (marca no visto)
-        const url = watched ? `${TRAKT_API}/sync/history` : `${TRAKT_API}/sync/history/remove`
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: traktHeaders(token),
-            body: JSON.stringify(payload)
-        })
-
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.error || 'Error actualizando episodio')
-
-        return NextResponse.json({ ok: true })
+        return NextResponse.json(
+            { error: backend.error || 'No se pudo actualizar el episodio' },
+            { status: backend.status || 502 },
+        )
     } catch (e) {
         return NextResponse.json({ error: e?.message || 'Error' }, { status: 500 })
     }

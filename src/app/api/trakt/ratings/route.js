@@ -1,39 +1,20 @@
 // /src/app/api/trakt/ratings/route.js
+// Valoraciones de usuario — ÍNTEGRO en el backend propio (/v1/ratings). Sin Trakt.
+// El backend no tiene valoración de TEMPORADA: se mapea a valoración POR EPISODIO
+// (puntuar/leer todos los episodios de la temporada, que comparten valor).
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import {
   backendFetchJson,
   mediaTypeToBackend,
   setBackendAuthCookies,
-  hasBackendCredentials,
 } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TRAKT_API = "https://api.trakt.tv";
-const TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
-const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET;
-const TRAKT_USER_AGENT =
-  process.env.TRAKT_USER_AGENT || "TheShowVerse/1.0 (Next.js; Trakt Ratings)";
-const TRAKT_REDIRECT_URI =
-  process.env.TRAKT_REDIRECT_URI ||
-  (process.env.TRAKT_APP_ORIGIN
-    ? `${String(process.env.TRAKT_APP_ORIGIN).replace(/\/+$/, "")}/api/trakt/auth/callback`
-    : null);
-
-function jsonWithCookies(payload, status = 200, cookiesToSet = []) {
-  const res = NextResponse.json(payload, { status });
-  for (const c of cookiesToSet) {
-    res.cookies.set(c.name, c.value, c.options);
-  }
-  return res;
-}
-
-function mustEnv() {
-  if (!TRAKT_CLIENT_ID) throw new Error("Missing TRAKT_CLIENT_ID");
-  if (!TRAKT_CLIENT_SECRET) throw new Error("Missing TRAKT_CLIENT_SECRET");
-}
+const TMDB_API = "https://api.themoviedb.org/3";
+const TMDB_API_KEY =
+  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function normalizeType(t) {
   const x = String(t || "")
@@ -52,364 +33,131 @@ function normalizeRating(val) {
   if (!Number.isFinite(n)) return null;
   const clamped = Math.min(10, Math.max(1, n));
   const normalized = Math.round(clamped * 10) / 10;
-  if (normalized < 1 || normalized > 10) {
-    throw new Error("Rating must be 1..10 or null");
-  }
+  if (normalized < 1 || normalized > 10) return null;
   return normalized;
 }
 
-function cookieOpts() {
-  // En Vercel es https => secure true OK.
-  // En local (http) conviene no romper: secure solo en prod.
-  return {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  };
-}
-
-async function readTraktAuthCookies() {
-  const store = await cookies();
-  const accessToken = store.get("trakt_access_token")?.value || null;
-  const refreshToken = store.get("trakt_refresh_token")?.value || null;
-  const expiresAtMs = store.get("trakt_expires_at")?.value
-    ? Number(store.get("trakt_expires_at").value)
-    : null;
-  return { accessToken, refreshToken, expiresAtMs };
-}
-
-// Devuelve { accessToken, refreshToken, expiresAtMs, cookiesToSet: [] }
-async function refreshIfNeeded(auth) {
-  mustEnv();
-  const { accessToken, refreshToken, expiresAtMs } = auth;
-
-  if (!accessToken) return { ...auth, accessToken: null, cookiesToSet: [] };
-  if (!refreshToken || !expiresAtMs) return { ...auth, cookiesToSet: [] };
-
-  // margen de 60s
-  const now = Date.now();
-  if (now < expiresAtMs - 60_000) return { ...auth, cookiesToSet: [] };
-
-  // sin redirect_uri no refrescamos (mantienes funcionalidad previa: simplemente no auto-refresh)
-  if (!TRAKT_REDIRECT_URI) return { ...auth, cookiesToSet: [] };
-
-  const res = await fetch(`${TRAKT_API}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "trakt-api-version": "2",
-      "trakt-api-key": TRAKT_CLIENT_ID,
-      "User-Agent": TRAKT_USER_AGENT,
-    },
-    body: JSON.stringify({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: TRAKT_CLIENT_ID,
-      client_secret: TRAKT_CLIENT_SECRET,
-      redirect_uri: TRAKT_REDIRECT_URI,
-    }),
-    cache: "no-store",
-  });
-
-  if (!res.ok) return { ...auth, cookiesToSet: [] };
-
-  const data = await res.json().catch(() => ({}));
-  const newAccess = data?.access_token || null;
-  const newRefresh = data?.refresh_token || refreshToken;
-  const newExpiresIn = Number(data?.expires_in || 0);
-  const newExpiresAtMs = newExpiresIn
-    ? Date.now() + newExpiresIn * 1000
-    : expiresAtMs;
-
-  const cookiesToSet = [];
-  if (newAccess) {
-    const opts = cookieOpts();
-    cookiesToSet.push({
-      name: "trakt_access_token",
-      value: newAccess,
-      options: opts,
-    });
-    cookiesToSet.push({
-      name: "trakt_refresh_token",
-      value: newRefresh,
-      options: opts,
-    });
-    cookiesToSet.push({
-      name: "trakt_expires_at",
-      value: String(newExpiresAtMs),
-      options: opts,
-    });
+async function fetchSeasonEpisodes(tmdbId, season) {
+  if (!TMDB_API_KEY || !Number.isFinite(tmdbId) || !Number.isFinite(season)) {
+    return [];
   }
-
-  return {
-    ...auth,
-    accessToken: newAccess,
-    refreshToken: newRefresh,
-    expiresAtMs: newExpiresAtMs,
-    cookiesToSet,
-  };
+  try {
+    const url = `${TMDB_API}/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const eps = Array.isArray(json?.episodes) ? json.episodes : [];
+    return eps
+      .map((e) => Number(e?.episode_number))
+      .filter((n) => Number.isFinite(n) && n > 0);
+  } catch {
+    return [];
+  }
 }
 
-async function traktFetch(
-  path,
-  { accessToken },
-  { method = "GET", body } = {},
-) {
-  mustEnv();
-  return fetch(`${TRAKT_API}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "trakt-api-version": "2",
-      "trakt-api-key": TRAKT_CLIENT_ID,
-      "User-Agent": TRAKT_USER_AGENT,
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    cache: "no-store",
-  });
-}
+const secureFor = (req) => ({ secure: req.nextUrl?.protocol === "https:" });
 
 // ======================
-// GET: leer rating user
-// - /api/trakt/ratings?type=season&tmdbId=XXXX&season=Y
-// - /api/trakt/ratings?type=movie&tmdbId=XXXX
-// - /api/trakt/ratings?type=show&tmdbId=XXXX
-// - /api/trakt/ratings?type=episode&tmdbId=SHOW_TMDB&season=Y&episode=Z
+// GET: leer la valoración del usuario (backend propio)
+//   ?type=movie|show|episode|season&tmdbId=..&season=..&episode=..
+//   (sin type → lista completa de valoraciones)
 // ======================
 export async function GET(req) {
   try {
     const url = new URL(req.url);
     const type = normalizeType(url.searchParams.get("type"));
 
-    if (hasBackendCredentials(req)) {
-      try {
-        if (!type) {
-          const limit = Number(url.searchParams.get("limit") || 1000);
-          const backend = await backendFetchJson(
-            req,
-            `/v1/ratings?limit=${encodeURIComponent(String(limit))}`,
-          );
-          if (backend.ok) {
-            const res = NextResponse.json({
-              results: Array.isArray(backend.json?.results)
-                ? backend.json.results
-                : [],
-              page: backend.json?.page || 1,
-              source: "backend",
-            });
-            setBackendAuthCookies(res, backend, {
-              secure: req.nextUrl?.protocol === "https:",
-            });
-            return res;
-          }
-        }
-
-        const mediaType = mediaTypeToBackend(type);
-        if (type === "episode") {
-          const showTmdbId = Number(url.searchParams.get("tmdbId"));
-          const seasonNumber = Number(url.searchParams.get("season"));
-          const episodeNumber = Number(url.searchParams.get("episode"));
-
-          const backend = await backendFetchJson(req, "/v1/ratings?type=episode&limit=1000");
-          if (backend.ok) {
-            const items = backend.json?.results || [];
-            const found = items.find((it) => {
-              return Number(it.tmdbId) === showTmdbId &&
-                     Number(it.season) === seasonNumber &&
-                     Number(it.episode) === episodeNumber;
-            });
-            const res = NextResponse.json({
-              found: !!found,
-              rating: found ? found.rating : null,
-              source: "backend",
-            });
-            setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === "https:" });
-            return res;
-          }
-        } else if (type === "movie" || type === "show") {
-          const tmdbId = Number(url.searchParams.get("tmdbId"));
-          const backend = await backendFetchJson(req, `/v1/items/${encodeURIComponent(tmdbId)}/${mediaType}/status`);
-          if (backend.ok) {
-            const res = NextResponse.json({
-              found: backend.json?.rating != null,
-              rating: backend.json?.rating || null,
-              source: "backend",
-            });
-            setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === "https:" });
-            return res;
-          }
-        }
-      } catch (e) {
-        console.warn("Backend rating fetch failed; falling back to Trakt", e);
+    if (!type) {
+      const limit = Number(url.searchParams.get("limit") || 1000);
+      const backend = await backendFetchJson(
+        req,
+        `/v1/ratings?limit=${encodeURIComponent(String(limit))}`,
+      );
+      if (!backend.ok) {
+        return NextResponse.json(
+          { results: [], page: 1 },
+          { status: backend.status === 401 ? 401 : 200 },
+        );
       }
+      const res = NextResponse.json({
+        results: Array.isArray(backend.json?.results)
+          ? backend.json.results
+          : [],
+        page: backend.json?.page || 1,
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, secureFor(req));
+      return res;
     }
 
-    const auth0 = await readTraktAuthCookies();
-    const auth = await refreshIfNeeded(auth0);
-    const respond = (payload, status = 200) =>
-      jsonWithCookies(payload, status, auth.cookiesToSet);
-
-    if (!auth.accessToken) return respond({ error: "Unauthorized" }, 401);
-
-    // ---- MOVIE / SHOW ----
     if (type === "movie" || type === "show") {
       const tmdbId = Number(url.searchParams.get("tmdbId"));
-      if (!Number.isFinite(tmdbId))
-        return respond({ error: "Missing tmdbId" }, 400);
-
-      const pathType = type === "movie" ? "movies" : "shows";
-      let page = 1;
-      const limit = 100;
-
-      while (page <= 20) {
-        const res = await traktFetch(
-          `/sync/ratings/${pathType}?extended=full&page=${page}&limit=${limit}`,
-          auth,
+      const mediaType = mediaTypeToBackend(type);
+      const backend = await backendFetchJson(
+        req,
+        `/v1/items/${encodeURIComponent(tmdbId)}/${mediaType}/status`,
+      );
+      if (!backend.ok) {
+        return NextResponse.json(
+          { found: false, rating: null },
+          { status: backend.status === 401 ? 401 : 200 },
         );
-        if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return respond(
-            { error: err?.error || "Trakt GET ratings failed" },
-            res.status,
-          );
-        }
-
-        const items = await res.json();
-        if (!Array.isArray(items) || items.length === 0) break;
-
-        const found = items.find((it) => {
-          const ids = type === "movie" ? it?.movie?.ids : it?.show?.ids;
-          return Number(ids?.tmdb) === tmdbId;
-        });
-
-        if (found) {
-          return respond({
-            found: true,
-            rating: typeof found?.rating === "number" ? found.rating : null,
-            rated_at: found?.rated_at || null,
-          });
-        }
-
-        page++;
       }
-
-      return respond({ found: false, rating: null });
+      const res = NextResponse.json({
+        found: backend.json?.rating != null,
+        rating: backend.json?.rating ?? null,
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, secureFor(req));
+      return res;
     }
 
-    // ---- SEASON ----
-    if (type === "season") {
-      const tmdbId = Number(url.searchParams.get("tmdbId"));
-      const seasonNumber = Number(url.searchParams.get("season"));
-      if (!Number.isFinite(tmdbId) || !Number.isFinite(seasonNumber)) {
-        return respond({ error: "Missing tmdbId/season" }, 400);
-      }
-
-      let page = 1;
-      const limit = 100;
-
-      while (page <= 20) {
-        const res = await traktFetch(
-          `/sync/ratings/seasons?extended=full&page=${page}&limit=${limit}`,
-          auth,
-        );
-        if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return respond(
-            { error: err?.error || "Trakt GET ratings failed" },
-            res.status,
-          );
-        }
-
-        const items = await res.json();
-        if (!Array.isArray(items) || items.length === 0) break;
-
-        const found = items.find((it) => {
-          const showTmdb = Number(it?.show?.ids?.tmdb);
-          const sn = Number(it?.season?.number);
-          return showTmdb === tmdbId && sn === seasonNumber;
-        });
-
-        if (found) {
-          return respond({
-            found: true,
-            rating: typeof found?.rating === "number" ? found.rating : null,
-            rated_at: found?.rated_at || null,
-          });
-        }
-
-        page++;
-      }
-
-      return respond({ found: false, rating: null });
-    }
-
-    // ---- EPISODE ----
-    if (type === "episode") {
+    if (type === "episode" || type === "season") {
       const showTmdbId = Number(url.searchParams.get("tmdbId"));
       const seasonNumber = Number(url.searchParams.get("season"));
-      const episodeNumber = Number(url.searchParams.get("episode"));
-      if (
-        !Number.isFinite(showTmdbId) ||
-        !Number.isFinite(seasonNumber) ||
-        !Number.isFinite(episodeNumber)
-      ) {
-        return respond({ error: "Missing tmdbId/season/episode" }, 400);
-      }
+      const episodeNumber =
+        type === "episode" ? Number(url.searchParams.get("episode")) : null;
 
-      let page = 1;
-      const limit = 100;
-
-      while (page <= 20) {
-        const res = await traktFetch(
-          `/sync/ratings/episodes?extended=full&page=${page}&limit=${limit}`,
-          auth,
+      const backend = await backendFetchJson(
+        req,
+        "/v1/ratings?type=episode&limit=1000",
+      );
+      if (!backend.ok) {
+        return NextResponse.json(
+          { found: false, rating: null },
+          { status: backend.status === 401 ? 401 : 200 },
         );
-        if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return respond(
-            { error: err?.error || "Trakt GET ratings failed" },
-            res.status,
-          );
-        }
-
-        const items = await res.json();
-        if (!Array.isArray(items) || items.length === 0) break;
-
-        const found = items.find((it) => {
-          const showTmdb = Number(it?.show?.ids?.tmdb);
-          const sn = Number(it?.episode?.season);
-          const en = Number(it?.episode?.number);
-          return (
-            showTmdb === showTmdbId &&
-            sn === seasonNumber &&
-            en === episodeNumber
-          );
-        });
-
-        if (found) {
-          return respond({
-            found: true,
-            rating: typeof found?.rating === "number" ? found.rating : null,
-            rated_at: found?.rated_at || null,
-          });
-        }
-
-        page++;
       }
+      const items = Array.isArray(backend.json?.results)
+        ? backend.json.results
+        : [];
+      const found =
+        type === "episode"
+          ? items.find(
+              (it) =>
+                Number(it.tmdbId) === showTmdbId &&
+                Number(it.season) === seasonNumber &&
+                Number(it.episode) === episodeNumber,
+            )
+          : // Temporada: valoración representativa = la de cualquier episodio
+            // valorado de la temporada (todos comparten valor al puntuar la temporada).
+            items.find(
+              (it) =>
+                Number(it.tmdbId) === showTmdbId &&
+                Number(it.season) === seasonNumber,
+            );
 
-      return respond({ found: false, rating: null });
+      const res = NextResponse.json({
+        found: !!found,
+        rating: found ? found.rating : null,
+        source: "backend",
+      });
+      setBackendAuthCookies(res, backend, secureFor(req));
+      return res;
     }
 
-    return respond({ error: "Unsupported type" }, 400);
+    return NextResponse.json({ error: "Unsupported type" }, { status: 400 });
   } catch (e) {
-    console.error(e);
     return NextResponse.json(
       { error: e?.message || "Server error" },
       { status: 500 },
@@ -418,48 +166,35 @@ export async function GET(req) {
 }
 
 // ======================
-// POST: crear/eliminar rating
-// - movie/show: body { type:'movie'|'show'|'tv', tmdbId OR ids:{tmdb}, rating }
-// - season:     body { type:'season', tmdbId, season, rating }
-// - episode:    body { type:'episode', tmdbId(SHOW), season, episode, rating }
-// rating=null => remove
+// POST: dar/quitar valoración (backend propio)
 // ======================
 export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
     const type = normalizeType(body?.type);
+    const rating = normalizeRating(body?.rating);
+    const mediaType = mediaTypeToBackend(type);
 
-    const auth0 = await readTraktAuthCookies();
-    const auth = await refreshIfNeeded(auth0);
-    const respond = (payload, status = 200) =>
-      jsonWithCookies(payload, status, auth.cookiesToSet);
+    let backendResult = null;
 
-    if (hasBackendCredentials(req)) {
-      try {
-        const mediaType = mediaTypeToBackend(type);
-        const rating = normalizeRating(body?.rating);
-        let backendResult = null;
-
-        if (type === "episode") {
-          const showTmdbId = Number(
-            body?.tmdbId ??
-              body?.showId ??
-              body?.tvId ??
-              body?.showTmdbId ??
-              body?.ids?.tmdb,
-          );
-          const seasonNumber = Number(body?.season ?? body?.seasonNumber);
-          const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
-
-          if (rating === null) {
-            const res = await backendFetchJson(
+    if (type === "episode") {
+      const showTmdbId = Number(
+        body?.tmdbId ??
+          body?.showId ??
+          body?.tvId ??
+          body?.showTmdbId ??
+          body?.ids?.tmdb,
+      );
+      const seasonNumber = Number(body?.season ?? body?.seasonNumber);
+      const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
+      backendResult =
+        rating === null
+          ? await backendFetchJson(
               req,
               `/v1/ratings/${encodeURIComponent(showTmdbId)}/episode?season=${seasonNumber}&episode=${episodeNumber}`,
-              { method: "DELETE" }
-            );
-            if (res.ok) backendResult = res;
-          } else {
-            const res = await backendFetchJson(req, "/v1/ratings", {
+              { method: "DELETE" },
+            )
+          : await backendFetchJson(req, "/v1/ratings", {
               method: "POST",
               body: JSON.stringify({
                 tmdbId: showTmdbId,
@@ -471,17 +206,16 @@ export async function POST(req) {
                 posterPath: body?.posterPath || undefined,
               }),
             });
-            if (res.ok) backendResult = res;
-          }
-        } else if (type === "movie" || type === "show") {
-          const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
-          if (rating === null) {
-            const res = await backendFetchJson(req, `/v1/ratings/${encodeURIComponent(tmdbId)}/${mediaType}`, {
-              method: "DELETE",
-            });
-            if (res.ok) backendResult = res;
-          } else {
-            const res = await backendFetchJson(req, "/v1/ratings", {
+    } else if (type === "movie" || type === "show") {
+      const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
+      backendResult =
+        rating === null
+          ? await backendFetchJson(
+              req,
+              `/v1/ratings/${encodeURIComponent(tmdbId)}/${mediaType}`,
+              { method: "DELETE" },
+            )
+          : await backendFetchJson(req, "/v1/ratings", {
               method: "POST",
               body: JSON.stringify({
                 tmdbId,
@@ -491,307 +225,60 @@ export async function POST(req) {
                 posterPath: body?.posterPath || undefined,
               }),
             });
-            if (res.ok) backendResult = res;
-          }
-        }
-
-        if (backendResult) {
-          // Sincronización opcional hacia Trakt si está conectado
-          const token = auth.accessToken;
-          if (token) {
-            try {
-              const isRemove = rating === null;
-              const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
-              if (type === "episode") {
-                const showTmdbId = Number(
-                  body?.tmdbId ??
-                    body?.showId ??
-                    body?.tvId ??
-                    body?.showTmdbId ??
-                    body?.ids?.tmdb,
-                );
-                const seasonNumber = Number(body?.season ?? body?.seasonNumber);
-                const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
-                const payload = {
-                  shows: [
-                    {
-                      ids: { tmdb: showTmdbId },
-                      seasons: [
-                        {
-                          number: seasonNumber,
-                          episodes: [
-                            isRemove
-                              ? { number: episodeNumber }
-                              : {
-                                  number: episodeNumber,
-                                  rating,
-                                  rated_at: new Date().toISOString(),
-                                },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                };
-                await traktFetch(endpoint, auth, { method: "POST", body: payload });
-              } else {
-                const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
-                const key = type === "movie" ? "movies" : "shows";
-                const payload = {
-                  [key]: [
-                    isRemove
-                      ? { ids: { tmdb: tmdbId } }
-                      : {
-                          ids: { tmdb: tmdbId },
-                          rating,
-                          rated_at: new Date().toISOString(),
-                        },
-                  ],
-                };
-                await traktFetch(endpoint, auth, { method: "POST", body: payload });
-              }
-            } catch (traktErr) {
-              console.warn("Failed to sync rating to Trakt:", traktErr);
-            }
-          }
-
-          const res = NextResponse.json({
-            ok: true,
-            removed: rating === null,
-            rating,
-            source: "backend",
-          });
-          if (auth.cookiesToSet) {
-            for (const c of auth.cookiesToSet) {
-              res.cookies.set(c.name, c.value, c.options);
-            }
-          }
-          setBackendAuthCookies(res, backendResult, { secure: req.nextUrl?.protocol === "https:" });
-          return res;
-        }
-      } catch (e) {
-        console.warn("Backend rating operation failed; falling back to Trakt", e);
-      }
-    }
-
-    if (!auth.accessToken) return respond({ error: "Unauthorized" }, 401);
-
-    // ---- MOVIE / SHOW ----
-    if (type === "movie" || type === "show") {
-      const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
-      const traktId = Number(body?.traktId ?? body?.ids?.trakt);
-
-      if (!Number.isFinite(tmdbId) && !Number.isFinite(traktId))
-        return respond({ error: "Missing tmdbId or traktId" }, 400);
-
-      const rating = normalizeRating(body?.rating);
-      const isRemove = rating === null;
-
-      const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
-      const key = type === "movie" ? "movies" : "shows";
-
-      // Construir IDs: preferir traktId si está disponible, sino tmdbId
-      const itemIds = {};
-      if (Number.isFinite(traktId)) {
-        itemIds.trakt = traktId;
-      } else if (Number.isFinite(tmdbId)) {
-        itemIds.tmdb = tmdbId;
-      }
-
-      const payload = {
-        [key]: [
-          isRemove
-            ? { ids: itemIds }
-            : {
-                ids: itemIds,
-                rating,
-                rated_at: new Date().toISOString(),
-              },
-        ],
-      };
-
-      const res = await traktFetch(endpoint, auth, {
-        method: "POST",
-        body: payload,
-      });
-      if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-
-      const out = await res.json().catch(() => ({}));
-      if (res.status === 403) {
-        return respond(
-          {
-            error:
-              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
-            code: "TRAKT_REAUTH_REQUIRED",
-            details: out,
-          },
-          403,
-        );
-      }
-      if (!res.ok)
-        return respond(
-          { error: out?.error || "Trakt rating failed", details: out },
-          res.status,
-        );
-
-      return respond({
-        ok: true,
-        type,
-        removed: isRemove,
-        rating: isRemove ? null : rating,
-        summary: out,
-      });
-    }
-
-    // ---- SEASON ----
-    if (type === "season") {
-      const tmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
+    } else if (type === "season") {
+      // No hay valoración de temporada en el backend: puntuar una temporada =
+      // puntuar todos sus episodios.
+      const showTmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
       const seasonNumber = Number(body?.season ?? body?.seasonNumber);
-      if (!Number.isFinite(tmdbId) || !Number.isFinite(seasonNumber)) {
-        return respond(
-          { error: "Missing tmdbId (show) or season number" },
-          400,
-        );
+      const episodeNumbers = await fetchSeasonEpisodes(showTmdbId, seasonNumber);
+      let anyOk = false;
+      for (const epNum of episodeNumbers) {
+        const res =
+          rating === null
+            ? await backendFetchJson(
+                req,
+                `/v1/ratings/${encodeURIComponent(showTmdbId)}/episode?season=${seasonNumber}&episode=${epNum}`,
+                { method: "DELETE" },
+              )
+            : await backendFetchJson(req, "/v1/ratings", {
+                method: "POST",
+                body: JSON.stringify({
+                  tmdbId: showTmdbId,
+                  mediaType: "episode",
+                  rating,
+                  season: seasonNumber,
+                  episode: epNum,
+                  title: body?.title || undefined,
+                  posterPath: body?.posterPath || undefined,
+                }),
+              });
+        if (res.ok) {
+          anyOk = true;
+          backendResult = res;
+        }
       }
-
-      const rating = normalizeRating(body?.rating);
-      const isRemove = rating === null;
-
-      const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
-      const payload = {
-        shows: [
-          {
-            ids: { tmdb: tmdbId },
-            seasons: [
-              isRemove
-                ? { number: seasonNumber }
-                : {
-                    number: seasonNumber,
-                    rating,
-                    rated_at: new Date().toISOString(),
-                  },
-            ],
-          },
-        ],
-      };
-
-      const res = await traktFetch(endpoint, auth, {
-        method: "POST",
-        body: payload,
-      });
-      if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-
-      const out = await res.json().catch(() => ({}));
-      if (res.status === 403) {
-        return respond(
-          {
-            error:
-              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
-            code: "TRAKT_REAUTH_REQUIRED",
-            details: out,
-          },
-          403,
-        );
-      }
-      if (!res.ok)
-        return respond(
-          { error: out?.error || "Trakt rating failed", details: out },
-          res.status,
-        );
-
-      return respond({
-        ok: true,
-        removed: isRemove,
-        rating: isRemove ? null : rating,
-        summary: out,
-      });
+      if (!anyOk) backendResult = null;
+    } else {
+      return NextResponse.json({ error: "Unsupported type" }, { status: 400 });
     }
 
-    // ---- EPISODE ----
-    if (type === "episode") {
-      const showTmdbId = Number(
-        body?.tmdbId ??
-          body?.showId ??
-          body?.tvId ??
-          body?.showTmdbId ??
-          body?.ids?.tmdb,
+    if (!backendResult || !backendResult.ok) {
+      return NextResponse.json(
+        { error: backendResult?.error || "No se pudo guardar la valoración" },
+        { status: backendResult?.status || 502 },
       );
-      const seasonNumber = Number(body?.season ?? body?.seasonNumber);
-      const episodeNumber = Number(body?.episode ?? body?.episodeNumber);
-
-      if (
-        !Number.isFinite(showTmdbId) ||
-        !Number.isFinite(seasonNumber) ||
-        !Number.isFinite(episodeNumber)
-      ) {
-        return respond(
-          { error: "Missing tmdbId (show) / season / episode" },
-          400,
-        );
-      }
-
-      const rating = normalizeRating(body?.rating);
-      const isRemove = rating === null;
-
-      const endpoint = isRemove ? "/sync/ratings/remove" : "/sync/ratings";
-      const payload = {
-        shows: [
-          {
-            ids: { tmdb: showTmdbId },
-            seasons: [
-              {
-                number: seasonNumber,
-                episodes: [
-                  isRemove
-                    ? { number: episodeNumber }
-                    : {
-                        number: episodeNumber,
-                        rating,
-                        rated_at: new Date().toISOString(),
-                      },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-
-      const res = await traktFetch(endpoint, auth, {
-        method: "POST",
-        body: payload,
-      });
-      if (res.status === 401) return respond({ error: "Unauthorized" }, 401);
-
-      const out = await res.json().catch(() => ({}));
-      if (res.status === 403) {
-        return respond(
-          {
-            error:
-              "Trakt requires write permissions for ratings. Reconnect Trakt and try again.",
-            code: "TRAKT_REAUTH_REQUIRED",
-            details: out,
-          },
-          403,
-        );
-      }
-      if (!res.ok)
-        return respond(
-          { error: out?.error || "Trakt rating failed", details: out },
-          res.status,
-        );
-
-      return respond({
-        ok: true,
-        type,
-        removed: isRemove,
-        rating: isRemove ? null : rating,
-        summary: out,
-      });
     }
 
-    return respond({ error: "Unsupported type" }, 400);
+    const res = NextResponse.json({
+      ok: true,
+      type,
+      removed: rating === null,
+      rating,
+      source: "backend",
+    });
+    setBackendAuthCookies(res, backendResult, secureFor(req));
+    return res;
   } catch (e) {
-    console.error(e);
     return NextResponse.json(
       { error: e?.message || "Server error" },
       { status: 500 },

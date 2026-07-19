@@ -515,10 +515,11 @@ export function useDetailModalData(item) {
           const hasStats = Object.values(stats).some(
             (v) => typeof v === "number",
           );
-          if (rating != null || votes != null || hasStats) {
+          const traktUrl = sb?.traktUrl || null;
+          if (rating != null || votes != null || hasStats || traktUrl) {
             setData((prev) => ({
               ...prev,
-              scoreboard: { rating, votes, stats },
+              scoreboard: { rating, votes, stats, traktUrl },
               scoreboardResolved: true,
             }));
           } else {
@@ -915,10 +916,11 @@ export function useDetailModalData(item) {
           favorited: typeof st.favorited === "number" ? st.favorited : null,
         };
         const hasStats = Object.values(stats).some((v) => typeof v === "number");
-        if (rating != null || votes != null || hasStats) {
+        const traktUrl = sb?.traktUrl || null;
+        if (rating != null || votes != null || hasStats || traktUrl) {
           setData((prev) => ({
             ...prev,
-            scoreboard: { rating, votes, stats },
+            scoreboard: { rating, votes, stats, traktUrl },
             scoreboardResolved: true,
           }));
         } else {
