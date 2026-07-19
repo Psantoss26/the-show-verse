@@ -706,8 +706,37 @@ html {
 }
 
 @media (max-width: 639px) {
+  /* Transición ÚNICA imagen: dirigida por `--sv-hero-scroll` (0→1, lo escribe el
+     listener de scroll de DetailsClient). En p=0 el póster está NÍTIDO, escala 1.02
+     y con un fundido inferior a negro en la línea de la portada → se ve IGUAL que
+     la entrada actual (botones sobre oscuro). Al hacer scroll (p→1) difumina hasta
+     28px, amplía a 1.12, se oscurece y la máscara se relaja hasta cubrir toda la
+     pantalla → acaba EXACTAMENTE como el fondo. Constantes ajustables. */
   .hero-bg-base {
-    transform: scale(1.12);
-    filter: brightness(0.75) saturate(1.03) blur(28px);
+    /* En p=0 el layer mide EXACTAMENTE la caja de la portada actual (mismo alto →
+       mismo recorte `cover` y misma máscara que la entrada de hoy); al hacer scroll
+       crece hasta cubrir la pantalla completa (fondo). */
+    bottom: auto;
+    height: calc(
+      (100svh - 13.5rem - env(safe-area-inset-bottom)) +
+        var(--sv-hero-scroll, 0) * (13.5rem + env(safe-area-inset-bottom))
+    );
+    transform: scale(calc(1.02 + var(--sv-hero-scroll, 0) * 0.1));
+    filter: brightness(calc(1 - var(--sv-hero-scroll, 0) * 0.25)) saturate(1.03)
+      blur(calc(var(--sv-hero-scroll, 0) * 28px));
+    /* Máscara de desvanecido inferior igual que la portada (60%→96%), que se relaja
+       hasta full-bleed con el scroll. */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 calc(60% + var(--sv-hero-scroll, 0) * 40%),
+      transparent calc(96% + var(--sv-hero-scroll, 0) * 4%)
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 calc(60% + var(--sv-hero-scroll, 0) * 40%),
+      transparent calc(96% + var(--sv-hero-scroll, 0) * 4%)
+    );
   }
 }
