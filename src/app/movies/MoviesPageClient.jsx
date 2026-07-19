@@ -1869,11 +1869,15 @@ function Row({
             onClick={handlePrevClick}
             className="absolute inset-y-0 left-0 w-28 z-30
               hidden sm:flex items-center justify-start
-              bg-gradient-to-r from-black/80 via-black/55 to-transparent
-              hover:from-black/95 hover:via-black/75
-              transition-colors pointer-events-auto"
+              pointer-events-auto group/nav"
           >
-            <span className="ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+            {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                y respeta las esquinas redondeadas externas de las tarjetas (rounded-l-xl). */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 right-2 rounded-l-xl bg-gradient-to-r from-black/85 via-black/40 to-transparent backdrop-blur-[6px] transition-all duration-300 group-hover/nav:from-black/95"
+            />
+            <span className="relative ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ‹
             </span>
           </button>
@@ -1885,11 +1889,15 @@ function Row({
             onClick={handleNextClick}
             className="absolute inset-y-0 right-0 w-28 z-30
               hidden sm:flex items-center justify-end
-              bg-gradient-to-l from-black/80 via-black/55 to-transparent
-              hover:from-black/95 hover:via-black/75
-              transition-colors pointer-events-auto"
+              pointer-events-auto group/nav"
           >
-            <span className="mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]">
+            {/* Panel difuminado que ocupa el alto completo del botón (inset-y-0)
+                y respeta las esquinas redondeadas externas de las tarjetas (rounded-r-xl). */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 left-2 rounded-r-xl bg-gradient-to-l from-black/85 via-black/40 to-transparent backdrop-blur-[6px] transition-all duration-300 group-hover/nav:from-black/95"
+            />
+            <span className="relative mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ›
             </span>
           </button>
