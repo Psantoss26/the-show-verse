@@ -46,7 +46,7 @@ import { useTranslation } from "@/lib/i18n";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-const HISTORY_PAGE_SIZE = 160;
+const HISTORY_PAGE_SIZE = 200;
 const HISTORY_CACHE_KEY = "showverse:history:items:v4";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -2512,34 +2512,67 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 export default function HistoryClient() {
   const { session, account, hydrated: authHydrated, preferences } = useAuth();
   const { t } = useTranslation();
-  // Navegación atrás/adelante: al VOLVER restauramos la lista ya cargada y su
-  // posición en vez de re-pedir desde la página 1. La restauración de la lista se
-  // hace en un efecto (no en el init de estado) para NO romper la hidratación
-  // (en SSR no hay localStorage); <ScrollRestoration> reaplica la posición cuando
-  // la altura del documento vuelve a crecer con la lista restaurada.
+  // Navegación atrás/adelante: al VOLVER sembramos TODO el estado (lista, cursor de
+  // página, orden/agrupación/vista) YA en el init de estado —no en un efecto— para
+  // que la lista COMPLETA y su layout estén en el DOM en el PRIMER pintado, con la
+  // altura correcta cuando <ScrollRestoration> restaura la posición exacta, igual
+  // que Favoritos/Pendientes. Es HIDRATACIÓN-SEGURO: el back-nav es un re-montaje de
+  // CLIENTE (sin SSR), y en cargas frescas isBackNav=false → mismos valores por
+  // defecto que en el servidor (el contenido va oculto tras `hydrated` de todos modos).
   const isBackNav = useIsHistoryNavigation();
-  const restoredFromHistoryCacheRef = useRef(false);
+  const [backNavInit] = useState(() => {
+    if (!isBackNav || typeof window === "undefined") return null;
+    const cache = readHistoryCache();
+    const ls = (k) => {
+      try {
+        return window.localStorage.getItem(k);
+      } catch {
+        return null;
+      }
+    };
+    const view = ls("showverse:history:viewMode");
+    const grp = ls("showverse:history:groupBy");
+    const typ = ls("showverse:history:typeFilter");
+    const srt = ls("showverse:history:sortBy");
+    return {
+      items: cache?.items?.length ? cache.items : null,
+      hasMore: !!cache?.hasMore,
+      nextPage: cache?.nextPage || 1,
+      viewMode:
+        view === "list" || view === "grid" || view === "compact" ? view : null,
+      groupBy: grp || null,
+      typeFilter: typ || null,
+      sortBy: srt || null,
+    };
+  });
+  const restoredFromHistoryCacheRef = useRef(!!backNavInit?.items);
 
-  const [hydrated, setHydrated] = useState(false);
+  // En back-nav renderizamos el contenido desde el primer pintado (no hay SSR con el
+  // que chocar). En carga fresca sigue oculto hasta el efecto de montaje.
+  const [hydrated, setHydrated] = useState(() => !!backNavInit);
   const [auth, setAuth] = useState({ loading: true, connected: false });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [raw, setRaw] = useState([]);
-  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(() => !!backNavInit?.items);
+  const [raw, setRaw] = useState(() => backNavInit?.items || []);
+  const [hasMoreHistory, setHasMoreHistory] = useState(
+    () => !!backNavInit?.hasMore,
+  );
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const loadMoreRef = useRef(null);
   const loadingHistoryRef = useRef(false);
-  const nextHistoryPageRef = useRef(1);
-  const hasMoreHistoryRef = useRef(false);
+  const nextHistoryPageRef = useRef(backNavInit?.nextPage || 1);
+  const hasMoreHistoryRef = useRef(!!backNavInit?.hasMore);
 
   // UI States
-  const [viewMode, setViewModeState] = useState("compact");
+  const [viewMode, setViewModeState] = useState(
+    () => backNavInit?.viewMode || "compact",
+  );
   // Marca si el usuario (o el localStorage propio) ya fijó una vista del Historial,
   // para que la preferencia global NUNCA la sobrescriba al recargar.
-  const viewModeUserSetRef = useRef(false);
+  const viewModeUserSetRef = useRef(!!backNavInit?.viewMode);
 
   // La preferencia global solo SIEMBRA la vista la primera vez (cuando aún no hay
   // una vista propia del Historial guardada). El valor real ya se restauró desde
@@ -2560,9 +2593,11 @@ export default function HistoryClient() {
     }
   }, []);
 
-  const [groupBy, setGroupBy] = useState("day");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date-desc");
+  const [groupBy, setGroupBy] = useState(() => backNavInit?.groupBy || "day");
+  const [typeFilter, setTypeFilter] = useState(
+    () => backNavInit?.typeFilter || "all",
+  );
+  const [sortBy, setSortBy] = useState(() => backNavInit?.sortBy || "date-desc");
   const [q, setQ] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [monthDate, setMonthDate] = useState(() => {
@@ -2590,14 +2625,18 @@ export default function HistoryClient() {
     // cursor de página desde la caché. Al VOLVER (atrás/adelante), esto + saltar el
     // reset-fetch (más abajo) mantiene la lista completa; <ScrollRestoration>
     // devuelve la posición porque la altura del documento vuelve a la de antes.
-    const cached = readHistoryCache();
-    if (cached?.items?.length) {
-      setRaw(cached.items);
-      setHistoryLoaded(true);
-      setHasMoreHistory(cached.hasMore);
-      hasMoreHistoryRef.current = cached.hasMore;
-      nextHistoryPageRef.current = cached.nextPage || 1;
-      restoredFromHistoryCacheRef.current = true;
+    // En back-nav la lista ya se sembró en el init de estado (arriba). Aquí solo
+    // restauramos en la carga fresca (paint stale-while-revalidate), sin repetirlo.
+    if (!restoredFromHistoryCacheRef.current) {
+      const cached = readHistoryCache();
+      if (cached?.items?.length) {
+        setRaw(cached.items);
+        setHistoryLoaded(true);
+        setHasMoreHistory(cached.hasMore);
+        hasMoreHistoryRef.current = cached.hasMore;
+        nextHistoryPageRef.current = cached.nextPage || 1;
+        restoredFromHistoryCacheRef.current = true;
+      }
     }
 
     const savedView = window.localStorage.getItem("showverse:history:viewMode");

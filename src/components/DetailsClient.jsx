@@ -3406,7 +3406,9 @@ export default function DetailsClient({
     [initialScoreboard],
   );
   const initialScoreboardState = useMemo(() => {
-    if (!initialParsedScoreboard?.found) return defaultScoreboard;
+    if (!initialParsedScoreboard?.found) {
+      return { ...defaultScoreboard, loading: true };
+    }
     return {
       ...initialParsedScoreboard,
       loading: !hasNumericScoreboardStats(initialParsedScoreboard?.stats),
@@ -5286,6 +5288,7 @@ export default function DetailsClient({
     rtScore: null,
     mcScore: null,
   });
+  const [externalScoresLoading, setExternalScoresLoading] = useState(true);
   // Se recupera el getter (antes descartado). Arranca en `true`: los premios se
   // piden SIEMPRE al montar, así que desde el primer frame el menú puede
   // reservar el hueco de "Premios" en estado de carga, en vez de que aparezca
@@ -5313,6 +5316,7 @@ export default function DetailsClient({
 
     const run = async () => {
       try {
+        setExternalScoresLoading(true);
         // Reset suave al cambiar de contenido
         setExtras((prev) => ({
           ...prev,
@@ -5437,6 +5441,8 @@ export default function DetailsClient({
           // Resetear el resolvedImdbId si hay error
           setResolvedImdbId(null);
         }
+      } finally {
+        if (!abort) setExternalScoresLoading(false);
       }
     };
 
@@ -8735,17 +8741,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
                 tmdb={{
-                  value: data.vote_average?.toFixed(1),
+                  value:
+                    typeof data.vote_average === "number" &&
+                    data.vote_average > 0
+                      ? data.vote_average.toFixed(1)
+                      : null,
                   sub: data.vote_count
                     ? formatCountShort(data.vote_count)
                     : undefined,
                   href: buildTmdbHref({ href: tmdbDetailUrl, type, tmdbId: id }),
                 }}
-                // Trakt SIEMPRE visible (aunque no haya nota todavía): value "-" y
-                // enlace a la ficha de Trakt (canónico o búsqueda por id de TMDb).
+                // Trakt mantiene enlace canónico/búsqueda; el badge se oculta
+                // mientras la nota está pendiente y muestra "-" solo al resolverse
+                // sin puntuación.
                 // Se unifica con el antiguo `traktPublic` (que iba sin enlace).
                 trakt={{
-                  value: traktDecimal || undefined,
+                  value:
+                    traktDecimal ??
+                    (tScoreboard.loading ? undefined : null),
                   sub: tScoreboard.votes
                     ? formatCountShort(tScoreboard.votes)
                     : undefined,
@@ -8754,18 +8767,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     type,
                     tmdbId: id,
                   }),
+                  pending: tScoreboard.loading && traktDecimal == null,
                 }}
                 traktPublic={null}
                 // IMDb SIEMPRE visible con enlace (directo por id, o búsqueda por
                 // título si aún no se resolvió el id de IMDb).
                 imdb={{
-                  value: extras.imdbRating
-                    ? Number(extras.imdbRating).toFixed(1)
-                    : undefined,
-                  sub: extras.imdbRating
+                  value:
+                    extras.imdbRating != null
+                      ? Number(extras.imdbRating).toFixed(1)
+                      : externalScoresLoading
+                        ? undefined
+                        : null,
+                  sub: extras.imdbRating != null
                     ? formatCountShort(extras.imdbVotes)
                     : undefined,
                   href: buildImdbHref({ imdbId: resolvedImdbId, title }),
+                  pending:
+                    externalScoresLoading && extras.imdbRating == null,
                 }}
                 rt={
                   tScoreboard?.external?.rtAudience != null ||

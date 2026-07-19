@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
 
 export function CompactBadge({
@@ -24,6 +24,8 @@ export function CompactBadge({
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
+  const prefersReducedMotion = useReducedMotion();
+  const shouldAnimateOnMount = animateOnMount && !prefersReducedMotion;
 
   const titleText =
     tooltip ||
@@ -40,11 +42,13 @@ export function CompactBadge({
       type={onClick && !href ? "button" : undefined}
       draggable={false}
       onDragStart={(event) => event.preventDefault()}
-      initial={animateOnMount ? { opacity: 0, y: 6, scale: 0.99 } : false}
-      animate={animateOnMount ? { opacity: 1, y: 0, scale: 1 } : undefined}
+      initial={shouldAnimateOnMount ? { opacity: 0, y: 6, scale: 0.99 } : false}
+      animate={
+        shouldAnimateOnMount ? { opacity: 1, y: 0, scale: 1 } : undefined
+      }
       whileHover={isInteractive && !disableHoverLift ? { y: -1 } : undefined}
       transition={
-        animateOnMount
+        shouldAnimateOnMount
           ? { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
           : undefined
       }
