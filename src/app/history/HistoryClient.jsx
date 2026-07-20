@@ -127,33 +127,45 @@ function ymdLocal(date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+// Formateadores de fecha CREADOS UNA SOLA VEZ (módulo). Construir un
+// Intl.DateTimeFormat es CARO (~0,5-2ms en móvil); antes se creaban DOS por
+// tarjeta en cada render, y al VOLVER (atrás) se renderizan cientos de tarjetas
+// de golpe → segundos de bloqueo del hilo principal justo cuando
+// <ScrollRestoration> intenta restaurar la posición. Con los formateadores
+// cacheados, `format()` es ~100× más barato y la restauración es inmediata.
+const DATE_FMT_MONTH_YEAR = new Intl.DateTimeFormat("es-ES", {
+  month: "long",
+  year: "numeric",
+});
+const DATE_FMT_FULL_DAY = new Intl.DateTimeFormat("es-ES", {
+  weekday: "long",
+  day: "2-digit",
+  month: "long",
+  year: "numeric",
+});
+const DATE_FMT_MONTH_SHORT = new Intl.DateTimeFormat("es-ES", {
+  month: "short",
+});
+const DATE_FMT_DAY_NUM = new Intl.DateTimeFormat("es-ES", { day: "numeric" });
+
 function formatDateHeader(date, mode = "day") {
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return "";
   if (mode === "year") return String(d.getFullYear());
   if (mode === "month") {
-    return new Intl.DateTimeFormat("es-ES", {
-      month: "long",
-      year: "numeric",
-    }).format(d);
+    return DATE_FMT_MONTH_YEAR.format(d);
   }
-  return new Intl.DateTimeFormat("es-ES", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(d);
+  return DATE_FMT_FULL_DAY.format(d);
 }
 
 function formatWatchedBadgeDate(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  const month = new Intl.DateTimeFormat("es-ES", { month: "short" })
-    .format(d)
+  const month = DATE_FMT_MONTH_SHORT.format(d)
     .replace(".", "")
     .slice(0, 3)
     .toUpperCase();
-  const day = new Intl.DateTimeFormat("es-ES", { day: "numeric" }).format(d);
+  const day = DATE_FMT_DAY_NUM.format(d);
   return {
     month,
     day,
@@ -791,11 +803,7 @@ function CalendarWithPosters({
   const month = monthDate.getMonth();
   const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month]);
   const monthLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat("es-ES", {
-        month: "long",
-        year: "numeric",
-      }).format(monthDate),
+    () => DATE_FMT_MONTH_YEAR.format(monthDate),
     [monthDate],
   );
   const dow = ["L", "M", "X", "J", "V", "S", "D"];
@@ -1258,11 +1266,7 @@ function CalendarPanel({
   const month = monthDate.getMonth();
   const weeks = useMemo(() => buildMonthGrid(year, month, 1), [year, month]);
   const monthLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat("es-ES", {
-        month: "long",
-        year: "numeric",
-      }).format(monthDate),
+    () => DATE_FMT_MONTH_YEAR.format(monthDate),
     [monthDate],
   );
   const dow = ["L", "M", "X", "J", "V", "S", "D"];
