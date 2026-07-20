@@ -6,7 +6,7 @@
     android:description="@string/a11y_service_desc"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:notificationTimeout="300"
     android:packageNames="com.netflix.mediaclient,com.amazon.avod.thirdpartyclient,com.amazon.amazonvideo.livingroom,com.wbd.stream,com.hbo.hbonow,com.disney.disneyplus,com.crunchyroll.crunchyroid,com.telefonica.gvp,es.plus.yomvi,com.apple.atve.androidtv.appletv,com.filmin,com.skyshowtime.skyshowtime,tv.pluto.android,com.rakuten.tv,com.atresmedia.atresplayer,es.rtve.rtvePlay,app.plex.android,com.plexapp.android" />

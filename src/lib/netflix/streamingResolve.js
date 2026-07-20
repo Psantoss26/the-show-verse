@@ -30,6 +30,28 @@ function isExactTitle(entity, query, mediaType) {
   );
 }
 
+// Nombres de episodio GENÉRICOS que se repiten entre temporadas ("Piloto",
+// "Final", "Parte 2", "Capítulo 3"…). Nunca valen para un match por INCLUSIÓN
+// (señalarían una temporada equivocada); solo por igualdad exacta y, aun así,
+// idealmente con la temporada ya acotada. Se compara sobre texto NORMALIZADO
+// (minúsculas, sin acentos).
+const GENERIC_EPISODE_RE =
+  /^(?:piloto|pilot|finale?|final|el final|season finale|final de temporada|(?:parte|part|capitulo|chapter|episodio|episode|ep)\s*\d{1,3})$/;
+
+export function isGenericEpisodeName(name) {
+  const q = normalizeText(name);
+  return !q || GENERIC_EPISODE_RE.test(q);
+}
+
+// ¿`a` y `b` (normalizados) casan por inclusión de forma FIABLE? Exige longitud
+// mínima 6 en ambos y que ninguno sea un nombre genérico: con el umbral antiguo
+// (4) nombres como "Piloto" o "Final" casaban con el episodio equivocado.
+function reliableInclusion(a, b) {
+  if (!a || !b || a.length < 6 || b.length < 6) return false;
+  if (GENERIC_EPISODE_RE.test(a) || GENERIC_EPISODE_RE.test(b)) return false;
+  return a.includes(b) || b.includes(a);
+}
+
 // Encuentra {season, episode} comparando el nombre del episodio detectado
 // (Media Session / selector) con la lista de episodios de TMDb (normalizada).
 // Pura y testeable: recibe los episodios ya obtenidos, sin red.
@@ -39,17 +61,48 @@ export function matchEpisodeByName({ episodeName, seasonEpisodes }) {
   if (!q || q.length < 2) return null;
   // 1. Coincidencia exacta del nombre normalizado.
   let hit = seasonEpisodes.find((e) => normalizeText(e?.name) === q);
-  // 2. Uno contiene al otro: cubre títulos parciales o con prefijo distinto
-  //    ("El proyecto Nina" ⊂ "Capítulo cinco: El proyecto Nina").
+  // 2. Uno contiene al otro (endurecido): cubre títulos parciales o con prefijo
+  //    distinto ("El proyecto Nina" ⊂ "Capítulo cinco: El proyecto Nina").
   if (!hit) {
-    hit = seasonEpisodes.find((e) => {
-      const n = normalizeText(e?.name);
-      return n && n.length >= 4 && (n.includes(q) || q.includes(n));
-    });
+    hit = seasonEpisodes.find((e) => reliableInclusion(normalizeText(e?.name), q));
   }
   return hit
     ? { season: hit.season_number, episode: hit.episode_number }
     : null;
+}
+
+// Candidatos de episodio en un CONJUNTO de episodios de varias temporadas,
+// separados por calidad del match ({exact, partial}), sin duplicados por T/E.
+// Permite al llamante detectar AMBIGÜEDAD (mismo nombre en varias temporadas) y
+// preferir no fijar nada antes que fijar la temporada equivocada. Pura.
+export function matchEpisodeCandidates({ episodeName, seasonEpisodes }) {
+  const out = { exact: [], partial: [] };
+  if (!episodeName || !Array.isArray(seasonEpisodes)) return out;
+  const q = normalizeText(episodeName);
+  if (!q || q.length < 2) return out;
+  // Dos pasadas: primero los EXACTOS y después los parciales, para que un mismo
+  // episodio presente en dos idiomas (es+en concatenados) no quede como "parcial"
+  // por casar antes en el idioma equivocado.
+  const seen = new Set();
+  for (const e of seasonEpisodes) {
+    const n = normalizeText(e?.name);
+    if (!n || n !== q) continue;
+    const key = `${e.season_number}:${e.episode_number}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.exact.push({ season: e.season_number, episode: e.episode_number });
+  }
+  for (const e of seasonEpisodes) {
+    const n = normalizeText(e?.name);
+    if (!n) continue;
+    const key = `${e.season_number}:${e.episode_number}`;
+    if (seen.has(key)) continue;
+    if (reliableInclusion(n, q)) {
+      seen.add(key);
+      out.partial.push({ season: e.season_number, episode: e.episode_number });
+    }
+  }
+  return out;
 }
 
 // Nivel de confianza de una resolución.

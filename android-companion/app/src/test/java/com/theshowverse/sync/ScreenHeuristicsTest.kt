@@ -38,8 +38,24 @@ class ScreenHeuristicsTest {
         assertTrue(ScreenHeuristics.isDetailSignal("Comprar"))
         assertTrue(ScreenHeuristics.isDetailSignal("Alquilar"))
         assertTrue(ScreenHeuristics.isDetailSignal("X-Ray"))
+        // Señales robustas de Prime: nota IMDb, año suelto y badges de calidad.
+        assertTrue(ScreenHeuristics.isDetailSignal("IMDb 8,1"))
+        assertTrue(ScreenHeuristics.isDetailSignal("2023"))
+        assertTrue(ScreenHeuristics.isDetailSignal("4K UHD"))
+        assertTrue(ScreenHeuristics.isDetailSignal("HDR"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Dolby Vision"))
         assertFalse(ScreenHeuristics.isDetailSignal("The Boys"))
         assertFalse(ScreenHeuristics.isDetailSignal(""))
+    }
+
+    @Test
+    fun playViewIdRecognizesIconOnlyPlayButtons() {
+        assertTrue(ScreenHeuristics.isPlayViewId("com.amazon.avod.thirdpartyclient:id/play_button"))
+        assertTrue(ScreenHeuristics.isPlayViewId("com.wbd.stream:id/btn_play_main"))
+        assertTrue(ScreenHeuristics.isPlayViewId("app:id/play"))
+        assertFalse(ScreenHeuristics.isPlayViewId("com.amazon.avod:id/player_settings"))
+        assertFalse(ScreenHeuristics.isPlayViewId(null))
+        assertFalse(ScreenHeuristics.isPlayViewId(""))
     }
 
     @Test

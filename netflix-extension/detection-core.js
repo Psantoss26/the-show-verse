@@ -110,14 +110,37 @@
   function buildPlaybackSignal(input) {
     const i = input || {};
     const ms = i.mediaSession || {};
-    const hasSeries = Boolean(clean(ms.artist) || clean(ms.album));
+    const hasArtistAlbum = Boolean(clean(ms.artist) || clean(ms.album));
 
-    let se = {};
-    for (const t of [i.seasonEpisodeText, i.subTitle, i.tabTitle]) {
+    // EVIDENCIA FUERTE de episodio: un badge S×E del DOM (seasonEpisodeText) o el
+    // subtítulo del reproductor (subTitle) son campos controlados por el player y
+    // solo existen en series → sirven para CLASIFICAR como serie aunque la Media
+    // Session no traiga artist/album (Prime Video, Max). El título de pestaña o el
+    // ms.title NO valen como evidencia de clasificación: una película llamada
+    // "John Wick: Chapter 2" los haría casar y la convertiría en serie.
+    let strongSe = {};
+    for (const t of [i.seasonEpisodeText, i.subTitle]) {
       const r = parseSeasonEpisode(t || "");
       if (r && r.episode) {
-        se = r;
+        strongSe = r;
         break;
+      }
+    }
+    const hasSeries = hasArtistAlbum || Boolean(strongSe.episode);
+
+    // Números S×E: primero la evidencia fuerte; después, SOLO si ya sabemos que
+    // es serie, también el título de la Media Session (algunas plataformas ponen
+    // "T1:E3 – nombre" ahí y antes se perdía) y el título de pestaña. En una
+    // película NUNCA se extraen números de campos sueltos: "John Wick: Chapter 2"
+    // en la pestaña produciría episode=2 y el servidor la buscaría solo como TV.
+    let se = strongSe;
+    if (!se.episode && hasSeries) {
+      for (const t of [clean(ms.title), i.tabTitle]) {
+        const r = parseSeasonEpisode(t || "");
+        if (r && r.episode) {
+          se = r;
+          break;
+        }
       }
     }
 
@@ -125,14 +148,14 @@
       host: i.host,
       url: i.url,
       contentId: i.contentId || null,
-      showName: hasSeries
+      showName: hasArtistAlbum
         ? clean(ms.artist) || clean(ms.album)
         : i.showName || undefined,
-      episodeName: hasSeries ? clean(ms.title) || undefined : i.episodeName || undefined,
+      episodeName: hasSeries ? clean(ms.title) || i.episodeName || undefined : i.episodeName || undefined,
       movieTitle: hasSeries ? undefined : clean(ms.title) || i.movieTitle || undefined,
       season: se.season,
       episode: se.episode,
-      seasonEpisodeText: i.seasonEpisodeText || undefined,
+      seasonEpisodeText: i.seasonEpisodeText || i.subTitle || undefined,
       tabTitle: i.tabTitle || undefined,
       artworkUrl: largestArtwork(ms.artwork),
       durationSec: i.durationSec,
