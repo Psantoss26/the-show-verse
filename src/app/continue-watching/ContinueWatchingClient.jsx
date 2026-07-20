@@ -1038,10 +1038,14 @@ export default function ContinueWatchingClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    {/* Grupo de vista: MISMA estructura que WatchingSectionNav
+                        (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
+                        para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
+                        de sección de la fila de arriba y las dos filas se alineen. */}
+                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setViewMode("cards")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -1051,7 +1055,7 @@ export default function ContinueWatchingClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("poster")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -1061,7 +1065,7 @@ export default function ContinueWatchingClient() {
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"

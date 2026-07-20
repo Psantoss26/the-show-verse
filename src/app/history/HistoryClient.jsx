@@ -704,26 +704,71 @@ function StatCard({
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // El menú se RENDERIZA POR PORTAL en <body> con position:fixed calculado desde
+  // el botón. Así no lo recorta el stacking context del panel de filtros (el
+  // `backdrop-blur` creaba un contexto que ocultaba el `absolute` anterior); el
+  // menú queda siempre visible por encima de todo, igual que en Favoritos.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
+          {Icon && <Icon className="w-4 h-4 shrink-0 text-emerald-500" />}
+          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
@@ -735,23 +780,30 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
-            style={{
-              scrollbarWidth: "thin",
-              scrollbarGutter: "stable",
-              overscrollBehavior: "contain",
-            }}
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -3352,7 +3404,7 @@ export default function HistoryClient() {
                       <div className="space-y-3">
                         {/* Fila 1 - Tipo y Agrupar */}
                         <div className="flex gap-2">
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <InlineDropdown
                               label="Tipo"
                               valueLabel={
@@ -3398,7 +3450,7 @@ export default function HistoryClient() {
                             </InlineDropdown>
                           </div>
 
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <InlineDropdown
                               label="Agrupar"
                               valueLabel={
@@ -3447,7 +3499,7 @@ export default function HistoryClient() {
 
                         {/* Fila 2 - Ordenar, Vista y Editar */}
                         <div className="flex gap-2">
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <InlineDropdown
                               label="Ordenar"
                               valueLabel={
