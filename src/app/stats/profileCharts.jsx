@@ -5,7 +5,7 @@
 // downloaded when the overview/patterns charts actually render. Each export is a
 // self-contained chart that mirrors the markup previously inlined in StatsClient.
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -62,24 +62,32 @@ function CustomTooltip({ active, payload, label, formatter }) {
   return null;
 }
 
+// Medidas del ChartFrame, compartidas con los ResponsiveContainer de dentro para
+// que arranquen ya con el tamaño real (ver FrameResponsiveContainer).
+const FrameSizeContext = createContext(null);
+
 function ChartFrame({ className = "h-[300px]", children }) {
   const ref = useRef(null);
-  const [ready, setReady] = useState(false);
+  const [size, setSize] = useState(null);
 
   useEffect(() => {
     const node = ref.current;
     if (!node) return undefined;
 
     let observer = null;
-    // Latch de UNA SOLA VÍA: en cuanto el contenedor tiene tamaño marcamos "ready" y
-    // DEJAMOS de observar. Antes se hacía setReady(width>0 && height>0) en CADA
-    // callback del ResizeObserver, con lo que `ready` podía alternar true↔false
-    // durante la transición de vistas (AnimatePresence) y realimentarse con el
-    // ResizeObserver interno de Recharts → "Maximum update depth exceeded".
+    // Latch de UNA SOLA VÍA: en cuanto el contenedor tiene tamaño guardamos sus
+    // MEDIDAS y DEJAMOS de observar. Antes se hacía setReady(width>0 && height>0)
+    // en CADA callback del ResizeObserver, con lo que `ready` podía alternar
+    // true↔false durante la transición de vistas (AnimatePresence) y
+    // realimentarse con el ResizeObserver interno de Recharts → "Maximum update
+    // depth exceeded".
     const check = () => {
       const rect = node.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        setReady(true);
+        setSize({
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        });
         if (observer) observer.disconnect();
       }
     };
@@ -95,8 +103,31 @@ function ChartFrame({ className = "h-[300px]", children }) {
 
   return (
     <div ref={ref} className={`${className} min-w-0 w-full`}>
-      {ready ? children : null}
+      {size ? (
+        <FrameSizeContext.Provider value={size}>
+          {children}
+        </FrameSizeContext.Provider>
+      ) : null}
     </div>
+  );
+}
+
+// ResponsiveContainer que ARRANCA con las medidas reales del ChartFrame
+// (`initialDimension`). Sin esto, su primer render interno usa (-1,-1) hasta que
+// mide su propio ResizeObserver, y Recharts avisa en consola con
+// "The width(-1) and height(-1) of chart should be greater than 0".
+function FrameResponsiveContainer({ children, ...props }) {
+  const size = useContext(FrameSizeContext);
+  return (
+    <ResponsiveContainer
+      width="100%"
+      height="100%"
+      minWidth={0}
+      initialDimension={size || undefined}
+      {...props}
+    >
+      {children}
+    </ResponsiveContainer>
   );
 }
 
@@ -127,7 +158,7 @@ function formatGenreTick(value) {
 export function MonthlyActivityChart({ data }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <AreaChart
           data={data}
           margin={{ top: 10, right: 5, left: -28, bottom: 0 }}
@@ -172,7 +203,7 @@ export function MonthlyActivityChart({ data }) {
             animationDuration={1500}
           />
         </AreaChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
     </ChartFrame>
   );
 }
@@ -181,7 +212,7 @@ export function TimeDistributionChart({ data, formattedTotalTime = "" }) {
   const parts = String(formattedTotalTime).split(" ");
   return (
     <ChartFrame className="relative h-[250px]">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <PieChart>
           <Pie
             data={data}
@@ -204,7 +235,7 @@ export function TimeDistributionChart({ data, formattedTotalTime = "" }) {
           />
           <Legend verticalAlign="bottom" height={36} iconType="circle" />
         </PieChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
       {/* Center Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
         <span className="text-3xl font-black text-white">{parts[0]}</span>
@@ -219,7 +250,7 @@ export function TimeDistributionChart({ data, formattedTotalTime = "" }) {
 export function HourOfDayChart({ data }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <BarChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -239,7 +270,7 @@ export function HourOfDayChart({ data }) {
           />
           <Bar dataKey="value" fill={COLORS.pink} radius={[4, 4, 0, 0]} />
         </BarChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
     </ChartFrame>
   );
 }
@@ -247,7 +278,7 @@ export function HourOfDayChart({ data }) {
 export function DayOfWeekChart({ data }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <BarChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -267,7 +298,7 @@ export function DayOfWeekChart({ data }) {
           />
           <Bar dataKey="value" fill={COLORS.cyan} radius={[4, 4, 0, 0]} />
         </BarChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
     </ChartFrame>
   );
 }
@@ -275,7 +306,7 @@ export function DayOfWeekChart({ data }) {
 export function GenreRadarChart({ data, isMobile = false }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
           <PolarGrid stroke={CHART_THEME.grid} />
           <PolarAngleAxis
@@ -302,7 +333,7 @@ export function GenreRadarChart({ data, isMobile = false }) {
           />
           <Tooltip content={<CustomTooltip />} />
         </RadarChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
     </ChartFrame>
   );
 }
@@ -310,7 +341,7 @@ export function GenreRadarChart({ data, isMobile = false }) {
 export function RatingsBarChart({ data }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <FrameResponsiveContainer>
         <BarChart
           data={data}
           barSize={20}
@@ -350,7 +381,7 @@ export function RatingsBarChart({ data }) {
             })}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+      </FrameResponsiveContainer>
     </ChartFrame>
   );
 }

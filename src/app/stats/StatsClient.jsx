@@ -37,6 +37,10 @@ import {
   RotateCcw,
   MonitorPlay,
   Settings,
+  Flame,
+  CalendarDays,
+  Trophy,
+  Gauge,
 } from "lucide-react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -44,6 +48,7 @@ import { Navigation, FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
 import LiquidButton from "@/components/LiquidButton";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "./chartConstants";
 
@@ -380,10 +385,13 @@ const COLOR_STYLES = {
   },
 };
 
-const PROFILE_GLASS_SURFACE =
-  "relative isolate overflow-hidden bg-black/40 bg-gradient-to-br from-white/20 via-transparent to-black/60 backdrop-blur-[60px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.9)] transform-gpu";
+// Acabado LIQUID GLASS compartido (el mismo de los modales de detalles):
+// translúcido, luz diagonal, blur 16px + saturación y reflejo interior. La
+// fuente única vive en src/lib/ui/liquidGlass.js — aquí solo se añade la capa
+// de posicionamiento y un hover sutil.
+const PROFILE_GLASS_SURFACE = `relative isolate overflow-hidden ${LIQUID_GLASS_PANEL} transform-gpu`;
 const PROFILE_GLASS_HOVER =
-  "transition-all duration-300 hover:bg-black/50 hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,1)]";
+  "transition-all duration-300 hover:bg-black/[0.38]";
 const PROFILE_GLASS_PANEL = `${PROFILE_GLASS_SURFACE} ${PROFILE_GLASS_HOVER}`;
 
 // -----------------------------------------------------------------------------
@@ -470,6 +478,154 @@ const processHourOfDay = (historyData) => {
 // -----------------------------------------------------------------------------
 // COMPONENTS
 // -----------------------------------------------------------------------------
+
+// Tile compacto del bento de insights: icono en chip de color + valor + etiqueta
+// (+ badge opcional de tendencia/subtexto). Mismo liquid glass que el resto.
+const INSIGHT_TILE_STYLES = {
+  orange: { iconBg: "bg-orange-500/10", iconText: "text-orange-400" },
+  yellow: { iconBg: "bg-yellow-500/10", iconText: "text-yellow-400" },
+  emerald: { iconBg: "bg-emerald-500/10", iconText: "text-emerald-400" },
+  sky: { iconBg: "bg-sky-500/10", iconText: "text-sky-400" },
+  purple: { iconBg: "bg-purple-500/10", iconText: "text-purple-400" },
+  rose: { iconBg: "bg-rose-500/10", iconText: "text-rose-400" },
+  indigo: { iconBg: "bg-indigo-500/10", iconText: "text-indigo-400" },
+  teal: { iconBg: "bg-teal-500/10", iconText: "text-teal-400" },
+  blue: { iconBg: "bg-blue-500/10", iconText: "text-blue-400" },
+  cyan: { iconBg: "bg-cyan-500/10", iconText: "text-cyan-400" },
+};
+
+// Fila compacta del panel "Hábitos": icono en chip + etiqueta + valor a la derecha.
+function HabitRow({ icon: Icon, color = "indigo", label, value, sub }) {
+  const styles = INSIGHT_TILE_STYLES[color] || INSIGHT_TILE_STYLES.indigo;
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white/[0.04] px-2.5 py-1.5 ring-1 ring-white/10">
+      <div
+        className={`p-1.5 rounded-lg ${styles.iconBg} ${styles.iconText} shrink-0`}
+      >
+        <Icon className="w-4 h-4" />
+      </div>
+      <span className="text-xs font-bold text-zinc-400 truncate">{label}</span>
+      <span className="ml-auto text-sm font-black text-white whitespace-nowrap">
+        {value}
+      </span>
+      {sub ? (
+        <span className="text-[10px] text-zinc-500 whitespace-nowrap">{sub}</span>
+      ) : null}
+    </div>
+  );
+}
+
+// Estadística individual de la tira de cabecera: mini-chip glass con icono en
+// color + valor + etiqueta. Más visual que el número "suelto" anterior.
+function StripStat({ icon: Icon, value, label, color = "indigo", badge = null }) {
+  const styles = INSIGHT_TILE_STYLES[color] || INSIGHT_TILE_STYLES.indigo;
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-white/[0.04] px-3 py-2 ring-1 ring-white/10">
+      <div
+        className={`shrink-0 rounded-lg p-1.5 ${styles.iconBg} ${styles.iconText}`}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="flex min-w-0 flex-col leading-tight">
+        {/* El VALOR nunca se trunca (whitespace-nowrap); si el badge de
+            tendencia no cabe al lado, ENVUELVE a la línea siguiente. */}
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm sm:text-base font-black text-white">
+          <span className="whitespace-nowrap">{value}</span>
+          {badge}
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+          {label}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Tira de estadísticas de la cabecera (estilo dashboard de Trakt): dos grupos
+// ("Este mes" y "De por vida") integrados en el MISMO panel glass del usuario.
+// Los chips ENVUELVEN (flex-wrap): siempre visibles en móvil, sin scroll oculto.
+function ProfileStatsStrip({ stats }) {
+  const ins = stats.insights || {};
+  const thisMonth = stats.monthlyData?.[stats.monthlyData.length - 1] || null;
+
+  return (
+    <div className="mt-4 flex flex-col gap-4 border-t border-white/10 pt-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+      {/* Este mes */}
+      <div className="flex min-w-0 flex-col gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          Este mes
+        </span>
+        <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-wrap">
+          <StripStat
+            icon={MonitorPlay}
+            value={ins.thisMonthTotal ?? 0}
+            label="Reprod."
+            color="blue"
+          />
+          <StripStat
+            icon={Film}
+            value={thisMonth?.movies ?? 0}
+            label="Películas"
+            color="sky"
+          />
+          <StripStat
+            icon={Tv}
+            value={thisMonth?.episodes ?? 0}
+            label="Episodios"
+            color="purple"
+          />
+        </div>
+      </div>
+
+      <div className="hidden w-px self-stretch bg-white/10 lg:block" />
+
+      {/* De por vida */}
+      <div className="flex min-w-0 flex-col gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          De por vida
+        </span>
+        <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-wrap">
+          <StripStat
+            icon={Timer}
+            value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
+            label="Tiempo"
+            color="cyan"
+          />
+          <StripStat
+            icon={Film}
+            value={(stats.movies.watched || 0).toLocaleString()}
+            label="Películas"
+            color="blue"
+          />
+          <StripStat
+            icon={Tv}
+            value={(stats.episodes.watched || 0).toLocaleString()}
+            label="Episodios"
+            color="purple"
+          />
+          <StripStat
+            icon={MonitorPlay}
+            value={(stats.raw?.shows?.watched || 0).toLocaleString()}
+            label="Series"
+            color="indigo"
+          />
+          <StripStat
+            icon={Library}
+            value={stats.totalCollected.toLocaleString()}
+            label="Colección"
+            color="orange"
+          />
+          <StripStat
+            icon={Star}
+            value={stats.ratings.total || 0}
+            label="Notas"
+            color="yellow"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function KPICard({
   title,
@@ -594,7 +750,7 @@ function ProfileCardScroller({ children }) {
     640: { slidesPerView: 4, spaceBetween: 14 },
     768: { slidesPerView: 4, spaceBetween: 16 },
     1024: { slidesPerView: 5, spaceBetween: 18 },
-    1280: { slidesPerView: 6, spaceBetween: 20 },
+    1280: { slidesPerView: 7, spaceBetween: 20 },
   };
 
   const getStep = useCallback((swiper) => {
@@ -1418,7 +1574,91 @@ export default function StatsClient({ connectNext = "/profile" }) {
       (showStats.collected || 0) +
       (episodes.collected || 0);
 
+    // ---------- INSIGHTS (estadísticas derivadas para el dashboard) ----------
+    // Rachas: días CONSECUTIVOS con actividad (según el historial cargado).
+    const dayKeys = new Set();
+    for (const h of history) {
+      const d = new Date(h.watched_at);
+      if (!Number.isNaN(d.getTime())) {
+        dayKeys.add(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        );
+      }
+    }
+    const sortedDays = [...dayKeys].sort();
+    let bestStreak = 0;
+    let run = 0;
+    let prevTime = 0;
+    for (const key of sortedDays) {
+      const t = new Date(`${key}T12:00:00`).getTime();
+      run = t - prevTime === 86400000 ? run + 1 : 1;
+      if (run > bestStreak) bestStreak = run;
+      prevTime = t;
+    }
+    // Racha actual: hacia atrás desde hoy (o ayer, si hoy aún no hay actividad).
+    const todayRef = new Date();
+    const dayKeyOf = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    let currentStreak = 0;
+    const cursor = new Date(todayRef);
+    if (!dayKeys.has(dayKeyOf(cursor))) cursor.setDate(cursor.getDate() - 1);
+    while (dayKeys.has(dayKeyOf(cursor))) {
+      currentStreak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    // Nota media (media ponderada de la distribución de valoraciones).
+    const distEntries = Object.entries(tStats.ratings?.distribution || {});
+    let ratingSum = 0;
+    let ratingCount = 0;
+    for (const [score, count] of distEntries) {
+      ratingSum += Number(score) * Number(count || 0);
+      ratingCount += Number(count || 0);
+    }
+    const avgRating = ratingCount > 0 ? ratingSum / ratingCount : null;
+
+    // Día favorito y hora punta (máximos de las distribuciones).
+    const topDay = dayOfWeekData.reduce(
+      (best, d) => (d.value > (best?.value || 0) ? d : best),
+      null,
+    );
+    const peakHour = hourOfDayData.reduce(
+      (best, h) => (h.value > (best?.value || 0) ? h : best),
+      null,
+    );
+
+    // Género top (genreData ya viene ordenado desc).
+    const topGenre = genreData[0] || null;
+
+    // Este mes vs mes anterior (tendencia) + mejor mes + media semanal (12 meses).
+    const thisMonth = monthlyData[monthlyData.length - 1] || null;
+    const prevMonth = monthlyData[monthlyData.length - 2] || null;
+    const monthDelta =
+      thisMonth && prevMonth && prevMonth.total > 0
+        ? Math.round(((thisMonth.total - prevMonth.total) / prevMonth.total) * 100)
+        : null;
+    const bestMonth = monthlyData.reduce(
+      (best, m) => (m.total > (best?.total || 0) ? m : best),
+      null,
+    );
+    const yearTotal = monthlyData.reduce((acc, m) => acc + m.total, 0);
+    const weeklyAvg = yearTotal > 0 ? Math.round((yearTotal / 52) * 10) / 10 : 0;
+
+    const insights = {
+      currentStreak,
+      bestStreak,
+      avgRating,
+      topDay: topDay?.value > 0 ? topDay : null,
+      peakHour: peakHour?.value > 0 ? peakHour : null,
+      topGenre,
+      thisMonthTotal: thisMonth?.total ?? 0,
+      monthDelta,
+      bestMonth: bestMonth?.total > 0 ? bestMonth : null,
+      weeklyAvg,
+    };
+
     return {
+      insights,
       raw: tStats,
       history,
       movies,
@@ -1492,7 +1732,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
       <div className="min-h-screen bg-black text-zinc-100 pb-20 selection:bg-emerald-500/30">
         <ProfilePageBackground variant="connect" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -1565,24 +1805,28 @@ export default function StatsClient({ connectNext = "/profile" }) {
     <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 lg:py-12">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {headerReady ? (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 lg:mb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8"
+            className={`${PROFILE_GLASS_PANEL} mb-6 rounded-3xl p-4 sm:p-6 lg:mb-8`}
           >
-            <ProfileHero
-              user={profileUser}
-              onSync={handleSyncProfile}
-              onDisconnect={() => setShowDisconnectModal(true)}
-              syncing={loading}
-            />
-            <ProfileSectionTabs
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              className="hidden justify-self-end lg:block"
-            />
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
+              <ProfileHero
+                user={profileUser}
+                onSync={handleSyncProfile}
+                onDisconnect={() => setShowDisconnectModal(true)}
+                syncing={loading}
+              />
+              <ProfileSectionTabs
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                className="hidden justify-self-end lg:block"
+              />
+            </div>
+            {/* Tira de estadísticas integrada en la cabecera (estilo Trakt). */}
+            {stats ? <ProfileStatsStrip stats={stats} /> : null}
           </motion.div>
         ) : null}
 
@@ -1616,105 +1860,106 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 transition={{ duration: 0.5 }}
                 className="flex flex-col gap-8"
               >
-                {/* KPIs */}
+                {/* FILA DE GRÁFICAS (estilo Trakt): actividad + distribución +
+                    hábitos. En móvil se APILAN a ancho completo (siempre
+                    visibles); en desktop es una rejilla de 12 columnas. */}
                 {stats && (
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                    <KPICard
-                      title="Tiempo Total"
-                      value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
-                      subtitle={`${stats.totalHours.toLocaleString()} horas`}
-                      icon={Timer}
-                      color="cyan"
-                      delay={0.1}
-                    />
-                    <KPICard
-                      title="Películas"
-                      value={stats.movies.watched.toLocaleString()}
-                      subtitle={`${stats.movies.plays.toLocaleString()} plays`}
-                      icon={Film}
-                      color="blue"
-                      delay={0.2}
-                    />
-                    <KPICard
-                      title="Episodios"
-                      value={stats.episodes.watched.toLocaleString()}
-                      subtitle={`${(stats.raw?.shows?.watched || 0).toLocaleString()} series`}
-                      icon={Tv}
-                      color="purple"
-                      delay={0.3}
-                    />
-                    <KPICard
-                      title="Colección"
-                      value={stats.totalCollected.toLocaleString()}
-                      subtitle="Items guardados"
-                      icon={Library}
-                      color="orange"
-                      delay={0.4}
-                    />
-                  </div>
-                )}
+                  <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:items-start">
+                    {/* Actividad mensual */}
+                    <div
+                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6 lg:col-span-6`}
+                    >
+                      <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+                      <SectionTitle
+                        icon={Activity}
+                        title="Actividad Mensual"
+                        subtitle="Último año"
+                        color="indigo"
+                      />
+                      {deferredOverviewReady ? (
+                        <MonthlyActivityChart data={stats.monthlyData} />
+                      ) : (
+                        <div className="h-64 w-full animate-pulse rounded-2xl bg-white/5" />
+                      )}
+                    </div>
 
-                {/* Secondary KPIs */}
-                {stats && (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Distribución de tiempo */}
                     <div
-                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                      className={`${PROFILE_GLASS_PANEL} flex min-w-0 flex-col items-center rounded-3xl p-4 sm:p-6 lg:col-span-3`}
                     >
-                      <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
-                        <Star className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold">
-                          {stats.ratings.total}
-                        </div>
-                        <div className="text-xs text-zinc-500 uppercase font-bold">
-                          Valoraciones
-                        </div>
-                      </div>
+                      <SectionTitle
+                        icon={Clock}
+                        title="Distribución"
+                        subtitle="Películas vs Series"
+                        color="indigo"
+                      />
+                      {deferredOverviewReady ? (
+                        <TimeDistributionChart
+                          data={stats.timeDistribution}
+                          formattedTotalTime={stats.formattedTotalTime}
+                        />
+                      ) : (
+                        <div className="h-64 w-full animate-pulse rounded-2xl bg-white/5" />
+                      )}
                     </div>
+
+                    {/* Hábitos (insights derivados) */}
                     <div
-                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
+                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-3 sm:p-4 lg:col-span-3`}
                     >
-                      <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
-                        <MessageSquare className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold">
-                          {stats.totalComments}
-                        </div>
-                        <div className="text-xs text-zinc-500 uppercase font-bold">
-                          Comentarios
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
-                    >
-                      <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                        <Users className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold">
-                          {stats.network.followers}
-                        </div>
-                        <div className="text-xs text-zinc-500 uppercase font-bold">
-                          Seguidores
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`${PROFILE_GLASS_PANEL} rounded-2xl p-4 flex items-center gap-3`}
-                    >
-                      <div className="p-2 bg-teal-500/10 rounded-lg text-teal-500">
-                        <Heart className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold">
-                          {stats.network.friends}
-                        </div>
-                        <div className="text-xs text-zinc-500 uppercase font-bold">
-                          Amigos
-                        </div>
+                      <div className="flex flex-col gap-1.5">
+                        <HabitRow
+                          icon={Flame}
+                          color="orange"
+                          label="Racha actual"
+                          value={`${stats.insights.currentStreak} día${stats.insights.currentStreak === 1 ? "" : "s"}`}
+                        />
+                        <HabitRow
+                          icon={Trophy}
+                          color="rose"
+                          label="Mejor racha"
+                          value={`${stats.insights.bestStreak} día${stats.insights.bestStreak === 1 ? "" : "s"}`}
+                        />
+                        <HabitRow
+                          icon={Star}
+                          color="yellow"
+                          label="Nota media"
+                          value={
+                            stats.insights.avgRating != null
+                              ? stats.insights.avgRating.toFixed(1)
+                              : "—"
+                          }
+                        />
+                        <HabitRow
+                          icon={Award}
+                          color="emerald"
+                          label="Género top"
+                          value={stats.insights.topGenre?.name || "—"}
+                        />
+                        <HabitRow
+                          icon={CalendarDays}
+                          color="sky"
+                          label="Día favorito"
+                          value={stats.insights.topDay?.name || "—"}
+                        />
+                        <HabitRow
+                          icon={Clock}
+                          color="purple"
+                          label="Hora punta"
+                          value={stats.insights.peakHour?.name || "—"}
+                        />
+                        <HabitRow
+                          icon={Gauge}
+                          color="cyan"
+                          label="Media semanal"
+                          value={stats.insights.weeklyAvg}
+                        />
+                        <HabitRow
+                          icon={Trophy}
+                          color="indigo"
+                          label="Mejor mes"
+                          value={stats.insights.bestMonth?.label || "—"}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1811,48 +2056,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
                       ))}
                     </ProfileCardScroller>
                   </motion.div>
-                )}
-
-                {/* Main Charts Row */}
-                {deferredOverviewReady && stats && (
-                  <div className="order-1 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Activity Chart - Spans 2 cols */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className={`${PROFILE_GLASS_PANEL} min-w-0 lg:col-span-2 rounded-3xl p-4 sm:p-6`}
-                    >
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-                      <SectionTitle
-                        icon={Activity}
-                        title="Actividad Mensual"
-                        subtitle="Visualizaciones en el último año"
-                        color="indigo"
-                      />
-
-                      <MonthlyActivityChart data={stats.monthlyData} />
-                    </motion.div>
-
-                    {/* Time Distribution */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-6 flex flex-col items-center justify-center`}
-                    >
-                      <SectionTitle
-                        icon={Clock}
-                        title="Distribución de Tiempo"
-                        subtitle="Películas vs Series"
-                        color="indigo"
-                      />
-                      <TimeDistributionChart
-                        data={stats.timeDistribution}
-                        formattedTotalTime={stats.formattedTotalTime}
-                      />
-                    </motion.div>
-                  </div>
                 )}
 
                 {/* Top Content Row */}
