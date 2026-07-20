@@ -120,7 +120,7 @@ export default async function dashboardRoutes(fastify) {
                 } else {
                   items = await getPool(`decade:${d}`, def.mediaType).catch(() => []);
                 }
-                return { key: `decade_${d}`, title: `Lo mejor de los ${d}`, reason: null, mediaType: def.mediaType, items, rotate: true };
+                return { key: `decade_${d}`, title: `Lo mejor de ${d}`, reason: null, mediaType: def.mediaType, items, rotate: true };
               } catch {
                 return null;
               }

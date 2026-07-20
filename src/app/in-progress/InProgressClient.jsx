@@ -40,6 +40,10 @@ import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  isServerUnavailable,
+  isUnavailableStatus,
+} from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import {
   normalizeSearchText,
@@ -1351,6 +1355,29 @@ export default function InProgressClient({
 
         if (cancelled) return;
 
+        // SERVIDOR CAÍDO (5xx, túnel con el NAS apagado): no podemos verificar la
+        // conexión Trakt, pero si hay caché el usuario estaba conectado → mostramos
+        // lo cacheado (modo offline) en vez de marcar desconectado.
+        if (isUnavailableStatus(statusRes.status)) {
+          const cachedOffline = readSessionCache(
+            IN_PROGRESS_CACHE_KEY,
+            IN_PROGRESS_CACHE_TTL,
+          );
+          if (cachedOffline?.items || cachedOffline?.stats) {
+            setAuth({ loading: false, connected: true });
+            setItems(
+              Array.isArray(cachedOffline.items) ? cachedOffline.items : [],
+            );
+            setStats(cachedOffline.stats || null);
+            setDataLoaded(true);
+            setLoading(false);
+            void loadData({ background: true, fallbackCache: cachedOffline });
+          } else {
+            markDisconnected();
+          }
+          return;
+        }
+
         if (!statusRes.ok || !status?.connected || status?.degraded) {
           markDisconnected();
           return;
@@ -1375,6 +1402,25 @@ export default function InProgressClient({
       } catch (error) {
         if (cancelled) return;
         console.error("Error checking Trakt auth:", error);
+        // Error de RED (servidor apagado): si hay caché, modo offline (mostrar lo
+        // último) en vez de marcar desconectado; si no hay caché, desconectado.
+        if (isServerUnavailable(error)) {
+          const cachedOffline = readSessionCache(
+            IN_PROGRESS_CACHE_KEY,
+            IN_PROGRESS_CACHE_TTL,
+          );
+          if (cachedOffline?.items || cachedOffline?.stats) {
+            setAuth({ loading: false, connected: true });
+            setItems(
+              Array.isArray(cachedOffline.items) ? cachedOffline.items : [],
+            );
+            setStats(cachedOffline.stats || null);
+            setDataLoaded(true);
+            setLoading(false);
+            void loadData({ background: true, fallbackCache: cachedOffline });
+            return;
+          }
+        }
         markDisconnected();
       }
     };

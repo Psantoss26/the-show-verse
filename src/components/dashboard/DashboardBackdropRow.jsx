@@ -53,7 +53,10 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { formatCountShort } from "@/lib/details/formatters";
-import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import {
+  deriveSectionLabel,
+  normalizeDashboardSectionTitle,
+} from "@/lib/dashboard/sectionLabel";
 import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -1409,6 +1412,7 @@ export default function DashboardBackdropRow({
 
   const displayItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
+  const displayTitle = normalizeDashboardSectionTitle(title);
   const sectionLabel = deriveSectionLabel(title, labelText);
   if (displayItems.length === 0) return null;
 
@@ -1546,9 +1550,9 @@ export default function DashboardBackdropRow({
         <Link
           href={href}
           className={`group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition-all duration-200 ${sectionAccent.hover} active:scale-[0.98] active:opacity-90 sm:text-2xl md:text-3xl`}
-          aria-label={`Ver todos los títulos de ${title}`}
+          aria-label={`Ver todos los títulos de ${displayTitle}`}
         >
-          <span>{title}</span>
+          <span>{displayTitle}</span>
           <span className={sectionAccent.dot}>.</span>
           <ChevronRight
             className={`ml-1 h-5 w-5 translate-x-[-4px] opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6 ${sectionAccent.chevron}`}
@@ -1556,7 +1560,7 @@ export default function DashboardBackdropRow({
         </Link>
       ) : (
         <h3 className="inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent sm:text-2xl md:text-3xl">
-          <span>{title}</span>
+          <span>{displayTitle}</span>
           <span className={sectionAccent.dot}>.</span>
         </h3>
       )}

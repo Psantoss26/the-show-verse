@@ -166,7 +166,18 @@ async function fetchEngineRows(surface, key) {
     credentials: "include",
     priority: "high",
   })
-    .then((r) => (r.ok ? r.json() : null))
+    .then((r) => {
+      // SERVIDOR CAÍDO (5xx del túnel con el NAS apagado): tratar como FALLO, no
+      // como "sin filas". Si devolviéramos [] aquí, el `.then` de abajo
+      // sobrescribiría la caché offline con vacío y dejaría el inicio en blanco;
+      // al lanzar, el `.catch` del consumidor conserva las filas cacheadas.
+      if (!r.ok) {
+        const err = new Error(`dashboard ${r.status}`);
+        err.status = r.status;
+        throw err;
+      }
+      return r.json();
+    })
     .then((json) => ({
       rows: mapRows(json),
       personalized: !!json?.personalized,

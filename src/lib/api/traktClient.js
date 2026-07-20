@@ -109,6 +109,16 @@ async function ensureTraktAuthReady({ force = false } = {}) {
       cache: "no-store",
       credentials: "include",
     });
+    // 5xx/429 (el túnel Cloudflare responde así con el NAS apagado): NO es
+    // "desconectado", es SERVIDOR CAÍDO. Señalamos `unavailable` para que los
+    // llamantes lo distingan y caigan a su caché offline en vez de forzar el
+    // prompt de login. Se cachea 5s como el resto (evita reconsultar en bucle).
+    if (res.status >= 500 || res.status === 429) {
+      const status = { connected: false, unavailable: true };
+      traktAuthBootstrapValue = status;
+      traktAuthBootstrapAt = Date.now();
+      return status;
+    }
     const json = await safeJson(res);
     const status = json || { connected: false };
     traktAuthBootstrapValue = status;

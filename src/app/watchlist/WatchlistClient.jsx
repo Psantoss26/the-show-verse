@@ -45,6 +45,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  isServerUnavailable,
+  isUnavailableStatus,
+} from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
@@ -2212,6 +2216,16 @@ export default function WatchlistClient() {
             setItems([]);
             return;
           }
+          // SERVIDOR CAÍDO (5xx/429, túnel con el NAS apagado): NO vaciar.
+          // Conservamos/recuperamos la caché —aunque sea vieja— para seguir usando
+          // la app offline.
+          if (isUnavailableStatus(response.status)) {
+            const cached = readWatchlistCache();
+            if (cached?.items?.length) {
+              setItems((prev) => (prev.length ? prev : cached.items));
+            }
+            return;
+          }
           console.error("API error:", response.status, response.statusText);
           setItems([]);
           return;
@@ -2249,7 +2263,16 @@ export default function WatchlistClient() {
           return;
         }
         console.error("Error loading watchlist:", error);
-        setItems([]);
+        // Error de RED (servidor apagado): conservamos/recuperamos la caché en vez
+        // de vaciar, para seguir mostrando la lista offline.
+        if (isServerUnavailable(error)) {
+          const cached = readWatchlistCache();
+          if (cached?.items?.length) {
+            setItems((prev) => (prev.length ? prev : cached.items));
+          }
+        } else {
+          setItems([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
