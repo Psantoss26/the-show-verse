@@ -2553,7 +2553,9 @@ export default function DetailsClient({
    * Inicializacion asincrona del artwork.
    * Para series TV: carga imagenes extra de todas las temporadas y selecciona las mejores.
    * Para peliculas sin imagenes SSR: carga imagenes desde la API de TMDb.
-   * Precarga las imagenes seleccionadas en el tamano adecuado.
+   * Resuelve las imágenes seleccionadas sin bloquear el primer render del
+   * póster. La imagen visible se solicita directamente desde el markup: esperar
+   * aquí una precarga añadía una cadena de red innecesaria en móvil.
    */
   useEffect(() => {
     let cancelled = false;
@@ -2563,6 +2565,14 @@ export default function DetailsClient({
 
       let poster = data.poster_path || data.profile_path || null;
       let backdrop = data.backdrop_path || null;
+
+      // La ficha ya trae una portada principal. Pintarla de inmediato evita que
+      // el usuario espere la consulta secundaria de `/images` antes incluso de
+      // que el navegador pueda iniciar la descarga. Cuando llegue una selección
+      // mejor, la lógica existente la sustituye con su transición habitual.
+      if (poster) {
+        setBasePosterPath((current) => current || asTmdbPath(poster));
+      }
 
       if (data?.images) {
         const bestPoster = pickBestEnglishPoster(data.images.posters || []);
@@ -2601,25 +2611,8 @@ export default function DetailsClient({
               const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(
                 fetched.backdrops,
               );
-              const bestBackdropForPreviewCalc = pickBestBackdropForPreview(
-                fetched.backdrops,
-              );
-
               const bestPosterPath = asTmdbPath(bestPoster);
               const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
-              const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
-
-              const savedGlobalMode =
-                typeof window !== "undefined"
-                  ? window.localStorage.getItem(
-                      "showverse:global:posterViewMode",
-                    )
-                  : null;
-
-              if (savedGlobalMode === "preview" && bestPreviewPath) {
-                await preloadTmdb(bestPreviewPath, "w780");
-              }
-              if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
 
               if (!cancelled) {
                 if (bestPosterPath) poster = bestPosterPath;
@@ -2644,22 +2637,8 @@ export default function DetailsClient({
           const bestPoster = pickBestEnglishPoster(tvPosters);
           const bestBackdropForBackground =
             pickBestBackdropTVNeutralFirst(tvBackdrops);
-          const bestBackdropForPreviewCalc =
-            pickBestBackdropForPreview(tvBackdrops);
-
           const bestPosterPath = asTmdbPath(bestPoster);
           const bestBackdropPath = asTmdbPath(bestBackdropForBackground);
-          const bestPreviewPath = asTmdbPath(bestBackdropForPreviewCalc);
-
-          const savedGlobalMode =
-            typeof window !== "undefined"
-              ? window.localStorage.getItem("showverse:global:posterViewMode")
-              : null;
-
-          if (savedGlobalMode === "preview" && bestPreviewPath) {
-            await preloadTmdb(bestPreviewPath, "w780");
-          }
-          if (bestPosterPath) await preloadTmdb(bestPosterPath, "w780");
 
           if (!cancelled) {
             if (bestPosterPath) poster = bestPosterPath;
@@ -2679,21 +2658,7 @@ export default function DetailsClient({
           const backdrops = json.backdrops || [];
 
           const bestPoster = pickBestEnglishPoster(posters);
-          const bestBackdropForPreviewCalc =
-            pickBestBackdropForPreview(backdrops);
-
-          // Precargar backdrop de vista previa primero si estamos en modo preview
-          const savedGlobalMode =
-            typeof window !== "undefined"
-              ? window.localStorage.getItem("showverse:global:posterViewMode")
-              : null;
-
-          if (savedGlobalMode === "preview" && bestBackdropForPreviewCalc) {
-            await preloadTmdb(bestBackdropForPreviewCalc, "w780");
-          }
-
           if (bestPoster?.file_path) {
-            await preloadTmdb(bestPoster.file_path, "w780");
             poster = bestPoster.file_path;
           }
 
@@ -2749,9 +2714,9 @@ export default function DetailsClient({
   // Cadena de prioridad: seleccion del usuario > calculada > datos de TMDb
   // ---------------------------------------------------------------------------
 
-  // Poster a mostrar: seleccion manual > calculado > fallback final.
-  // Mientras initArtwork no termina, no usamos data.poster_path/profile_path:
-  // puede ser una imagen secundaria que se reemplaza enseguida.
+  // Poster a mostrar: seleccion manual > calculado > portada principal de la
+  // ficha. La portada principal se pinta de inmediato; una selección mejor se
+  // funde sobre ella cuando termina de resolverse el artwork.
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
     asTmdbPath(basePosterPath) ||
@@ -2770,18 +2735,17 @@ export default function DetailsClient({
   const displayPosterPath =
     posterViewMode === "preview" ? previewBackdropPath : basePosterDisplayPath;
 
-  // Precarga ambas variantes para que el cambio entre poster y preview sea instantáneo.
+  // La portada visible se descubre desde sus propios <img>. Precargar aquí w342
+  // y w780 duplicaba tráfico en móvil y competía con su versión original; además
+  // esas peticiones no coincidían con las URLs que realmente se muestran allí.
+  // La vista previa no es accesible en táctil, así que sí puede calentarse en
+  // segundo plano para que el cambio de escritorio siga siendo instantáneo.
   useEffect(() => {
-    if (basePosterDisplayPath) {
-      void preloadTmdb(basePosterDisplayPath, "w342");
-      void preloadTmdb(basePosterDisplayPath, "w780");
-    }
-
-    if (previewBackdropPath) {
+    if (!isMobileViewport && previewBackdropPath) {
       void preloadTmdb(previewBackdropPath, "w780");
       void preloadTmdb(previewBackdropPath, "w1280");
     }
-  }, [basePosterDisplayPath, previewBackdropPath]);
+  }, [isMobileViewport, previewBackdropPath]);
 
   // Comprueba si una ruta pertenece a la lista de backdrops (no posters)
   const isBackdropPath = useCallback(
@@ -7548,6 +7512,9 @@ export default function DetailsClient({
         : displayPosterPath
           ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
           : null;
+  // En móvil la versión original es la imagen final y candidata a LCP. Se le
+  // da prioridad alta; la versión w500 sigue siendo un fallback inmediato, pero
+  // no debe retrasar el inicio de la descarga de máxima calidad.
   const posterLoadToken = posterLoadTokenRef.current;
 
   // Estados unificados: usar backdrop states si estamos en preview, sino poster states
@@ -7610,6 +7577,18 @@ export default function DetailsClient({
   const POSTER_SCALE = 1.06; // escala al hover
   const POSTER_OVERSCAN = 1.02; // Minimo para no perder nitidez
   const IDLE_DELAY = 220; // ms sin interacción => idle
+
+  // Una entrada corta de opacidad + escala da presencia a la portada sin
+  // bloquear el render ni animar propiedades costosas. Queda desactivada para
+  // personas que han pedido reducir movimiento.
+  const posterLowEntranceScale =
+    prefersReducedMotion || currentLowLoaded
+      ? POSTER_OVERSCAN
+      : POSTER_OVERSCAN + 0.025;
+  const posterHighEntranceScale =
+    prefersReducedMotion || currentHighLoaded
+      ? POSTER_OVERSCAN
+      : POSTER_OVERSCAN + 0.025;
 
   // Overscan
   const posterImgOverscan = poster3dEnabled ? 1.12 : 1;
@@ -8238,7 +8217,6 @@ export default function DetailsClient({
                               : "(max-width: 1024px) 280px, 320px"
                           }
                           loading="eager"
-                          fetchPriority="high"
                           decoding="async"
                           // RED DE SEGURIDAD PARA IMÁGENES EN CACHÉ.
                           // Si la imagen ya está en caché, el navegador puede
@@ -8307,15 +8285,17 @@ export default function DetailsClient({
                           // pósters claros). Sin promoción, rasteriza DENTRO de la
                           // capa del wrapper y la máscara la cubre siempre. La GPU
                           // la sigue aportando el wrapper (`transform-gpu`).
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
+                          className={`absolute inset-0 w-full h-full object-cover transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none
 ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
-                            transform: `scale(${POSTER_OVERSCAN})`,
+                            transform: `scale(${posterLowEntranceScale})`,
                           }}
                         />
 
-                        {/* HIGH */}
-                        {currentLowLoaded && posterHighUrl && (
+                        {/* HIGH: se monta inmediatamente, en paralelo a LOW.
+                            Antes esperaba al onLoad de w500, creando una cadena
+                            w500 → original especialmente lenta con datos móviles. */}
+                        {posterHighUrl && (
                           <OptimizedImage
                             src={posterHighUrl}
                             alt={title}
@@ -8329,6 +8309,19 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                             loading="eager"
                             decoding="async"
                             fetchPriority="high"
+                            ref={(el) => {
+                              if (!el || !el.complete || !el.naturalWidth)
+                                return;
+                              if (
+                                currentLoadTokenRef.current !== currentLoadToken
+                              )
+                                return;
+                              if (posterViewMode === "preview") {
+                                setBackdropHighLoaded(true);
+                              } else {
+                                setPosterHighLoaded(true);
+                              }
+                            }}
                             onLoad={() => {
                               if (
                                 currentLoadTokenRef.current !== currentLoadToken
@@ -8345,10 +8338,10 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                             // Igual que la LOW: sin promoción a capa propia para
                             // que rasterice DENTRO de la capa enmascarada del
                             // wrapper y no asome el borde crudo al hacer overscroll.
-                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-out
+                            className={`absolute inset-0 w-full h-full object-cover transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none
 ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             style={{
-                              transform: `scale(${POSTER_OVERSCAN})`,
+                              transform: `scale(${posterHighEntranceScale})`,
                             }}
                           />
                         )}

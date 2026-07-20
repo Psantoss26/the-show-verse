@@ -793,7 +793,6 @@ export default function Navbar() {
   const isDetailsRoute =
     /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
     /^\/details\/tv\/[^/]+\/?$/.test(pathname || "");
-  const detailsHeroNavMobile = isDetailsRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
@@ -983,26 +982,35 @@ export default function Navbar() {
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
           al hacer scroll aparece el fondo glass difuminado. */}
       <nav
-        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow,opacity] duration-300 ${
+        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
-            : detailsHeroNavMobile
-              ? // Escritorio (lg:): glass de siempre. Móvil: el glass y la opacidad
-                // los pone el bloque `isDetailsRoute` de abajo (aparición gradual).
+            : isDetailsRoute
+              ? // FICHA: escritorio glass de siempre (lg:); MÓVIL transparente,
+                // compacto y visible/interactivo desde la entrada. El fondo glass y
+                // el crecimiento de altura los aportan la capa interna y la fila
+                // móvil, GRADUALMENTE con el scroll (--sv-hero-scroll).
                 "lg:bg-black/20 lg:bg-gradient-to-br lg:from-white/10 lg:via-transparent lg:to-black/40 lg:backdrop-blur-[50px] lg:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
               : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
-        }${
-          isDetailsRoute
-            ? // MÓVIL ficha: el navbar aparece GRADUALMENTE con el scroll,
-              // sincronizado con la transición del póster (--sv-hero-scroll: 0→1),
-              // como glass desde el primer píxel de opacidad. Solo captura toques
-              // tras hacer scroll (isScrolled). Escritorio intacto (todo max-sm:).
-              ` max-sm:bg-black/20 max-sm:bg-gradient-to-br max-sm:from-white/10 max-sm:via-transparent max-sm:to-black/40 max-sm:backdrop-blur-[50px] max-sm:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] max-sm:[opacity:var(--sv-hero-scroll,0)] ${
-                isScrolled ? "" : "max-sm:pointer-events-none"
-              }`
-            : ""
         }`}
       >
+        {isDetailsRoute && (
+          <>
+            {/* MÓVIL ficha: velo sutil SIEMPRE presente para que los iconos se
+                lean sobre el póster con el navbar transparente en la entrada; en
+                el scroll queda bajo el glass. */}
+            <div
+              aria-hidden
+              className="lg:hidden pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-transparent"
+            />
+            {/* Fondo GLASS que aparece GRADUALMENTE con el scroll
+                (--sv-hero-scroll: 0→1) sin afectar a los iconos. */}
+            <div
+              aria-hidden
+              className="lg:hidden pointer-events-none absolute inset-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] [opacity:var(--sv-hero-scroll,0)]"
+            />
+          </>
+        )}
         {/* ---------------- Desktop ---------------- */}
         <div className="hidden lg:flex items-center justify-between h-16 py-3">
           {/* Izquierda */}
@@ -1239,8 +1247,16 @@ export default function Navbar() {
 
         {/* ---------------- Mobile ---------------- */}
         <div className="lg:hidden relative flex items-center justify-between h-16 px-2">
-          {/* Izquierda: menú + IA */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Izquierda: menú + IA. En FICHA móvil los botones arrancan más
+              PEQUEÑOS (escala 0.8) y crecen a tamaño normal con el scroll
+              (--sv-hero-scroll), manteniendo el navbar a su altura normal. */}
+          <div
+            className={`flex items-center gap-1 flex-shrink-0 ${
+              isDetailsRoute
+                ? "origin-left [transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
+                : ""
+            }`}
+          >
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
@@ -1251,9 +1267,16 @@ export default function Navbar() {
             <WatchNextAssistant isMobile heroNavMode={heroNavMode} />
           </div>
 
-          {/* Centro: logo */}
+          {/* Centro: logo (mismo escalado compacto→normal en ficha móvil). */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <Link href="/" className="block h-10 overflow-hidden">
+            <Link
+              href="/"
+              className={`block h-10 overflow-hidden ${
+                isDetailsRoute
+                  ? "[transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
+                  : ""
+              }`}
+            >
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <OptimizedImage
                   src="/logo-TSV-sinFondo.png"
@@ -1266,8 +1289,14 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Derecha: búsqueda + perfil */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-1">
+          {/* Derecha: búsqueda + perfil (mismo escalado compacto→normal en ficha). */}
+          <div
+            className={`flex items-center gap-2 flex-shrink-0 pr-1 ${
+              isDetailsRoute
+                ? "origin-right [transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
+                : ""
+            }`}
+          >
             <button
               onClick={() => setShowMobileSearch(true)}
               className="p-2 rounded-full transition-colors text-white hover:bg-white/10"
