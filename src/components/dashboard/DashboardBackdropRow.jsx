@@ -1618,7 +1618,7 @@ export default function DashboardBackdropRow({
             // la sección de info cuelga hacia abajo (necesita más hueco inferior).
             // El Swiper es pointer-events-none en escritorio para no robar
             // hover/clic a las filas vecinas; las tarjetas los reactivan.
-            className={`group relative !pt-14 sm:!pt-16 md:!pt-44 !pb-40 sm:!pb-52 md:!pb-72 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-40 sm:!-mb-52 md:!-mb-72 ${
+            className={`group relative !pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72 ${
               isMobile ? "" : "pointer-events-none"
             }`}
             wrapperClass="flex items-center"
