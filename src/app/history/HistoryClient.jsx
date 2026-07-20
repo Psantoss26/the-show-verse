@@ -2555,7 +2555,19 @@ export default function HistoryClient() {
   // En back-nav renderizamos el contenido desde el primer pintado (no hay SSR con el
   // que chocar). En carga fresca sigue oculto hasta el efecto de montaje.
   const [hydrated, setHydrated] = useState(() => !!backNavInit);
-  const [auth, setAuth] = useState({ loading: true, connected: false });
+  // BACK-NAV con historial cacheado: sembramos `connected` para que las
+  // estadísticas y el resto del layout dependiente de `auth` se pinten YA en el
+  // primer frame, con la MISMA altura que al guardar. Sin esto, `auth.connected`
+  // llega tras el round-trip de `traktAuthStatus` y las stats aparecían DESPUÉS,
+  // desplazando el contenido hacia abajo → el punto restaurado por
+  // <ScrollRestoration> quedaba desalineado (peor cuanto más abajo se estaba, por
+  // eso fallaba con la carga progresiva). `loadAuth` revalida igual y corrige si
+  // el usuario ya no está conectado.
+  const [auth, setAuth] = useState(() =>
+    backNavInit?.items
+      ? { loading: false, connected: true }
+      : { loading: true, connected: false },
+  );
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(() => !!backNavInit?.items);

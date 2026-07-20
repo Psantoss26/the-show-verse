@@ -1628,7 +1628,7 @@ function Row({
           modules={[Navigation, FreeMode]}
           className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
             isTop10
-              ? "!pt-14 sm:!pt-16 md:!pt-44 !pb-40 sm:!pb-52 md:!pb-72 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-40 sm:!-mb-52 md:!-mb-72"
+              ? "!pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72"
               : ""
           }`}
           wrapperClass={isTop10 ? "flex items-center" : undefined}
@@ -2014,11 +2014,12 @@ export default function SeriesPageClient({
                 // El pop-out de la vista previa se centra en su imagen y la fila de
                 // acciones cuelga por debajo; en la ÚLTIMA fila ese excedente caía
                 // fuera del área desplazable y se recortaba. Reservamos abajo el mismo
-                // hueco que cada fila reserva para su pop-out (pb-40/52/72) para que la
-                // tarjeta se vea completa.
+                // hueco que cada fila reserva para su pop-out en escritorio
+                // (sm:pb-52/md:pb-72) para que la tarjeta se vea completa.
+                // En móvil no hay hover-preview, así que dejamos un cierre corto.
                 hasFeaturedHero
-                  ? "space-y-12 px-4 pb-40 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72"
-                  : "space-y-12 pb-40 pt-2 sm:pb-52 md:pb-72"
+                  ? "space-y-8 px-4 pb-8 pt-4 sm:space-y-12 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72"
+                  : "space-y-8 pb-8 pt-2 sm:space-y-12 sm:pb-52 md:pb-72"
               }
             >
           {(() => {

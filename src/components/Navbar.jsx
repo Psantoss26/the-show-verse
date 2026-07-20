@@ -158,7 +158,7 @@ function dedupeSearchResults(results) {
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
-function SearchBar({ onResultClick, isMobile = false }) {
+function SearchBar({ onResultClick, isMobile = false, formClassName = "" }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -492,7 +492,10 @@ function SearchBar({ onResultClick, isMobile = false }) {
       className={`relative min-w-0 w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
       ref={searchRef}
     >
-      <form onSubmit={(e) => e.preventDefault()} className="relative w-full">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className={`relative w-full ${formClassName}`}
+      >
         <div
           onClick={(event) => {
             if (event.target.closest("button")) return;
@@ -780,15 +783,16 @@ export default function Navbar() {
   // El fondo difuminado aparece al hacer scroll.
   const heroNavMode = isFeaturedHeroRoute && !isScrolled;
 
-  // Fichas (/movie/… y /tv/…): en MÓVIL el póster es full-bleed y arranca justo
-  // bajo la navbar, borde con borde. Con el fondo glass, su velo cortaba en seco
-  // en ese borde y dejaba un escalón de brillo (línea horizontal) contra la fila
-  // superior del póster. Arriba del todo usamos el mismo velo degradado que el
-  // hero, que MUERE en transparente: así el borde no existe. Solo móvil
-  // (`max-lg:`): en escritorio la navbar de fichas sigue siendo glass, intacta.
-  // Las fichas viven en /details/movie/<id> y /details/tv/<id>. Se excluye
-  // /details/person/<id>: no tiene póster full-bleed y debe conservar el glass.
-  const isDetailsRoute = /^\/details\/(movie|tv)\//.test(pathname || "");
+  // Fichas base (/details/movie/<id> y /details/tv/<id>): en MÓVIL el póster es
+  // full-bleed y arranca justo bajo la navbar, borde con borde. Con el fondo
+  // glass, su velo cortaba en seco en ese borde y dejaba un escalón de brillo
+  // contra la fila superior del póster. Arriba del todo usamos el mismo velo
+  // degradado que el hero, que muere en transparente: así el borde no existe.
+  // SeasonDetails/EpisodeDetails son subrutas con layout propio y deben conservar
+  // la navbar glass visible desde el primer render.
+  const isDetailsRoute =
+    /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
+    /^\/details\/tv\/[^/]+\/?$/.test(pathname || "");
   const detailsHeroNavMobile = isDetailsRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
@@ -1655,16 +1659,16 @@ export default function Navbar() {
               className="w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start gap-3 mb-4">
-                <div className="flex-1">
-                  <SearchBar
-                    isMobile={true}
-                    onResultClick={() => setShowMobileSearch(false)}
-                  />
-                </div>
+              <div className="relative mb-4 w-full">
+                <SearchBar
+                  isMobile={true}
+                  formClassName="pr-[4.75rem]"
+                  onResultClick={() => setShowMobileSearch(false)}
+                />
                 <button
+                  type="button"
                   onClick={() => setShowMobileSearch(false)}
-                  className="flex-shrink-0 p-3 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 text-white transition-all active:scale-95"
+                  className="absolute right-0 top-0 p-3 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 text-white transition-all active:scale-95"
                   aria-label="Cerrar búsqueda"
                 >
                   <XIcon className="w-6 h-6" />

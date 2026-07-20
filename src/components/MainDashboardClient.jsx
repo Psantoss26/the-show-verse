@@ -3032,7 +3032,7 @@ export function Row({
             modules={[Navigation, FreeMode]}
             className={`group relative ${
               previewKind === "anticipated"
-                ? "!py-20 sm:!py-24 md:!py-28 !-my-20 sm:!-my-24 md:!-my-28"
+                ? "!py-3 sm:!py-24 md:!py-28 !-my-3 sm:!-my-24 md:!-my-28"
                 : hasActivePreview
                   ? "!overflow-visible"
                   : ""
@@ -4398,10 +4398,9 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               />
             </div>
 
-            {/* pb amplio abajo: el pop-out de la vista previa cuelga por debajo de la
-                tarjeta y en la última fila se recortaba fuera del área desplazable.
-                Reservamos el mismo hueco que cada fila reserva para su pop-out. */}
-            <div className="px-4 pb-40 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72">
+            {/* En escritorio reservamos hueco para el pop-out de la última preview;
+                en móvil no hay hover-preview, así que el cierre inferior es corto. */}
+            <div className="px-4 pb-8 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72">
               <TopRatedHero
                 movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
                 tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
@@ -4411,7 +4410,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               />
 
           <motion.div
-            className="space-y-14 sm:space-y-16 mt-10 sm:mt-14"
+            className="mt-8 space-y-8 sm:mt-14 sm:space-y-16"
             variants={staggerContainer}
             initial="hidden"
             animate="visible"
