@@ -2747,89 +2747,131 @@ export default function HistoryClient() {
     }
   }, [account?.provider, session]);
 
-  const loadHistory = useCallback(async ({ reset = true } = {}) => {
-    if (loadingHistoryRef.current) return;
+  const loadHistory = useCallback(
+    async ({ reset = true, refreshTop = false } = {}) => {
+      if (loadingHistoryRef.current) return;
 
-    const pageToLoad = reset ? 1 : nextHistoryPageRef.current;
-    if (!reset && !hasMoreHistoryRef.current) return;
+      // `refreshTop`: revalidación NO destructiva de la página 1 (carga fresca).
+      // Fusiona novedades por arriba CONSERVANDO todas las páginas ya cargadas por
+      // la carga progresiva (sin tocar cursor ni `hasMore`), para que lo cargado
+      // persista entre visitas y no haya que recargarlo cada vez que se accede.
+      const pageToLoad = reset || refreshTop ? 1 : nextHistoryPageRef.current;
+      if (!reset && !refreshTop && !hasMoreHistoryRef.current) return;
 
-    loadingHistoryRef.current = true;
-    setHistoryError("");
-    setLoading(true);
-    setLoadingMore(!reset);
+      loadingHistoryRef.current = true;
+      if (!refreshTop) {
+        setHistoryError("");
+        setLoading(true);
+        setLoadingMore(!reset);
+      }
 
-    try {
-      const json = await traktGetHistory({
-        type: "all",
-        page: pageToLoad,
-        limit: HISTORY_PAGE_SIZE,
-        enrich: false,
-      });
-      const { items } = normalizeHistoryResponse(json);
-      const sorted = [...items].sort(
-        (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
-      );
-      const nextHasMore =
-        typeof json?.pagination?.hasMore === "boolean"
-          ? json.pagination.hasMore
-          : items.length >= HISTORY_PAGE_SIZE;
+      try {
+        const json = await traktGetHistory({
+          type: "all",
+          page: pageToLoad,
+          limit: HISTORY_PAGE_SIZE,
+          enrich: false,
+        });
+        const { items } = normalizeHistoryResponse(json);
+        const sorted = [...items].sort(
+          (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
+        );
 
-      nextHistoryPageRef.current = pageToLoad + 1;
-      hasMoreHistoryRef.current = nextHasMore;
-      setHasMoreHistory(nextHasMore);
+        if (refreshTop) {
+          // Fusiona la página 1 fresca con lo cacheado (solo añade lo nuevo por
+          // arriba); conserva cursor/hasMore y TODAS las páginas ya cargadas.
+          setRaw((prev) => {
+            const seen = new Set(
+              (prev || []).map((x) => String(getHistoryId(x))),
+            );
+            const merged = [...(prev || [])];
+            for (const item of sorted) {
+              const id = String(getHistoryId(item));
+              if (!seen.has(id)) {
+                seen.add(id);
+                merged.push(item);
+              }
+            }
+            const nextItems = merged.sort(
+              (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
+            );
+            writeHistoryCache(nextItems, {
+              hasMore: hasMoreHistoryRef.current,
+              nextPage: nextHistoryPageRef.current,
+            });
+            return nextItems;
+          });
+          return;
+        }
 
-      setRaw((prev) => {
-        if (reset) {
-          writeHistoryCache(sorted, {
+        const nextHasMore =
+          typeof json?.pagination?.hasMore === "boolean"
+            ? json.pagination.hasMore
+            : items.length >= HISTORY_PAGE_SIZE;
+
+        nextHistoryPageRef.current = pageToLoad + 1;
+        hasMoreHistoryRef.current = nextHasMore;
+        setHasMoreHistory(nextHasMore);
+
+        setRaw((prev) => {
+          if (reset) {
+            writeHistoryCache(sorted, {
+              hasMore: nextHasMore,
+              nextPage: nextHistoryPageRef.current,
+            });
+            return sorted;
+          }
+
+          const seen = new Set((prev || []).map((x) => String(getHistoryId(x))));
+          const merged = [...(prev || [])];
+          for (const item of sorted) {
+            const id = String(getHistoryId(item));
+            if (!seen.has(id)) {
+              seen.add(id);
+              merged.push(item);
+            }
+          }
+          const nextItems = merged.sort(
+            (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
+          );
+          writeHistoryCache(nextItems, {
             hasMore: nextHasMore,
             nextPage: nextHistoryPageRef.current,
           });
-          return sorted;
-        }
-
-        const seen = new Set((prev || []).map((x) => String(getHistoryId(x))));
-        const merged = [...(prev || [])];
-        for (const item of sorted) {
-          const id = String(getHistoryId(item));
-          if (!seen.has(id)) {
-            seen.add(id);
-            merged.push(item);
-          }
-        }
-        const nextItems = merged.sort(
-          (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
-        );
-        writeHistoryCache(nextItems, {
-          hasMore: nextHasMore,
-          nextPage: nextHistoryPageRef.current,
+          return nextItems;
         });
-        return nextItems;
-      });
-    } catch (error) {
-      // SERVIDOR CAÍDO (5xx/429/red, túnel con el NAS apagado): NO desconectar ni
-      // borrar la caché. Conservamos lo cacheado (sembrado al montar) para seguir
-      // usando el historial offline.
-      if (isServerUnavailable(error)) {
-        setHistoryError("");
-      } else if (isTraktUnavailableError(error)) {
-        // 401/403: desconexión real de Trakt → limpiar.
-        setAuth({ loading: false, connected: false });
-        setRaw([]);
-        setHistoryError("");
-        clearHistoryCache();
-      } else {
-        setHistoryError("No se pudo cargar el historial.");
+      } catch (error) {
+        // Refresco en segundo plano (refreshTop): si falla, conservamos lo cacheado
+        // sin tocar nada (no vaciar, no error visible).
+        if (refreshTop) return;
+        // SERVIDOR CAÍDO (5xx/429/red, túnel con el NAS apagado): NO desconectar ni
+        // borrar la caché. Conservamos lo cacheado (sembrado al montar) para seguir
+        // usando el historial offline.
+        if (isServerUnavailable(error)) {
+          setHistoryError("");
+        } else if (isTraktUnavailableError(error)) {
+          // 401/403: desconexión real de Trakt → limpiar.
+          setAuth({ loading: false, connected: false });
+          setRaw([]);
+          setHistoryError("");
+          clearHistoryCache();
+        } else {
+          setHistoryError("No se pudo cargar el historial.");
+        }
+        if (reset) {
+          hasMoreHistoryRef.current = false;
+        }
+      } finally {
+        loadingHistoryRef.current = false;
+        if (!refreshTop) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+        setHistoryLoaded(true);
       }
-      if (reset) {
-        hasMoreHistoryRef.current = false;
-      }
-    } finally {
-      loadingHistoryRef.current = false;
-      setLoading(false);
-      setLoadingMore(false);
-      setHistoryLoaded(true);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -2862,7 +2904,14 @@ export default function HistoryClient() {
     // a la página 1: eso encogería la lista y rompería la restauración de scroll.
     // La paginación continúa desde el cursor restaurado y <ScrollRestoration>
     // devuelve la posición porque la altura del documento vuelve a ser la de antes.
-    if (isBackNav && restoredFromHistoryCacheRef.current) return;
+    // En BACK-NAV con lista cacheada no tocamos nada (restauración de scroll
+    // intacta). En carga FRESCA con lista cacheada revalidamos SOLO la página 1 de
+    // forma NO destructiva (`refreshTop`): añade novedades por arriba y conserva
+    // TODAS las páginas ya cargadas → persisten entre visitas sin recargarlas.
+    if (restoredFromHistoryCacheRef.current) {
+      if (!isBackNav) loadHistory({ refreshTop: true });
+      return;
+    }
     loadHistory({ reset: true });
   }, [auth.loading, auth.connected, loadHistory, isBackNav]);
 
