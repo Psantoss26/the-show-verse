@@ -1588,9 +1588,13 @@ export default function TraktEpisodesWatchedModal({
                               openEpisodeDetails(sn, en);
                             }
                           }}
-                          className="group flex cursor-pointer gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-2 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.08] sm:gap-4 sm:p-3"
+                          className={`group flex cursor-pointer gap-3 rounded-2xl bg-white/[0.035] bg-gradient-to-r from-white/[0.055] via-white/[0.03] to-transparent p-2 shadow-[0_16px_38px_-30px_rgba(0,0,0,0.95)] backdrop-blur-xl transition hover:bg-white/[0.075] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:gap-4 sm:p-3 ${
+                            isRewatchView
+                              ? "focus-visible:outline-purple-300/60"
+                              : "focus-visible:outline-emerald-300/60"
+                          }`}
                         >
-                          <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30 sm:w-32">
+                          <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl bg-black/30 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035),0_10px_24px_-18px_rgba(0,0,0,0.95)] sm:w-32">
                             {img ? (
                               <OptimizedImage
                                 src={img}
