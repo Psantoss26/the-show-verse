@@ -59,6 +59,7 @@ import {
 } from "@/lib/api/backendLists";
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import LiquidButton from "@/components/LiquidButton";
+
 import {
   buildImg,
   getMediaTypeForItem,
@@ -2329,7 +2330,7 @@ export default function DetailModal({
             type="button"
             onClick={onClose}
             disabled={navigatingToFullDetails}
-            className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 opacity-100 backdrop-blur-md transition-all duration-300 hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)] group"
+            className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/[0.48] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)] text-white/80 transition-all duration-300 hover:bg-black/65 hover:text-white disabled:pointer-events-none select-none group"
             aria-label="Cerrar modal"
           >
             <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
@@ -2340,7 +2341,7 @@ export default function DetailModal({
             type="button"
             onClick={goToFullDetails}
             disabled={navigatingToFullDetails}
-            className="absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[166px] items-center justify-center gap-0 overflow-hidden rounded-full border border-white/10 bg-black/40 px-0 hover:px-3 text-white/80 opacity-100 backdrop-blur-md transition-all duration-300 ease-out hover:gap-1.5 hover:bg-black/60 hover:text-white disabled:pointer-events-none select-none shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+            className="absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[166px] items-center justify-center gap-0 overflow-hidden rounded-full bg-black/[0.48] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)] px-0 hover:px-3 text-white/80 transition-all duration-300 ease-out hover:gap-1.5 hover:bg-black/65 hover:text-white disabled:pointer-events-none select-none"
             aria-label="Ver ficha completa"
             aria-busy={navigatingToFullDetails ? "true" : undefined}
           >
