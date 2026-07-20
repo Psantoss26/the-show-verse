@@ -8527,6 +8527,32 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             </motion.div>
 
+            {/* MÓVIL: el indicador conserva el mismo estado y estilo que la
+                versión integrada en el póster de escritorio, pero vive debajo
+                de la tarjeta para quedar entre el logo de la portada y las
+                acciones rápidas. */}
+            {inProgressPct != null && (
+              <div className="pointer-events-none w-full px-4 sm:hidden">
+                <div className="px-3 pb-2.5 pt-4">
+                  <div className="mb-1.5 flex items-end justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
+                      <Play className="h-2.5 w-2.5 fill-current" /> Viendo
+                    </span>
+                    <span className="text-lg font-black leading-none text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                      {inProgressPct}
+                      <span className="ml-0.5 text-xs font-bold text-emerald-300">%</span>
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/25 backdrop-blur-sm">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.9)]"
+                      style={{ width: `${inProgressPct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Providers Grid.
                 En móvil poster se oculta porque las plataformas viven en la
                 pestaña "Plataformas" de DetailsInfoTabs. En móvil backdrop y
