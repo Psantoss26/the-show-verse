@@ -1216,7 +1216,7 @@ function GroupDivider({
 
   useEffect(() => {
     if (mobileFiltersOpen) {
-      setTransitioningThreshold(232);
+      setTransitioningThreshold(260);
     } else {
       const timer = setTimeout(() => {
         setTransitioningThreshold(128);
@@ -1251,7 +1251,7 @@ function GroupDivider({
       ref={ref}
       data-group-divider
       className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
-        mobileFiltersOpen ? "top-[232px]" : "top-[128px]"
+        mobileFiltersOpen ? "top-[260px]" : "top-[128px]"
       }`}
       // `initial={false}` al retroceder. Es un elemento STICKY que entraba
       // desde 20px abajo: al volver de una ficha se recolocaba tras cargar, y
@@ -3079,19 +3079,15 @@ export default function WatchlistClient() {
               nunca en flujo: abrir/cerrar NO cambia la altura de la cabecera y la
               rejilla de detrás queda ESTÁTICA (antes conmutaba absolute↔relative y
               al cerrar insertaba su altura en el flujo → salto hacia abajo). */}
-          <div
-            className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              mobileFiltersOpen
-                ? "opacity-100"
-                : "opacity-0 pointer-events-none"
-            } lg:hidden overflow-hidden absolute left-0 right-0 z-[80]`}
-            style={{
-              gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top: "calc(100% + 4px)",
-            }}
-          >
-            <div className="min-h-0">
-              <div className="space-y-1 pt-1 pb-1">
+          <AnimatePresence>
+            {mobileFiltersOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top space-y-3 rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-3 shadow-2xl backdrop-blur-2xl lg:hidden"
+              >
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <InlineDropdown
@@ -3296,9 +3292,9 @@ export default function WatchlistClient() {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Desktop: Single row */}
           <div className="relative z-10 hidden lg:flex gap-3">

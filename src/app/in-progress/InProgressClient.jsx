@@ -5,6 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import { createPortal } from "react-dom";
 import {
   Tv,
   Play,
@@ -674,26 +675,71 @@ function GroupDivider({ title, count, total, avgProgress }) {
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // El menú se RENDERIZA POR PORTAL en <body> con position:fixed calculado desde
+  // el botón. Así no lo recorta el stacking context del panel de filtros (el
+  // `backdrop-blur` creaba un contexto que ocultaba el `absolute` anterior); el
+  // menú queda siempre visible por encima de todo, igual que en Favoritos.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
+          {Icon && <Icon className="w-4 h-4 shrink-0 text-emerald-500" />}
+          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
@@ -705,23 +751,30 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
-            style={{
-              scrollbarWidth: "thin",
-              scrollbarGutter: "stable",
-              overscrollBehavior: "contain",
-            }}
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -2093,10 +2146,14 @@ export default function InProgressClient({
                         )}
                       </InlineDropdown>
                     </div>
-                    <div className="flex w-28 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    {/* Grupo de vista: MISMA estructura que WatchingSectionNav
+                        (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
+                        para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
+                        de sección de la fila de arriba y las dos filas se alineen. */}
+                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setViewMode("cards")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -2106,7 +2163,7 @@ export default function InProgressClient({
                       </button>
                       <button
                         onClick={() => setViewMode("poster")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -2116,7 +2173,7 @@ export default function InProgressClient({
                       </button>
                       <button
                         onClick={() => setViewMode("compact")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
                           viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
