@@ -5,10 +5,10 @@
 // contenido. Los títulos llegan del motor del backend (algunos dinámicos:
 // géneros y décadas), así que en vez de encadenar `if (title === ...)` en cada
 // página —lo que dejaba filas sin etiqueta o con etiquetas sin sentido (p. ej.
-// "GÉNERO" en "Lo mejor de los 1990")— centralizamos aquí la lógica:
+// "GÉNERO" en "Lo mejor de 1990")— centralizamos aquí la lógica:
 //   1. Mapa exacto de los títulos conocidos (de backend/src/dashboard/surfaces).
 //   2. "Porque te gustó X" → SIMILARES.
-//   3. Décadas (4 o 2 dígitos) → "AÑOS 80 / 90 / 2000 / 2010 / 2020".
+//   3. Décadas (4 o 2 dígitos) → "DÉCADA 1980 / 1990 / 2000 / 2010 / 2020".
 //   4. Filas de género (etiqueta = nombre del género) → GÉNERO.
 //   5. Reserva → SELECCIÓN (ninguna fila se queda sin etiqueta).
 
@@ -107,17 +107,24 @@ const EXACT_LABELS = {
   "Creemos que te van a encantar": "SUGERENCIAS",
 
   // Décadas concretas (la actual / atajos legacy)
-  "Lo mejor de esta década": "AÑOS 2020",
-  "Lo mejor de 2020": "AÑOS 2020",
+  "Lo mejor de esta década": "DÉCADA 2020",
+  "Lo mejor de 2020": "DÉCADA 2020",
 };
+
+export function normalizeDashboardSectionTitle(title) {
+  if (!title || typeof title !== "string") return title;
+  return title.replace(
+    /^Lo mejor de los (19[5-9]0|20[0-2]0)$/i,
+    "Lo mejor de $1",
+  );
+}
 
 // Devuelve la etiqueta de década a partir del año de inicio (80, 90, 2000…).
 function decadeLabelFromYear(year) {
-  if (year < 2000) return `AÑOS ${year % 100}`; // 1980 → "AÑOS 80", 1990 → "AÑOS 90"
-  return `AÑOS ${year}`; // 2000/2010/2020 → "AÑOS 2000"…
+  return `DÉCADA ${year}`;
 }
 
-// Detecta una década en el título ("Lo mejor de los 1990", "Clásicos de los 90",
+// Detecta una década en el título ("Lo mejor de 1990", "Clásicos de los 90",
 // "Hits de 2010"…) y devuelve su etiqueta, o null si no hay década.
 function decadeLabelFromTitle(title) {
   // 4 dígitos: 1950–2020.
@@ -127,7 +134,7 @@ function decadeLabelFromTitle(title) {
   const two = title.match(/\blos (\d0)s?\b/i);
   if (two) {
     const n = Number(two[1]);
-    return n >= 70 ? `AÑOS ${n}` : `AÑOS ${2000 + n}`;
+    return n >= 70 ? `DÉCADA ${1900 + n}` : `DÉCADA ${2000 + n}`;
   }
   return null;
 }
@@ -138,7 +145,7 @@ function decadeLabelFromTitle(title) {
 export function deriveSectionLabel(title, providedLabel = null) {
   if (providedLabel) return providedLabel;
   if (!title || typeof title !== "string") return null;
-  const t = title.trim();
+  const t = normalizeDashboardSectionTitle(title).trim();
   if (!t) return null;
 
   if (EXACT_LABELS[t]) return EXACT_LABELS[t];

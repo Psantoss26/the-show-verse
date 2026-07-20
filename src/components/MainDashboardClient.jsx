@@ -10,7 +10,10 @@ import {
   useScrollRevealProps,
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
-import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import {
+  deriveSectionLabel,
+  normalizeDashboardSectionTitle,
+} from "@/lib/dashboard/sectionLabel";
 import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
@@ -366,9 +369,10 @@ const EXPANDABLE_SECTION_HREFS = {
 };
 
 function ExpandableSectionTitle({ title, href, className = "" }) {
+  const displayTitle = normalizeDashboardSectionTitle(title);
   const content = (
     <>
-      <span>{title}</span>
+      <span>{displayTitle}</span>
       <span className="text-amber-500">.</span>
       {href && (
         <ChevronRight className="ml-1 h-5 w-5 translate-x-[-4px] text-amber-400 opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
@@ -390,7 +394,7 @@ function ExpandableSectionTitle({ title, href, className = "" }) {
     <Link
       href={href}
       className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 ${className}`}
-      aria-label={`Ver todos los títulos de ${title}`}
+      aria-label={`Ver todos los títulos de ${displayTitle}`}
     >
       {content}
     </Link>

@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
@@ -2713,9 +2714,24 @@ export default function HistoryClient() {
 
     try {
       const st = await traktAuthStatus();
-      setAuth({ loading: false, connected: !!st?.connected && !st?.degraded });
-    } catch {
-      setAuth({ loading: false, connected: false });
+      // SERVIDOR CAÍDO (5xx → `unavailable`): no podemos verificar Trakt. Si hay
+      // historial cacheado el usuario estaba conectado → mantenemos `connected`
+      // para mostrarlo offline (en vez del prompt de login).
+      if (st?.unavailable) {
+        setAuth({
+          loading: false,
+          connected: !!readHistoryCache()?.items?.length,
+        });
+      } else {
+        setAuth({ loading: false, connected: !!st?.connected && !st?.degraded });
+      }
+    } catch (error) {
+      // Error de RED (offline total): igual, conservar conexión si hay caché.
+      if (isServerUnavailable(error) && readHistoryCache()?.items?.length) {
+        setAuth({ loading: false, connected: true });
+      } else {
+        setAuth({ loading: false, connected: false });
+      }
     }
   }, [account?.provider, session]);
 
@@ -2778,7 +2794,13 @@ export default function HistoryClient() {
         return nextItems;
       });
     } catch (error) {
-      if (isTraktUnavailableError(error)) {
+      // SERVIDOR CAÍDO (5xx/429/red, túnel con el NAS apagado): NO desconectar ni
+      // borrar la caché. Conservamos lo cacheado (sembrado al montar) para seguir
+      // usando el historial offline.
+      if (isServerUnavailable(error)) {
+        setHistoryError("");
+      } else if (isTraktUnavailableError(error)) {
+        // 401/403: desconexión real de Trakt → limpiar.
         setAuth({ loading: false, connected: false });
         setRaw([]);
         setHistoryError("");

@@ -196,7 +196,7 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
       {/* Scroller con padding + safe-area para que no se recorte en bordes */}
       <div
         className="
-        overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-x]
+        overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y]
         py-2.5
         pl-[calc(1.25rem+env(safe-area-inset-left))]
         pr-[calc(0.75rem+env(safe-area-inset-right))]

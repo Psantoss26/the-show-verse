@@ -49,6 +49,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  isServerUnavailable,
+  isUnavailableStatus,
+} from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
@@ -2549,6 +2553,19 @@ export default function FavoritesClient() {
             setRatedItems([]);
             return;
           }
+          // SERVIDOR CAÍDO (5xx/429, típico del túnel con el NAS apagado): NO
+          // vaciar. Conservamos la lista o la recuperamos de la caché —aunque sea
+          // vieja— para poder seguir usando la app offline.
+          if (isUnavailableStatus(favResponse.status)) {
+            const cached = readFavoritesCache();
+            if (cached?.items?.length) {
+              setItems((prev) => (prev.length ? prev : cached.items));
+              setRatedItems((prev) =>
+                prev.length ? prev : cached.ratedItems || [],
+              );
+            }
+            return;
+          }
           console.error(
             "API error:",
             favResponse.status,
@@ -2642,7 +2659,19 @@ export default function FavoritesClient() {
         }
         console.error("Error loading favorites:", error);
         if (!cancelled) {
-          setItems([]);
+          // Error de RED (servidor apagado): conservamos/recuperamos la caché en
+          // vez de vaciar, para seguir mostrando la lista offline.
+          if (isServerUnavailable(error)) {
+            const cached = readFavoritesCache();
+            if (cached?.items?.length) {
+              setItems((prev) => (prev.length ? prev : cached.items));
+              setRatedItems((prev) =>
+                prev.length ? prev : cached.ratedItems || [],
+              );
+            }
+          } else {
+            setItems([]);
+          }
         }
       } finally {
         if (!cancelled) {
