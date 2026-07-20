@@ -8002,7 +8002,9 @@ export default function DetailsClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="-mt-[5.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
+          className={`-mt-[5.5rem] sm:mt-0 flex flex-col lg:flex-row ${
+            inProgressPct != null ? "gap-3 sm:gap-5" : "gap-5"
+          } lg:gap-12 mb-12 items-start`}
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
