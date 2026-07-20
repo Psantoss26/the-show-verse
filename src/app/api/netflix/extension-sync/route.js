@@ -4,7 +4,9 @@ import {
   resolveStreamingEntity,
   searchTmdbCandidatesWithFallback,
   matchEpisodeByName,
+  matchEpisodeCandidates,
 } from "@/lib/netflix/streamingResolve";
+import { normalizeText } from "@/lib/netflix/resolve";
 import { buildQueryVariants } from "@/lib/netflix/queryVariants";
 
 export const runtime = "nodejs";
@@ -92,39 +94,92 @@ async function tmdbJson(url) {
   }
 }
 
-// Localiza la temporada buscando el episodio por NOMBRE en TODAS las temporadas de
-// la serie. Necesario para Netflix web, cuyo reproductor muestra el episodio pero
-// NO la temporada. Devuelve {season, episode} o null.
-async function findSeasonByEpisodeName(tmdbId, episodeName) {
+// Localiza la temporada buscando el episodio en TODAS las temporadas de la serie.
+// Necesario para Netflix web (muestra el episodio pero NO la temporada) y para
+// HBO Max/Prime (serie + nombre de episodio sin números). Escalera, de más a
+// menos fiable — y ante AMBIGÜEDAD (varias temporadas casan) devuelve null en
+// vez de fijar una temporada al azar (antes: "la primera ascendente", que en
+// series largas solía ser la equivocada):
+//   1) `episodeNumber` conocido: temporadas cuyo episodio Nº N casa por nombre.
+//   2) Nombre EXACTO único entre todas las temporadas.
+//   3) Nombre por inclusión fiable (endurecida) único.
+//   4) `episodeNumber` conocido y UNA SOLA temporada tiene ≥N episodios.
+// Devuelve {season, episode} o null.
+async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null) {
   if (!tmdbId || !TMDB_API_KEY) return null;
   const clean = cleanEpisodeName(episodeName);
-  if (!clean || clean.length < 2) return null;
+  const epNum = Number.isInteger(episodeNumber) && episodeNumber > 0 ? episodeNumber : null;
+  if ((!clean || clean.length < 2) && !epNum) return null;
 
   const showData = await tmdbJson(
     `${TMDB_API}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`,
   );
-  const seasonNums = (Array.isArray(showData?.seasons) ? showData.seasons : [])
-    .map((s) => Number(s.season_number))
-    .filter((n) => n > 0)
-    .sort((a, b) => a - b)
+  const realSeasons = (Array.isArray(showData?.seasons) ? showData.seasons : [])
+    .filter((s) => s && Number(s.season_number) > 0)
+    .sort((a, b) => Number(a.season_number) - Number(b.season_number))
     .slice(0, 30); // cota de seguridad para series con muchas temporadas
+  const seasonNums = realSeasons.map((s) => Number(s.season_number));
   if (!seasonNums.length) return null;
 
-  const perSeason = await Promise.all(
-    seasonNums.map(async (n) => {
-      const [es, en] = await Promise.all([
-        tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=es-ES`),
-        tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=en-US`),
-      ]);
-      const episodes = [
-        ...(Array.isArray(es?.episodes) ? es.episodes : []),
-        ...(Array.isArray(en?.episodes) ? en.episodes : []),
-      ];
-      return matchEpisodeByName({ episodeName: clean, seasonEpisodes: episodes });
-    }),
-  );
-  // Primera temporada (ascendente) con coincidencia.
-  return perSeason.find(Boolean) || null;
+  const allEpisodes = (
+    await Promise.all(
+      seasonNums.map(async (n) => {
+        const [es, en] = await Promise.all([
+          tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=es-ES`),
+          tmdbJson(`${TMDB_API}/tv/${tmdbId}/season/${n}?api_key=${TMDB_API_KEY}&language=en-US`),
+        ]);
+        return [
+          ...(Array.isArray(es?.episodes) ? es.episodes : []),
+          ...(Array.isArray(en?.episodes) ? en.episodes : []),
+        ];
+      }),
+    )
+  ).flat();
+
+  // 1) Número de episodio conocido: ¿en qué temporadas casa el NOMBRE del
+  //    episodio Nº epNum? Único → fijado con máxima fiabilidad.
+  if (epNum && clean) {
+    const q = normalizeText(clean);
+    const seasonsMatching = new Set();
+    for (const e of allEpisodes) {
+      if (Number(e?.episode_number) !== epNum) continue;
+      const n = normalizeText(e?.name);
+      if (n && q && (n === q || (n.length >= 6 && q.length >= 6 && (n.includes(q) || q.includes(n))))) {
+        seasonsMatching.add(Number(e.season_number));
+      }
+    }
+    if (seasonsMatching.size === 1) {
+      return { season: [...seasonsMatching][0], episode: epNum };
+    }
+  }
+
+  // 2-3) Por nombre en todas las temporadas: exactos primero, inclusión después;
+  //      solo si el resultado es ÚNICO (sin ambigüedad).
+  if (clean) {
+    const { exact, partial } = matchEpisodeCandidates({
+      episodeName: clean,
+      seasonEpisodes: allEpisodes,
+    });
+    if (exact.length === 1) return exact[0];
+    if (exact.length === 0 && partial.length === 1) return partial[0];
+    if (exact.length > 1 || partial.length > 1) {
+      console.warn(
+        `[Extension Sync] Episodio "${clean}" ambiguo entre temporadas (${exact.length} exactos, ${partial.length} parciales); no se fija temporada.`,
+      );
+    }
+  }
+
+  // 4) Último recurso con número: una sola temporada tiene ≥ epNum episodios.
+  if (epNum) {
+    const seasonsWithEnough = realSeasons.filter(
+      (s) => Number(s.episode_count) >= epNum,
+    );
+    if (seasonsWithEnough.length === 1) {
+      return { season: Number(seasonsWithEnough[0].season_number), episode: epNum };
+    }
+  }
+
+  return null;
 }
 
 export async function POST(request) {
@@ -325,9 +380,11 @@ export async function POST(request) {
         season = Number(realSeasons[0].season_number) || 1;
       }
 
-      // 2. Varias temporadas: localizar la temporada por el NOMBRE del episodio.
+      // 2. Varias temporadas: localizar la temporada por el NOMBRE del episodio,
+      //    apoyándose también en el NÚMERO conocido (episodio Nº N cuyo nombre
+      //    casa, o única temporada con ≥N episodios).
       if (season == null && episodeName) {
-        const hit = await findSeasonByEpisodeName(tmdbId, episodeName);
+        const hit = await findSeasonByEpisodeName(tmdbId, episodeName, episode);
         if (hit) {
           season = hit.season;
           episode = hit.episode;

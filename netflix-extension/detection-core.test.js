@@ -44,6 +44,42 @@ test("buildPlaybackSignal treats no-artist Media Session as a movie", () => {
   assert.equal(sig.episode, undefined);
 });
 
+test("badge S×E reclassifies as series even without artist/album (Prime/Max)", () => {
+  // Prime/Max no exponen artist/album: el título de la Media Session es el
+  // EPISODIO. El badge S×E del DOM es evidencia fuerte de serie.
+  const sig = D.buildPlaybackSignal({
+    host: "www.primevideo.com",
+    mediaSession: { title: "La bendición" },
+    seasonEpisodeText: "T2 E5",
+  });
+  assert.equal(sig.movieTitle, undefined);
+  assert.equal(sig.episodeName, "La bendición");
+  assert.equal(sig.season, 2);
+  assert.equal(sig.episode, 5);
+});
+
+test("S×E only in Media Session title is parsed when it's a series", () => {
+  const sig = D.buildPlaybackSignal({
+    host: "example.com",
+    mediaSession: { title: "T3:E7 - El final", artist: "La Serie" },
+  });
+  assert.equal(sig.showName, "La Serie");
+  assert.equal(sig.season, 3);
+  assert.equal(sig.episode, 7);
+});
+
+test("a movie with 'Chapter N' in tab/title never gets episode numbers", () => {
+  const sig = D.buildPlaybackSignal({
+    host: "play.max.com",
+    mediaSession: { title: "John Wick: Chapter 2" },
+    tabTitle: "John Wick: Chapter 2 | Max",
+  });
+  assert.equal(sig.movieTitle, "John Wick: Chapter 2");
+  assert.equal(sig.showName, undefined);
+  assert.equal(sig.episode, undefined);
+  assert.equal(sig.season, undefined);
+});
+
 test("largestArtwork picks the biggest by area", () => {
   assert.equal(
     D.largestArtwork([

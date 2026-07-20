@@ -19,6 +19,11 @@ object ScreenHeuristics {
         Regex("\\b\\d{1,2}\\s*h(?:\\s*\\d{1,2}\\s*m(?:in)?)?\\b|\\b\\d{1,3}\\s*min\\b")
     private val RATING_RE =
         Regex("^(?:\\+?\\d{1,2}\\+?|tv-?(?:ma|14|pg|g|y7?)|nr|ur|apta|todos los p[uú]blicos)$")
+    // Señales adicionales típicas de la ficha de Prime Video, que las expone de
+    // forma fiable aunque el resto de etiquetas cambien o estén en otro idioma:
+    // la nota de IMDb ("IMDb 8,1"), y el AÑO de estreno como texto suelto.
+    private val IMDB_RE = Regex("^imdb\\s*\\d", RegexOption.IGNORE_CASE)
+    private val YEAR_RE = Regex("^(?:19|20)\\d{2}$")
 
     /** Normaliza para comparar: minúsculas, sin puntos/puntos suspensivos finales
      *  ("Cargando…" → "cargando") ni espacios de más. */
@@ -97,6 +102,15 @@ object ScreenHeuristics {
         "buy", "rent", "rent or buy", "x-ray", "rayos x", "descripción",
         "descripcion", "description", "idiomas", "audio e idiomas",
         "más como esto", "mas como esto", "más títulos como este",
+        // Badges de calidad/audio que Prime pinta en la ficha como textos sueltos.
+        "uhd", "4k", "4k uhd", "hd", "hdr", "hdr10", "hdr10+", "dolby vision",
+        "dolby atmos", "5.1", "subtítulos", "subtitulos", "subtitles", "cc",
+        "audio descriptivo", "audio description", "ad",
+        // Otros idiomas (FR/DE/IT/PT) para dispositivos no configurados en ES/EN.
+        "bande-annonce", "télécharger", "épisodes", "saisons",
+        "herunterladen", "episoden", "staffeln",
+        "episodi", "stagioni", "guarda il trailer",
+        "baixar", "episódios", "temporadas",
     )
     private val DETAIL_PREFIXES = setOf(
         "temporada", "season", "episodio", "episode", "capítulo", "capitulo",
@@ -111,7 +125,24 @@ object ScreenHeuristics {
         if (DETAIL_PREFIXES.any { l.startsWith(it) }) return true
         if (RUNTIME_RE.containsMatchIn(l)) return true
         if (RATING_RE.matches(l)) return true
+        if (IMDB_RE.containsMatchIn(l)) return true
+        if (YEAR_RE.matches(l)) return true
         return false
+    }
+
+    private val PLAY_VIEW_ID_HINTS = listOf(
+        "play_button", "playbutton", "btn_play", "play_icon", "resume_button",
+    )
+
+    /**
+     * ¿El viewId del nodo delata un botón de reproducir? Cubre el caso Prime/Max
+     * donde el botón es SOLO un icono sin texto ni contentDescription casable: el
+     * id de recurso ("…:id/play_button") sigue identificándolo.
+     */
+    fun isPlayViewId(viewId: String?): Boolean {
+        val id = viewId?.substringAfterLast('/')?.lowercase() ?: return false
+        if (id.isEmpty()) return false
+        return PLAY_VIEW_ID_HINTS.any { id.contains(it) } || id == "play"
     }
 
     private val STOP_WORDS = setOf(

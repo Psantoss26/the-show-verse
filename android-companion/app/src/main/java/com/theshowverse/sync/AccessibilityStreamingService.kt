@@ -176,6 +176,12 @@ class AccessibilityStreamingService : AccessibilityService() {
         while (queue.isNotEmpty() && visited < MAX_NODES) {
             val node = queue.removeFirst()
             visited++
+            // Botón de reproducir por viewId: en Prime/Max el botón puede ser SOLO
+            // un icono, sin texto ni contentDescription; su id de recurso
+            // ("…:id/play_button") sigue identificándolo. Requiere flagReportViewIds.
+            if (!sawPlay && ScreenHeuristics.isPlayViewId(node.viewIdResourceName)) {
+                sawPlay = true
+            }
             val raw = (node.text ?: node.contentDescription)?.toString()?.trim()
             if (!raw.isNullOrBlank()) {
                 if (!sawPlay && ScreenHeuristics.isPlayLabel(raw)) sawPlay = true
@@ -235,7 +241,10 @@ class AccessibilityStreamingService : AccessibilityService() {
     companion object {
         private const val DEBOUNCE_MS = 700L
         private const val DEDUP_MS = 60_000L
-        private const val MAX_NODES = 900
+        // 1600 (antes 900): las fichas de Prime son árboles muy poblados y las
+        // señales de detalle (watchlist, IMDb, calidad…) quedaban fuera de la poda
+        // → señales=0 → la ficha no se reconocía y no salía la notificación.
+        private const val MAX_NODES = 1600
         private const val MAX_CANDIDATES = 4
         private const val MAX_LABELS = 8
         private const val MAX_WINDOWS = 6

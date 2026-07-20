@@ -18,6 +18,16 @@ class SignalBuilderTest {
     }
 
     @Test
+    fun episodeRegexDoesNotMatchInsideWords() {
+        // "PARTE3"/"SUITE3" contienen "E3" pero NO son un episodio (guarda izquierda).
+        assertNull(SignalBuilder.parseSeasonEpisode("PARTE3"))
+        assertNull(SignalBuilder.parseSeasonEpisode("Suite3"))
+        // Los formatos legítimos con no-letra delante siguen casando.
+        assertEquals(2 to 10, SignalBuilder.parseSeasonEpisode("S2E10"))
+        assertEquals(1 to 1, SignalBuilder.parseSeasonEpisode("T1:E1 - Piloto"))
+    }
+
+    @Test
     fun buildsSeriesSignalFromMediaSession() {
         val raw = RawMetadata(
             packageName = "com.netflix.mediaclient",

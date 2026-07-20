@@ -740,10 +740,18 @@
 
     // Último recurso: título desde la pestaña si Media Session no dio nombre —
     // pero NUNCA un nombre de plataforma suelto ("Netflix"), que resolvería a una
-    // película sin relación.
+    // película sin relación. Si la señal tiene evidencia de EPISODIO (números S×E
+    // o nombre de episodio), el nombre de la pestaña es el de la SERIE (caso Prime
+    // sin JSON-LD): va a showName para que el servidor resuelva como TV.
     if (!signal.showName && !signal.movieTitle) {
       const fromTab = D.stripPlatformPrefix(document.title, [platformName]);
-      if (fromTab && !isBarePlatformName(fromTab)) signal.movieTitle = fromTab;
+      if (fromTab && !isBarePlatformName(fromTab)) {
+        if (signal.episode != null || signal.episodeName) {
+          signal.showName = fromTab;
+        } else {
+          signal.movieTitle = fromTab;
+        }
+      }
     }
 
     return signal;

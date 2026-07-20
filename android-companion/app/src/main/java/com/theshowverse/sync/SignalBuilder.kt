@@ -12,8 +12,10 @@ object SignalBuilder {
         "(?:^|[^a-zA-Z])(?:T|S|Temporada|Season|Saison|Staffel)\\s*\\.?\\s*(\\d{1,3})",
         RegexOption.IGNORE_CASE,
     )
+    // Con guarda izquierda (^ o no-letra), como SEASON_RE: sin ella, "PARTE3" o
+    // "SUITE3" casaban su "E3" interior como episodio 3 (falso positivo).
     private val EPISODE_RE = Regex(
-        "(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\\s*\\.?\\s*(\\d{1,3})",
+        "(?:^|[^a-zA-Z])(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\\s*\\.?\\s*(\\d{1,3})",
         RegexOption.IGNORE_CASE,
     )
 
