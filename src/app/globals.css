@@ -721,11 +721,16 @@ html {
     filter: brightness(0.9) saturate(1.03) blur(4px);
   }
 
-  /* En DetailsClient con progreso, los controles de acción pasan por detrás
-     del navbar. El cristal normal es translúcido y revelaba sus colores; esta
-     capa mantiene la silueta y reflejos del navbar, pero lo convierte en una
-     oclusión visual completa para esa única composición. */
-  body:has(.details-mobile-progress-indicator) .mobile-bottom-nav-occlusion {
-    background-color: #060606;
+  /* Acciones del hero con progreso: inicialmente quedan ocultas detrás del
+     navbar. En el primer desplazamiento recuperan directamente su estado final
+     e interacción, sin fundido ni opacidad intermedia. */
+  .details-mobile-progress-actions {
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  html[data-details-hero-scrolled] .details-mobile-progress-actions {
+    pointer-events: auto;
+    visibility: visible;
   }
 }
