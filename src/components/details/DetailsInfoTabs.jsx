@@ -13,7 +13,7 @@
 //   - "backdrop": Presupuesto/Recaudación/Canal se muestran SOLO si hay valor
 //                 y el tagline usa comillas rectas " ".
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   CalendarIcon,
@@ -25,60 +25,12 @@ import {
   Users,
   Building2,
   Trophy,
+  Tags,
 } from "lucide-react";
 
-import OptimizedImage from "@/components/OptimizedImage";
 import { VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
-
-// Tarjeta de plataforma con el MISMO estilo/diseño/comportamiento que
-// <VisualMetaCard> (pestañas Detalles/Producción): idéntico shell (fondo, blur,
-// capa de luz, icono + etiqueta + valor), sin animación de entrada ni hover
-// propios. Se mantiene como enlace (<a>) para poder abrir la plataforma.
-function PlatformLinkCard({ platform }) {
-  if (!platform?.icon || !platform?.href) return null;
-
-  return (
-    <a
-      href={platform.href}
-      target={platform.target}
-      rel={platform.rel}
-      aria-label={`Abrir ${platform.title}`}
-      className="relative isolate flex h-full w-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 lg:w-auto lg:flex-auto lg:shrink-0"
-    >
-      {/* Capa de luz estilo ScoreboardBar (igual que VisualMetaCard) */}
-      <div
-        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-      />
-
-      {/* Icono: logo de la plataforma en el mismo hueco que el icono de las
-          tarjetas de Detalles/Producción */}
-      <div className="relative z-10 shrink-0">
-        <OptimizedImage
-          src={platform.icon}
-          alt=""
-          className="h-8 w-8 rounded object-contain"
-          onError={(e) => {
-            e.target.style.display = "none";
-          }}
-        />
-        {platform.isPlexProvider && (
-          <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-black" />
-        )}
-      </div>
-
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <span className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-          Plataforma
-        </span>
-        <span className="text-sm font-bold leading-tight text-white whitespace-normal break-words">
-          {platform.title}
-        </span>
-      </div>
-    </a>
-  );
-}
+import { translateGenre } from "@/lib/details/formatters";
 
 export default function DetailsInfoTabs({
   variant = "normal",
@@ -100,19 +52,20 @@ export default function DetailsInfoTabs({
   awards,
   awardItems = [],
   showAwardsTab = true,
-  platforms = [],
+  genres = [],
+  metadataLoading = false,
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
-  const hasPlatformsTab = Array.isArray(platforms) && platforms.length > 0;
-
-  useEffect(() => {
-    if (activeTab === "platforms" && !hasPlatformsTab) {
-      setActiveTab("details");
-    }
-  }, [activeTab, hasPlatformsTab]);
+  const genresValue = Array.isArray(genres)
+    ? genres
+        .filter(Boolean)
+        .map((genre) => translateGenre(genre.name || genre))
+        .filter(Boolean)
+        .join(", ")
+    : "";
 
   return (
     <>
@@ -122,9 +75,6 @@ export default function DetailsInfoTabs({
           { id: "details", label: "Detalles" },
           { id: "production", label: "Producción" },
           { id: "synopsis", label: "Sinopsis" },
-          ...(hasPlatformsTab
-            ? [{ id: "platforms", label: "Plataformas" }]
-            : []),
           ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
         ]}
         activeTab={activeTab}
@@ -169,8 +119,18 @@ export default function DetailsInfoTabs({
                   icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
                   label="Título Original"
                   value={originalTitle}
+                  isLoading={metadataLoading}
                   expanded={true}
                   className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                />
+
+                <VisualMetaCard
+                  icon={Tags}
+                  label="Géneros"
+                  value={metadataLoading ? null : genresValue || "—"}
+                  isLoading={metadataLoading}
+                  expanded={true}
+                  className="w-full sm:hidden"
                 />
 
                 {/* Duración (solo series) */}
@@ -187,7 +147,8 @@ export default function DetailsInfoTabs({
                 <VisualMetaCard
                   icon={CalendarIcon}
                   label={mediaType === "movie" ? "Estreno" : "Inicio"}
-                  value={releaseDateValue || "—"}
+                  value={metadataLoading ? null : releaseDateValue || "—"}
+                  isLoading={metadataLoading}
                   className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                 />
 
@@ -233,13 +194,15 @@ export default function DetailsInfoTabs({
                       <VisualMetaCard
                         icon={BadgeDollarSignIcon}
                         label="Presupuesto"
-                        value={budgetValue || "—"}
+                        value={metadataLoading ? null : budgetValue || "—"}
+                        isLoading={metadataLoading}
                         className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
                       <VisualMetaCard
                         icon={TrendingUp}
                         label="Recaudación"
-                        value={revenueValue || "—"}
+                        value={metadataLoading ? null : revenueValue || "—"}
+                        isLoading={metadataLoading}
                         className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                       />
                     </>
@@ -293,20 +256,6 @@ export default function DetailsInfoTabs({
                   expanded={true}
                   className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                 />
-              </div>
-            </div>
-          )}
-
-          {/* ===== TAB: PLATAFORMAS ===== */}
-          {activeTab === "platforms" && hasPlatformsTab && (
-            <div key="platforms">
-              <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                {platforms.map((platform, index) => (
-                  <PlatformLinkCard
-                    key={platform.key ?? `${platform.title}-${index}`}
-                    platform={platform}
-                  />
-                ))}
               </div>
             </div>
           )}

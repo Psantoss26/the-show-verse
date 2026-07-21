@@ -669,6 +669,10 @@ export default function DetailModal({
   const mediaType = isEpisode
     ? "tv"
     : data.mediaType || getMediaTypeForItem(item);
+  const detailKey = `${mediaType}:${item?.id ?? ""}`;
+  const metadataLoading =
+    !isEpisode &&
+    (!data.detailsResolved || data.detailsKey !== detailKey);
   const episodeMeta = data.episodeMeta || null;
   const title = data.title || item?.title || item?.name || "";
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
@@ -2992,7 +2996,8 @@ export default function DetailModal({
                   overview={data.overview}
                   awards={data.awards}
                   showAwardsTab={false}
-                  platforms={[]}
+                  genres={data.genres}
+                  metadataLoading={metadataLoading}
                 />
               </motion.div>
             )}

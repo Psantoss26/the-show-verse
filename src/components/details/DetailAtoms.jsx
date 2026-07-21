@@ -4,8 +4,14 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { motion } from "framer-motion";
 
-export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
-  if (!value) return null;
+export function VisualMetaCard({
+  icon: Icon,
+  label,
+  value,
+  isLoading = false,
+  className = "",
+}) {
+  if (!value && !isLoading) return null;
 
   return (
     <div
@@ -25,9 +31,16 @@ export function VisualMetaCard({ icon: Icon, label, value, className = "" }) {
         <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
           {label}
         </span>
-        <span className="text-sm font-bold text-white leading-tight whitespace-normal break-words">
-          {value}
-        </span>
+        {isLoading ? (
+          <span
+            aria-label={`Cargando ${label.toLowerCase()}`}
+            className="mt-1 block h-3.5 w-20 animate-pulse rounded-full bg-white/15"
+          />
+        ) : (
+          <span className="text-sm font-bold text-white leading-tight whitespace-normal break-words">
+            {value}
+          </span>
+        )}
       </div>
     </div>
   );
