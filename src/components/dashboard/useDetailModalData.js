@@ -187,6 +187,10 @@ const EMPTY_DATA = {
   genreObjects: [],
   status: null,
   // Campos que alimentan las pestañas compartidas <DetailsInfoTabs>
+  // Permiten diferenciar un dato todavía cargando de un dato definitivamente
+  // ausente al cambiar de título dentro del modal.
+  detailsKey: null,
+  detailsResolved: false,
   originalTitle: null,
   numberOfSeasons: null,
   numberOfEpisodes: null,
@@ -580,6 +584,7 @@ export function useDetailModalData(item) {
     // Semilla inmediata con lo que ya trae el item (evita salto en cabecera).
     setData({
       ...EMPTY_DATA,
+      detailsKey: `${mediaType}:${id}`,
       mediaType,
       title: item.title || item.name || null,
       logoPath: seedLogoPath,
@@ -785,6 +790,7 @@ export function useDetailModalData(item) {
           genres,
           genreObjects,
           status: details?.status || null,
+          detailsResolved: true,
           originalTitle,
           numberOfSeasons,
           numberOfEpisodes,
@@ -812,7 +818,11 @@ export function useDetailModalData(item) {
       } catch {
         // Degradamos en silencio: nos quedamos con la semilla del item.
         if (!cancelled) {
-          setData((prev) => ({ ...prev, tmdbRatingResolved: true }));
+          setData((prev) => ({
+            ...prev,
+            detailsResolved: true,
+            tmdbRatingResolved: true,
+          }));
         }
       } finally {
         if (!cancelled) setLoading(false);

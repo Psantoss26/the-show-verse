@@ -8555,16 +8555,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             )}
 
-            {/* Providers Grid.
-                En móvil poster se oculta porque las plataformas viven en la
-                pestaña "Plataformas" de DetailsInfoTabs. En móvil backdrop y
-                escritorio se muestran como iconos directos, así que la pestaña
-                se omite para no duplicar. */}
+            {/* Plataformas en escritorio. En móvil se colocan después de las
+                acciones, dentro de la columna de información, para mantener la
+                jerarquía compacta antes de los metadatos y los premios. */}
             {platformItems.length > 0 ? (
               <StaggerContainer
-                className={`${
-                  isBackdropPoster ? "flex" : "hidden"
-                } flex-row flex-wrap justify-center items-center gap-3 w-full px-1 py-1 sm:flex`}
+                className="hidden w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:flex"
                 staggerDelay={0.05}
               >
                 {/* Providers - Solo si hay plataformas */}
@@ -8637,7 +8633,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
-            <FadeIn delay={0.06} className="mb-6 px-1 flex flex-col items-center md:items-start text-center md:text-left">
+            <FadeIn delay={0.06} className="order-3 mb-6 flex flex-col items-center gap-2 px-1 text-center md:items-start md:text-left sm:order-none sm:gap-0">
               {/* En MÓVIL (&lt;640) el título va como LOGO sobre la portada (ver poster
                   card); el h1 de texto se muestra de sm: en adelante. */}
               <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
@@ -8645,19 +8641,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </h1>
 
               {headerAwardsValue && (
-                <div className="mb-3 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:justify-start sm:text-left sm:text-sm">
+                <div className="order-2 mb-0 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:order-none sm:mb-3 sm:justify-start sm:text-left sm:text-sm">
                   <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span className="line-clamp-1">{headerAwardsValue}</span>
                 </div>
               )}
 
-              <DetailsMetaGenresRow
-                yearIso={yearIso}
-                displayRuntimeValue={displayRuntimeValue}
-                status={data.status}
-                genres={data.genres}
-                genresBelowMetaOnMobile
-              />
+              <div className="order-1 w-full sm:order-none">
+                <DetailsMetaGenresRow
+                  yearIso={yearIso}
+                  displayRuntimeValue={displayRuntimeValue}
+                  status={data.status}
+                  genres={data.genres}
+                  hideGenresOnMobile
+                />
+              </div>
             </FadeIn>
 
             {/* =================================================================
@@ -8667,7 +8665,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada.
                 En MÓVIL (&lt;640) van ANTES de premios/info (order-first), como en
                 DetailModal; de sm: en adelante se mantiene el orden original. */}
-            <div className="order-first sm:order-none -mx-1 w-[calc(100%+0.5rem)] sm:mx-0 sm:w-full">
+            <div className="order-1 -mx-1 w-[calc(100%+0.5rem)] sm:order-none sm:mx-0 sm:w-full">
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
                 <DetailActionsRow
                 mobileGapClass="gap-1.5"
@@ -8720,6 +8718,63 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             </FadeIn>
           </div>
 
+            {/* MÓVIL: plataformas inmediatamente después de las acciones. */}
+            {platformItems.length > 0 && (
+              <StaggerContainer
+                className="order-2 mb-4 flex w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:hidden"
+                staggerDelay={0.05}
+              >
+                <div className="flex flex-row flex-nowrap items-center gap-2">
+                  {platformItems.map((provider, index) => (
+                    <motion.a
+                      key={provider.key ?? `${provider.title}-${index}`}
+                      href={provider.href}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: 0.03 + index * 0.04,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      target={provider.target}
+                      rel={provider.rel}
+                      aria-label={provider.title}
+                      className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                    >
+                      <OptimizedImage
+                        src={provider.icon}
+                        alt=""
+                        className="h-9 w-9 rounded-xl bg-white/5 object-contain shadow-lg"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                      {provider.isPlexProvider && (
+                        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
+                      )}
+                    </motion.a>
+                  ))}
+                </div>
+
+                {isBackdropPoster && scoreboardExternalLinks.length > 0 && (
+                  <>
+                    <ToolbarSeparator className="mx-0.5" />
+                    <div className="flex flex-row flex-nowrap items-center gap-2">
+                      {scoreboardExternalLinks.map((link) => (
+                        <ExternalLinkButton
+                          key={link.key}
+                          icon={link.icon}
+                          title={link.title}
+                          href={link.href}
+                          fallbackHref={link.fallbackHref}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </StaggerContainer>
+            )}
+
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
                ================================================================= */}
@@ -8729,7 +8784,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* Panel de puntuaciones + barra de acciones (ratings, enlaces
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
-            <div className={isBackdropPoster ? "" : "mb-6"}>
+            <div className={`order-4 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}>
               <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
                 tmdb={{
@@ -8814,7 +8869,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <FadeIn delay={0.24}>
+              <FadeIn delay={0.24} className="order-5 sm:order-none">
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -8846,9 +8901,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     awards={extras.awards}
                     awardItems={awardItems}
                     showAwardsTab={false}
-                    platforms={
-                      !isBackdropPoster && isMobileViewport ? platformItems : []
-                    }
+                    genres={data.genres}
                   />
                 </div>
               </FadeIn>
@@ -8888,7 +8941,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               awards={extras.awards}
               awardItems={awardItems}
               showAwardsTab={false}
-              platforms={[]}
+              genres={data.genres}
             />
           </div>
         </FadeIn>

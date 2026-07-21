@@ -42,6 +42,7 @@ export default function DetailsMetaGenresRow({
   status,
   genres = [],
   genresBelowMetaOnMobile = false,
+  hideGenresOnMobile = false,
 }) {
   const rowRef = useRef(null);
   const metaProbeRef = useRef(null);
@@ -134,7 +135,7 @@ export default function DetailsMetaGenresRow({
   const desktopGenreRow = clampedGenreCount > 0 && (
     <div
       className={
-        genresBelowMetaOnMobile
+        genresBelowMetaOnMobile || hideGenresOnMobile
           ? "hidden min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap sm:flex"
           : "flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap"
       }
@@ -191,7 +192,7 @@ export default function DetailsMetaGenresRow({
         )}
       </div>
 
-      {genresBelowMetaOnMobile && visibleGenres.length > 0 && (
+      {genresBelowMetaOnMobile && !hideGenresOnMobile && visibleGenres.length > 0 && (
         <div className="flex max-w-full flex-wrap items-center justify-center gap-2 overflow-hidden sm:hidden">
           {visibleGenres.map((genre) => (
             <span key={genre.id} className={genreChipClass}>
