@@ -1467,6 +1467,7 @@ export default function DetailsClient({
     const root = document.documentElement;
     if (!isMobileViewport) {
       root.style.removeProperty("--sv-hero-scroll");
+      root.removeAttribute("data-details-hero-scrolled");
       return undefined;
     }
     let raf = 0;
@@ -1475,6 +1476,7 @@ export default function DetailsClient({
       const dist = Math.max(1, window.innerHeight * 0.55);
       const p = Math.min(1, Math.max(0, window.scrollY / dist));
       root.style.setProperty("--sv-hero-scroll", p.toFixed(4));
+      root.toggleAttribute("data-details-hero-scrolled", p > 0);
     };
     const onScroll = () => {
       if (!raf) raf = window.requestAnimationFrame(apply);
@@ -1487,6 +1489,7 @@ export default function DetailsClient({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       root.style.removeProperty("--sv-hero-scroll");
+      root.removeAttribute("data-details-hero-scrolled");
     };
   }, [isMobileViewport]);
 
@@ -8760,7 +8763,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     cambian de posición. */}
                 <div
                   className={`relative ${
-                    inProgressPct != null ? "-top-6" : "-top-2"
+                    inProgressPct != null
+                      ? "details-mobile-progress-actions -top-6"
+                      : "-top-2"
                   } sm:top-0`}
                 >
                   <div ref={mobileActionRowRef}>
