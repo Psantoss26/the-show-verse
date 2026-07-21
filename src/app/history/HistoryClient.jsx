@@ -703,7 +703,13 @@ function StatCard({
   );
 }
 
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+function InlineDropdown({
+  label,
+  valueLabel,
+  icon: Icon,
+  children,
+  compact = false,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -766,11 +772,19 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+        aria-label={compact ? `${label}: ${valueLabel}` : undefined}
+        className={`h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition-[min-width,background-color,color] text-sm lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 ${
+          compact ? "lg:min-w-0" : "lg:min-w-[140px]"
+        }`}
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 shrink-0 text-emerald-500" />}
-          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
+          <span
+            aria-hidden={compact}
+            className={`shrink-0 overflow-hidden whitespace-nowrap text-zinc-500 font-bold text-xs uppercase tracking-wider transition-[max-width,opacity] duration-200 ${
+              compact ? "max-w-0 opacity-0" : "max-w-24 opacity-100"
+            }`}
+          >
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
@@ -2699,6 +2713,7 @@ export default function HistoryClient() {
     }
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [desktopSearchFocused, setDesktopSearchFocused] = useState(false);
   const filtersRef = useRef(null);
   const filtersSticky = useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
@@ -3644,6 +3659,8 @@ export default function HistoryClient() {
                     <input
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
+                      onFocus={() => setDesktopSearchFocused(true)}
+                      onBlur={() => setDesktopSearchFocused(false)}
                       placeholder="Buscar por título..."
                       className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
                     />
@@ -3667,6 +3684,7 @@ export default function HistoryClient() {
                           : "Series"
                     }
                     icon={Filter}
+                    compact={desktopSearchFocused}
                   >
                     {({ close }) => (
                       <>
@@ -3711,6 +3729,7 @@ export default function HistoryClient() {
                           : "Año"
                     }
                     icon={Layers}
+                    compact={desktopSearchFocused}
                   >
                     {({ close }) => (
                       <>
@@ -3757,6 +3776,7 @@ export default function HistoryClient() {
                             : "Z-A"
                     }
                     icon={ArrowUpDown}
+                    compact={desktopSearchFocused}
                   >
                     {({ close }) => (
                       <>
@@ -4011,7 +4031,7 @@ export default function HistoryClient() {
                       </div>
 
                       {viewMode === "grid" ? (
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                           {g.collapsedItems.map((entry, idx) =>
                             renderItems(HistoryGridCard, entry, idx),
                           )}
