@@ -728,6 +728,11 @@ const ProgressCard = memo(function ProgressCard({
 // CACHÉ LOCAL (pintado instantáneo)
 // ----------------------------
 const CACHE_KEY = "showverse:continue-watching:page:v2";
+// Solo se pinta la caché AL INSTANTE si es RECIENTE (< 10 min). Si es más vieja
+// (p. ej. añadiste algo desde otro dispositivo: tu caché es de la última visita,
+// sin lo nuevo) NO se pinta: se muestra carga y el fetch trae la lista correcta de
+// una vez, en vez de la vieja y luego lo nuevo parpadeando. Igual que Favoritos.
+const CW_FRESH_TTL_MS = 10 * 60 * 1000;
 function readCache() {
   if (typeof window === "undefined") return null;
   try {
@@ -735,7 +740,8 @@ function readCache() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.ts || Date.now() - parsed.ts > 6 * 60 * 60 * 1000) return null;
-    return Array.isArray(parsed.items) ? parsed.items : null;
+    if (!Array.isArray(parsed.items) || !parsed.items.length) return null;
+    return { items: parsed.items, fresh: Date.now() - parsed.ts < CW_FRESH_TTL_MS };
   } catch {
     return null;
   }
@@ -775,8 +781,11 @@ export default function ContinueWatchingClient() {
     const v = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:viewMode");
     if (v && VIEW_MODES.has(v)) setViewMode(v);
     const cached = readCache();
-    if (cached) {
-      setItems(cached);
+    // Solo pintamos al instante si la caché es RECIENTE. Si es vieja, dejamos la
+    // carga (skeleton) hasta que `load()` pinte la lista completa de una vez, sin
+    // el parpadeo del contenido obsoleto que luego cambia.
+    if (cached?.fresh) {
+      setItems(cached.items);
       setLoading(false);
     }
   }, []);
@@ -786,11 +795,21 @@ export default function ContinueWatchingClient() {
   }, [viewMode]);
 
   const load = useCallback(async () => {
-    const rows = await getLocalInProgress();
-    const mapped = mapRows(rows);
-    setItems(mapped);
-    writeCache(mapped);
-    setLoading(false);
+    try {
+      const rows = await getLocalInProgress();
+      const mapped = mapRows(rows);
+      setItems(mapped);
+      writeCache(mapped);
+    } catch {
+      // Servidor caído/red: NO vaciamos. Conservamos lo que hubiera pintado o
+      // recuperamos la caché (aunque no fuera "reciente") para el modo offline.
+      setItems((cur) => {
+        if (Array.isArray(cur) && cur.length) return cur;
+        return readCache()?.items || [];
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Quita una entrada de "Continuar viendo": borra en el backend

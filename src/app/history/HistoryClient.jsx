@@ -2718,13 +2718,24 @@ export default function HistoryClient() {
     // restauramos en la carga fresca (paint stale-while-revalidate), sin repetirlo.
     if (!restoredFromHistoryCacheRef.current) {
       const cached = readHistoryCache();
-      if (cached?.items?.length) {
+      // Solo pintamos la caché AL INSTANTE si es RECIENTE (`fresh`). Si es vieja
+      // (p. ej. añadiste algo desde otro dispositivo: tu caché es de la última
+      // visita, sin lo nuevo) NO la pintamos: el reset-fetch de abajo trae la lista
+      // correcta DE UNA VEZ, evitando el parpadeo de pintar lo viejo y luego
+      // insertar lo nuevo con retraso. Igual que Favoritos/Pendientes. (En back-nav
+      // la lista SÍ se siembra siempre —arriba— para restaurar el scroll; ahí no
+      // hay contenido nuevo que parpadee.)
+      if (cached?.fresh && cached.items?.length) {
         setRaw(cached.items);
         setHistoryLoaded(true);
         setHasMoreHistory(cached.hasMore);
         hasMoreHistoryRef.current = cached.hasMore;
         nextHistoryPageRef.current = cached.nextPage || 1;
         restoredFromHistoryCacheRef.current = true;
+      } else {
+        // Caché vieja o ausente: mostramos CARGA hasta que el reset-fetch pinte la
+        // lista completa, sin el parpadeo del contenido obsoleto.
+        setLoading(true);
       }
     }
 

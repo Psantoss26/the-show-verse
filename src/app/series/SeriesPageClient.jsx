@@ -1473,12 +1473,14 @@ function Row({
           loop={false}
           watchOverflow={true}
           allowTouchMove={true}
+          simulateTouch={true}
           grabCursor={false}
           preventClicks={true}
           preventClicksPropagation={true}
           threshold={2}
           touchRatio={1.5}
-          modules={[Navigation]}
+          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+          modules={[Navigation, FreeMode]}
           className="group relative"
         >
           {safeItems.map((s, i) => (
@@ -1620,11 +1622,7 @@ function Row({
           preventClicksPropagation={true}
           threshold={isMobile ? 2 : 5}
           touchRatio={isMobile ? 1.5 : 1}
-          freeMode={
-            !isMobile
-              ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-              : false
-          }
+          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
           modules={[Navigation, FreeMode]}
           className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
             isTop10
