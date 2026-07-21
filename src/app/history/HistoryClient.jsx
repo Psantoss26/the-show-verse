@@ -3412,7 +3412,7 @@ export default function HistoryClient() {
                       transition={{ duration: 0.18, ease: "easeOut" }}
                       className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
                     >
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {/* Fila 1 - Tipo y Agrupar */}
                         <div className="flex gap-2">
                           <div className="flex-1 min-w-0">

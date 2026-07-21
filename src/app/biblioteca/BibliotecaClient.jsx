@@ -2165,7 +2165,7 @@ export default function BibliotecaClient() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* ====== HEADER ====== */}
         <motion.header
-          className="mb-10"
+          className="mb-6 sm:mb-10"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -2255,7 +2255,9 @@ export default function BibliotecaClient() {
         {/* ====== FILTERS ====== */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-14 z-[70] mb-2 space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6"
+          className={`sticky top-14 z-[70] space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6 ${
+            groupBy === "none" ? "mb-6" : "mb-2"
+          }`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
