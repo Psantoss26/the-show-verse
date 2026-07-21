@@ -3596,11 +3596,11 @@ export default function FavoritesClient() {
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] mt-2 origin-top space-y-2 lg:hidden ${
+                initial={{ height: 0 }}
+                animate={{ height: "auto" }}
+                exit={{ height: 0 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                className={`z-[80] mt-2 origin-top space-y-2 overflow-hidden lg:hidden ${
                   filtersSticky
                     ? "absolute left-0 right-0 top-full"
                     : "relative"

@@ -2284,11 +2284,9 @@ export default function BibliotecaClient() {
           {/* En flujo antes de fijarse y como overlay cuando la barra ya está
               adherida al navbar móvil. */}
           <div
-            className={`grid transition-[grid-template-rows,opacity] duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              mobileFiltersOpen
-                ? "opacity-100"
-                : "opacity-0 pointer-events-none"
-            } lg:hidden overflow-hidden z-[80] ${
+            className={`grid overflow-hidden transition-[grid-template-rows] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              mobileFiltersOpen ? "" : "pointer-events-none"
+            } lg:hidden z-[80] ${
               filtersSticky
                 ? "absolute left-0 right-0"
                 : "relative mt-1"

@@ -3230,7 +3230,7 @@ export default function HistoryClient() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header */}
         <motion.header
-          className="mb-10"
+          className="mb-6 lg:mb-10"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -3300,7 +3300,6 @@ export default function HistoryClient() {
             {/* Solo estadísticas a la derecha */}
             {auth.connected && historyLoaded && (
               <motion.div
-                ref={filtersRef}
                 className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -3380,16 +3379,17 @@ export default function HistoryClient() {
           >
             {auth.connected && (
               <motion.div
-                className="sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20"
+                ref={filtersRef}
+                className="sticky top-14 z-[70] space-y-3 mb-2 transition-all duration-300 sm:top-20 lg:mb-6"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
               >
-                {/* Mobile: búsqueda + panel de filtros. El panel es un OVERLAY
-                    absoluto (fuera de flujo): al abrir/cerrar NO cambia la altura
-                    de esta cabecera sticky, así la lista de detrás queda ESTÁTICA
-                    (sin empuje ni parpadeo del antiguo acordeón height:auto). El
-                    wrapper `relative` es el contexto de posicionamiento del overlay. */}
+                {/* Mobile: búsqueda + panel de filtros. Antes de fijarse (sticky),
+                    el panel forma parte del flujo y empuja el contenido de abajo.
+                    Al alcanzar el sticky (filtersSticky) se convierte en overlay
+                    absoluto para no desplazar nada. El wrapper `relative` es el
+                    contexto de posicionamiento del overlay. */}
                 <div className="relative z-10 lg:hidden">
                   <div className="relative flex gap-2">
                   <div className="relative min-w-0 flex-1">
@@ -3427,11 +3427,11 @@ export default function HistoryClient() {
                 <AnimatePresence>
                   {mobileFiltersOpen && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                      className={`z-[80] mt-2 origin-top ${
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                      className={`z-[80] mt-2 origin-top overflow-hidden ${
                         filtersSticky
                           ? "absolute left-0 right-0 top-full"
                           : "relative"
