@@ -1224,12 +1224,33 @@ export default function DetailsClient({
   // Solo aplica a PELICULAS: el progreso de una serie es por episodio (se
   // muestra en EpisodeDetails), no tiene sentido a nivel de ficha de serie.
   const [inProgressPct, setInProgressPct] = useState(null);
+  // Se resuelve con un fetch real (`/api/progress`), así que no está listo en
+  // el primer render. Mientras no lo está, la fila de acciones móvil se
+  // mantiene con `max-sm:invisible` (ver el render): invisible pero SIN salir
+  // del flujo, para que `mobileActionRowRef`/ResizeObserver sigan midiendo su
+  // alto real y no descoloquen el póster. Así no aparece primero en la
+  // posición "sin progreso" para saltar en cuanto se resuelve la barra.
+  // Arranca SIEMPRE en `false`: `authenticated` también tarda en hidratarse
+  // (useAuth cachea en localStorage, pero eso ocurre en un efecto del
+  // AuthProvider que se ejecuta DESPUÉS del primer efecto de este componente,
+  // así que en el primer render `authenticated` todavía es `false` aunque el
+  // usuario esté loggeado). Usar `authenticated` para decidir el valor inicial
+  // aquí mostraría la fila igualmente y la ocultaría/rebotaría un instante
+  // después al confirmarse la sesión — el mismo salto que se quiere evitar.
+  const [inProgressChecked, setInProgressChecked] = useState(false);
 
   useEffect(() => {
+    // Sin confirmar aún si hay sesión: no sabemos si hará falta el fetch de
+    // progreso, así que tampoco se puede dar por comprobado.
+    if (!authHydrated) return;
     if (!authenticated || !id || endpointType !== "movie") {
       setInProgressPct(null);
+      setInProgressChecked(true);
       return;
     }
+    // Nuevo id/título (o sesión recién confirmada): oculta de nuevo la fila de
+    // acciones móvil hasta que este fetch resuelva.
+    setInProgressChecked(false);
     let abort = false;
     (async () => {
       const rows = await getLocalInProgress();
@@ -1242,11 +1263,12 @@ export default function DetailsClient({
           ? Math.round(Math.min(1, Math.max(0, match.percent)) * 100)
           : 0;
       setInProgressPct(pct >= 1 && pct < 100 ? pct : null);
+      setInProgressChecked(true);
     })();
     return () => {
       abort = true;
     };
-  }, [authenticated, id, endpointType]);
+  }, [authHydrated, authenticated, id, endpointType]);
 
   // -- Estados de carga progresiva del backdrop (misma logica que poster) --
   const [backdropResolved, setBackdropResolved] = useState(false);
@@ -8779,7 +8801,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 inProgressPct != null
                   ? "mx-0 w-full"
                   : "-mx-1 w-[calc(100%+0.5rem)]"
-              }`}
+              } ${inProgressChecked ? "" : "max-sm:invisible"}`}
             >
               <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6">
                 {/* Con progreso, la fila se adelanta bajo el navbar para que
