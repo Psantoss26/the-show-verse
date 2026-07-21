@@ -1024,7 +1024,7 @@ export default function DashboardSectionClient({ section }) {
         </motion.header>
 
         <motion.section
-          className="sticky top-20 z-[70] space-y-1 mb-1 lg:mb-6 transition-all duration-300"
+          className="sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}

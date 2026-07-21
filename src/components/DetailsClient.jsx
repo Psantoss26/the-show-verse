@@ -8004,7 +8004,7 @@ export default function DetailsClient({
                   : "opacity-0"
               }`}
               style={{
-                height: `calc(100svh - 5.75rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
+                height: `calc(100svh - 6rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: `scale(${POSTER_OVERSCAN})`,
                 willChange: "opacity",
@@ -8190,7 +8190,7 @@ export default function DetailsClient({
                     className="relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 sm:bg-neutral-950 poster-aspect-box"
                     style={{
                       contain: "layout paint",
-                      "--details-mobile-poster-height": `calc(100svh - 5.75rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
+                      "--details-mobile-poster-height": `calc(100svh - 6rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
                       // (2:3 póster ↔ 16:9 backdrop) y el cambio se anima desde
                       // `.poster-aspect-box`. Antes esto era `sm:aspect-[2/3]`
@@ -9943,7 +9943,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     className="h-full pt-1 pb-3"
                                   >
                                     <div
-                                      className={`w-full rounded-2xl border-2 border-white/10 bg-white/5 animate-pulse ${aspect}`}
+                                      className={`w-full rounded-2xl border-2 border-transparent bg-white/5 animate-pulse sm:border-white/10 ${aspect}`}
                                       aria-hidden="true"
                                     />
                                   </SwiperSlide>
@@ -10160,7 +10160,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: 4 }).map((_, index) => (
                                 <div
                                   key={index}
-                                  className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
+                                  className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse sm:border-white/5"
                                   aria-hidden="true"
                                 >
                                   <div className="relative z-10 aspect-video bg-white/5">
@@ -10170,7 +10170,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   </div>
 
-                                  <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
+                                  <div className="relative z-10 flex flex-col shrink-0 h-[120px] p-4 w-full">
                                     <div className="h-4 w-3/4 rounded bg-white/10" />
                                     <div className="mt-3 flex gap-2">
                                       <div className="h-5 w-16 rounded-full bg-white/10" />
@@ -10249,7 +10249,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
                                       </div>
 
-                                      <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 items-start w-full">
+                                      <div className="relative z-10 flex flex-col shrink-0 h-[120px] p-4 items-start w-full">
                                         {/* Titulo arriba (1 linea siempre) */}
                                         <div className="w-full min-h-[22px]">
                                           <div className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-1 truncate">
@@ -10258,7 +10258,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
 
                                         {/* Propiedades debajo, alineadas a la izquierda */}
-                                        <div className="mt-3 flex items-center gap-3 w-full overflow-hidden">
+                                        <div className="mt-2 flex items-center gap-3 w-full overflow-hidden">
                                           <div className="flex items-center gap-3 flex-nowrap overflow-x-auto no-scrollbar pb-1">
                                             {/* Label de Oficial */}
                                             {v.official && (
@@ -10291,7 +10291,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
 
                                         {/* Fuente y fecha abajo, mismo margen izquierdo */}
-                                        <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2">
+                                        <div className="mt-2 pt-0 text-xs text-zinc-400 flex items-center gap-2">
                                           <span className="font-semibold text-zinc-200">
                                             {v.site || "—"}
                                           </span>
@@ -10339,7 +10339,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: 5 }).map((_, index) => (
                                 <div
                                   key={index}
-                                  className="relative isolate rounded-2xl overflow-hidden border border-white/5 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse"
+                                  className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu animate-pulse sm:border-white/5"
                                   aria-hidden="true"
                                 >
                                   <div className="relative z-10 aspect-square bg-white/5">
@@ -10347,7 +10347,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
                                     </div>
                                   </div>
-                                  <div className="relative z-10 flex flex-col shrink-0 h-[164px] p-4 w-full">
+                                  <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
                                     <div className="h-4 w-3/4 rounded bg-white/10" />
                                     <div className="mt-2 h-3 w-1/2 rounded bg-white/10" />
                                     <div className="mt-3 h-3 w-1/3 rounded bg-white/10" />
@@ -10444,8 +10444,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         </div>
                                       </div>
 
-                                      <div className="relative z-10 flex flex-col shrink-0 h-[164px] p-4 items-start w-full overflow-hidden">
-                                        <div className="w-full h-[40px] sm:h-[44px] mb-1.5">
+                                      <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 items-start w-full overflow-hidden">
+                                        <div className="w-full h-[40px] sm:h-[44px] mb-1">
                                           <div
                                             className="font-bold text-white leading-snug text-sm sm:text-[16px] line-clamp-2"
                                             title={track.trackName}
@@ -10463,7 +10463,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           </div>
                                         </div>
 
-                                        <div className="mt-3 flex items-center gap-3 w-full overflow-hidden pb-1">
+                                        <div className="mt-2 flex items-center gap-3 w-full overflow-hidden pb-1">
                                           <span
                                             className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${sourceBadge.textClass}`}
                                           >
@@ -10474,7 +10474,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           </span>
                                         </div>
 
-                                        <div className="mt-auto pt-3 text-xs text-zinc-400 flex items-center gap-2 w-full overflow-hidden">
+                                        <div className="mt-2 pt-0 text-xs text-zinc-400 flex items-center gap-2 w-full overflow-hidden">
                                           <span
                                             className="font-semibold text-zinc-200 truncate"
                                             title={
@@ -10542,7 +10542,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* Sin mostrar error, directamente el contenido */}
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                               {/* Columna Positiva */}
-                              <div className="relative isolate overflow-hidden rounded-2xl border border-emerald-500/5 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5">
+                              <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5 sm:border-emerald-500/5">
                                 <div className="mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
                                     <ThumbsUp className="h-4 w-4" />
@@ -10572,7 +10572,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
 
                               {/* Columna Negativa */}
-                              <div className="relative isolate overflow-hidden rounded-2xl border border-rose-500/5 bg-gradient-to-br from-rose-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5">
+                              <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-gradient-to-br from-rose-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5 sm:border-rose-500/5">
                                 <div className="mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
                                     <ThumbsDown className="h-4 w-4" />

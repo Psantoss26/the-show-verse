@@ -306,7 +306,7 @@ export default function FilterableListItems({
   return (
     <div className="space-y-7">
       <motion.div
-        className="sticky top-20 z-[70] mb-4 space-y-1 transition-all duration-300"
+        className="sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20"
         initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
