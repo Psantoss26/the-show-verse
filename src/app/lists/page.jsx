@@ -1949,10 +1949,10 @@ export default function ListsPage() {
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                initial={{ height: 0 }}
+                animate={{ height: "auto" }}
+                exit={{ height: 0 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                 className={`z-[80] overflow-visible lg:hidden ${
                   filtersSticky
                     ? "absolute left-0 right-0 top-full !mt-2"

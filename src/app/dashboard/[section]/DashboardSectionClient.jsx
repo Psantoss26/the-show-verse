@@ -1082,8 +1082,8 @@ export default function DashboardSectionClient({ section }) {
           </div>
 
           <div
-            className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
-              mobileFiltersOpen ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`grid overflow-hidden transition-[grid-template-rows] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
+              mobileFiltersOpen ? "" : "pointer-events-none"
             } ${
               filtersSticky
                 ? "absolute left-0 right-0 top-full z-[80] !mt-2"

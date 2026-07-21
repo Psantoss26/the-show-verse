@@ -951,169 +951,163 @@ export default function ContinueWatchingClient() {
               la lista de detrás queda ESTÁTICA (sin empuje ni parpadeo). */}
           <div className="relative z-10 lg:hidden">
             <div className="relative flex gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar..."
-                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
-              />
-              {q && (
-                <button
-                  onClick={() => setQ("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
-                >
-                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
-                </button>
-              )}
-            </div>
-            <HistorySectionNav className="h-11 shrink-0" />
-            <button
-              type="button"
-              onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                mobileFiltersOpen
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                />
+                {q && (
+                  <button
+                    onClick={() => setQ("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+                  </button>
+                )}
+              </div>
+              <HistorySectionNav className="h-11 shrink-0" />
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen((v) => !v)}
+                className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen
                   ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
-              }`}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-            </button>
-          </div>
+                  }`}
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+            </div>
 
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] mt-2 origin-top ${
-                  filtersSticky
+            <AnimatePresence>
+              {mobileFiltersOpen && (
+                <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: "auto" }}
+                exit={{ height: 0 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className={`z-[80] mt-2 origin-top ${filtersSticky
                     ? "absolute left-0 right-0 top-full"
                     : "relative"
-                }`}
-              >
-                <div className="space-y-2">
-                  {/* Fila 1: ordenar + acción de eliminar. El selector de
+                    }`}
+                >
+                  <div className="space-y-2">
+                    {/* Fila 1: ordenar + acción de eliminar. El selector de
                       secciones permanece visible en la barra principal. */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 min-w-0">
-                      <InlineDropdown
-                        label="Ordenar"
-                        valueLabel={sortLabels[sortBy]}
-                        icon={ArrowUpDown}
-                      >
-                        {({ close }) => (
-                          <>
-                            {Object.entries(sortLabels).map(([key, label]) => (
-                              <DropdownItem
-                                key={key}
-                                active={sortBy === key}
-                                onClick={() => {
-                                  setSortBy(key);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))}
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditMode((v) => !v)}
-                      title={
-                        editMode ? "Salir del modo borrar" : "Quitar títulos"
-                      }
-                      aria-label={
-                        editMode ? "Salir del modo borrar" : "Quitar títulos"
-                      }
-                      aria-pressed={editMode}
-                      className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                        editMode
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 min-w-0">
+                        <InlineDropdown
+                          label="Ordenar"
+                          valueLabel={sortLabels[sortBy]}
+                          icon={ArrowUpDown}
+                        >
+                          {({ close }) => (
+                            <>
+                              {Object.entries(sortLabels).map(([key, label]) => (
+                                <DropdownItem
+                                  key={key}
+                                  active={sortBy === key}
+                                  onClick={() => {
+                                    setSortBy(key);
+                                    close();
+                                  }}
+                                >
+                                  {label}
+                                </DropdownItem>
+                              ))}
+                            </>
+                          )}
+                        </InlineDropdown>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditMode((v) => !v)}
+                        title={
+                          editMode ? "Salir del modo borrar" : "Quitar títulos"
+                        }
+                        aria-label={
+                          editMode ? "Salir del modo borrar" : "Quitar títulos"
+                        }
+                        aria-pressed={editMode}
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
                           ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                           : "text-zinc-200 hover:bg-black/30"
-                      }`}
-                    >
-                      {editMode ? (
-                        <X className="w-4 h-4" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Fila 2: Tipo + botones de vista */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 min-w-0">
-                      <InlineDropdown
-                        label="Tipo"
-                        valueLabel={typeLabels[typeFilter]}
-                        icon={Film}
+                          }`}
                       >
-                        {({ close }) => (
-                          <>
-                            {Object.entries(typeLabels).map(([key, label]) => (
-                              <DropdownItem
-                                key={key}
-                                active={typeFilter === key}
-                                onClick={() => {
-                                  setTypeFilter(key);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))}
-                          </>
+                        {editMode ? (
+                          <X className="w-4 h-4" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
                         )}
-                      </InlineDropdown>
+                      </button>
                     </div>
-                    {/* Grupo de vista: misma estructura que la navegación de
+
+                    {/* Fila 2: Tipo + botones de vista */}
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 min-w-0">
+                        <InlineDropdown
+                          label="Tipo"
+                          valueLabel={typeLabels[typeFilter]}
+                          icon={Film}
+                        >
+                          {({ close }) => (
+                            <>
+                              {Object.entries(typeLabels).map(([key, label]) => (
+                                <DropdownItem
+                                  key={key}
+                                  active={typeFilter === key}
+                                  onClick={() => {
+                                    setTypeFilter(key);
+                                    close();
+                                  }}
+                                >
+                                  {label}
+                                </DropdownItem>
+                              ))}
+                            </>
+                          )}
+                        </InlineDropdown>
+                      </div>
+                      {/* Grupo de vista: misma estructura que la navegación de
                         (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
                         para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
                         de sección de la fila de arriba y las dos filas se alineen. */}
-                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <button
-                        onClick={() => setViewMode("cards")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "cards"
+                      <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                        <button
+                          onClick={() => setViewMode("cards")}
+                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Film className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("poster")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "poster"
+                            }`}
+                        >
+                          <Film className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setViewMode("poster")}
+                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <LayoutGrid className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("compact")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "compact"
+                            }`}
+                        >
+                          <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setViewMode("compact")}
+                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <LayoutList className="w-4 h-4" />
-                      </button>
+                            }`}
+                        >
+                          <LayoutList className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Escritorio: Fila única */}
@@ -1187,31 +1181,28 @@ export default function ContinueWatchingClient() {
             <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("cards")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "cards"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "cards"
+                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
               >
                 <Film className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("poster")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "poster"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "poster"
+                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("compact")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                  viewMode === "compact"
-                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
+                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
+                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  }`}
               >
                 <LayoutList className="w-4 h-4" />
               </button>
@@ -1224,11 +1215,10 @@ export default function ContinueWatchingClient() {
               title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-pressed={editMode}
-              className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                editMode
-                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                  : "text-zinc-200 hover:bg-black/30"
-              }`}
+              className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
+                ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                : "text-zinc-200 hover:bg-black/30"
+                }`}
             >
               {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
             </button>
@@ -1305,7 +1295,7 @@ function Header({ stats, loading, onRefresh, refreshing }) {
             )}
           </div>
           <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-            Películas y episodios a medias, con el porcentaje que llevas reproducido.
+            Películas y episodios que estás viendo.
           </p>
         </div>
         <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
