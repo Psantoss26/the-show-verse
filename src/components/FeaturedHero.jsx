@@ -1318,7 +1318,7 @@ function FeaturedSlide({
           ahora el borde funde a TRANSPARENTE y revela lo que hay detrás sin corte. */}
 
       {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-8 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
         <div className="flex max-w-full flex-col items-center text-center sm:block sm:max-w-xl sm:text-left">
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc ? (
