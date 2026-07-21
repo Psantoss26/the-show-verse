@@ -350,7 +350,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
@@ -953,7 +953,7 @@ export default function ContinueWatchingClient() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {q && (
                 <button
@@ -967,7 +967,7 @@ export default function ContinueWatchingClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
@@ -981,7 +981,7 @@ export default function ContinueWatchingClient() {
               title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-pressed={editMode}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 editMode
                   ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
@@ -994,11 +994,11 @@ export default function ContinueWatchingClient() {
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.98 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-3 shadow-2xl backdrop-blur-2xl"
+                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
               >
                 <div className="space-y-3">
                   {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
@@ -1061,7 +1061,7 @@ export default function ContinueWatchingClient() {
                         (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
                         para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
                         de sección de la fila de arriba y las dos filas se alineen. */}
-                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setViewMode("cards")}
                         className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
@@ -1109,7 +1109,7 @@ export default function ContinueWatchingClient() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar por título..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {q && (
                 <button
@@ -1168,7 +1168,7 @@ export default function ContinueWatchingClient() {
             </InlineDropdown>
 
             {/* Modo de visualización */}
-            <div className="flex gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+            <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("cards")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
@@ -1208,7 +1208,7 @@ export default function ContinueWatchingClient() {
               title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
               aria-pressed={editMode}
-              className={`h-11 w-11 rounded-xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 editMode
                   ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
@@ -1313,7 +1313,7 @@ function ViewToggle({ viewMode, setViewMode }) {
     </button>
   );
   return (
-    <div className="flex gap-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+    <div className="flex gap-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
       {btn("cards", Film)}
       {btn("poster", LayoutGrid)}
       {btn("compact", LayoutList)}

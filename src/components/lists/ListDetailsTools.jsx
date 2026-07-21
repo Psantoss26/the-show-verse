@@ -38,7 +38,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
             setOpen(false);
           }
         }}
-        className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white lg:min-w-[145px]"
+        className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white lg:min-w-[145px]"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-purple-400" /> : null}
@@ -188,7 +188,7 @@ function groupItems(entries, groupBy) {
 
 function ViewSwitcher({ viewMode, setViewMode }) {
   return (
-    <div className="flex h-11 items-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
+    <div className="flex h-11 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
       {[
         { id: "grid", icon: Grid3X3, label: "Grid" },
         { id: "compact", icon: Rows3, label: "Compacto" },
@@ -318,7 +318,7 @@ export default function FilterableListItems({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar..."
-              className="h-11 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="h-11 w-full rounded-2xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
             {q ? (
               <button
@@ -333,7 +333,7 @@ export default function FilterableListItems({
           <button
             type="button"
             onClick={() => setMobileFiltersOpen((v) => !v)}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
               mobileFiltersOpen
                 ? "bg-gradient-to-br from-white/15 to-white/10 text-white shadow-lg backdrop-blur-lg"
                 : "bg-gradient-to-br from-white/10 to-white/5 text-zinc-200 shadow-lg backdrop-blur-lg hover:from-white/15 hover:to-white/10 hover:text-white"
@@ -373,7 +373,7 @@ export default function FilterableListItems({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por título..."
-              className="h-11 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="h-11 w-full rounded-2xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
             {q ? (
               <button

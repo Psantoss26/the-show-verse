@@ -368,7 +368,7 @@ function Dropdown({
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-amber-400" />}
@@ -684,9 +684,22 @@ function SectionCard({
   );
 }
 
-function GroupDivider({ title, count }) {
+function GroupDivider({
+  title,
+  count,
+  isFirstGroup = false,
+  mobileFiltersOpen = false,
+}) {
   return (
-    <div className="my-5 flex items-center gap-3">
+    <div
+      className={
+        isFirstGroup
+          ? mobileFiltersOpen
+            ? "mt-0 mb-5 flex items-center gap-3"
+            : "mt-2 mb-5 flex items-center gap-3"
+          : "my-5 flex items-center gap-3"
+      }
+    >
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/40 to-amber-500/15" />
       <div className="relative overflow-hidden inline-flex max-w-[75%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-3 py-1">
         <div className="relative z-10 flex min-w-0 items-center gap-2">
@@ -1036,7 +1049,7 @@ export default function DashboardSectionClient({ section }) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
@@ -1052,7 +1065,7 @@ export default function DashboardSectionClient({ section }) {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((value) => !value)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.28)]"
                   : "text-zinc-200 hover:bg-white/10"
@@ -1189,7 +1202,7 @@ export default function DashboardSectionClient({ section }) {
                 </div>
 
                 <div className="flex gap-2">
-                  <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     {[
                       ["list", List],
                       ["compact", Grid2X2],
@@ -1210,7 +1223,7 @@ export default function DashboardSectionClient({ section }) {
                     ))}
                   </div>
 
-                  <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     {[
                       ["poster", Film],
                       ["backdrop", MonitorPlay],
@@ -1241,7 +1254,7 @@ export default function DashboardSectionClient({ section }) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Buscar por título..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
@@ -1339,7 +1352,7 @@ export default function DashboardSectionClient({ section }) {
                 )}
               </Dropdown>
 
-            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+            <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               {[
                 ["list", List],
                 ["compact", Grid2X2],
@@ -1360,7 +1373,7 @@ export default function DashboardSectionClient({ section }) {
               ))}
             </div>
 
-            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+            <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               {[
                 ["poster", Film],
                 ["backdrop", MonitorPlay],
@@ -1413,7 +1426,12 @@ export default function DashboardSectionClient({ section }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
               >
-                <GroupDivider title={group.label} count={group.items.length} />
+                <GroupDivider
+                  title={group.label}
+                  count={group.items.length}
+                  isFirstGroup={groupIndex === 0}
+                  mobileFiltersOpen={mobileFiltersOpen}
+                />
                 <div
                   key={`section-grid-${group.key}-${viewMode}-${imageMode}`}
                   className={favoritesGridClassFor(viewMode, imageMode, true)}

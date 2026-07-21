@@ -422,7 +422,7 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex items-center gap-2 truncate">
           {Icon && <Icon className="w-4 h-4 text-purple-500" />}
@@ -509,7 +509,7 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-purple-500" />}
@@ -1917,7 +1917,7 @@ export default function ListsPage() {
                     ? "Buscar colecciones..."
                     : "Buscar listas..."
                 }
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
@@ -1931,7 +1931,7 @@ export default function ListsPage() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
@@ -2121,7 +2121,7 @@ export default function ListsPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() =>
                           startTransition(() => setViewMode("grid"))
@@ -2162,7 +2162,7 @@ export default function ListsPage() {
 
                     <button
                       onClick={handleRefresh}
-                      className="h-11 w-11 rounded-xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
+                      className="h-11 w-11 rounded-2xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
                       title="Refrescar"
                     >
                       <RefreshCcw className="w-4 h-4" />
@@ -2171,7 +2171,7 @@ export default function ListsPage() {
                     {canEdit && (
                       <button
                         onClick={() => setCreateOpen(true)}
-                        className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
+                        className="h-11 px-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Crear</span>
@@ -2197,7 +2197,7 @@ export default function ListsPage() {
                     ? "Buscar colecciones..."
                     : "Buscar listas..."
                 }
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
@@ -2361,7 +2361,7 @@ export default function ListsPage() {
               )}
             </InlineDropdown>
 
-            <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+            <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => startTransition(() => setViewMode("grid"))}
                 className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
@@ -2396,7 +2396,7 @@ export default function ListsPage() {
 
             <button
               onClick={handleRefresh}
-              className="h-11 w-11 rounded-xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
+              className="h-11 w-11 rounded-2xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
               title="Refrescar"
             >
               <RefreshCcw className="w-4 h-4" />
@@ -2405,7 +2405,7 @@ export default function ListsPage() {
             {canEdit && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="h-11 px-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
+                className="h-11 px-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
               >
                 <Plus className="w-4 h-4" />
                 <span>Crear</span>
