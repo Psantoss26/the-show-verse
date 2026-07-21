@@ -1351,12 +1351,15 @@ export default function Navbar() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed left-1/2 z-30 flex -translate-x-1/2 items-center overflow-visible rounded-full px-2 ${LIQUID_GLASS_PANEL} transform-gpu transition-[width,height,bottom] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        className={`mobile-bottom-nav lg:hidden fixed left-1/2 z-30 flex -translate-x-1/2 items-center overflow-visible rounded-full px-2 ${LIQUID_GLASS_PANEL} transform-gpu transition-[width,height,bottom] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           isScrolled
             ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12 w-[min(calc(100%_-_6rem),28rem)]"
             : "bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14 w-[min(calc(100%_-_2rem),32rem)]"
         }`}
       >
+        {/* Base de oclusión: solo se vuelve opaca cuando el progreso de
+            DetailsClient ocupa el espacio inmediatamente superior. */}
+        <div className="mobile-bottom-nav-occlusion pointer-events-none absolute inset-0 rounded-[inherit]" />
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
         <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
         {/* iOS 26 Liquid Glass Sheen Light Overlay */}

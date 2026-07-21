@@ -8582,7 +8582,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 la fila de acciones sin progreso, sin variar el alto del póster
                 ni desplazar el logo. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
+              <div className="details-mobile-progress-indicator pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
                 <div className="px-3 pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -8760,7 +8760,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     cambian de posición. */}
                 <div
                   className={`relative ${
-                    inProgressPct != null ? "-top-10" : "-top-2"
+                    inProgressPct != null ? "-top-6" : "-top-2"
                   } sm:top-0`}
                 >
                   <div ref={mobileActionRowRef}>
