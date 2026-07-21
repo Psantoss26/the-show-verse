@@ -3380,7 +3380,7 @@ export default function HistoryClient() {
             {auth.connected && (
               <motion.div
                 ref={filtersRef}
-                className="sticky top-14 z-[70] space-y-3 mb-2 transition-all duration-300 sm:top-20 lg:mb-6"
+                className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
