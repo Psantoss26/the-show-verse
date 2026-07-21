@@ -3,7 +3,14 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import "@/app/globals.css";
@@ -158,7 +165,13 @@ function dedupeSearchResults(results) {
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
-function SearchBar({ onResultClick, isMobile = false, formClassName = "" }) {
+function SearchBar({
+  onResultClick,
+  isMobile = false,
+  formClassName = "",
+  autoFocus = false,
+  onEscape,
+}) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -520,6 +533,7 @@ function SearchBar({ onResultClick, isMobile = false, formClassName = "" }) {
             ref={inputRef}
             type="text"
             autoComplete="off"
+            autoFocus={autoFocus}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => {
@@ -536,6 +550,7 @@ function SearchBar({ onResultClick, isMobile = false, formClassName = "" }) {
               if (event.key === "Escape") {
                 setShowDropdown(false);
                 inputRef.current?.blur();
+                onEscape?.();
               }
             }}
             aria-label={t("search_input_label", "Buscar en The Show Verse")}
@@ -760,6 +775,51 @@ export default function Navbar() {
   // transición de ruta haga commit (lo que dejaba el indicador en la página de
   // origen mientras se montaban las páginas pesadas como Favoritos/Pendientes).
   const [pendingHref, setPendingHref] = useState(null);
+  // La búsqueda deja de ocupar el centro cuando ya no tiene un carril útil entre
+  // las secciones principales y los accesos de la derecha. Se mide el espacio
+  // real —incluidos traducciones, avatar y zoom— en vez de depender de un único
+  // breakpoint de viewport.
+  const [desktopSearchCompact, setDesktopSearchCompact] = useState(true);
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const desktopHeaderRef = useRef(null);
+  const desktopLeftRef = useRef(null);
+  const desktopRightRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const header = desktopHeaderRef.current;
+    const left = desktopLeftRef.current;
+    const right = desktopRightRef.current;
+    if (!header || !left || !right) return undefined;
+
+    let frameId = 0;
+    const updateSearchLayout = () => {
+      frameId = 0;
+      const availableWidth =
+        header.clientWidth - left.offsetWidth - right.offsetWidth - 32;
+
+      setDesktopSearchCompact((isCompact) => {
+        // Histéresis: evitamos que la pestaña «Buscar» oscile al aparecer,
+        // pues forma parte de la propia columna izquierda que se está midiendo.
+        const minimumWidth = isCompact ? 520 : 460;
+        return availableWidth < minimumWidth;
+      });
+    };
+
+    const scheduleUpdate = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updateSearchLayout);
+    };
+
+    const observer = new ResizeObserver(scheduleUpdate);
+    observer.observe(header);
+    observer.observe(left);
+    observer.observe(right);
+    updateSearchLayout();
+
+    return () => {
+      observer.disconnect();
+      if (frameId) window.cancelAnimationFrame(frameId);
+    };
+  }, []);
 
   useEffect(() => {
     let frameId = 0;
@@ -1047,9 +1107,15 @@ export default function Navbar() {
           </>
         )}
         {/* ---------------- Desktop ---------------- */}
-        <div className="hidden lg:flex items-center justify-between h-16 py-3">
+        <div
+          ref={desktopHeaderRef}
+          className="hidden h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 lg:grid"
+        >
           {/* Izquierda */}
-          <div className="flex items-center gap-8 flex-shrink-0 pl-6 -ml-10">
+          <div
+            ref={desktopLeftRef}
+            className="flex min-w-0 items-center gap-8 pl-6 -ml-10"
+          >
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
               <div className="h-full w-[120px] flex items-center justify-center overflow-hidden">
                 <OptimizedImage
@@ -1136,12 +1202,61 @@ export default function Navbar() {
                 )}
                 <span className="relative z-10">{t("nav_library", "Biblioteca")}</span>
               </Link>
+
+              {desktopSearchCompact && (
+                <button
+                  type="button"
+                  onClick={() => setDesktopSearchOpen(true)}
+                  aria-label={t("search_input_label", "Buscar en The Show Verse")}
+                  aria-expanded={desktopSearchOpen}
+                  className={`${navLinkClass("/__search")} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80`}
+                >
+                  {desktopSearchOpen && (
+                    <motion.div
+                      className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
+                      transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                    />
+                  )}
+                  <span className="relative z-10">{t("nav_search", "Buscar")}</span>
+                </button>
+              )}
+
             </div>
           </div>
 
+          {/* Centro: en modo compacto la búsqueda se abre únicamente en el
+              carril libre entre ambos grupos; en modo normal permanece visible. */}
+          <div className="flex min-w-0 items-center justify-center gap-2">
+            {(!desktopSearchCompact || desktopSearchOpen) && (
+              <SearchBar
+                autoFocus={desktopSearchCompact && desktopSearchOpen}
+                onEscape={
+                  desktopSearchCompact
+                    ? () => setDesktopSearchOpen(false)
+                    : undefined
+                }
+                onResultClick={
+                  desktopSearchCompact
+                    ? () => setDesktopSearchOpen(false)
+                    : undefined
+                }
+              />
+            )}
+            {!desktopSearchCompact && (
+              <WatchNextAssistant heroNavMode={heroNavMode} />
+            )}
+          </div>
+
           {/* Derecha */}
-          <div className="flex items-center gap-2 flex-shrink-0 pr-12">
+          <div
+            ref={desktopRightRef}
+            className="flex shrink-0 items-center gap-2 pr-12"
+          >
             <div className="flex items-center gap-2">
+              {desktopSearchCompact && (
+                <WatchNextAssistant heroNavMode={heroNavMode} />
+              )}
+
               <Link
                 href="/lists"
                 prefetch
@@ -1273,11 +1388,6 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Centro */}
-          <div className="absolute left-1/2 top-1/2 flex w-full max-w-[620px] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 px-4">
-            <SearchBar />
-            <WatchNextAssistant heroNavMode={heroNavMode} />
-          </div>
         </div>
 
         {/* ---------------- Mobile ---------------- */}

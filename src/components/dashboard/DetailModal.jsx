@@ -2494,6 +2494,20 @@ export default function DetailModal({
               className="pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
 
+            {/* El arte de portada abre la ficha completa con la misma transición
+                que el control superior derecho. El botón queda bajo el logo y
+                los controles, para no interceptar sus interacciones. */}
+            {!showTrailer && hasHeroArt && (
+              <button
+                type="button"
+                onClick={goToFullDetails}
+                disabled={navigatingToFullDetails}
+                aria-label="Ver ficha completa"
+                aria-busy={navigatingToFullDetails ? "true" : undefined}
+                className="absolute inset-0 z-[11] cursor-pointer touch-pan-y focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400 disabled:cursor-default"
+              />
+            )}
+
             {/* Aquí había una sombra de 10rem para el logo, la MISMA que ya se
                 retiró del póster móvil de DetailsClient por este mismo motivo.
 

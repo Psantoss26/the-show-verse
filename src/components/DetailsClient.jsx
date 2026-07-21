@@ -1205,6 +1205,15 @@ export default function DetailsClient({
   const [posterResolved, setPosterResolved] = useState(false); // Ruta del poster determinada
   const [posterLowLoaded, setPosterLowLoaded] = useState(false); // Imagen baja calidad cargada
   const [posterHighLoaded, setPosterHighLoaded] = useState(false); // Imagen alta calidad cargada
+  // Ref (no state, para poder leerla desde `initArtwork` sin closures obsoletas):
+  // true cuando la portada actual YA terminó su fundido de entrada. Cuando no
+  // hay `images` en el SSR (portada aun no cacheada en el servidor) hace falta
+  // un fetch cliente a `/images` para elegir el mejor póster en inglés; si ese
+  // fetch tarda más que el fundido, el póster inicial (`data.poster_path`) ya
+  // se ve estable cuando llega el "mejor" póster, y sustituirlo en ese momento
+  // provoca un parpadeo (la portada cambia de golpe). Con esta ref, una vez
+  // estabilizada la portada visible ya NO se sustituye por una "mejor".
+  const posterSettledRef = useRef(false);
   const [posterImgError, setPosterImgError] = useState(false); // Error al cargar poster
   const [posterTransitioning, setPosterTransitioning] = useState(false); // Transicion entre posters
   const [prevPosterPath, setPrevPosterPath] = useState(null); // Poster anterior (para crossfade)
@@ -2522,6 +2531,7 @@ export default function DetailsClient({
     setPosterHighLoaded(false);
     setPosterImgError(false);
     setArtworkInitialized(false);
+    posterSettledRef.current = false;
 
     const initialPoster =
       (typeof window !== "undefined"
@@ -2720,11 +2730,18 @@ export default function DetailsClient({
           Boolean(window.localStorage.getItem(posterStorageKey));
 
         // Respetar selecciones manuales, pero permitir sustituir el poster base
-        // localizado por el poster ingles calculado.
+        // localizado por el poster ingles calculado -- SALVO que la portada
+        // visible ya haya terminado de cargar y estabilizarse (fetch de
+        // `/images` más lento que el fundido de entrada, típico en títulos sin
+        // `images` en el SSR, es decir sin caché de servidor todavía). En ese
+        // caso sustituirla ahora se vería como un parpadeo, así que se
+        // mantiene la que el usuario ya está viendo.
         if (poster) {
-          setBasePosterPath((prev) =>
-            hasSavedPoster ? prev || asTmdbPath(poster) : asTmdbPath(poster),
-          );
+          setBasePosterPath((prev) => {
+            if (hasSavedPoster) return prev || asTmdbPath(poster);
+            if (posterSettledRef.current && prev) return prev;
+            return asTmdbPath(poster);
+          });
         }
         if (backdrop) {
           setBaseBackdropPath((prev) => prev || asTmdbPath(backdrop));
@@ -7369,6 +7386,7 @@ export default function DetailsClient({
       setPosterImgError(false);
       setPosterLowLoaded(false);
       setPosterHighLoaded(false);
+      posterSettledRef.current = false;
     }
   }, [posterImgError, posterViewMode, basePosterDisplayPath]);
 
@@ -7455,9 +7473,11 @@ export default function DetailsClient({
             setPosterLowLoaded(true);
             setPosterHighLoaded(isHighPreloaded);
             setPosterResolved(true);
+            posterSettledRef.current = isHighPreloaded;
           } else {
             setPosterLowLoaded(false);
             setPosterHighLoaded(false);
+            posterSettledRef.current = false;
           }
           setPosterImgError(false);
         }
@@ -7473,6 +7493,7 @@ export default function DetailsClient({
           setPosterLowLoaded(false);
           setPosterHighLoaded(false);
           setPosterResolved(false);
+          posterSettledRef.current = false;
         }
         setPosterTransitioning(false);
         setPrevPosterPath(null);
@@ -8363,6 +8384,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                                 setBackdropHighLoaded(true);
                               } else {
                                 setPosterHighLoaded(true);
+                                posterSettledRef.current = true;
                               }
                             }}
                             onLoad={() => {
@@ -8375,6 +8397,7 @@ ${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-
                                 setBackdropHighLoaded(true);
                               } else {
                                 setPosterHighLoaded(true);
+                                posterSettledRef.current = true;
                               }
                             }}
                             onError={() => {}}
@@ -8410,7 +8433,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         `mobilePosterHasBurnedTitle` comprueba el idioma real del
                         póster elegido y cubre ese caso. */}
                     {mobilePosterPath && !mobilePosterHasBurnedTitle && (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center p-4">
+                      <div className="pointer-events-none absolute inset-x-0 bottom-2 z-[16] flex items-end justify-center p-4 sm:bottom-0">
                         {/* Aquí había una sombra de 10rem para el logo. No era un
                             degradado anclado sino una FRANJA flotante: negro al
                             45% en su punto medio y transparente por arriba Y por
