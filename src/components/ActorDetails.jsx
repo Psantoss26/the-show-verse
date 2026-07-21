@@ -2657,7 +2657,7 @@ export default function ActorDetails({
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.25, ease: "easeInOut" }}
+                          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                           className="overflow-visible lg:hidden"
                         >
                           <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">

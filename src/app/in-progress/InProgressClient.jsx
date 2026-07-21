@@ -46,6 +46,7 @@ import {
   isUnavailableStatus,
 } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -1274,6 +1275,8 @@ export default function InProgressClient({
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const [uiReady, setUiReady] = useState(false);
 
   useEffect(() => {
@@ -2052,6 +2055,7 @@ export default function InProgressClient({
 
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
+          ref={filtersRef}
           className={`sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
@@ -2059,12 +2063,11 @@ export default function InProgressClient({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Mobile: búsqueda + panel de filtros como OVERLAY absoluto (fuera de
-              flujo): al abrir/cerrar no cambia la altura de la cabecera sticky, así
-              la lista de detrás queda ESTÁTICA (sin empuje ni parpadeo). */}
+          {/* El panel desplaza la lista antes de que la barra se fije; una vez
+              adherida, conserva el comportamiento de overlay. */}
           <div className="relative z-10 lg:hidden">
             <div className="relative flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
                 value={q}
@@ -2081,6 +2084,7 @@ export default function InProgressClient({
                 </button>
               )}
             </div>
+            <WatchingSectionNav className="h-11 shrink-0" />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -2098,42 +2102,41 @@ export default function InProgressClient({
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={false}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className={`z-[80] mt-2 origin-top ${
+                  filtersSticky
+                    ? "absolute left-0 right-0 top-full"
+                    : "relative"
+                }`}
               >
                 <div className="space-y-2">
-                  {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
-                      altura que Ordenar) — diseño móvil de siempre. */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 min-w-0">
-                      <InlineDropdown
-                        label="Ordenar"
-                        valueLabel={sortLabels[sortBy]}
-                        icon={ArrowUpDown}
-                      >
-                        {({ close }) => (
-                          <>
-                            {Object.entries(sortLabels).map(([key, label]) => (
-                              <DropdownItem
-                                key={key}
-                                active={sortBy === key}
-                                onClick={() => {
-                                  setSortBy(key);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))}
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    <WatchingSectionNav className="h-11 shrink-0" />
-                  </div>
+                  {/* Fila 1: ordenar. El selector de secciones permanece visible
+                      en la barra principal, entre la búsqueda y los filtros. */}
+                  <InlineDropdown
+                    label="Ordenar"
+                    valueLabel={sortLabels[sortBy]}
+                    icon={ArrowUpDown}
+                  >
+                    {({ close }) => (
+                      <>
+                        {Object.entries(sortLabels).map(([key, label]) => (
+                          <DropdownItem
+                            key={key}
+                            active={sortBy === key}
+                            onClick={() => {
+                              setSortBy(key);
+                              close();
+                            }}
+                          >
+                            {label}
+                          </DropdownItem>
+                        ))}
+                      </>
+                    )}
+                  </InlineDropdown>
 
                   {/* Fila 2: Agrupar + botones de vista */}
                   <div className="flex gap-2 items-center">

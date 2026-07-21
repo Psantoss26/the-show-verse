@@ -54,6 +54,7 @@ import {
   isUnavailableStatus,
 } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
@@ -2392,8 +2393,8 @@ export default function FavoritesClient() {
 
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const tmdbLogoutInFlightRef = useRef(false);
 
   const handleTmdbLogout = useCallback(async () => {
@@ -2417,17 +2418,6 @@ export default function FavoritesClient() {
       alert("No se pudo cerrar la sesión de TMDb. Inténtalo de nuevo.");
     }
   }, [logout, logoutLoading]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!filtersRef.current) return;
-      const rect = filtersRef.current.getBoundingClientRect();
-      setFiltersSticky(rect.top <= 82);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   // Limpieza única al montar: descarta las versiones antiguas de la caché de
   // elecciones, que quedarían huérfanas en localStorage tras subir la clave.
@@ -3601,20 +3591,20 @@ export default function FavoritesClient() {
             </button>
           </div>
 
-          {/* Mobile: panel de filtros. SIEMPRE overlay absoluto (fuera de flujo),
-              nunca en flujo: así abrir/cerrar NO cambia la altura de la cabecera y
-              la rejilla de detrás queda ESTÁTICA. Antes conmutaba absolute↔relative
-              y, al cerrar con el header sticky, insertaba toda su altura en el flujo
-              un instante → el "salto hacia abajo" acumulativo. El grid 0fr→1fr anima
-              el desplegado sobre el propio elemento absoluto (sin empujar). */}
+          {/* Antes de fijarse, el panel forma parte del flujo. Al alcanzar el
+              sticky se convierte en overlay para no desplazar el contenido. */}
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={false}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top space-y-2 lg:hidden"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className={`z-[80] mt-2 origin-top space-y-2 lg:hidden ${
+                  filtersSticky
+                    ? "absolute left-0 right-0 top-full"
+                    : "relative"
+                }`}
               >
                 <div className="flex gap-2">
                   <div className="flex-1">

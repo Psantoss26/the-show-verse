@@ -36,6 +36,7 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -750,6 +751,8 @@ export default function DashboardSectionClient({ section }) {
   const [viewMode, setViewMode] = useState("compact");
   const [imageMode, setImageMode] = useState("poster");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState({});
   const [previewBackdropsReady, setPreviewBackdropsReady] = useState(false);
 
@@ -1037,7 +1040,8 @@ export default function DashboardSectionClient({ section }) {
         </motion.header>
 
         <motion.section
-          className="sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6"
+          ref={filtersRef}
+          className="relative sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -1078,8 +1082,12 @@ export default function DashboardSectionClient({ section }) {
           </div>
 
           <div
-            className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
+            className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
               mobileFiltersOpen ? "opacity-100" : "pointer-events-none opacity-0"
+            } ${
+              filtersSticky
+                ? "absolute left-0 right-0 top-full z-[80] !mt-2"
+                : "relative"
             }`}
             style={{ gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr" }}
           >

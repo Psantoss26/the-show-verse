@@ -44,6 +44,7 @@ import {
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 
 
 // ================== CONSTANTS ==================
@@ -1187,19 +1188,8 @@ export default function BibliotecaClient() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
-  const [filtersSticky, setFiltersSticky] = useState(false);
   const filtersRef = useRef(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!filtersRef.current) return;
-      const rect = filtersRef.current.getBoundingClientRect();
-      setFiltersSticky(rect.top <= 82);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const filtersSticky = useStickyToolbarState(filtersRef);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2291,19 +2281,21 @@ export default function BibliotecaClient() {
             </button>
           </div>
 
-          {/* Mobile: panel de filtros. SIEMPRE overlay absoluto (fuera de flujo),
-              nunca en flujo: abrir/cerrar NO cambia la altura de la cabecera y la
-              rejilla de detrás queda ESTÁTICA (antes conmutaba absolute↔relative y
-              al cerrar insertaba su altura en el flujo → salto hacia abajo). */}
+          {/* En flujo antes de fijarse y como overlay cuando la barra ya está
+              adherida al navbar móvil. */}
           <div
-            className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            className={`grid transition-[grid-template-rows,opacity] duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
               mobileFiltersOpen
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
-            } lg:hidden overflow-hidden absolute left-0 right-0 z-[80]`}
+            } lg:hidden overflow-hidden z-[80] ${
+              filtersSticky
+                ? "absolute left-0 right-0"
+                : "relative mt-1"
+            }`}
             style={{
               gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              top: "calc(100% + 4px)",
+              ...(filtersSticky ? { top: "calc(100% + 4px)" } : {}),
             }}
           >
             <div className="min-h-0">

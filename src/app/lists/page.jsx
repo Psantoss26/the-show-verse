@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import ListPosterCard from "@/components/lists/ListPosterCard";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1345,6 +1346,8 @@ export default function ListsPage() {
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente
@@ -1898,7 +1901,8 @@ export default function ListsPage() {
 
         {/* Filtros Sticky */}
         <motion.div
-          className="sticky top-14 z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-20"
+          ref={filtersRef}
+          className="relative sticky top-14 z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-20"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -1948,8 +1952,12 @@ export default function ListsPage() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="relative z-10 lg:hidden overflow-visible"
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className={`z-[80] overflow-visible lg:hidden ${
+                  filtersSticky
+                    ? "absolute left-0 right-0 top-full !mt-2"
+                    : "relative z-10"
+                }`}
               >
                 <div className="space-y-3 pt-1">
                   <div className="flex gap-2">
