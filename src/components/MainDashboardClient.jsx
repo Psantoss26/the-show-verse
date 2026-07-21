@@ -3024,11 +3024,7 @@ export function Row({
             preventClicksPropagation={true}
             threshold={isMobile ? 2 : 5}
             touchRatio={isMobile ? 1.5 : 1}
-            freeMode={
-              !isMobile
-                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-                : false
-            }
+            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
             modules={[Navigation, FreeMode]}
             className={`group relative ${
               previewKind === "anticipated"
@@ -3445,11 +3441,14 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
           loop={false}
           watchOverflow={true}
           grabCursor={!isMobile}
+          simulateTouch={true}
           allowTouchMove={true}
           preventClicks={true}
           preventClicksPropagation={true}
-          threshold={5}
-          modules={[Navigation]}
+          threshold={isMobile ? 2 : 5}
+          touchRatio={isMobile ? 1.5 : 1}
+          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+          modules={[Navigation, FreeMode]}
           breakpoints={breakpointsRow}
           className="group relative"
         >

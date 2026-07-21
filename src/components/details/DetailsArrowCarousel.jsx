@@ -13,6 +13,7 @@
 
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { FreeMode } from "swiper/modules";
 import { motion, AnimatePresence } from "framer-motion";
 import "swiper/swiper-bundle.css";
 
@@ -122,6 +123,20 @@ export default function DetailsArrowCarousel({
           observer={swiperProps.observer ?? true}
           observeParents={swiperProps.observeParents ?? true}
           resizeObserver={swiperProps.resizeObserver ?? true}
+          simulateTouch={swiperProps.simulateTouch ?? true}
+          allowTouchMove={swiperProps.allowTouchMove ?? true}
+          freeMode={
+            swiperProps.freeMode ?? {
+              enabled: true,
+              momentum: true,
+              momentumRatio: 0.55,
+            }
+          }
+          modules={
+            swiperProps.modules
+              ? [FreeMode, ...swiperProps.modules.filter((module) => module !== FreeMode)]
+              : [FreeMode]
+          }
           onSwiper={(swiper) => {
             handleSwiper(swiper);
             swiperProps.onSwiper?.(swiper);

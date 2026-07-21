@@ -1605,11 +1605,7 @@ export default function DashboardBackdropRow({
             preventClicksPropagation={true}
             threshold={isMobile ? 2 : 5}
             touchRatio={isMobile ? 1.5 : 1}
-            freeMode={
-              !isMobile
-                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-                : false
-            }
+            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
             modules={[Navigation, FreeMode]}
             // Padding vertical amplio (con margen negativo que lo compensa, así
             // el espaciado entre filas no cambia) para reservar el hueco de la
