@@ -1187,7 +1187,7 @@ export default function DetailModal({
     null;
 
   const handleToggleFavorite = async (e) => {
-    e.stopPropagation();
+    stopDrawerActionEvent(e);
     if (requireLogin() || updating || !item) return;
     try {
       setUpdating(true);
@@ -1212,7 +1212,7 @@ export default function DetailModal({
   };
 
   const handleToggleWatchlist = async (e) => {
-    e.stopPropagation();
+    stopDrawerActionEvent(e);
     if (requireLogin() || updating || !item) return;
     try {
       setUpdating(true);
