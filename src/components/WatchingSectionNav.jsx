@@ -13,12 +13,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Play, CheckCircle2, MonitorPlay } from "lucide-react";
+import { Play, CheckCircle2 } from "lucide-react";
 
 const SECTIONS = [
   { href: "/in-progress", label: "En progreso", Icon: Play, fillWhenActive: true },
   { href: "/completed", label: "Completadas", Icon: CheckCircle2, fillWhenActive: false },
-  { href: "/continue-watching", label: "Continuar viendo", Icon: MonitorPlay, fillWhenActive: false },
 ];
 
 export default function WatchingSectionNav({ className = "" }) {

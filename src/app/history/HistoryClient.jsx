@@ -42,6 +42,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import HistorySectionNav from "@/components/HistorySectionNav";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -3376,7 +3377,7 @@ export default function HistoryClient() {
                     wrapper `relative` es el contexto de posicionamiento del overlay. */}
                 <div className="relative z-10 lg:hidden">
                   <div className="relative flex gap-2">
-                  <div className="relative flex-1">
+                  <div className="relative min-w-0 flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
                       value={q}
@@ -3393,6 +3394,7 @@ export default function HistoryClient() {
                       </button>
                     )}
                   </div>
+                  <HistorySectionNav className="h-11 shrink-0" />
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -3636,6 +3638,7 @@ export default function HistoryClient() {
 
                 {/* Desktop: Una sola fila con todo */}
                 <div className="hidden lg:flex gap-3 relative z-10">
+                  <HistorySectionNav className="shrink-0" />
                   <div className="relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
