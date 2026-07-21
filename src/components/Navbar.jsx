@@ -980,6 +980,16 @@ export default function Navbar() {
       ? "translate-y-1 opacity-0"
       : "translate-y-0 opacity-100");
 
+  // Las fichas conservan siempre la presencia compacta de su entrada. Así el
+  // progreso del hero no vuelve a agrandar los controles antes de que el resto
+  // de rutas active la compactación por scroll.
+  const mobileTopIsCompact = isScrolled || isDetailsRoute;
+  const mobileTopControlScaleClass = isDetailsRoute
+    ? "scale-[0.8]"
+    : isScrolled
+      ? "scale-[0.82]"
+      : "scale-100";
+
   // Menú inferior fijo: las secciones siempre son accesibles; cada página muestra
   // su conexión necesaria si la cuenta correspondiente no está enlazada.
   const favHref = "/favorites";
@@ -1030,7 +1040,9 @@ export default function Navbar() {
                 (--sv-hero-scroll: 0→1) sin afectar a los iconos. */}
             <div
               aria-hidden
-              className="lg:hidden pointer-events-none absolute inset-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] [opacity:var(--sv-hero-scroll,0)]"
+              className={`lg:hidden pointer-events-none absolute inset-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] transition-opacity duration-300 motion-reduce:transition-none ${
+                isScrolled ? "opacity-100" : "[opacity:var(--sv-hero-scroll,0)]"
+              }`}
             />
           </>
         )}
@@ -1269,16 +1281,16 @@ export default function Navbar() {
         </div>
 
         {/* ---------------- Mobile ---------------- */}
-        <div className="lg:hidden relative flex items-center justify-between h-16 px-2">
-          {/* Izquierda: menú + IA. En FICHA móvil los botones arrancan más
-              PEQUEÑOS (escala 0.8) y crecen a tamaño normal con el scroll
-              (--sv-hero-scroll), manteniendo el navbar a su altura normal. */}
+        <div
+          className={`lg:hidden relative flex items-center justify-between px-2 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            mobileTopIsCompact ? "h-12" : "h-16"
+          }`}
+        >
+          {/* Izquierda: en el estado compacto se replica la escala inicial de
+              DetailsClient para que menú y asistente reduzcan presencia sin
+              perder su área táctil ni su posición. */}
           <div
-            className={`flex items-center gap-1 flex-shrink-0 ${
-              isDetailsRoute
-                ? "origin-left [transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
-                : ""
-            }`}
+            className={`flex flex-shrink-0 origin-left items-center gap-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -1290,15 +1302,11 @@ export default function Navbar() {
             <WatchNextAssistant isMobile heroNavMode={heroNavMode} />
           </div>
 
-          {/* Centro: logo (mismo escalado compacto→normal en ficha móvil). */}
+          {/* Centro: el logo acompaña la reducción de los controles. */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <Link
               href="/"
-              className={`block h-10 overflow-hidden ${
-                isDetailsRoute
-                  ? "[transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
-                  : ""
-              }`}
+              className={`block h-10 overflow-hidden transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
             >
               <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
                 <OptimizedImage
@@ -1312,13 +1320,9 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Derecha: búsqueda + perfil (mismo escalado compacto→normal en ficha). */}
+          {/* Derecha: búsqueda y perfil mantienen la misma escala que el resto. */}
           <div
-            className={`flex items-center gap-2 flex-shrink-0 pr-1 ${
-              isDetailsRoute
-                ? "origin-right [transform:scale(calc(0.8_+_var(--sv-hero-scroll,0)_*_0.2))]"
-                : ""
-            }`}
+            className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             <button
               onClick={() => setShowMobileSearch(true)}
@@ -1347,10 +1351,10 @@ export default function Navbar() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed z-30 mx-auto rounded-full ${LIQUID_GLASS_PANEL} flex items-center px-2 overflow-visible transition-[left,right,bottom,height,max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        className={`lg:hidden fixed left-1/2 z-30 flex -translate-x-1/2 items-center overflow-visible rounded-full px-2 ${LIQUID_GLASS_PANEL} transform-gpu transition-[width,height,bottom] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           isScrolled
-            ? "left-12 right-12 max-w-md bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
-            : "left-4 right-4 max-w-lg bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
+            ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12 w-[min(calc(100%_-_6rem),28rem)]"
+            : "bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14 w-[min(calc(100%_-_2rem),32rem)]"
         }`}
       >
         {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
