@@ -2052,7 +2052,9 @@ export default function InProgressClient({
 
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
-          className="sticky top-14 z-[70] mb-2 space-y-3 transition-all duration-300 sm:top-20 sm:mb-6"
+          className={`sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
+            groupBy === "none" ? "mb-6" : "mb-2"
+          }`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -2102,7 +2104,7 @@ export default function InProgressClient({
                 transition={{ duration: 0.18, ease: "easeOut" }}
                 className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
               >
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
                       altura que Ordenar) — diseño móvil de siempre. */}
                   <div className="flex gap-2 items-center">

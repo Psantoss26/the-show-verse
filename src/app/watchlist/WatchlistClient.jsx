@@ -2946,7 +2946,7 @@ export default function WatchlistClient() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header */}
         <motion.header
-          className="mb-10"
+          className="mb-6 sm:mb-10"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -3058,7 +3058,9 @@ export default function WatchlistClient() {
         {/* Filters */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-14 z-[70] mb-2 space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6"
+          className={`sticky top-14 z-[70] space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6 ${
+            groupBy === "none" ? "mb-6" : "mb-2"
+          }`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -3106,7 +3108,7 @@ export default function WatchlistClient() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.98 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top space-y-3 lg:hidden"
+                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top space-y-2 lg:hidden"
               >
                 <div className="flex gap-2">
                   <div className="flex-1">

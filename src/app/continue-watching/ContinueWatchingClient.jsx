@@ -1000,7 +1000,7 @@ export default function ContinueWatchingClient() {
                 transition={{ duration: 0.18, ease: "easeOut" }}
                 className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
               >
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
                       altura que Ordenar) — diseño móvil de siempre. */}
                   <div className="flex gap-2 items-center">
