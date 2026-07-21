@@ -26,7 +26,7 @@ import {
 import { getLocalInProgress, dismissLocalProgress } from "@/lib/api/progressClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
-import WatchingSectionNav from "@/components/WatchingSectionNav";
+import HistorySectionNav from "@/components/HistorySectionNav";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
@@ -909,7 +909,7 @@ export default function ContinueWatchingClient() {
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <Header stats={stats} loading />
           <div className="mb-8">
-            <WatchingSectionNav />
+            <HistorySectionNav />
           </div>
           <div className="flex items-center justify-center py-16 lg:py-24">
             <div className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-2xl backdrop-blur-3xl">
@@ -968,7 +968,7 @@ export default function ContinueWatchingClient() {
                 </button>
               )}
             </div>
-            <WatchingSectionNav className="h-11 shrink-0" />
+            <HistorySectionNav className="h-11 shrink-0" />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -1073,7 +1073,7 @@ export default function ContinueWatchingClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    {/* Grupo de vista: MISMA estructura que WatchingSectionNav
+                    {/* Grupo de vista: misma estructura que la navegación de
                         (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
                         para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
                         de sección de la fila de arriba y las dos filas se alineen. */}
@@ -1118,7 +1118,7 @@ export default function ContinueWatchingClient() {
 
           {/* Escritorio: Fila única */}
           <div className="hidden lg:flex gap-3 relative z-10">
-            <WatchingSectionNav className="shrink-0" />
+            <HistorySectionNav className="shrink-0" />
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input

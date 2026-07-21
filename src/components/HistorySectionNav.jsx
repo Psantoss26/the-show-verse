@@ -1,33 +1,23 @@
 "use client";
 
-// Selector de sección compartido por las tres vistas de "lo que estoy viendo":
-// En progreso (/in-progress), Completadas (/completed) y Continuar viendo
-// (/continue-watching). Son rutas hermanas; este control navega entre ellas y
-// resalta la activa según la URL. Mismo estilo de "pastilla" que los antiguos
-// tabs internos, para que la navegación se sienta igual en las tres páginas.
-//
-// Compacto: en escritorio SOLO la ruta activa muestra su etiqueta (icono + texto)
-// y las otras dos quedan como icono suelto. En móvil las tres son solo icono
-// (incluida la activa), como el diseño anterior, para que quepan en la misma fila
-// que el selector de "Ordenar".
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Play, CheckCircle2 } from "lucide-react";
+import { History, MonitorPlay } from "lucide-react";
 
 const SECTIONS = [
-  { href: "/in-progress", label: "En progreso", Icon: Play, fillWhenActive: true },
-  { href: "/completed", label: "Completadas", Icon: CheckCircle2, fillWhenActive: false },
+  { href: "/history", label: "Historial", Icon: History },
+  { href: "/continue-watching", label: "Continuar viendo", Icon: MonitorPlay },
 ];
 
-export default function WatchingSectionNav({ className = "" }) {
+export default function HistorySectionNav({ className = "" }) {
   const pathname = usePathname();
+
   return (
     <nav
-      aria-label="Secciones de seguimiento"
+      aria-label="Historial y continuar viendo"
       className={`inline-flex max-w-full gap-1 overflow-x-auto rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
-      {SECTIONS.map(({ href, label, Icon, fillWhenActive }) => {
+      {SECTIONS.map(({ href, label, Icon }) => {
         const active = pathname === href;
         return (
           <Link
@@ -45,10 +35,7 @@ export default function WatchingSectionNav({ className = "" }) {
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
             }`}
           >
-            <Icon
-              className="h-4 w-4 shrink-0"
-              fill={active && fillWhenActive ? "currentColor" : "none"}
-            />
+            <Icon className="h-4 w-4 shrink-0" />
             {active && <span className="hidden lg:inline">{label}</span>}
           </Link>
         );
