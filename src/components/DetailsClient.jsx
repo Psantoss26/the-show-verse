@@ -1467,7 +1467,6 @@ export default function DetailsClient({
     const root = document.documentElement;
     if (!isMobileViewport) {
       root.style.removeProperty("--sv-hero-scroll");
-      root.removeAttribute("data-details-hero-scrolled");
       return undefined;
     }
     let raf = 0;
@@ -1476,7 +1475,6 @@ export default function DetailsClient({
       const dist = Math.max(1, window.innerHeight * 0.55);
       const p = Math.min(1, Math.max(0, window.scrollY / dist));
       root.style.setProperty("--sv-hero-scroll", p.toFixed(4));
-      root.toggleAttribute("data-details-hero-scrolled", p > 0);
     };
     const onScroll = () => {
       if (!raf) raf = window.requestAnimationFrame(apply);
@@ -1489,7 +1487,6 @@ export default function DetailsClient({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       root.style.removeProperty("--sv-hero-scroll");
-      root.removeAttribute("data-details-hero-scrolled");
     };
   }, [isMobileViewport]);
 
@@ -8585,7 +8582,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 la fila de acciones sin progreso, sin variar el alto del póster
                 ni desplazar el logo. */}
             {inProgressPct != null && (
-              <div className="details-mobile-progress-indicator pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
+              <div className="pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
                 <div className="px-3 pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -8754,7 +8751,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 puntuar, agregar a favoritos, watchlist y listas, cambiar portada.
                 En MÓVIL (&lt;640) van ANTES de premios/info (order-first), como en
                 DetailModal; de sm: en adelante se mantiene el orden original. */}
-            <div className="order-1 -mx-1 w-[calc(100%+0.5rem)] sm:order-none sm:mx-0 sm:w-full">
+            <div
+              className={`order-1 sm:order-none sm:mx-0 sm:w-full ${
+                inProgressPct != null
+                  ? "mx-0 w-full"
+                  : "-mx-1 w-[calc(100%+0.5rem)]"
+              }`}
+            >
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
                 {/* Con progreso, la fila se adelanta bajo el navbar para que
                     quede completamente cubierta por él. Sin progreso conserva
@@ -8764,7 +8767,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <div
                   className={`relative ${
                     inProgressPct != null
-                      ? "details-mobile-progress-actions -top-6"
+                      ? "-top-6"
                       : "-top-2"
                   } sm:top-0`}
                 >
