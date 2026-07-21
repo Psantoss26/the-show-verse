@@ -3,6 +3,7 @@
 // Reutiliza InProgressClient en modo "completed"; la navegación entre
 // En progreso · Completadas · Continuar viendo la hace <WatchingSectionNav />.
 import InProgressClient from '../in-progress/InProgressClient'
+import DetailModalProvider from '@/components/dashboard/DetailModalProvider'
 
 export const metadata = {
     title: 'Completadas',
@@ -10,5 +11,9 @@ export const metadata = {
 }
 
 export default function CompletedPage() {
-    return <InProgressClient mode="completed" />
+    return (
+        <DetailModalProvider placement="right">
+            <InProgressClient mode="completed" />
+        </DetailModalProvider>
+    )
 }
