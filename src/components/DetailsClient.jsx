@@ -1212,10 +1212,12 @@ export default function DetailsClient({
   // -- Progreso de reproduccion local ("Continuar viendo") de ESTE titulo --
   // Si hay una fila en watch_progress (mismo tmdbId y tipo), guardamos su % para
   // pintar una barra de progreso sobre el poster. null = no esta en curso.
+  // Solo aplica a PELICULAS: el progreso de una serie es por episodio (se
+  // muestra en EpisodeDetails), no tiene sentido a nivel de ficha de serie.
   const [inProgressPct, setInProgressPct] = useState(null);
 
   useEffect(() => {
-    if (!authenticated || !id) {
+    if (!authenticated || !id || endpointType !== "movie") {
       setInProgressPct(null);
       return;
     }
@@ -1223,8 +1225,6 @@ export default function DetailsClient({
     (async () => {
       const rows = await getLocalInProgress();
       if (abort) return;
-      // getLocalInProgress viene ordenado por updatedAt desc: el primer match es
-      // la reproduccion mas reciente de este titulo (para series, el ultimo ep.).
       const match = (Array.isArray(rows) ? rows : []).find(
         (r) => Number(r.tmdbId) === Number(id) && r.mediaType === endpointType,
       );
