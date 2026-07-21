@@ -2395,11 +2395,10 @@ function ContinueWatchingSection({
             preventClicksPropagation={true}
             threshold={isMobile ? 2 : 5}
             touchRatio={isMobile ? 1.5 : 1}
-            freeMode={
-              !isMobile
-                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-                : false
-            }
+            // Mantener el arrastre libre también en móvil. Calendario reutiliza
+            // esta fila, así que ambos carruseles responden al gesto táctil con
+            // la misma inercia fluida que las filas de ActorDetails.
+            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
             modules={[Navigation, FreeMode]}
             // En escritorio el padding vertical amplio crea el espacio para que
             // la vista previa NUNCA se recorte (el truco padding + -margin no

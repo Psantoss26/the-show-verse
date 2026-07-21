@@ -754,6 +754,7 @@ export default function Navbar() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const isScrolledRef = useRef(false);
   // Destino marcado de forma optimista al pulsar un enlace: el indicador del
   // navbar resalta de inmediato la sección a la que vas, sin esperar a que la
   // transición de ruta haga commit (lo que dejaba el indicador en la página de
@@ -761,12 +762,34 @@ export default function Navbar() {
   const [pendingHref, setPendingHref] = useState(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 40);
+    let frameId = 0;
+
+    const updateScrolledState = () => {
+      frameId = 0;
+      const scrollY = window.scrollY;
+      // Histéresis: al compactarse, la barra no vuelve a expandirse hasta que
+      // se llega claramente más arriba. Evita invertir la animación en cada
+      // pequeño rebote o variación de scroll junto al umbral.
+      const nextIsScrolled = isScrolledRef.current
+        ? scrollY > 24
+        : scrollY > 40;
+
+      if (nextIsScrolled === isScrolledRef.current) return;
+
+      isScrolledRef.current = nextIsScrolled;
+      setIsScrolled(nextIsScrolled);
     };
+
+    const handleScroll = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updateScrolledState);
+    };
+
     window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    updateScrolledState();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (frameId) window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   // Una vez la URL refleja el destino (o cambia por cualquier motivo), se limpia
@@ -943,16 +966,16 @@ export default function Navbar() {
   };
 
   const mobileBottomIconSlotClass =
-    "absolute left-1/2 top-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center transition-all duration-300 ease-out " +
+    "absolute left-1/2 top-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
     (isScrolled ? "-translate-y-1/2" : "-translate-y-[85%]");
 
   const mobileBottomIconClass =
-    "shrink-0 transition-[width,height] duration-300 ease-out " +
-    (isScrolled ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5");
+    "h-5 w-5 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
+    (isScrolled ? "scale-90" : "scale-100");
 
   const mobileBottomLabelClass =
     "pointer-events-none absolute inset-x-0 bottom-1.5 z-10 block truncate px-0.5 text-center text-[10px] font-semibold leading-[12px] tracking-tight " +
-    "transition-[opacity,transform] duration-200 ease-out " +
+    "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
     (isScrolled
       ? "translate-y-1 opacity-0"
       : "translate-y-0 opacity-100");
@@ -1324,7 +1347,7 @@ export default function Navbar() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed z-30 mx-auto rounded-full ${LIQUID_GLASS_PANEL} flex items-center px-2 overflow-visible transition-all duration-300 ease-out ${
+        className={`lg:hidden fixed z-30 mx-auto rounded-full ${LIQUID_GLASS_PANEL} flex items-center px-2 overflow-visible transition-[left,right,bottom,height,max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           isScrolled
             ? "left-12 right-12 max-w-md bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12"
             : "left-4 right-4 max-w-lg bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14"
