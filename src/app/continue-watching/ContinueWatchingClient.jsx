@@ -28,6 +28,7 @@ import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -487,9 +488,9 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "compact") {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-emerald-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden">
+        <Link href={href} prefetch={false} className="relative block overflow-hidden rounded-xl bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
@@ -558,7 +559,7 @@ const ProgressCard = memo(function ProgressCard({
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} className="block">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 border border-white/5 shadow-md lg:hover:shadow-emerald-900/20 transition-all">
+          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartImage item={item} kind="poster" alt={title} />
 
             {/* Overlay con gradientes - desktop hover (igual que En progreso) */}
@@ -770,6 +771,8 @@ export default function ContinueWatchingClient() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState("cards");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const [editMode, setEditMode] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
@@ -937,6 +940,7 @@ export default function ContinueWatchingClient() {
 
         {/* Filtros */}
         <motion.div
+          ref={filtersRef}
           className="sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -947,7 +951,7 @@ export default function ContinueWatchingClient() {
               la lista de detrás queda ESTÁTICA (sin empuje ni parpadeo). */}
           <div className="relative z-10 lg:hidden">
             <div className="relative flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
               <input
                 value={q}
@@ -964,6 +968,7 @@ export default function ContinueWatchingClient() {
                 </button>
               )}
             </div>
+            <WatchingSectionNav className="h-11 shrink-0" />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -975,34 +980,24 @@ export default function ContinueWatchingClient() {
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setEditMode((v) => !v)}
-              title={editMode ? "Salir del modo borrar" : "Quitar títulos"}
-              aria-label={editMode ? "Salir del modo borrar" : "Quitar títulos"}
-              aria-pressed={editMode}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                editMode
-                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                  : "text-zinc-200 hover:bg-black/30"
-              }`}
-            >
-              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
-            </button>
           </div>
 
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={false}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className={`z-[80] mt-2 origin-top ${
+                  filtersSticky
+                    ? "absolute left-0 right-0 top-full"
+                    : "relative"
+                }`}
               >
                 <div className="space-y-2">
-                  {/* Fila 1: Ordenar + selector de sección (3 iconos, misma
-                      altura que Ordenar) — diseño móvil de siempre. */}
+                  {/* Fila 1: ordenar + acción de eliminar. El selector de
+                      secciones permanece visible en la barra principal. */}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 min-w-0">
                       <InlineDropdown
@@ -1028,7 +1023,28 @@ export default function ContinueWatchingClient() {
                         )}
                       </InlineDropdown>
                     </div>
-                    <WatchingSectionNav className="h-11 shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setEditMode((v) => !v)}
+                      title={
+                        editMode ? "Salir del modo borrar" : "Quitar títulos"
+                      }
+                      aria-label={
+                        editMode ? "Salir del modo borrar" : "Quitar títulos"
+                      }
+                      aria-pressed={editMode}
+                      className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                        editMode
+                          ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                          : "text-zinc-200 hover:bg-black/30"
+                      }`}
+                    >
+                      {editMode ? (
+                        <X className="w-4 h-4" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
 
                   {/* Fila 2: Tipo + botones de vista */}

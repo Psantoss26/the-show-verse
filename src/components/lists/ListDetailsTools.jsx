@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ListPosterCard, { listPosterGridClass } from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -225,6 +226,8 @@ export default function FilterableListItems({
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();
@@ -306,7 +309,8 @@ export default function FilterableListItems({
   return (
     <div className="space-y-7">
       <motion.div
-        className="sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20"
+        ref={filtersRef}
+        className="relative sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20"
         initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
@@ -349,7 +353,12 @@ export default function FilterableListItems({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-visible lg:hidden"
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className={`overflow-visible lg:hidden ${
+                filtersSticky
+                  ? "absolute left-0 right-0 top-full z-[80] !mt-2"
+                  : "relative"
+              }`}
             >
               <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
                 <FilterDropdowns

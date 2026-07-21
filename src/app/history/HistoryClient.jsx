@@ -41,6 +41,7 @@ import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -2697,6 +2698,8 @@ export default function HistoryClient() {
     }
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const filtersSticky = useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
 
@@ -3281,6 +3284,7 @@ export default function HistoryClient() {
             {/* Solo estadísticas a la derecha */}
             {auth.connected && historyLoaded && (
               <motion.div
+                ref={filtersRef}
                 className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -3406,11 +3410,15 @@ export default function HistoryClient() {
                 <AnimatePresence>
                   {mobileFiltersOpen && (
                     <motion.div
-                      initial={false}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
-                      className="absolute left-0 right-0 top-full z-[80] mt-2 origin-top"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                      className={`z-[80] mt-2 origin-top ${
+                        filtersSticky
+                          ? "absolute left-0 right-0 top-full"
+                          : "relative"
+                      }`}
                     >
                       <div className="space-y-2">
                         {/* Fila 1 - Tipo y Agrupar */}
