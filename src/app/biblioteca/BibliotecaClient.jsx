@@ -465,7 +465,7 @@ function InlineDropdown({
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex items-center gap-2 min-w-0">
           {Icon && <Icon className="w-4 h-4 text-amber-500 shrink-0" />}
@@ -530,18 +530,25 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
-function GroupDivider({ title, count, total, stats, mobileFiltersOpen }) {
+function GroupDivider({
+  title,
+  count,
+  total,
+  stats,
+  mobileFiltersOpen,
+  isFirstGroup = false,
+}) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
-  const [transitioningThreshold, setTransitioningThreshold] = useState(130);
+  const [transitioningThreshold, setTransitioningThreshold] = useState(108);
 
   useEffect(() => {
     if (mobileFiltersOpen) {
       setTransitioningThreshold(232);
     } else {
       const timer = setTimeout(() => {
-        setTransitioningThreshold(130);
+        setTransitioningThreshold(108);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -563,8 +570,8 @@ function GroupDivider({ title, count, total, stats, mobileFiltersOpen }) {
   return (
     <motion.div
       ref={ref}
-      className={`sticky z-[60] my-4 sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
-        mobileFiltersOpen ? "top-[232px]" : "top-[130px]"
+      className={`sticky z-[60] ${isFirstGroup ? mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4" : "my-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
+        mobileFiltersOpen ? "top-[232px]" : "top-[108px]"
       }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1898,7 +1905,7 @@ export default function BibliotecaClient() {
     const inactive = "text-zinc-400 hover:text-white hover:bg-white/10";
 
     return (
-      <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+      <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
         <button
           type="button"
           onClick={() => setViewMode("list")}
@@ -1933,7 +1940,7 @@ export default function BibliotecaClient() {
     const inactive = "text-zinc-400 hover:text-white hover:bg-white/10";
 
     return (
-      <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+      <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
         <button
           type="button"
           onClick={() => setImageMode("poster")}
@@ -2038,7 +2045,7 @@ export default function BibliotecaClient() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          {visibleGrouped.map((group) => (
+          {visibleGrouped.map((group, groupIndex) => (
             <div key={group.key}>
               <GroupDivider
                 title={group.label}
@@ -2046,6 +2053,7 @@ export default function BibliotecaClient() {
                 total={filteredItems.length}
                 stats={group.stats}
                 mobileFiltersOpen={mobileFiltersOpen}
+                isFirstGroup={groupIndex === 0}
               />
               <motion.div
                 key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
@@ -2247,7 +2255,7 @@ export default function BibliotecaClient() {
         {/* ====== FILTERS ====== */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-14 z-[70] space-y-1 mb-5 transition-all duration-300 sm:top-20 lg:mb-6"
+          className="sticky top-14 z-[70] mb-2 space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -2260,7 +2268,7 @@ export default function BibliotecaClient() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
@@ -2275,7 +2283,7 @@ export default function BibliotecaClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
@@ -2308,7 +2316,7 @@ export default function BibliotecaClient() {
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1 flex gap-2">
-                    <div className="flex rounded-xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         type="button"
                         onClick={() => setViewMode("list")}
@@ -2342,7 +2350,7 @@ export default function BibliotecaClient() {
                             imageMode === "poster" ? "backdrop" : "poster",
                           )
                         }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
+                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
                         title={
                           imageMode === "poster"
                             ? "Cambiar a Backdrop"
@@ -2370,7 +2378,7 @@ export default function BibliotecaClient() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar en biblioteca..."
-                className="w-full h-11 rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
               />
               {query && (
                 <button
