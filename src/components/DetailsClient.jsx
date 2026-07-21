@@ -8758,7 +8758,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   : "-mx-1 w-[calc(100%+0.5rem)]"
               }`}
             >
-              <FadeIn delay={0.12} className="mb-6 px-1 w-full">
+              <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6">
                 {/* Con progreso, la fila se adelanta bajo el navbar para que
                     quede completamente cubierta por él. Sin progreso conserva
                     su separación visual normal. Ninguno de los dos ajustes
@@ -8767,7 +8767,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <div
                   className={`relative ${
                     inProgressPct != null
-                      ? "-top-6"
+                      ? "-top-7"
                       : "-top-2"
                   } sm:top-0`}
                 >
