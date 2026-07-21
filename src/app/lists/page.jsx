@@ -1898,7 +1898,7 @@ export default function ListsPage() {
 
         {/* Filtros Sticky */}
         <motion.div
-          className="sticky top-20 z-[60] space-y-3 mb-6 transition-all duration-300"
+          className="sticky top-14 z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-20"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
