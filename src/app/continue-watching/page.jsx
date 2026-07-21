@@ -1,5 +1,6 @@
 // src/app/continue-watching/page.jsx
 import ContinueWatchingClient from "./ContinueWatchingClient";
+import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 
 export const metadata = {
   title: "Continuar viendo",
@@ -8,5 +9,9 @@ export const metadata = {
 };
 
 export default function ContinueWatchingPage() {
-  return <ContinueWatchingClient />;
+  return (
+    <DetailModalProvider placement="right">
+      <ContinueWatchingClient />
+    </DetailModalProvider>
+  );
 }

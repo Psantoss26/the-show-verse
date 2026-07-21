@@ -27,6 +27,7 @@ import { getLocalInProgress, dismissLocalProgress } from "@/lib/api/progressClie
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import HistorySectionNav from "@/components/HistorySectionNav";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
@@ -454,6 +455,8 @@ const ProgressCard = memo(function ProgressCard({
 }) {
   const title = item.title || "Sin título";
   const href = detailsHref(item);
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: mediaTypeOf(item) });
   const pct = clampPct(item.pct);
   const colors = getProgressColor(pct);
   const code = epCode(item);
@@ -488,7 +491,7 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "compact") {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} className="relative block overflow-hidden rounded-xl bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} className="relative block overflow-hidden rounded-xl bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
@@ -558,7 +561,7 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "poster") {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} className="block">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartImage item={item} kind="poster" alt={title} />
 
@@ -632,7 +635,7 @@ const ProgressCard = memo(function ProgressCard({
   // ==== CARDS (por defecto) ====
   return (
     <motion.div initial={{ opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4, delay: animDelay, ease: [0.25, 0.46, 0.45, 0.94] }}>
-      <Link href={href} prefetch={false} className="block group">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
           onMouseEnter={(e) => {
