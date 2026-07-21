@@ -721,16 +721,4 @@ html {
     filter: brightness(0.9) saturate(1.03) blur(4px);
   }
 
-  /* Acciones del hero con progreso: inicialmente quedan ocultas detrás del
-     navbar. En el primer desplazamiento recuperan directamente su estado final
-     e interacción, sin fundido ni opacidad intermedia. */
-  .details-mobile-progress-actions {
-    pointer-events: none;
-    visibility: hidden;
-  }
-
-  html[data-details-hero-scrolled] .details-mobile-progress-actions {
-    pointer-events: auto;
-    visibility: visible;
-  }
 }
