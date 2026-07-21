@@ -8678,7 +8678,45 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             }`}
           >
             {/* 1. TÍTULO Y CABECERA */}
-            <FadeIn delay={0.06} className="order-3 mb-6 flex flex-col items-center gap-2 px-1 text-center md:items-start md:text-left sm:order-none sm:gap-0">
+            {/* En móvil esta sección se revela tras las acciones y las
+                plataformas. Es una entrada corta y de una sola capa para no
+                competir con la animación individual de los iconos. */}
+            <motion.div
+              initial={prefersReducedMotion ? false : "hidden"}
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.2 }}
+              variants={{
+                hidden: { opacity: 0, y: 12 },
+                visible: {
+                  opacity: 1,
+                  y: 0,
+                  transition: {
+                    duration: 0.42,
+                    ease: [0.16, 1, 0.3, 1],
+                  },
+                },
+              }}
+              className="order-3 mb-6 flex flex-col items-center gap-2 px-1 text-center sm:hidden"
+            >
+              {headerAwardsValue && (
+                <div className="order-2 mb-0 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md">
+                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-1">{headerAwardsValue}</span>
+                </div>
+              )}
+
+              <div className="order-1 w-full">
+                <DetailsMetaGenresRow
+                  yearIso={yearIso}
+                  displayRuntimeValue={displayRuntimeValue}
+                  status={data.status}
+                  genres={data.genres}
+                  hideGenresOnMobile
+                />
+              </div>
+            </motion.div>
+
+            <FadeIn delay={0.06} className="hidden sm:order-none sm:mb-6 sm:flex sm:flex-col sm:items-center sm:gap-0 sm:px-1 sm:text-center md:items-start md:text-left">
               {/* En MÓVIL (&lt;640) el título va como LOGO sobre la portada (ver poster
                   card); el h1 de texto se muestra de sm: en adelante. */}
               <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
@@ -8767,21 +8805,40 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
             {/* MÓVIL: plataformas inmediatamente después de las acciones. */}
             {platformItems.length > 0 && (
-              <StaggerContainer
+              <motion.div
+                initial={prefersReducedMotion ? false : "hidden"}
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={{
+                  hidden: { opacity: 0, y: 10 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      duration: 0.38,
+                      ease: [0.16, 1, 0.3, 1],
+                      staggerChildren: prefersReducedMotion ? 0 : 0.04,
+                    },
+                  },
+                }}
                 className="order-2 mb-4 flex w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:hidden"
-                staggerDelay={0.05}
               >
                 <div className="flex flex-row flex-nowrap items-center gap-2">
                   {platformItems.map((provider, index) => (
                     <motion.a
                       key={provider.key ?? `${provider.title}-${index}`}
                       href={provider.href}
-                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: 0.28,
-                        delay: 0.03 + index * 0.04,
-                        ease: [0.22, 1, 0.36, 1],
+                      variants={{
+                        hidden: { opacity: 0, y: 6, scale: 0.98 },
+                        visible: {
+                          opacity: 1,
+                          y: 0,
+                          scale: 1,
+                          transition: {
+                            duration: 0.28,
+                            ease: [0.16, 1, 0.3, 1],
+                          },
+                        },
                       }}
                       target={provider.target}
                       rel={provider.rel}
@@ -8806,7 +8863,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 {isBackdropPoster && scoreboardExternalLinks.length > 0 && (
                   <>
                     <ToolbarSeparator className="mx-0.5" />
-                    <div className="flex flex-row flex-nowrap items-center gap-2">
+                    <motion.div
+                      variants={{
+                        hidden: { opacity: 0, y: 6 },
+                        visible: { opacity: 1, y: 0 },
+                      }}
+                      className="flex flex-row flex-nowrap items-center gap-2"
+                    >
                       {scoreboardExternalLinks.map((link) => (
                         <ExternalLinkButton
                           key={link.key}
@@ -8816,10 +8879,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           fallbackHref={link.fallbackHref}
                         />
                       ))}
-                    </div>
+                    </motion.div>
                   </>
                 )}
-              </StaggerContainer>
+              </motion.div>
             )}
 
             {/* =================================================================
