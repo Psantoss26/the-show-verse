@@ -1272,6 +1272,13 @@ export default function DetailsClient({
   // -- Refs y estado para scroll horizontal de la galeria de imagenes --
   const imagesScrollRef = useRef(null);
   const contentTopRef = useRef(null);
+  // En móvil el alto real de los botones cambia con el ancho disponible y con
+  // las acciones que tenga cada título. Se mide para que el hero termine justo
+  // antes del navbar inferior, sin dejar metadatos entre ambos.
+  const mobileActionRowRef = useRef(null);
+  const mobileProgressRef = useRef(null);
+  const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60);
+  const [mobileProgressHeight, setMobileProgressHeight] = useState(0);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
   const [canNextImages, setCanNextImages] = useState(false); // Hay scroll a la derecha
@@ -1382,6 +1389,44 @@ export default function DetailsClient({
     const id = l?.id ?? l?._id ?? l?.ids?.tmdb ?? l?.slug ?? l?.name;
     return id != null ? String(id) : null;
   }, []);
+
+  // El alto de la fila puede ser 60px en pantallas anchas o menor cuando los
+  // botones se adaptan al ancho. ResizeObserver evita depender de una cifra
+  // estimada y también cubre la barra de "Continuar viendo" cuando existe.
+  useLayoutEffect(() => {
+    const updateHeroMobileGeometry = () => {
+      const nextActionHeight = Math.max(
+        1,
+        Math.ceil(mobileActionRowRef.current?.getBoundingClientRect().height || 60),
+      );
+      const nextProgressHeight = Math.ceil(
+        mobileProgressRef.current?.getBoundingClientRect().height || 0,
+      );
+
+      setMobileActionRowHeight((current) =>
+        current === nextActionHeight ? current : nextActionHeight,
+      );
+      setMobileProgressHeight((current) =>
+        current === nextProgressHeight ? current : nextProgressHeight,
+      );
+    };
+
+    updateHeroMobileGeometry();
+    window.addEventListener("resize", updateHeroMobileGeometry, { passive: true });
+
+    if (typeof ResizeObserver === "undefined") {
+      return () => window.removeEventListener("resize", updateHeroMobileGeometry);
+    }
+
+    const observer = new ResizeObserver(updateHeroMobileGeometry);
+    if (mobileActionRowRef.current) observer.observe(mobileActionRowRef.current);
+    if (mobileProgressRef.current) observer.observe(mobileProgressRef.current);
+
+    return () => {
+      window.removeEventListener("resize", updateHeroMobileGeometry);
+      observer.disconnect();
+    };
+  }, [inProgressPct]);
 
   // Detecta las capacidades del dispositivo: hover (desktop) y viewport movil.
   // Usa matchMedia para reaccionar a cambios en tiempo real (ej. rotar tablet).
@@ -6727,8 +6772,9 @@ export default function DetailsClient({
     awardsLoading,
   ]);
 
-  // Menu global (scroll + sticky + spy)
-  const STICKY_TOP = 72; // ajusta si tu navbar mide otra cosa (px)
+  // Menú global (scroll + sticky + spy). En móvil Details mantiene el navbar
+  // superior compacto (48px); desde `sm` se conserva la referencia de 72px.
+  const STICKY_TOP = isMobileViewport ? 48 : 72;
 
   const sentinelRef = useRef(null);
   const menuStickyRef = useRef(null);
@@ -6785,7 +6831,7 @@ export default function DetailsClient({
 
     io.observe(sentinelRef.current);
     return () => io.disconnect();
-  }, []);
+  }, [STICKY_TOP]);
 
   const scrollToSection = useCallback(
     (sid) => {
@@ -6831,7 +6877,7 @@ export default function DetailsClient({
 
       window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     },
-    [menuH],
+    [menuH, STICKY_TOP],
   );
 
   // Scroll-spy (qué sección está “activa”)
@@ -6898,7 +6944,7 @@ export default function DetailsClient({
         pendingScrollEndCleanupRef.current = null;
       }
     };
-  }, [sectionItems, menuH]);
+  }, [sectionItems, menuH, STICKY_TOP]);
 
   useEffect(() => {
     if (!Array.isArray(sectionItems) || sectionItems.length === 0) return;
@@ -7958,7 +8004,7 @@ export default function DetailsClient({
                   : "opacity-0"
               }`}
               style={{
-                height: "calc(100svh - 9.5rem - env(safe-area-inset-bottom))",
+                height: `calc(100svh - 5.75rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
                 backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
                 transform: `scale(${POSTER_OVERSCAN})`,
                 willChange: "opacity",
@@ -7989,10 +8035,8 @@ export default function DetailsClient({
         ref={contentTopRef}
         tabIndex={-1}
         // El margen superior se ajusta SOLO en `sm:`/`lg:` (vista normal). En
-        // móvil el `pt-6` no se toca: el hero de abajo usa `-mt-[5.5rem]`
-        // (1.5rem del pt-6 + 4rem del navbar) para subir el póster BAJO el
-        // navbar superior, que ahora es un overlay oculto en la entrada. Así el
-        // póster full-bleed llena también los 4rem del navbar (sin hueco negro).
+        // móvil el `pt-6` no se toca: el hero compensa los 3rem del navbar
+        // superior compacto y conserva el póster full-bleed bajo el cristal.
         className="relative z-10 px-4 pt-6 pb-8 sm:pt-12 lg:pt-14 lg:pb-12 max-w-7xl mx-auto focus:outline-none"
       >
         {/* =================================================================
@@ -8002,7 +8046,7 @@ export default function DetailsClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className={`-mt-[5.5rem] sm:mt-0 flex flex-col lg:flex-row ${
+          className={`-mt-[4.5rem] sm:mt-0 flex flex-col lg:flex-row ${
             inProgressPct != null ? "gap-3 sm:gap-5" : "gap-5"
           } lg:gap-12 mb-12 items-start`}
         >
@@ -8137,15 +8181,16 @@ export default function DetailsClient({
                       primera vista SOLO se vean póster + logo + fila de botones,
                       quedando los botones justo encima del navbar inferior y el
                       resto (premios/info/scoreboard/tabs) por debajo (scroll).
-                      El hueco reservado (9.5rem) = fila de botones + navbar
-                      inferior (el navbar superior ya NO reserva hueco: es un
-                      overlay y el póster sube bajo él con el `-mt-[5.5rem]` del
-                      hero); `env(safe-area-inset-bottom)` cubre el indicador
-                      home. ESCRITORIO: aspecto 2:3. Ajustable. */}
+                      Su alto usa el viewport seguro, el área segura inferior y
+                      las alturas MEDIDAS de progreso y botones. De este modo,
+                      logo y acciones acaban justo antes del navbar en cualquier
+                      ancho; el resto de la información queda después al hacer
+                      scroll. ESCRITORIO: aspecto 2:3. */}
                   <div
-                    className={`relative bg-transparent sm:bg-neutral-950 will-change-auto overflow-hidden w-full h-[calc(100svh_-_9.5rem_-_env(safe-area-inset-bottom))] sm:h-0 poster-aspect-box`}
+                    className="relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 sm:bg-neutral-950 poster-aspect-box"
                     style={{
                       contain: "layout paint",
+                      "--details-mobile-poster-height": `calc(100svh - 5.75rem - ${mobileActionRowHeight}px - ${mobileProgressHeight}px - env(safe-area-inset-bottom))`,
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
                       // (2:3 póster ↔ 16:9 backdrop) y el cambio se anima desde
                       // `.poster-aspect-box`. Antes esto era `sm:aspect-[2/3]`
@@ -8534,7 +8579,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 de la tarjeta para quedar entre el logo de la portada y las
                 acciones rápidas. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none w-full px-4 sm:hidden">
+              <div ref={mobileProgressRef} className="pointer-events-none w-full px-4 sm:hidden">
                 <div className="px-3 pb-2.5 pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -8667,7 +8712,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 DetailModal; de sm: en adelante se mantiene el orden original. */}
             <div className="order-1 -mx-1 w-[calc(100%+0.5rem)] sm:order-none sm:mx-0 sm:w-full">
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
-                <DetailActionsRow
+                <div ref={mobileActionRowRef}>
+                  <DetailActionsRow
                 mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
@@ -8714,7 +8760,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 showComments={trakt.connected}
                 commentsActive={myComments.length > 0}
                 onComments={() => setCommentModalOpen(true)}
-              />
+                  />
+                </div>
             </FadeIn>
           </div>
 

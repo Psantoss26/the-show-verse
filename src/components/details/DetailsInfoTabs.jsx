@@ -64,7 +64,7 @@ export default function DetailsInfoTabs({
         .filter(Boolean)
         .map((genre) => translateGenre(genre.name || genre))
         .filter(Boolean)
-        .join(", ")
+        .join(" · ")
     : "";
 
   return (
