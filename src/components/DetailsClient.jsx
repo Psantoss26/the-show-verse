@@ -8577,11 +8577,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (ver `--details-mobile-poster-height` más arriba): al insertarse
                 aquí, empuja la fila de acciones hacia abajo en flujo normal,
                 hasta quedar detrás del navbar inferior flotante, que la cubre.
-                `mb-6` iguala el margen inferior de la fila de acciones (ver
-                `FadeIn` más abajo) para que el hueco hasta el navbar sea el
-                mismo se muestre o no el progreso. */}
+                `mb-6` preserva el hueco de flujo. El ajuste visual se hace en
+                el propio bloque para igualar la distancia al navbar que tiene
+                la fila de acciones sin progreso, sin variar el alto del póster
+                ni desplazar el logo. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none w-full px-4 mb-6 sm:hidden">
+              <div className="pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
                 <div className="px-3 pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -8752,11 +8753,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 DetailModal; de sm: en adelante se mantiene el orden original. */}
             <div className="order-1 -mx-1 w-[calc(100%+0.5rem)] sm:order-none sm:mx-0 sm:w-full">
               <FadeIn delay={0.12} className="mb-6 px-1 w-full">
-                {/* Solo en móvil, elevamos levemente la fila sobre el navbar
-                    inferior. Es un desplazamiento visual que no participa en
-                    el flujo: el alto del hero, el logo y el resto de secciones
-                    conservan exactamente su geometría actual. */}
-                <div className="relative -top-2 sm:top-0">
+                {/* Con progreso, la fila se adelanta bajo el navbar para que
+                    quede completamente cubierta por él. Sin progreso conserva
+                    su separación visual normal. Ninguno de los dos ajustes
+                    participa en el flujo, así que logo y resto del detalle no
+                    cambian de posición. */}
+                <div
+                  className={`relative ${
+                    inProgressPct != null ? "-top-10" : "-top-2"
+                  } sm:top-0`}
+                >
                   <div ref={mobileActionRowRef}>
                   <DetailActionsRow
                 mobileGapClass="gap-1.5"
