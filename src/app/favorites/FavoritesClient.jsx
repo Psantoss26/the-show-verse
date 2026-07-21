@@ -2319,7 +2319,10 @@ export default function FavoritesClient() {
   const [providersByItem, setProvidersByItem] = useState(
     () => initialCache.providers,
   );
-  const [layoutProvidersByItem] = useState(() => initialCache.providers);
+  // El agrupado debe reaccionar a cada lote de plataformas. Mantener una copia
+  // inicial congelada hacía que la primera visita se quedara en “Cargando
+  // plataformas…” hasta recargar y leer la caché ya persistida.
+  const layoutProvidersByItem = providersByItem;
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
@@ -3213,6 +3216,22 @@ export default function FavoritesClient() {
     [sorted, renderLimit],
   );
   const renderedGrouped = grouped;
+  // Un título puede pertenecer a varias plataformas (o géneros/subgrupos). El
+  // límite incremental ha de contar cada tarjeta que se va a pintar, no solo
+  // los títulos únicos, para que los grupos situados al final no queden vacíos.
+  const renderableItemCount = useMemo(() => {
+    if (!grouped) return sorted.length;
+    return grouped.reduce((total, group) => {
+      if (!group.subgroups?.length) return total + group.items.length;
+      return (
+        total +
+        group.subgroups.reduce(
+          (subgroupTotal, subgroup) => subgroupTotal + subgroup.items.length,
+          0,
+        )
+      );
+    }, 0);
+  }, [grouped, sorted.length]);
 
   // Only start expanding the render window AFTER the entrance animation of the
   // first batch has finished, so growing the list never interrupts (and janks)
@@ -3227,14 +3246,14 @@ export default function FavoritesClient() {
   // Grow the render window up to the full list during idle time, so the rest of
   // the cards appear shortly after the (cheap, fast) first paint.
   useEffect(() => {
-    if (!canExpandRender || renderLimit >= sorted.length) return;
+    if (!canExpandRender || renderLimit >= renderableItemCount) return;
     const handle = scheduleFavoritesRenderChunk(() => {
       setRenderLimit((prev) =>
-        Math.min(prev + FAVORITES_RENDER_CHUNK_SIZE, sorted.length),
+        Math.min(prev + FAVORITES_RENDER_CHUNK_SIZE, renderableItemCount),
       );
     });
     return () => cancelFavoritesRenderChunk(handle);
-  }, [canExpandRender, renderLimit, sorted.length]);
+  }, [canExpandRender, renderLimit, renderableItemCount]);
 
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
