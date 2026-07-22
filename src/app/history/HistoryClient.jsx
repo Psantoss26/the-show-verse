@@ -2650,7 +2650,6 @@ export default function HistoryClient() {
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
-  const loadMoreRef = useRef(null);
   const loadingHistoryRef = useRef(false);
   const nextHistoryPageRef = useRef(backNavInit?.nextPage || 1);
   const hasMoreHistoryRef = useRef(!!backNavInit?.hasMore);
@@ -2810,22 +2809,49 @@ export default function HistoryClient() {
       return;
     }
 
+    // Si había historial cacheado, el usuario estaba conectado a Trakt en la
+    // visita anterior (más recientemente en back-nav, ya sembrado en `auth`
+    // para pintar la lista al instante). Sirve de señal para no fiarse a la
+    // primera de una respuesta "no conectado".
+    const hadCachedConnection = !!readHistoryCache()?.items?.length;
+
     try {
-      const st = await traktAuthStatus();
+      let st = await traktAuthStatus();
+
+      // Igual que la hidratación de la sesión propia (ver AuthContext,
+      // "carrera de refresco concurrente"): si HABÍA conexión cacheada pero la
+      // comprobación fresca dice que no, puede ser un falso negativo
+      // transitorio (p. ej. el token de Trakt refrescándose a la vez desde
+      // otra pestaña/petición). Antes se creía a la primera respuesta y, si
+      // era ese falso negativo, sustituía el historial YA restaurado
+      // (posición de scroll incluida) por el aviso de "Inicia sesión" -- en
+      // móvil, con peor red, este caso era mucho más frecuente. Reintentamos
+      // unas veces (sin tocar lo que ya se ve en pantalla) antes de
+      // desconectar de verdad.
+      if (
+        hadCachedConnection &&
+        !st?.unavailable &&
+        !(st?.connected && !st?.degraded)
+      ) {
+        const delays = [500, 1200, 2500];
+        for (let i = 0; i < delays.length; i += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, delays[i]));
+          st = await traktAuthStatus();
+          if (st?.connected && !st?.degraded) break;
+        }
+      }
+
       // SERVIDOR CAÍDO (5xx → `unavailable`): no podemos verificar Trakt. Si hay
       // historial cacheado el usuario estaba conectado → mantenemos `connected`
       // para mostrarlo offline (en vez del prompt de login).
       if (st?.unavailable) {
-        setAuth({
-          loading: false,
-          connected: !!readHistoryCache()?.items?.length,
-        });
+        setAuth({ loading: false, connected: hadCachedConnection });
       } else {
         setAuth({ loading: false, connected: !!st?.connected && !st?.degraded });
       }
     } catch (error) {
       // Error de RED (offline total): igual, conservar conexión si hay caché.
-      if (isServerUnavailable(error) && readHistoryCache()?.items?.length) {
+      if (isServerUnavailable(error) && hadCachedConnection) {
         setAuth({ loading: false, connected: true });
       } else {
         setAuth({ loading: false, connected: false });
@@ -3001,21 +3027,16 @@ export default function HistoryClient() {
     loadHistory({ reset: true });
   }, [auth.loading, auth.connected, loadHistory, isBackNav]);
 
-  useEffect(() => {
-    if (!auth.connected || !historyLoaded || !hasMoreHistory || loading) return;
-    const el = loadMoreRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) loadHistory({ reset: false });
-      },
-      { threshold: 0.01, rootMargin: "900px 0px" },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [auth.connected, hasMoreHistory, historyLoaded, loadHistory, loading]);
+  // Antes había un IntersectionObserver aquí que disparaba `loadHistory` solo
+  // con acercarse al final de la lista (rootMargin de 900px). Se quita a
+  // propósito: en back-nav (volver desde una ficha) toda la lista cacheada se
+  // renderiza de golpe para que <ScrollRestoration> recupere la posición, así
+  // que ese observer se enganchaba nada más montar y, si el punto restaurado
+  // caía cerca del final, disparaba una carga automática justo en mitad de la
+  // restauración -- una petición de red no pedida por el usuario que además
+  // podía interferir con el scroll. El botón "Cargar más" de abajo cubre la
+  // misma función sin ese riesgo: la petición solo sale cuando el usuario
+  // pulsa, nunca sola al montar o volver atrás.
 
   const removeFromHistory = useCallback(async (_entry, { historyId }) => {
     if (!historyId) return;
@@ -4054,10 +4075,7 @@ export default function HistoryClient() {
                 })}
 
                 {(hasMoreHistory || loadingMore || historyError) && (
-                  <div
-                    ref={loadMoreRef}
-                    className="flex flex-col items-center justify-center gap-3 py-8"
-                  >
+                  <div className="flex flex-col items-center justify-center gap-3 py-8">
                     {historyError && (
                       <p className="text-sm text-red-300">{historyError}</p>
                     )}
