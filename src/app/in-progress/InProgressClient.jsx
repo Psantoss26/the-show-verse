@@ -2168,7 +2168,7 @@ export default function InProgressClient({
                         (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
                         para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
                         de sección de la fila de arriba y las dos filas se alineen. */}
-                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                       <button
                         onClick={() => setViewMode("cards")}
                         className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
@@ -2275,7 +2275,7 @@ export default function InProgressClient({
             </InlineDropdown>
 
             {/* View mode */}
-            <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+            <div className="flex gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("cards")}
                 className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${

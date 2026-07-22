@@ -15,7 +15,7 @@ export default function HistorySectionNav({ className = "" }) {
   return (
     <nav
       aria-label="Historial y continuar viendo"
-      className={`inline-flex max-w-full gap-1 overflow-x-auto rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {SECTIONS.map(({ href, label, Icon }) => {
         const active = pathname === href;
@@ -27,7 +27,7 @@ export default function HistorySectionNav({ className = "" }) {
             aria-current={active ? "page" : undefined}
             aria-label={label}
             title={label}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg py-2 text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl py-2 text-sm font-bold transition-all ${
               active ? "px-2.5 lg:px-3.5" : "px-2.5"
             } ${
               active
