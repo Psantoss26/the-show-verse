@@ -327,6 +327,10 @@ const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 
+// Referencia estable (no recrear en cada render) para forzar animaciones de
+// Framer Motion por JS en vez de WAAPI acelerado -- ver comentario de uso.
+function NOOP_ON_UPDATE() {}
+
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
     ? rawVideos.results
@@ -9145,6 +9149,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? true
                     : undefined
                 }
+                // Sin `onUpdate`, Framer Motion anima opacity/transform por
+                // WAAPI (nativo, acelerado). Al completarse esa animación
+                // nativa el navegador la retira y el elemento vuelve un frame
+                // al estilo inline previo (opacity:0) hasta que Framer escribe
+                // el valor final por JS justo después -> parpadeo real
+                // (opacity 1 -> 0 -> 1) al terminar de revelarse. Pasar un
+                // `onUpdate` desactiva WAAPI (Framer no puede leer valores por
+                // frame desde ahí) y fuerza su animación por JS, sincronizada
+                // con lo pintado. Mismo bug y arreglo que en FadeIn.
+                onUpdate={NOOP_ON_UPDATE}
               >
                 <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
