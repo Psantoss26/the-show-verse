@@ -28,7 +28,6 @@ import {
   X,
   LogOut,
   SlidersHorizontal,
-  ChevronsUpDown,
   MonitorPlay,
 } from "lucide-react";
 
@@ -2655,6 +2654,7 @@ export default function HistoryClient() {
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const loadMoreRef = useRef(null);
   const loadingHistoryRef = useRef(false);
   const nextHistoryPageRef = useRef(backNavInit?.nextPage || 1);
   const hasMoreHistoryRef = useRef(!!backNavInit?.hasMore);
@@ -3032,16 +3032,47 @@ export default function HistoryClient() {
     loadHistory({ reset: true });
   }, [auth.loading, auth.connected, loadHistory, isBackNav]);
 
-  // Antes había un IntersectionObserver aquí que disparaba `loadHistory` solo
-  // con acercarse al final de la lista (rootMargin de 900px). Se quita a
-  // propósito: en back-nav (volver desde una ficha) toda la lista cacheada se
-  // renderiza de golpe para que <ScrollRestoration> recupere la posición, así
-  // que ese observer se enganchaba nada más montar y, si el punto restaurado
-  // caía cerca del final, disparaba una carga automática justo en mitad de la
-  // restauración -- una petición de red no pedida por el usuario que además
-  // podía interferir con el scroll. El botón "Cargar más" de abajo cubre la
-  // misma función sin ese riesgo: la petición solo sale cuando el usuario
-  // pulsa, nunca sola al montar o volver atrás.
+  // Carga progresiva al acercarse al final. Al volver desde una ficha se deja
+  // INACTIVA: la lista completa sale de caché en el primer frame y no iniciamos
+  // una petición que pueda modificar su altura mientras ScrollRestoration fija
+  // la posición guardada.
+  useEffect(() => {
+    if (
+      isBackNav ||
+      !auth.connected ||
+      !historyLoaded ||
+      !hasMoreHistory ||
+      loading ||
+      historyError
+    ) {
+      return undefined;
+    }
+
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadHistory({ reset: false });
+        }
+      },
+      // Solo empieza cuando el usuario se acerca de verdad al final, no al
+      // montar la página ni durante la restauración de scroll.
+      { threshold: 0.01, rootMargin: "0px 0px 320px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    auth.connected,
+    hasMoreHistory,
+    historyLoaded,
+    historyError,
+    isBackNav,
+    loadHistory,
+    loading,
+  ]);
 
   const removeFromHistory = useCallback(async (_entry, { historyId }) => {
     if (!historyId) return;
@@ -4086,25 +4117,36 @@ export default function HistoryClient() {
                   );
                 })}
 
-                {(hasMoreHistory || loadingMore || historyError) && (
+                {hasMoreHistory && (
+                  <div
+                    ref={loadMoreRef}
+                    className="h-px w-full"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {(loadingMore || historyError) && (
                   <div className="flex flex-col items-center justify-center gap-3 py-8">
                     {historyError && (
-                      <p className="text-sm text-red-300">{historyError}</p>
-                    )}
-                    {hasMoreHistory && (
-                      <button
-                        type="button"
-                        onClick={() => loadHistory({ reset: false })}
-                        disabled={loadingMore || loading}
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-sm font-bold text-zinc-200 hover:border-emerald-500/40 hover:text-white transition disabled:opacity-50"
-                      >
-                        {loadingMore ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                        ) : (
-                          <ChevronsUpDown className="w-4 h-4 text-emerald-400" />
+                      <>
+                        <p className="text-sm text-red-300">{historyError}</p>
+                        {hasMoreHistory && (
+                          <button
+                            type="button"
+                            onClick={() => loadHistory({ reset: false })}
+                            disabled={loadingMore || loading}
+                            className="text-sm font-bold text-emerald-300 transition hover:text-white disabled:opacity-50"
+                          >
+                            Reintentar
+                          </button>
                         )}
-                        {loadingMore ? "Cargando más..." : "Cargar más"}
-                      </button>
+                      </>
+                    )}
+                    {loadingMore && (
+                      <div className="inline-flex items-center gap-2 text-sm font-bold text-zinc-300">
+                        <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                        Cargando más...
+                      </div>
                     )}
                   </div>
                 )}

@@ -13,7 +13,10 @@ import { useRef } from "react";
 // popstate; como al navegar las páginas RE-MONTAN, el primer render del nuevo
 // componente cae dentro de una ventana breve tras ese popstate.
 
-const HISTORY_WINDOW_MS = 1500;
+// La ficha de detalle puede resolver datos y renderizar antes de que vuelva a
+// montar la lista. Una ventana corta convertía ese back real en navegación
+// nueva justo cuando había varias páginas de Historial en caché.
+const HISTORY_WINDOW_MS = 10_000;
 let lastHistoryNavAt = -Infinity;
 let installed = false;
 
