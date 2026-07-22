@@ -140,16 +140,19 @@ export const movieImagesCache = new Map();
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
 export function getArtworkPreference(movieId, mediaType = "movie") {
   if (typeof window === "undefined") {
-    return { poster: null, backdrop: null };
+    return { poster: null, backdrop: null, logo: null };
   }
   const type = mediaType === "tv" ? "tv" : "movie";
   const posterKey = `showverse:${type}:${movieId}:poster`;
   const backdropKey = `showverse:${type}:${movieId}:backdrop`;
+  const logoKey = `showverse:${type}:${movieId}:logo`;
   const poster = window.localStorage.getItem(posterKey);
   const backdrop = window.localStorage.getItem(backdropKey);
+  const logo = window.localStorage.getItem(logoKey);
   return {
     poster: poster || null,
     backdrop: backdrop || null,
+    logo: logo || null,
   };
 }
 
