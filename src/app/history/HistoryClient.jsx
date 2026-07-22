@@ -71,29 +71,47 @@ const pad2 = (n) => String(n).padStart(2, "0");
 // new session, then a background refresh replaces them. A hard age cap drops
 // data that is too old to be useful.
 const HISTORY_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+// `localStorage` tiene una cuota pequeña y puede rechazar silenciosamente una
+// lista larga. La navegación a DetailsClient ocurre dentro de la misma sesión,
+// así que esta copia en memoria es la fuente de verdad para volver a una página
+// posterior a la primera; localStorage queda como respaldo entre recargas.
+let historySessionCache = null;
+
+function normalizeHistoryCache(cache) {
+  if (!Array.isArray(cache?.items)) return null;
+
+  const age = Date.now() - Number(cache.t || 0);
+  if (age < 0 || age > HISTORY_CACHE_HARD_MAX_AGE) return null;
+
+  return {
+    items: cache.items,
+    hasMore: !!cache.hasMore,
+    // Cursor de la SIGUIENTE página a cargar. Se persiste para que, al volver
+    // (atrás/adelante), la paginación continúe donde estaba en vez de re-pedir
+    // desde la página 1. Cachés antiguas sin este campo → 1 (el dedupe evita
+    // duplicados si se re-pide una página ya cargada).
+    nextPage: Number(cache.nextPage) > 1 ? Number(cache.nextPage) : 1,
+    fresh: age < HISTORY_CACHE_TTL_MS,
+  };
+}
 
 function readHistoryCache() {
   if (typeof window === "undefined") return null;
+
+  const inMemory = normalizeHistoryCache(historySessionCache);
+  if (inMemory) return inMemory;
+
   try {
     const raw = window.localStorage.getItem(HISTORY_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.items)) return null;
-    const age = Date.now() - Number(parsed.t || 0);
-    if (age > HISTORY_CACHE_HARD_MAX_AGE) {
+    const cached = normalizeHistoryCache(parsed);
+    if (!cached) {
       window.localStorage.removeItem(HISTORY_CACHE_KEY);
       return null;
     }
-    return {
-      items: parsed.items,
-      hasMore: !!parsed.hasMore,
-      // Cursor de la SIGUIENTE página a cargar. Se persiste para que, al volver
-      // (atrás/adelante), la paginación continúe donde estaba en vez de re-pedir
-      // desde la página 1. Cachés antiguas sin este campo → 1 (el dedupe evita
-      // duplicados si se re-pide una página ya cargada).
-      nextPage: Number(parsed.nextPage) > 1 ? Number(parsed.nextPage) : 1,
-      fresh: age < HISTORY_CACHE_TTL_MS,
-    };
+    historySessionCache = parsed;
+    return cached;
   } catch {
     return null;
   }
@@ -101,22 +119,24 @@ function readHistoryCache() {
 
 function writeHistoryCache(items, { hasMore = false, nextPage } = {}) {
   if (typeof window === "undefined") return;
+
+  const snapshot = {
+    t: Date.now(),
+    items: Array.isArray(items) ? items : [],
+    hasMore: !!hasMore,
+    // Cursor de la siguiente página (para reanudar la paginación al volver).
+    nextPage: Number(nextPage) > 1 ? Number(nextPage) : 1,
+  };
+  historySessionCache = snapshot;
+
   try {
-    window.localStorage.setItem(
-      HISTORY_CACHE_KEY,
-      JSON.stringify({
-        t: Date.now(),
-        items: Array.isArray(items) ? items : [],
-        hasMore: !!hasMore,
-        // Cursor de la siguiente página (para reanudar la paginación al volver).
-        nextPage: Number(nextPage) > 1 ? Number(nextPage) : 1,
-      }),
-    );
+    window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(snapshot));
   } catch {}
 }
 
 function clearHistoryCache() {
   if (typeof window === "undefined") return;
+  historySessionCache = null;
   try {
     window.localStorage.removeItem(HISTORY_CACHE_KEY);
   } catch {}
