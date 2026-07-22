@@ -36,7 +36,12 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 // -- Componentes internos del proyecto --
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
-import { saveArtworkOverride } from "@/lib/artworkApi";
+import {
+  fetchArtworkOverride,
+  readArtworkPreference,
+  saveArtworkOverride,
+  writeArtworkPreference,
+} from "@/lib/artworkApi";
 import Link from "next/link";
 
 // Componentes de animacion reutilizables para secciones con entrada animada
@@ -1198,6 +1203,12 @@ export default function DetailsClient({
   const globalViewModeStorageKey = "showverse:global:posterViewMode";
   const traktStatusStorageKey = `showverse:trakt:status:${endpointType}:${id}`;
   const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${id}`;
+  const artworkPreferenceRevisionRef = useRef(0);
+
+  const persistArtworkPreference = (storageKey, filePath) => {
+    artworkPreferenceRevisionRef.current += 1;
+    writeArtworkPreference(storageKey, filePath);
+  };
 
   // -- Rutas de imagen seleccionadas por el usuario --
   const [selectedPosterPath, setSelectedPosterPath] = useState(null);
@@ -2673,29 +2684,20 @@ export default function DetailsClient({
     setArtworkInitialized(false);
     posterSettledRef.current = false;
 
-    const initialPoster =
-      (typeof window !== "undefined"
-      ? window.localStorage.getItem(posterStorageKey)
-        : null) || null;
-
-    const initialMobilePoster =
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem(mobilePosterStorageKey)
-        : null) || null;
-
-    const initialLogo =
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem(logoStorageKey)
-        : null) || null;
-
-    const initialBackdrop =
-      (typeof window !== "undefined"
-        ? window.localStorage.getItem(backgroundStorageKey)
-        : null) || null;
+    const initialPoster = readArtworkPreference(posterStorageKey);
+    const initialMobilePoster = readArtworkPreference(mobilePosterStorageKey);
+    const initialLogo = readArtworkPreference(logoStorageKey);
+    const initialPreviewBackdrop = readArtworkPreference(
+      previewBackdropStorageKey,
+    );
+    const initialBackdrop = readArtworkPreference(backgroundStorageKey);
 
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
+    setSelectedPosterPath(initialPoster);
     setSelectedMobilePosterPath(initialMobilePoster);
+    setSelectedPreviewBackdropPath(initialPreviewBackdrop);
+    setSelectedBackgroundPath(initialBackdrop);
     setSelectedLogoPath(initialLogo);
     // No activar posterResolved hasta que initArtwork termine
 
@@ -2711,41 +2713,12 @@ export default function DetailsClient({
     setImagesError("");
     setActiveImagesTab("posters");
 
-    setSelectedPosterPath(null);
-    setSelectedMobilePosterPath(null);
-    setSelectedPreviewBackdropPath(null);
-    setSelectedBackgroundPath(null);
-    setSelectedLogoPath(null);
-
     // No resetear posterViewMode/posterLayoutMode - respetar la preferencia global
     // Ya se inicializan desde localStorage en el useState inicial
 
     setActiveTab("details");
     setActiveSection(null);
 
-    if (typeof window !== "undefined") {
-      try {
-        const savedPoster = window.localStorage.getItem(posterStorageKey);
-        const savedMobilePoster = window.localStorage.getItem(
-          mobilePosterStorageKey,
-        );
-        const savedLogo = window.localStorage.getItem(logoStorageKey);
-        const savedPreviewBackdrop = window.localStorage.getItem(
-          previewBackdropStorageKey,
-        );
-        const savedBackground =
-          window.localStorage.getItem(backgroundStorageKey);
-
-        if (savedPoster) setSelectedPosterPath(savedPoster);
-        if (savedMobilePoster) setSelectedMobilePosterPath(savedMobilePoster);
-        if (savedLogo) setSelectedLogoPath(savedLogo);
-        if (savedPreviewBackdrop)
-          setSelectedPreviewBackdropPath(savedPreviewBackdrop);
-        if (savedBackground) setSelectedBackgroundPath(savedBackground);
-      } catch {
-        // ignore
-      }
-    }
     // No activar artworkInitialized aqui - esperar a que initArtwork termine
   }, [
     id,
@@ -2758,6 +2731,54 @@ export default function DetailsClient({
     logoStorageKey,
     backgroundStorageKey,
     previewBackdropStorageKey,
+  ]);
+
+  // En móviles donde localStorage está bloqueado, la copia guardada por la API
+  // recupera la selección tras volver a abrir la ficha. Nunca pisa una elección
+  // local o una interacción hecha mientras la petición estaba en curso.
+  useEffect(() => {
+    let cancelled = false;
+    const revisionAtStart = artworkPreferenceRevisionRef.current;
+
+    const restoreRemoteArtwork = async () => {
+      const overrides = await fetchArtworkOverride({ type: endpointType, id });
+      if (
+        cancelled ||
+        artworkPreferenceRevisionRef.current !== revisionAtStart
+      ) {
+        return;
+      }
+
+      const restore = (kind, storageKey, setter) => {
+        const filePath = overrides?.[kind];
+        if (!filePath || readArtworkPreference(storageKey)) return;
+        writeArtworkPreference(storageKey, filePath);
+        setter(filePath);
+      };
+
+      restore("poster", posterStorageKey, setSelectedPosterPath);
+      restore("mobilePoster", mobilePosterStorageKey, setSelectedMobilePosterPath);
+      restore("logo", logoStorageKey, setSelectedLogoPath);
+      restore(
+        "backdrop",
+        previewBackdropStorageKey,
+        setSelectedPreviewBackdropPath,
+      );
+      restore("background", backgroundStorageKey, setSelectedBackgroundPath);
+    };
+
+    void restoreRemoteArtwork();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    id,
+    endpointType,
+    posterStorageKey,
+    mobilePosterStorageKey,
+    logoStorageKey,
+    previewBackdropStorageKey,
+    backgroundStorageKey,
   ]);
 
   /**
@@ -2887,9 +2908,9 @@ export default function DetailsClient({
       }
 
       if (!cancelled) {
-        const hasSavedPoster =
-          typeof window !== "undefined" &&
-          Boolean(window.localStorage.getItem(posterStorageKey));
+        const hasSavedPoster = Boolean(
+          readArtworkPreference(posterStorageKey),
+        );
 
         // Respetar selecciones manuales, pero permitir sustituir el poster base
         // localizado por el poster ingles calculado -- SALVO que la portada
@@ -5938,11 +5959,7 @@ export default function DetailsClient({
     setPosterViewMode("poster");
     setPosterLayoutMode("poster");
     setSelectedPosterPath(filePath);
-    if (typeof window !== "undefined") {
-      filePath
-        ? window.localStorage.setItem(posterStorageKey, filePath)
-        : window.localStorage.removeItem(posterStorageKey);
-    }
+    persistArtworkPreference(posterStorageKey, filePath);
     saveArtworkOverride({ type: endpointType, id, kind: "poster", filePath });
   };
 
@@ -5950,11 +5967,7 @@ export default function DetailsClient({
   // de la pestaña de pósters neutros y alimenta directamente el hero vertical.
   const handleSelectMobilePoster = (filePath) => {
     setSelectedMobilePosterPath(filePath);
-    if (typeof window !== "undefined") {
-      filePath
-        ? window.localStorage.setItem(mobilePosterStorageKey, filePath)
-        : window.localStorage.removeItem(mobilePosterStorageKey);
-    }
+    persistArtworkPreference(mobilePosterStorageKey, filePath);
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -5965,22 +5978,14 @@ export default function DetailsClient({
 
   const handleSelectLogo = (filePath) => {
     setSelectedLogoPath(filePath);
-    if (typeof window !== "undefined") {
-      filePath
-        ? window.localStorage.setItem(logoStorageKey, filePath)
-        : window.localStorage.removeItem(logoStorageKey);
-    }
+    persistArtworkPreference(logoStorageKey, filePath);
     saveArtworkOverride({ type: endpointType, id, kind: "logo", filePath });
   };
 
   // Selecciona un backdrop para el modo preview y lo persiste
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath);
-    if (typeof window !== "undefined") {
-      filePath
-        ? window.localStorage.setItem(previewBackdropStorageKey, filePath)
-        : window.localStorage.removeItem(previewBackdropStorageKey);
-    }
+    persistArtworkPreference(previewBackdropStorageKey, filePath);
     saveArtworkOverride({ type: endpointType, id, kind: "backdrop", filePath });
   };
 
@@ -5991,11 +5996,7 @@ export default function DetailsClient({
     setIsTransitioning(true);
 
     setSelectedBackgroundPath(filePath);
-    if (typeof window !== "undefined") {
-      filePath
-        ? window.localStorage.setItem(backgroundStorageKey, filePath)
-        : window.localStorage.removeItem(backgroundStorageKey);
-    }
+    persistArtworkPreference(backgroundStorageKey, filePath);
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -6019,13 +6020,11 @@ export default function DetailsClient({
     setSelectedLogoPath(null);
     setPosterViewMode("poster");
     setPosterLayoutMode("poster");
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(posterStorageKey);
-      window.localStorage.removeItem(mobilePosterStorageKey);
-      window.localStorage.removeItem(previewBackdropStorageKey);
-      window.localStorage.removeItem(backgroundStorageKey);
-      window.localStorage.removeItem(logoStorageKey);
-    }
+    persistArtworkPreference(posterStorageKey, null);
+    persistArtworkPreference(mobilePosterStorageKey, null);
+    persistArtworkPreference(previewBackdropStorageKey, null);
+    persistArtworkPreference(backgroundStorageKey, null);
+    persistArtworkPreference(logoStorageKey, null);
     saveArtworkOverride({
       type: endpointType,
       id,
