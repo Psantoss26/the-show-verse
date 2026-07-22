@@ -8035,9 +8035,9 @@ export default function DetailsClient({
                 (evita destello). El logo y el contenido (en flujo, z-10) se
                 superponen. Solo móvil (`sm:hidden`). */}
             <div
-              className={`sm:hidden absolute top-0 inset-x-0 bg-cover bg-center poster-mobile-fade ${
+              className={`sv-mobile-poster-entry sm:hidden absolute top-0 inset-x-0 bg-cover bg-center poster-mobile-fade ${
                 currentLowLoaded
-                  ? "[opacity:calc(1_-_var(--sv-hero-scroll,0))]"
+                  ? "sv-mobile-poster-reveal [opacity:calc(1_-_var(--sv-hero-scroll,0))]"
                   : "opacity-0"
               }`}
               style={{
@@ -8454,8 +8454,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         portada ya trae el título impreso y el logo lo duplicaba.
                         `mobilePosterHasBurnedTitle` comprueba el idioma real del
                         póster elegido y cubre ese caso. */}
-                    {mobilePosterPath && !mobilePosterHasBurnedTitle && (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-2 z-[16] flex items-end justify-center p-4 sm:bottom-0">
+                    {currentLowLoaded &&
+                      mobilePosterPath &&
+                      !mobilePosterHasBurnedTitle &&
+                      (heroLogoPath || heroLogoResolved) && (
+                      <motion.div
+                        initial={
+                          prefersReducedMotion
+                            ? false
+                            : { opacity: 0, y: 18, scale: 0.94, filter: "blur(8px)" }
+                        }
+                        animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                        transition={{
+                          duration: prefersReducedMotion ? 0 : 0.48,
+                          delay: prefersReducedMotion ? 0 : 0.14,
+                          ease: [0.16, 1, 0.3, 1],
+                        }}
+                        className="pointer-events-none absolute inset-x-0 bottom-2 z-[16] flex items-end justify-center p-4 sm:bottom-0"
+                      >
                         {/* Aquí había una sombra de 10rem para el logo. No era un
                             degradado anclado sino una FRANJA flotante: negro al
                             45% en su punto medio y transparente por arriba Y por
@@ -8479,7 +8495,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {title}
                           </h2>
                         ) : null}
-                      </div>
+                      </motion.div>
                     )}
 
                     {/* Overlay VISUAL DENTRO del marco: se inclina con la imagen
@@ -8816,7 +8832,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       : "-top-2"
                   } sm:top-0`}
                 >
-                  <div ref={mobileActionRowRef}>
+                  <div
+                    ref={mobileActionRowRef}
+                    className={
+                      currentLowLoaded && inProgressChecked
+                        ? "sv-mobile-actions-reveal"
+                        : ""
+                    }
+                  >
                   <DetailActionsRow
                 mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}

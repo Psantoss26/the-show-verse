@@ -239,7 +239,7 @@ export function pickBestPosterByLangThenResolution(list, opts = {}) {
   return null;
 }
 
-export async function getMovieImages(itemId, mediaType = "movie") {
+export async function getMovieImages(itemId, mediaType = "movie", opts = {}) {
   const cacheKey = `${mediaType}:${itemId}`;
   if (movieImagesCache.has(cacheKey)) return movieImagesCache.get(cacheKey);
 
@@ -255,7 +255,10 @@ export async function getMovieImages(itemId, mediaType = "movie") {
     // No restringimos `include_image_language`: para las previews necesitamos
     // poder caer en cualquier backdrop con idioma si no existe versión inglesa.
     // El selector prioriza inglés y deja las imágenes sin idioma para el final.
-    const j = await fetchTmdbImages(type, itemId, { allLanguages: true });
+    const j = await fetchTmdbImages(type, itemId, {
+      allLanguages: true,
+      priority: opts.priority,
+    });
     if (!j) return { posters: [], backdrops: [], logos: [] };
     const posters = Array.isArray(j?.posters) ? j.posters : [];
     const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
@@ -324,7 +327,9 @@ export function pickBestBackdropNoLang(
 }
 
 export async function fetchBestBackdropNoLang(itemId, mediaType = "movie", opts = {}) {
-  const { backdrops } = await getMovieImages(itemId, mediaType);
+  const { backdrops } = await getMovieImages(itemId, mediaType, {
+    priority: opts.priority,
+  });
   const best = pickBestBackdropNoLang(backdrops, opts);
   return best?.file_path || null;
 }
@@ -515,7 +520,9 @@ export async function fetchBestPosterNoLang(
   mediaType = "movie",
   opts = {},
 ) {
-  const { posters } = await getMovieImages(itemId, mediaType);
+  const { posters } = await getMovieImages(itemId, mediaType, {
+    priority: opts.priority,
+  });
   const best = pickBestPosterNoLang(posters, opts);
   return best?.file_path || null;
 }
@@ -558,7 +565,7 @@ function pickBestLogoByLang(logos, order = ["es", "en", null]) {
 // votado de cualquier idioma.
 export const movieLogosCache = new Map(); // `${mediaType}:${id}` -> logos[]
 
-export async function getTitleLogos(itemId, mediaType = "movie") {
+export async function getTitleLogos(itemId, mediaType = "movie", opts = {}) {
   const cacheKey = `${mediaType}:${itemId}`;
   if (movieLogosCache.has(cacheKey)) return movieLogosCache.get(cacheKey);
 
@@ -570,7 +577,10 @@ export async function getTitleLogos(itemId, mediaType = "movie") {
 
   try {
     const type = mediaType === "tv" ? "tv" : "movie";
-    const j = await fetchTmdbImages(type, itemId, { allLanguages: true });
+    const j = await fetchTmdbImages(type, itemId, {
+      allLanguages: true,
+      priority: opts.priority,
+    });
     if (!j) return [];
     const logos = Array.isArray(j?.logos) ? j.logos : [];
     movieLogosCache.set(cacheKey, logos);
@@ -584,8 +594,9 @@ export async function fetchBestLogo(
   itemId,
   mediaType = "movie",
   preferLangs = ["es", "en", null],
+  opts = {},
 ) {
-  const logos = await getTitleLogos(itemId, mediaType);
+  const logos = await getTitleLogos(itemId, mediaType, opts);
   const best = pickBestLogoByLang(logos, preferLangs);
   return best?.file_path || null;
 }
