@@ -1291,8 +1291,17 @@ function FeaturedSlide({
           showTrailer ? "opacity-0" : "opacity-100"
         }`}
         style={{
+          // max() de los dos huecos posibles: el que deja la relación de
+          // aspecto (pantallas anchas y bajas, altura limitada por
+          // --hero-desktop-max-height) y el que ahora introduce a propósito
+          // --hero-info-image-width en pantallas estrechas de alta densidad,
+          // para que el centro del backdrop no quede tapado. Cada uno suma su
+          // propio margen de fundido (+42rem) para que el borde nunca se vea.
           width:
-            "calc(100% - var(--hero-desktop-max-height, 88dvh) * 16 / 9 + 42rem)",
+            "max(" +
+            "calc(100% - var(--hero-desktop-max-height, 88dvh) * 16 / 9 + 42rem), " +
+            "calc(100% - var(--hero-info-image-width, 100%) + 42rem)" +
+            ")",
           background:
             "linear-gradient(to right," +
             " #000 0%," +
@@ -1679,6 +1688,16 @@ function FeaturedSlide({
           transform: translate3d(0, 0, 0);
           filter: blur(0);
           will-change: opacity, transform, filter;
+        }
+
+        /* Encoge el backdrop de escritorio y lo re-ancla a la derecha (ver
+           --hero-info-image-width, definida en .featured-hero-shell más
+           abajo) para que su centro no quede tapado por la columna de
+           información en pantallas estrechas. left:auto deja que el nuevo
+           width mande; right se conserva en 0 desde el inset-0 de Tailwind. */
+        .hero-backdrop-reveal-desktop {
+          left: auto;
+          width: var(--hero-info-image-width, 100%);
         }
 
         .hero-backdrop-loading {
@@ -2378,6 +2397,12 @@ export default function FeaturedHero({
       <style jsx>{`
         .featured-hero-shell {
           --hero-desktop-max-height: 92dvh;
+          /* Ancho reservado por la columna de información (logo + botones +
+             sinopsis): padding lateral (sm:px-20 = 5rem) + su max-width
+             (sm:max-w-xl = 36rem) = 41rem = 656px. Se usa para calcular cuánto
+             hay que encoger y desplazar el backdrop a la derecha en pantallas
+             estrechas -- ver --hero-info-image-width más abajo. */
+          --hero-info-panel-px: 656px;
         }
 
         /* Pantallas grandes (FullHD y panorámicas): el hero ocupa casi toda la
@@ -2388,6 +2413,38 @@ export default function FeaturedHero({
           .featured-hero-shell {
             --hero-desktop-max-height: 95dvh;
           }
+        }
+
+        /* De 1024px en adelante el padding lateral pasa a lg:px-40 = 10rem, así
+           que el hueco reservado crece a 10rem + 36rem = 46rem = 736px. */
+        @media (min-width: 1024px) {
+          .featured-hero-shell {
+            --hero-info-panel-px: 736px;
+          }
+        }
+
+        /* Ancho del backdrop de escritorio, encogido y anclado a la derecha
+           para que su CENTRO quede SIEMPRE fuera de la columna de información,
+           sea cual sea el ancho de la ventana (no solo su relación de
+           aspecto). En pantallas grandes (p. ej. un monitor 27" 16:9) el hueco
+           de la columna es una fracción pequeña del ancho total y la fórmula
+           satura en el 100% -- el backdrop se ve exactamente igual que antes.
+           En pantallas más estrechas pero de alta resolución (p. ej. una
+           tablet/portátil de 12" 2K, donde la columna de información -que mide
+           lo mismo en px- ocupa una fracción mucho mayor del ancho) el
+           backdrop se encoge y se desplaza a la derecha lo justo para que su
+           punto medio no quede tapado. Deducción: si el backdrop (ancho W,
+           anclado a la derecha) reproduce la imagen completa sin recortar,
+           su centro cae en pantalla a 100% - W/2; igualando eso al borde
+           derecho de la columna (--hero-info-panel-px) y despejando W:
+           W = 2 * (100vw - panel). El suelo del 50% evita que se encoja de
+           más en ventanas de escritorio muy estrechas (~640-700px). */
+        .featured-hero-shell {
+          --hero-info-image-width: clamp(
+            50%,
+            calc((100vw - var(--hero-info-panel-px)) * 2),
+            100%
+          );
         }
 
         .hero-scroll-cue {
