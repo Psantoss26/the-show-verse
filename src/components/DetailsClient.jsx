@@ -10372,16 +10372,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 );
                                             }
                                           }}
-                                          // Igual que Reparto y Recomendaciones: una tarjeta limpia,
-                                          // sin bordes persistentes. La selección se señala con el
-                                          // indicador puntual, no con un marco adicional.
-                                          className={`group relative w-full rounded-xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer
-                        transition-all duration-300 transform-gpu hover:-translate-y-1 hover:shadow-yellow-900/20
+                                          // La selección se comunica con un borde verde persistente.
+                                          // El borde se decide en una sola rama para que el estado
+                                          // transparente de las tarjetas inactivas no lo sobrescriba.
+                                          className={`group relative w-full rounded-xl overflow-hidden border-2 bg-zinc-900 shadow-md cursor-pointer
+                        transition-all duration-300 transform-gpu hover:-translate-y-1
                         after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300
                         ${
                           isActive
-                            ? ""
-                            : "hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] hover:shadow-[0_0_16px_rgba(16,185,129,0.45)]"
+                            : "border-transparent hover:shadow-yellow-900/20 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                         }`}
                                           aria-label="Seleccionar"
                                           style={{
