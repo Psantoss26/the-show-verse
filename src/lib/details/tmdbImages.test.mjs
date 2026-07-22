@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
     isLanguageNeutralImage,
     pickBestBackdropTVNeutralFirst,
+    pickBestNeutralPosterByResVotes,
     pickBestNeutralBackdropByResVotes,
     resolveNeutralBackdropPath
 } from './tmdbImages.js'
@@ -68,6 +69,27 @@ test('the best-quality candidate is selected from neutral backdrops only', () =>
     ])
 
     assert.equal(best?.file_path, '/neutral-4k.jpg')
+})
+
+test('a localized poster is used when a title has no neutral poster artwork', () => {
+    const poster = pickBestNeutralPosterByResVotes([
+        {
+            file_path: '/top-gear-en.jpg',
+            iso_639_1: 'en',
+            width: 2000,
+            height: 3000,
+            vote_count: 29
+        },
+        {
+            file_path: '/top-gear-en-small.jpg',
+            iso_639_1: 'en',
+            width: 1000,
+            height: 1500,
+            vote_count: 18
+        }
+    ])
+
+    assert.equal(poster?.file_path, '/top-gear-en.jpg')
 })
 
 test('saved localized or metadata-less paths cannot override a neutral background', () => {
