@@ -1563,8 +1563,9 @@ export default function DetailsClient({
   }, [isMobileViewport]);
 
   // MÓVIL: el marcador de puntuaciones no compite con la portada al entrar.
-  // Se revela al cruzar por primera vez el navbar inferior y se vuelve a
-  // colapsar únicamente al regresar al inicio de la ficha.
+  // Su espacio se reserva para que las pestañas no ocupen su lugar; solo se
+  // revela al cruzar por primera vez el navbar inferior y se oculta al volver
+  // al inicio de la ficha.
   useEffect(() => {
     if (!isMobileViewport) {
       setMobileScoreboardVisible(false);
@@ -9115,18 +9116,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 initial={false}
                 animate={
                   isMobileViewport && !mobileScoreboardVisible
-                    ? { opacity: 0, height: 0, y: 12 }
-                    : { opacity: 1, height: "auto", y: 0 }
+                    ? { opacity: 0, y: 20, scale: 0.985 }
+                    : { opacity: 1, y: 0, scale: 1 }
                 }
                 transition={
                   prefersReducedMotion
                     ? { duration: 0 }
-                    : { duration: 0.38, ease: [0.16, 1, 0.3, 1] }
+                    : { duration: 0.46, ease: [0.16, 1, 0.3, 1] }
                 }
-                className={`overflow-hidden sm:overflow-visible ${
+                className={`origin-top transform-gpu ${
                   mobileScoreboardVisible
-                    ? "max-sm:will-change-[height,opacity,transform]"
-                    : "max-sm:!h-0 max-sm:!translate-y-3 max-sm:!opacity-0 max-sm:pointer-events-none"
+                    ? "max-sm:will-change-[opacity,transform]"
+                    : "max-sm:!opacity-0 max-sm:pointer-events-none"
                 }`}
                 inert={isMobileViewport && !mobileScoreboardVisible}
                 aria-hidden={
