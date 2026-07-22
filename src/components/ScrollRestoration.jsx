@@ -4,7 +4,11 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
-const HISTORY_NAVIGATION_WINDOW_MS = 1200;
+// En rutas dinámicas pesadas, el cambio de pathname puede llegar varios
+// segundos después del `popstate`. Mantenemos la navegación marcada como
+// historial durante ese tiempo para no tratar la vuelta como un push y mandar
+// el documento al inicio.
+const HISTORY_NAVIGATION_WINDOW_MS = 10_000;
 // Ventana máxima durante la cual reaplicamos la posición guardada mientras el
 // layout «se pone al día». En las páginas con contenido asíncrono (p. ej. el
 // dashboard: "Continuar viendo" y "Para ti" aparecen tras hidratar la sesión,
