@@ -779,7 +779,10 @@ export default function Navbar() {
   // las secciones principales y los accesos de la derecha. Se mide el espacio
   // real —incluidos traducciones, avatar y zoom— en vez de depender de un único
   // breakpoint de viewport.
-  const [desktopSearchCompact, setDesktopSearchCompact] = useState(true);
+  // No asumimos el modo compacto antes de medir el header. De ese modo, al
+  // recargar no se llega a pintar el botón «Buscar» en pantallas que sí tienen
+  // espacio para la barra completa; ResizeObserver lo activa solo cuando toca.
+  const [desktopSearchCompact, setDesktopSearchCompact] = useState(false);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
   const desktopHeaderRef = useRef(null);
   const desktopLeftRef = useRef(null);
@@ -1370,7 +1373,13 @@ export default function Navbar() {
             </div>
 
             {profileAuthLoading ? (
-              <div className="ml-2 w-28 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
+              // Durante la hidratación conservamos la huella circular del avatar.
+              // Así una sesión ya iniciada nunca parece convertirse por un instante
+              // en el botón ancho de acceso antes de recuperar la cuenta cacheada.
+              <div
+                aria-hidden="true"
+                className="ml-2 h-9 w-9 rounded-full bg-neutral-800/80 animate-pulse"
+              />
             ) : !account ? (
               <a
                 href={loginHref}

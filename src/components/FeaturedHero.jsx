@@ -1900,7 +1900,7 @@ export default function FeaturedHero({
   }, []);
 
   const resolveAssetsFor = useCallback(
-    async (movie) => {
+    async (movie, { priority } = {}) => {
       if (!movie?.id) return;
       const id = movie.id;
       if (assetsRef.current[id] || resolvingAssetsRef.current.has(id)) return;
@@ -1912,13 +1912,48 @@ export default function FeaturedHero({
       let poster = null;
       let logo = null;
 
+      const { backdrop: userBackdrop } = getArtworkPreference(id);
+
+      // El backdrop primario, el póster y el logo son independientes entre sí
+      // -- los tres leen la MISMA respuesta de `/images`, deduplicada por
+      // `fetchTmdbImages`. Antes se encadenaban con `await` uno detrás de
+      // otro: cada paso esperaba a que el anterior completara su vuelta de
+      // red antes de empezar, así que para cuando arrancaba el logo la
+      // petición compartida ya se había resuelto (y limpiado de la caché "en
+      // vuelo"), y acababa disparando su PROPIA copia de `/images`. Lanzarlas
+      // a la vez comparte esa única petición: el hero -lo primero que se ve
+      // del dashboard- tarda ~1 vuelta de red en vez de varias encadenadas.
+      // `priority: "high"` (solo para el slide activo) además la salta al
+      // frente de la cola de `fetchTmdbImages` por delante del resto de
+      // peticiones de fondo del dashboard.
+      const [primaryBackdropResult, posterResult, logoResult] =
+        await Promise.allSettled([
+          userBackdrop
+            ? Promise.resolve(userBackdrop)
+            : fetchBestBackdropNoLang(id, mediaType, { priority }),
+          fetchBestPosterNoLang(id, mediaType, { priority }),
+          // Orden de preferencia: inglés → español → sin idioma → y, si no,
+          // el más votado de cualquier idioma (el fetch trae logos de TODOS
+          // los idiomas, así que nunca debería quedar vacío si TMDb tiene
+          // alguno).
+          fetchBestLogo(id, mediaType, ["en", "es", null], { priority }),
+        ]);
+
+      const primaryBackdrop =
+        primaryBackdropResult.status === "fulfilled"
+          ? primaryBackdropResult.value
+          : null;
+      poster = posterResult.status === "fulfilled" ? posterResult.value : null;
+      logo = logoResult.status === "fulfilled" ? logoResult.value : null;
+
       try {
-        const { backdrop: userBackdrop } = getArtworkPreference(id);
-        const primaryBackdrop =
-          userBackdrop || (await fetchBestBackdropNoLang(id, mediaType));
+        // Para cuando llegamos aquí, `/images` de este título ya está en
+        // caché (la petición de arriba la rellenó): esto resuelve sin vuelta
+        // de red adicional, solo selección sobre datos ya en memoria.
         const secondaryBackdrop = await fetchBestBackdropNoLang(id, mediaType, {
           limit: 5,
           excludePaths: [primaryBackdrop],
+          priority,
         });
         backdrops = uniquePaths([
           primaryBackdrop,
@@ -1927,22 +1962,9 @@ export default function FeaturedHero({
         ]).slice(0, 2);
         backdrop = backdrops[0] || null;
       } catch {
-        backdrop = getPreviewBackdropFallback(movie);
+        backdrop = primaryBackdrop || getPreviewBackdropFallback(movie);
         backdrops = uniquePaths([backdrop]);
       }
-
-      try {
-        poster = await fetchBestPosterNoLang(id, mediaType);
-      } catch {
-        poster = null;
-      }
-
-      try {
-        // Orden de preferencia: inglés → español → sin idioma → y, si no, el más
-        // votado de cualquier idioma (el fetch trae logos de TODOS los idiomas,
-        // así que nunca debería quedar vacío si TMDb tiene algún logo).
-        logo = await fetchBestLogo(id, mediaType, ["en", "es", null]);
-      } catch { }
 
       const backdropSignature = backdrops.join("|");
       if (deferInitialBackdrop && backdropSignature) {
@@ -1980,10 +2002,12 @@ export default function FeaturedHero({
     [deferInitialBackdrop],
   );
 
-  // El slide activo se resuelve inmediatamente.
+  // El slide activo se resuelve inmediatamente y con prioridad alta: es lo
+  // primero que se ve del dashboard, así que su petición de `/images` salta
+  // por delante de las demás peticiones de fondo (filas, próximo slide...).
   useEffect(() => {
     if (!list.length) return;
-    resolveAssetsFor(list[activeIndex]);
+    resolveAssetsFor(list[activeIndex], { priority: "high" });
   }, [list, activeIndex, resolveAssetsFor]);
 
   // Preparamos únicamente los metadatos del siguiente título cuando el

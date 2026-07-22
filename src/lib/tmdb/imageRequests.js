@@ -58,9 +58,14 @@ function pump() {
   }
 }
 
-function schedule(run) {
+function schedule(run, { priority = "normal" } = {}) {
   return new Promise((resolve, reject) => {
-    pending.push({ run, resolve, reject });
+    const job = { run, resolve, reject };
+    // Alta prioridad = salta al frente de la cola (p. ej. el hero destacado del
+    // dashboard, que es lo primero que se ve): no cambia el tope de concurrencia,
+    // solo el ORDEN en que se atienden las peticiones aún no arrancadas.
+    if (priority === "high") pending.unshift(job);
+    else pending.push(job);
     pump();
   });
 }
@@ -126,9 +131,16 @@ const inFlight = new Map();
  *   necesitan los selectores de logo: prefieren es/en pero, antes que quedarse
  *   sin logo, aceptan el más votado de cualquier idioma. Restringir aquí les
  *   quitaría esa red.
+ * @param {"normal"|"high"} [opts.priority] "high" salta al frente de la cola
+ *   (ver `schedule`). Para contenido visible de inmediato (p. ej. el hero
+ *   destacado) frente al resto de peticiones de fondo del dashboard.
  * @returns {Promise<{posters: [], backdrops: [], logos: []}|null>} null si falló.
  */
-export function fetchTmdbImages(type, id, { apiKey, allLanguages = false } = {}) {
+export function fetchTmdbImages(
+  type,
+  id,
+  { apiKey, allLanguages = false, priority = "normal" } = {},
+) {
   const key = process.env.NEXT_PUBLIC_TMDB_API_KEY || apiKey;
   if (!key || !type || id == null) return Promise.resolve(null);
 
@@ -143,7 +155,7 @@ export function fetchTmdbImages(type, id, { apiKey, allLanguages = false } = {})
     `https://api.themoviedb.org/3/${mediaType}/${id}/images?api_key=${key}` +
     (allLanguages ? "" : `&${TMDB_IMAGE_LANGS_PARAM}`);
 
-  const promise = schedule(() => requestImages(url)).finally(() => {
+  const promise = schedule(() => requestImages(url), { priority }).finally(() => {
     inFlight.delete(cacheKey);
   });
 
