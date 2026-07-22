@@ -164,12 +164,16 @@ import {
   preloadTmdb,
   pickBestImage,
   pickBestNeutralPosterByResVotes,
+  isLanguageNeutralImage,
   resolveNeutralBackdropPath,
   pickBestBackdropByLangResVotes,
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
-import { getTitleLogos } from "@/lib/dashboard/media";
+import {
+  getTitleLogos,
+  pickBestBackdropNoLang,
+} from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
@@ -1569,14 +1573,6 @@ export default function DetailsClient({
     };
   }, [data?.id, endpointType]);
 
-  // La pestaña de logos existe solo en el selector móvil. Al volver a escritorio
-  // restauramos una pestaña visible para conservar sus tres controles habituales.
-  useEffect(() => {
-    if (!isMobileViewport && activeImagesTab === "logos") {
-      setActiveImagesTab("posters");
-    }
-  }, [activeImagesTab, isMobileViewport]);
-
   // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
     if (supportsHover || !mobileClearOpen) return;
@@ -2290,10 +2286,11 @@ export default function DetailsClient({
   /**
    * Selecciona el mejor backdrop para el modo preview.
    * Combina todas las fuentes de backdrops disponibles y usa un algoritmo
-   * inteligente que prioriza imagenes con idioma ES/EN y buena resolucion.
+   * que comparte con DetailModal: prioriza backdrops sin idioma para que el
+   * logo se pueda superponer sin texto duplicado.
    * Evita parpadeos: no devuelve fallback generico hasta que la inicializacion termine.
    */
-  const previewBackdropFallback = useMemo(() => {
+  const detailModalPreviewBackdropFallback = useMemo(() => {
     // Durante la inicializacion no mostramos el backdrop base de TMDb:
     // puede ser una imagen secundaria que sera reemplazada por la seleccion final.
     if (!artworkInitialized) return null;
@@ -2304,14 +2301,39 @@ export default function DetailsClient({
       ...(data?.images?.backdrops ? data.images.backdrops : []),
     ];
 
-    // 2. Aplicar el filtro inteligente para encontrar el mejor backdrop
+    // 2. Usar exactamente el selector de DetailModal. La imagen inicial del
+    // detalle no tiene metadatos de idioma, así que no participa como arte
+    // neutro; solo queda como último fallback, igual que en la preview.
     if (allBackdrops.length > 0) {
-      const bestPath = pickBestBackdropForPreview(allBackdrops);
-      if (bestPath) return bestPath;
+      const galleryBackdrops = allBackdrops.filter(
+        (backdrop) => backdrop?.file_path && backdrop.from !== "main",
+      );
+      const bestBackdrop = pickBestBackdropNoLang(galleryBackdrops);
+      if (bestBackdrop?.file_path) return bestBackdrop.file_path;
     }
 
     // 3. Fallback final: si ya terminamos y no hay nada mejor, usamos el generico
     return data?.backdrop_path || null;
+  }, [
+    imagesState?.backdrops,
+    data?.images?.backdrops,
+    data?.backdrop_path,
+    artworkInitialized,
+  ]);
+
+  // El cambio de modo de la portada es independiente de la pestaña «Vista
+  // previa». Aquí se conserva la política localizada del póster (inglés antes
+  // que cualquier fallback), que es la que siempre usó la ficha al alternar
+  // entre Póster y Backdrop.
+  const posterBackdropFallback = useMemo(() => {
+    if (!artworkInitialized) return null;
+
+    const allBackdrops = [
+      ...(imagesState?.backdrops || []),
+      ...(data?.images?.backdrops ? data.images.backdrops : []),
+    ];
+    const bestPath = pickBestBackdropForPreview(allBackdrops);
+    return bestPath || data?.backdrop_path || null;
   }, [
     imagesState?.backdrops,
     data?.images?.backdrops,
@@ -2378,8 +2400,8 @@ export default function DetailsClient({
     const currentMobilePosterActive =
       selectedMobilePosterPath || mobileNeutralPosterPath || null;
 
-    // Backdrop de preview: misma logica de seleccion que MainDashboard
-    const previewFallback = previewBackdropFallback;
+    // Vista previa de la galería: mismo backdrop neutro que DetailModal.
+    const previewFallback = detailModalPreviewBackdropFallback;
 
     const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
 
@@ -2436,9 +2458,9 @@ export default function DetailsClient({
       if (isLogoTab) return matchesLang(img);
 
       if (isBackdropTab) {
-        // Vista previa: backdrops CON idioma (ES o EN, independiente de filtros)
-        const lang = normLang(img?.iso_639_1);
-        return isLangES(lang) || isLangEN(lang);
+        // Vista previa: el mismo arte neutro que DetailModal para poder mostrar
+        // un logo encima. El fallback relajado cubre títulos que no lo tengan.
+        return img.from !== "main" && isLanguageNeutralImage(img);
       }
 
       // Posters: solo ES/EN según filtros activos
@@ -2453,9 +2475,12 @@ export default function DetailsClient({
         return neutral.length ? neutral : withPath;
       }
       if (isBackdropTab) {
-        // Vista previa: priorizar backdrops que tienen idioma asignado
-        const withLang = withPath.filter((img) => !!img?.iso_639_1);
-        return withLang.length ? withLang : withPath;
+        const galleryBackdrops = withPath.filter(
+          (img) => img.from !== "main",
+        );
+        const neutral = galleryBackdrops.filter(isLanguageNeutralImage);
+        if (neutral.length) return neutral;
+        return galleryBackdrops.length ? galleryBackdrops : withPath;
       }
       if (isPoster) {
         const neutral = withPath.filter((img) => !img?.iso_639_1);
@@ -2512,7 +2537,7 @@ export default function DetailsClient({
     data?.profile_path,
     mobileNeutralPosterPath,
     displayHeroLogoPath,
-    previewBackdropFallback,
+    detailModalPreviewBackdropFallback,
     selectedPreviewBackdropPath,
     selectedBackgroundPath,
     baseBackdropPath,
@@ -2921,7 +2946,7 @@ export default function DetailsClient({
   // Backdrop para modo preview: seleccion manual > fallback inteligente
   const previewBackdropPath =
     asTmdbPath(selectedPreviewBackdropPath) ||
-    asTmdbPath(previewBackdropFallback) ||
+    asTmdbPath(posterBackdropFallback) ||
     null;
 
   // Imagen principal del poster: en modo preview muestra backdrop, si no el poster
@@ -6042,7 +6067,7 @@ export default function DetailsClient({
 
     const previewPath =
       asTmdbPath(selectedPreviewBackdropPath) ||
-      asTmdbPath(previewBackdropFallback) ||
+      asTmdbPath(posterBackdropFallback) ||
       null;
 
     if (!posterPath || !previewPath) return;
@@ -6088,7 +6113,7 @@ export default function DetailsClient({
     basePosterPath,
     data?.profile_path,
     selectedPreviewBackdropPath,
-    previewBackdropFallback,
+    posterBackdropFallback,
     posterViewMode,
   ]);
 
@@ -9783,9 +9808,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <div className="self-start shrink-0 flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                              {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo */}
+                              {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo y Logo */}
                               <div className="flex isolate transform-gpu items-center rounded-xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                                {["posters", "backdrops", "background"].map(
+                                {["posters", "backdrops", "background", "logos"].map(
                                   (tab) => (
                                     <button
                                       key={tab}
@@ -9805,7 +9830,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         ? "Portada"
                                         : tab === "backdrops"
                                           ? "Vista previa"
-                                          : "Fondo"}
+                                          : tab === "background"
+                                            ? "Fondo"
+                                            : "Logo"}
                                     </button>
                                   ),
                                 )}
@@ -9900,7 +9927,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
 
                               {/* Idioma (sin label) */}
-                              {activeImagesTab !== "background" && (
+                              {activeImagesTab !== "background" &&
+                                activeImagesTab !== "backdrops" && (
                                 <div
                                   className="flex isolate transform-gpu rounded-xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   aria-label="Idioma"

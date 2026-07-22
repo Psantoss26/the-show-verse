@@ -39,6 +39,7 @@ import {
   formatRuntime,
   GENRES,
   getMediaTypeForItem,
+  getArtworkPreference,
   fetchBestLogo,
   fetchBestPosterNoLang,
   fetchBestBackdropNoLang,
@@ -577,7 +578,10 @@ export function useDetailModalData(item) {
     let cancelled = false;
     const mediaType = getMediaTypeForItem(item);
     const id = item.id;
-    const seedLogoPath = item.logoPath || item.logo_path || null;
+    const artworkPreference = getArtworkPreference(id, mediaType);
+    const logoOverride = artworkPreference.logo;
+    const backdropOverride = artworkPreference.backdrop;
+    const seedLogoPath = logoOverride || item.logoPath || item.logo_path || null;
     const detailsPromise = getDetails(mediaType, id).catch(() => null);
 
     setLoading(true);
@@ -590,7 +594,7 @@ export function useDetailModalData(item) {
       logoPath: seedLogoPath,
       // Si el item ya traía logo, no hay nada que esperar.
       logoResolved: Boolean(seedLogoPath),
-      backdropPath: item.backdrop_path || null,
+      backdropPath: backdropOverride || item.backdrop_path || null,
       posterPath: item.poster_path || null,
       year: yearOf(item) || null,
     });
@@ -617,7 +621,7 @@ export function useDetailModalData(item) {
         // No pisar el backdrop de la semilla con el de getDetails (evita el flash).
         // El backdrop FINAL (textless) se fija aparte y YA PRECARGADO más abajo.
         const backdropPath =
-          item?.backdrop_path || source?.backdrop_path || null;
+          backdropOverride || item?.backdrop_path || source?.backdrop_path || null;
         const posterPath = source?.poster_path || item?.poster_path || null;
         const year = yearOf(source) || yearOf(item) || null;
 
@@ -949,7 +953,9 @@ export function useDetailModalData(item) {
     // idioma (neutro) y, como último recurso, al español.
     (async () => {
       try {
-        const logoPath = await fetchBestLogo(id, mediaType, ["en", null, "es"]);
+        const logoPath =
+          logoOverride ||
+          (await fetchBestLogo(id, mediaType, ["en", null, "es"]));
         if (!cancelled) {
           setData((prev) => ({
             ...prev,
@@ -998,6 +1004,7 @@ export function useDetailModalData(item) {
           fetchBestBackdropNoLang(id, mediaType).catch(() => null),
         ]);
         const finalBackdrop =
+          backdropOverride ||
           bestBackdrop ||
           item?.backdrop_path ||
           detailsForArt?.backdrop_path ||

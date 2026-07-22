@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
     isLanguageNeutralImage,
     pickBestBackdropTVNeutralFirst,
+    pickBestBackdropForPreview,
     pickBestNeutralPosterByResVotes,
     pickBestNeutralBackdropByResVotes,
     resolveNeutralBackdropPath
@@ -69,6 +70,27 @@ test('the best-quality candidate is selected from neutral backdrops only', () =>
     ])
 
     assert.equal(best?.file_path, '/neutral-4k.jpg')
+})
+
+test('poster backdrop mode keeps the localized English artwork preference', () => {
+    const path = pickBestBackdropForPreview([
+        {
+            file_path: '/neutral-4k.jpg',
+            iso_639_1: null,
+            width: 3840,
+            height: 2160,
+            vote_count: 200
+        },
+        {
+            file_path: '/english-1080p.jpg',
+            iso_639_1: 'en',
+            width: 1920,
+            height: 1080,
+            vote_count: 4
+        }
+    ])
+
+    assert.equal(path, '/english-1080p.jpg')
 })
 
 test('a localized poster is used when a title has no neutral poster artwork', () => {
