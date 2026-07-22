@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
+const RESTORATION_COMPLETE_KEY = "showverse:scroll-restoration-complete";
+const RESTORATION_COMPLETE_EVENT = "showverse:scroll-restoration-complete";
 // En rutas dinámicas pesadas, el cambio de pathname puede llegar varios
 // segundos después del `popstate`. Mantenemos la navegación marcada como
 // historial durante ese tiempo para no tratar la vuelta como un push y mandar
@@ -46,6 +48,27 @@ function clearHistoryNavigationMarker() {
   } catch {
     // Session storage may be unavailable in private browsing.
   }
+}
+
+function clearRestorationComplete() {
+  try {
+    window.sessionStorage.removeItem(RESTORATION_COMPLETE_KEY);
+  } catch {
+    // Session storage may be unavailable in private browsing.
+  }
+}
+
+function markRestorationComplete(route) {
+  const detail = { route, at: Date.now() };
+  try {
+    window.sessionStorage.setItem(
+      RESTORATION_COMPLETE_KEY,
+      JSON.stringify(detail),
+    );
+  } catch {
+    // Session storage may be unavailable in private browsing.
+  }
+  window.dispatchEvent(new CustomEvent(RESTORATION_COMPLETE_EVENT, { detail }));
 }
 
 function documentScrollHeight() {
@@ -151,6 +174,7 @@ export default function ScrollRestoration() {
     window.history.pushState = function pushState(...args) {
       saveScrollPosition(currentRouteKeyRef.current);
       clearHistoryNavigationMarker();
+      clearRestorationComplete();
       navigationModeRef.current = "push";
       return originalPushState.apply(this, args);
     };
@@ -171,6 +195,7 @@ export default function ScrollRestoration() {
       // para que la página que monte después sepa con certeza que debe usar su
       // snapshot cacheado, aunque el commit del App Router llegue tarde.
       markHistoryNavigation();
+      clearRestorationComplete();
       navigationModeRef.current = "history";
       historyNavigationUntilRef.current =
         window.performance.now() + HISTORY_NAVIGATION_WINDOW_MS;
@@ -296,7 +321,7 @@ export default function ScrollRestoration() {
       interrupted = true;
     };
 
-    const cleanup = () => {
+    const cleanup = ({ restored = false } = {}) => {
       if (rafId) window.cancelAnimationFrame(rafId);
       rafId = 0;
       removeSpacer();
@@ -305,6 +330,7 @@ export default function ScrollRestoration() {
       window.removeEventListener("keydown", onUserIntent);
       isRestoringRef.current = false;
       restoreCleanupRef.current = null;
+      if (restored) markRestorationComplete(routeKey);
     };
 
     window.addEventListener("wheel", onUserIntent, { passive: true });
@@ -313,7 +339,7 @@ export default function ScrollRestoration() {
 
     const step = () => {
       if (interrupted) {
-        cleanup();
+        cleanup({ restored: true });
         return;
       }
 
@@ -347,7 +373,7 @@ export default function ScrollRestoration() {
       if (heightCaughtUp && atTarget) {
         stableFrames += 1;
         if (stableFrames >= RESTORE_STABLE_FRAMES) {
-          cleanup();
+          cleanup({ restored: true });
           return;
         }
       } else {
@@ -357,7 +383,7 @@ export default function ScrollRestoration() {
       if (window.performance.now() - startedAt < RESTORE_MAX_MS) {
         rafId = window.requestAnimationFrame(step);
       } else {
-        cleanup();
+        cleanup({ restored: true });
       }
     };
 

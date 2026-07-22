@@ -55,6 +55,9 @@ const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 200;
 const HISTORY_CACHE_KEY = "showverse:history:items:v4";
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
+const RESTORATION_COMPLETE_KEY = "showverse:scroll-restoration-complete";
+const RESTORATION_COMPLETE_EVENT = "showverse:scroll-restoration-complete";
+const RESTORATION_COMPLETE_MAX_AGE_MS = 30_000;
 
 function isTraktUnavailableError(error) {
   const status = Number(error?.status || error?.payload?.upstreamStatus || 0);
@@ -140,6 +143,24 @@ function clearHistoryCache() {
   try {
     window.localStorage.removeItem(HISTORY_CACHE_KEY);
   } catch {}
+}
+
+function hasCompletedScrollRestoration() {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(RESTORATION_COMPLETE_KEY);
+    if (!raw) return false;
+    const marker = JSON.parse(raw);
+    const age = Date.now() - Number(marker?.at || 0);
+    const route = `${window.location.pathname}${window.location.search}`;
+    return (
+      age >= 0 &&
+      age <= RESTORATION_COMPLETE_MAX_AGE_MS &&
+      marker?.route === route
+    );
+  } catch {
+    return false;
+  }
 }
 
 function ymdLocal(date) {
@@ -2616,6 +2637,12 @@ export default function HistoryClient() {
   // CLIENTE (sin SSR), y en cargas frescas isBackNav=false → mismos valores por
   // defecto que en el servidor (el contenido va oculto tras `hydrated` de todos modos).
   const isBackNav = useIsHistoryNavigation();
+  // Durante la vuelta bloqueamos el cargador infinito solo hasta que el
+  // restaurador global ha fijado el scroll. Después se reactiva para que el
+  // usuario pueda seguir recorriendo el historial desde ese mismo punto.
+  const [backScrollRestored, setBackScrollRestored] = useState(
+    () => !isBackNav || hasCompletedScrollRestoration(),
+  );
   const [backNavInit] = useState(() => {
     if (!isBackNav || typeof window === "undefined") return null;
     const cache = readHistoryCache();
@@ -2742,6 +2769,29 @@ export default function HistoryClient() {
   const filtersSticky = useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
+
+  useEffect(() => {
+    if (!isBackNav) {
+      setBackScrollRestored(true);
+      return undefined;
+    }
+
+    const currentRoute = `${window.location.pathname}${window.location.search}`;
+    const onRestorationComplete = (event) => {
+      if (event.detail?.route === currentRoute) {
+        setBackScrollRestored(true);
+      }
+    };
+
+    window.addEventListener(RESTORATION_COMPLETE_EVENT, onRestorationComplete);
+    if (hasCompletedScrollRestoration()) setBackScrollRestored(true);
+
+    return () =>
+      window.removeEventListener(
+        RESTORATION_COMPLETE_EVENT,
+        onRestorationComplete,
+      );
+  }, [isBackNav]);
 
   const toggleExpandGroup = useCallback((groupKey) => {
     setExpandedGroups((prev) => {
@@ -3058,7 +3108,7 @@ export default function HistoryClient() {
   // la posición guardada.
   useEffect(() => {
     if (
-      isBackNav ||
+      (isBackNav && !backScrollRestored) ||
       !auth.connected ||
       !historyLoaded ||
       !hasMoreHistory ||
@@ -3086,6 +3136,7 @@ export default function HistoryClient() {
     return () => observer.disconnect();
   }, [
     auth.connected,
+    backScrollRestored,
     hasMoreHistory,
     historyLoaded,
     historyError,
