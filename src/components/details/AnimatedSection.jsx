@@ -48,6 +48,7 @@ export function FadeIn({
   children,
   className = "",
   delay = 0,
+  duration = 0.6,
   direction = "up",
 }) {
   const ref = useRef(null);
@@ -73,7 +74,7 @@ export function FadeIn({
       ref={ref}
       initial={initial}
       animate={animate}
-      transition={baseTransition(delay, 0.6, shouldReduceMotion)}
+      transition={baseTransition(delay, duration, shouldReduceMotion)}
       className={className}
     >
       {children}

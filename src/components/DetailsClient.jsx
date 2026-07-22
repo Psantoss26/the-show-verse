@@ -9061,7 +9061,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <FadeIn delay={0.18} className="order-3 mb-2 w-full sm:hidden">
+            <FadeIn
+              delay={0.04}
+              duration={0.32}
+              className="order-3 mb-2 w-full sm:hidden"
+            >
               <DetailsInfoTabs
                 key={`detailsTabMobile-${id}`}
                 variant={isBackdropPoster ? "backdrop" : "normal"}
@@ -9116,13 +9120,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 initial={false}
                 animate={
                   isMobileViewport && !mobileScoreboardVisible
-                    ? { opacity: 0, y: 20, scale: 0.985 }
-                    : { opacity: 1, y: 0, scale: 1 }
+                    ? { opacity: 0, y: 12 }
+                    : { opacity: 1, y: 0 }
                 }
                 transition={
                   prefersReducedMotion
                     ? { duration: 0 }
-                    : { duration: 0.46, ease: [0.16, 1, 0.3, 1] }
+                    : {
+                        opacity: { duration: 0.2, ease: "easeOut" },
+                        y: {
+                          duration: 0.3,
+                          ease: [0.16, 1, 0.3, 1],
+                        },
+                      }
                 }
                 className={`origin-top transform-gpu ${
                   mobileScoreboardVisible
