@@ -1,6 +1,6 @@
 // /src/lib/artworkApi.js
 
-// Guardar una selección global (poster, backdrop o background)
+// Guardar una selección de artwork (poster, mobilePoster, backdrop, background o logo)
 export async function saveArtworkOverride({ type, id, kind, filePath }) {
     try {
         await fetch('/api/artwork', {

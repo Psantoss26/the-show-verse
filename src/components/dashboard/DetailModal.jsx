@@ -443,33 +443,11 @@ function SkeletonBar({ className = "" }) {
   );
 }
 
-// La fila de acciones depende de varias consultas asíncronas (Trakt, estado de
-// listas y valoración). Se mantiene fuera del foco y se revela UNA sola vez
-// cuando todas las acciones que muestra ya conocen su estado final; así no se
-// mezcla la animación de entrada con cambios icono → spinner → icono.
-function DetailModalActionsReveal({
-  children,
-  ready,
-  reducedMotion,
-  className = "",
-}) {
-  const hidden = reducedMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: 12 };
-
-  return (
-    <motion.div
-      initial={hidden}
-      animate={ready ? { opacity: 1, y: 0 } : hidden}
-      transition={{
-        duration: reducedMotion ? 0 : 0.34,
-        ease: [0.16, 1, 0.3, 1],
-      }}
-      aria-hidden={!ready}
-      inert={ready ? undefined : ""}
-      className={`min-h-[3.75rem] ${className}`}
-    >
-      {children}
-    </motion.div>
-  );
+// La fila se monta ya en su posición final. Esperar sus consultas asíncronas
+// antes de mostrarla introducía una pausa perceptible; cada control conserva su
+// indicador de carga estable hasta que conoce su propio estado.
+function DetailModalActionsReveal({ children, className = "" }) {
+  return <div className={className}>{children}</div>;
 }
 
 /* =========================== TARJETA "SIMILAR" ============================= */
@@ -1549,7 +1527,7 @@ export default function DetailModal({
   // Estado de conexión de Trakt en cliente (localStorage). Sirve para mostrar el
   // botón de reseñas solo cuando procede, igual criterio que DetailsClient
   // (allí `trakt.connected` viene del servidor; aquí usamos la señal de cliente).
-  const { isConnected: traktConnected, ready: traktAuthReady } = useTraktAuth();
+  const { isConnected: traktConnected } = useTraktAuth();
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const traktType = mediaType === "tv" ? "show" : "movie";
 
@@ -2041,18 +2019,6 @@ export default function DetailModal({
   const ratingActionLoading = ratingLoading || traktStatusLoading;
   const ratingActionConnected =
     isLoggedIn || traktConnected || traktStatus.connected;
-
-  const tvWatchedStateReady =
-    mediaType !== "tv" ||
-    !(traktConnected || traktStatus.connected) ||
-    episodesWatched.watchedBySeasonLoaded;
-  const actionRowReady = isEpisode
-    ? panelSettled && !epWatch.loading && !epRate.loading
-    : panelSettled &&
-      traktAuthReady &&
-      !loadingStates &&
-      !traktStatusLoading &&
-      tvWatchedStateReady;
 
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
@@ -2603,8 +2569,6 @@ export default function DetailModal({
                 pasan sus handlers), por lo que no se renderizan. */}
             {!isEpisode && (
             <DetailModalActionsReveal
-              ready={actionRowReady}
-              reducedMotion={prefersReducedMotion}
               className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
             >
               <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
@@ -2716,8 +2680,6 @@ export default function DetailModal({
                 plataformas de streaming a la derecha. */}
             {isEpisode && (
               <DetailModalActionsReveal
-                ready={actionRowReady}
-                reducedMotion={prefersReducedMotion}
                 className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
               >
                 <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">

@@ -169,7 +169,7 @@ import {
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
-import { fetchBestLogo } from "@/lib/dashboard/media";
+import { getTitleLogos } from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
 import {
@@ -1059,6 +1059,23 @@ function SectionTitle({ title, icon: Icon, className = "" }) {
   );
 }
 
+// Mismo criterio visual del hero: PNG primero (suele mantener el color original),
+// después inglés, sin idioma y español; por último, votos de TMDb.
+function pickDefaultHeroLogo(logos) {
+  if (!Array.isArray(logos) || logos.length === 0) return null;
+  const languageOrder = ["en", null, "es"];
+  const score = (logo) => {
+    const lang = logo?.iso_639_1 ?? null;
+    const languageIndex = languageOrder.indexOf(lang);
+    const languageScore =
+      languageIndex === -1 ? 0 : (languageOrder.length - languageIndex) * 1000;
+    const pngScore = /\.png$/i.test(logo?.file_path || "") ? 1_000_000 : 0;
+    return pngScore + languageScore + (logo?.vote_count || 0);
+  };
+
+  return [...logos].sort((a, b) => score(b) - score(a))[0]?.file_path || null;
+}
+
 // Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
@@ -1169,6 +1186,8 @@ export default function DetailsClient({
   // ====== CLAVES DE LOCALSTORAGE PARA PREFERENCIAS DE IMAGENES ======
   // Cada clave es unica por tipo de contenido e ID para persistir selecciones del usuario
   const posterStorageKey = `showverse:${endpointType}:${id}:poster`;
+  const mobilePosterStorageKey = `showverse:${endpointType}:${id}:mobilePoster`;
+  const logoStorageKey = `showverse:${endpointType}:${id}:logo`;
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`;
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`;
   // Modo de vista global (poster o preview) - se comparte entre todos los contenidos
@@ -1178,6 +1197,8 @@ export default function DetailsClient({
 
   // -- Rutas de imagen seleccionadas por el usuario --
   const [selectedPosterPath, setSelectedPosterPath] = useState(null);
+  const [selectedMobilePosterPath, setSelectedMobilePosterPath] =
+    useState(null);
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(null);
 
@@ -1400,6 +1421,8 @@ export default function DetailsClient({
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
   const [heroLogoPath, setHeroLogoPath] = useState(null);
+  const [selectedLogoPath, setSelectedLogoPath] = useState(null);
+  const [titleLogos, setTitleLogos] = useState([]);
   // ¿Ya terminó el fetch del logo? El título de TEXTO solo se muestra cuando el
   // logo se ha resuelto y NO existe; durante la carga no se muestra nada (el
   // 99% de los títulos tienen logo, así que evitamos el parpadeo texto→logo).
@@ -1521,20 +1544,21 @@ export default function DetailsClient({
     };
   }, [isMobileViewport]);
 
-  // Logo del título (best-effort) para la cabecera móvil. Prioriza inglés, luego
-  // sin idioma, luego español (mismo criterio que DetailModal).
+  // Logos disponibles para la cabecera y la galería móvil. Se cargan una vez y
+  // la selección manual se aplica por encima del logo recomendado.
   useEffect(() => {
     const showId = data?.id;
     if (!showId) return undefined;
     let alive = true;
-    // Al cambiar de título reseteamos: ni texto ni logo previo mientras se
-    // resuelve el nuevo logo.
     setHeroLogoPath(null);
+    setTitleLogos([]);
     setHeroLogoResolved(false);
-    fetchBestLogo(showId, endpointType, ["en", null, "es"])
-      .then((logo) => {
+    getTitleLogos(showId, endpointType)
+      .then((logos) => {
         if (!alive) return;
-        if (logo) setHeroLogoPath(logo);
+        const availableLogos = Array.isArray(logos) ? logos : [];
+        setTitleLogos(availableLogos);
+        setHeroLogoPath(pickDefaultHeroLogo(availableLogos));
         setHeroLogoResolved(true);
       })
       .catch(() => {
@@ -1544,6 +1568,14 @@ export default function DetailsClient({
       alive = false;
     };
   }, [data?.id, endpointType]);
+
+  // La pestaña de logos existe solo en el selector móvil. Al volver a escritorio
+  // restauramos una pestaña visible para conservar sus tres controles habituales.
+  useEffect(() => {
+    if (!isMobileViewport && activeImagesTab === "logos") {
+      setActiveImagesTab("posters");
+    }
+  }, [activeImagesTab, isMobileViewport]);
 
   // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
@@ -2287,14 +2319,43 @@ export default function DetailsClient({
     artworkInitialized,
   ]);
 
+  // Póster neutro del hero móvil. Una elección manual solo puede venir de la
+  // galería móvil, que muestra imágenes sin idioma, así que sigue evitando la
+  // duplicación de título impreso y logo.
+  const mobileNeutralPosterPath = useMemo(() => {
+    if (selectedMobilePosterPath) return selectedMobilePosterPath;
+
+    const sourcePosters = imagesState?.posters || [];
+    const neutralPosters =
+      endpointType === "tv"
+        ? sourcePosters.filter(
+            (p) => p?.file_path && p.from !== "main" && !p?.iso_639_1,
+          )
+        : sourcePosters;
+
+    const best =
+      pickBestNeutralPosterByResVotes(neutralPosters)?.file_path || null;
+    if (best) return best;
+    return (
+      neutralPosters.find((p) => p?.file_path && !p?.iso_639_1)?.file_path ||
+      null
+    );
+  }, [endpointType, imagesState?.posters, selectedMobilePosterPath]);
+
+  const displayHeroLogoPath = selectedLogoPath || heroLogoPath || null;
+
   /**
    * Procesa y filtra la galeria de artwork segun la pestana activa (posters/backdrops/background),
    * filtros de resolucion e idioma. Devuelve la lista ordenada, el aspect ratio,
    * el tamano de imagen y la ruta activa actual.
    */
   const artworkSelection = useMemo(() => {
-    const rawList =
-      activeImagesTab === "posters"
+    const isLogoTab = activeImagesTab === "logos";
+    const isMobilePosterTab =
+      isMobileViewport && activeImagesTab === "posters";
+    const rawList = isLogoTab
+      ? titleLogos
+      : activeImagesTab === "posters"
         ? imagesState?.posters
         : imagesState?.backdrops;
 
@@ -2302,10 +2363,12 @@ export default function DetailsClient({
     const isBackdropTab = activeImagesTab === "backdrops";
     const isBackgroundTab = activeImagesTab === "background";
     const aspect = isPoster ? "aspect-[2/3]" : "aspect-[16/9]";
-    const size = isPoster ? "w342" : "w780";
+    const size = isPoster ? "w342" : isLogoTab ? "w500" : "w780";
 
     const currentPosterActive =
       (selectedPosterPath || basePosterPath || data?.profile_path) ?? null;
+    const currentMobilePosterActive =
+      selectedMobilePosterPath || mobileNeutralPosterPath || null;
 
     // Backdrop de preview: misma logica de seleccion que MainDashboard
     const previewFallback = previewBackdropFallback;
@@ -2316,8 +2379,12 @@ export default function DetailsClient({
       (selectedBackgroundPath || baseBackdropPath || data?.backdrop_path) ??
       null;
 
-    const activePath = isPoster
-      ? currentPosterActive
+    const activePath = isLogoTab
+      ? displayHeroLogoPath
+      : isMobilePosterTab
+        ? currentMobilePosterActive
+      : isPoster
+        ? currentPosterActive
       : isBackdropTab
         ? currentPreviewActive
         : currentBackgroundActive;
@@ -2353,6 +2420,13 @@ export default function DetailsClient({
         return !img?.iso_639_1;
       }
 
+      if (isMobilePosterTab) {
+        // El hero móvil usa una portada sin idioma para no duplicar el logo.
+        return !img?.iso_639_1;
+      }
+
+      if (isLogoTab) return true;
+
       if (isBackdropTab) {
         // Vista previa: backdrops CON idioma (ES o EN, independiente de filtros)
         const lang = normLang(img?.iso_639_1);
@@ -2379,6 +2453,7 @@ export default function DetailsClient({
         const neutral = withPath.filter((img) => !img?.iso_639_1);
         return neutral.length ? neutral : withPath;
       }
+      if (isLogoTab) return withPath;
       return withPath;
     })();
 
@@ -2403,6 +2478,8 @@ export default function DetailsClient({
     return {
       ordered,
       isPoster,
+      isMobilePosterTab,
+      isLogoTab,
       isBackdropTab,
       isBackgroundTab,
       aspect,
@@ -2411,14 +2488,19 @@ export default function DetailsClient({
     };
   }, [
     activeImagesTab,
+    isMobileViewport,
     imagesState?.posters,
     imagesState?.backdrops,
+    titleLogos,
     imagesResFilter,
     langES,
     langEN,
     selectedPosterPath,
+    selectedMobilePosterPath,
     basePosterPath,
     data?.profile_path,
+    mobileNeutralPosterPath,
+    displayHeroLogoPath,
     previewBackdropFallback,
     selectedPreviewBackdropPath,
     selectedBackgroundPath,
@@ -2557,7 +2639,17 @@ export default function DetailsClient({
 
     const initialPoster =
       (typeof window !== "undefined"
-        ? window.localStorage.getItem(posterStorageKey)
+      ? window.localStorage.getItem(posterStorageKey)
+        : null) || null;
+
+    const initialMobilePoster =
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem(mobilePosterStorageKey)
+        : null) || null;
+
+    const initialLogo =
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem(logoStorageKey)
         : null) || null;
 
     const initialBackdrop =
@@ -2567,6 +2659,8 @@ export default function DetailsClient({
 
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
+    setSelectedMobilePosterPath(initialMobilePoster);
+    setSelectedLogoPath(initialLogo);
     // No activar posterResolved hasta que initArtwork termine
 
     setImagesState({
@@ -2582,8 +2676,10 @@ export default function DetailsClient({
     setActiveImagesTab("posters");
 
     setSelectedPosterPath(null);
+    setSelectedMobilePosterPath(null);
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
+    setSelectedLogoPath(null);
 
     // No resetear posterViewMode/posterLayoutMode - respetar la preferencia global
     // Ya se inicializan desde localStorage en el useState inicial
@@ -2594,6 +2690,10 @@ export default function DetailsClient({
     if (typeof window !== "undefined") {
       try {
         const savedPoster = window.localStorage.getItem(posterStorageKey);
+        const savedMobilePoster = window.localStorage.getItem(
+          mobilePosterStorageKey,
+        );
+        const savedLogo = window.localStorage.getItem(logoStorageKey);
         const savedPreviewBackdrop = window.localStorage.getItem(
           previewBackdropStorageKey,
         );
@@ -2601,6 +2701,8 @@ export default function DetailsClient({
           window.localStorage.getItem(backgroundStorageKey);
 
         if (savedPoster) setSelectedPosterPath(savedPoster);
+        if (savedMobilePoster) setSelectedMobilePosterPath(savedMobilePoster);
+        if (savedLogo) setSelectedLogoPath(savedLogo);
         if (savedPreviewBackdrop)
           setSelectedPreviewBackdropPath(savedPreviewBackdrop);
         if (savedBackground) setSelectedBackgroundPath(savedBackground);
@@ -2616,6 +2718,8 @@ export default function DetailsClient({
     data?.backdrop_path,
     data?.profile_path,
     posterStorageKey,
+    mobilePosterStorageKey,
+    logoStorageKey,
     backgroundStorageKey,
     previewBackdropStorageKey,
   ]);
@@ -2857,28 +2961,6 @@ export default function DetailsClient({
       baseBackdropPath,
     ],
   );
-
-  // Mejor poster neutro (sin idioma) para uso en movil como fondo.
-  // En series excluimos data.poster_path ("main") porque llega sin metadatos
-  // de idioma y puede ser un poster localizado.
-  const mobileNeutralPosterPath = useMemo(() => {
-    const sourcePosters = imagesState?.posters || [];
-    const neutralPosters =
-      endpointType === "tv"
-        ? sourcePosters.filter(
-            (p) => p?.file_path && p.from !== "main" && !p?.iso_639_1,
-          )
-        : sourcePosters;
-
-    const best =
-      pickBestNeutralPosterByResVotes(neutralPosters)?.file_path || null;
-    if (best) return best;
-    // Fallback: primera imagen sin idioma si no hay metadata de tamanos/votos
-    return (
-      neutralPosters.find((p) => p?.file_path && !p?.iso_639_1)?.file_path ||
-      null
-    );
-  }, [endpointType, imagesState?.posters]);
 
   // ¿La portada que se muestra en móvil trae el título IMPRESO?
   //
@@ -5828,6 +5910,33 @@ export default function DetailsClient({
     saveArtworkOverride({ type: endpointType, id, kind: "poster", filePath });
   };
 
+  // La portada de móvil es independiente de la de escritorio: siempre procede
+  // de la pestaña de pósters neutros y alimenta directamente el hero vertical.
+  const handleSelectMobilePoster = (filePath) => {
+    setSelectedMobilePosterPath(filePath);
+    if (typeof window !== "undefined") {
+      filePath
+        ? window.localStorage.setItem(mobilePosterStorageKey, filePath)
+        : window.localStorage.removeItem(mobilePosterStorageKey);
+    }
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: "mobilePoster",
+      filePath,
+    });
+  };
+
+  const handleSelectLogo = (filePath) => {
+    setSelectedLogoPath(filePath);
+    if (typeof window !== "undefined") {
+      filePath
+        ? window.localStorage.setItem(logoStorageKey, filePath)
+        : window.localStorage.removeItem(logoStorageKey);
+    }
+    saveArtworkOverride({ type: endpointType, id, kind: "logo", filePath });
+  };
+
   // Selecciona un backdrop para el modo preview y lo persiste
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath);
@@ -5868,14 +5977,18 @@ export default function DetailsClient({
   // Resetea todas las selecciones de artwork a los valores por defecto
   const handleResetArtwork = () => {
     setSelectedPosterPath(null);
+    setSelectedMobilePosterPath(null);
     setSelectedPreviewBackdropPath(null);
     setSelectedBackgroundPath(null);
+    setSelectedLogoPath(null);
     setPosterViewMode("poster");
     setPosterLayoutMode("poster");
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(posterStorageKey);
+      window.localStorage.removeItem(mobilePosterStorageKey);
       window.localStorage.removeItem(previewBackdropStorageKey);
       window.localStorage.removeItem(backgroundStorageKey);
+      window.localStorage.removeItem(logoStorageKey);
     }
     saveArtworkOverride({
       type: endpointType,
@@ -5895,6 +6008,13 @@ export default function DetailsClient({
       kind: "background",
       filePath: null,
     });
+    saveArtworkOverride({
+      type: endpointType,
+      id,
+      kind: "mobilePoster",
+      filePath: null,
+    });
+    saveArtworkOverride({ type: endpointType, id, kind: "logo", filePath: null });
   };
 
   /**
@@ -8457,7 +8577,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {currentLowLoaded &&
                       mobilePosterPath &&
                       !mobilePosterHasBurnedTitle &&
-                      (heroLogoPath || heroLogoResolved) && (
+                      (displayHeroLogoPath || heroLogoResolved) && (
                       <motion.div
                         initial={
                           prefersReducedMotion
@@ -8484,9 +8604,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             su propio drop-shadow fuerte para el contraste local.
                             (Sin citar las clases: el escáner de Tailwind no
                             distingue comentarios y volvería a emitir ese CSS.) */}
-                        {heroLogoPath ? (
+                        {displayHeroLogoPath ? (
                           <img
-                            src={`https://image.tmdb.org/t/p/w500${heroLogoPath}`}
+                            src={`https://image.tmdb.org/t/p/w500${displayHeroLogoPath}`}
                             alt={title}
                             className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
                           />
@@ -9841,7 +9961,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               className="sm:hidden mb-4"
                             >
                               <div>
-                                {/* Todo en una sola fila con iconos */}
+                                {/* En móvil se editan exactamente las dos capas del hero:
+                                    póster neutro y logo. */}
                                 <div className="flex items-center gap-2">
                                   {/* Tabs con iconos - compacto */}
                                   <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
@@ -9859,42 +9980,27 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         WebkitTapHighlightColor: "transparent",
                                       }}
                                       aria-label="Portada"
+                                      aria-pressed={activeImagesTab === "posters"}
                                     >
                                       <ImageIcon className="w-4 h-4" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        setActiveImagesTab("backdrops")
+                                        setActiveImagesTab("logos")
                                       }
                                       className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
-                                        activeImagesTab === "backdrops"
+                                        activeImagesTab === "logos"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
                                       }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
                                       }}
-                                      aria-label="Vista previa"
+                                      aria-label="Logo"
+                                      aria-pressed={activeImagesTab === "logos"}
                                     >
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setActiveImagesTab("background")
-                                      }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
-                                        activeImagesTab === "background"
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                      }`}
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                      aria-label="Fondo"
-                                    >
-                                      <Layers className="w-4 h-4" />
+                                      <Sparkles className="w-4 h-4" />
                                     </button>
                                   </div>
 
@@ -9996,41 +10102,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </AnimatePresence>
                                   </div>
 
-                                  {/* Idioma móvil - compacto */}
-                                  {activeImagesTab !== "background" && (
-                                    <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                                      <button
-                                        type="button"
-                                        onClick={() => setLangES((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
-                                          langES
-                                            ? "bg-white/10 text-white shadow-md"
-                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
-                                        style={{
-                                          WebkitTapHighlightColor:
-                                            "transparent",
-                                        }}
-                                      >
-                                        ES
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setLangEN((v) => !v)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
-                                          langEN
-                                            ? "bg-white/10 text-white shadow-md"
-                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                        }`}
-                                        style={{
-                                          WebkitTapHighlightColor:
-                                            "transparent",
-                                        }}
-                                      >
-                                        EN
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -10047,13 +10118,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const {
                             ordered,
                             isPoster,
+                            isMobilePosterTab,
+                            isLogoTab,
                             isBackdropTab,
                             aspect,
                             size,
                             activePath,
                           } = artworkSelection;
 
-                          // 2 en movil y 4 en desktop para backdrops (vista previa / fondo)
+                          // 2 en móvil y 4 en escritorio para imágenes apaisadas
+                          // (vista previa, fondo y logos).
                           const isBackdropLike = activeImagesTab !== "posters";
 
                           const breakpoints = isPoster
@@ -10147,7 +10221,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     const isPriority =
                                       index < artworkPreloadCount;
                                     const imgAlt = isPoster
-                                      ? `Portada de ${title}`
+                                      ? `${isMobilePosterTab ? "Portada sin idioma" : "Portada"} de ${title}`
+                                      : isLogoTab
+                                        ? `Logo de ${title}`
                                       : isBackdropTab
                                         ? `Vista previa de ${title}`
                                         : `Fondo de ${title}`;
@@ -10155,9 +10231,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
                                     const imgSrcSet = isPoster
                                       ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
+                                      : isLogoTab
+                                        ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w500${filePath} 500w, https://image.tmdb.org/t/p/original${filePath} 1000w`
                                       : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
                                     const imgSizes = isPoster
                                       ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
+                                      : isLogoTab
+                                        ? "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px"
                                       : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
 
                                     return (
@@ -10169,7 +10249,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           role="button"
                                           tabIndex={0}
                                           onClick={() => {
-                                            if (activeImagesTab === "posters")
+                                            if (isLogoTab) {
+                                              handleSelectLogo(filePath);
+                                            } else if (isMobilePosterTab) {
+                                              handleSelectMobilePoster(filePath);
+                                            } else if (activeImagesTab === "posters")
                                               handleSelectPoster(filePath);
                                             else if (
                                               activeImagesTab === "backdrops"
@@ -10186,7 +10270,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               e.key === " "
                                             ) {
                                               e.preventDefault();
-                                              if (activeImagesTab === "posters")
+                                              if (isLogoTab) {
+                                                handleSelectLogo(filePath);
+                                              } else if (isMobilePosterTab) {
+                                                handleSelectMobilePoster(filePath);
+                                              } else if (activeImagesTab === "posters")
                                                 handleSelectPoster(filePath);
                                               else if (
                                                 activeImagesTab === "backdrops"
@@ -10220,7 +10308,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                         >
                                           <div
-                                            className={`relative w-full ${aspect} bg-black/40`}
+                                            className={`relative w-full ${aspect} ${isLogoTab ? "bg-gradient-to-br from-white/10 via-black/50 to-black/70 p-4" : "bg-black/40"}`}
                                           >
                                             <OptimizedImage
                                               src={imgSrc}
@@ -10234,8 +10322,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 isPriority ? "high" : undefined
                                               }
                                               decoding="async"
-                                              className="w-full h-full object-cover transition-transform duration-700 transform-gpu
-                            group-hover:scale-[1.08]"
+                                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-700 transform-gpu
+                            group-hover:scale-[1.08]`}
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                           </div>
