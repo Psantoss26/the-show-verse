@@ -3728,7 +3728,7 @@ export default function HistoryClient() {
                           </div>
 
                           <div className="flex-1 flex gap-2">
-                            <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                            <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                               <button
                                 onClick={() => setViewMode("list")}
                                 className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
@@ -3955,7 +3955,7 @@ export default function HistoryClient() {
                     )}
                   </InlineDropdown>
 
-                  <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <button
                       onClick={() => setViewMode("list")}
                       className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
