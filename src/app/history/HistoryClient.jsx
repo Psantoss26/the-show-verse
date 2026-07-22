@@ -2623,6 +2623,11 @@ export default function HistoryClient() {
     };
   });
   const restoredFromHistoryCacheRef = useRef(!!backNavInit?.items);
+  // La caché de Historial contiene el estado visual completo que el usuario dejó
+  // antes de abrir una ficha. No la ocultamos detrás de la hidratación global de
+  // sesión: esa petición puede tardar varios segundos en móvil, mientras que la
+  // caché ya permite restaurar el contenido y el scroll de inmediato.
+  const hasBackNavSnapshot = !!backNavInit?.items;
 
   // En back-nav renderizamos el contenido desde el primer pintado (no hay SSR con el
   // que chocar). En carga fresca sigue oculto hasta el efecto de montaje.
@@ -3171,11 +3176,18 @@ export default function HistoryClient() {
     setExpandedGroups(new Set());
   }, [sorted, groupBy, typeFilter, q, selectedDay]);
 
-  if (!hydrated || !authHydrated) {
+  // En una vuelta desde DetailsClient damos prioridad al snapshot local. Cuando
+  // AuthContext termine de revalidar, los guards normales siguen corrigiendo la
+  // vista si la sesión ya no existe; durante la revalidación no sustituimos la
+  // lista por una pantalla vacía.
+  if (!hydrated || (!authHydrated && !hasBackNavSnapshot)) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if (!session || !account) {
+  if (
+    (!session || !account) &&
+    !(hasBackNavSnapshot && !authHydrated)
+  ) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -3252,7 +3264,7 @@ export default function HistoryClient() {
         {/* Header */}
         <motion.header
           className="mb-6 lg:mb-10"
-          initial={{ opacity: 0, y: -20 }}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
@@ -3274,7 +3286,7 @@ export default function HistoryClient() {
                 {auth.connected && historyLoaded && (
                   <div className="flex items-center gap-2">
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
+                      initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.3 }}
                     >
@@ -3294,7 +3306,7 @@ export default function HistoryClient() {
                     </motion.div>
 
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
+                      initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.4 }}
                     >
@@ -3322,7 +3334,7 @@ export default function HistoryClient() {
             {auth.connected && historyLoaded && (
               <motion.div
                 className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-                initial={{ opacity: 0, y: 20 }}
+                initial={isBackNav ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
@@ -4033,7 +4045,7 @@ export default function HistoryClient() {
                   return (
                     <motion.div
                       key={g.key}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={isBackNav ? false : { opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
                     >
