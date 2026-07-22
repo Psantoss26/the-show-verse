@@ -4,11 +4,12 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
+const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
 // En rutas dinámicas pesadas, el cambio de pathname puede llegar varios
 // segundos después del `popstate`. Mantenemos la navegación marcada como
 // historial durante ese tiempo para no tratar la vuelta como un push y mandar
 // el documento al inicio.
-const HISTORY_NAVIGATION_WINDOW_MS = 10_000;
+const HISTORY_NAVIGATION_WINDOW_MS = 30_000;
 // Ventana máxima durante la cual reaplicamos la posición guardada mientras el
 // layout «se pone al día». En las páginas con contenido asíncrono (p. ej. el
 // dashboard: "Continuar viendo" y "Para ti" aparecen tras hidratar la sesión,
@@ -26,6 +27,25 @@ function getCurrentRouteKey() {
 
 function getStorageKey(pathname) {
   return `${STORAGE_PREFIX}${pathname || "/"}`;
+}
+
+function markHistoryNavigation() {
+  try {
+    window.sessionStorage.setItem(
+      HISTORY_NAVIGATION_MARKER_KEY,
+      JSON.stringify({ route: getCurrentRouteKey(), at: Date.now() }),
+    );
+  } catch {
+    // Session storage may be unavailable in private browsing.
+  }
+}
+
+function clearHistoryNavigationMarker() {
+  try {
+    window.sessionStorage.removeItem(HISTORY_NAVIGATION_MARKER_KEY);
+  } catch {
+    // Session storage may be unavailable in private browsing.
+  }
 }
 
 function documentScrollHeight() {
@@ -130,6 +150,7 @@ export default function ScrollRestoration() {
 
     window.history.pushState = function pushState(...args) {
       saveScrollPosition(currentRouteKeyRef.current);
+      clearHistoryNavigationMarker();
       navigationModeRef.current = "push";
       return originalPushState.apply(this, args);
     };
@@ -146,6 +167,10 @@ export default function ScrollRestoration() {
 
     const handlePopState = () => {
       saveScrollPosition(currentRouteKeyRef.current);
+      // `popstate` ya se ejecuta con la URL de DESTINO. Persistimos esa ruta
+      // para que la página que monte después sepa con certeza que debe usar su
+      // snapshot cacheado, aunque el commit del App Router llegue tarde.
+      markHistoryNavigation();
       navigationModeRef.current = "history";
       historyNavigationUntilRef.current =
         window.performance.now() + HISTORY_NAVIGATION_WINDOW_MS;
