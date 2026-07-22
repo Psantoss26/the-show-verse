@@ -10254,7 +10254,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     className="h-full pt-1 pb-3"
                                   >
                                     <div
-                                      className={`w-full rounded-2xl border-2 border-transparent bg-white/5 animate-pulse sm:border-white/10 ${aspect}`}
+                                      className={`w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md animate-pulse ${aspect}`}
                                       aria-hidden="true"
                                     />
                                   </SwiperSlide>
@@ -10372,15 +10372,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 );
                                             }
                                           }}
-                                          // El borde esmeralda ya marca la imagen seleccionada. Al
-                                          // pasar por encima solo se eleva: no se añade otro anillo.
-                                          className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
-                        transition-all duration-300 transform-gpu hover:-translate-y-1
+                                          // Igual que Reparto y Recomendaciones: una tarjeta limpia,
+                                          // sin bordes persistentes. La selección se señala con el
+                                          // indicador puntual, no con un marco adicional.
+                                          className={`group relative w-full rounded-xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer
+                        transition-all duration-300 transform-gpu hover:-translate-y-1 hover:shadow-yellow-900/20
                         after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300
                         ${
                           isActive
-                            ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-transparent bg-black/25 hover:bg-black/35 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            ? ""
+                            : "hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                         }`}
                                           aria-label="Seleccionar"
                                           style={{
@@ -10389,7 +10390,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                         >
                                           <div
-                                            className={`relative w-full ${aspect} ${isLogoTab ? "bg-gradient-to-br from-white/10 via-black/50 to-black/70 p-4" : "bg-black/40"}`}
+                                            className={`relative w-full overflow-hidden ${aspect} ${isLogoTab ? "bg-gradient-to-br from-white/10 via-black/50 to-black/70 p-4" : "bg-black/40"}`}
                                           >
                                             <OptimizedImage
                                               src={imgSrc}
@@ -10403,7 +10404,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 isPriority ? "high" : undefined
                                               }
                                               decoding="async"
-                                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-700 transform-gpu
+                                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-500 ease-out transform-gpu
                             group-hover:scale-[1.08]`}
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -10439,7 +10440,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleCopyImageUrl(filePath);
                                               }
                                             }}
-                                            className="group/link absolute bottom-0 right-0 z-20 p-2 sm:p-2.5 rounded-tl-2xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
+                                            className="group/link absolute bottom-0 right-0 z-20 p-2 sm:p-2.5 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
                                             aria-label="Copiar URL"
                                           >
                                             <LinkIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
