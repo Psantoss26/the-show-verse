@@ -2425,7 +2425,7 @@ export default function DetailsClient({
         return !img?.iso_639_1;
       }
 
-      if (isLogoTab) return true;
+      if (isLogoTab) return matchesLang(img);
 
       if (isBackdropTab) {
         // Vista previa: backdrops CON idioma (ES o EN, independiente de filtros)
@@ -2453,7 +2453,10 @@ export default function DetailsClient({
         const neutral = withPath.filter((img) => !img?.iso_639_1);
         return neutral.length ? neutral : withPath;
       }
-      if (isLogoTab) return withPath;
+      if (isLogoTab) {
+        const matching = withPath.filter(matchesLang);
+        return matching.length ? matching : withPath;
+      }
       return withPath;
     })();
 
@@ -8606,7 +8609,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             distingue comentarios y volvería a emitir ese CSS.) */}
                         {displayHeroLogoPath ? (
                           <img
-                            src={`https://image.tmdb.org/t/p/w500${displayHeroLogoPath}`}
+                            src={`https://image.tmdb.org/t/p/original${displayHeroLogoPath}`}
                             alt={title}
                             className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
                           />
@@ -9764,7 +9767,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SectionTitle
                             title="Portadas y fondos"
                             icon={ImageIcon}
-                            className="!w-auto flex-1 min-w-0 pr-4 sm:pr-6"
+                            className="!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6"
                           />
 
                           {/* ========== Controles de Filtrado ========== */}
@@ -9963,15 +9966,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <div>
                                 {/* En móvil se editan exactamente las dos capas del hero:
                                     póster neutro y logo. */}
-                                <div className="flex items-center gap-2">
-                                  {/* Tabs con iconos - compacto */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {/* Las etiquetas hacen explícita la categoría seleccionable,
+                                      además de conservar su icono visual. */}
                                   <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                     <button
                                       type="button"
                                       onClick={() =>
                                         setActiveImagesTab("posters")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                      className={`px-2.5 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                                         activeImagesTab === "posters"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -9983,13 +9987,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       aria-pressed={activeImagesTab === "posters"}
                                     >
                                       <ImageIcon className="w-4 h-4" />
+                                      <span className="text-xs font-semibold">Portada</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() =>
                                         setActiveImagesTab("logos")
                                       }
-                                      className={`px-3 h-full rounded-lg transition-all flex items-center justify-center ${
+                                      className={`px-2.5 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                                         activeImagesTab === "logos"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -10001,13 +10006,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       aria-pressed={activeImagesTab === "logos"}
                                     >
                                       <Sparkles className="w-4 h-4" />
+                                      <span className="text-xs font-semibold">Logo</span>
                                     </button>
                                   </div>
 
                                   {/* Resolución móvil - más compacto */}
                                   <div
                                     ref={resMenuRef}
-                                    className="relative flex-1"
+                                    className="relative min-w-[6.25rem] flex-1"
                                   >
                                     <button
                                       type="button"
@@ -10101,6 +10107,48 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       )}
                                     </AnimatePresence>
                                   </div>
+
+                                  {/* Los logos sí tienen variantes localizadas; el póster
+                                      móvil se mantiene neutro y no necesita este filtro. */}
+                                  {activeImagesTab === "logos" && (
+                                    <div
+                                      className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                                      aria-label="Idioma de los logos"
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => setLangES((value) => !value)}
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langES
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                        }`}
+                                        style={{
+                                          WebkitTapHighlightColor: "transparent",
+                                        }}
+                                        aria-label="Mostrar logos en español"
+                                        aria-pressed={langES}
+                                      >
+                                        ES
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setLangEN((value) => !value)}
+                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                          langEN
+                                            ? "bg-white/10 text-white shadow-md"
+                                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                        }`}
+                                        style={{
+                                          WebkitTapHighlightColor: "transparent",
+                                        }}
+                                        aria-label="Mostrar logos en inglés"
+                                        aria-pressed={langEN}
+                                      >
+                                        EN
+                                      </button>
+                                    </div>
+                                  )}
 
                                 </div>
                               </div>
@@ -10288,18 +10336,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 );
                                             }
                                           }}
-                                          // El borde esmeralda NO es decorativo: marca la imagen
-                                          // seleccionada, así que se conserva. Solo se neutraliza el
-                                          // de reposo (`border-white/10` → transparente), manteniendo
-                                          // `border-2` para que seleccionar no provoque salto de
-                                          // layout. El hover pasa al anillo nítido, como el resto.
+                                          // El borde esmeralda ya marca la imagen seleccionada. Al
+                                          // pasar por encima solo se eleva: no se añade otro anillo.
                                           className={`group relative w-full rounded-2xl overflow-hidden border-2 cursor-pointer
                         transition-all duration-300 transform-gpu hover:-translate-y-1
-                        after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]
+                        after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300
                         ${
                           isActive
                             ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] ring-2 ring-emerald-500/30"
-                            : "border-transparent bg-black/25 hover:bg-black/35"
+                            : "border-transparent bg-black/25 hover:bg-black/35 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                         }`}
                                           aria-label="Seleccionar"
                                           style={{
