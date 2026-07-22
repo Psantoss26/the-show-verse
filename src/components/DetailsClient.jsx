@@ -1344,6 +1344,7 @@ export default function DetailsClient({
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
   const mobileScoreboardTriggerRef = useRef(null);
+  const mobileScoreboardWrapperRef = useRef(null);
   const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
@@ -1433,8 +1434,6 @@ export default function DetailsClient({
   const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
-  const [mobileScoreboardVisible, setMobileScoreboardVisible] =
-    useState(false);
 
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
@@ -1562,45 +1561,49 @@ export default function DetailsClient({
     };
   }, [isMobileViewport]);
 
-  // MÓVIL: el marcador de puntuaciones no compite con la portada al entrar.
-  // Su espacio se reserva para que las pestañas no ocupen su lugar; solo se
-  // revela al cruzar por primera vez el navbar inferior y se oculta al volver
-  // al inicio de la ficha.
+  // MÓVIL: el marcador de puntuaciones se revela de forma fluida al cruzar por
+  // primera vez el navbar inferior y se oculta al volver al inicio.
+  // Se utiliza manipulación directa del DOM (clase CSS) para no causar
+  // re-renders de React durante el scroll.
   useEffect(() => {
-    if (!isMobileViewport) {
-      setMobileScoreboardVisible(false);
-      return undefined;
-    }
+    if (!isMobileViewport) return undefined;
 
-    setMobileScoreboardVisible(false);
+    const wrapper = mobileScoreboardWrapperRef.current;
     const trigger = mobileScoreboardTriggerRef.current;
-    if (!trigger) return undefined;
+    if (!wrapper || !trigger) return undefined;
 
-    const hideAtTop = () => {
-      if (window.scrollY <= 4) setMobileScoreboardVisible(false);
-    };
+    // Estado inicial en móvil
+    wrapper.classList.remove("sv-scoreboard-visible");
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && window.scrollY > 4) {
-          setMobileScoreboardVisible(true);
+          wrapper.classList.add("sv-scoreboard-visible");
+        } else if (window.scrollY <= 4) {
+          wrapper.classList.remove("sv-scoreboard-visible");
         }
       },
       {
         root: null,
         // Reserva el espacio cubierto por la navegación inferior flotante.
-        rootMargin: "0px 0px -88px 0px",
+        rootMargin: "0px 0px -60px 0px",
         threshold: 0,
       },
     );
 
     observer.observe(trigger);
-    hideAtTop();
-    window.addEventListener("scroll", hideAtTop, { passive: true });
+
+    const handleScroll = () => {
+      if (window.scrollY <= 4) {
+        wrapper.classList.remove("sv-scoreboard-visible");
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", hideAtTop);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, [id, isMobileViewport]);
 
@@ -9061,10 +9064,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <FadeIn
-              delay={0.04}
-              duration={0.32}
-              className="order-3 mb-2 w-full sm:hidden"
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="order-3 mb-2 w-full sm:hidden transform-gpu"
             >
               <DetailsInfoTabs
                 key={`detailsTabMobile-${id}`}
@@ -9099,7 +9103,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   isBackdropPoster ? scoreboardExternalLinks : []
                 }
               />
-            </FadeIn>
+            </motion.div>
 
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
@@ -9116,35 +9120,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 aria-hidden="true"
                 className="block h-px sm:hidden"
               />
-              <motion.div
-                initial={false}
-                animate={
-                  isMobileViewport && !mobileScoreboardVisible
-                    ? { opacity: 0, y: 12 }
-                    : { opacity: 1, y: 0 }
-                }
-                transition={
-                  prefersReducedMotion
-                    ? { duration: 0 }
-                    : {
-                        opacity: { duration: 0.2, ease: "easeOut" },
-                        y: {
-                          duration: 0.3,
-                          ease: [0.16, 1, 0.3, 1],
-                        },
-                      }
-                }
-                className={`origin-top transform-gpu ${
-                  mobileScoreboardVisible
-                    ? "max-sm:will-change-[opacity,transform]"
-                    : "max-sm:!opacity-0 max-sm:pointer-events-none"
-                }`}
-                inert={isMobileViewport && !mobileScoreboardVisible}
-                aria-hidden={
-                  isMobileViewport && !mobileScoreboardVisible
-                    ? true
-                    : undefined
-                }
+              <div
+                ref={mobileScoreboardWrapperRef}
+                className="origin-top transform-gpu transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[opacity,transform] max-sm:opacity-0 max-sm:translate-y-3 max-sm:pointer-events-none [.sv-scoreboard-visible&]:max-sm:opacity-100 [.sv-scoreboard-visible&]:max-sm:translate-y-0 [.sv-scoreboard-visible&]:max-sm:pointer-events-auto"
               >
                 <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
@@ -9222,7 +9200,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
                 stats={tScoreboard?.stats}
                 />
-              </motion.div>
+              </div>
             </div>
 
             {/* =================================================================
