@@ -14,7 +14,7 @@
 //                 y el tagline usa comillas rectas " ".
 
 import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarIcon,
   FilmIcon,
@@ -97,7 +97,14 @@ export default function DetailsInfoTabs({
         <AnimatePresence mode="wait">
           {/* ===== TAB: SINOPSIS ===== */}
           {activeTab === "synopsis" && (
-            <div key="synopsis">
+            <motion.div
+              key="synopsis"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="transform-gpu"
+            >
               <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
                 {/* Capa de fondo suave */}
                 <div
@@ -117,12 +124,19 @@ export default function DetailsInfoTabs({
                   </p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* ===== TAB: DETALLES ===== */}
           {activeTab === "details" && (
-            <div key="details">
+            <motion.div
+              key="details"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="transform-gpu"
+            >
               {mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
@@ -277,12 +291,19 @@ export default function DetailsInfoTabs({
                     ))}
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* ===== TAB: PRODUCCIÓN Y EQUIPO ===== */}
           {activeTab === "production" && (
-            <div key="production">
+            <motion.div
+              key="production"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="transform-gpu"
+            >
               {mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
@@ -382,12 +403,19 @@ export default function DetailsInfoTabs({
                   />
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* ===== TAB: PLATAFORMAS (solo diseño móvil de DetailsClient) ===== */}
           {activeTab === "platforms" && hasPlatformsTab && (
-            <div key="platforms">
+            <motion.div
+              key="platforms"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="transform-gpu"
+            >
               <div className="flex flex-col gap-3">
                 {platforms.length > 0 ? (
                   platforms.map((platform, index) => (
@@ -440,12 +468,19 @@ export default function DetailsInfoTabs({
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* ===== TAB: PREMIOS ===== */}
           {activeTab === "awards" && hasAwardsTab && (
-            <div key="awards">
+            <motion.div
+              key="awards"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="transform-gpu"
+            >
               {awards ? (
                 <AwardsPanel awards={awards} />
               ) : (
@@ -483,7 +518,7 @@ export default function DetailsInfoTabs({
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
