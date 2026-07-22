@@ -1343,6 +1343,7 @@ export default function DetailsClient({
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
+  const mobileScoreboardTriggerRef = useRef(null);
   const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
@@ -1432,6 +1433,8 @@ export default function DetailsClient({
   const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
+  const [mobileScoreboardVisible, setMobileScoreboardVisible] =
+    useState(false);
 
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
@@ -1558,6 +1561,47 @@ export default function DetailsClient({
       root.style.removeProperty("--sv-hero-scroll");
     };
   }, [isMobileViewport]);
+
+  // MÓVIL: el marcador de puntuaciones no compite con la portada al entrar.
+  // Se revela al cruzar por primera vez el navbar inferior y se vuelve a
+  // colapsar únicamente al regresar al inicio de la ficha.
+  useEffect(() => {
+    if (!isMobileViewport) {
+      setMobileScoreboardVisible(false);
+      return undefined;
+    }
+
+    setMobileScoreboardVisible(false);
+    const trigger = mobileScoreboardTriggerRef.current;
+    if (!trigger) return undefined;
+
+    const hideAtTop = () => {
+      if (window.scrollY <= 4) setMobileScoreboardVisible(false);
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && window.scrollY > 4) {
+          setMobileScoreboardVisible(true);
+        }
+      },
+      {
+        root: null,
+        // Reserva el espacio cubierto por la navegación inferior flotante.
+        rootMargin: "0px 0px -88px 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(trigger);
+    hideAtTop();
+    window.addEventListener("scroll", hideAtTop, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", hideAtTop);
+    };
+  }, [id, isMobileViewport]);
 
   // Logos disponibles para la cabecera y la galería móvil. Se cargan una vez y
   // la selección manual se aplica por encima del logo recomendado.
@@ -6551,6 +6595,10 @@ export default function DetailsClient({
           data.number_of_episodes ? ` · ${data.number_of_episodes} Eps.` : ""
         }`
       : null;
+  const seriesFormatValue =
+    type === "tv"
+      ? [seasonEpisodeValue, episodeRuntimeFormatValue].filter(Boolean).join(" · ")
+      : null;
 
   const displayRuntimeValue =
     type === "tv" ? seasonEpisodeValue : runtimeValue || episodeRuntimeValue;
@@ -8238,7 +8286,7 @@ export default function DetailsClient({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="-mt-[4.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-12 items-start"
+          className="-mt-[4.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
@@ -8896,45 +8944,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               isBackdropPoster ? "" : ""
             }`}
           >
-            {/* 1. TÍTULO Y CABECERA */}
-            {/* En móvil esta sección se revela tras las acciones y las
-                plataformas. Es una entrada corta y de una sola capa para no
-                competir con la animación individual de los iconos. */}
-            <motion.div
-              initial={prefersReducedMotion ? false : "hidden"}
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              variants={{
-                hidden: { opacity: 0, y: 12 },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  transition: {
-                    duration: 0.42,
-                    ease: [0.16, 1, 0.3, 1],
-                  },
-                },
-              }}
-              className="order-3 mb-6 flex flex-col items-center gap-2 px-1 text-center sm:hidden"
-            >
-              {headerAwardsValue && (
-                <div className="order-2 mb-0 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md">
-                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="line-clamp-1">{headerAwardsValue}</span>
-                </div>
-              )}
-
-              <div className="order-1 w-full">
-                <DetailsMetaGenresRow
-                  yearIso={yearIso}
-                  displayRuntimeValue={displayRuntimeValue}
-                  status={data.status}
-                  genres={data.genres}
-                  hideGenresOnMobile
-                />
-              </div>
-            </motion.div>
-
             <FadeIn delay={0.06} className="hidden sm:order-none sm:mb-6 sm:flex sm:flex-col sm:items-center sm:gap-0 sm:px-1 sm:text-center md:items-start md:text-left">
               {/* En MÓVIL (&lt;640) el título va como LOGO sobre la portada (ver poster
                   card); el h1 de texto se muestra de sm: en adelante. */}
@@ -9048,87 +9057,44 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             </FadeIn>
           </div>
 
-            {/* MÓVIL: plataformas inmediatamente después de las acciones. */}
-            {platformItems.length > 0 && (
-              <motion.div
-                initial={prefersReducedMotion ? false : "hidden"}
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.2 }}
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  visible: {
-                    opacity: 1,
-                    y: 0,
-                    transition: {
-                      duration: 0.38,
-                      ease: [0.16, 1, 0.3, 1],
-                      staggerChildren: prefersReducedMotion ? 0 : 0.04,
-                    },
-                  },
-                }}
-                className="order-2 mb-4 flex w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:hidden"
-              >
-                <div className="flex flex-row flex-nowrap items-center gap-2">
-                  {platformItems.map((provider, index) => (
-                    <motion.a
-                      key={provider.key ?? `${provider.title}-${index}`}
-                      href={provider.href}
-                      variants={{
-                        hidden: { opacity: 0, y: 6, scale: 0.98 },
-                        visible: {
-                          opacity: 1,
-                          y: 0,
-                          scale: 1,
-                          transition: {
-                            duration: 0.28,
-                            ease: [0.16, 1, 0.3, 1],
-                          },
-                        },
-                      }}
-                      target={provider.target}
-                      rel={provider.rel}
-                      aria-label={provider.title}
-                      className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
-                    >
-                      <OptimizedImage
-                        src={provider.icon}
-                        alt=""
-                        className="h-9 w-9 rounded-xl bg-white/5 object-contain shadow-lg"
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                        }}
-                      />
-                      {provider.isPlexProvider && (
-                        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
-                      )}
-                    </motion.a>
-                  ))}
-                </div>
-
-                {isBackdropPoster && scoreboardExternalLinks.length > 0 && (
-                  <>
-                    <ToolbarSeparator className="mx-0.5" />
-                    <motion.div
-                      variants={{
-                        hidden: { opacity: 0, y: 6 },
-                        visible: { opacity: 1, y: 0 },
-                      }}
-                      className="flex flex-row flex-nowrap items-center gap-2"
-                    >
-                      {scoreboardExternalLinks.map((link) => (
-                        <ExternalLinkButton
-                          key={link.key}
-                          icon={link.icon}
-                          title={link.title}
-                          href={link.href}
-                          fallbackHref={link.fallbackHref}
-                        />
-                      ))}
-                    </motion.div>
-                  </>
-                )}
-              </motion.div>
-            )}
+            {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
+                segunda fila de plataformas/estado/premios fuera de la jerarquía
+                informativa. */}
+            <FadeIn delay={0.18} className="order-3 mb-2 w-full sm:hidden">
+              <DetailsInfoTabs
+                key={`detailsTabMobile-${id}`}
+                variant={isBackdropPoster ? "backdrop" : "normal"}
+                layoutId="detailsTabMobile"
+                mobileLayout
+                mediaType={type}
+                originalTitle={
+                  type === "movie" ? data.original_title : data.original_name
+                }
+                formatValue={
+                  type === "movie"
+                    ? displayRuntimeValue || "—"
+                    : seriesFormatValue || "—"
+                }
+                releaseDateValue={releaseDateValue}
+                lastAirDateValue={lastAirDateValue}
+                status={data.status}
+                budgetValue={budgetValue}
+                revenueValue={revenueValue}
+                director={movieDirector}
+                creators={createdByNames}
+                network={network}
+                productionText={production}
+                tagline={data.tagline}
+                overview={data.overview}
+                awardsValue={headerAwardsValue}
+                showAwardsTab={false}
+                genres={data.genres}
+                platforms={platformItems}
+                platformLinks={
+                  isBackdropPoster ? scoreboardExternalLinks : []
+                }
+              />
+            </FadeIn>
 
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
@@ -9139,8 +9105,37 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* Panel de puntuaciones + barra de acciones (ratings, enlaces
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
-            <div className={`order-4 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}>
-              <DetailsScoreboardPanel
+            <div className={`order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}>
+              <span
+                ref={mobileScoreboardTriggerRef}
+                aria-hidden="true"
+                className="block h-px sm:hidden"
+              />
+              <motion.div
+                initial={false}
+                animate={
+                  isMobileViewport && !mobileScoreboardVisible
+                    ? { opacity: 0, height: 0, y: 12 }
+                    : { opacity: 1, height: "auto", y: 0 }
+                }
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0 }
+                    : { duration: 0.38, ease: [0.16, 1, 0.3, 1] }
+                }
+                className={`overflow-hidden sm:overflow-visible ${
+                  mobileScoreboardVisible
+                    ? "max-sm:will-change-[height,opacity,transform]"
+                    : "max-sm:!h-0 max-sm:!translate-y-3 max-sm:!opacity-0 max-sm:pointer-events-none"
+                }`}
+                inert={isMobileViewport && !mobileScoreboardVisible}
+                aria-hidden={
+                  isMobileViewport && !mobileScoreboardVisible
+                    ? true
+                    : undefined
+                }
+              >
+                <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
                 tmdb={{
                   value:
@@ -9215,7 +9210,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   text: `Echa un vistazo a ${title} en The Show Verse`,
                 }}
                 stats={tScoreboard?.stats}
-              />
+                />
+              </motion.div>
             </div>
 
             {/* =================================================================
@@ -9224,7 +9220,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <FadeIn delay={0.24} className="order-5 sm:order-none">
+              <FadeIn delay={0.24} className="hidden sm:block sm:order-none">
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -9266,7 +9262,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <FadeIn delay={0.24} className="mt-8 lg:mt-6 w-full">
+          <FadeIn delay={0.24} className="mt-8 hidden w-full sm:block lg:mt-6">
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
@@ -9307,7 +9303,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
            ================================================================= */}
         {/* Sistema de navegación por secciones con detección de scroll */}
         {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
-        <div className="mt-8 sm:mt-10">
+        <div className="mt-2 sm:mt-10">
           {/* Elemento centinela para detectar cuándo el menú debe quedar sticky */}
           <div ref={sentinelRef} className="h-px w-full" />
 

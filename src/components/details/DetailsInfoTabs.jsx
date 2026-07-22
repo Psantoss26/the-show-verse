@@ -26,11 +26,15 @@ import {
   Building2,
   Trophy,
   Tags,
+  BadgeCheck,
 } from "lucide-react";
 
 import { VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
 import { translateGenre } from "@/lib/details/formatters";
+import OptimizedImage from "@/components/OptimizedImage";
+import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
+import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
 
 export default function DetailsInfoTabs({
   variant = "normal",
@@ -54,11 +58,16 @@ export default function DetailsInfoTabs({
   showAwardsTab = true,
   genres = [],
   metadataLoading = false,
+  mobileLayout = false,
+  platforms = [],
+  platformLinks = [],
+  awardsValue,
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
+  const hasPlatformsTab = mobileLayout;
   const genresValue = Array.isArray(genres)
     ? genres
         .filter(Boolean)
@@ -75,6 +84,7 @@ export default function DetailsInfoTabs({
           { id: "details", label: "Detalles" },
           { id: "production", label: "Producción" },
           { id: "synopsis", label: "Sinopsis" },
+          ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
           ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
         ]}
         activeTab={activeTab}
@@ -113,149 +123,322 @@ export default function DetailsInfoTabs({
           {/* ===== TAB: DETALLES ===== */}
           {activeTab === "details" && (
             <div key="details">
-              <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                {/* Título Original */}
-                <VisualMetaCard
-                  icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
-                  label="Título Original"
-                  value={originalTitle}
-                  isLoading={metadataLoading}
-                  expanded={true}
-                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                />
-
-                <VisualMetaCard
-                  icon={Tags}
-                  label="Géneros"
-                  value={metadataLoading ? null : genresValue || "—"}
-                  isLoading={metadataLoading}
-                  expanded={true}
-                  className="w-full sm:hidden"
-                />
-
-                {/* Duración (solo series) */}
-                {mediaType !== "movie" ? (
+              {mobileLayout ? (
+                <div className="flex flex-col gap-3">
+                  <VisualMetaCard
+                    icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
+                    label="Título original"
+                    value={originalTitle || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                  {mediaType === "movie" ? (
+                    <VisualMetaCard
+                      icon={CalendarIcon}
+                      label="Estreno"
+                      value={metadataLoading ? null : releaseDateValue || "—"}
+                      isLoading={metadataLoading}
+                      className="w-full"
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <VisualMetaCard
+                        icon={CalendarIcon}
+                        label="Inicio"
+                        value={metadataLoading ? null : releaseDateValue || "—"}
+                        isLoading={metadataLoading}
+                        className="min-w-0"
+                      />
+                      <VisualMetaCard
+                        icon={CalendarIcon}
+                        label="Finalización"
+                        value={metadataLoading ? null : lastAirDateValue || "—"}
+                        isLoading={metadataLoading}
+                        className="min-w-0"
+                      />
+                    </div>
+                  )}
                   <VisualMetaCard
                     icon={Layers}
-                    label="Duración"
-                    value={formatValue}
+                    label={mediaType === "movie" ? "Duración" : "Formato"}
+                    value={formatValue || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                  <VisualMetaCard
+                    icon={BadgeCheck}
+                    label="Estado"
+                    value={metadataLoading ? null : getStatusLabel(status) || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                  <VisualMetaCard
+                    icon={Tags}
+                    label="Géneros"
+                    value={metadataLoading ? null : genresValue || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                  {/* Título Original */}
+                  <VisualMetaCard
+                    icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
+                    label="Título Original"
+                    value={originalTitle}
+                    isLoading={metadataLoading}
+                    expanded={true}
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                   />
-                ) : null}
 
-                {/* Estreno / Inicio */}
-                <VisualMetaCard
-                  icon={CalendarIcon}
-                  label={mediaType === "movie" ? "Estreno" : "Inicio"}
-                  value={metadataLoading ? null : releaseDateValue || "—"}
-                  isLoading={metadataLoading}
-                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                />
+                  <VisualMetaCard
+                    icon={Tags}
+                    label="Géneros"
+                    value={metadataLoading ? null : genresValue || "—"}
+                    isLoading={metadataLoading}
+                    expanded={true}
+                    className="w-full sm:hidden"
+                  />
 
-                {/* Finalización / Última emisión (solo series) */}
-                {mediaType !== "movie" && lastAirDateValue && (
+                  {/* Duración (solo series) */}
+                  {mediaType !== "movie" ? (
+                    <VisualMetaCard
+                      icon={Layers}
+                      label="Duración"
+                      value={formatValue}
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                  ) : null}
+
+                  {/* Estreno / Inicio */}
                   <VisualMetaCard
                     icon={CalendarIcon}
-                    label={
-                      status === "Ended" ? "Finalización" : "Última emisión"
-                    }
-                    value={
-                      isBackdrop
-                        ? lastAirDateValue
-                        : lastAirDateValue || "En emisión"
-                    }
+                    label={mediaType === "movie" ? "Estreno" : "Inicio"}
+                    value={metadataLoading ? null : releaseDateValue || "—"}
+                    isLoading={metadataLoading}
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                   />
-                )}
 
-                {/* Presupuesto y Recaudación (solo películas) */}
-                {mediaType === "movie" &&
-                  (isBackdrop ? (
-                    <>
-                      {budgetValue && (
+                  {/* Finalización / Última emisión (solo series) */}
+                  {mediaType !== "movie" && lastAirDateValue && (
+                    <VisualMetaCard
+                      icon={CalendarIcon}
+                      label={
+                        status === "Ended" ? "Finalización" : "Última emisión"
+                      }
+                      value={
+                        isBackdrop
+                          ? lastAirDateValue
+                          : lastAirDateValue || "En emisión"
+                      }
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                  )}
+
+                  {/* Presupuesto y Recaudación (solo películas) */}
+                  {mediaType === "movie" &&
+                    (isBackdrop ? (
+                      <>
+                        {budgetValue && (
+                          <VisualMetaCard
+                            icon={BadgeDollarSignIcon}
+                            label="Presupuesto"
+                            value={budgetValue}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        )}
+                        {revenueValue && (
+                          <VisualMetaCard
+                            icon={TrendingUp}
+                            label="Recaudación"
+                            value={revenueValue}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <>
                         <VisualMetaCard
                           icon={BadgeDollarSignIcon}
                           label="Presupuesto"
-                          value={budgetValue}
+                          value={metadataLoading ? null : budgetValue || "—"}
+                          isLoading={metadataLoading}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
-                      )}
-                      {revenueValue && (
                         <VisualMetaCard
                           icon={TrendingUp}
                           label="Recaudación"
-                          value={revenueValue}
+                          value={metadataLoading ? null : revenueValue || "—"}
+                          isLoading={metadataLoading}
                           className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                         />
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <VisualMetaCard
-                        icon={BadgeDollarSignIcon}
-                        label="Presupuesto"
-                        value={metadataLoading ? null : budgetValue || "—"}
-                        isLoading={metadataLoading}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-                      <VisualMetaCard
-                        icon={TrendingUp}
-                        label="Recaudación"
-                        value={metadataLoading ? null : revenueValue || "—"}
-                        isLoading={metadataLoading}
-                        className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                      />
-                    </>
-                  ))}
-              </div>
+                      </>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* ===== TAB: PRODUCCIÓN Y EQUIPO ===== */}
           {activeTab === "production" && (
             <div key="production">
-              <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                {/* Director (Cine) / Creadores (TV) */}
-                <VisualMetaCard
-                  icon={Users}
-                  label={mediaType === "movie" ? "Director" : "Creadores"}
-                  value={
-                    mediaType === "movie"
-                      ? director || "Desconocido"
-                      : creators || "Desconocido"
-                  }
-                  expanded={true}
-                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                />
+              {mobileLayout ? (
+                <div className="flex flex-col gap-3">
+                  <VisualMetaCard
+                    icon={Users}
+                    label={mediaType === "movie" ? "Director" : "Creadores"}
+                    value={
+                      mediaType === "movie"
+                        ? director || "Desconocido"
+                        : creators || "Desconocido"
+                    }
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                  <VisualMetaCard
+                    icon={Trophy}
+                    label="Premios"
+                    value={metadataLoading ? null : awardsValue || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                  {mediaType === "movie" ? (
+                    <>
+                      <VisualMetaCard
+                        icon={BadgeDollarSignIcon}
+                        label="Presupuesto"
+                        value={metadataLoading ? null : budgetValue || "—"}
+                        isLoading={metadataLoading}
+                        className="w-full"
+                      />
+                      <VisualMetaCard
+                        icon={TrendingUp}
+                        label="Recaudación"
+                        value={metadataLoading ? null : revenueValue || "—"}
+                        isLoading={metadataLoading}
+                        className="w-full"
+                      />
+                    </>
+                  ) : (
+                    <VisualMetaCard
+                      icon={MonitorPlay}
+                      label="Canal"
+                      value={metadataLoading ? null : network || "—"}
+                      isLoading={metadataLoading}
+                      className="w-full"
+                    />
+                  )}
+                  <VisualMetaCard
+                    icon={Building2}
+                    label="Producción"
+                    value={metadataLoading ? null : productionText || "—"}
+                    isLoading={metadataLoading}
+                    className="w-full"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                  {/* Director (Cine) / Creadores (TV) */}
+                  <VisualMetaCard
+                    icon={Users}
+                    label={mediaType === "movie" ? "Director" : "Creadores"}
+                    value={
+                      mediaType === "movie"
+                        ? director || "Desconocido"
+                        : creators || "Desconocido"
+                    }
+                    expanded={true}
+                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                  />
 
-                {/* Canal (solo TV) */}
-                {mediaType !== "movie" &&
-                  (isBackdrop
-                    ? network && (
-                        <VisualMetaCard
-                          icon={MonitorPlay}
-                          label="Canal"
-                          value={network}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      )
-                    : (
-                        <VisualMetaCard
-                          icon={MonitorPlay}
-                          label="Canal"
-                          value={network || "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      ))}
+                  {/* Canal (solo TV) */}
+                  {mediaType !== "movie" &&
+                    (isBackdrop
+                      ? network && (
+                          <VisualMetaCard
+                            icon={MonitorPlay}
+                            label="Canal"
+                            value={network}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        )
+                      : (
+                          <VisualMetaCard
+                            icon={MonitorPlay}
+                            label="Canal"
+                            value={network || "—"}
+                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          />
+                        ))}
 
-                {/* Producción (ambos) */}
-                <VisualMetaCard
-                  icon={Building2}
-                  label="Producción"
-                  value={productionText || "—"}
-                  expanded={true}
-                  className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                />
+                  {/* Producción (ambos) */}
+                  <VisualMetaCard
+                    icon={Building2}
+                    label="Producción"
+                    value={productionText || "—"}
+                    expanded={true}
+                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== TAB: PLATAFORMAS (solo diseño móvil de DetailsClient) ===== */}
+          {activeTab === "platforms" && hasPlatformsTab && (
+            <div key="platforms">
+              <div className="flex flex-col gap-3">
+                {platforms.length > 0 ? (
+                  platforms.map((platform, index) => (
+                    <a
+                      key={platform.key ?? `${platform.title}-${index}`}
+                      href={platform.href}
+                      target={platform.target}
+                      rel={platform.rel}
+                      aria-label={platform.title}
+                      className="group/provider block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                    >
+                      <VisualMetaCard
+                        iconContent={
+                          <span className="relative block h-10 w-10">
+                            <OptimizedImage
+                              src={platform.icon}
+                              alt=""
+                              className="h-10 w-10 rounded-xl bg-white/5 object-contain shadow-lg"
+                            />
+                            {platform.isPlexProvider && (
+                              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-black" />
+                            )}
+                          </span>
+                        }
+                        label="Plataforma"
+                        value={platform.title}
+                        className="w-full transition-colors group-hover/provider:from-white/15 group-hover/provider:to-black/5"
+                      />
+                    </a>
+                  ))
+                ) : (
+                  <VisualMetaCard
+                    icon={MonitorPlay}
+                    label="Plataformas"
+                    value="No hay plataformas disponibles."
+                    className="w-full"
+                  />
+                )}
+                {platformLinks.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+                    {platformLinks.map((link) => (
+                      <ExternalLinkButton
+                        key={link.key}
+                        icon={link.icon}
+                        title={link.title}
+                        href={link.href}
+                        fallbackHref={link.fallbackHref}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

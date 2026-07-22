@@ -166,9 +166,17 @@ export async function GET(_request, { params }) {
   }
 
   try {
+    // Solo hace falta `movie.ids.tmdb`/`show.ids.tmdb` (ver `buildWatchedMap`),
+    // que YA viene en la respuesta mínima de Trakt. Pedir `extended=full` en
+    // movies traía metadatos completos por cada película vista (potencialmente
+    // miles, en un historial largo) que se descartaban al instante: más peso,
+    // más tiempo de respuesta y más riesgo de agotar el timeout de 9s en
+    // cuentas con mucho historial -- justo cuando eso pasa, `Promise.allSettled`
+    // descarta esa rama silenciosamente y la sección de "Vistos" se queda vacía
+    // sin ningún aviso.
     const [creditsRes, watchedMoviesRes, watchedShowsRes] = await Promise.allSettled([
       fetchTmdbPersonCredits(personId),
-      traktFetch("/sync/watched/movies?extended=full", {
+      traktFetch("/sync/watched/movies", {
         token,
         timeoutMs: 9000,
         retries: 1,
@@ -192,6 +200,36 @@ export async function GET(_request, { params }) {
       watchedShowsRes.status === "fulfilled" && watchedShowsRes.value?.ok
         ? watchedShowsRes.value.json
         : [];
+
+    // `Promise.allSettled` traga los fallos de cada rama sin dejar rastro: la
+    // sección quedaba vacía en silencio, indistinguible de "sin coincidencias".
+    // Se registran aquí para poder diagnosticar (timeout, 401 tras refresco,
+    // TMDB caído...) la próxima vez que ocurra en vez de solo ver "0 items".
+    if (creditsRes.status === "rejected" || !credits) {
+      console.error(
+        `[trakt/person/watched] TMDB combined_credits falló para person ${personId}:`,
+        creditsRes.status === "rejected" ? creditsRes.reason : "respuesta vacía",
+      );
+    }
+    if (
+      watchedMoviesRes.status === "rejected" ||
+      !watchedMoviesRes.value?.ok
+    ) {
+      console.error(
+        `[trakt/person/watched] Trakt watched/movies falló para person ${personId}:`,
+        watchedMoviesRes.status === "rejected"
+          ? watchedMoviesRes.reason
+          : `HTTP ${watchedMoviesRes.value?.status}`,
+      );
+    }
+    if (watchedShowsRes.status === "rejected" || !watchedShowsRes.value?.ok) {
+      console.error(
+        `[trakt/person/watched] Trakt watched/shows falló para person ${personId}:`,
+        watchedShowsRes.status === "rejected"
+          ? watchedShowsRes.reason
+          : `HTTP ${watchedShowsRes.value?.status}`,
+      );
+    }
 
     const watched = new Map([
       ...buildWatchedMap(moviesPayload, "movie"),
@@ -229,6 +267,10 @@ export async function GET(_request, { params }) {
     if (refreshedTokens) setTraktCookies(response, refreshedTokens);
     return noCache(response);
   } catch (error) {
+    console.error(
+      `[trakt/person/watched] Fallo inesperado para person ${personId}:`,
+      error,
+    );
     const response = NextResponse.json(
       {
         connected: true,
