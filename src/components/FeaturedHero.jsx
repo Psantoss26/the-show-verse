@@ -1332,7 +1332,7 @@ function FeaturedSlide({
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc ? (
               <div
-                className="hero-reveal hero-logo-reveal relative mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+                className="hero-reveal hero-logo-reveal hero-info-logo relative mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
                 style={{ "--hero-delay": "80ms" }}
               >
                 <NextImage
@@ -1354,7 +1354,7 @@ function FeaturedSlide({
               </div>
             ) : logoResolved ? (
               <h2
-                className="hero-reveal hero-title-reveal mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:mb-8 sm:text-5xl lg:text-6xl text-center sm:text-left"
+                className="hero-reveal hero-title-reveal hero-info-title mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:mb-8 sm:text-5xl lg:text-6xl text-center sm:text-left"
                 style={{ "--hero-delay": "80ms" }}
               >
                 {title}
@@ -1365,14 +1365,14 @@ function FeaturedSlide({
                  de texto solo aparece si se confirma que NO hay logo). */
               <div
                 aria-hidden="true"
-                className="mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+                className="hero-info-logo mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
               />
             )}
 
             {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
                 Contenedor relativo: el indicador "ahora sonando" se posiciona de
                 forma absoluta debajo para no desplazar la información. */}
-            <div className="relative mb-4 w-full max-w-full sm:mb-6 sm:w-auto">
+            <div className="hero-info-actions relative mb-4 w-full max-w-full sm:mb-6 sm:w-auto">
             <div
               className="hero-reveal flex flex-nowrap items-center justify-center gap-1.5 sm:justify-start sm:gap-3 w-full max-w-full"
               style={{ "--hero-delay": "130ms" }}
@@ -1538,7 +1538,7 @@ function FeaturedSlide({
               <>
                 {/* Premios + Puntuaciones en la misma línea en escritorio */}
                 <div
-                  className="hero-reveal mb-2.5 flex min-h-[1.5rem] flex-row flex-nowrap justify-start gap-x-4 items-center"
+                  className="hero-reveal hero-info-meta mb-2.5 flex min-h-[1.5rem] flex-row flex-nowrap justify-start gap-x-4 items-center"
                   style={{ "--hero-delay": "140ms" }}
                 >
                   {extras.awards && (
@@ -1569,7 +1569,7 @@ function FeaturedSlide({
 
                 {/* Badge contextual + Metadatos en la misma línea en escritorio */}
                 <div
-                  className="hero-reveal mb-2.5 flex w-full max-w-full flex-row flex-nowrap justify-start gap-x-2 items-center"
+                  className="hero-reveal hero-info-meta mb-2.5 flex w-full max-w-full flex-row flex-nowrap justify-start gap-x-2 items-center"
                   style={{ "--hero-delay": "170ms" }}
                 >
                   {featuredBadge && (
@@ -1592,7 +1592,7 @@ function FeaturedSlide({
 
             {overview && !isMobile && (
               <p
-                className="hero-reveal mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
+                className="hero-reveal hero-info-overview mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
                 style={{ "--hero-delay": "290ms" }}
               >
                 {overview}
@@ -1698,6 +1698,50 @@ function FeaturedSlide({
         .hero-backdrop-reveal-desktop {
           left: auto;
           width: var(--hero-info-image-width, 100%);
+        }
+
+        /* Columna de información (escritorio) más compacta cuando el hero
+           tiene poca altura disponible (ventanas bajas, portátiles de poca
+           pulgada en horizontal, zoom del navegador...): logo/título, huecos
+           entre bloques y sinopsis se encogen para que el conjunto quepa sin
+           apretarse contra el borde superior ni tapar la imagen. Ligado a la
+           ALTURA del viewport (no al ancho), y solo en escritorio -- en móvil
+           la columna ya vive en flujo normal debajo del póster, sin este
+           problema. */
+        @media (min-width: 640px) and (max-height: 50rem) {
+          .hero-info-logo {
+            height: 7rem;
+            max-width: 22rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .hero-info-title {
+            font-size: 2.25rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .hero-info-actions {
+            margin-bottom: 1rem;
+          }
+
+          .hero-info-meta {
+            margin-bottom: 0.375rem;
+          }
+
+          .hero-info-overview {
+            margin-bottom: 0.75rem;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+          }
+        }
+
+        /* Si aun así el conjunto sigue sin caber (ventanas muy bajas), se
+           retira directamente la sinopsis: es el bloque menos esencial y el
+           que más alto ocupa. */
+        @media (min-width: 640px) and (max-height: 41.25rem) {
+          .hero-info-overview {
+            display: none;
+          }
         }
 
         .hero-backdrop-loading {

@@ -73,7 +73,7 @@ export async function GET(request) {
 
 /**
  * POST /api/artwork
- * body: { type: 'movie'|'tv', id: string|number, kind: 'poster'|'backdrop'|'background', filePath: string|null }
+ * body: { type: 'movie'|'tv', id: string|number, kind: 'poster'|'mobilePoster'|'backdrop'|'background'|'logo', filePath: string|null }
  *
  * - Si filePath tiene valor => lo guarda
  * - Si filePath es null/undefined => borra ese override
