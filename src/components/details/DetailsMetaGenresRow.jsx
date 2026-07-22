@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { translateGenre } from "@/lib/details/formatters";
 
-function getStatusLabel(status) {
+export function getStatusLabel(status) {
   return status === "Released"
     ? "Estrenada"
     : status === "Ended"

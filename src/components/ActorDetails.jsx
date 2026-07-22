@@ -2578,7 +2578,7 @@ export default function ActorDetails({
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
                     <SectionTitle
-                      title="Ya vistos"
+                      title="Títulos vistos"
                       subtitle={`${watchedCredits.length} títulos vistos de ${safeText(actorDetails?.name)}`}
                       icon={CheckCircle2}
                     />

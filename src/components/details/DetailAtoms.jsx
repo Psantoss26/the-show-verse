@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 
 export function VisualMetaCard({
   icon: Icon,
+  iconContent = null,
   label,
   value,
   isLoading = false,
@@ -24,7 +25,7 @@ export function VisualMetaCard({
       />
 
       <div className="relative z-10 shrink-0 text-zinc-300">
-        <Icon className="w-5 h-5" />
+        {iconContent || (Icon ? <Icon className="w-5 h-5" /> : null)}
       </div>
 
       <div className="relative z-10 flex flex-col min-w-0 flex-1">
