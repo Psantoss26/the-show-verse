@@ -4,6 +4,10 @@
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef } from "react";
 
+// Referencia estable (no recrear en cada render) para forzar a Framer Motion
+// a animar por JS en vez de WAAPI acelerado -- ver comentario en FadeIn.
+function EMPTY_ON_UPDATE() {}
+
 function baseTransition(
   delay = 0,
   duration = 0.55,
@@ -64,7 +68,7 @@ export function FadeIn({
 
   const initial = shouldReduceMotion
     ? { opacity: 1, x: 0, y: 0 }
-    : { opacity: 0, ...directions[direction] };
+    : { opacity: 0, x: 0, y: 0, ...directions[direction] };
 
   const animate =
     isInView || shouldReduceMotion ? { opacity: 1, y: 0, x: 0 } : initial;
@@ -76,6 +80,16 @@ export function FadeIn({
       animate={animate}
       transition={baseTransition(delay, duration, shouldReduceMotion)}
       className={className}
+      // Framer Motion anima opacity/transform vía WAAPI (nativo del navegador)
+      // cuando puede, para acelerarlo por hardware. El problema: al terminar
+      // esa animación nativa, el navegador la retira y el elemento "vuelve"
+      // un frame al estilo inline previo (opacity:0) hasta que Framer escribe
+      // el valor final por JS justo después -> parpadeo real y visible
+      // (opacity 1 -> 0 -> 1) justo al completarse. Pasar un `onUpdate`
+      // desactiva esa vía WAAPI (Framer no puede leer valores por frame desde
+      // WAAPI) y fuerza su animación por JS, que sí queda sincronizada con lo
+      // que se pinta. Confirmado en DetailsInfoTabs (móvil), que usa FadeIn.
+      onUpdate={EMPTY_ON_UPDATE}
     >
       {children}
     </motion.div>
