@@ -13,10 +13,12 @@ import { useRef } from "react";
 // popstate; como al navegar las páginas RE-MONTAN, el primer render del nuevo
 // componente cae dentro de una ventana breve tras ese popstate.
 
+const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
 // La ficha de detalle puede resolver datos y renderizar antes de que vuelva a
-// montar la lista. Una ventana corta convertía ese back real en navegación
-// nueva justo cuando había varias páginas de Historial en caché.
+// montar la lista. La marca escrita por ScrollRestoration conserva el destino
+// exacto de `popstate`, por encima de una simple ventana de tiempo.
 const HISTORY_WINDOW_MS = 10_000;
+const HISTORY_MARKER_MAX_AGE_MS = 30_000;
 let lastHistoryNavAt = -Infinity;
 let installed = false;
 
@@ -34,11 +36,33 @@ function install() {
 
 install();
 
+function hasPendingHistoryNavigation() {
+  try {
+    const raw = window.sessionStorage.getItem(HISTORY_NAVIGATION_MARKER_KEY);
+    if (!raw) return false;
+
+    const marker = JSON.parse(raw);
+    const age = Date.now() - Number(marker?.at || 0);
+    if (age < 0 || age > HISTORY_MARKER_MAX_AGE_MS) {
+      window.sessionStorage.removeItem(HISTORY_NAVIGATION_MARKER_KEY);
+      return false;
+    }
+
+    const route = `${window.location.pathname}${window.location.search}`;
+    return marker?.route === route;
+  } catch {
+    return false;
+  }
+}
+
 // ¿El momento actual está dentro de la ventana posterior a una navegación de
 // historial? (lectura puntual, no reactiva).
 export function isHistoryNavigation() {
   if (typeof window === "undefined") return false;
-  return window.performance.now() - lastHistoryNavAt < HISTORY_WINDOW_MS;
+  return (
+    window.performance.now() - lastHistoryNavAt < HISTORY_WINDOW_MS ||
+    hasPendingHistoryNavigation()
+  );
 }
 
 // Captura el valor en el PRIMER render del componente (su montaje) y lo mantiene
