@@ -2319,28 +2319,36 @@ export default function DetailsClient({
     artworkInitialized,
   ]);
 
-  // Póster neutro del hero móvil. Una elección manual solo puede venir de la
-  // galería móvil, que muestra imágenes sin idioma, así que sigue evitando la
-  // duplicación de título impreso y logo.
+  // Póster del hero móvil. Se prioriza el arte sin idioma para no duplicar el
+  // logo, pero algunas series (por ejemplo realities) solo tienen pósteres
+  // localizados en TMDb. En ese caso usamos el mejor disponible: dejar la ruta
+  // vacía ocultaba por completo la capa móvil y dejaba la pantalla negra.
   const mobileNeutralPosterPath = useMemo(() => {
     if (selectedMobilePosterPath) return selectedMobilePosterPath;
 
-    const sourcePosters = imagesState?.posters || [];
-    const neutralPosters =
-      endpointType === "tv"
-        ? sourcePosters.filter(
-            (p) => p?.file_path && p.from !== "main" && !p?.iso_639_1,
-          )
-        : sourcePosters;
+    // La imagen principal carece de metadatos de idioma, así que no puede
+    // considerarse neutra. Se excluye hasta el fallback final para preservar la
+    // preferencia por una imagen confirmada por TMDb como textless.
+    const galleryPosters = (imagesState?.posters || []).filter(
+      (poster) => poster?.file_path && poster.from !== "main",
+    );
+    const bestFromGallery =
+      pickBestNeutralPosterByResVotes(galleryPosters)?.file_path || null;
 
-    const best =
-      pickBestNeutralPosterByResVotes(neutralPosters)?.file_path || null;
-    if (best) return best;
     return (
-      neutralPosters.find((p) => p?.file_path && !p?.iso_639_1)?.file_path ||
+      bestFromGallery ||
+      asTmdbPath(basePosterPath) ||
+      asTmdbPath(data?.poster_path) ||
+      asTmdbPath(data?.profile_path) ||
       null
     );
-  }, [endpointType, imagesState?.posters, selectedMobilePosterPath]);
+  }, [
+    imagesState?.posters,
+    selectedMobilePosterPath,
+    basePosterPath,
+    data?.poster_path,
+    data?.profile_path,
+  ]);
 
   const displayHeroLogoPath = selectedLogoPath || heroLogoPath || null;
 

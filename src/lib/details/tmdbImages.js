@@ -1,4 +1,4 @@
-import { TMDB_IMAGE_LANGS_PARAM } from '@/lib/tmdb/imageLanguages'
+import { TMDB_IMAGE_LANGS_PARAM } from '../tmdb/imageLanguages.js'
 
 export const mergeUniqueImages = (current = [], incoming = []) => {
     const map = new Map()
