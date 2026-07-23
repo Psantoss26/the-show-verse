@@ -747,6 +747,11 @@ function ProfileCardScroller({ children }) {
   const isMobile = useIsMobileLayout(768);
   const slides = Children.toArray(children);
   const childrenCount = slides.length;
+  // Swiper fija varias opciones de interacción al inicializarse. La clave
+  // separa explícitamente la configuración móvil de la de escritorio, como en
+  // las filas de los dashboards, para que un cambio de viewport no herede una
+  // física de arrastre distinta.
+  const swiperKey = `profile-row-${isMobile ? "mobile" : "desktop"}-${childrenCount}`;
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: 12 },
@@ -847,6 +852,7 @@ function ProfileCardScroller({ children }) {
           }}
         >
           <Swiper
+            key={swiperKey}
             slidesPerView={3}
             spaceBetween={12}
             observer={true}
@@ -867,11 +873,7 @@ function ProfileCardScroller({ children }) {
             preventClicksPropagation={true}
             threshold={isMobile ? 2 : 5}
             touchRatio={isMobile ? 1.5 : 1}
-            freeMode={
-              !isMobile
-                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
-                : false
-            }
+            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
             modules={[Navigation, FreeMode]}
             className="relative z-0 !overflow-visible pb-8 pt-7"
           >
@@ -1831,6 +1833,15 @@ export default function StatsClient({ connectNext = "/profile" }) {
               </div>
             </motion.div>
 
+            <motion.div
+              className="sticky top-14 z-[60] transition-all duration-300 sm:top-20 lg:hidden"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            >
+              <ProfileSectionTabs viewMode={viewMode} setViewMode={setViewMode} />
+            </motion.div>
+
             {stats ? (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
@@ -1842,17 +1853,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
               </motion.div>
             ) : null}
           </div>
-        ) : null}
-
-        {headerReady ? (
-          <motion.div
-            className="sticky top-14 z-[60] mb-4 sm:mb-6 transition-all duration-300 sm:top-20 lg:hidden"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.25 }}
-          >
-            <ProfileSectionTabs viewMode={viewMode} setViewMode={setViewMode} />
-          </motion.div>
         ) : null}
 
         {/* Content Area */}
