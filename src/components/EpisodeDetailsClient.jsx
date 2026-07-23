@@ -1614,7 +1614,7 @@ export default function EpisodeDetailsClient({
                   <SwiperSlide key={actor.id}>
                     <Link
                       href={`/details/person/${actor.id}`}
-                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
@@ -1668,7 +1668,7 @@ export default function EpisodeDetailsClient({
                   <SwiperSlide key={actor.id}>
                     <Link
                       href={`/details/person/${actor.id}`}
-                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800/80 shadow-md lg:hover:shadow-yellow-900/20 hover:border-yellow-500/30 transition-all duration-300"
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
