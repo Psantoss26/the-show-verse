@@ -1484,58 +1484,36 @@ export default function SeasonDetailsClient({
                         onMouseEnter={() => prefetchEpisodeDetails(epNum)}
                         onFocus={() => prefetchEpisodeDetails(epNum)}
                         onTouchStart={() => prefetchEpisodeDetails(epNum)}
-                        className="
-                  group block rounded-2xl overflow-hidden
-                  border border-white/10 bg-black/25
-                  hover:bg-black/35 hover:border-yellow-500/30
-                  transition
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/40
-                "
+                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                         title={epTitle}
                       >
-                        <div className="relative aspect-video bg-white/5">
+                        <div className="relative aspect-video overflow-hidden">
                           {still ? (
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/w780${still}`}
                               alt={epTitle}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
                               loading="lazy"
                               decoding="async"
                             />
                           ) : (
-                            <div className="absolute inset-0 grid place-items-center opacity-70">
+                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
                               <ImageOff className="w-7 h-7 text-zinc-500" />
                             </div>
                           )}
 
-                          {/* Overlay: visible en móvil, hover/focus en desktop */}
-                          <div
-                            className="
-                      absolute inset-0
-                      bg-gradient-to-t from-black/90 via-black/35 to-transparent
-                      opacity-100
-                      sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100
-                      transition-opacity
-                    "
-                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
 
-                          <div
-                            className="
-                      absolute inset-0 p-3 flex flex-col justify-end
-                      opacity-100
-                      sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100
-                      transition-opacity
-                    "
-                          >
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">
+                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
+                            <div className="text-[10px] sm:text-xs font-semibold leading-tight text-zinc-300 group-hover:text-yellow-400 transition-colors duration-300 drop-shadow-sm">
                               Episodio {epNum}
                             </div>
 
-                            <div className="mt-0.5 text-sm font-extrabold text-white leading-snug line-clamp-2">
+                            <p className="mt-0.5 text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
                               {epTitle}
-                            </div>
+                            </p>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-200/90">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-300 drop-shadow-sm">
                               {epAir ? (
                                 <span className="inline-flex items-center gap-1">
                                   <CalendarIcon className="w-3.5 h-3.5" />{" "}
