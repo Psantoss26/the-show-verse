@@ -14,6 +14,7 @@ import {
   deriveSectionLabel,
   normalizeDashboardSectionTitle,
 } from "@/lib/dashboard/sectionLabel";
+import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
 import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
@@ -2705,8 +2706,9 @@ export function Row({
       ? undefined
       : sectionHref || EXPANDABLE_SECTION_HREFS[title];
 
-  // Tarjetas por fila en móvil (ajuste de usuario): NO afecta a filas
-  // destacadas (isSpotlight), que mantienen su diseño de 2 por fila.
+  // Tarjetas por fila en móvil (3 por defecto, 4 si el usuario lo elige). El
+  // tamaño spotlight se limita a escritorio para que todas las filas poster
+  // móviles compartan esta misma densidad.
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
   // Al VOLVER (atrás/adelante) el montaje es nuevo y `content-visibility`
@@ -2878,9 +2880,11 @@ export function Row({
   ]);
 
   const hasActivePreview = !!hoveredId;
-  // Fila DESTACADA (×1,6): la elige el padre (exactamente una por dashboard) y
-  // la pasa por `spotlight`. Nunca en la variante "anticipated".
-  const isSpotlight = spotlight && previewKind !== "anticipated";
+  // Fila DESTACADA (×1,6): se conserva solo en escritorio. En móvil todas las
+  // filas poster genéricas comparten el mismo tamaño y número de tarjetas; las
+  // excepciones usan componentes independientes.
+  const isSpotlight =
+    !isMobile && spotlight && previewKind !== "anticipated";
   const heightClassDesktop = isSpotlight
     ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
     : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
@@ -3000,7 +3004,10 @@ export function Row({
       slidesPerView: isSpotlight ? 2 : mobileCardsPerRow,
       spaceBetween: isSpotlight ? 14 : 12,
     },
-    640: { slidesPerView: isSpotlight ? 2.2 : 4, spaceBetween: isSpotlight ? 18 : 14 },
+    640: {
+      slidesPerView: isMobile ? mobileCardsPerRow : isSpotlight ? 2.2 : 4,
+      spaceBetween: isSpotlight ? 18 : 14,
+    },
     768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : 14 },
     1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : 18 },
     1280: { slidesPerView: "auto", spaceBetween: isSpotlight ? 36 : 20 },
@@ -4536,11 +4543,9 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
 
             const nodes = [];
             let blockInserted = false;
-            // Alternancia backdrop/poster de las filas genéricas: la 1ª
-            // (Recomendaciones, idx 0) sigue en poster; de la 2ª en adelante
-            // alternan empezando por backdrop (idx 1). Continúa el patrón
-            // CW(backdrop)·Recom(poster)·Calendario(backdrop)·Más esperadas(poster)·…
-            // Las filas "spotlight" (Estrenos) conservan su preview grande en poster.
+            // Escritorio conserva la alternancia backdrop/poster. En móvil las
+            // filas genéricas son siempre poster, con tres tarjetas por defecto.
+            // "Mejor valoradas" usa su hero independiente.
             let genericIndex = -1;
             for (const row of visibleEngineRows) {
               // "Más esperadas" se pinta en el bloque superior, no en su sitio.
@@ -4548,7 +4553,11 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               genericIndex += 1;
               const isSpotlight =
                 !!spotlightRowTitle && row.title === spotlightRowTitle;
-              const useBackdrop = genericIndex % 2 === 1 && !isSpotlight;
+              const useBackdrop = shouldUseDashboardBackdropRow({
+                isMobile,
+                rowIndex: genericIndex,
+                isSpotlight,
+              });
               nodes.push(
                 useBackdrop ? (
                   <DashboardBackdropRow
