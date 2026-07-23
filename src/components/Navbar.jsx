@@ -17,7 +17,7 @@ import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
 import { useTranslation } from "@/lib/i18n";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   FilmIcon,
   TvIcon,
@@ -884,6 +884,43 @@ export default function Navbar() {
   const isActive = (href) =>
     activePath === href || (href !== "/" && activePath?.startsWith(href));
 
+  const desktopNavTabsRef = useRef(null);
+  const [activeDesktopRect, setActiveDesktopRect] = useState(null);
+  const [desktopNavMounted, setDesktopNavMounted] = useState(false);
+
+  useLayoutEffect(() => {
+    const container = desktopNavTabsRef.current;
+    if (!container) return;
+
+    const measure = () => {
+      const activeEl =
+        container.querySelector(`[data-desktop-nav-href="${activePath}"]`) ||
+        (activePath === "/" ? container.querySelector(`[data-desktop-nav-href="/"]`) : null);
+
+      if (activeEl) {
+        const left = activeEl.offsetLeft;
+        const width = activeEl.offsetWidth;
+        setActiveDesktopRect((prev) => {
+          if (prev && prev.left === left && prev.width === width && prev.href === activePath) {
+            return prev;
+          }
+          return { left, width, href: activePath };
+        });
+      } else {
+        setActiveDesktopRect(null);
+      }
+    };
+
+    measure();
+    if (!desktopNavMounted) {
+      setDesktopNavMounted(true);
+    }
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [activePath, desktopNavMounted]);
+
   const prefetchNavRoute = useCallback(
     (href) => {
       if (!href || pathname === href) return;
@@ -930,17 +967,41 @@ export default function Navbar() {
     return () => cancel(handle);
   }, [pathname, prefetchNavRoute]);
 
-  const navLinkClass = (href) =>
-    `relative px-3 py-2 rounded-xl text-sm font-bold transition-all duration-300 ease-out ${
-      isActive(href)
-        ? "text-white"
-        : isScrolled
-          ? "text-zinc-100 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
-          : "text-neutral-300 hover:text-white hover:bg-white/10 hover:backdrop-blur-md hover:shadow-sm"
-    } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
+  const navLinkClass = (href) => {
+    const active = isActive(href);
+    const activeTextClass =
+      href === "/movies"
+        ? "text-sky-300 font-bold"
+        : href === "/series"
+          ? "text-fuchsia-300 font-bold"
+          : href === "/discover"
+            ? "text-indigo-300 font-bold"
+            : href === "/biblioteca"
+              ? "text-amber-300 font-bold"
+              : "text-white font-bold";
 
-  const getActiveTabStyle = () => {
-    return "bg-white/[0.09] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.22),0_8px_20px_-6px_rgba(0,0,0,0.4)]";
+    return `relative px-3.5 py-2 rounded-xl text-sm transition-all duration-300 ease-out ${
+      active
+        ? activeTextClass
+        : isScrolled
+          ? "text-zinc-200 font-bold hover:text-white hover:bg-white/10 hover:backdrop-blur-md"
+          : "text-neutral-300 font-bold hover:text-white hover:bg-white/10 hover:backdrop-blur-md"
+    } ${isScrolled ? "[text-shadow:0_2px_10px_rgba(0,0,0,1),0_1px_4px_rgba(0,0,0,0.8)]" : ""}`;
+  };
+
+  const getActiveTabStyle = (href) => {
+    switch (href) {
+      case "/movies":
+        return "bg-gradient-to-b from-sky-500/25 via-sky-500/15 to-sky-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(56,189,248,0.28)]";
+      case "/series":
+        return "bg-gradient-to-b from-fuchsia-500/25 via-fuchsia-500/15 to-fuchsia-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(217,70,239,0.28)]";
+      case "/discover":
+        return "bg-gradient-to-b from-indigo-500/25 via-indigo-500/15 to-indigo-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(99,102,241,0.28)]";
+      case "/biblioteca":
+        return "bg-gradient-to-b from-amber-500/25 via-amber-500/15 to-amber-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(245,158,11,0.28)]";
+      default:
+        return "bg-gradient-to-b from-white/20 via-white/14 to-white/16 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(255,255,255,0.15)]";
+    }
   };
 
   const iconLinkClass = (href, tone = "neutral") => {
@@ -1131,99 +1192,85 @@ export default function Navbar() {
               </div>
             </Link>
 
-            <div className="flex items-center gap-4">
+            <div
+              ref={desktopNavTabsRef}
+              className="relative flex items-center gap-4"
+            >
+              {activeDesktopRect && (
+                <div
+                  className={`absolute top-0 bottom-0 rounded-xl pointer-events-none transform-gpu ${getActiveTabStyle(activeDesktopRect.href)} ${
+                    desktopNavMounted
+                      ? "transition-[transform,width,opacity,background-color,box-shadow] duration-220 ease-[cubic-bezier(0.2,0,0.1,1)]"
+                      : "transition-none"
+                  }`}
+                  style={{
+                    transform: `translate3d(${activeDesktopRect.left}px, 0, 0)`,
+                    width: `${activeDesktopRect.width}px`,
+                  }}
+                />
+              )}
+
               <Link
                 href="/"
+                data-desktop-nav-href="/"
                 onClick={() => setPendingHref("/")}
                 className={navLinkClass("/")}
               >
-                {isActive("/") && (
-                  <motion.div
-                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
                 <span className="relative z-10">{t("nav_home", "Inicio")}</span>
               </Link>
               <Link
                 href="/movies"
+                data-desktop-nav-href="/movies"
                 prefetch
                 onMouseEnter={() => prefetchNavRoute("/movies")}
                 onFocus={() => prefetchNavRoute("/movies")}
                 onClick={() => setPendingHref("/movies")}
                 className={navLinkClass("/movies")}
               >
-                {isActive("/movies") && (
-                  <motion.div
-                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
                 <span className="relative z-10">{t("nav_movies", "Películas")}</span>
               </Link>
               <Link
                 href="/series"
+                data-desktop-nav-href="/series"
                 prefetch
                 onMouseEnter={() => prefetchNavRoute("/series")}
                 onFocus={() => prefetchNavRoute("/series")}
                 onClick={() => setPendingHref("/series")}
                 className={navLinkClass("/series")}
               >
-                {isActive("/series") && (
-                  <motion.div
-                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
                 <span className="relative z-10">{t("nav_series", "Series")}</span>
               </Link>
               <Link
                 href="/discover"
+                data-desktop-nav-href="/discover"
                 prefetch
                 {...navPrefetchHandlers("/discover")}
                 className={navLinkClass("/discover")}
               >
-                {isActive("/discover") && (
-                  <motion.div
-                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
                 <span className="relative z-10">{t("nav_discover", "Descubrir")}</span>
               </Link>
               <Link
                 href="/biblioteca"
+                data-desktop-nav-href="/biblioteca"
                 prefetch
                 {...navPrefetchHandlers("/biblioteca")}
                 className={navLinkClass("/biblioteca")}
               >
-                {isActive("/biblioteca") && (
-                  <motion.div
-                    className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
                 <span className="relative z-10">{t("nav_library", "Biblioteca")}</span>
               </Link>
 
               {desktopSearchCompact && (
                 <button
                   type="button"
+                  data-desktop-nav-href="/__search"
                   onClick={() => setDesktopSearchOpen(true)}
                   aria-label={t("search_input_label", "Buscar en The Show Verse")}
                   aria-expanded={desktopSearchOpen}
                   className={`${navLinkClass("/__search")} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80`}
                 >
-                  {desktopSearchOpen && (
-                    <motion.div
-                      className={`absolute inset-0 rounded-xl ${getActiveTabStyle()}`}
-                      transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                    />
-                  )}
                   <span className="relative z-10">{t("nav_search", "Buscar")}</span>
                 </button>
               )}
-
             </div>
           </div>
 
@@ -1495,7 +1542,7 @@ export default function Navbar() {
         >
           {isActive("/movies") && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[0_4px_14px_rgba(56,189,248,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1518,7 +1565,7 @@ export default function Navbar() {
         >
           {isActive("/series") && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-fuchsia-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(217,70,239,0.12)]"
+              className="absolute inset-0 rounded-full bg-fuchsia-500/20 shadow-[0_4px_14px_rgba(217,70,239,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1539,7 +1586,7 @@ export default function Navbar() {
         >
           {isActive("/in-progress") && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
+              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[0_4px_14px_rgba(16,185,129,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1560,7 +1607,7 @@ export default function Navbar() {
         >
           {isActive("/history") && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(16,185,129,0.12)]"
+              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[0_4px_14px_rgba(16,185,129,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1581,7 +1628,7 @@ export default function Navbar() {
         >
           {isActive(favHref) && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-red-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(239,68,68,0.12)]"
+              className="absolute inset-0 rounded-full bg-red-500/20 shadow-[0_4px_14px_rgba(239,68,68,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1602,7 +1649,7 @@ export default function Navbar() {
         >
           {isActive(watchHref) && (
             <motion.div
-              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(56,189,248,0.12)]"
+              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[0_4px_14px_rgba(56,189,248,0.18)]"
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
             />
           )}
@@ -1661,13 +1708,13 @@ export default function Navbar() {
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive("/")
-                      ? "bg-white/10 text-white"
+                      ? "bg-gradient-to-r from-white/18 via-white/12 to-white/8 text-white font-bold shadow-[0_2px_12px_rgba(255,255,255,0.08)]"
                       : "text-neutral-300 hover:bg-white/5"
                   }`}
                 >
-                  <HomeIcon className="w-5 h-5" />
+                  <HomeIcon className={`w-5 h-5 ${isActive("/") ? "text-white" : ""}`} />
                   <span>{t("nav_home", "Inicio")}</span>
                 </Link>
 
@@ -1676,13 +1723,13 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   onMouseEnter={() => prefetchNavRoute("/movies")}
                   onFocus={() => prefetchNavRoute("/movies")}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive("/movies")
-                      ? "bg-white/10 text-white"
+                      ? "bg-gradient-to-r from-sky-500/24 via-sky-500/16 to-sky-500/10 text-sky-300 font-bold shadow-[0_2px_12px_rgba(56,189,248,0.15)]"
                       : "text-neutral-300 hover:bg-white/5"
                   }`}
                 >
-                  <FilmIcon className="w-5 h-5" />
+                  <FilmIcon className={`w-5 h-5 ${isActive("/movies") ? "text-sky-400" : ""}`} />
                   <span>{t("nav_movies", "Películas")}</span>
                 </Link>
 
@@ -1691,39 +1738,39 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   onMouseEnter={() => prefetchNavRoute("/series")}
                   onFocus={() => prefetchNavRoute("/series")}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive("/series")
-                      ? "bg-white/10 text-white"
+                      ? "bg-gradient-to-r from-fuchsia-500/24 via-fuchsia-500/16 to-fuchsia-500/10 text-fuchsia-300 font-bold shadow-[0_2px_12px_rgba(217,70,239,0.15)]"
                       : "text-neutral-300 hover:bg-white/5"
                   }`}
                 >
-                  <TvIcon className="w-5 h-5" />
+                  <TvIcon className={`w-5 h-5 ${isActive("/series") ? "text-fuchsia-400" : ""}`} />
                   <span>{t("nav_series", "Series")}</span>
                 </Link>
 
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive("/discover")
-                      ? "bg-white/10 text-white"
+                      ? "bg-gradient-to-r from-indigo-500/24 via-indigo-500/16 to-indigo-500/10 text-indigo-300 font-bold shadow-[0_2px_12px_rgba(99,102,241,0.15)]"
                       : "text-neutral-300 hover:bg-white/5"
                   }`}
                 >
-                  <Compass className="w-5 h-5" />
+                  <Compass className={`w-5 h-5 ${isActive("/discover") ? "text-indigo-400" : ""}`} />
                   <span>{t("nav_discover", "Descubrir")}</span>
                 </Link>
 
                 <Link
                   href="/biblioteca"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive("/biblioteca")
-                      ? "bg-white/10 text-white"
+                      ? "bg-gradient-to-r from-amber-500/24 via-amber-500/16 to-amber-500/10 text-amber-300 font-bold shadow-[0_2px_12px_rgba(245,158,11,0.15)]"
                       : "text-neutral-300 hover:bg-white/5"
                   }`}
                 >
-                  <FolderKanban className="w-5 h-5" />
+                  <FolderKanban className={`w-5 h-5 ${isActive("/biblioteca") ? "text-amber-400" : ""}`} />
                   <span>{t("nav_library", "Biblioteca")}</span>
                 </Link>
 
