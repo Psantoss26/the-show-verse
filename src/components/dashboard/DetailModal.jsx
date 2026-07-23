@@ -349,7 +349,8 @@ const panelVariants = {
 // se lee más nítido y directo que uno que además aparece de la nada, y se anima
 // una propiedad menos. El fundido se conserva SOLO para `switching` (cambio de
 // título con el drawer abierto), donde el crossfade sí es el efecto buscado.
-const DRAWER_EASE = [0.32, 0.72, 0, 1];
+const DRAWER_EASE_IN = [0.16, 1, 0.3, 1];
+const DRAWER_EASE_OUT = [0.32, 0, 0.67, 0];
 
 const panelVariantsRight = {
   hidden: (switching) =>
@@ -358,8 +359,8 @@ const panelVariantsRight = {
     opacity: 1,
     x: 0,
     transition: switching
-      ? { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
-      : { duration: 0.42, ease: DRAWER_EASE },
+      ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+      : { duration: 0.32, ease: DRAWER_EASE_IN },
   }),
   navigate: {
     // Igual que en el centrado: el panel real se oculta y el movimiento a la
@@ -370,14 +371,12 @@ const panelVariantsRight = {
   },
   exit: (switching) =>
     switching
-      ? { opacity: 0, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }
+      ? { opacity: 0, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }
       : {
-          // Sale deslizando sólido, sin desvanecerse: simétrico con la entrada.
-          // Antes se difuminaba a la vez que salía, lo que dejaba ver el panel
-          // medio transparente sobre la página durante el recorrido.
+          // Sale deslizando sólido sin lag en la GPU: simétrico y fluido.
           opacity: 1,
           x: "100%",
-          transition: { duration: 0.28, ease: DRAWER_EASE },
+          transition: { duration: 0.24, ease: DRAWER_EASE_OUT },
         },
 };
 
@@ -755,9 +754,11 @@ export default function DetailModal({
   //   2) NO declarar `will-change: opacity` en el drawer, que forzaba esa misma
   //      capa con alfa aunque ya no animemos la opacidad.
   //
-  // Centrado: mantiene la optimización de apagar el blur durante la entrada (ahí
-  // sí se transforma y/scale, y el dim de fondo ya difumina, así que no se nota).
-  const [panelSettled, setPanelSettled] = useState(() => isRightPlacement);
+  // El backdrop-blur del panel solo se aplica una vez TERMINADA la animación
+  // de entrada/salida. Durante la entrada y salida el panel se desplaza por GPU
+  // (x transform); tener el backdrop-filter activo durante el movimiento obligaría
+  // a recalcular el desenfoque en cada frame (provocando ralentización y tirones).
+  const [panelSettled, setPanelSettled] = useState(false);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
@@ -2249,6 +2250,11 @@ export default function DetailModal({
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
+        onAnimationStart={(definition) => {
+          if (definition === "exit" || definition === "hidden") {
+            setPanelSettled(false);
+          }
+        }}
         onAnimationComplete={(definition) => {
           if (definition === "visible") setPanelSettled(true);
         }}
