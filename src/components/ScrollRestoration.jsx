@@ -286,7 +286,14 @@ export default function ScrollRestoration() {
         spacer.setAttribute("aria-hidden", "true");
         spacer.style.cssText =
           "width:1px;height:0;margin:0;padding:0;border:0;flex:0 0 auto;visibility:hidden;pointer-events:none;";
-        document.body.appendChild(spacer);
+        // El relleno debe pertenecer al lienzo visual persistente de la app, no
+        // al final de <body>. Si se añade a body, al volver a una posición
+        // profunda puede quedar visible como una franja sin el fondo de la ruta
+        // mientras React recompone la página destino.
+        const restorationRoot = document.querySelector(
+          "[data-scroll-restoration-root]",
+        );
+        (restorationRoot || document.body).appendChild(spacer);
       }
       // `offsetTop` del spacer = altura del contenido que tiene por encima.
       const contentHeight = spacer.offsetTop;

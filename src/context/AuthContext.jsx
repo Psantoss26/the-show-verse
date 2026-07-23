@@ -17,6 +17,10 @@ const DEFAULT_PREFERENCES = {
     profileAutoRefresh: true,
     compactProfileCards: false,
     syncTraktActions: false,
+    // Tarjetas por fila en móvil para las filas tipo dashboard (Inicio,
+    // Películas, Series) -- ver `src/lib/ui/mobileCardsPerRow.js`. NO afecta a
+    // las páginas de usuario con grid (Favoritos/Pendientes/Historial/Biblioteca).
+    mobileCardsPerRow: 3,
   },
 };
 
