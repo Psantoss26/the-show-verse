@@ -46,6 +46,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { resolveUserListInitialSnapshot } from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
   isUnavailableStatus,
@@ -2008,6 +2009,7 @@ const WatchlistCard = memo(function WatchlistCard({
 export default function WatchlistClient() {
   const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
+  const isBackNav = useIsHistoryNavigation();
   // Read each persistent cache only once on mount. These JSON.parse and build
   // Maps from localStorage; calling them several times (watchlist x2,
   // providers x2) blocked the first render and added a perceptible delay to the
@@ -2016,17 +2018,16 @@ export default function WatchlistClient() {
     watchlist: readWatchlistCache(),
     providers: readProvidersCache(),
   }));
-  // Solo se pinta al instante la caché si es RECIENTE (`fresh`, < TTL). Si es vieja
-  // (p. ej. añadiste títulos en el ordenador y abres la lista en el móvil: su caché
-  // es de la última visita, sin lo nuevo) NO la pintamos: mostramos skeleton y el
-  // fetch trae la lista correcta de una vez, en vez de la vieja y luego los nuevos.
-  const hasFreshCache = !!(
-    initialCache.watchlist?.fresh && initialCache.watchlist?.items?.length
-  );
-  const [loading, setLoading] = useState(() => !hasFreshCache);
+  const { hasBackNavigationSnapshot, shouldRestoreSnapshot } =
+    resolveUserListInitialSnapshot(initialCache.watchlist, isBackNav);
+  // En una entrada normal solo pintamos caché RECIENTE (`fresh`, < TTL). Al
+  // retroceder restauramos también una instantánea válida más antigua: es la vista
+  // que el usuario acaba de dejar y permite recuperar contenido + scroll antes de
+  // que terminen la hidratación de sesión y la revalidación habitual.
+  const [loading, setLoading] = useState(() => !shouldRestoreSnapshot);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() =>
-    hasFreshCache ? initialCache.watchlist.items : [],
+    shouldRestoreSnapshot ? initialCache.watchlist.items : [],
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
@@ -2050,7 +2051,6 @@ export default function WatchlistClient() {
   // mount, so the entrance feels consistent every visit.
   // Al VOLVER (atrás/adelante) se renderiza todo de golpe (sin trocear) para que
   // la altura sea correcta al instante y el scroll se restaure sin saltos.
-  const isBackNav = useIsHistoryNavigation();
   const [renderLimit, setRenderLimit] = useState(
     isBackNav ? Number.MAX_SAFE_INTEGER : WATCHLIST_INITIAL_RENDER_LIMIT,
   );
@@ -2873,11 +2873,11 @@ export default function WatchlistClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
-  if (!hydrated) {
+  if (!hydrated && !hasBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if (!session || !account) {
+  if ((!session || !account) && !(hasBackNavigationSnapshot && !hydrated)) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">

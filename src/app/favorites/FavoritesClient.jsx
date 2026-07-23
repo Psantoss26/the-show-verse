@@ -50,6 +50,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { resolveUserListInitialSnapshot } from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
   isUnavailableStatus,
@@ -2306,6 +2307,7 @@ const FavoriteCard = memo(function FavoriteCard({
 export default function FavoritesClient() {
   const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
   const { t } = useTranslation();
+  const isBackNav = useIsHistoryNavigation();
   // Read each persistent cache only once on mount. These JSON.parse and build
   // Maps from localStorage; calling them several times (favorites x3,
   // providers x2) blocked the first render and added a perceptible delay to the
@@ -2314,20 +2316,19 @@ export default function FavoritesClient() {
     favorites: readFavoritesCache(),
     providers: readProvidersCache(),
   }));
-  // Solo se pinta al instante la caché si es RECIENTE (`fresh`, < TTL). Si es vieja
-  // (p. ej. añadiste favoritos en el ordenador y abres la lista en el móvil: su
-  // caché es de la última visita, sin lo nuevo) NO la pintamos: mostramos skeleton y
-  // el fetch trae la lista correcta de una vez, en vez de la vieja y luego los nuevos.
-  const hasFreshCache = !!(
-    initialCache.favorites?.fresh && initialCache.favorites?.items?.length
-  );
-  const [loading, setLoading] = useState(() => !hasFreshCache);
+  const { hasBackNavigationSnapshot, shouldRestoreSnapshot } =
+    resolveUserListInitialSnapshot(initialCache.favorites, isBackNav);
+  // En una entrada normal solo pintamos caché RECIENTE (`fresh`, < TTL). Al
+  // retroceder restauramos también una instantánea válida más antigua: es la vista
+  // que el usuario acaba de dejar y permite recuperar contenido + scroll antes de
+  // que terminen la hidratación de sesión y la revalidación habitual.
+  const [loading, setLoading] = useState(() => !shouldRestoreSnapshot);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [items, setItems] = useState(() =>
-    hasFreshCache ? initialCache.favorites.items : [],
+    shouldRestoreSnapshot ? initialCache.favorites.items : [],
   );
   const [ratedItems, setRatedItems] = useState(() =>
-    hasFreshCache ? initialCache.favorites.ratedItems || [] : [],
+    shouldRestoreSnapshot ? initialCache.favorites.ratedItems || [] : [],
   );
   const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
@@ -2348,8 +2349,6 @@ export default function FavoritesClient() {
   // como estaba. En ese caso se renderiza el contenido COMPLETO desde el primer
   // frame (sin trocear), para que la altura del documento sea la correcta de
   // inmediato y <ScrollRestoration> restaure la posición sin saltos ni "chase".
-  const isBackNav = useIsHistoryNavigation();
-
   // Render the cards in chunks: only the first batch mounts on the initial
   // render, so navigating into the page commits cheaply (instant redirect) while
   // those first cards animate in immediately — same fluid entrance as the other
@@ -3377,11 +3376,11 @@ export default function FavoritesClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
-  if (!hydrated) {
+  if (!hydrated && !hasBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if (!session || !account) {
+  if ((!session || !account) && !(hasBackNavigationSnapshot && !hydrated)) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
