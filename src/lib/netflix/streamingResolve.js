@@ -30,6 +30,62 @@ function isExactTitle(entity, query, mediaType) {
   );
 }
 
+// Umbrales de "plausibilidad" para no confiar ciegamente en un candidato de
+// TMDb cuando el texto de origen (leído del árbol de accesibilidad de la
+// ficha, ruidoso por naturaleza: botones, badges, texto de otras secciones…)
+// no da un título EXACTO. Sin esto, `pickTmdbResult` sin `exactOnly` devuelve
+// el primer resultado de la búsqueda de TMDb aunque no tenga relación real con
+// el texto detectado -- causa nº1 de notificaciones de "acceso a ficha" sobre
+// títulos irrelevantes.
+const MIN_PLAUSIBLE_POPULARITY = 3;
+const MIN_PLAUSIBLE_VOTES = 15;
+
+// ¿El título del candidato guarda relación textual real con la consulta (por
+// inclusión, ya normalizados)? Evita aceptar un resultado que a TMDb le
+// "parece relevante" por búsqueda libre pero no tiene nada que ver con el
+// texto detectado en pantalla.
+function hasTextualOverlap(entityTitle, query) {
+  const a = normalizeText(entityTitle);
+  const b = normalizeText(query);
+  if (!a || !b || a.length < 3 || b.length < 3) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+// ¿Tiene sentido aceptar este candidato como resolución real? Un título EXACTO
+// siempre es plausible (máxima confianza posible). Para el resto, exige
+// relación textual real con la consulta Y un mínimo reconocimiento en TMDb
+// (popularidad o votos): un texto de UI mal filtrado puede "casar" con algo en
+// TMDb por relevancia de búsqueda libre, pero rara vez con algo popular Y
+// relacionado textualmente a la vez.
+export function isPlausibleMatch(entity, query, mediaType) {
+  if (!entity) return false;
+  if (isExactTitle(entity, query, mediaType)) return true;
+  if (!hasTextualOverlap(titleFor(entity, mediaType), query)) return false;
+  const popularity = Number(entity.popularity) || 0;
+  const voteCount = Number(entity.vote_count) || 0;
+  return popularity >= MIN_PLAUSIBLE_POPULARITY || voteCount >= MIN_PLAUSIBLE_VOTES;
+}
+
+// Umbral de DURACIÓN real de reproducción para diferenciar película de
+// EPISODIO de serie cuando el título coincide EXACTO en ambos tipos (p. ej.
+// "X-Men": la película de 2000 Y la serie animada de 1992 se llaman igual).
+// La duración real es una señal mucho más fiable que la popularidad de TMDb
+// (volátil, no indica qué está viendo el usuario AHORA) para saber si es un
+// largometraje o un episodio -- causa del bug donde "X-Men" (película) se
+// registraba como la serie por tener esta más popularidad en TMDb ese día.
+// Fuera de estos umbrales la duración es concluyente; en la zona intermedia
+// (podría ser una película corta o un episodio largo) se mantiene el criterio
+// de popularidad como desempate, igual que antes.
+const MOVIE_MIN_DURATION_SEC = 70 * 60; // 70 min: casi ningún episodio llega aquí
+const EPISODE_MAX_DURATION_SEC = 45 * 60; // 45 min: por debajo, rara vez es largometraje
+
+function decideByDuration(durationSec) {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
+  if (durationSec >= MOVIE_MIN_DURATION_SEC) return "movie";
+  if (durationSec <= EPISODE_MAX_DURATION_SEC) return "tv";
+  return null;
+}
+
 // Nombres de episodio GENÉRICOS que se repiten entre temporadas ("Piloto",
 // "Final", "Parte 2", "Capítulo 3"…). Nunca valen para un match por INCLUSIÓN
 // (señalarían una temporada equivocada); solo por igualdad exacta y, aun así,
@@ -136,6 +192,12 @@ export async function resolveStreamingEntity({
   query,
   expectedMediaType = null,
   preferTv = false,
+  // Duración real (segundos) de la reproducción en curso, si se conoce. Sirve
+  // para desempatar película/serie cuando el título coincide exacto en ambas
+  // -- ver `decideByDuration`. Solo disponible durante reproducción real, no
+  // al navegar una ficha (resolveOnly): ahí queda `null` y el desempate cae al
+  // criterio de popularidad de siempre.
+  durationSec = null,
   search,
 }) {
   // Nivel serie (sin episodio conocido): confianza baja, pero SÍ se registra
@@ -175,13 +237,29 @@ export async function resolveStreamingEntity({
   });
 
   if (preferTv && (exactShow || (!exactMovie && tvResults.length > 0))) {
-    return showLevel(exactShow || pickTmdbResult(tvResults, query, "tv"));
+    const candidate = exactShow || pickTmdbResult(tvResults, query, "tv");
+    // Con pista de serie (episodio/subtítulo) el candidato EXACTO siempre vale;
+    // el candidato SIN exactitud (fallback) solo si es plausible -- si no, cae
+    // al resto de la función en vez de forzar una serie sin relación real.
+    if (isPlausibleMatch(candidate, query, "tv")) {
+      return showLevel(candidate);
+    }
   }
 
   // Coincidencia EXACTA como serie Y como película (p. ej. "Stranger Things"
-  // existe de ambas): elegimos la más POPULAR, que es casi siempre la buscada.
-  // Clave para el modo resolveOnly (ficha), donde no hay pista de tipo.
+  // existe de ambas, y "X-Men" también: la película de 2000 y la serie
+  // animada de 1992). Primero se intenta desempatar por DURACIÓN real de
+  // reproducción (mucho más fiable: una peli de 100 min no es un episodio); si
+  // no es concluyente (o no hay reproducción, p. ej. resolveOnly), se elige la
+  // más POPULAR, que sigue siendo el mejor criterio disponible sin duración.
   if (exactShow && exactMovie) {
+    const byDuration = decideByDuration(durationSec);
+    if (byDuration === "movie") {
+      return { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high" };
+    }
+    if (byDuration === "tv") {
+      return showLevel(exactShow);
+    }
     const showPop = Number(exactShow.popularity) || 0;
     const moviePop = Number(exactMovie.popularity) || 0;
     return showPop >= moviePop
@@ -208,6 +286,13 @@ export async function resolveStreamingEntity({
 
   const movie = pickTmdbResult(movieResults, query, "movie");
   const show = pickTmdbResult(tvResults, query, "tv");
+  // Sin título exacto en ningún lado: exigimos que el candidato tenga relación
+  // textual real con la consulta Y un mínimo reconocimiento en TMDb. Sin esto,
+  // `pickTmdbResult` sin `exactOnly` devuelve el primer resultado de búsqueda
+  // libre de TMDb aunque no tenga nada que ver con el texto detectado --causa
+  // de notificaciones de ficha sobre títulos irrelevantes.
+  const moviePlausible = isPlausibleMatch(movie, query, "movie");
+  const showPlausible = isPlausibleMatch(show, query, "tv");
   const asMovie = () => ({
     kind: "resolved",
     mediaType: "movie",
@@ -215,14 +300,19 @@ export async function resolveStreamingEntity({
     confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
   });
 
-  // Sin coincidencia exacta: si hay candidato de película Y de serie, elegir por
-  // POPULARIDAD (evita coger una peli irrelevante en vez de una serie muy popular,
-  // p. ej. "Hunter x Hunter" → la película "Hunter X" en vez del anime).
-  if (movie && show) {
+  // Candidato plausible de película Y de serie: mismo desempate que arriba
+  // (duración real primero, popularidad como respaldo) para no confundir una
+  // serie con una película que comparte nombre, p. ej. "Hunter x Hunter" → la
+  // película "Hunter X" en vez del anime.
+  if (moviePlausible && showPlausible) {
+    const byDuration = decideByDuration(durationSec);
+    if (byDuration === "movie") return asMovie();
+    if (byDuration === "tv") return showLevel(show);
     const showPop = Number(show.popularity) || 0;
     const moviePop = Number(movie.popularity) || 0;
     return showPop > moviePop ? showLevel(show) : asMovie();
   }
-  if (movie) return asMovie();
-  return show ? showLevel(show) : null;
+  if (moviePlausible) return asMovie();
+  if (showPlausible) return showLevel(show);
+  return null;
 }

@@ -6,6 +6,7 @@ import {
   searchTmdbCandidatesWithFallback,
   matchEpisodeByName,
   scoreConfidence,
+  isPlausibleMatch,
 } from "./streamingResolve.js";
 
 const peakyShow = {
@@ -165,6 +166,97 @@ test("sin exacta, elige por popularidad (serie popular sobre película irrelevan
   });
   assert.equal(result?.kind, "show_level");
   assert.equal(result?.entity?.id, 100);
+});
+
+test("con doble coincidencia exacta y duración de película, elige la película aunque la serie sea más popular (bug X-Men)", async () => {
+  const result = await resolveStreamingEntity({
+    query: "X-Men",
+    durationSec: 6240, // ~104 min: la película de 2000
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 4658, name: "X-Men", popularity: 120 }] // serie animada de 1992
+        : [{ id: 36657, title: "X-Men", popularity: 40 }],
+  });
+  assert.equal(result?.kind, "resolved");
+  assert.equal(result?.mediaType, "movie");
+  assert.equal(result?.entity?.id, 36657);
+});
+
+test("con doble coincidencia exacta y duración de episodio, elige la serie aunque la película sea más popular", async () => {
+  const result = await resolveStreamingEntity({
+    query: "X-Men",
+    durationSec: 1320, // ~22 min: episodio de la serie animada
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 4658, name: "X-Men", popularity: 10 }]
+        : [{ id: 36657, title: "X-Men", popularity: 90 }],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 4658);
+});
+
+test("sin duración conocida (resolveOnly), mantiene el desempate por popularidad de siempre", async () => {
+  const result = await resolveStreamingEntity({
+    query: "X-Men",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 4658, name: "X-Men", popularity: 120 }]
+        : [{ id: 36657, title: "X-Men", popularity: 40 }],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 4658);
+});
+
+test("isPlausibleMatch: título exacto siempre es plausible aunque no tenga reconocimiento", () => {
+  assert.equal(
+    isPlausibleMatch({ title: "Roma", popularity: 0, vote_count: 0 }, "Roma", "movie"),
+    true,
+  );
+});
+
+test("isPlausibleMatch rechaza un resultado sin relación textual ni reconocimiento", () => {
+  assert.equal(
+    isPlausibleMatch(
+      { title: "Alguna Película Rara", popularity: 0.6, vote_count: 3 },
+      "Cargando contenido",
+      "movie",
+    ),
+    false,
+  );
+});
+
+test("isPlausibleMatch acepta relación textual por inclusión con reconocimiento suficiente", () => {
+  assert.equal(
+    isPlausibleMatch(
+      { name: "Peaky Blinders", popularity: 55, vote_count: 400 },
+      "Peaky Blinders temporada",
+      "tv",
+    ),
+    true,
+  );
+});
+
+test("resolveStreamingEntity descarta (null) un candidato sin relación real con el texto detectado", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Cargando contenido",
+    search: async (mt) =>
+      mt === "movie"
+        ? [{ id: 999, title: "Alguna Película Rara", popularity: 0.6, vote_count: 3 }]
+        : [],
+  });
+  assert.equal(result, null);
+});
+
+test("resolveStreamingEntity acepta un no-exacto con relación textual y reconocimiento suficiente", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Peaky Blinders temporada",
+    search: async (mt) =>
+      mt === "tv"
+        ? [{ id: 60574, name: "Peaky Blinders", popularity: 55, vote_count: 400 }]
+        : [],
+  });
+  assert.equal(result?.kind, "show_level");
+  assert.equal(result?.entity?.id, 60574);
 });
 
 test("matchEpisodeByName casa por substring (título parcial o con prefijo)", () => {

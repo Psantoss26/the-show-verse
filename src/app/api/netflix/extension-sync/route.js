@@ -208,10 +208,20 @@ export async function POST(request) {
       notifTitle,
       notifText,
       notifSubText,
+      // Duración real (segundos) de la reproducción en curso, si se conoce
+      // (viene de la MediaSession en Android/extensión). Se usa para desempatar
+      // película/serie cuando el título coincide exacto en ambas (ver
+      // `resolveStreamingEntity`/`decideByDuration`) -- p. ej. "X-Men" existe
+      // como película Y como serie animada con el mismo título exacto.
+      durationSec,
       // Modo "solo resolver": para el indicador en la FICHA del título (navegando,
       // sin reproducir). Resuelve el título pero NO lo inserta en el historial.
       resolveOnly,
     } = await request.json().catch(() => ({}));
+    const durationSecNum = Number(durationSec);
+    const safeDurationSec = Number.isFinite(durationSecNum) && durationSecNum > 0
+      ? durationSecNum
+      : null;
     const resolvedVideoId = videoId || contentId || null;
     const authHeader = request.headers.get("authorization") || "";
     const syncToken = authHeader.toLowerCase().startsWith("bearer ")
@@ -293,6 +303,7 @@ export async function POST(request) {
         query: variant,
         expectedMediaType: isTv ? "tv" : null,
         preferTv: Boolean(subTitle || episodeName || showName),
+        durationSec: safeDurationSec,
         search: (type) => searchTmdbCandidates(request, variant, type),
       });
       if (resolution) {
