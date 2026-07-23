@@ -1,6 +1,8 @@
 // /src/lib/artworkApi.js
 
 const sessionArtworkPreferences = new Map()
+let artworkPreferencesRequest = null
+let artworkSaveQueue = Promise.resolve()
 
 function browserStorage() {
     if (typeof window === 'undefined') return null
@@ -61,53 +63,88 @@ export function writeArtworkPreference(key, value, storage) {
     return persisted
 }
 
-// Guardar una selección de artwork (poster, mobilePoster, backdrop, background o logo)
-export async function saveArtworkOverride({ type, id, kind, filePath }) {
-    try {
-        const response = await fetch('/api/artwork', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // Evita que el navegador cancele el guardado si el usuario vuelve
-            // de inmediato desde la ficha al dashboard.
-            keepalive: true,
-            body: JSON.stringify({
-                type,
-                id,
-                kind,
-                filePath
+async function fetchRemoteArtworkPreferences() {
+    if (artworkPreferencesRequest) return artworkPreferencesRequest
+
+    artworkPreferencesRequest = (async () => {
+        try {
+            const response = await fetch('/api/user/preferences', {
+                method: 'GET',
+                cache: 'no-store',
+                credentials: 'include'
             })
-        })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        return true
-    } catch (err) {
-        console.error('Error guardando artwork override', err)
-        return false
-    }
+            if (!response.ok) return null
+            const json = await response.json()
+            const overrides = json?.preferences?.uiSettings?.artworkOverrides
+            return overrides && typeof overrides === 'object' ? overrides : {}
+        } catch (err) {
+            console.error('Error al obtener preferencias de artwork', err)
+            return null
+        } finally {
+            artworkPreferencesRequest = null
+        }
+    })()
+
+    return artworkPreferencesRequest
 }
 
-// Leer todos los overrides de una obra concreta para recuperar una selección
-// cuando localStorage no está disponible en el dispositivo móvil.
+// Guarda una o varias selecciones de artwork en las preferencias autenticadas.
+// La cola conserva el orden local y el backend bloquea la fila del usuario para
+// que los cambios hechos desde distintos dispositivos no se pisen entre sí.
+export function saveArtworkOverrides({ type, id, changes }) {
+    const normalizedChanges = (changes || []).map((change) => ({
+        type: type === 'show' ? 'tv' : type || 'movie',
+        id: Number(id),
+        kind: change.kind,
+        filePath: change.filePath || null
+    }))
+
+    const save = async () => {
+        if (!normalizedChanges.length) return true
+
+        try {
+            const response = await fetch('/api/user/preferences', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                // Una selección contiene solo rutas cortas de TMDb y puede
+                // terminar aunque se navegue al dashboard de inmediato.
+                keepalive: true,
+                credentials: 'include',
+                body: JSON.stringify({ artworkChanges: normalizedChanges })
+            })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            return true
+        } catch (err) {
+            console.error('Error guardando artwork override', err)
+            return false
+        }
+    }
+
+    const queued = artworkSaveQueue.then(save, save)
+    artworkSaveQueue = queued.catch(() => undefined)
+    return queued
+}
+
+// Guardar una selección de artwork (poster, mobilePoster, backdrop, background o logo)
+export function saveArtworkOverride({ type, id, kind, filePath }) {
+    return saveArtworkOverrides({
+        type,
+        id,
+        changes: [{ kind, filePath }]
+    })
+}
+
+// Leer todos los overrides de una obra concreta. `null` representa un fallo de
+// red/autenticación y se diferencia de `{}`, que es un restablecimiento remoto.
 export async function fetchArtworkOverride({ type, id }) {
     if (id == null || id === '') return {}
 
-    try {
-        const params = new URLSearchParams({
-            type: type || 'movie',
-            id: String(id)
-        })
-        const res = await fetch(`/api/artwork?${params.toString()}`, {
-            method: 'GET',
-            cache: 'no-store'
-        })
-        if (!res.ok) return {}
-        const json = await res.json()
-        return json.overrides || {}
-    } catch (err) {
-        console.error('Error al obtener artwork override', err)
-        return {}
-    }
+    const overrides = await fetchRemoteArtworkPreferences()
+    if (overrides == null) return null
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    return overrides[`${normalizedType}:${Number(id)}`] || {}
 }
 
 // Leer overrides para varios ids de un tipo y kind concreto
@@ -115,26 +152,14 @@ export async function fetchArtworkOverride({ type, id }) {
 export async function fetchArtworkOverrides({ type, kind, ids }) {
     if (!ids || ids.length === 0) return {}
 
-    const params = new URLSearchParams()
-    params.set('type', type || 'movie')
-    if (kind) params.set('kind', kind)
-    params.set('ids', ids.join(','))
+    const overrides = await fetchRemoteArtworkPreferences()
+    if (overrides == null) return {}
 
-    try {
-        const res = await fetch(`/api/artwork?${params.toString()}`, {
-            method: 'GET',
-            cache: 'no-store'
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    return Object.fromEntries(
+        ids.map((id) => {
+            const entry = overrides[`${normalizedType}:${Number(id)}`]
+            return [String(id), kind ? entry?.[kind] || null : entry || {}]
         })
-
-        if (!res.ok) {
-            console.error('Error al obtener artwork overrides', res.status)
-            return {}
-        }
-
-        const json = await res.json()
-        return json.overrides || {}
-    } catch (err) {
-        console.error('Error al llamar a /api/artwork', err)
-        return {}
-    }
+    )
 }

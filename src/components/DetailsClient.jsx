@@ -40,6 +40,7 @@ import {
   fetchArtworkOverride,
   readArtworkPreference,
   saveArtworkOverride,
+  saveArtworkOverrides,
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
@@ -2782,10 +2783,12 @@ export default function DetailsClient({
     previewBackdropStorageKey,
   ]);
 
-  // En móviles donde localStorage está bloqueado, la copia guardada por la API
-  // recupera la selección tras volver a abrir la ficha. Nunca pisa una elección
-  // local o una interacción hecha mientras la petición estaba en curso.
+  // La preferencia remota pertenece al usuario autenticado y es la fuente de
+  // verdad entre dispositivos. La caché local solo pinta de inmediato mientras
+  // llega la respuesta. Un restablecimiento remoto elimina también esa caché.
   useEffect(() => {
+    if (!authHydrated || !authenticated) return undefined;
+
     let cancelled = false;
     const revisionAtStart = artworkPreferenceRevisionRef.current;
 
@@ -2793,14 +2796,14 @@ export default function DetailsClient({
       const overrides = await fetchArtworkOverride({ type: endpointType, id });
       if (
         cancelled ||
+        overrides == null ||
         artworkPreferenceRevisionRef.current !== revisionAtStart
       ) {
         return;
       }
 
       const restore = (kind, storageKey, setter) => {
-        const filePath = overrides?.[kind];
-        if (!filePath || readArtworkPreference(storageKey)) return;
+        const filePath = overrides?.[kind] || null;
         writeArtworkPreference(storageKey, filePath);
         setter(filePath);
       };
@@ -2828,6 +2831,9 @@ export default function DetailsClient({
     logoStorageKey,
     previewBackdropStorageKey,
     backgroundStorageKey,
+    authHydrated,
+    authenticated,
+    account?.id,
   ]);
 
   /**
@@ -6074,31 +6080,17 @@ export default function DetailsClient({
     persistArtworkPreference(previewBackdropStorageKey, null);
     persistArtworkPreference(backgroundStorageKey, null);
     persistArtworkPreference(logoStorageKey, null);
-    saveArtworkOverride({
+    saveArtworkOverrides({
       type: endpointType,
       id,
-      kind: "poster",
-      filePath: null,
+      changes: [
+        { kind: "poster", filePath: null },
+        { kind: "backdrop", filePath: null },
+        { kind: "background", filePath: null },
+        { kind: "mobilePoster", filePath: null },
+        { kind: "logo", filePath: null },
+      ],
     });
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: "backdrop",
-      filePath: null,
-    });
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: "background",
-      filePath: null,
-    });
-    saveArtworkOverride({
-      type: endpointType,
-      id,
-      kind: "mobilePoster",
-      filePath: null,
-    });
-    saveArtworkOverride({ type: endpointType, id, kind: "logo", filePath: null });
   };
 
   /**
