@@ -30,6 +30,28 @@ import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
 import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
+export const MAX_AVATAR_DATA_URL_LENGTH = 480_000;
+
+const httpsAvatarUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => new URL(value).protocol === 'https:', {
+    message: 'Avatar URL must use HTTPS',
+  });
+
+const localAvatarDataUrlSchema = z
+  .string()
+  .max(MAX_AVATAR_DATA_URL_LENGTH)
+  .regex(
+    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i,
+    'Avatar image must be an optimized PNG, JPEG, or WebP data URL',
+  );
+
+export const avatarUrlSchema = z.union([
+  httpsAvatarUrlSchema,
+  localAvatarDataUrlSchema,
+]);
 
 // Validadores
 const registerSchema = z.object({
@@ -758,15 +780,7 @@ export default async function authRoutes(fastify) {
       username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/).optional(),
       displayName: z.string().max(50).optional(),
       bio: z.string().max(500).optional(),
-      avatarUrl: z
-        .string()
-        .url()
-        .max(2048)
-        .refine((value) => new URL(value).protocol === 'https:', {
-          message: 'Avatar URL must use HTTPS',
-        })
-        .nullable()
-        .optional(),
+      avatarUrl: avatarUrlSchema.nullable().optional(),
       locale: z.string().optional(),
       timezone: z.string().optional(),
     });

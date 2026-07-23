@@ -353,12 +353,77 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
   );
 }
 
+const MAX_AVATAR_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_AVATAR_DATA_URL_BYTES = 320 * 1024;
+const AVATAR_EXPORT_SIZES = [512, 384, 256];
+const AVATAR_EXPORT_QUALITIES = [0.82, 0.7, 0.58];
+
+function canvasToBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("No se pudo optimizar la imagen."))),
+      "image/webp",
+      quality,
+    );
+  });
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo preparar la imagen."));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function createOptimizedAvatar(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const source = new Image();
+      source.decoding = "async";
+      source.onload = () => resolve(source);
+      source.onerror = () => reject(new Error("No se pudo leer esta imagen."));
+      source.src = objectUrl;
+    });
+
+    const sourceSide = Math.min(image.naturalWidth, image.naturalHeight);
+    if (!sourceSide) throw new Error("La imagen no tiene dimensiones válidas.");
+
+    const sourceX = (image.naturalWidth - sourceSide) / 2;
+    const sourceY = (image.naturalHeight - sourceSide) / 2;
+
+    for (const size of AVATAR_EXPORT_SIZES) {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Tu navegador no puede preparar esta imagen.");
+
+      context.drawImage(image, sourceX, sourceY, sourceSide, sourceSide, 0, 0, size, size);
+
+      for (const quality of AVATAR_EXPORT_QUALITIES) {
+        const optimized = await canvasToBlob(canvas, quality);
+        if (optimized.size <= MAX_AVATAR_DATA_URL_BYTES) {
+          return blobToDataUrl(optimized);
+        }
+      }
+    }
+
+    throw new Error("No se pudo reducir la imagen lo suficiente. Prueba con otra foto.");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
   const [mode, setMode] = useState("file");
   const [urlInput, setUrlInput] = useState(currentAvatarUrl || "");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(currentAvatarUrl || "");
   const [error, setError] = useState("");
+  const [optimizing, setOptimizing] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -368,12 +433,13 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
       setPreviewUrl(currentAvatarUrl || "");
       setMode("file");
       setError("");
+      setOptimizing(false);
     }
   }, [isOpen, currentAvatarUrl]);
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -381,18 +447,21 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
       setError("Por favor, selecciona un archivo de imagen válido.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_AVATAR_FILE_BYTES) {
       setError("La imagen no debe superar los 5MB.");
       return;
     }
 
     setError("");
     setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreviewUrl(reader.result);
-    };
-    reader.readAsDataURL(file);
+    setOptimizing(true);
+    try {
+      setPreviewUrl(await createOptimizedAvatar(file));
+    } catch (err) {
+      setError(err?.message || "No se pudo optimizar esta imagen.");
+    } finally {
+      setOptimizing(false);
+    }
   };
 
   const handleUrlChange = (val) => {
@@ -520,7 +589,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
-                disabled={loading}
+                disabled={loading || optimizing}
                 className="hidden"
                 id="avatar-file-upload"
               />
@@ -530,9 +599,9 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
               >
                 <Upload className="h-7 w-7 text-emerald-400 mb-1" />
                 <span className="text-xs font-bold text-white">
-                  {selectedFile ? selectedFile.name : "Haz clic para buscar o seleccionar una imagen"}
+                  {optimizing ? "Optimizando imagen…" : selectedFile ? selectedFile.name : "Haz clic para buscar o seleccionar una imagen"}
                 </span>
-                <span className="text-[10px] text-zinc-500 mt-1">PNG, JPG, GIF o WEBP (máx 5MB)</span>
+                <span className="text-[10px] text-zinc-500 mt-1">PNG, JPG, GIF o WEBP (máx 5MB, se optimiza automáticamente)</span>
               </label>
             </div>
           ) : (
@@ -547,7 +616,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
                   value={urlInput}
                   onChange={(e) => handleUrlChange(e.target.value)}
                   placeholder="https://ejemplo.com/mi-foto.jpg"
-                  disabled={loading}
+                  disabled={loading || optimizing}
                   className="h-11 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
                 />
               </div>
@@ -558,18 +627,18 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
+              disabled={loading || optimizing}
               className="h-10 px-4 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition hover:bg-white/5"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || optimizing}
               className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-black transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Guardar foto
+              {loading || optimizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {optimizing ? "Optimizando" : "Guardar foto"}
             </button>
           </div>
         </form>
