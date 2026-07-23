@@ -3172,6 +3172,15 @@ export default function DetailsClient({
     return isMobileViewport ? mobile : desktop;
   })();
 
+  // Tamaño de TMDb para `heroBackgroundPath`/`prevBackgroundPath` como fondo
+  // CSS (`background-image`). En MÓVIL es el mismo póster que ya se pinta en
+  // w780 como <img> (ver `posterHighUrl`): pedirlo TAMBIÉN en "original" aquí
+  // descargaba el mismo archivo pesado (varios MB) una SEGUNDA vez solo para
+  // mostrarlo desenfocado (`.hero-bg-base` le aplica `blur(4px)` en móvil, que
+  // ya borra cualquier detalle por encima de w780). Escritorio no se toca: ahí
+  // es el backdrop panorámico, no el póster, y no forma parte de esta mejora.
+  const heroBackgroundSize = isMobileViewport ? "w780" : "original";
+
   // =====================================================================
   // ESTADOS DE CUENTA (TMDb)
   // Carga el estado de favorito, watchlist y puntuacion del usuario.
@@ -7834,18 +7843,23 @@ export default function DetailsClient({
           ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
           : null;
 
-  // MÓVIL: máxima calidad para el póster de portada (original). Escritorio
-  // mantiene w780.
+  // MÓVIL: alta calidad para el póster de portada. Antes pedía "original"
+  // (varios MB, sin redimensionar por TMDb: 2000px+ de ancho en muchos
+  // pósters) para un ancho renderizado real de ~390-430px -- con `unoptimized`
+  // (sin pasar por el optimizador de Next.js) esa descarga entera bloqueaba la
+  // carga final del póster en redes móviles. `w780` es el bucket de póster
+  // más grande de TMDb aparte de "original" (cubre incluso pantallas 2x sin
+  // recortar), igual que ya usa escritorio, y pesa una fracción del tamaño.
   const posterHighUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
       : mobilePosterPath
-        ? `https://image.tmdb.org/t/p/original${mobilePosterPath}`
+        ? `https://image.tmdb.org/t/p/w780${mobilePosterPath}`
         : displayPosterPath
           ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
           : null;
-  // En móvil la versión original es la imagen final y candidata a LCP. Se le
-  // da prioridad alta; la versión w500 sigue siendo un fallback inmediato, pero
+  // En móvil la versión w780 es la imagen final y candidata a LCP. Se le da
+  // prioridad alta; la versión w500 sigue siendo un fallback inmediato, pero
   // no debe retrasar el inicio de la descarga de máxima calidad.
   const posterLoadToken = posterLoadTokenRef.current;
 
@@ -8205,7 +8219,7 @@ export default function DetailsClient({
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
                   style={{
-                    backgroundImage: `url(https://image.tmdb.org/t/p/original${prevBackgroundPath})`,
+                    backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${prevBackgroundPath})`,
                     transform: "scale(1)",
                     filter: "brightness(0.75) saturate(1.03)",
                     opacity: 0,
@@ -8215,7 +8229,7 @@ export default function DetailsClient({
                 <div
                   className="absolute inset-0 bg-cover transition-opacity duration-500"
                   style={{
-                    backgroundImage: `url(https://image.tmdb.org/t/p/original${prevBackgroundPath})`,
+                    backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${prevBackgroundPath})`,
                     backgroundPosition: "center top",
                     transform: "scale(1)",
                     transformOrigin: "center top",
@@ -8246,7 +8260,7 @@ export default function DetailsClient({
             <div
               className="hero-bg-base absolute inset-0 bg-cover bg-center max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100 sm:transition-opacity sm:duration-500"
               style={{
-                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+                backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
                 // MÓVIL: desenfoque + un punto de escala.
                 //
                 // En móvil este fondo es el MISMO póster (atenuado y con otro
@@ -8306,7 +8320,7 @@ export default function DetailsClient({
               }`}
               style={{
                 height: `calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`,
-                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+                backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
                 transform: `scale(${POSTER_OVERSCAN})`,
                 willChange: "opacity",
               }}
@@ -9050,7 +9064,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 inProgressPct != null
                   ? "mx-0 w-full"
                   : "-mx-1 w-[calc(100%+0.5rem)]"
-              } ${inProgressChecked ? "" : "max-sm:invisible"}`}
+              } ${
+                // Debe coincidir EXACTAMENTE con la condición que añade
+                // `sv-mobile-actions-reveal` más abajo. Si esta se hacía
+                // visible solo con `inProgressChecked` (antes de que
+                // `currentLowLoaded` also fuera true), los botones se
+                // pintaban ya visibles y SIN animación (la clase de entrada
+                // aún no estaba aplicada); al llegar `currentLowLoaded` un
+                // instante después, esa clase se añadía de golpe y su
+                // `animation` se disparaba desde cero sobre botones que YA
+                // se veían -- efecto "aparecen sin imagen y un instante
+                // después vuelven a aparecer con imagen".
+                currentLowLoaded && inProgressChecked ? "" : "max-sm:invisible"
+              }`}
             >
               <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6">
                 {/* Con progreso, la fila se adelanta bajo el navbar para que
