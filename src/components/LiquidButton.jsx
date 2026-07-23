@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, Eye } from "lucide-react";
+import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 
 /**
  * LiquidButton: Botón con efecto de gotas/cristal líquido
@@ -24,6 +25,17 @@ export default function LiquidButton({
 }) {
   const buttonRef = useRef(null);
   const canvasRef = useRef(null);
+  // Texto del número que se muestra en el badge (veces vista o progreso de
+  // serie sin el "%") -- se mide con las métricas reales de la fuente para
+  // centrarlo con precisión, ver `useCenteredGlyphOffset`.
+  const badgeText =
+    playsCount > 0
+      ? String(playsCount)
+      : progressPercent && progressPercent !== "100%"
+        ? progressPercent.replace("%", "")
+        : "";
+  const { ref: badgeRef, offsetPx: badgeOffsetPx } =
+    useCenteredGlyphOffset(badgeText);
   const [isHovered, setIsHovered] = useState(false);
   const [ripples, setRipples] = useState([]);
   const [proximityGlow, setProximityGlow] = useState(0);
@@ -623,7 +635,9 @@ export default function LiquidButton({
           <Loader2 className="w-6 h-6 animate-spin" />
         ) : playsCount > 0 ? (
           <span
-            className={`font-black leading-none translate-y-[0.05em] ${
+            ref={badgeRef}
+            style={{ transform: `translateY(${badgeOffsetPx}px)` }}
+            className={`font-black leading-none ${
               String(playsCount).length === 1
                 ? "text-2xl"
                 : "text-xl tracking-tighter"
@@ -641,13 +655,19 @@ export default function LiquidButton({
             const numberPart = progressPercent.replace("%", "");
             // El "%" es relativo al número para mantener aire lateral, pero el
             // valor principal conserva el tamaño de la puntuación de usuario.
+            // El offset se mide sobre el NÚMERO (dominante) y se aplica al
+            // grupo entero para que "%" se mueva con él manteniendo su
+            // alineación de línea base.
             const fontSizeClass =
               numberPart.length >= 2 ? "text-xl tracking-tighter" : "text-2xl";
             return (
               <div
-                className={`flex items-baseline leading-none gap-px translate-y-[0.05em] ${fontSizeClass}`}
+                style={{ transform: `translateY(${badgeOffsetPx}px)` }}
+                className={`flex items-baseline leading-none gap-px ${fontSizeClass}`}
               >
-                <span className="font-black drop-shadow-md">{numberPart}</span>
+                <span ref={badgeRef} className="font-black drop-shadow-md">
+                  {numberPart}
+                </span>
                 <span className="font-bold text-[0.5em] text-white drop-shadow-sm">
                   %
                 </span>

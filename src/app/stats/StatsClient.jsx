@@ -482,34 +482,34 @@ const processHourOfDay = (historyData) => {
 // Tile compacto del bento de insights: icono en chip de color + valor + etiqueta
 // (+ badge opcional de tendencia/subtexto). Mismo liquid glass que el resto.
 const INSIGHT_TILE_STYLES = {
-  orange: { iconBg: "bg-orange-500/10", iconText: "text-orange-400" },
-  yellow: { iconBg: "bg-yellow-500/10", iconText: "text-yellow-400" },
-  emerald: { iconBg: "bg-emerald-500/10", iconText: "text-emerald-400" },
-  sky: { iconBg: "bg-sky-500/10", iconText: "text-sky-400" },
-  purple: { iconBg: "bg-purple-500/10", iconText: "text-purple-400" },
-  rose: { iconBg: "bg-rose-500/10", iconText: "text-rose-400" },
-  indigo: { iconBg: "bg-indigo-500/10", iconText: "text-indigo-400" },
-  teal: { iconBg: "bg-teal-500/10", iconText: "text-teal-400" },
-  blue: { iconBg: "bg-blue-500/10", iconText: "text-blue-400" },
-  cyan: { iconBg: "bg-cyan-500/10", iconText: "text-cyan-400" },
+  orange: { iconBg: "bg-orange-500/15 border border-orange-500/20 shadow-sm", iconText: "text-orange-400" },
+  yellow: { iconBg: "bg-yellow-500/15 border border-yellow-500/20 shadow-sm", iconText: "text-yellow-400" },
+  emerald: { iconBg: "bg-emerald-500/15 border border-emerald-500/20 shadow-sm", iconText: "text-emerald-400" },
+  sky: { iconBg: "bg-sky-500/15 border border-sky-500/20 shadow-sm", iconText: "text-sky-400" },
+  purple: { iconBg: "bg-purple-500/15 border border-purple-500/20 shadow-sm", iconText: "text-purple-400" },
+  rose: { iconBg: "bg-rose-500/15 border border-rose-500/20 shadow-sm", iconText: "text-rose-400" },
+  indigo: { iconBg: "bg-indigo-500/15 border border-indigo-500/20 shadow-sm", iconText: "text-indigo-400" },
+  teal: { iconBg: "bg-teal-500/15 border border-teal-500/20 shadow-sm", iconText: "text-teal-400" },
+  blue: { iconBg: "bg-blue-500/15 border border-blue-500/20 shadow-sm", iconText: "text-blue-400" },
+  cyan: { iconBg: "bg-cyan-500/15 border border-cyan-500/20 shadow-sm", iconText: "text-cyan-400" },
 };
 
 // Fila compacta del panel "Hábitos": icono en chip + etiqueta + valor a la derecha.
 function HabitRow({ icon: Icon, color = "indigo", label, value, sub }) {
   const styles = INSIGHT_TILE_STYLES[color] || INSIGHT_TILE_STYLES.indigo;
   return (
-    <div className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white/[0.04] px-2.5 py-1.5 ring-1 ring-white/10">
+    <div className="relative flex min-w-0 items-center gap-2.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-md px-3 py-1.5 sm:py-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] transition-all duration-200 group flex-1">
       <div
-        className={`p-1.5 rounded-lg ${styles.iconBg} ${styles.iconText} shrink-0`}
+        className={`p-1.5 rounded-xl ${styles.iconBg} ${styles.iconText} shrink-0 transition-transform duration-200 group-hover:scale-105`}
       >
-        <Icon className="w-4 h-4" />
+        <Icon className="w-3.5 h-3.5" />
       </div>
-      <span className="text-xs font-bold text-zinc-400 truncate">{label}</span>
-      <span className="ml-auto text-sm font-black text-white whitespace-nowrap">
+      <span className="text-xs font-semibold text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] truncate">{label}</span>
+      <span className="ml-auto text-xs sm:text-sm font-extrabold text-white whitespace-nowrap tracking-tight drop-shadow-sm">
         {value}
       </span>
       {sub ? (
-        <span className="text-[10px] text-zinc-500 whitespace-nowrap">{sub}</span>
+        <span className="text-[10px] font-semibold text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] whitespace-nowrap">{sub}</span>
       ) : null}
     </div>
   );
@@ -520,20 +520,20 @@ function HabitRow({ icon: Icon, color = "indigo", label, value, sub }) {
 function StripStat({ icon: Icon, value, label, color = "indigo", badge = null }) {
   const styles = INSIGHT_TILE_STYLES[color] || INSIGHT_TILE_STYLES.indigo;
   return (
-    <div className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-white/[0.04] px-3 py-2 ring-1 ring-white/10">
+    <div className="relative flex min-w-0 items-center gap-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-md px-3.5 py-2.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-300 group">
       <div
-        className={`shrink-0 rounded-lg p-1.5 ${styles.iconBg} ${styles.iconText}`}
+        className={`shrink-0 rounded-xl p-2 ${styles.iconBg} ${styles.iconText} transition-transform duration-300 group-hover:scale-105`}
       >
         <Icon className="h-4 w-4" />
       </div>
       <div className="flex min-w-0 flex-col leading-tight">
         {/* El VALOR nunca se trunca (whitespace-nowrap); si el badge de
             tendencia no cabe al lado, ENVUELVE a la línea siguiente. */}
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm sm:text-base font-black text-white">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm sm:text-base font-extrabold text-white tracking-tight drop-shadow-sm">
           <span className="whitespace-nowrap">{value}</span>
           {badge}
         </span>
-        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
           {label}
         </span>
       </div>
@@ -549,13 +549,16 @@ function ProfileStatsStrip({ stats }) {
   const thisMonth = stats.monthlyData?.[stats.monthlyData.length - 1] || null;
 
   return (
-    <div className="mt-4 flex flex-col gap-4 border-t border-white/10 pt-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
       {/* Este mes */}
-      <div className="flex min-w-0 flex-col gap-2">
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
-          Este mes
-        </span>
-        <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-wrap">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs font-black uppercase tracking-widest text-emerald-400 drop-shadow-sm">
+            Este mes
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-3 lg:flex lg:flex-wrap">
           <StripStat
             icon={MonitorPlay}
             value={ins.thisMonthTotal ?? 0}
@@ -580,11 +583,11 @@ function ProfileStatsStrip({ stats }) {
       <div className="hidden w-px self-stretch bg-white/10 lg:block" />
 
       {/* De por vida */}
-      <div className="flex min-w-0 flex-col gap-2">
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <div className="flex min-w-0 flex-col gap-3">
+        <span className="text-xs font-black uppercase tracking-widest text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
           De por vida
         </span>
-        <div className="grid grid-cols-3 gap-2 lg:flex lg:flex-wrap">
+        <div className="grid grid-cols-3 gap-3 lg:flex lg:flex-wrap">
           <StripStat
             icon={Timer}
             value={`${stats.totalDays}d ${stats.totalHours % 24}h`}
@@ -658,7 +661,7 @@ function KPICard({
           >
             <Icon className="w-6 h-6" />
           </div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 sm:text-sm">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] sm:text-sm">
             {title}
           </h3>
         </div>
@@ -674,7 +677,7 @@ function KPICard({
           {loading ? (
             <span className="inline-block h-4 w-28 rounded-lg bg-white/5 animate-pulse" />
           ) : subtitle ? (
-            <div className="text-sm font-medium text-zinc-500">{subtitle}</div>
+            <div className="text-sm font-semibold text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{subtitle}</div>
           ) : null}
         </div>
       </div>
@@ -1032,25 +1035,25 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
           )}
           {actionButtons("shrink-0")}
         </div>
-        <p className="mt-1 text-xs sm:text-sm font-medium text-zinc-500 hidden sm:block">
+        <p className="mt-1 text-xs sm:text-sm font-semibold text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] hidden sm:block">
           @{user.username}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 font-medium">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
           {user.location && (
             <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
+              <MapPin className="h-3 w-3 text-indigo-400" />
               {user.location}
             </span>
           )}
           {user.joined_at && (
             <span className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3 text-indigo-400" />
               Desde {fmtDate(user.joined_at)}
             </span>
           )}
         </div>
         {user.about && (
-          <p className="mt-2 line-clamp-1 max-w-lg text-xs sm:text-sm text-zinc-400">
+          <p className="mt-2 line-clamp-1 max-w-lg text-xs sm:text-sm font-medium text-zinc-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
             {user.about}
           </p>
         )}
@@ -1807,27 +1810,38 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {headerReady ? (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`${PROFILE_GLASS_PANEL} mb-6 rounded-3xl p-4 sm:p-6 lg:mb-8`}
-          >
-            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
-              <ProfileHero
-                user={profileUser}
-                onSync={handleSyncProfile}
-                onDisconnect={() => setShowDisconnectModal(true)}
-                syncing={loading}
-              />
-              <ProfileSectionTabs
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-                className="hidden justify-self-end lg:block"
-              />
-            </div>
-            {/* Tira de estadísticas integrada en la cabecera (estilo Trakt). */}
-            {stats ? <ProfileStatsStrip stats={stats} /> : null}
-          </motion.div>
+          <div className="mb-6 lg:mb-8 space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: -15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="px-1"
+            >
+              <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
+                <ProfileHero
+                  user={profileUser}
+                  onSync={handleSyncProfile}
+                  onDisconnect={() => setShowDisconnectModal(true)}
+                  syncing={loading}
+                />
+                <ProfileSectionTabs
+                  viewMode={viewMode}
+                  setViewMode={setViewMode}
+                  className="hidden justify-self-end lg:block"
+                />
+              </div>
+            </motion.div>
+
+            {stats ? (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className={`${PROFILE_GLASS_PANEL} rounded-3xl p-4 sm:p-6`}
+              >
+                <ProfileStatsStrip stats={stats} />
+              </motion.div>
+            ) : null}
+          </div>
         ) : null}
 
         {headerReady ? (
@@ -1864,10 +1878,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
                     hábitos. En móvil se APILAN a ancho completo (siempre
                     visibles); en desktop es una rejilla de 12 columnas. */}
                 {stats && (
-                  <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:items-start">
+                  <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:items-stretch">
                     {/* Actividad mensual */}
                     <div
-                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-4 sm:p-6 lg:col-span-6`}
+                      className={`${PROFILE_GLASS_PANEL} flex min-w-0 flex-col justify-between rounded-3xl p-4 sm:p-6 lg:col-span-6 h-full`}
                     >
                       <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
                       <SectionTitle
@@ -1885,7 +1899,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                     {/* Distribución de tiempo */}
                     <div
-                      className={`${PROFILE_GLASS_PANEL} flex min-w-0 flex-col items-center rounded-3xl p-4 sm:p-6 lg:col-span-3`}
+                      className={`${PROFILE_GLASS_PANEL} flex min-w-0 flex-col items-center justify-between rounded-3xl p-4 sm:p-6 lg:col-span-3 h-full`}
                     >
                       <SectionTitle
                         icon={Clock}
@@ -1905,9 +1919,9 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
                     {/* Hábitos (insights derivados) */}
                     <div
-                      className={`${PROFILE_GLASS_PANEL} min-w-0 rounded-3xl p-3 sm:p-4 lg:col-span-3`}
+                      className={`${PROFILE_GLASS_PANEL} flex min-w-0 flex-col justify-between rounded-3xl p-3 sm:p-4 lg:col-span-3 h-full`}
                     >
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col justify-between h-full gap-1 sm:gap-1.5">
                         <HabitRow
                           icon={Flame}
                           color="orange"

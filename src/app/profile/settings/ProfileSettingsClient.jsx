@@ -22,6 +22,10 @@ import {
   Link2,
   Chrome,
   Unlink,
+  AtSign,
+  ImageIcon,
+  X,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -134,6 +138,28 @@ async function detectNetflixExtension() {
   return pingExtensionBridge(700);
 }
 
+function TSVSyncAndroidIcon({ className = "h-10 w-10" }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className={`drop-shadow-[0_2px_10px_rgba(234,179,8,0.35)] transition-transform duration-300 group-hover:scale-110 ${className}`}
+    >
+      {/* Órbita "verse" oficial en ámbar (#EAB308) */}
+      <circle
+        cx="24"
+        cy="24"
+        r="19"
+        stroke="#EAB308"
+        strokeWidth="3.8"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* Triángulo de reproducción (Play) nítido y audaz */}
+      <path d="M19.5 15 L19.5 33 L33.5 24 Z" fill="#EAB308" />
+    </svg>
+  );
+}
+
 function SettingsBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden bg-black z-0">
@@ -173,6 +199,381 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+function SettingActionRow({ icon: Icon, avatarSrc, title, description, buttonLabel = "Cambiar", disabled, onClick }) {
+  return (
+    <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 group`}>
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="h-10 w-10 shrink-0 rounded-xl bg-white/5 p-2.5 text-emerald-400 ring-1 ring-white/10 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300 flex items-center justify-center overflow-hidden">
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="" className="h-full w-full rounded-lg object-cover" />
+          ) : Icon ? (
+            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+          ) : null}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-white tracking-wide">{title}</h3>
+          <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed truncate max-w-md sm:max-w-xl">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className="min-h-9 px-4 shrink-0 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition-all duration-200 flex items-center justify-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+      >
+        <span>{buttonLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
+  const [username, setUsername] = useState(currentUsername || "");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setUsername(currentUsername || "");
+      setError("");
+    }
+  }, [isOpen, currentUsername]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const cleaned = username.trim().toLowerCase();
+    if (cleaned.length < 3 || cleaned.length > 30) {
+      setError("El nombre de usuario debe tener entre 3 y 30 caracteres.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleaned)) {
+      setError("Solo se permiten letras, números, guiones (-) y guiones bajos (_).");
+      return;
+    }
+    setError("");
+    try {
+      await onSave(cleaned);
+      onClose();
+    } catch (err) {
+      setError(err?.message || "No se pudo actualizar el nombre de usuario.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/80 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className={`${GLASS_SURFACE} relative z-10 w-full max-w-md rounded-3xl p-6 border border-white/10 shadow-2xl`}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 border border-emerald-500/20">
+              <AtSign className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white">Cambiar nombre de usuario</h3>
+              <p className="text-xs text-zinc-400">Actualiza tu identificador único en la plataforma.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+              {error}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+              Nombre de usuario
+            </label>
+            <div className="relative">
+              <AtSign className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                minLength={3}
+                maxLength={30}
+                pattern="[a-zA-Z0-9_-]+"
+                required
+                placeholder="nuevo_usuario"
+                disabled={loading}
+                className="h-11 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] text-zinc-500">
+              Entre 3 y 30 caracteres. Solo letras, números, guiones y guiones bajos.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="h-10 px-4 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition hover:bg-white/5"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !username.trim()}
+              className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-black transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Guardar cambios
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
+  const [mode, setMode] = useState("file");
+  const [urlInput, setUrlInput] = useState(currentAvatarUrl || "");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(currentAvatarUrl || "");
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setUrlInput(currentAvatarUrl || "");
+      setSelectedFile(null);
+      setPreviewUrl(currentAvatarUrl || "");
+      setMode("file");
+      setError("");
+    }
+  }, [isOpen, currentAvatarUrl]);
+
+  if (!isOpen) return null;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor, selecciona un archivo de imagen válido.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La imagen no debe superar los 5MB.");
+      return;
+    }
+
+    setError("");
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPreviewUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUrlChange = (val) => {
+    setUrlInput(val);
+    setPreviewUrl(val);
+    setError("");
+  };
+
+  const handleRemove = () => {
+    setPreviewUrl("");
+    setUrlInput("");
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const finalAvatar = previewUrl.trim() || null;
+      await onSave(finalAvatar);
+      onClose();
+    } catch (err) {
+      setError(err?.message || "No se pudo actualizar la foto de perfil.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/80 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className={`${GLASS_SURFACE} relative z-10 w-full max-w-md rounded-3xl p-6 border border-white/10 shadow-2xl`}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 border border-emerald-500/20">
+              <ImageIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white">Cambiar foto de perfil</h3>
+              <p className="text-xs text-zinc-400">Selecciona un archivo local o pega una URL.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Preview circle */}
+        <div className="flex flex-col items-center justify-center mb-6">
+          <div className="relative h-24 w-24 rounded-full border-2 border-white/20 bg-white/5 overflow-hidden flex items-center justify-center shadow-xl group">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Vista previa"
+                className="h-full w-full object-cover"
+                onError={() => setError("No se pudo cargar la imagen desde la URL especificada.")}
+              />
+            ) : (
+              <User className="h-10 w-10 text-zinc-500" />
+            )}
+          </div>
+          {previewUrl && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="mt-2.5 text-xs font-semibold text-red-400 hover:text-red-300 transition flex items-center gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              Eliminar foto
+            </button>
+          )}
+        </div>
+
+        {/* Option switcher */}
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-black/40 border border-white/10 mb-4">
+          <button
+            type="button"
+            onClick={() => setMode("file")}
+            className={`py-2 text-xs font-bold rounded-lg transition ${
+              mode === "file" ? "bg-white/15 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            Archivo local
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("url")}
+            className={`py-2 text-xs font-bold rounded-lg transition ${
+              mode === "url" ? "bg-white/15 text-white shadow-sm" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            URL de imagen
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+              {error}
+            </div>
+          )}
+
+          {mode === "file" ? (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                Seleccionar imagen local
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={loading}
+                className="hidden"
+                id="avatar-file-upload"
+              />
+              <label
+                htmlFor="avatar-file-upload"
+                className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-white/20 bg-black/30 hover:bg-white/5 cursor-pointer transition text-center"
+              >
+                <Upload className="h-7 w-7 text-emerald-400 mb-1" />
+                <span className="text-xs font-bold text-white">
+                  {selectedFile ? selectedFile.name : "Haz clic para buscar o seleccionar una imagen"}
+                </span>
+                <span className="text-[10px] text-zinc-500 mt-1">PNG, JPG, GIF o WEBP (máx 5MB)</span>
+              </label>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                URL de la imagen (HTTPS)
+              </label>
+              <div className="relative">
+                <ImageIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  placeholder="https://ejemplo.com/mi-foto.jpg"
+                  disabled={loading}
+                  className="h-11 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="h-10 px-4 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition hover:bg-white/5"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-black transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Guardar foto
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
 }
@@ -456,12 +857,56 @@ function ImportPanel({
 }
 
 function ProfileSettingsClient() {
-  const { preferences, updatePreference, loadingPreferences, authenticated, hydrated, user } = useAuth();
+  const {
+    preferences,
+    updatePreference,
+    updateProfile,
+    loadingPreferences,
+    preferencesReady,
+    authenticated,
+    hydrated,
+    user,
+  } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("personalization");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+
+  const saveUsername = async (newUsername) => {
+    setProfileSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      await updateProfile({ username: newUsername });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (err) {
+      setError(err?.message || "No se pudo actualizar el nombre de usuario.");
+      throw err;
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const saveAvatar = async (newAvatarUrl) => {
+    setProfileSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      await updateProfile({ avatarUrl: newAvatarUrl });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (err) {
+      setError(err?.message || "No se pudo actualizar la foto de perfil.");
+      throw err;
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const [connections, setConnections] = useState([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
@@ -908,7 +1353,7 @@ function ProfileSettingsClient() {
     }
   }, [loadingPreferences]);
 
-  if (!hydrated) {
+  if (!hydrated || (authenticated && !preferencesReady)) {
     return (
       <main className="min-h-screen bg-black text-zinc-100 flex items-center justify-center relative">
         <SettingsBackground />
@@ -960,66 +1405,67 @@ function ProfileSettingsClient() {
       <SettingsBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 lg:py-12">
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Link
-                href="/profile"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-zinc-300 shadow-lg backdrop-blur-lg transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 shrink-0"
-                aria-label={t("settings_back", "Volver al perfil")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <div className="h-px w-10 bg-emerald-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                {t("settings_account", "Tu cuenta")}
-              </span>
-            </div>
-            <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">
+        <header className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Link
+              href="/profile"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-zinc-300 shadow-lg backdrop-blur-lg transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 shrink-0"
+              aria-label={t("settings_back", "Volver al perfil")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div className="h-px w-10 bg-emerald-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 truncate">
+              {t("settings_account", "Tu cuenta")}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl truncate">
               {t("settings_title", "Configuración")}
               <span className="text-emerald-500">.</span>
             </h1>
-          </div>
 
-          <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-zinc-400 bg-white/5 border border-white/10 rounded-full py-1.5 px-4 h-9 shadow-inner self-start sm:self-auto">
-            {saving ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-                <span>{t("settings_saving", "Guardando")}</span>
-              </>
-            ) : saved ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
-                <span>{t("settings_saved", "Guardado")}</span>
-              </>
-            ) : (
-              <span className="text-emerald-400/80">● {t("settings_saved", "Sincronizado")}</span>
-            )}
+            <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-zinc-400 bg-white/5 border border-white/10 rounded-full py-1.5 px-3.5 sm:px-4 h-9 shadow-inner ml-auto">
+              {saving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                  <span>{t("settings_saving", "Guardando")}</span>
+                </>
+              ) : saved ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>{t("settings_saved", "Guardado")}</span>
+                </>
+              ) : (
+                <span className="text-emerald-400/80">● {t("settings_saved", "Sincronizado")}</span>
+              )}
+            </div>
           </div>
         </header>
 
         {/* Profile Info Summary Card */}
-        <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 backdrop-blur-xl relative overflow-hidden">
+        <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.04] to-indigo-500/[0.04] pointer-events-none" />
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
               {user?.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
               ) : (
                 <User className="h-6 w-6" />
               )}
             </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-black text-white leading-tight">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-black text-white leading-tight truncate">
                 {user?.displayName || user?.username || "Usuario"}
               </h2>
-              <p className="text-xs sm:text-sm text-zinc-400 mt-0.5 truncate max-w-sm sm:max-w-md">
+              <p className="text-xs sm:text-sm text-zinc-400 mt-0.5 truncate">
                 {user?.email}
               </p>
             </div>
           </div>
-          <div className="shrink-0 flex items-center">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full shadow-sm">
+          <div className="shrink-0 flex items-center ml-auto">
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
               Plan {user?.plan || "free"}
             </span>
           </div>
@@ -1067,7 +1513,28 @@ function ProfileSettingsClient() {
                     <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-xs sm:text-sm text-red-200" role="alert">
                       {error}
                     </div>
-      )}
+                  )}
+
+                  <div className="space-y-4">
+                    <SettingActionRow
+                      icon={AtSign}
+                      title={t("settings_username", "Nombre de usuario")}
+                      description={user?.username ? `@${user.username}` : "Establece tu identificador único de usuario"}
+                      buttonLabel="Cambiar"
+                      disabled={profileSaving}
+                      onClick={() => setShowUsernameModal(true)}
+                    />
+
+                    <SettingActionRow
+                      icon={ImageIcon}
+                      avatarSrc={user?.avatarUrl}
+                      title={t("settings_avatar", "Foto de perfil")}
+                      description={user?.avatarUrl ? "Imagen de perfil personalizada activa" : "Personaliza tu imagen con un archivo local o URL"}
+                      buttonLabel="Cambiar"
+                      disabled={profileSaving}
+                      onClick={() => setShowAvatarModal(true)}
+                    />
+                  </div>
 
                   <div className="flex flex-col gap-4">
                     <SegmentedField
@@ -1257,72 +1724,83 @@ function ProfileSettingsClient() {
                       activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
                       className="pl-16"
                     />
+                  </div>
 
-                    {/* App companion de Android: sincroniza desde las apps
-                        oficiales de streaming en el móvil (deep link de
-                        emparejamiento). */}
-                    <div className="mt-4 pl-0 sm:pl-16">
-                      <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-white">
-                              App de Android
-                            </h4>
-                            <p className="mt-0.5 text-xs text-zinc-400 leading-relaxed">
-                              Sincroniza automáticamente lo que ves en las apps
-                              oficiales de streaming del móvil. Instala la app
-                              companion y pulsa Vincular en este mismo dispositivo.
-                            </p>
+                  {/* App companion de Android: Tarjeta independiente */}
+                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-col gap-4`}>
+                    <div className="flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5">
+                      <div className="flex items-start gap-4 min-w-0">
+                        <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
+                          <TSVSyncAndroidIcon className="h-8 w-8 sm:h-9 sm:w-9" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-base font-extrabold text-white tracking-wide">
+                              The Show Verse Sync
+                            </h3>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                              Android App
+                            </span>
                           </div>
+                          <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                            Sincroniza automáticamente lo que ves en las apps oficiales de streaming del móvil. Instala la app companion y pulsa Vincular.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePairAndroid}
+                        disabled={androidPair.loading}
+                        aria-label="Vincular app Android"
+                        title="Vincular app Android"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60 self-start sm:self-auto"
+                      >
+                        {androidPair.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                        ) : (
+                          <>
+                            <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                            <span className="hidden sm:inline">Vincular app Android</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {androidPair.error && (
+                      <p className="text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-2.5 rounded-xl">
+                        {androidPair.error}
+                      </p>
+                    )}
+
+                    {androidPair.link && (
+                      <div className="space-y-2 pt-2 border-t border-white/5">
+                        <p className="text-xs text-emerald-300 font-semibold">
+                          Emparejamiento generado. Si la app no se abrió sola, usa el enlace:
+                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <a
+                            href={androidPair.link}
+                            className="min-h-9 px-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/20 hover:bg-emerald-500/30 text-xs font-bold text-emerald-200 transition flex items-center"
+                          >
+                            Abrir app
+                          </a>
                           <button
                             type="button"
-                            onClick={handlePairAndroid}
-                            disabled={androidPair.loading}
-                            className="min-h-10 px-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60"
+                            onClick={() => {
+                              if (navigator?.clipboard) {
+                                navigator.clipboard.writeText(androidPair.link);
+                              }
+                            }}
+                            className="min-h-9 px-3.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"
                           >
-                            {androidPair.loading ? "Generando…" : "Vincular app Android"}
+                            Copiar enlace
                           </button>
                         </div>
-
-                        {androidPair.error && (
-                          <p className="mt-3 text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-2.5 rounded-xl">
-                            {androidPair.error}
-                          </p>
-                        )}
-
-                        {androidPair.link && (
-                          <div className="mt-3 space-y-2">
-                            <p className="text-xs text-emerald-300">
-                              Emparejamiento generado. Si la app no se abrió sola,
-                              usa el enlace:
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={androidPair.link}
-                                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-white transition flex items-center"
-                              >
-                                Abrir app
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (navigator?.clipboard) {
-                                    navigator.clipboard.writeText(androidPair.link);
-                                  }
-                                }}
-                                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"
-                              >
-                                Copiar enlace
-                              </button>
-                            </div>
-                            <p className="text-[10px] text-zinc-500 leading-relaxed">
-                              El enlace contiene un token de sincronización propio
-                              del móvil; no afecta a la extensión del navegador.
-                            </p>
-                          </div>
-                        )}
+                        <p className="text-[10px] text-zinc-500 leading-relaxed">
+                          El enlace contiene un token de sincronización propio del móvil; no afecta a la extensión del navegador.
+                        </p>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Plex Connection */}
@@ -1708,6 +2186,30 @@ function ProfileSettingsClient() {
               )}
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showUsernameModal && (
+          <UsernameModal
+            isOpen={showUsernameModal}
+            onClose={() => setShowUsernameModal(false)}
+            currentUsername={user?.username || ""}
+            onSave={saveUsername}
+            loading={profileSaving}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAvatarModal && (
+          <AvatarModal
+            isOpen={showAvatarModal}
+            onClose={() => setShowAvatarModal(false)}
+            currentAvatarUrl={user?.avatarUrl || ""}
+            onSave={saveAvatar}
+            loading={profileSaving}
+          />
         )}
       </AnimatePresence>
     </main>
