@@ -1,7 +1,5 @@
 "use client";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-
-
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -13,6 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/auth/UserAvatar";
@@ -179,10 +178,17 @@ function SearchBar({
   const [isSearching, setIsSearching] = useState(false);
   const [searchHistory, setSearchHistory] = useState([]);
   const searchRef = useRef(null);
+  const dropdownRef = useRef(null);
   const inputRef = useRef(null);
   const dropdownId = useId();
   const [showCollection, setShowCollection] = useState(false);
+  const [portalHostReady, setPortalHostReady] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState(null);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
+
+  useEffect(() => {
+    setPortalHostReady(true);
+  }, []);
 
   useEffect(() => {
     if (isMobile) {
@@ -203,13 +209,57 @@ function SearchBar({
 
   useEffect(() => {
     const handler = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(e.target) &&
+        !dropdownRef.current?.contains(e.target)
+      ) {
         setShowDropdown(false);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!showDropdown || !searchRef.current) {
+      setDropdownPosition(null);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updatePosition = () => {
+      frameId = 0;
+      const rect = searchRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const next = {
+        top: rect.bottom + (isMobile ? 12 : 8),
+        left: rect.left,
+        width: rect.width,
+      };
+      setDropdownPosition((current) =>
+        current &&
+        current.top === next.top &&
+        current.left === next.left &&
+        current.width === next.width
+          ? current
+          : next,
+      );
+    };
+    const schedulePositionUpdate = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updatePosition);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", schedulePositionUpdate);
+    window.addEventListener("scroll", schedulePositionUpdate, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", schedulePositionUpdate);
+      window.removeEventListener("scroll", schedulePositionUpdate, true);
+    };
+  }, [showDropdown, isMobile]);
 
   const openSearchHistory = () => {
     const history = readSearchHistory();
@@ -592,19 +642,25 @@ function SearchBar({
         </div>
       </form>
 
-      <AnimatePresence>
-        {showDropdown &&
-          (results.length > 0 || !query.trim()) && (
-          <motion.div
-            id={dropdownId}
-            initial={{ opacity: 0, y: -10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`absolute top-full left-0 w-full text-white ${isMobile ? "mt-3" : "mt-2"} z-[99999] max-h-[70vh] overflow-y-auto no-scrollbar
-              rounded-2xl bg-black/85 bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] backdrop-blur-2xl shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)]`}
-          >
-            {!query.trim() ? (
+      {portalHostReady &&
+        createPortal(
+          <AnimatePresence>
+            {showDropdown &&
+              dropdownPosition &&
+              (results.length > 0 || !query.trim()) && (
+                <motion.div
+                  ref={dropdownRef}
+                  id={dropdownId}
+                  initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  style={dropdownPosition}
+                  onClick={(event) => event.stopPropagation()}
+                  className={`fixed z-[99999] overflow-hidden rounded-2xl text-white ${LIQUID_GLASS_PANEL}`}
+                >
+                  <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
+                    {!query.trim() ? (
               <div className="p-2">
                 <div className="flex items-center justify-between gap-3 px-3 py-2">
                   <div className="flex min-w-0 items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
@@ -749,10 +805,13 @@ function SearchBar({
                   </div>
                 )}
               </>
-            )}
-          </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -1666,7 +1725,7 @@ export default function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/30"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1676,15 +1735,16 @@ export default function Navbar() {
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
-              transition={{ type: "tween", duration: 0.22 }}
-              className="h-full w-[280px] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[30px_0_80px_-15px_rgba(0,0,0,0.9)] px-4 pt-2 pb-2"
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] ${LIQUID_GLASS_PANEL} px-4 pt-3 pb-6 flex flex-col select-none transform-gpu overflow-y-auto scrollbar-none`}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between gap-2">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex-1 min-w-0 h-28"
+                  className="flex-1 min-w-0 h-24"
                 >
                   <OptimizedImage
                     src="/logo-final-titulo-sinFondo.png"
@@ -1697,24 +1757,25 @@ export default function Navbar() {
 
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors flex-shrink-0"
+                  className={`p-2 rounded-full text-neutral-200 transition-colors hover:bg-white/10 hover:text-white flex-shrink-0 ${LIQUID_GLASS_PANEL}`}
                   aria-label="Cerrar menú"
                 >
-                  <XIcon className="w-6 h-6" />
+                  <XIcon className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="mt-0 space-y-2">
+              {/* Menu items */}
+              <div className="space-y-1 pt-1">
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/")
-                      ? "bg-gradient-to-r from-white/18 via-white/12 to-white/8 text-white font-bold shadow-[0_2px_12px_rgba(255,255,255,0.08)]"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-white/15 text-white font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <HomeIcon className={`w-5 h-5 ${isActive("/") ? "text-white" : ""}`} />
+                  <HomeIcon className={`w-5 h-5 ${isActive("/") ? "text-white" : "text-neutral-400"}`} />
                   <span>{t("nav_home", "Inicio")}</span>
                 </Link>
 
@@ -1723,13 +1784,13 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   onMouseEnter={() => prefetchNavRoute("/movies")}
                   onFocus={() => prefetchNavRoute("/movies")}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/movies")
-                      ? "bg-gradient-to-r from-sky-500/24 via-sky-500/16 to-sky-500/10 text-sky-300 font-bold shadow-[0_2px_12px_rgba(56,189,248,0.15)]"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-sky-500/20 text-sky-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <FilmIcon className={`w-5 h-5 ${isActive("/movies") ? "text-sky-400" : ""}`} />
+                  <FilmIcon className={`w-5 h-5 ${isActive("/movies") ? "text-sky-400" : "text-neutral-400"}`} />
                   <span>{t("nav_movies", "Películas")}</span>
                 </Link>
 
@@ -1738,123 +1799,123 @@ export default function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   onMouseEnter={() => prefetchNavRoute("/series")}
                   onFocus={() => prefetchNavRoute("/series")}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/series")
-                      ? "bg-gradient-to-r from-fuchsia-500/24 via-fuchsia-500/16 to-fuchsia-500/10 text-fuchsia-300 font-bold shadow-[0_2px_12px_rgba(217,70,239,0.15)]"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-fuchsia-500/20 text-fuchsia-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <TvIcon className={`w-5 h-5 ${isActive("/series") ? "text-fuchsia-400" : ""}`} />
+                  <TvIcon className={`w-5 h-5 ${isActive("/series") ? "text-fuchsia-400" : "text-neutral-400"}`} />
                   <span>{t("nav_series", "Series")}</span>
                 </Link>
 
                 <Link
                   href="/discover"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/discover")
-                      ? "bg-gradient-to-r from-indigo-500/24 via-indigo-500/16 to-indigo-500/10 text-indigo-300 font-bold shadow-[0_2px_12px_rgba(99,102,241,0.15)]"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-indigo-500/20 text-indigo-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Compass className={`w-5 h-5 ${isActive("/discover") ? "text-indigo-400" : ""}`} />
+                  <Compass className={`w-5 h-5 ${isActive("/discover") ? "text-indigo-400" : "text-neutral-400"}`} />
                   <span>{t("nav_discover", "Descubrir")}</span>
                 </Link>
 
                 <Link
                   href="/biblioteca"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/biblioteca")
-                      ? "bg-gradient-to-r from-amber-500/24 via-amber-500/16 to-amber-500/10 text-amber-300 font-bold shadow-[0_2px_12px_rgba(245,158,11,0.15)]"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-amber-500/20 text-amber-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <FolderKanban className={`w-5 h-5 ${isActive("/biblioteca") ? "text-amber-400" : ""}`} />
+                  <FolderKanban className={`w-5 h-5 ${isActive("/biblioteca") ? "text-amber-400" : "text-neutral-400"}`} />
                   <span>{t("nav_library", "Biblioteca")}</span>
                 </Link>
 
-                <div className="my-3 h-px bg-neutral-800" />
+                <div className="my-2.5 h-px bg-white/5" />
 
                 <Link
                   href="/in-progress"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/in-progress")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Play className="w-5 h-5" fill="currentColor" />
+                  <Play className={`w-5 h-5 ${isActive("/in-progress") ? "text-emerald-400" : "text-neutral-400"}`} fill="currentColor" />
                   <span>{t("nav_in_progress", "En Progreso")}</span>
                 </Link>
 
                 <Link
                   href="/history"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/history")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Eye className="w-5 h-5" />
+                  <Eye className={`w-5 h-5 ${isActive("/history") ? "text-emerald-400" : "text-neutral-400"}`} />
                   <span>{t("nav_history", "Historial")}</span>
                 </Link>
 
-                <div className="my-3 h-px bg-neutral-800" />
+                <div className="my-2.5 h-px bg-white/5" />
 
                 <Link
                   href={favHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/favorites")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-red-500/20 text-red-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Heart className="w-5 h-5" />
+                  <Heart className={`w-5 h-5 ${isActive("/favorites") ? "text-red-400" : "text-neutral-400"}`} />
                   <span>{t("nav_favorites", "Favoritas")}</span>
                 </Link>
 
                 <Link
                   href={watchHref}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/watchlist")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-sky-500/20 text-sky-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Bookmark className="w-5 h-5" />
+                  <Bookmark className={`w-5 h-5 ${isActive("/watchlist") ? "text-sky-400" : "text-neutral-400"}`} />
                   <span>{t("nav_watchlist", "Pendientes")}</span>
                 </Link>
 
-                <div className="my-3 h-px bg-neutral-800" />
+                <div className="my-2.5 h-px bg-white/5" />
 
                 <Link
                   href="/lists"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/lists")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-purple-500/20 text-purple-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <ListVideo className="w-5 h-5" />
+                  <ListVideo className={`w-5 h-5 ${isActive("/lists") ? "text-purple-400" : "text-neutral-400"}`} />
                   <span>{t("nav_lists", "Listas")}</span>
                 </Link>
 
                 <Link
                   href="/calendar"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/calendar")
-                      ? "bg-white/10 text-white"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-amber-500/20 text-amber-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <CalendarDaysIcon className="w-5 h-5" />
+                  <CalendarDaysIcon className={`w-5 h-5 ${isActive("/calendar") ? "text-amber-400" : "text-neutral-400"}`} />
                   <span>{t("nav_calendar", "Calendario")}</span>
                 </Link>
               </div>

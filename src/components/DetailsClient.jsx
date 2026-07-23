@@ -1240,6 +1240,17 @@ export default function DetailsClient({
   const [basePosterPath, setBasePosterPath] = useState(null);
   const [baseBackdropPath, setBaseBackdropPath] = useState(null);
   const [artworkInitialized, setArtworkInitialized] = useState(false); // Se pone a true tras la carga inicial
+  // Un usuario autenticado puede tener poster/backdrop/preview/logo personalizados
+  // guardados en el servidor (sección "Portadas y fondos"). En una sesión nueva
+  // (sin caché local todavía) no hay forma de saberlo hasta que responda
+  // GET /api/user/preferences. Mientras esa comprobación está en curso, las
+  // imágenes "por defecto" (calculadas o de TMDb) se mantienen ocultas: sin
+  // esto, se pintaban de inmediato y luego el override llegaba y las
+  // sustituía, provocando el parpadeo "por defecto -> seleccionada". Empieza
+  // en `false` siempre (SSR/primer render) y pasa a `true` en cuanto se sabe
+  // que no hace falta esperar (usuario no autenticado) o en cuanto responde
+  // la comprobación remota (autenticado).
+  const [remoteArtworkChecked, setRemoteArtworkChecked] = useState(false);
 
   // -- Estados de carga progresiva del poster --
   // Se usan para mostrar primero una version de baja calidad y luego la alta
@@ -2387,7 +2398,11 @@ export default function DetailsClient({
   // que cualquier fallback), que es la que siempre usó la ficha al alternar
   // entre Póster y Backdrop.
   const posterBackdropFallback = useMemo(() => {
-    if (!artworkInitialized) return null;
+    // Además de esperar a la inicialización, se espera a saber si hay un
+    // backdrop de preview personalizado remoto (`remoteArtworkChecked`): si
+    // no, este fallback "por defecto" pintaría antes que la selección del
+    // usuario y luego sería sustituido -- el parpadeo que se quiere evitar.
+    if (!artworkInitialized || !remoteArtworkChecked) return null;
 
     const allBackdrops = [
       ...(imagesState?.backdrops || []),
@@ -2400,6 +2415,7 @@ export default function DetailsClient({
     data?.images?.backdrops,
     data?.backdrop_path,
     artworkInitialized,
+    remoteArtworkChecked,
   ]);
 
   // Póster del hero móvil. Se prioriza el arte sin idioma para no duplicar el
@@ -2408,6 +2424,9 @@ export default function DetailsClient({
   // vacía ocultaba por completo la capa móvil y dejaba la pantalla negra.
   const mobileNeutralPosterPath = useMemo(() => {
     if (selectedMobilePosterPath) return selectedMobilePosterPath;
+    // Aún no se sabe si hay un póster móvil personalizado remoto: no calcular
+    // el "por defecto" todavía, o parpadearía al llegar el override.
+    if (!remoteArtworkChecked) return null;
 
     // La imagen principal carece de metadatos de idioma, así que no puede
     // considerarse neutra. Se excluye hasta el fallback final para preservar la
@@ -2428,12 +2447,16 @@ export default function DetailsClient({
   }, [
     imagesState?.posters,
     selectedMobilePosterPath,
+    remoteArtworkChecked,
     basePosterPath,
     data?.poster_path,
     data?.profile_path,
   ]);
 
-  const displayHeroLogoPath = selectedLogoPath || heroLogoPath || null;
+  // `heroLogoPath` es el logo "recomendado" (calculado de TMDb): no se muestra
+  // hasta saber si hay un logo personalizado remoto, para no parpadear.
+  const displayHeroLogoPath =
+    selectedLogoPath || (remoteArtworkChecked ? heroLogoPath : null) || null;
 
   /**
    * Procesa y filtra la galeria de artwork segun la pestana activa (posters/backdrops/background),
@@ -2733,6 +2756,9 @@ export default function DetailsClient({
     setPosterImgError(false);
     setArtworkInitialized(false);
     posterSettledRef.current = false;
+    // Nuevo título: hay que volver a confirmar si tiene overrides remotos
+    // antes de poder pintar cualquier imagen por defecto (ver declaración).
+    setRemoteArtworkChecked(false);
 
     const initialPoster = readArtworkPreference(posterStorageKey);
     const initialMobilePoster = readArtworkPreference(mobilePosterStorageKey);
@@ -2786,37 +2812,50 @@ export default function DetailsClient({
   // La preferencia remota pertenece al usuario autenticado y es la fuente de
   // verdad entre dispositivos. La caché local solo pinta de inmediato mientras
   // llega la respuesta. Un restablecimiento remoto elimina también esa caché.
+  //
+  // Se lanza YA al montar, sin esperar a `authHydrated`: la API ya autentica
+  // por cookies (`credentials: "include"`), así que esperar el propio ciclo de
+  // hidratación de auth del cliente (su propia llamada a /api/auth/me) solo
+  // encadenaba dos idas y vueltas en serie en vez de una -- justo el tiempo
+  // que se quiere evitar que se note como una tarjeta vacía. Sin sesión, la
+  // API devuelve simplemente "sin overrides" igual de rápido.
+  //
+  // Además marca `remoteArtworkChecked` cuando se resuelve esta comprobación
+  // (éxito o fallo -- `finally` evita que las imágenes por defecto se queden
+  // ocultas para siempre si la petición falla).
   useEffect(() => {
-    if (!authHydrated || !authenticated) return undefined;
-
     let cancelled = false;
     const revisionAtStart = artworkPreferenceRevisionRef.current;
 
     const restoreRemoteArtwork = async () => {
-      const overrides = await fetchArtworkOverride({ type: endpointType, id });
-      if (
-        cancelled ||
-        overrides == null ||
-        artworkPreferenceRevisionRef.current !== revisionAtStart
-      ) {
-        return;
+      try {
+        const overrides = await fetchArtworkOverride({ type: endpointType, id });
+        if (
+          cancelled ||
+          overrides == null ||
+          artworkPreferenceRevisionRef.current !== revisionAtStart
+        ) {
+          return;
+        }
+
+        const restore = (kind, storageKey, setter) => {
+          const filePath = overrides?.[kind] || null;
+          writeArtworkPreference(storageKey, filePath);
+          setter(filePath);
+        };
+
+        restore("poster", posterStorageKey, setSelectedPosterPath);
+        restore("mobilePoster", mobilePosterStorageKey, setSelectedMobilePosterPath);
+        restore("logo", logoStorageKey, setSelectedLogoPath);
+        restore(
+          "backdrop",
+          previewBackdropStorageKey,
+          setSelectedPreviewBackdropPath,
+        );
+        restore("background", backgroundStorageKey, setSelectedBackgroundPath);
+      } finally {
+        if (!cancelled) setRemoteArtworkChecked(true);
       }
-
-      const restore = (kind, storageKey, setter) => {
-        const filePath = overrides?.[kind] || null;
-        writeArtworkPreference(storageKey, filePath);
-        setter(filePath);
-      };
-
-      restore("poster", posterStorageKey, setSelectedPosterPath);
-      restore("mobilePoster", mobilePosterStorageKey, setSelectedMobilePosterPath);
-      restore("logo", logoStorageKey, setSelectedLogoPath);
-      restore(
-        "backdrop",
-        previewBackdropStorageKey,
-        setSelectedPreviewBackdropPath,
-      );
-      restore("background", backgroundStorageKey, setSelectedBackgroundPath);
     };
 
     void restoreRemoteArtwork();
@@ -2831,8 +2870,6 @@ export default function DetailsClient({
     logoStorageKey,
     previewBackdropStorageKey,
     backgroundStorageKey,
-    authHydrated,
-    authenticated,
     account?.id,
   ]);
 
@@ -3009,13 +3046,18 @@ export default function DetailsClient({
   // ---------------------------------------------------------------------------
 
   // Poster a mostrar: seleccion manual > calculado > portada principal de la
-  // ficha. La portada principal se pinta de inmediato; una selección mejor se
-  // funde sobre ella cuando termina de resolverse el artwork.
+  // ficha. La portada principal se pinta de inmediato (una selección mejor se
+  // funde sobre ella cuando termina de resolverse el artwork) SALVO que aún no
+  // se sepa si hay un override remoto (`remoteArtworkChecked`): mostrarla
+  // antes se vería como el parpadeo "por defecto -> seleccionada" en sesiones
+  // nuevas sin caché local.
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
-    asTmdbPath(basePosterPath) ||
-    (artworkInitialized
-      ? asTmdbPath(data?.poster_path) || asTmdbPath(data?.profile_path)
+    (remoteArtworkChecked
+      ? asTmdbPath(basePosterPath) ||
+        (artworkInitialized
+          ? asTmdbPath(data?.poster_path) || asTmdbPath(data?.profile_path)
+          : null)
       : null) ||
     null;
 
@@ -3061,18 +3103,22 @@ export default function DetailsClient({
 
   // Backdrop de fondo: solo se admiten imagenes confirmadas por TMDb como
   // neutras. La ruta principal no incluye metadatos de idioma y no es segura.
-  const displayBackdropPath = useMemo(
-    () =>
-      resolveNeutralBackdropPath(imagesState?.backdrops || [], [
-        selectedBackgroundPath,
-        baseBackdropPath,
-      ]),
-    [
-      imagesState?.backdrops,
+  const displayBackdropPath = useMemo(() => {
+    // Sin override remoto conocido todavía, no se elige un backdrop "por
+    // defecto" de la galería: se vería sustituido al llegar la selección del
+    // usuario. `selectedBackgroundPath` ya es seguro de usar en cuanto se
+    // conoce (caché local o respuesta remota), pase lo que pase con el resto.
+    if (!remoteArtworkChecked && !selectedBackgroundPath) return null;
+    return resolveNeutralBackdropPath(imagesState?.backdrops || [], [
       selectedBackgroundPath,
       baseBackdropPath,
-    ],
-  );
+    ]);
+  }, [
+    imagesState?.backdrops,
+    selectedBackgroundPath,
+    baseBackdropPath,
+    remoteArtworkChecked,
+  ]);
 
   // ¿La portada que se muestra en móvil trae el título IMPRESO?
   //
@@ -3111,12 +3157,15 @@ export default function DetailsClient({
         ? mobileNeutralPosterPath
         : // MÓVIL: el héroe full-bleed ES el póster de portada; el fondo de la
           // transición debe ser ESE MISMO póster (no un backdrop distinto) para
-          // que se perciba UNA sola imagen. Prioriza el póster neutro.
+          // que se perciba UNA sola imagen. Prioriza el póster neutro. Los
+          // valores "por defecto" (basePosterPath/data.poster_path/profile_path)
+          // se ocultan hasta saber si hay override remoto, para no parpadear;
+          // `selectedBackgroundPath` es seguro en cuanto se conoce.
           mobileNeutralPosterPath ||
-          basePosterPath ||
-          data.poster_path ||
+          (remoteArtworkChecked ? basePosterPath : null) ||
+          (remoteArtworkChecked ? data.poster_path : null) ||
           selectedBackgroundPath ||
-          data.profile_path ||
+          (remoteArtworkChecked ? data.profile_path : null) ||
           desktop ||
           null;
 
@@ -7838,10 +7887,25 @@ export default function DetailsClient({
   // ha resuelto que NO hay imagen (o falló). Requerir `artworkInitialized` en
   // TODOS los modos evita que el icono parpadee durante el proceso de carga
   // (antes podía mostrarse un instante antes de que apareciera el póster).
+  // También se exige `remoteArtworkChecked`: mientras no se sepa si hay un
+  // override remoto guardado, `currentImagePath` es `null` a propósito (evita
+  // el parpadeo "por defecto -> seleccionada"), pero eso NO significa que no
+  // haya imagen -- sin esto, ese hueco intencional se mostraba como el icono
+  // de "sin imagen", pareciendo un título roto en vez de "cargando".
   const showNoPoster =
     artworkInitialized &&
     currentResolved &&
+    remoteArtworkChecked &&
     (!currentImagePath || currentImgError);
+
+  // Mientras se espera a `remoteArtworkChecked` (y no hay ya algo que mostrar:
+  // un póster anterior en transición), el marco del póster (fondo oscuro,
+  // sombra, borde) se oculta también: sin esto, aunque ya no aparezca el
+  // icono de "sin imagen" (ver `showNoPoster`), quedaba un recuadro vacío con
+  // marco visible -- la misma sensación de "tarjeta vacía" que se quiere
+  // evitar. En cuanto se sabe si hay imagen o no, el marco vuelve.
+  const posterChromeReady =
+    remoteArtworkChecked || Boolean(posterLowUrl) || Boolean(prevPosterPath);
 
   // ====== Poster 3D Tilt / Shine ======
   const posterWrapRef = useRef(null);
@@ -8396,7 +8460,11 @@ export default function DetailsClient({
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
-                  className="relative rounded-none sm:rounded-2xl overflow-hidden sm:shadow-2xl sm:shadow-black/80 bg-transparent sm:bg-black/40 will-change-transform poster-tilt-corner-mask"
+                  className={`relative rounded-none sm:rounded-2xl overflow-hidden bg-transparent will-change-transform poster-tilt-corner-mask ${
+                    posterChromeReady
+                      ? "sm:shadow-2xl sm:shadow-black/80 sm:bg-black/40"
+                      : ""
+                  }`}
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
@@ -8410,7 +8478,9 @@ export default function DetailsClient({
                   }}
                 >
                   {/* Borde premium suavizado en la capa superior para evitar entrecortados */}
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30 hidden sm:block" />
+                  {posterChromeReady && (
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30 hidden sm:block" />
+                  )}
 
                   {/* MÓVIL: el póster ocupa casi toda la pantalla para que en la
                       primera vista SOLO se vean póster + logo + fila de botones,
@@ -8426,7 +8496,9 @@ export default function DetailsClient({
                       del navbar inferior flotante (z-30 > z-10 del contenido),
                       que la cubre por completo. ESCRITORIO: aspecto 2:3. */}
                   <div
-                    className="relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 sm:bg-neutral-950 poster-aspect-box"
+                    className={`relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 poster-aspect-box ${
+                      posterChromeReady ? "sm:bg-neutral-950" : ""
+                    }`}
                     style={{
                       contain: "layout paint",
                       "--details-mobile-poster-height": `calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`,
