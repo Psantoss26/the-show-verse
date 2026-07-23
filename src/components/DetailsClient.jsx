@@ -39,6 +39,7 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
   readArtworkPreference,
+  resolveCachedArtworkOverride,
   saveArtworkOverride,
   saveArtworkOverrides,
   writeArtworkPreference,
@@ -1090,6 +1091,60 @@ function pickDefaultHeroLogo(logos) {
   return [...logos].sort((a, b) => score(b) - score(a))[0]?.file_path || null;
 }
 
+// Muestra primero una variante ligera del logo y conserva la calidad original
+// como estado final. La original se descarga después de que w500 ya sea
+// visible y se intercambia solo cuando está cargada y decodificada, así una
+// conexión móvil nunca deja el hueco del logo vacío por esperar un PNG grande.
+function ProgressiveHeroLogo({ path, title }) {
+  const [previewPathLoaded, setPreviewPathLoaded] = useState(null);
+  const [originalPathReady, setOriginalPathReady] = useState(null);
+  const previewLoaded = previewPathLoaded === path;
+  const useOriginal = originalPathReady === path;
+
+  useEffect(() => {
+    if (!path || !previewLoaded || useOriginal) return undefined;
+
+    let cancelled = false;
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = async () => {
+      try {
+        await image.decode?.();
+      } catch {
+        // La imagen cargada sigue siendo válida aunque decode() no esté disponible.
+      }
+      if (!cancelled) setOriginalPathReady(path);
+    };
+    image.src = `https://image.tmdb.org/t/p/original${path}`;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path, previewLoaded, useOriginal]);
+
+  if (!path) return null;
+
+  return (
+    <OptimizedImage
+      src={`https://image.tmdb.org/t/p/${useOriginal ? "original" : "w500"}${path}`}
+      alt={title}
+      priority
+      unoptimized
+      decoding="async"
+      fetchPriority="high"
+      onLoad={() => {
+        if (!useOriginal) setPreviewPathLoaded(path);
+      }}
+      onError={() => {
+        // Mantiene el fallback que existía: si TMDb no sirve w500, se prueba la
+        // ruta original directamente.
+        if (!useOriginal) setOriginalPathReady(path);
+      }}
+      className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
+    />
+  );
+}
+
 // Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
@@ -1167,6 +1222,9 @@ export default function DetailsClient({
     account,
     authenticated = false,
     hydrated: authHydrated = true,
+    preferences,
+    preferencesCached = false,
+    cacheArtworkOverrides,
   } = useAuth();
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
@@ -1626,13 +1684,21 @@ export default function DetailsClient({
     const showId = data?.id;
     if (!showId) return undefined;
     let alive = true;
-    setHeroLogoPath(null);
-    setTitleLogos([]);
-    setHeroLogoResolved(false);
-    getTitleLogos(showId, endpointType)
+    const embeddedLogos = Array.isArray(data?.images?.logos)
+      ? data.images.logos
+      : [];
+    setHeroLogoPath(pickDefaultHeroLogo(embeddedLogos));
+    setTitleLogos(embeddedLogos);
+    // `getDetails(... append_to_response=images)` ya trae los logos preferidos.
+    // Si hay alguno, puede pintarse sin esperar otra petición desde el móvil.
+    setHeroLogoResolved(embeddedLogos.length > 0);
+    getTitleLogos(showId, endpointType, { priority: "high" })
       .then((logos) => {
         if (!alive) return;
-        const availableLogos = Array.isArray(logos) ? logos : [];
+        const availableLogos = mergeUniqueImages(
+          embeddedLogos,
+          Array.isArray(logos) ? logos : [],
+        );
         setTitleLogos(availableLogos);
         setHeroLogoPath(pickDefaultHeroLogo(availableLogos));
         setHeroLogoResolved(true);
@@ -1643,7 +1709,7 @@ export default function DetailsClient({
     return () => {
       alive = false;
     };
-  }, [data?.id, endpointType]);
+  }, [data?.id, data?.images?.logos, endpointType]);
 
   // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
@@ -2809,6 +2875,58 @@ export default function DetailsClient({
     previewBackdropStorageKey,
   ]);
 
+  // La caché global de preferencias guarda una instantánea COMPLETA de los
+  // overrides del usuario, incluidos los títulos que no tienen ninguno. Eso
+  // permite distinguir «no hay selección personalizada» de «todavía no lo
+  // sabemos» y montar las imágenes de TMDb antes de consultar de nuevo el NAS.
+  //
+  // La revalidación remota de abajo se mantiene intacta: si otro dispositivo
+  // cambió una selección, la respuesta más reciente sigue siendo la fuente de
+  // verdad y actualiza esta vista.
+  const cachedArtworkOverride = useMemo(() => {
+    return resolveCachedArtworkOverride({
+      preferences,
+      cached: preferencesCached,
+      authenticated,
+      type: endpointType,
+      id,
+    });
+  }, [
+    authenticated,
+    preferencesCached,
+    preferences,
+    endpointType,
+    id,
+  ]);
+
+  useLayoutEffect(() => {
+    if (cachedArtworkOverride == null) return;
+
+    const restore = (kind, storageKey, setter) => {
+      const filePath = cachedArtworkOverride?.[kind] || null;
+      writeArtworkPreference(storageKey, filePath);
+      setter(filePath);
+    };
+
+    restore("poster", posterStorageKey, setSelectedPosterPath);
+    restore("mobilePoster", mobilePosterStorageKey, setSelectedMobilePosterPath);
+    restore("logo", logoStorageKey, setSelectedLogoPath);
+    restore(
+      "backdrop",
+      previewBackdropStorageKey,
+      setSelectedPreviewBackdropPath,
+    );
+    restore("background", backgroundStorageKey, setSelectedBackgroundPath);
+    setRemoteArtworkChecked(true);
+  }, [
+    cachedArtworkOverride,
+    posterStorageKey,
+    mobilePosterStorageKey,
+    logoStorageKey,
+    previewBackdropStorageKey,
+    backgroundStorageKey,
+  ]);
+
   // La preferencia remota pertenece al usuario autenticado y es la fuente de
   // verdad entre dispositivos. La caché local solo pinta de inmediato mientras
   // llega la respuesta. Un restablecimiento remoto elimina también esa caché.
@@ -2853,6 +2971,20 @@ export default function DetailsClient({
           setSelectedPreviewBackdropPath,
         );
         restore("background", backgroundStorageKey, setSelectedBackgroundPath);
+        cacheArtworkOverrides?.({
+          type: endpointType,
+          id,
+          changes: [
+            { kind: "poster", filePath: overrides?.poster || null },
+            {
+              kind: "mobilePoster",
+              filePath: overrides?.mobilePoster || null,
+            },
+            { kind: "logo", filePath: overrides?.logo || null },
+            { kind: "backdrop", filePath: overrides?.backdrop || null },
+            { kind: "background", filePath: overrides?.background || null },
+          ],
+        });
       } finally {
         if (!cancelled) setRemoteArtworkChecked(true);
       }
@@ -2871,6 +3003,7 @@ export default function DetailsClient({
     previewBackdropStorageKey,
     backgroundStorageKey,
     account?.id,
+    cacheArtworkOverrides,
   ]);
 
   /**
@@ -6073,6 +6206,11 @@ export default function DetailsClient({
     setPosterLayoutMode("poster");
     setSelectedPosterPath(filePath);
     persistArtworkPreference(posterStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "poster", filePath }],
+    });
     saveArtworkOverride({ type: endpointType, id, kind: "poster", filePath });
   };
 
@@ -6081,6 +6219,11 @@ export default function DetailsClient({
   const handleSelectMobilePoster = (filePath) => {
     setSelectedMobilePosterPath(filePath);
     persistArtworkPreference(mobilePosterStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "mobilePoster", filePath }],
+    });
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -6092,6 +6235,11 @@ export default function DetailsClient({
   const handleSelectLogo = (filePath) => {
     setSelectedLogoPath(filePath);
     persistArtworkPreference(logoStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "logo", filePath }],
+    });
     saveArtworkOverride({ type: endpointType, id, kind: "logo", filePath });
   };
 
@@ -6099,6 +6247,11 @@ export default function DetailsClient({
   const handleSelectPreviewBackdrop = (filePath) => {
     setSelectedPreviewBackdropPath(filePath);
     persistArtworkPreference(previewBackdropStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "backdrop", filePath }],
+    });
     saveArtworkOverride({ type: endpointType, id, kind: "backdrop", filePath });
   };
 
@@ -6110,6 +6263,11 @@ export default function DetailsClient({
 
     setSelectedBackgroundPath(filePath);
     persistArtworkPreference(backgroundStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "background", filePath }],
+    });
     saveArtworkOverride({
       type: endpointType,
       id,
@@ -6138,16 +6296,22 @@ export default function DetailsClient({
     persistArtworkPreference(previewBackdropStorageKey, null);
     persistArtworkPreference(backgroundStorageKey, null);
     persistArtworkPreference(logoStorageKey, null);
+    const resetChanges = [
+      { kind: "poster", filePath: null },
+      { kind: "backdrop", filePath: null },
+      { kind: "background", filePath: null },
+      { kind: "mobilePoster", filePath: null },
+      { kind: "logo", filePath: null },
+    ];
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: resetChanges,
+    });
     saveArtworkOverrides({
       type: endpointType,
       id,
-      changes: [
-        { kind: "poster", filePath: null },
-        { kind: "backdrop", filePath: null },
-        { kind: "background", filePath: null },
-        { kind: "mobilePoster", filePath: null },
-        { kind: "logo", filePath: null },
-      ],
+      changes: resetChanges,
     });
   };
 
@@ -8771,10 +8935,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             (Sin citar las clases: el escáner de Tailwind no
                             distingue comentarios y volvería a emitir ese CSS.) */}
                         {displayHeroLogoPath ? (
-                          <img
-                            src={`https://image.tmdb.org/t/p/original${displayHeroLogoPath}`}
-                            alt={title}
-                            className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
+                          <ProgressiveHeroLogo
+                            path={displayHeroLogoPath}
+                            title={title}
                           />
                         ) : heroLogoResolved ? (
                           <h2 className="relative z-10 max-w-[90%] text-center text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 // Devuelve `true` en cuanto el usuario hace SCROLL VERTICAL (o si la página ya
 // está desplazada al montar, p. ej. al restaurar el scroll en una vuelta atrás).
@@ -51,13 +52,24 @@ export function useHasScrolled(
 // se ve nada bajo el hero al cargar, aunque asome). Se aplica con `{...props}` a
 // un motion.div que tenga `variants` (p. ej. fadeInUp).
 //   - reduced motion → aparece sin animación.
+//   - vuelta atrás/adelante → aparece sin animación (ver más abajo).
 //   - aún sin scroll → forzado a "hidden".
 //   - tras hacer scroll → se revela vía whileInView al entrar en la ventana.
 export function useScrollRevealProps(margin = "-80px") {
   const reduceMotion = useReducedMotion();
+  // Al VOLVER (atrás/adelante), el scroll se restaura ya desplazado: la fila
+  // en la que el usuario hizo clic reaparece con la página YA posicionada
+  // sobre ella (sin el gesto de scroll que normalmente cruza el margen de
+  // `viewport`). `whileInView` + `once:true` solo evalúa la intersección
+  // cuando arranca a observar: si en ESE instante la fila no cae del todo
+  // dentro del margen reducido (-80px), nunca vuelve a comprobarlo -- el
+  // título se queda oculto para siempre aunque las tarjetas (que no dependen
+  // de esto) sí se vean. Se evita saltándose el gateo por scroll en este
+  // montaje, igual que ya se hace en Historial/Favoritos.
+  const isBackNav = useIsHistoryNavigation();
   const hasScrolled = useHasScrolled();
 
-  if (reduceMotion) return { initial: false, animate: "visible" };
+  if (reduceMotion || isBackNav) return { initial: false, animate: "visible" };
   if (!hasScrolled) return { initial: "hidden", animate: "hidden" };
   return {
     initial: "hidden",
@@ -75,12 +87,21 @@ export function useTopResetRevealProps(
   enabled = true,
 ) {
   const reduceMotion = useReducedMotion();
-  const hasScrolled = useHasScrolled(4, { resetAtTop: true, enabled });
+  // Al VOLVER (atrás/adelante) el scroll se restaura ya desplazado: si la
+  // sección no cae dentro del margen del IntersectionObserver justo en ese
+  // instante y el usuario no vuelve a hacer scroll, `revealed` se queda en
+  // `false` para siempre (mismo problema que en `useScrollRevealProps`, ver
+  // su comentario). Se salta el gateo por scroll en este montaje.
+  const isBackNav = useIsHistoryNavigation();
+  const hasScrolled = useHasScrolled(4, {
+    resetAtTop: true,
+    enabled: enabled && !isBackNav,
+  });
   const isIntersectingRef = useRef(false);
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
-    if (!enabled || typeof IntersectionObserver === "undefined")
+    if (!enabled || isBackNav || typeof IntersectionObserver === "undefined")
       return undefined;
 
     const target = targetRef.current;
@@ -99,18 +120,19 @@ export function useTopResetRevealProps(
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [enabled, margin, targetRef]);
+  }, [enabled, isBackNav, margin, targetRef]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || isBackNav) return;
     if (!hasScrolled) {
       setRevealed(false);
     } else if (isIntersectingRef.current) {
       setRevealed(true);
     }
-  }, [enabled, hasScrolled]);
+  }, [enabled, isBackNav, hasScrolled]);
 
   if (!enabled) return null;
+  if (isBackNav) return { initial: false, animate: "visible" };
   if (reduceMotion) {
     return {
       initial: false,
