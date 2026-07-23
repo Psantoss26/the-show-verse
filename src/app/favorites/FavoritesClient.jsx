@@ -50,7 +50,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
-import { resolveUserListInitialSnapshot } from "@/lib/userLists/backNavigationSnapshot";
+import {
+  resolveUserListInitialSnapshot,
+  shouldPreserveAddedOrderSnapshot,
+} from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
   isUnavailableStatus,
@@ -2457,6 +2460,12 @@ export default function FavoritesClient() {
   const freezeOrder = useBackNavOrderFreeze(
     `${sortBy}|${groupBy}|${subGroupBy}`,
   );
+  const [preserveAddedOrderSnapshot] = useState(() =>
+    shouldPreserveAddedOrderSnapshot({
+      hasBackNavigationSnapshot,
+      sortBy,
+    }),
+  );
 
   // Persist filter states
   useEffect(() => {
@@ -2609,7 +2618,13 @@ export default function FavoritesClient() {
           const cachedTrakt = readScoreCache("trakt");
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
-          setItems(favoritesWithMeta);
+          // En una vuelta ordenada por fecha, el primer frame ya contiene el
+          // orden exacto que dejó el usuario. Reemplazarlo aquí regeneraría
+          // `_addedIndex` y provocaría un segundo orden visible. La respuesta
+          // fresca se guarda igualmente para la próxima entrada.
+          if (!preserveAddedOrderSnapshot) {
+            setItems(favoritesWithMeta);
+          }
           writeFavoritesCache(favoritesWithMeta, []);
 
           const isShowverse = session === "showverse" || account?.provider === "showverse";
@@ -2693,7 +2708,7 @@ export default function FavoritesClient() {
       cancelled = true;
       controller.abort();
     };
-  }, [session, account]);
+  }, [session, account, preserveAddedOrderSnapshot]);
 
   // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
