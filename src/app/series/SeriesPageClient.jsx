@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 import {
   markAsFavorite,
@@ -1323,6 +1324,15 @@ function Row({
   // destacadas (isSpotlight) ni a Top10 en móvil (diseño de backdrop propio).
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
+  // Al VOLVER (atrás/adelante) el montaje es nuevo y `content-visibility`
+  // arranca en frío: las filas usan su altura estimada hasta que el navegador
+  // las considera cerca del viewport. Si la restauración de scroll salta
+  // directo a una Y guardada sin pasar antes por las filas intermedias, esas
+  // filas nunca se revelan de verdad y el usuario termina viendo OTRAS filas
+  // distintas a las que había antes de navegar (parecen "desaparecer").
+  // Desactivar el diferido en este montaje lo evita (mismo patrón que en
+  // Historial/Favoritos).
+  const isBackNav = useIsHistoryNavigation();
   const safeItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = safeItems.length > 0;
 
@@ -1458,7 +1468,7 @@ function Row({
         ref={rowRef}
         {...revealProps}
         variants={fadeInUp}
-        className="relative group sv-deferred-row"
+        className={`relative group ${isBackNav ? "" : "sv-deferred-row"}`}
       >
         {/* Título para Top 10 móvil con diseño igual a escritorio */}
         <div className="mb-4 px-1 sm:px-0">
@@ -1566,7 +1576,9 @@ function Row({
       ref={rowRef}
       {...revealProps}
       variants={fadeInUp}
-      className={`relative group ${hasActivePreview ? "z-[100]" : "sv-deferred-row"}`}
+      className={`relative group ${
+        hasActivePreview ? "z-[100]" : isBackNav ? "" : "sv-deferred-row"
+      }`}
     >
       <motion.div
         {...revealProps}

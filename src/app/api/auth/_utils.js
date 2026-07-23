@@ -74,12 +74,25 @@ export async function refreshBackendSession(request) {
     body: JSON.stringify({ refreshToken }),
   });
 
-  if (!refreshed.ok || !refreshed.json?.accessToken) return null;
+  if (!refreshed.ok || !refreshed.json?.accessToken) {
+    return {
+      accessToken: null,
+      refreshToken: null,
+      status: refreshed.status || 0,
+      error: refreshed.error || "Backend session refresh failed",
+    };
+  }
 
   return {
     accessToken: refreshed.json.accessToken,
     refreshToken: refreshed.json.refreshToken || refreshToken,
+    status: refreshed.status,
   };
+}
+
+export function isBackendSessionUnavailable(result) {
+  const status = Number(result?.status || 0);
+  return status === 0 || status === 429 || status >= 500;
 }
 
 export async function fetchBackendMe(accessToken) {

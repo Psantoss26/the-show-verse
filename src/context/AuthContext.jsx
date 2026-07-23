@@ -1,7 +1,15 @@
 // /src/context/AuthContext.jsx
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 
 const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
@@ -58,7 +66,7 @@ function cleanLegacyStorage() {
 // (History/Stats): permite pintar el icono de perfil del navbar al instante sin
 // esperar a /api/auth/me, y revalidar en segundo plano.
 const AUTH_USER_CACHE_KEY = "showverse:auth:user:v1";
-const AUTH_USER_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
+const AUTH_USER_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 año
 
 function readAuthUserCache() {
   if (typeof window === "undefined") return null;
@@ -238,6 +246,17 @@ export const AuthProvider = ({ children }) => {
     });
     savePreferences(next);
   }, [preferences, savePreferences]);
+
+  // Restaura el perfil cacheado antes de que el navegador pinte. El efecto
+  // asíncrono inferior sigue verificando la sesión con el servidor, pero el
+  // navbar no pasa por un placeholder entre recargas cuando ya conocemos al
+  // usuario de este dispositivo.
+  useLayoutEffect(() => {
+    const cachedUser = readAuthUserCache();
+    if (!cachedUser) return;
+    setUser(cachedUser);
+    setHydrated(true);
+  }, []);
 
   const refreshMe = useCallback(async () => {
     let res;
