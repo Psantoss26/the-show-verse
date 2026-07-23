@@ -46,7 +46,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
-import { resolveUserListInitialSnapshot } from "@/lib/userLists/backNavigationSnapshot";
+import {
+  resolveUserListInitialSnapshot,
+  shouldPreserveAddedOrderSnapshot,
+} from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
   isUnavailableStatus,
@@ -2127,6 +2130,12 @@ export default function WatchlistClient() {
   const freezeOrder = useBackNavOrderFreeze(
     `${sortBy}|${groupBy}|${subGroupBy}`,
   );
+  const [preserveAddedOrderSnapshot] = useState(() =>
+    shouldPreserveAddedOrderSnapshot({
+      hasBackNavigationSnapshot,
+      sortBy,
+    }),
+  );
 
   // Persist filter states
   useEffect(() => {
@@ -2265,7 +2274,11 @@ export default function WatchlistClient() {
         const cachedTrakt = readScoreCache("trakt");
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
-        setItems(watchlistWithIndex);
+        // Conserva el orden ya visible durante la vuelta. La revalidación sigue
+        // actualizando la caché, pero no regenera `_addedIndex` en pantalla.
+        if (!preserveAddedOrderSnapshot) {
+          setItems(watchlistWithIndex);
+        }
         writeWatchlistCache(watchlistWithIndex);
       } catch (error) {
         if (shouldIgnoreExpectedLogoutError() || error?.name === "AbortError") {
@@ -2292,7 +2305,7 @@ export default function WatchlistClient() {
       cancelled = true;
       controller.abort();
     };
-  }, [session, account]);
+  }, [session, account, preserveAddedOrderSnapshot]);
 
   // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {

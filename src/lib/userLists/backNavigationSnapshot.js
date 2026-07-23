@@ -14,3 +14,16 @@ export function resolveUserListInitialSnapshot(cache, isBackNavigation) {
     ),
   };
 }
+
+// El índice de "añadido" se deriva de la posición de la respuesta remota. En una
+// vuelta atrás no debe sustituir el orden que ya estaba visible; la respuesta se
+// puede persistir para la próxima entrada sin repintar esta instantánea.
+export function shouldPreserveAddedOrderSnapshot({
+  hasBackNavigationSnapshot,
+  sortBy,
+}) {
+  return Boolean(
+    hasBackNavigationSnapshot &&
+      (sortBy === "added-desc" || sortBy === "added-asc"),
+  );
+}
