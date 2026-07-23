@@ -17,6 +17,7 @@ import {
   useTopResetRevealProps,
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
+import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
 import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
@@ -2056,10 +2057,9 @@ export default function MoviesPageClient({
               }
             >
           {(() => {
-            // Alternancia poster/backdrop como en Inicio: filas pares en póster
-            // (Row compartido con preview al hover) e impares en backdrop
-            // (DashboardBackdropRow). La fila "Top 10 en tu región" conserva su
-            // render especial (backdrop numerado) con el Row LOCAL y no alterna.
+            // Escritorio conserva la alternancia poster/backdrop de Inicio. En
+            // móvil todas las filas genéricas usan poster; `region_top` mantiene
+            // aparte su diseño especial de "Top de hoy en España".
             const nodes = [];
             let genericIndex = -1;
             visibleRows.forEach(({ key, title, items }, index) => {
@@ -2078,10 +2078,14 @@ export default function MoviesPageClient({
                 return;
               }
               genericIndex += 1;
-              // "Tendencias ahora mismo" es la fila DESTACADA (spotlight): se
-              // queda en póster con tamaño mayor (no alterna), como en Inicio.
+              // En escritorio "Tendencias ahora mismo" conserva el spotlight;
+              // en móvil el componente compartido normaliza también su tamaño.
               const isSpotlight = title === "Tendencias ahora mismo";
-              const useBackdrop = genericIndex % 2 === 1 && !isSpotlight;
+              const useBackdrop = shouldUseDashboardBackdropRow({
+                isMobile,
+                rowIndex: genericIndex,
+                isSpotlight,
+              });
               nodes.push(
                 useBackdrop ? (
                   <DashboardBackdropRow
