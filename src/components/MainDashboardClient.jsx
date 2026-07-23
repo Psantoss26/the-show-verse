@@ -32,6 +32,7 @@ import {
   Pause,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 
 import {
   markAsFavorite,
@@ -368,14 +369,55 @@ const EXPANDABLE_SECTION_HREFS = {
   "Más esperadas": "/dashboard/mas-esperadas",
 };
 
-function ExpandableSectionTitle({ title, href, className = "" }) {
+const SECTION_ACCENTS = {
+  amber: {
+    line: "bg-amber-500",
+    text: "text-amber-400",
+    dot: "text-amber-500",
+    chevron: "text-amber-400",
+    hover: "hover:from-amber-100 hover:via-white hover:to-amber-200",
+  },
+  sky: {
+    line: "bg-sky-500",
+    text: "text-sky-400",
+    dot: "text-sky-400",
+    chevron: "text-sky-400",
+    hover: "hover:from-sky-100 hover:via-white hover:to-sky-200",
+  },
+  fuchsia: {
+    line: "bg-fuchsia-500",
+    text: "text-fuchsia-400",
+    dot: "text-fuchsia-400",
+    chevron: "text-fuchsia-400",
+    hover: "hover:from-fuchsia-100 hover:via-white hover:to-fuchsia-200",
+  },
+  purple: {
+    line: "bg-purple-500",
+    text: "text-purple-400",
+    dot: "text-purple-400",
+    chevron: "text-purple-400",
+    hover: "hover:from-purple-100 hover:via-white hover:to-purple-200",
+  },
+  rose: {
+    line: "bg-rose-500",
+    text: "text-rose-400",
+    dot: "text-rose-400",
+    chevron: "text-rose-400",
+    hover: "hover:from-rose-100 hover:via-white hover:to-rose-200",
+  },
+};
+
+function ExpandableSectionTitle({ title, href, className = "", accent = "amber" }) {
   const displayTitle = normalizeDashboardSectionTitle(title);
+  const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
   const content = (
     <>
       <span>{displayTitle}</span>
-      <span className="text-amber-500">.</span>
+      <span className={sectionAccent.dot}>.</span>
       {href && (
-        <ChevronRight className="ml-1 h-5 w-5 translate-x-[-4px] text-amber-400 opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
+        <ChevronRight
+          className={`ml-1 h-5 w-5 translate-x-[-4px] opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6 ${sectionAccent.chevron}`}
+        />
       )}
     </>
   );
@@ -393,7 +435,7 @@ function ExpandableSectionTitle({ title, href, className = "" }) {
   return (
     <Link
       href={href}
-      className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 ${className}`}
+      className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition-all duration-200 ${sectionAccent.hover} active:scale-[0.98] active:opacity-90 ${className}`}
       aria-label={`Ver todos los títulos de ${displayTitle}`}
     >
       {content}
@@ -2648,9 +2690,11 @@ export function Row({
   reserveWhileEmpty = false,
   spotlight = false, // Fila DESTACADA (×1,6). La elige el padre (una por dashboard).
   showContextBadge = false,
+  accent = "amber",
 }) {
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
+  const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
 
   // Etiqueta superior representativa (centralizada). Respeta la que llega como
   // prop; si no, la deriva del título (todas las filas tienen etiqueta).
@@ -2659,6 +2703,11 @@ export function Row({
     sectionHref === false
       ? undefined
       : sectionHref || EXPANDABLE_SECTION_HREFS[title];
+
+  // Tarjetas por fila en móvil (ajuste de usuario): NO afecta a filas
+  // destacadas (isSpotlight), que mantienen su diseño de 2 por fila.
+  const { preferences } = useAuth();
+  const mobileCardsPerRow = getMobileCardsPerRow(preferences);
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -2866,8 +2915,10 @@ export function Row({
           <div className="mb-5 px-1 sm:px-0">
             {labelText && (
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="h-px w-8 bg-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
+                <div className={`h-px w-8 ${sectionAccent.line}`} />
+                <span
+                  className={`${sectionAccent.text} font-bold uppercase tracking-widest text-[10px]`}
+                >
                   {labelText}
                 </span>
               </div>
@@ -2875,6 +2926,7 @@ export function Row({
             <ExpandableSectionTitle
               title={title}
               href={resolvedSectionHref}
+              accent={accent}
             />
           </div>
         )}
@@ -2933,7 +2985,10 @@ export function Row({
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
   const breakpointsRow = {
-    0: { slidesPerView: isSpotlight ? 2 : 3, spaceBetween: isSpotlight ? 14 : 12 },
+    0: {
+      slidesPerView: isSpotlight ? 2 : mobileCardsPerRow,
+      spaceBetween: isSpotlight ? 14 : 12,
+    },
     640: { slidesPerView: isSpotlight ? 2.2 : 4, spaceBetween: isSpotlight ? 18 : 14 },
     768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : 14 },
     1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : 18 },
@@ -2941,8 +2996,9 @@ export function Row({
   };
 
   // No incluimos `hydrated` en la key: hacerlo remonta el Swiper al hidratar y
-  // bloquea el primer desliz. La config solo cambia con el layout (móvil/desktop).
-  const swiperKey = `${title}-${isMobile ? "m" : "d"}`;
+  // bloquea el primer desliz. La config solo cambia con el layout (móvil/desktop)
+  // y con el ajuste de tarjetas por fila.
+  const swiperKey = `${title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`;
 
   return (
     <motion.div
@@ -2964,8 +3020,10 @@ export function Row({
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
           {labelText && (
             <div className="flex items-center gap-2 mb-1.5">
-              <div className="h-px w-8 bg-amber-500" />
-              <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
+              <div className={`h-px w-8 ${sectionAccent.line}`} />
+              <span
+                className={`${sectionAccent.text} font-bold uppercase tracking-widest text-[10px]`}
+              >
                 {labelText}
               </span>
             </div>
@@ -2973,6 +3031,7 @@ export function Row({
           <ExpandableSectionTitle
             title={title}
             href={resolvedSectionHref}
+            accent={accent}
           />
         </motion.div>
       )}
@@ -3008,7 +3067,7 @@ export function Row({
         <div>
           <Swiper
             key={swiperKey}
-            slidesPerView={isSpotlight ? 2 : 3}
+            slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
             spaceBetween={isSpotlight ? 14 : 12}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
@@ -3379,6 +3438,8 @@ export function Row({
 
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
   const { openDetailModal } = useDetailModal();
+  const { preferences } = useAuth();
+  const mobileCardsPerRow = getMobileCardsPerRow(preferences);
 
   if (!items || items.length === 0) return null;
 
@@ -3389,7 +3450,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
   const isInView = useInView(rowRef, { once: true, margin: "-100px" });
 
   const breakpointsRow = {
-    0: { slidesPerView: 3, spaceBetween: 12 },
+    0: { slidesPerView: mobileCardsPerRow, spaceBetween: 12 },
     640: { slidesPerView: 4, spaceBetween: 14 },
     768: { slidesPerView: "auto", spaceBetween: 14 },
     1024: { slidesPerView: "auto", spaceBetween: 18 },
@@ -3398,7 +3459,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
 
   const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
-  const swiperKey = `trakt-${title}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  const swiperKey = `trakt-${title}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`;
 
   const formatMeta = (m) => {
     const year = (m?.release_date || m?.first_air_date || "").slice(0, 4);
@@ -3436,7 +3497,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
       <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
         <Swiper
           key={swiperKey}
-          slidesPerView={3}
+          slidesPerView={mobileCardsPerRow}
           spaceBetween={12}
           loop={false}
           watchOverflow={true}

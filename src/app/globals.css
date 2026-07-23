@@ -797,3 +797,48 @@ html {
   }
 
 }
+
+/* =============================================================================
+   Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
+   ========================================================================== */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-responsive-container,
+.recharts-responsive-container *,
+.recharts-surface,
+.recharts-surface *,
+.recharts-layer,
+.recharts-layer *,
+.recharts-tooltip-wrapper,
+.recharts-sector,
+.recharts-pie,
+.recharts-bar-rectangle,
+.recharts-curve,
+.recharts-cartesian-axis-tick {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+}
+
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-wrapper:focus-within,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
+.recharts-wrapper *:focus-within,
+.recharts-responsive-container:focus,
+.recharts-responsive-container:focus-visible,
+.recharts-responsive-container:focus-within,
+.recharts-surface:focus,
+.recharts-surface:focus-visible,
+svg.recharts-surface:focus,
+svg.recharts-surface:focus-visible,
+svg.recharts-surface *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+

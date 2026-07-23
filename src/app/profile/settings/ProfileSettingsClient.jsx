@@ -1617,6 +1617,26 @@ function ProfileSettingsClient() {
                       ]}
                       onChange={(defaultView) => updatePreference({ defaultView })}
                     />
+                    <SegmentedField
+                      label={t(
+                        "settings_mobile_cards_per_row",
+                        "Tarjetas por fila (móvil)",
+                      )}
+                      value={preferences.uiSettings.mobileCardsPerRow ?? 3}
+                      disabled={saving}
+                      options={[
+                        { value: 3, label: "3" },
+                        { value: 4, label: "4" },
+                      ]}
+                      onChange={(mobileCardsPerRow) =>
+                        updatePreference({
+                          uiSettings: {
+                            ...preferences.uiSettings,
+                            mobileCardsPerRow,
+                          },
+                        })
+                      }
+                    />
                   </div>
 
                   <div className="space-y-4">

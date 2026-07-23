@@ -506,13 +506,18 @@ export default function TraktEpisodesWatchedModal({
       setDisplaySeason(activeSeason);
   }, [open, isMovie, viewMode, activeSeason, seasonCache]);
 
+  const initialSeasonNumber = usableSeasons[0]?.season_number ?? null;
   const selectedSeasonObj = useMemo(
     () => usableSeasons.find((s) => s?.season_number === activeSeason) || null,
     [usableSeasons, activeSeason],
   );
 
-  const selectedSn = selectedSeasonObj?.season_number ?? null;
-  const displaySn = displaySeason ?? activeSeason ?? null;
+  // La temporada inicial se escoge en un efecto al abrir el modal. Usamos la
+  // primera disponible también durante ese primer render para que el contenido
+  // se trate como pendiente de carga, en lugar de enseñar momentáneamente el
+  // estado vacío antes de que arranque la petición.
+  const selectedSn = selectedSeasonObj?.season_number ?? initialSeasonNumber;
+  const displaySn = displaySeason ?? activeSeason ?? initialSeasonNumber;
   const displayCache = displaySn != null ? seasonCache?.[displaySn] : null;
   const episodes = Array.isArray(displayCache?.episodes)
     ? displayCache.episodes
@@ -522,7 +527,14 @@ export default function TraktEpisodesWatchedModal({
     [watchedBySeasonActive, displaySn],
   );
 
-  const loadingSeason = seasonCache?.[selectedSn]?.loading;
+  const canLoadSelectedSeason = Boolean(
+    TMDB_API_KEY && tmdbId && selectedSn != null,
+  );
+  const loadingSeason = Boolean(seasonCache?.[selectedSn]?.loading) || (
+    canLoadSelectedSeason &&
+    !Array.isArray(displayCache?.episodes) &&
+    !displayCache?.error
+  );
   const isSwitching = selectedSn !== displaySn && loadingSeason;
 
   const filteredEpisodes = useMemo(() => {

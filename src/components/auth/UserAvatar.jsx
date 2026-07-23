@@ -27,6 +27,7 @@ export default function UserAvatar({ account, className = "" }) {
       <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-black text-white">
         {avatarUrl ? (
           <OptimizedImage
+            key={avatarUrl}
             src={avatarUrl}
             alt={label}
             className="h-full w-full object-cover"

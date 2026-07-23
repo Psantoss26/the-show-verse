@@ -5,6 +5,7 @@ import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useMemo,
   useRef,
@@ -1714,7 +1715,10 @@ function GroupDivider({
     }
   }, [mobileFiltersOpen]);
 
-  useEffect(() => {
+  // En una vuelta del historial el scroll ya se restaura antes del primer
+  // paint. Medir en un layout effect evita que el divisor se vea expandido
+  // antes de recuperar su estado sticky compacto.
+  useLayoutEffect(() => {
     const handleScroll = () => {
       if (!ref.current) return;
       const top = ref.current.getBoundingClientRect().top;
@@ -1726,12 +1730,22 @@ function GroupDivider({
       });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener(
+      "showverse:scroll-restoration-complete",
+      handleScroll,
+    );
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener(
+        "showverse:scroll-restoration-complete",
+        handleScroll,
+      );
+    };
   }, [transitioningThreshold]);
 
   const renderSticky = isSticky || forceSticky;
-  const stickyTransitionClass = disableStickyAnimation
+  const stickyTransitionClass = disableStickyAnimation || isBackNav
     ? "transition-none"
     : "transition-all duration-300";
 
@@ -1739,7 +1753,7 @@ function GroupDivider({
     <motion.div
       ref={ref}
       data-group-divider
-      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
+      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${isBackNav ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} lg:top-[136px] ${
         mobileFiltersOpen ? "top-[216px]" : "top-[108px]"
       }`}
       // `initial={false}` al retroceder. Es un elemento STICKY que entraba
@@ -1748,7 +1762,9 @@ function GroupDivider({
       // animación de entrada rompe el requisito de "estático al retroceder".
       initial={isBackNav ? false : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={
+        isBackNav ? { duration: 0 } : { duration: 0.4, ease: "easeOut" }
+      }
     >
       <div className="flex min-w-0 items-center gap-3 lg:gap-4">
         <div
@@ -3552,12 +3568,14 @@ export default function FavoritesClient() {
         {/* Filters */}
         <motion.div
           ref={filtersRef}
-          className={`sticky top-14 z-[70] space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6 ${
+          className={`sticky top-14 z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-20 sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
-          initial={{ opacity: 0, y: 10 }}
+          initial={isBackNav ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
+          }
         >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">

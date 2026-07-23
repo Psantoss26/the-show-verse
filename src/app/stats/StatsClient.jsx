@@ -1810,7 +1810,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {headerReady ? (
-          <div className="mb-6 lg:mb-8 space-y-6">
+          <div className="mb-4 sm:mb-6 lg:mb-8 space-y-6">
             <motion.div
               initial={{ opacity: 0, y: -15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1846,7 +1846,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
 
         {headerReady ? (
           <motion.div
-            className="sticky top-14 z-[60] mb-3 transition-all duration-300 sm:top-20 lg:hidden"
+            className="sticky top-14 z-[60] mb-4 sm:mb-6 transition-all duration-300 sm:top-20 lg:hidden"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.25 }}
