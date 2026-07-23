@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 
 import {
   markAsFavorite,
@@ -1325,6 +1326,10 @@ function Row({
   replayRevealAtTop = false,
 }) {
   const reduceMotion = useReducedMotion();
+  // Tarjetas por fila en móvil (ajuste de usuario): NO afecta a filas
+  // destacadas (isSpotlight) ni a Top10 en móvil (diseño de backdrop propio).
+  const { preferences } = useAuth();
+  const mobileCardsPerRow = getMobileCardsPerRow(preferences);
   const safeItems = useMemo(() => {
     if (!Array.isArray(items)) return EMPTY_ARRAY;
     const seen = new Set();
@@ -1552,7 +1557,7 @@ function Row({
 
   const breakpointsRow = {
     0: {
-      slidesPerView: isSpotlight ? 2 : 3,
+      slidesPerView: isSpotlight ? 2 : mobileCardsPerRow,
       spaceBetween: isSpotlight ? 14 : isTop10 ? 16 : 12,
     },
     640: {
@@ -1623,7 +1628,8 @@ function Row({
         }}
       >
         <Swiper
-          slidesPerView={isSpotlight ? 2 : 3}
+          key={`row-${rowKey || title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`}
+          slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
           spaceBetween={isSpotlight ? 14 : isTop10 ? 16 : 12}
           onSwiper={handleSwiper}
           onSlideChange={updateNav}
@@ -2088,6 +2094,7 @@ export default function MoviesPageClient({
                     overridesReady
                     spotlight={isSpotlight}
                     showContextBadge={isSpotlight}
+                    accent="sky"
                   />
                 ),
               );

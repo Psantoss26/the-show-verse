@@ -102,7 +102,10 @@ function ChartFrame({ className = "h-[300px]", children }) {
   }, []);
 
   return (
-    <div ref={ref} className={`${className} min-w-0 w-full`}>
+    <div
+      ref={ref}
+      className={`${className} min-w-0 w-full outline-none focus:outline-none focus:ring-0 select-none [-webkit-tap-highlight-color:transparent] [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus:ring-0 [&_*]:[-webkit-tap-highlight-color:transparent]`}
+    >
       {size ? (
         <FrameSizeContext.Provider value={size}>
           {children}
@@ -124,6 +127,7 @@ function FrameResponsiveContainer({ children, ...props }) {
       height="100%"
       minWidth={0}
       initialDimension={size || undefined}
+      style={{ outline: "none", boxShadow: "none", WebkitTapHighlightColor: "transparent" }}
       {...props}
     >
       {children}

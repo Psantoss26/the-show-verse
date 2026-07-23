@@ -63,12 +63,16 @@ const AUTH_USER_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 días
 function readAuthUserCache() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(AUTH_USER_CACHE_KEY);
+    let raw = window.localStorage.getItem(AUTH_USER_CACHE_KEY);
+    if (!raw) {
+      raw = window.sessionStorage.getItem(AUTH_USER_CACHE_KEY);
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || !parsed.user) return null;
     if (Date.now() - Number(parsed.t || 0) > AUTH_USER_CACHE_HARD_MAX_AGE) {
       window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      window.sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
       return null;
     }
     return parsed.user;
@@ -82,12 +86,24 @@ function writeAuthUserCache(user) {
   try {
     if (!user) {
       window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      window.sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
       return;
     }
-    window.localStorage.setItem(
-      AUTH_USER_CACHE_KEY,
-      JSON.stringify({ t: Date.now(), user }),
-    );
+    const payload = JSON.stringify({ t: Date.now(), user });
+    try {
+      window.localStorage.setItem(AUTH_USER_CACHE_KEY, payload);
+      window.sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
+    } catch {
+      // Si setItem en localStorage falla por límite de cuota (frecuente en navegador móvil
+      // cuando avatarUrl contiene una imagen base64 de ~300KB), eliminamos la clave antigua
+      // de localStorage para NO conservar la foto o datos obsoletos guardados previamente.
+      window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
+      try {
+        window.sessionStorage.setItem(AUTH_USER_CACHE_KEY, payload);
+      } catch {
+        // ignore
+      }
+    }
   } catch {
     // ignore
   }
