@@ -755,9 +755,18 @@ export default async function authRoutes(fastify) {
   // ──────────────────────────────────────────────
   fastify.patch('/me', { preHandler: fastify.requireAuth }, async (req, reply) => {
     const updateSchema = z.object({
+      username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/).optional(),
       displayName: z.string().max(50).optional(),
       bio: z.string().max(500).optional(),
-      avatarUrl: z.string().url().optional(),
+      avatarUrl: z
+        .string()
+        .url()
+        .max(2048)
+        .refine((value) => new URL(value).protocol === 'https:', {
+          message: 'Avatar URL must use HTTPS',
+        })
+        .nullable()
+        .optional(),
       locale: z.string().optional(),
       timezone: z.string().optional(),
     });
@@ -768,6 +777,21 @@ export default async function authRoutes(fastify) {
     }
 
     const updates = { ...parsed.data, updatedAt: new Date() };
+    if (updates.username) {
+      updates.username = updates.username.toLowerCase();
+      if (updates.username !== req.user.username) {
+        const [existingUsername] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.username, updates.username))
+          .limit(1);
+
+        if (existingUsername) {
+          return reply.status(409).send({ error: 'Username already taken' });
+        }
+      }
+    }
+
     const [updated] = await db
       .update(users)
       .set(updates)

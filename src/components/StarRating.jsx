@@ -3,6 +3,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
+import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import { createPortal } from "react-dom";
 import { Star, X, Minus, Plus, Loader2, Trash2 } from "lucide-react";
 import LiquidButton from "./LiquidButton";
@@ -45,6 +46,11 @@ export default function StarRating({
   const clearFn = onClear || onClearRating;
 
   const hasRating = typeof rating === "number" && Number.isFinite(rating);
+  // Puntuación decimal (p. ej. "8.5"): se mide con las métricas reales de la
+  // fuente para centrarla con precisión, ver `useCenteredGlyphOffset`.
+  const { ref: ratingRef, offsetPx: ratingOffsetPx } = useCenteredGlyphOffset(
+    hasRating ? fmt(rating) : "",
+  );
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -157,11 +163,9 @@ export default function StarRating({
           <Loader2 className="w-5 h-5 animate-spin" />
         ) : hasRating ? (
           <span
-            className={`font-black leading-none translate-y-[0.05em] ${
-              fmt(rating).length === 1
-                ? "text-xl"
-                : "text-xl tracking-tighter"
-            }`}
+            ref={ratingRef}
+            style={{ transform: `translateY(${ratingOffsetPx}px)` }}
+            className="font-black leading-none text-xl tracking-tighter"
           >
             {fmt(rating)}
           </span>

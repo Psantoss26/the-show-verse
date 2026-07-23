@@ -89,6 +89,42 @@ function writeAuthUserCache(user) {
   }
 }
 
+const AUTH_PREFERENCES_CACHE_KEY = "showverse:auth:preferences:v1";
+
+function readAuthPreferencesCache() {
+  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+  try {
+    let cached = null;
+    const raw = window.localStorage.getItem(AUTH_PREFERENCES_CACHE_KEY);
+    if (raw) {
+      cached = JSON.parse(raw);
+    }
+    if (!cached || typeof cached !== "object") {
+      cached = {};
+    }
+    const cookieMatch = document.cookie.match(/showverse_default_view=([^;]+)/);
+    if (cookieMatch && cookieMatch[1]) {
+      cached.defaultView = cookieMatch[1];
+    }
+    return mergePreferences(cached);
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+function writeAuthPreferencesCache(prefs) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!prefs) {
+      window.localStorage.removeItem(AUTH_PREFERENCES_CACHE_KEY);
+      return;
+    }
+    window.localStorage.setItem(AUTH_PREFERENCES_CACHE_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
+
 function toCompatAccount(user) {
   if (!user) return null;
   return {
@@ -117,8 +153,9 @@ async function readJsonResponse(response) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [hydrated, setHydrated] = useState(false);
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [preferences, setPreferences] = useState(readAuthPreferencesCache);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
 
   const applyUser = useCallback((nextUser) => {
     const normalized = nextUser || null;
@@ -142,17 +179,20 @@ export const AuthProvider = ({ children }) => {
         const merged = mergePreferences(json.preferences);
         setPreferences(merged);
         syncPreferenceCookies(merged);
+        writeAuthPreferencesCache(merged);
       }
     } catch (err) {
       console.warn("No se pudieron cargar las preferencias", err);
     } finally {
       setLoadingPreferences(false);
+      setPreferencesReady(true);
     }
   }, [syncPreferenceCookies]);
 
   const savePreferences = useCallback(async (nextPreferences) => {
     setPreferences(nextPreferences);
     syncPreferenceCookies(nextPreferences);
+    writeAuthPreferencesCache(nextPreferences);
     try {
       const res = await fetch("/api/user/preferences", {
         method: "PATCH",
@@ -164,6 +204,7 @@ export const AuthProvider = ({ children }) => {
         const merged = mergePreferences(json.preferences);
         setPreferences(merged);
         syncPreferenceCookies(merged);
+        writeAuthPreferencesCache(merged);
       }
     } catch (err) {
       console.error("Error al guardar preferencias:", err);
@@ -270,11 +311,16 @@ export const AuthProvider = ({ children }) => {
         setHydrated(true);
         if (loggedUser) {
           loadPreferences();
+        } else {
+          setPreferencesReady(true);
         }
       } catch (e) {
         console.warn("No se pudo hidratar la sesión propia", e);
         if (!cancelled && !cachedUser) applyUser(null);
-        if (!cancelled) setHydrated(true);
+        if (!cancelled) {
+          setPreferencesReady(true);
+          setHydrated(true);
+        }
       }
     }
 
@@ -326,6 +372,21 @@ export const AuthProvider = ({ children }) => {
     [applyUser, loadPreferences],
   );
 
+  const updateProfile = useCallback(
+    async (patch) => {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify(patch || {}),
+      });
+      const json = await readJsonResponse(res);
+      return applyUser(json.user || null);
+    },
+    [applyUser],
+  );
+
   const logout = useCallback(async (options = {}) => {
     const redirectTo = options?.redirectTo || null;
     try {
@@ -338,8 +399,10 @@ export const AuthProvider = ({ children }) => {
       console.warn("No se pudo cerrar la sesión en backend", e);
     } finally {
       cleanLegacyStorage();
+      writeAuthPreferencesCache(null);
       setPreferences(DEFAULT_PREFERENCES);
       setCookie("showverse_default_view", "grid");
+      setPreferencesReady(true);
       if (redirectTo && typeof window !== "undefined") {
         window.location.replace(redirectTo);
         return;
@@ -362,10 +425,12 @@ export const AuthProvider = ({ children }) => {
       hydrated,
       login,
       register,
+      updateProfile,
       logout,
       refreshMe,
       preferences,
       loadingPreferences,
+      preferencesReady,
       updatePreference,
     }),
     [
@@ -376,10 +441,12 @@ export const AuthProvider = ({ children }) => {
       logout,
       refreshMe,
       register,
+      updateProfile,
       session,
       user,
       preferences,
       loadingPreferences,
+      preferencesReady,
       updatePreference,
     ],
   );
@@ -399,10 +466,12 @@ export const useAuth = () => {
       hydrated: true,
       login: async () => null,
       register: async () => null,
+      updateProfile: async () => null,
       logout: async () => {},
       refreshMe: async () => null,
       preferences: DEFAULT_PREFERENCES,
       loadingPreferences: false,
+      preferencesReady: true,
       updatePreference: () => {},
     };
   }
