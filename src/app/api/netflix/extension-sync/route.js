@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { backendFetchJson, getBackendBaseUrl } from "@/lib/backend/server";
+import {
+  backendFetchJson,
+  getBackendBaseUrl,
+  getCookieSecure,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 import {
   resolveStreamingEntity,
   searchTmdbCandidatesWithFallback,
@@ -50,12 +55,11 @@ async function searchTmdbDirect(query, mediaType) {
   return [...byId.values()];
 }
 
-async function searchTmdbCandidates(request, query, mediaType) {
+async function searchTmdbCandidates(backendRequest, query, mediaType) {
   return searchTmdbCandidatesWithFallback({
     mediaType,
     backendSearch: async (type) => {
-      const result = await backendFetchJson(
-        request,
+      const result = await backendRequest(
         `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=${type}`,
       );
       if (!result.ok) {
@@ -183,6 +187,20 @@ async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null
 }
 
 export async function POST(request) {
+  let backendResult = null;
+  const backendRequest = async (path, init) => {
+    const result = await backendFetchJson(request, path, init);
+    if (result?.refreshedTokens) backendResult = result;
+    return result;
+  };
+  const respond = (body, init) => {
+    const response = NextResponse.json(body, init);
+    setBackendAuthCookies(response, backendResult, {
+      secure: getCookieSecure(request),
+    });
+    return response;
+  };
+
   try {
     const {
       mainTitle,
@@ -229,7 +247,7 @@ export async function POST(request) {
       : "";
 
     if (!mainTitle && !showName) {
-      return NextResponse.json({ error: "mainTitle is required" }, { status: 400 });
+      return respond({ error: "mainTitle is required" }, { status: 400 });
     }
 
     console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${resolvedVideoId})`);
@@ -282,7 +300,7 @@ export async function POST(request) {
       isSeries,
     });
     if (!queryVariants.length) {
-      return NextResponse.json({ error: "Empty title after cleanup" }, { status: 422 });
+      return respond({ error: "Empty title after cleanup" }, { status: 422 });
     }
 
     let tmdbId = null;
@@ -304,7 +322,7 @@ export async function POST(request) {
         expectedMediaType: isTv ? "tv" : null,
         preferTv: Boolean(subTitle || episodeName || showName),
         durationSec: safeDurationSec,
-        search: (type) => searchTmdbCandidates(request, variant, type),
+        search: (type) => searchTmdbCandidates(backendRequest, variant, type),
       });
       if (resolution) {
         query = variant;
@@ -438,13 +456,13 @@ export async function POST(request) {
 
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
-      return NextResponse.json({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
+      return respond({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
     }
 
     // Modo "solo resolver" (indicador en la ficha, sin reproducir): devolvemos la
     // entidad resuelta SIN insertar nada en el historial.
     if (resolveOnly) {
-      return NextResponse.json({
+      return respond({
         success: true,
         resolveOnly: true,
         synced: {
@@ -481,7 +499,7 @@ export async function POST(request) {
     if (syncToken) {
       const baseUrl = getBackendBaseUrl();
       if (!baseUrl) {
-        return NextResponse.json({ error: "Backend base URL is not configured" }, { status: 503 });
+        return respond({ error: "Backend base URL is not configured" }, { status: 503 });
       }
 
       const syncUrl = `${baseUrl}/v1/auth/netflix/sync`;
@@ -509,7 +527,7 @@ export async function POST(request) {
         error: json?.error || json?.message || `Backend HTTP ${res.status}`,
       };
     } else {
-      historyRes = await backendFetchJson(request, "/v1/history", {
+      historyRes = await backendRequest("/v1/history", {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -521,13 +539,13 @@ export async function POST(request) {
         error: historyRes.error,
         json: historyRes.json
       });
-      return NextResponse.json({ 
+      return respond({
         error: historyRes.error || "Failed to add history entry",
         issues: historyRes.json?.issues 
       }, { status: historyRes.status || 500 });
     }
 
-    return NextResponse.json({
+    return respond({
       success: true,
       synced: {
         tmdbId,
@@ -542,6 +560,6 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });
+    return respond({ error: error?.message || "Internal server error" }, { status: 500 });
   }
 }

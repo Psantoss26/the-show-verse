@@ -7,7 +7,12 @@ import {
   getTraktShowsTrending,
   getTraktTrending,
 } from "@/lib/api/traktHelpers";
-import { getBackendBaseUrl, backendFetchJson } from "@/lib/backend/server";
+import {
+  getBackendBaseUrl,
+  backendFetchJson,
+  getCookieSecure,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 import { getValidTraktToken } from "@/lib/trakt/server";
 
 export const runtime = "nodejs";
@@ -201,13 +206,14 @@ function mapEngineCards(items, section) {
 // Autenticado → fila personalizada `for_you` del motor (que ahora prioriza la
 // watchlist del usuario). Anónimo → generic pools (`popular`/`top_rated`), porque
 // sin sesión no hay personalización. Antes esta sección usaba getTraktRecommended.
-async function loadBackendRecommended(request) {
+async function loadBackendRecommended(request, onBackendResult) {
   // 1) Personalizado (reenvía la sesión del usuario al motor).
   const personal = request
     ? await backendFetchJson(request, "/v1/dashboard/home", {
         method: "GET",
       }).catch(() => null)
     : null;
+  if (personal) onBackendResult?.(personal);
   const personalRows = Array.isArray(personal?.json?.rows)
     ? personal.json.rows
     : [];
@@ -268,7 +274,10 @@ async function loadSectionItems(section, options = {}) {
   }
 
   if (section === "recomendados") {
-    return loadBackendRecommended(options.request);
+    return loadBackendRecommended(
+      options.request,
+      options.onBackendResult,
+    );
   }
 
   if (section === "tendencias") {
@@ -293,6 +302,7 @@ async function loadSectionItems(section, options = {}) {
 export async function GET(request, { params }) {
   const { section } = await params;
   const config = SECTION_CONFIG[section];
+  let backendResult = null;
 
   if (!config) {
     return NextResponse.json(
@@ -305,15 +315,25 @@ export async function GET(request, { params }) {
     const { token: traktToken } = await getValidTraktToken(
       request.cookies,
     ).catch(() => ({ token: null }));
-    const items = await loadSectionItems(section, { traktToken, request });
-    return NextResponse.json({
+    const items = await loadSectionItems(section, {
+      traktToken,
+      request,
+      onBackendResult: (result) => {
+        if (result?.refreshedTokens) backendResult = result;
+      },
+    });
+    const response = NextResponse.json({
       section,
       ...config,
       items,
     });
+    setBackendAuthCookies(response, backendResult, {
+      secure: getCookieSecure(request),
+    });
+    return response;
   } catch (err) {
     console.error(`Error cargando sección ${section}:`, err);
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         section,
         ...config,
@@ -322,5 +342,9 @@ export async function GET(request, { params }) {
       },
       { status: 200 },
     );
+    setBackendAuthCookies(response, backendResult, {
+      secure: getCookieSecure(request),
+    });
+    return response;
   }
 }

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 import {
   markAsFavorite,
@@ -2708,6 +2709,16 @@ export function Row({
   // destacadas (isSpotlight), que mantienen su diseño de 2 por fila.
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
+  // Al VOLVER (atrás/adelante) el montaje es nuevo y `content-visibility`
+  // arranca en frío: todas las filas usan su altura estimada
+  // (`contain-intrinsic-size`) hasta que el navegador las considera cerca del
+  // viewport. Si la restauración de scroll salta directo a una Y guardada sin
+  // "pasar" antes por las filas intermedias, esas filas nunca se revelan de
+  // verdad, la altura acumulada real no coincide con la estimada y el usuario
+  // termina viendo OTRAS filas distintas a las que había antes de navegar
+  // (parecen haber "desaparecido"). Desactivar el diferido en este montaje
+  // evita el problema: mismo patrón que en Historial/Favoritos.
+  const isBackNav = useIsHistoryNavigation();
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
@@ -3011,7 +3022,7 @@ export function Row({
       // para que el preview quede SIEMPRE superpuesto y la fila siguiente no lo
       // tape / recorte por abajo.
       className={`relative group ${hasActivePreview ? "z-[100]" : ""} ${
-        previewKind === "anticipated" || hasActivePreview
+        previewKind === "anticipated" || hasActivePreview || isBackNav
           ? ""
           : "sv-deferred-row"
       }`}

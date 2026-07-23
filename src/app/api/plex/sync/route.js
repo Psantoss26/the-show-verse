@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { backendFetchJson } from "@/lib/backend/server";
+import {
+  backendFetchJson,
+  getCookieSecure,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,16 +41,17 @@ function toIso(viewedAt) {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
-async function searchTmdb(request, query, type) {
+async function searchTmdb(request, query, type, onBackendResult) {
   const res = await backendFetchJson(
     request,
     `/v1/tmdb/search?q=${encodeURIComponent(query)}&type=${type}`,
   );
+  onBackendResult?.(res);
   if (res.ok && res.json?.results?.length > 0) return res.json.results[0];
   return null;
 }
 
-async function resolveItem(request, item) {
+async function resolveItem(request, item, onBackendResult) {
   const isTv = item.type === "episode";
   const season = Number.isInteger(item.season) && item.season > 0 ? item.season : isTv ? 1 : null;
   const episode = Number.isInteger(item.episode) && item.episode > 0 ? item.episode : null;
@@ -54,7 +59,7 @@ async function resolveItem(request, item) {
   if (isTv) {
     const query = cleanTitle(item.show || item.title);
     if (!query || !episode) return { skipped: true, reason: "missing_show_or_episode" };
-    const show = await searchTmdb(request, query, "tv");
+    const show = await searchTmdb(request, query, "tv", onBackendResult);
     if (!show) return { skipped: true, reason: "tv_not_found", query };
 
     let resolvedTitle = show.name;
@@ -82,7 +87,7 @@ async function resolveItem(request, item) {
 
   const query = cleanTitle(item.title);
   if (!query) return { skipped: true, reason: "empty_title" };
-  const movie = await searchTmdb(request, query, "movie");
+  const movie = await searchTmdb(request, query, "movie", onBackendResult);
   if (!movie) return { skipped: true, reason: "movie_not_found", query };
   return {
     tmdbId: movie.id,
@@ -111,10 +116,18 @@ export async function POST(request) {
   let duplicates = 0;
   let skipped = 0;
   let failed = 0;
+  let backendResult = null;
+  const captureBackendResult = (result) => {
+    if (result?.refreshedTokens) backendResult = result;
+  };
 
   for (const item of slice) {
     try {
-      const resolved = await resolveItem(request, item);
+      const resolved = await resolveItem(
+        request,
+        item,
+        captureBackendResult,
+      );
       if (resolved.skipped || !resolved.tmdbId) {
         skipped += 1;
         continue;
@@ -134,6 +147,7 @@ export async function POST(request) {
         method: "POST",
         body: JSON.stringify(body),
       });
+      captureBackendResult(historyRes);
 
       if (!historyRes.ok) {
         failed += 1;
@@ -146,7 +160,7 @@ export async function POST(request) {
     }
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     success: true,
     processed: slice.length,
     added,
@@ -154,4 +168,8 @@ export async function POST(request) {
     skipped,
     failed,
   });
+  setBackendAuthCookies(response, backendResult, {
+    secure: getCookieSecure(request),
+  });
+  return response;
 }

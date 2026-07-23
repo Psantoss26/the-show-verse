@@ -4,6 +4,7 @@ import {
   backendAuthRequest,
   fetchBackendMe,
   getCurrentBackendAccessToken,
+  isBackendSessionUnavailable,
   refreshBackendSession,
   unauthenticatedResponse,
 } from "../_utils";
@@ -21,6 +22,9 @@ export async function GET(request) {
   }
 
   if (!accessToken) {
+    if (isBackendSessionUnavailable(refreshedTokens)) {
+      return unauthenticatedResponse(request, 503);
+    }
     return unauthenticatedResponse(request);
   }
 
@@ -29,6 +33,8 @@ export async function GET(request) {
     refreshedTokens = await refreshBackendSession(request);
     if (refreshedTokens?.accessToken) {
       result = await fetchBackendMe(refreshedTokens.accessToken);
+    } else if (isBackendSessionUnavailable(refreshedTokens)) {
+      return unauthenticatedResponse(request, 503);
     }
   }
 
@@ -50,6 +56,9 @@ export async function PATCH(request) {
   }
 
   if (!accessToken) {
+    if (isBackendSessionUnavailable(refreshedTokens)) {
+      return authError("Authentication service unavailable", 503, request);
+    }
     return authError("Authentication required", 401, request);
   }
 
@@ -65,6 +74,8 @@ export async function PATCH(request) {
     refreshedTokens = await refreshBackendSession(request);
     if (refreshedTokens?.accessToken) {
       result = await sendUpdate(refreshedTokens.accessToken);
+    } else if (isBackendSessionUnavailable(refreshedTokens)) {
+      return authError("Authentication service unavailable", 503, request);
     }
   }
 
