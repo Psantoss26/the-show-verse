@@ -10,6 +10,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { applyArtworkOverrideChanges } from "@/lib/artworkApi";
 
 const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
@@ -119,6 +120,18 @@ function writeAuthUserCache(user) {
 
 const AUTH_PREFERENCES_CACHE_KEY = "showverse:auth:preferences:v1";
 
+function hasAuthPreferencesCache() {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(AUTH_PREFERENCES_CACHE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return Boolean(parsed && typeof parsed === "object");
+  } catch {
+    return false;
+  }
+}
+
 function readAuthPreferencesCache() {
   if (typeof window === "undefined") return DEFAULT_PREFERENCES;
   try {
@@ -184,6 +197,11 @@ export const AuthProvider = ({ children }) => {
   const [preferences, setPreferences] = useState(readAuthPreferencesCache);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
+  // Indica que existe una instantánea completa de preferencias (incluidos los
+  // overrides de artwork). Los consumidores pueden usarla en el primer paint y
+  // revalidarla después, sin bloquear imágenes críticas por una ida y vuelta al
+  // backend/NAS.
+  const [preferencesCached, setPreferencesCached] = useState(false);
 
   const applyUser = useCallback((nextUser) => {
     const normalized = nextUser || null;
@@ -208,6 +226,7 @@ export const AuthProvider = ({ children }) => {
         setPreferences(merged);
         syncPreferenceCookies(merged);
         writeAuthPreferencesCache(merged);
+        setPreferencesCached(true);
       }
     } catch (err) {
       console.warn("No se pudieron cargar las preferencias", err);
@@ -221,6 +240,7 @@ export const AuthProvider = ({ children }) => {
     setPreferences(nextPreferences);
     syncPreferenceCookies(nextPreferences);
     writeAuthPreferencesCache(nextPreferences);
+    setPreferencesCached(true);
     try {
       const res = await fetch("/api/user/preferences", {
         method: "PATCH",
@@ -247,15 +267,32 @@ export const AuthProvider = ({ children }) => {
     savePreferences(next);
   }, [preferences, savePreferences]);
 
+  // Actualiza solo la instantánea local de artwork. DetailsClient persiste los
+  // cambios con su propia cola PATCH; esta función mantiene sincronizados el
+  // estado del contexto y localStorage para que una navegación inmediata no
+  // restaure una selección anterior mientras el NAS termina de guardar.
+  const cacheArtworkOverrides = useCallback(({ type, id, changes }) => {
+    setPreferences((current) => {
+      const next = mergePreferences(
+        applyArtworkOverrideChanges(current, { type, id, changes }),
+      );
+      writeAuthPreferencesCache(next);
+      return next;
+    });
+    setPreferencesCached(true);
+  }, []);
+
   // Restaura el perfil cacheado antes de que el navegador pinte. El efecto
   // asíncrono inferior sigue verificando la sesión con el servidor, pero el
   // navbar no pasa por un placeholder entre recargas cuando ya conocemos al
   // usuario de este dispositivo.
   useLayoutEffect(() => {
     const cachedUser = readAuthUserCache();
-    if (!cachedUser) return;
-    setUser(cachedUser);
-    setHydrated(true);
+    if (cachedUser) {
+      setUser(cachedUser);
+      setHydrated(true);
+    }
+    setPreferencesCached(hasAuthPreferencesCache());
   }, []);
 
   const refreshMe = useCallback(async () => {
@@ -440,6 +477,7 @@ export const AuthProvider = ({ children }) => {
       cleanLegacyStorage();
       writeAuthPreferencesCache(null);
       setPreferences(DEFAULT_PREFERENCES);
+      setPreferencesCached(false);
       setCookie("showverse_default_view", "grid");
       setPreferencesReady(true);
       if (redirectTo && typeof window !== "undefined") {
@@ -468,9 +506,11 @@ export const AuthProvider = ({ children }) => {
       logout,
       refreshMe,
       preferences,
+      preferencesCached,
       loadingPreferences,
       preferencesReady,
       updatePreference,
+      cacheArtworkOverrides,
     }),
     [
       account,
@@ -484,9 +524,11 @@ export const AuthProvider = ({ children }) => {
       session,
       user,
       preferences,
+      preferencesCached,
       loadingPreferences,
       preferencesReady,
       updatePreference,
+      cacheArtworkOverrides,
     ],
   );
 
@@ -509,9 +551,11 @@ export const useAuth = () => {
       logout: async () => {},
       refreshMe: async () => null,
       preferences: DEFAULT_PREFERENCES,
+      preferencesCached: false,
       loadingPreferences: false,
       preferencesReady: true,
       updatePreference: () => {},
+      cacheArtworkOverrides: () => {},
     };
   }
   return ctx;

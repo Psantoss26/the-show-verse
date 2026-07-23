@@ -4,6 +4,65 @@ const sessionArtworkPreferences = new Map()
 let artworkPreferencesRequest = null
 let artworkSaveQueue = Promise.resolve()
 
+export function resolveCachedArtworkOverride({
+    preferences,
+    cached,
+    authenticated,
+    type,
+    id
+}) {
+    if (!authenticated || !cached) return null
+
+    const overrides = preferences?.uiSettings?.artworkOverrides
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    const entry =
+        overrides && typeof overrides === 'object'
+            ? overrides[`${normalizedType}:${Number(id)}`]
+            : null
+
+    // Una instantánea completa también confirma los casos negativos. `{}` no
+    // significa «cargando», sino «este título no tiene overrides».
+    return entry && typeof entry === 'object' ? entry : {}
+}
+
+export function applyArtworkOverrideChanges(preferences, { type, id, changes }) {
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    const artworkKey = `${normalizedType}:${Number(id)}`
+    const currentUiSettings = preferences?.uiSettings || {}
+    const currentOverrides =
+        currentUiSettings.artworkOverrides &&
+        typeof currentUiSettings.artworkOverrides === 'object'
+            ? currentUiSettings.artworkOverrides
+            : {}
+    const currentEntry =
+        currentOverrides[artworkKey] &&
+        typeof currentOverrides[artworkKey] === 'object'
+            ? currentOverrides[artworkKey]
+            : {}
+    const nextEntry = { ...currentEntry }
+
+    for (const change of changes || []) {
+        if (!change?.kind) continue
+        if (change.filePath) nextEntry[change.kind] = change.filePath
+        else delete nextEntry[change.kind]
+    }
+
+    const nextOverrides = { ...currentOverrides }
+    if (Object.keys(nextEntry).length > 0) {
+        nextOverrides[artworkKey] = nextEntry
+    } else {
+        delete nextOverrides[artworkKey]
+    }
+
+    return {
+        ...(preferences || {}),
+        uiSettings: {
+            ...currentUiSettings,
+            artworkOverrides: nextOverrides
+        }
+    }
+}
+
 function browserStorage() {
     if (typeof window === 'undefined') return null
     try {
