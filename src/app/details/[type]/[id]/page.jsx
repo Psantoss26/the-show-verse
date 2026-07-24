@@ -31,10 +31,15 @@ export default async function DetailsPage({ params }) {
     notFound();
   }
 
+  // `throwOnUnavailable`: un fallo TEMPORAL de TMDb/red lanza en vez de
+  // devolver `null`. Así `notFound()` (permanente) solo se dispara ante un 404
+  // real; una caída temporal propaga el error al límite de error de la ruta,
+  // que ofrece "reintentar" en lugar de un falso "página no encontrada".
   const data = await getDetails(type, id, {
     appendToResponse: DETAILS_APPEND_TO_RESPONSE,
     language: "es-ES",
     include_video_language: "en,es,null",
+    throwOnUnavailable: true,
   });
 
   if (!data) {

@@ -2,6 +2,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -21,15 +22,25 @@ import {
   LayoutGrid,
   Trash2,
   Loader2,
+  Plus,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 
-import { getLocalInProgress, dismissLocalProgress } from "@/lib/api/progressClient";
+import {
+  addManualProgress,
+  dismissLocalProgress,
+  getLocalInProgress,
+  searchProgressTitles,
+} from "@/lib/api/progressClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import HistorySectionNav from "@/components/HistorySectionNav";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import useModalGuard from "@/hooks/useModalGuard";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -339,41 +350,97 @@ function StatCard({ label, value, icon: Icon, colorClass = "text-white", loading
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    const menuMaxHeight = Math.max(64, Math.min(448, availableBelow));
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 1000,
+    });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      const target = e.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
   return (
     <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+        aria-expanded={open}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition-[min-width,background-color,color] text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-emerald-500" />}
+          {Icon && <Icon className="w-4 h-4 shrink-0 text-emerald-500" />}
           <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">{label}:</span>
           <span className="min-w-0 truncate font-semibold text-white">{valueLabel}</span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
-            style={{ scrollbarWidth: "thin", overscrollBehavior: "contain" }}
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -778,6 +845,7 @@ export default function ContinueWatchingClient() {
   const filtersSticky = useStickyToolbarState(filtersRef);
   const [editMode, setEditMode] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
 
   useEffect(() => {
     document.title = formatPageTitle("Continuar viendo");
@@ -854,6 +922,36 @@ export default function ContinueWatchingClient() {
   // watch_progress al llegar al 90% (pasa al historial). No hay estado
   // "completado", así que no hay selector de pestañas.
   const currentItems = useMemo(() => (dataLoaded ? items : []), [items, dataLoaded]);
+  const existingTitleKeys = useMemo(
+    () =>
+      new Set(
+        currentItems.map((item) => `${mediaTypeOf(item)}:${Number(item.id)}`),
+      ),
+    [currentItems],
+  );
+
+  const handleManualAdded = useCallback((row) => {
+    const added = mapRows([row])[0];
+    if (!added) return;
+    const addedKey = `${mediaTypeOf(added)}:${added.id}`;
+    setItems((current) => {
+      const next = [
+        added,
+        ...(Array.isArray(current) ? current : []).filter(
+          (item) => `${mediaTypeOf(item)}:${item.id}` !== addedKey,
+        ),
+      ];
+      writeCache(next);
+      return next;
+    });
+    setAddModalOpen(false);
+  }, []);
+
+  const openAddModal = useCallback(() => {
+    setEditMode(false);
+    setAddModalOpen(true);
+  }, []);
+  const closeAddModal = useCallback(() => setAddModalOpen(false), []);
 
   const filtered = useMemo(() => {
     let list = Array.isArray(currentItems) ? [...currentItems] : [];
@@ -944,14 +1042,14 @@ export default function ContinueWatchingClient() {
         {/* Filtros */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20"
+          className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Móvil: búsqueda + panel de filtros como OVERLAY absoluto (fuera de
-              flujo): al abrir/cerrar no cambia la altura de la cabecera sticky, así
-              la lista de detrás queda ESTÁTICA (sin empuje ni parpadeo). */}
+          {/* Móvil: antes de alcanzar el sticky el panel pertenece al flujo y
+              desplaza el contenido. Una vez fijado se convierte en overlay, igual
+              que en Historial, para conservar estable la lista que queda debajo. */}
           <div className="relative z-10 lg:hidden">
             <div className="relative flex gap-2">
               <div className="relative min-w-0 flex-1">
@@ -975,6 +1073,11 @@ export default function ContinueWatchingClient() {
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen((v) => !v)}
+                aria-expanded={mobileFiltersOpen}
+                aria-controls="continue-watching-mobile-filters"
+                aria-label={
+                  mobileFiltersOpen ? "Cerrar filtros" : "Abrir filtros"
+                }
                 className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${mobileFiltersOpen
                   ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
@@ -987,11 +1090,12 @@ export default function ContinueWatchingClient() {
             <AnimatePresence>
               {mobileFiltersOpen && (
                 <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: "auto" }}
-                exit={{ height: 0 }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                  className={`z-[80] mt-2 origin-top ${filtersSticky
+                  id="continue-watching-mobile-filters"
+                  initial={{ height: 0 }}
+                  animate={{ height: "auto" }}
+                  exit={{ height: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className={`z-[80] mt-2 origin-top overflow-hidden ${filtersSticky
                     ? "absolute left-0 right-0 top-full"
                     : "relative"
                     }`}
@@ -1024,6 +1128,15 @@ export default function ContinueWatchingClient() {
                           )}
                         </InlineDropdown>
                       </div>
+                      <button
+                        type="button"
+                        onClick={openAddModal}
+                        title="Añadir título"
+                        aria-label="Añadir título a Continuar viendo"
+                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl text-zinc-200 transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditMode((v) => !v)}
@@ -1211,6 +1324,16 @@ export default function ContinueWatchingClient() {
               </button>
             </div>
 
+            <button
+              type="button"
+              onClick={openAddModal}
+              title="Añadir título"
+              aria-label="Añadir título a Continuar viendo"
+              className="h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 text-zinc-200 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+
             {/* Modo borrar (mismo gesto que el Historial): revela una papelera en
                 cada tarjeta con confirmación antes de quitarla. */}
             <button
@@ -1260,8 +1383,313 @@ export default function ContinueWatchingClient() {
             )}
           </AnimatePresence>
         )}
+
+        <AnimatePresence>
+          {addModalOpen && (
+            <AddProgressModal
+              existingKeys={existingTitleKeys}
+              onAdded={handleManualAdded}
+              onClose={closeAddModal}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function AddProgressModal({ existingKeys, onAdded, onClose }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState("");
+  const [addingKey, setAddingKey] = useState("");
+  const inputRef = useRef(null);
+  const previousFocusRef = useRef(null);
+
+  useModalGuard({ open: true, onClose });
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    const focusFrame = window.requestAnimationFrame(() =>
+      inputRef.current?.focus(),
+    );
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      previousFocusRef.current?.focus?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    setError("");
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const nextResults = await searchProgressTitles(trimmed, {
+          signal: controller.signal,
+        });
+        setResults(nextResults.slice(0, 20));
+      } catch (searchError) {
+        if (searchError?.name !== "AbortError") {
+          setResults([]);
+          setError(searchError?.message || "No se pudieron buscar títulos");
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const handleAdd = async (item) => {
+    const key = `${item.media_type}:${item.id}`;
+    if (addingKey || existingKeys.has(key)) return;
+    setAddingKey(key);
+    setError("");
+    try {
+      const row = await addManualProgress(item);
+      onAdded(row);
+    } catch (addError) {
+      setError(addError?.message || "No se pudo añadir el título");
+      setAddingKey("");
+    }
+  };
+
+  return createPortal(
+    <motion.div
+      data-detail-modal-layer=""
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+    >
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-progress-title"
+        aria-describedby="add-progress-description"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className={`relative flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+      >
+        <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
+          <div className="min-w-0">
+            <h2
+              id="add-progress-title"
+              className="truncate bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+            >
+              Añadir a Continuar viendo
+            </h2>
+            <p
+              id="add-progress-description"
+              className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500"
+            >
+              Busca una película o serie
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar selector de títulos"
+            title="Cerrar (Esc)"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-8 sm:pb-8">
+          <div className="relative group">
+            <label htmlFor="add-progress-search" className="sr-only">
+              Buscar película o serie
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-white"
+              aria-hidden="true"
+            />
+            <input
+              ref={inputRef}
+              id="add-progress-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Título de la película o serie..."
+              autoComplete="off"
+              className="w-full rounded-xl border border-white/10 bg-black/40 py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/20 focus:bg-black/60"
+            />
+            {searching ? (
+              <Loader2
+                className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400 motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs font-medium text-red-400"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {error}
+            </div>
+          )}
+
+          {query.trim().length < 2 && (
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01] px-6 text-center">
+              <Search className="mb-3 h-8 w-8 text-zinc-700" aria-hidden="true" />
+              <p className="text-sm font-medium text-zinc-400">
+                Encuentra cualquier título
+              </p>
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-zinc-600">
+                Escribe al menos dos caracteres para buscar en películas y series.
+              </p>
+            </div>
+          )}
+
+          {!searching &&
+            query.trim().length >= 2 &&
+            !error &&
+            results.length === 0 && (
+              <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01] px-6 text-center">
+                <Film className="mb-3 h-8 w-8 text-zinc-700" aria-hidden="true" />
+                <p className="text-sm font-medium text-zinc-400">
+                  No se encontraron títulos
+                </p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Prueba con otro nombre.
+                </p>
+              </div>
+            )}
+
+          {results.length > 0 && (
+            <ul className="space-y-2" role="list">
+              {results.map((item) => {
+                const key = `${item.media_type}:${item.id}`;
+                const alreadyAdded = existingKeys.has(key);
+                const adding = addingKey === key;
+                const year = String(item.release_date || "").slice(0, 4);
+                const poster = item.poster_path
+                  ? buildImg(item.poster_path, "w342")
+                  : null;
+
+                return (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      onClick={() => handleAdd(item)}
+                      disabled={alreadyAdded || Boolean(addingKey)}
+                      className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-3 text-left transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
+                        alreadyAdded
+                          ? "cursor-default border-emerald-500/20 bg-emerald-500/[0.03]"
+                          : "border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.06] active:scale-[0.98]"
+                      } disabled:opacity-70`}
+                    >
+                      <div className="h-[72px] w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900">
+                        {poster ? (
+                          <OptimizedImage
+                            src={poster}
+                            alt=""
+                            width={96}
+                            height={144}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-zinc-700">
+                            {item.media_type === "movie" ? (
+                              <Film className="h-5 w-5" />
+                            ) : (
+                              <Tv className="h-5 w-5" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-bold transition-colors sm:text-base ${
+                            alreadyAdded
+                              ? "text-emerald-100"
+                              : "text-zinc-200 group-hover:text-white"
+                          }`}
+                        >
+                          {item.title}
+                        </p>
+                        <p className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
+                          <span>
+                            {item.media_type === "movie" ? "Película" : "Serie"}
+                          </span>
+                          {year && (
+                            <>
+                              <span aria-hidden="true">•</span>
+                              <span>{year}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <span className="shrink-0">
+                        <span
+                          className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-300 ${
+                            adding
+                              ? "border-white/10 bg-white/5 text-zinc-400"
+                              : alreadyAdded
+                                ? "border-emerald-500 bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                : "border-white/10 bg-transparent text-zinc-500 group-hover:border-emerald-500 group-hover:bg-emerald-500/10 group-hover:text-emerald-400"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {adding ? (
+                            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                          ) : alreadyAdded ? (
+                            <Check className="h-5 w-5" />
+                          ) : (
+                            <Plus className="h-5 w-5" />
+                          )}
+                        </span>
+                        <span className="sr-only">
+                          {alreadyAdded ? "Ya añadido" : "Añadir"}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </motion.section>
+    </motion.div>,
+    document.body,
   );
 }
 

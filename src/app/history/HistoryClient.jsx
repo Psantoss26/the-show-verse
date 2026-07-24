@@ -41,6 +41,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import useModalGuard from "@/hooks/useModalGuard";
 import HistorySectionNav from "@/components/HistorySectionNav";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
@@ -2448,13 +2449,13 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
   };
 
   return (
-    <div className="relative group/subitem rounded-xl overflow-hidden transition-all hover:bg-white/5 border border-transparent hover:border-white/10">
+    <div className="group/subitem relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] transition-all duration-300 hover:border-white/10 hover:bg-white/[0.06]">
       <Link
         href={href || "#"} prefetch
         onClick={onPreviewClick}
-        className={`flex items-center gap-3 p-2.5 sm:p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
+        className={`flex items-center gap-3 p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
-        <div className="relative w-24 sm:w-28 aspect-video rounded-lg bg-zinc-800 overflow-hidden shrink-0 shadow-md border border-white/10">
+        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
           <SmartPoster
             entry={entry}
             title={meta?.title || "Episodio"}
@@ -2462,10 +2463,10 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
           />
         </div>
         <div className="flex-1 min-w-0 pr-12 sm:pr-14">
-          <p className="text-sm sm:text-[15px] font-bold text-emerald-400 drop-shadow-sm">
+          <p className="text-sm font-bold text-emerald-300 sm:text-[15px]">
             {formatEpisodeBadge(meta)}
           </p>
-          <p className="text-xs sm:text-sm text-zinc-200 line-clamp-1 mt-0.5">
+          <p className="mt-0.5 line-clamp-1 text-xs text-zinc-300 sm:text-sm">
             {meta.title || "Episodio sin título"}
           </p>
         </div>
@@ -2475,7 +2476,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
       {!confirmDel && (
         <button
           onClick={handleDeleteClick}
-          className="absolute top-1/2 right-12 sm:right-14 -translate-y-1/2 z-20 flex items-center justify-center p-2 rounded-xl border backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu opacity-100 scale-100 lg:opacity-0 lg:scale-95 lg:group-hover/subitem:scale-100 lg:group-hover/subitem:opacity-100 bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/30 hover:text-red-200 pointer-events-auto"
+          className="pointer-events-auto absolute right-12 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 scale-100 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 shadow-sm backdrop-blur-xl transition-all duration-300 ease-out hover:border-red-300/30 hover:bg-red-500/15 hover:text-red-300 lg:scale-95 lg:opacity-0 lg:group-hover/subitem:scale-100 lg:group-hover/subitem:opacity-100 sm:right-14"
           aria-label="Borrar del historial"
           title="Borrar del historial"
         >
@@ -2489,7 +2490,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/90 backdrop-blur-sm z-10 flex items-center justify-center gap-3 px-3"
+            className="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-black/75 px-3 backdrop-blur-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <span className="text-red-200 text-xs sm:text-sm font-bold tracking-wide">
@@ -2497,14 +2498,14 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
             </span>
             <button
               onClick={handleCancel}
-              className="p-1.5 sm:p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors border border-white/10"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
               aria-label="Cancelar"
             >
               <X className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleConfirm}
-              className="p-1.5 sm:p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors border border-red-500/50"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-red-400/30 bg-red-500/20 text-red-200 transition hover:bg-red-500/35 hover:text-white"
               aria-label="Borrar"
             >
               {isBusy ? (
@@ -2534,12 +2535,9 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 
   useEffect(() => {
     setMounted(true);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
   }, []);
+
+  useModalGuard({ open: mounted, onClose: onCollapse });
 
   if (!mounted) return null;
 
@@ -2550,74 +2548,100 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
       // restringe su zona (y su fondo difuminado) al espacio LIBRE a la izquierda,
       // así se centra ahí y NO tapa la preview. Sin drawer la var es 0px → ventana
       // completa (centrado normal). El cambio de anchura se anima con transition.
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-lg transition-[right] duration-300 ease-out"
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6"
       style={{ right: "var(--sv-drawer-width, 0px)" }}
       // Marca de "capa de modal": el drawer derecho de DetailModal se cierra con un
       // listener global de click salvo dentro de `[data-detail-modal-layer]`. Sin
       // esto, cualquier clic en este modal (backdrop o panel) cerraría la preview.
       data-detail-modal-layer=""
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onCollapse();
-      }}
+      onClick={(e) => e.stopPropagation()}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <motion.div
-        className={`relative w-full max-w-xl overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} flex flex-col max-h-[85vh]`}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onCollapse();
+        }}
+        aria-hidden="true"
+      />
+
+      <motion.section
+        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-grouped-episodes-title"
+        aria-describedby="history-grouped-episodes-description"
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-12 sm:w-14 aspect-[2/3] shrink-0 rounded-lg overflow-hidden bg-zinc-800 border border-white/10 shadow-inner">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_42%)]"
+          aria-hidden="true"
+        />
+
+        <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-5 py-4 sm:px-8 sm:pb-6 sm:pt-8">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-inner sm:w-12">
               <Poster entry={entry} className="w-full h-full" />
             </div>
             <div className="min-w-0">
-              <Link
-                href={href || "#"} prefetch
-                onClick={onSeriesPreview}
-                className="text-base sm:text-lg font-bold text-white hover:text-emerald-300 transition-colors line-clamp-1 drop-shadow-sm"
+              <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">
+                Serie
+              </p>
+              <h2
+                id="history-grouped-episodes-title"
+                className="truncate text-lg font-black tracking-tight text-white sm:text-xl"
               >
-                {title}
-              </Link>
-              <p className="text-xs sm:text-sm font-medium text-emerald-400/90 mt-0.5">
+                <Link
+                  href={href || "#"} prefetch
+                  onClick={onSeriesPreview}
+                  className="transition-colors hover:text-emerald-300"
+                >
+                  {title}
+                </Link>
+              </h2>
+              <p
+                id="history-grouped-episodes-description"
+                className="mt-0.5 text-xs font-medium text-zinc-400 sm:text-sm"
+              >
                 {entry._group.length} episodios agrupados
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onCollapse}
-            className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-            title="Cerrar"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+            title="Cerrar (Esc)"
+            aria-label="Cerrar episodios agrupados"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
-        </div>
+        </header>
 
-        <div className="overflow-y-auto sv-scroll">
-          <div className="p-3 sm:p-4 space-y-1 sm:space-y-1.5">
-            {entry._group.map((ep, idx) => (
-              <EpisodeSubItem
-                // `getHistoryId(ep)` puede repetirse dentro de un grupo (para estas
-                // entradas coincide con el tmdbId de la serie, igual en todos los
-                // episodios), así que se combina con el índice para que la key sea
-                // ÚNICA y no dispare el aviso de React de keys duplicadas.
-                key={`ep-${getHistoryId(ep) ?? "x"}-${idx}`}
-                entry={ep}
-                onRemoveFromHistory={onRemoveFromHistory}
-                isBusy={busyId === `del:${getHistoryId(ep)}`}
-              />
-            ))}
-          </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
+          {entry._group.map((ep, idx) => (
+            <EpisodeSubItem
+              // `getHistoryId(ep)` puede repetirse dentro de un grupo (para estas
+              // entradas coincide con el tmdbId de la serie, igual en todos los
+              // episodios), así que se combina con el índice para que la key sea
+              // ÚNICA y no dispare el aviso de React de keys duplicadas.
+              key={`ep-${getHistoryId(ep) ?? "x"}-${idx}`}
+              entry={ep}
+              onRemoveFromHistory={onRemoveFromHistory}
+              isBusy={busyId === `del:${getHistoryId(ep)}`}
+            />
+          ))}
         </div>
-      </motion.div>
+      </motion.section>
     </motion.div>,
     document.body,
   );
