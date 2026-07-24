@@ -8,6 +8,30 @@ import { db } from '../db/client.js';
 import { watchProgress } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 
+const manualProgressSchema = z.object({
+  tmdbId: z.coerce.number().int().positive(),
+  mediaType: z.enum(['movie', 'tv']),
+  title: z.string().trim().min(1).max(300),
+  posterPath: z.string().trim().max(500).nullable().optional(),
+});
+
+function toProgressResult(row) {
+  return {
+    id: row.id,
+    tmdbId: row.tmdbId,
+    mediaType: row.mediaType,
+    season: row.season || null,
+    episode: row.episode || null,
+    positionSeconds: row.positionSeconds,
+    runtimeSeconds: row.runtimeSeconds,
+    percent: row.percent,
+    platform: row.platform,
+    title: row.title,
+    posterPath: row.posterPath,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export default async function progressRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
@@ -22,22 +46,64 @@ export default async function progressRoutes(fastify) {
       .orderBy(desc(watchProgress.updatedAt))
       .limit(50);
 
-    const results = rows.map((r) => ({
-      id: r.id,
-      tmdbId: r.tmdbId,
-      mediaType: r.mediaType,
-      season: r.season || null,
-      episode: r.episode || null,
-      positionSeconds: r.positionSeconds,
-      runtimeSeconds: r.runtimeSeconds,
-      percent: r.percent,
-      platform: r.platform,
-      title: r.title,
-      posterPath: r.posterPath,
-      updatedAt: r.updatedAt,
-    }));
+    const results = rows.map(toProgressResult);
 
     return reply.send({ results });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /progress — Añadir manualmente un título a "Continuar viendo".
+  // El progreso empieza en 0. Si la misma película/serie ya existe, conserva su
+  // posición y solo actualiza sus metadatos + fecha para llevarla al principio.
+  // ──────────────────────────────────────────────
+  fastify.post('/', async (req, reply) => {
+    const parsed = manualProgressSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        issues: parsed.error.issues,
+      });
+    }
+
+    const { tmdbId, mediaType, title, posterPath } = parsed.data;
+    const now = new Date();
+    const conflictUpdate = {
+      title,
+      updatedAt: now,
+      ...(posterPath ? { posterPath } : {}),
+    };
+    const [item] = await db
+      .insert(watchProgress)
+      .values({
+        userId: req.user.id,
+        tmdbId,
+        mediaType,
+        season: 0,
+        episode: 0,
+        positionSeconds: 0,
+        runtimeSeconds: 0,
+        percent: 0,
+        platform: null,
+        title,
+        posterPath: posterPath || null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [
+          watchProgress.userId,
+          watchProgress.tmdbId,
+          watchProgress.mediaType,
+          watchProgress.season,
+          watchProgress.episode,
+        ],
+        set: conflictUpdate,
+      })
+      .returning();
+
+    return reply.status(201).send({
+      ok: true,
+      item: toProgressResult(item),
+    });
   });
 
   // ──────────────────────────────────────────────

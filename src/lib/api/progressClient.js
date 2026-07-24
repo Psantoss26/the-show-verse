@@ -34,3 +34,74 @@ export async function dismissLocalProgress(id) {
     return false;
   }
 }
+
+export function normalizeProgressSearchResults(results) {
+  const seen = new Set();
+  const normalized = [];
+
+  for (const item of Array.isArray(results) ? results : []) {
+    const mediaType =
+      item?.media_type === "movie" || item?.media_type === "tv"
+        ? item.media_type
+        : null;
+    const id = Number(item?.id);
+    const title = String(item?.title || item?.name || "").trim();
+    if (!mediaType || !Number.isFinite(id) || id <= 0 || !title) continue;
+
+    const key = `${mediaType}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    normalized.push({
+      id,
+      media_type: mediaType,
+      title,
+      original_title: item.original_title || item.original_name || "",
+      poster_path: item.poster_path || null,
+      release_date: item.release_date || item.first_air_date || null,
+      vote_average: Number(item.vote_average) || 0,
+      popularity: Number(item.popularity) || 0,
+    });
+  }
+
+  return normalized;
+}
+
+export async function searchProgressTitles(query, { signal } = {}) {
+  const normalizedQuery = String(query || "").trim();
+  if (normalizedQuery.length < 2) return [];
+
+  const res = await fetch(
+    `/api/progress?search=${encodeURIComponent(normalizedQuery)}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+      signal,
+    },
+  );
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error || "No se pudieron buscar títulos");
+  }
+  return normalizeProgressSearchResults(json?.results);
+}
+
+export async function addManualProgress(item) {
+  const mediaType = item?.media_type === "tv" ? "tv" : "movie";
+  const res = await fetch("/api/progress", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tmdbId: Number(item?.id),
+      mediaType,
+      title: item?.title || item?.name || "",
+      posterPath: item?.poster_path || null,
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.item) {
+    throw new Error(json?.error || "No se pudo añadir el título");
+  }
+  return json.item;
+}

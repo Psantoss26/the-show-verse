@@ -53,6 +53,8 @@ import {
 import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
+  reconcileAddedOrderSnapshot,
+  userListItemKey,
 } from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
@@ -2619,10 +2621,22 @@ export default function FavoritesClient() {
           if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
           // En una vuelta ordenada por fecha, el primer frame ya contiene el
-          // orden exacto que dejó el usuario. Reemplazarlo aquí regeneraría
-          // `_addedIndex` y provocaría un segundo orden visible. La respuesta
-          // fresca se guarda igualmente para la próxima entrada.
-          if (!preserveAddedOrderSnapshot) {
+          // orden exacto que dejó el usuario. NO reemplazamos ese orden de golpe
+          // (regeneraría `_addedIndex` y se vería un segundo reordenamiento),
+          // pero SÍ reconciliamos las altas/bajas ocurridas desde que se guardó
+          // la instantánea: si no, los favoritos añadidos o quitados desde una
+          // ficha quedaban invisibles (los nuevos van al principio) hasta
+          // recargar la página. La reconciliación conserva la posición de los
+          // que siguen y coloca los nuevos en el extremo reciente.
+          if (preserveAddedOrderSnapshot) {
+            setItems((prev) =>
+              reconcileAddedOrderSnapshot(
+                prev,
+                favoritesWithMeta,
+                userListItemKey,
+              ),
+            );
+          } else {
             setItems(favoritesWithMeta);
           }
           writeFavoritesCache(favoritesWithMeta, []);

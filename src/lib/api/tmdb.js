@@ -49,11 +49,31 @@ function hasTmdbAccountSession(accountId, sessionId) {
   );
 }
 
+// Fallo TEMPORAL de TMDb/red (5xx, 429, timeout, desconexión…), a diferencia de
+// un 404 real (recurso inexistente). Solo se lanza cuando el llamador pide
+// distinguirlos (`distinguishErrors`), para que una ficha no muestre "página no
+// encontrada" cuando en realidad el servidor no estaba disponible.
+export class TmdbUnavailableError extends Error {
+  constructor(message, { status = null, cause = null } = {}) {
+    super(message || "TMDb temporarily unavailable");
+    this.name = "TmdbUnavailableError";
+    this.status = status;
+    if (cause) this.cause = cause;
+  }
+}
+
 /**
  * Cliente TMDb con:
  * - Timeout
  * - Caching en servidor (ISR) para endpoints de catálogo
  * - Menos ruido en consola con aborts
+ *
+ * `options.distinguishErrors`: por defecto `tmdb()` devuelve `null` ante
+ * CUALQUIER fallo (404 real o caída temporal), lo que en la ruta de la ficha se
+ * traduce en un `notFound()` permanente. Con esta opción activada, solo el 404
+ * real devuelve `null`; los fallos temporales (5xx/429/timeout/red) lanzan
+ * `TmdbUnavailableError` tras agotar los reintentos, para poder mostrar un
+ * estado de "reintentar" en vez de un "no encontrado" engañoso.
  */
 async function tmdb(path, params = {}, options = {}) {
   if (!API_KEY) {
@@ -70,8 +90,22 @@ async function tmdb(path, params = {}, options = {}) {
     : IS_SERVER
       ? 8000
       : 12000;
-  const { timeoutMs = defaultTimeoutMs, retries = 2, ...fetchOptions } = options;
+  const {
+    timeoutMs = defaultTimeoutMs,
+    retries = 2,
+    distinguishErrors = false,
+    ...fetchOptions
+  } = options;
   const attempts = Math.max(1, Number(retries || 0) + 1);
+  // Ante un fallo temporal (tras agotar reintentos): con `distinguishErrors`
+  // lanzamos para no confundirlo con un 404; si no, mantenemos el `null` de
+  // siempre (el resto del código lo trata con degradación elegante).
+  const failUnavailable = (message, { status = null, cause = null } = {}) => {
+    if (distinguishErrors) {
+      throw new TmdbUnavailableError(message, { status, cause });
+    }
+    return null;
+  };
   let lastError = null;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -128,7 +162,9 @@ async function tmdb(path, params = {}, options = {}) {
         }
 
         console.warn("TMDb error:", res.status, path, json);
-        return null;
+        return failUnavailable(`TMDb HTTP ${res.status} en ${path}`, {
+          status: res.status,
+        });
       }
 
       return json;
@@ -146,22 +182,22 @@ async function tmdb(path, params = {}, options = {}) {
 
       // Abort típico por cambio de ruta / navegación / timeout
       if (e?.name === "AbortError" || code === "UND_ERR_ABORTED") {
-        return null;
+        return failUnavailable(`TMDb abort/timeout en ${path}`, { cause: e });
       }
 
       // Timeout de conexión real hasta TMDb
       if (code === "UND_ERR_CONNECT_TIMEOUT") {
         console.warn("[TMDb] Timeout de conexión con TMDb en", path);
-        return null;
+        return failUnavailable(`TMDb connect timeout en ${path}`, { cause: e });
       }
 
       console.error("TMDb fetch error:", path, e);
-      return null;
+      return failUnavailable(`TMDb fetch error en ${path}`, { cause: e });
     }
   }
 
   if (lastError) console.error("TMDb fetch error:", path, lastError);
-  return null;
+  return failUnavailable(`TMDb sin respuesta en ${path}`, { cause: lastError });
 }
 
 /* -------------------- Películas (Movies) -------------------- */
@@ -394,6 +430,11 @@ export async function getDetails(type, id, params = {}) {
     append_to_response,
     includeImageLanguage,
     include_image_language,
+    // Cuando la ruta de la ficha lo pide, distinguimos un 404 real (→ `null`,
+    // que la página traduce en `notFound()`) de una caída temporal de TMDb/red
+    // (→ lanza `TmdbUnavailableError`, para mostrar "reintentar" en vez de
+    // "página no encontrada"). No es un parámetro de TMDb: se extrae aquí.
+    throwOnUnavailable = false,
     ...restParams
   } = params || {};
 
@@ -418,7 +459,11 @@ export async function getDetails(type, id, params = {}) {
     requestParams.include_image_language = resolvedIncludeImageLanguage;
   }
 
-  const data = await tmdb(`/${type}/${id}`, requestParams);
+  const data = await tmdb(`/${type}/${id}`, requestParams, {
+    distinguishErrors: throwOnUnavailable,
+    // Un reintento extra en la ruta crítica de la ficha absorbe más blips.
+    retries: throwOnUnavailable ? 3 : 2,
+  });
   if (type === "tv" && data) {
     data.imdb_id = data?.external_ids?.imdb_id || null;
   }

@@ -49,6 +49,8 @@ import {
 import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
+  reconcileAddedOrderSnapshot,
+  userListItemKey,
 } from "@/lib/userLists/backNavigationSnapshot";
 import {
   isServerUnavailable,
@@ -2274,9 +2276,20 @@ export default function WatchlistClient() {
         const cachedTrakt = readScoreCache("trakt");
         if (cachedTrakt.size > 0) setTraktScores(cachedTrakt);
 
-        // Conserva el orden ya visible durante la vuelta. La revalidación sigue
-        // actualizando la caché, pero no regenera `_addedIndex` en pantalla.
-        if (!preserveAddedOrderSnapshot) {
+        // Conserva el orden ya visible durante la vuelta, pero reconcilia las
+        // altas/bajas ocurridas desde una ficha: sin esto, los pendientes
+        // añadidos (que van al principio en added-desc) o quitados quedaban
+        // invisibles hasta recargar. La reconciliación mantiene la posición de
+        // los que siguen y coloca los nuevos en el extremo reciente.
+        if (preserveAddedOrderSnapshot) {
+          setItems((prev) =>
+            reconcileAddedOrderSnapshot(
+              prev,
+              watchlistWithIndex,
+              userListItemKey,
+            ),
+          );
+        } else {
           setItems(watchlistWithIndex);
         }
         writeWatchlistCache(watchlistWithIndex);
