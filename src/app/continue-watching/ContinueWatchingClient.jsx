@@ -528,9 +528,9 @@ function ContinueWatchingPosterHoverIndicator({
           <OptimizedImage
             src={platformIconUrl}
             alt=""
-            width={20}
-            height={20}
-            className="h-5 w-5 object-contain brightness-110"
+            width={24}
+            height={24}
+            className="h-6 w-6 rounded-lg object-contain brightness-110 shadow-[0_2px_8px_rgba(0,0,0,0.45)]"
           />
         ) : (
           <span className="max-w-8 truncate text-[9px] font-black uppercase text-zinc-200">
