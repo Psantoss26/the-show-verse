@@ -137,6 +137,25 @@ function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emera
   return <div className={className}>{body}</div>;
 }
 
+function ProfilePosterGrid({ items, showStars = false, viewerTitleStates }) {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+      {items.map((item) => (
+        <div
+          key={`${item.mediaType}:${item.tmdbId}`}
+          className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start sm:w-auto"
+        >
+          <PosterTile
+            item={item}
+            showStars={showStars}
+            viewerState={viewerTitleStates[titleStateKey(item)]}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SectionHeader({ label, action, onClick }) {
   return (
     <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
@@ -676,7 +695,7 @@ export default function ProfileClient({ username }) {
                     activeColor="teal"
                     groupId="profile-header-actions"
                     title="Configuración"
-                  className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
                     <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                   </LiquidButton>
@@ -771,15 +790,7 @@ export default function ProfileClient({ username }) {
             <section>
               <SectionHeader label="Favoritos" />
               {favorites?.length ? (
-                <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
-                  {favorites.map((item) => (
-                    <PosterTile
-                      key={`${item.mediaType}:${item.tmdbId}`}
-                      item={item}
-                      viewerState={viewerTitleStates[titleStateKey(item)]}
-                    />
-                  ))}
-                </div>
+                <ProfilePosterGrid items={favorites} viewerTitleStates={viewerTitleStates} />
               ) : (
                 <p className="text-sm text-zinc-600">
                   {isSelf
@@ -793,16 +804,11 @@ export default function ProfileClient({ username }) {
             <section>
               <SectionHeader label="Actividad reciente" />
               {recentWatched?.length ? (
-                <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
-                  {recentWatched.map((item) => (
-                    <PosterTile
-                      key={`${item.mediaType}:${item.tmdbId}`}
-                      item={item}
-                      showStars
-                      viewerState={viewerTitleStates[titleStateKey(item)]}
-                    />
-                  ))}
-                </div>
+                <ProfilePosterGrid
+                  items={recentWatched}
+                  showStars
+                  viewerTitleStates={viewerTitleStates}
+                />
               ) : (
                 <p className="text-sm text-zinc-600">Sin actividad reciente.</p>
               )}
@@ -900,7 +906,7 @@ function ProfileTabs({ tab, setTab, sections }) {
     { id: "social", label: "Social" },
   ];
   return (
-    <nav className="mt-8 flex gap-1 overflow-x-auto border-b border-white/10 pb-px [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <nav className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] sm:mt-8 [&::-webkit-scrollbar]:hidden">
       {items.map((it) => {
         const active = tab === it.id;
         return (
@@ -908,13 +914,13 @@ function ProfileTabs({ tab, setTab, sections }) {
             key={it.id}
             type="button"
             onClick={() => setTab(it.id)}
-            className={`relative flex-shrink-0 whitespace-nowrap px-3.5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
+            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-1 py-2.5 text-[9px] font-bold uppercase tracking-[0.08em] transition-colors sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {it.label}
             {typeof it.count === "number" && (
-              <span className={`ml-1.5 text-[10px] font-semibold tracking-normal ${active ? "text-emerald-400" : "text-zinc-600"}`}>
+              <span className={`ml-1.5 hidden text-[10px] font-semibold tracking-normal sm:inline ${active ? "text-emerald-400" : "text-zinc-600"}`}>
                 {it.count}
               </span>
             )}
