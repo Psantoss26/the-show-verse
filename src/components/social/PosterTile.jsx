@@ -16,7 +16,7 @@ function detailsHref(item) {
   return `/details/${type}/${item?.tmdbId || item?.id}`;
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default" }) {
   const [failed, setFailed] = useState(false);
   const src = tmdbPoster(item?.posterPath || item?.poster_path);
 
@@ -30,9 +30,22 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
   const hasUserRating = userRating != null && Number(userRating) > 0;
   const hasCollectionIndicator = favorite || watchlist;
   const hasViewerIndicators = hasCollectionIndicator || watched || hasUserRating;
-  const indicatorItemClassName = compactIndicator ? "h-7 w-8" : "h-9 w-10";
-  const indicatorIconClassName = compactIndicator ? "h-4 w-4" : "h-5 w-5";
-  const indicatorRatingClassName = compactIndicator ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
+  const useProfileIndicatorSize = indicatorSize === "profile";
+  const indicatorItemClassName = compactIndicator
+    ? "h-7 w-8"
+    : useProfileIndicatorSize
+      ? "h-8 w-9"
+      : "h-9 w-10";
+  const indicatorIconClassName = compactIndicator
+    ? "h-4 w-4"
+    : useProfileIndicatorSize
+      ? "h-[1.125rem] w-[1.125rem]"
+      : "h-5 w-5";
+  const indicatorRatingClassName = compactIndicator
+    ? "h-7 w-8 text-base"
+    : useProfileIndicatorSize
+      ? "h-8 w-9 text-lg"
+      : "h-9 w-10 text-xl";
 
   return (
     <Link href={detailsHref(item)} className="group/card relative block">
@@ -57,7 +70,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
         {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient (sin bordes marcados) */}
         {hasViewerIndicators && (
           <div
-            className={`pointer-events-none absolute ${compactIndicator ? "bottom-1.5" : "bottom-2"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
+            className={`pointer-events-none absolute ${compactIndicator || useProfileIndicatorSize ? "bottom-1.5" : "bottom-2"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
             aria-hidden="true"
           >
             {hasCollectionIndicator && (

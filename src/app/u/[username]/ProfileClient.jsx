@@ -163,6 +163,7 @@ function ProfilePosterGrid({ items, showStars = false, viewerTitleStates }) {
             item={item}
             showStars={showStars}
             viewerState={viewerTitleStates[titleStateKey(item)]}
+            indicatorSize="profile"
           />
         </div>
       ))}
