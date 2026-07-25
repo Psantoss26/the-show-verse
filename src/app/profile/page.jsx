@@ -1,4 +1,4 @@
-import StatsClient from "../stats/StatsClient";
+import ProfilePageClient from "./ProfilePageClient";
 
 export const metadata = {
   title: "Perfil",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function ProfilePage() {
-  return <StatsClient />;
+  return <ProfilePageClient />;
 }

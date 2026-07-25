@@ -15,14 +15,19 @@ import {
   userLists,
   userListItems,
   titleComments,
+  tmdbCache,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
 
 const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
 const RECENT_WATCHED_LIMIT = 5;
+const WATCHLIST_PREVIEW_LIMIT = 5;
 const FOLLOWING_PREVIEW_LIMIT = 12;
 export const PROFILE_FAVORITES_MAX = 5;
 const LIST_PREVIEW_LIMIT = 5;
+const PROFILE_ANALYTICS_HISTORY_LIMIT = 1500;
+const DEFAULT_MOVIE_RUNTIME_MINS = 100;
+const DEFAULT_EPISODE_RUNTIME_MINS = 45;
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
 export function pageParams({ limit, offset } = {}) {
@@ -114,6 +119,168 @@ export function normalizeProfileFavorites(items, max = PROFILE_FAVORITES_MAX) {
   return out;
 }
 
+function mediaCacheKeys(mediaType, tmdbId) {
+  const media = mediaType === 'movie' ? 'movie' : 'tv';
+  return [`tmdb:${media}:${tmdbId}`, `${media}:${tmdbId}`];
+}
+
+function publicMonthLabel(date) {
+  return new Intl.DateTimeFormat('es-ES', { month: 'short' })
+    .format(date)
+    .replace('.', '');
+}
+
+function ratingDistribution(values) {
+  const distribution = {};
+  for (const raw of values || []) {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 1 || value > 10) continue;
+    const key = String(Math.round(value * 2) / 2).replace(/\.0$/, '');
+    distribution[key] = (distribution[key] || 0) + 1;
+  }
+  return distribution;
+}
+
+// Métricas públicas ya agregadas. El perfil social nunca recibe eventos de
+// visionado individuales: solo los conjuntos necesarios para las gráficas.
+async function buildPublicProfileAnalytics(db, targetId, ratingValues) {
+  const history = await db
+    .select({
+      tmdbId: watchHistory.tmdbId,
+      mediaType: watchHistory.mediaType,
+      season: watchHistory.season,
+      episode: watchHistory.episode,
+      watchedAt: watchHistory.watchedAt,
+      runtimeMins: watchHistory.runtimeMins,
+    })
+    .from(watchHistory)
+    .where(eq(watchHistory.userId, targetId))
+    .orderBy(desc(watchHistory.watchedAt))
+    .limit(PROFILE_ANALYTICS_HISTORY_LIMIT);
+
+  const cacheKeys = [...new Set(history.flatMap((row) => mediaCacheKeys(row.mediaType, row.tmdbId)))];
+  const cachedRows = cacheKeys.length
+    ? await db
+        .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data })
+        .from(tmdbCache)
+        .where(inArray(tmdbCache.cacheKey, cacheKeys))
+    : [];
+  const metadata = new Map(cachedRows.map((row) => [row.cacheKey, row.data || {}]));
+
+  const now = new Date();
+  const months = new Map();
+  for (let index = 11; index >= 0; index -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index, 1));
+    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    months.set(key, { date: key, label: publicMonthLabel(date), movies: 0, episodes: 0, total: 0 });
+  }
+
+  const dayOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((name) => ({ name, value: 0 }));
+  const hourOfDay = Array.from({ length: 24 }, (_, hour) => ({ name: `${hour}h`, value: 0 }));
+  const dayKeys = new Set();
+  const genreCounts = {};
+  const watchedShows = new Set();
+  let movieMinutes = 0;
+  let episodeMinutes = 0;
+
+  for (const row of history) {
+    const watchedAt = new Date(row.watchedAt);
+    if (Number.isNaN(watchedAt.getTime()) || watchedAt > now) continue;
+
+    const key = `${watchedAt.getUTCFullYear()}-${String(watchedAt.getUTCMonth() + 1).padStart(2, '0')}`;
+    const month = months.get(key);
+    if (month) {
+      if (row.mediaType === 'movie') month.movies += 1;
+      else month.episodes += 1;
+      month.total += 1;
+    }
+    dayOfWeek[watchedAt.getUTCDay()].value += 1;
+    hourOfDay[watchedAt.getUTCHours()].value += 1;
+    dayKeys.add(`${watchedAt.getUTCFullYear()}-${String(watchedAt.getUTCMonth() + 1).padStart(2, '0')}-${String(watchedAt.getUTCDate()).padStart(2, '0')}`);
+
+    const fallbackRuntime = row.mediaType === 'movie'
+      ? DEFAULT_MOVIE_RUNTIME_MINS
+      : row.season != null && row.episode != null
+        ? DEFAULT_EPISODE_RUNTIME_MINS
+        : 0;
+    const runtime = Math.max(0, Number(row.runtimeMins || fallbackRuntime));
+    if (row.mediaType === 'movie') movieMinutes += runtime;
+    else {
+      episodeMinutes += runtime;
+      watchedShows.add(row.tmdbId);
+    }
+
+    const cached = metadata.get(`tmdb:${row.mediaType === 'movie' ? 'movie' : 'tv'}:${row.tmdbId}`)
+      || metadata.get(`${row.mediaType === 'movie' ? 'movie' : 'tv'}:${row.tmdbId}`)
+      || {};
+    for (const genre of Array.isArray(cached.genres) ? cached.genres : []) {
+      const name = typeof genre === 'string' ? genre : genre?.name;
+      if (name) genreCounts[name] = (genreCounts[name] || 0) + 1;
+    }
+  }
+
+  const sortedDays = [...dayKeys].sort();
+  let bestStreak = 0;
+  let currentRun = 0;
+  let previous = null;
+  for (const key of sortedDays) {
+    const time = new Date(`${key}T12:00:00Z`).getTime();
+    currentRun = previous != null && time - previous === 86400000 ? currentRun + 1 : 1;
+    bestStreak = Math.max(bestStreak, currentRun);
+    previous = time;
+  }
+  const dateKey = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+  const streakCursor = new Date(now);
+  if (!dayKeys.has(dateKey(streakCursor))) streakCursor.setUTCDate(streakCursor.getUTCDate() - 1);
+  let currentStreak = 0;
+  while (dayKeys.has(dateKey(streakCursor))) {
+    currentStreak += 1;
+    streakCursor.setUTCDate(streakCursor.getUTCDate() - 1);
+  }
+
+  const ratings = ratingDistribution(ratingValues);
+  const totalRatings = Object.values(ratings).reduce((sum, value) => sum + value, 0);
+  const averageRating = totalRatings
+    ? Object.entries(ratings).reduce((sum, [score, amount]) => sum + Number(score) * amount, 0) / totalRatings
+    : null;
+  const monthlyActivity = [...months.values()];
+  const topDay = dayOfWeek.reduce((best, item) => item.value > (best?.value || 0) ? item : best, null);
+  const peakHour = hourOfDay.reduce((best, item) => item.value > (best?.value || 0) ? item : best, null);
+  const genres = Object.entries(genreCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+  const bestMonth = monthlyActivity.reduce((best, item) => item.total > (best?.total || 0) ? item : best, null);
+  const totalActivity = monthlyActivity.reduce((sum, item) => sum + item.total, 0);
+
+  return {
+    totalMinutes: movieMinutes + episodeMinutes,
+    shows: watchedShows.size,
+    formattedTotalTime: `${Math.floor((movieMinutes + episodeMinutes) / 60)}h ${(movieMinutes + episodeMinutes) % 60}m`,
+    monthlyActivity,
+    timeDistribution: [
+      { name: 'Películas', value: movieMinutes, color: '#3b82f6' },
+      { name: 'Series', value: episodeMinutes, color: '#a855f7' },
+    ],
+    dayOfWeek,
+    hourOfDay,
+    genres,
+    ratings: Object.entries(ratings)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => Number(a.name) - Number(b.name)),
+    insights: {
+      currentStreak,
+      bestStreak,
+      averageRating,
+      topGenre: genres[0] || null,
+      topDay: topDay?.value ? topDay : null,
+      peakHour: peakHour?.value ? peakHour : null,
+      bestMonth: bestMonth?.total ? bestMonth : null,
+      weeklyAverage: totalActivity ? Math.round((totalActivity / 52) * 10) / 10 : 0,
+    },
+  };
+}
+
 // ─────────────────────────────────────────────
 // DB HELPERS
 // ─────────────────────────────────────────────
@@ -164,6 +331,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     favoriteRows,
     recentRows,
     ratingValueRows,
+    pendingPreviewRows,
     followingPreviewRows,
     followingState,
     sectionCounts,
@@ -215,6 +383,19 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       .limit(RECENT_WATCHED_SCAN),
     // Notas para el histograma.
     db.select({ rating: userRatings.rating }).from(userRatings).where(eq(userRatings.userId, targetId)),
+    // Últimos títulos añadidos a Pendientes para la vista previa lateral.
+    db
+      .select({
+        tmdbId: watchlist.tmdbId,
+        mediaType: watchlist.mediaType,
+        title: watchlist.title,
+        posterPath: watchlist.posterPath,
+        addedAt: watchlist.addedAt,
+      })
+      .from(watchlist)
+      .where(eq(watchlist.userId, targetId))
+      .orderBy(desc(watchlist.addedAt))
+      .limit(WATCHLIST_PREVIEW_LIMIT),
     // Avatares de "siguiendo" para la tira del perfil.
     db
       .select({
@@ -233,6 +414,11 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
   ]);
 
   const recentWatched = dedupeRecentWatched(recentRows, RECENT_WATCHED_LIMIT);
+  const analytics = await buildPublicProfileAnalytics(
+    db,
+    targetId,
+    ratingValueRows.map((row) => row.rating),
+  );
 
   // Notas del usuario para los títulos vistos recientemente.
   let ratingByKey = new Map();
@@ -269,6 +455,15 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
   }));
   await fillMissingPosters(db, targetId, recentWatchedItems);
 
+  const pendingPreview = pendingPreviewRows.map((item) => ({
+    tmdbId: item.tmdbId,
+    mediaType: item.mediaType,
+    title: item.title,
+    posterPath: item.posterPath,
+    addedAt: item.addedAt,
+  }));
+  await fillMissingPosters(db, targetId, pendingPreview);
+
   return {
     user: {
       id: targetUser.id,
@@ -293,6 +488,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       posterPath: f.posterPath,
     })),
     recentWatched: recentWatchedItems,
+    pendingPreview,
     followingPreview: followingPreviewRows.map((u) => ({
       username: u.username,
       displayName: u.displayName || u.username,
@@ -305,6 +501,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       totalRatings: totalRatingsRows[0]?.n || 0,
       ratingHistogram: buildRatingHistogram(ratingValueRows.map((r) => r.rating)),
     },
+    analytics,
     // Conteos por sección para las pestañas del perfil (Phase 2).
     sections: sectionCounts,
   };
