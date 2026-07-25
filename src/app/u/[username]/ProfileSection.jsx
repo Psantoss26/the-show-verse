@@ -1,17 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   BookmarkPlus,
+  Check,
+  ChevronDown,
   Eye,
+  Filter,
+  Grid2X2,
   Heart,
   ImageOff,
+  LayoutGrid,
+  Layers3,
+  List,
   ListPlus,
   ListVideo,
   Loader2,
   MessageSquare,
+  Search,
+  SlidersHorizontal,
+  ArrowUpDown,
+  X,
 } from "lucide-react";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
@@ -29,6 +42,128 @@ const SECTIONS = {
   lists: { layout: "lists", empty: "Sin listas públicas." },
   activity: { layout: "activity", empty: "Aún no hay actividad pública." },
 };
+
+const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watchlist", "ratings"]);
+const profileSectionPreferences = new Map();
+
+function getItemTitle(item) {
+  return String(item?.title || item?.name || item?.movie?.title || item?.show?.title || item?.listName || "");
+}
+
+function getItemMediaType(item) {
+  const type = item?.mediaType || item?.media_type || item?.type || item?.movie?.mediaType || item?.show?.mediaType;
+  return type === "tv" || type === "show" || type === "episode" ? "tv" : "movie";
+}
+
+function getItemDate(item) {
+  const value = item?.createdAt || item?.created_at || item?.updatedAt || item?.updated_at || item?.watchedAt || item?.watched_at || item?.addedAt || item?.added_at || item?.ratedAt || item?.rated_at || item?.lastWatchedAt || item?.last_watched_at;
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function getItemRating(item) {
+  const rating = Number(item?.rating ?? item?.userRating ?? item?.user_rating ?? 0);
+  return Number.isFinite(rating) ? rating : 0;
+}
+
+function activityTypeLabel(type) {
+  return {
+    watched: "Visionados",
+    watchlist: "Pendientes",
+    favorite: "Favoritos",
+    rating: "Puntuaciones",
+    review: "Reseñas",
+    list: "Listas",
+    list_item: "Elementos de listas",
+  }[type] || "Otros";
+}
+
+function groupProfileItems(items, groupBy, section) {
+  if (groupBy === "none") return [{ key: "all", label: null, items }];
+  const groups = new Map();
+
+  for (const item of items) {
+    let key = "unknown";
+    let label = "Sin información";
+    if (groupBy === "type") {
+      key = getItemMediaType(item);
+      label = key === "tv" ? "Series" : "Películas";
+    } else if (groupBy === "year") {
+      const date = getItemDate(item);
+      key = date ? String(date.getFullYear()) : "unknown";
+      label = date ? String(date.getFullYear()) : "Sin fecha";
+    } else if (groupBy === "month") {
+      const date = getItemDate(item);
+      key = date
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+        : "unknown";
+      label = date
+        ? new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" })
+            .format(date)
+            .toLocaleUpperCase("es-ES")
+        : "SIN FECHA";
+    } else if (groupBy === "rating") {
+      const stars = Math.max(1, Math.min(5, Math.ceil(getItemRating(item) / 2)));
+      key = String(stars);
+      label = `${stars} ${stars === 1 ? "estrella" : "estrellas"}`;
+    } else if (groupBy === "action" && section === "activity") {
+      key = item?.type || "other";
+      label = activityTypeLabel(item?.type);
+    }
+    if (!groups.has(key)) groups.set(key, { key, label, items: [] });
+    groups.get(key).items.push(item);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (groupBy === "year" || groupBy === "month") return b.key.localeCompare(a.key, "es", { numeric: true });
+    if (groupBy === "rating") return Number(b.key) - Number(a.key);
+    return a.label.localeCompare(b.label, "es");
+  });
+}
+
+function sectionMenuOptions(section) {
+  const activity = section === "activity";
+  const ratings = section === "ratings";
+  return {
+    filters: activity
+      ? [
+          ["all", "Toda la actividad"],
+          ["watched", "Visionados"],
+          ["watchlist", "Pendientes"],
+          ["favorite", "Favoritos"],
+          ["rating", "Puntuaciones"],
+          ["review", "Reseñas"],
+          ["list", "Listas"],
+        ]
+      : [["all", "Todo"], ["movie", "Películas"], ["tv", "Series"]],
+    sorts: [
+      ["recent", "Más recientes"],
+      ["oldest", "Más antiguos"],
+      ["title-asc", "Título A–Z"],
+      ["title-desc", "Título Z–A"],
+      ...(ratings ? [["rating-desc", "Mejor puntuación"], ["rating-asc", "Menor puntuación"]] : []),
+    ],
+    groups: [
+      ["month", "Mes"],
+      ["none", "Sin agrupar"],
+      ["year", "Año"],
+      ...(activity ? [["action", "Acción"]] : [["type", "Tipo"]]),
+      ...(ratings ? [["rating", "Estrellas"]] : []),
+    ],
+    views: activity ? [["list", "Lista", List], ["compact", "Compacta", LayoutGrid]] : [["grid", "Cuadrícula", Grid2X2], ["compact", "Compacta", LayoutGrid], ["list", "Lista", List]],
+  };
+}
+
+function getSectionPreference(cacheKey, section) {
+  return profileSectionPreferences.get(cacheKey) || {
+    query: "",
+    filter: "all",
+    sort: "recent",
+    group: "none",
+    autoMonthGroup: false,
+    view: section === "activity" ? "list" : "grid",
+  };
+}
 const profileSectionCache = new Map();
 
 function profileSectionCacheKey(username, section) {
@@ -47,6 +182,230 @@ function relativeActivityTime(value) {
   const days = Math.floor(hours / 24);
   if (days < 7) return `hace ${days} d`;
   return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const width = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - width - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width,
+      maxHeight: Math.max(64, Math.min(448, availableBelow)),
+      zIndex: 1000,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (!ref.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  return (
+    <div ref={ref} className="relative min-w-0 w-full">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex h-11 min-w-0 w-full items-center justify-between gap-3 overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg transition hover:from-white/15 hover:to-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+          <span className="hidden text-xs font-bold uppercase tracking-wider text-zinc-500 sm:inline">{label}:</span>
+          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">{valueLabel}</span>
+          <span className="min-w-0 truncate font-semibold text-white sm:hidden">{valueLabel}</span>
+        </span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {open && menuStyle ? (
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              aria-label={label}
+              className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl [scrollbar-color:#3f3f46_transparent]"
+              style={{ ...menuStyle, scrollbarWidth: "thin", scrollbarGutter: "stable", overscrollBehavior: "contain" }}
+            >
+              {options.map(([optionValue, optionLabel]) => {
+                const active = value === optionValue;
+                return (
+                  <button
+                    key={optionValue}
+                    type="button"
+                    onClick={() => {
+                      onChange(optionValue);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+                      active ? "bg-white/10 font-bold text-white" : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <span className="font-medium">{optionLabel}</span>
+                    {active ? <Check className="h-4 w-4 text-emerald-400" aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+function ProfileViewMode({ value, options, onChange }) {
+  return (
+    <div className="flex h-11 w-full items-center gap-1 overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg">
+      {options.map(([optionValue, label, Icon]) => {
+        const active = value === optionValue;
+        return (
+          <button
+            key={optionValue}
+            type="button"
+            onClick={() => onChange(optionValue)}
+            className={`flex h-full min-w-0 flex-1 items-center justify-center overflow-clip rounded-xl px-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${
+              active
+                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-inner shadow-emerald-950/35"
+                : "text-zinc-400 hover:bg-white/10 hover:text-white"
+            }`}
+            aria-pressed={active}
+          >
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="sr-only">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProfileSectionToolbar({ section, controls, onChange }) {
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  const options = sectionMenuOptions(section);
+  const filterLabel = options.filters.find(([value]) => value === controls.filter)?.[1] || "Todo";
+  const sortLabel = options.sorts.find(([value]) => value === controls.sort)?.[1] || "Más recientes";
+  const groupLabel = options.groups.find(([value]) => value === controls.group)?.[1] || "Sin agrupar";
+  const handleViewChange = (view) => {
+    if (section !== "watched") {
+      onChange({ view });
+      return;
+    }
+    if (view === "list" && controls.group === "none") {
+      onChange({ view, group: "month", autoMonthGroup: true });
+      return;
+    }
+    if (view !== "list" && controls.autoMonthGroup) {
+      onChange({ view, group: "none", autoMonthGroup: false });
+      return;
+    }
+    onChange({ view });
+  };
+
+  return (
+    <section aria-label="Opciones de la sección" className="relative z-20 mb-5 space-y-2 sm:mb-6">
+      <div className="flex gap-2 lg:hidden">
+        <label className="relative min-w-0 flex-1">
+          <span className="sr-only">Buscar en esta sección</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
+          <input
+            value={controls.query}
+            onChange={(event) => onChange({ query: event.target.value })}
+            placeholder="Buscar..."
+            className="h-11 w-full rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-base text-white shadow-lg transition placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+          />
+          {controls.query ? (
+            <button
+              type="button"
+              onClick={() => onChange({ query: "" })}
+              className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+        <button
+          type="button"
+          onClick={() => setMobileControlsOpen((current) => !current)}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${
+            mobileControlsOpen ? "text-emerald-400" : "text-zinc-200 hover:bg-white/10"
+          }`}
+          aria-expanded={mobileControlsOpen}
+          aria-controls={`profile-menu-${section}`}
+          aria-label="Mostrar opciones"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="hidden grid-cols-1 gap-2 lg:grid lg:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(10rem,1fr))_minmax(10rem,0.8fr)]">
+        <label className="relative min-w-0">
+          <span className="sr-only">Buscar en esta sección</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
+          <input
+            value={controls.query}
+            onChange={(event) => onChange({ query: event.target.value })}
+            placeholder="Buscar por título..."
+            className="h-11 w-full rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg transition placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+          />
+          {controls.query ? (
+            <button type="button" onClick={() => onChange({ query: "" })} className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/10 hover:text-white" aria-label="Limpiar búsqueda">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+        <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
+        <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
+        <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
+        <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
+      </div>
+
+      <div id={`profile-menu-${section}`} className={`${mobileControlsOpen ? "grid" : "hidden"} grid-cols-2 gap-2 lg:hidden`}>
+        <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
+        <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
+        <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
+        <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
+      </div>
+    </section>
+  );
 }
 
 function ActivityAvatar({ actor }) {
@@ -72,13 +431,13 @@ function ActivityTitle({ item, className = "" }) {
   );
 }
 
-function ActivityReview({ item, actor }) {
+function ActivityReview({ item, actor, compact = false }) {
   const [showSpoiler, setShowSpoiler] = useState(false);
   const type = item.mediaType === "tv" ? "tv" : "movie";
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
   return (
-    <article className="rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent p-4 shadow-[0_16px_38px_rgba(0,0,0,0.2)] sm:p-5">
+    <article className={`rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
       <div className="flex gap-3 sm:gap-4">
         <ActivityAvatar actor={actor} />
         <Link href={`/details/${type}/${item.tmdbId}`} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
@@ -111,7 +470,7 @@ function ActivityReview({ item, actor }) {
   );
 }
 
-function ActivityRow({ item, actor }) {
+function ActivityRow({ item, actor, compact = false }) {
   const definitions = {
     watched: { icon: Eye, tone: "text-emerald-300", text: "ha visto" },
     watchlist: { icon: BookmarkPlus, tone: "text-sky-300", text: "ha añadido a Pendientes" },
@@ -127,7 +486,7 @@ function ActivityRow({ item, actor }) {
     : "";
 
   return (
-    <article className="flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 py-3 last:border-b-0 sm:px-4">
+    <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 sm:px-4 ${compact ? "py-2" : "py-3"}`}>
       <ActivityAvatar actor={actor} />
       {item.type === "rating" ? (
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${definition.tone}`} aria-hidden="true">
@@ -156,12 +515,12 @@ function ActivityRow({ item, actor }) {
   );
 }
 
-function ActivityFeed({ items, actor }) {
+function ActivityFeed({ items, actor, compact = false }) {
   return (
-    <ol className="space-y-3" role="list">
+    <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
       {items.map((item) => (
         <li key={item.id}>
-          {item.type === "review" ? <ActivityReview item={item} actor={actor} /> : <ActivityRow item={item} actor={actor} />}
+          {item.type === "review" ? <ActivityReview item={item} actor={actor} compact={compact} /> : <ActivityRow item={item} actor={actor} compact={compact} />}
         </li>
       ))}
     </ol>
@@ -263,6 +622,85 @@ function ProfileListCard({ item }) {
   );
 }
 
+function ProfileMediaListItem({ item, showStars, viewerState, compact = false }) {
+  const type = getItemMediaType(item);
+  const title = getItemTitle(item) || "Sin título";
+  const src = item?.posterPath || item?.poster_path || item?.profilePosterPath;
+  const date = getItemDate(item);
+  const rating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? item?.rating;
+  const hasRating = Number(rating) > 0;
+  const sizeClass = compact ? "h-14 w-10" : "h-20 w-[3.55rem]";
+
+  return (
+    <Link
+      href={`/details/${type}/${item?.tmdbId || item?.id}`}
+      className="group flex min-w-0 items-center gap-3 rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
+    >
+      <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
+        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">{title}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+          <span>{type === "tv" ? "Serie" : "Película"}</span>
+          {date ? <span>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date)}</span> : null}
+        </span>
+        {showStars && hasRating ? <span className="mt-1.5 block"><Stars rating={Number(rating)} /></span> : null}
+      </span>
+      {!showStars && hasRating ? <span className="shrink-0 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
+    </Link>
+  );
+}
+
+function ProfileGroupHeading({ children }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 border-b border-emerald-400/15 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+      {children}
+    </h2>
+  );
+}
+
+function ProfileMonthHeading({ children }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-200">
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-emerald-400/35" aria-hidden="true" />
+      <span className="rounded-full bg-emerald-400/[0.09] px-3 py-1.5 shadow-sm">{children}</span>
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-emerald-400/35" aria-hidden="true" />
+    </h2>
+  );
+}
+
+function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
+  if (view === "list") {
+    return (
+      <div className="space-y-2">
+        {items.map((item) => (
+          <ProfileMediaListItem
+            key={`${getItemMediaType(item)}:${item.tmdbId || item.id}`}
+            item={item}
+            showStars={showStars}
+            viewerState={viewerTitleStates[titleStateKey(item)]}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
+      {items.map((item) => (
+        <PosterTile
+          key={`${getItemMediaType(item)}:${item.tmdbId || item.id}`}
+          item={item}
+          showStars={showStars}
+          viewerState={viewerTitleStates[titleStateKey(item)]}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
@@ -273,6 +711,53 @@ function ProfileContentSection({ username, section, actor }) {
   const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
+  const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
+  const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section));
+
+  useEffect(() => {
+    setControls(getSectionPreference(cacheKey, section));
+  }, [cacheKey, section]);
+
+  const updateControls = (patch) => {
+    setControls((current) => {
+      const isManualGroupChange = Object.hasOwn(patch, "group") && !Object.hasOwn(patch, "autoMonthGroup");
+      const next = { ...current, ...patch, ...(isManualGroupChange ? { autoMonthGroup: false } : {}) };
+      profileSectionPreferences.set(cacheKey, next);
+      return next;
+    });
+  };
+
+  const visibleItems = useMemo(() => {
+    if (!menuEnabled) return items;
+    const query = controls.query.trim().toLocaleLowerCase();
+    const filtered = items.filter((item) => {
+      const matchesQuery = !query || getItemTitle(item).toLocaleLowerCase().includes(query);
+      if (!matchesQuery) return false;
+      if (controls.filter === "all") return true;
+      if (section === "activity") {
+        return controls.filter === "list"
+          ? item?.type === "list" || item?.type === "list_item"
+          : item?.type === controls.filter;
+      }
+      return getItemMediaType(item) === controls.filter;
+    });
+
+    return filtered.sort((a, b) => {
+      if (controls.sort === "title-asc") return getItemTitle(a).localeCompare(getItemTitle(b), "es");
+      if (controls.sort === "title-desc") return getItemTitle(b).localeCompare(getItemTitle(a), "es");
+      if (controls.sort === "rating-desc") return getItemRating(b) - getItemRating(a);
+      if (controls.sort === "rating-asc") return getItemRating(a) - getItemRating(b);
+      const aDate = getItemDate(a)?.getTime() || 0;
+      const bDate = getItemDate(b)?.getTime() || 0;
+      return controls.sort === "oldest" ? aDate - bDate : bDate - aDate;
+    });
+  }, [controls, items, menuEnabled, section]);
+
+  const effectiveGroup = controls.group;
+  const groups = useMemo(
+    () => (menuEnabled ? groupProfileItems(visibleItems, effectiveGroup, section) : [{ key: "all", label: null, items: visibleItems }]),
+    [effectiveGroup, menuEnabled, section, visibleItems],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -345,11 +830,7 @@ function ProfileContentSection({ username, section, actor }) {
   if (!config) return null;
 
   if (status === "loading") {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-7 w-7 animate-spin text-emerald-400" />
-      </div>
-    );
+    return <div aria-busy="true" />;
   }
 
   if (status === "error") {
@@ -371,36 +852,45 @@ function ProfileContentSection({ username, section, actor }) {
 
   return (
     <div>
-      {config.layout === "posters" && (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-          {items.map((item) => (
-            <PosterTile
-              key={`${item.mediaType}:${item.tmdbId}`}
-              item={item}
-              showStars={config.showStars}
-              viewerState={viewerTitleStates[titleStateKey(item)]}
-            />
+      {menuEnabled ? <ProfileSectionToolbar section={section} controls={controls} onChange={updateControls} /> : null}
+
+      {visibleItems.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-14 text-center">
+          <Search className="h-8 w-8 text-zinc-700" aria-hidden="true" />
+          <p className="text-sm text-zinc-500">No hay resultados con estos filtros.</p>
+        </div>
+      ) : (
+        <div className="space-y-7">
+          {groups.map((group) => (
+            <section key={group.key}>
+              {group.label
+                ? effectiveGroup === "month"
+                  ? <ProfileMonthHeading>{group.label}</ProfileMonthHeading>
+                  : <ProfileGroupHeading>{group.label}</ProfileGroupHeading>
+                : null}
+              {config.layout === "posters" ? (
+                <ProfilePosterItems
+                  items={group.items}
+                  view={menuEnabled ? controls.view : "grid"}
+                  showStars={config.showStars}
+                  viewerTitleStates={viewerTitleStates}
+                />
+              ) : null}
+              {config.layout === "reviews" ? (
+                <div className="space-y-3">
+                  {group.items.map((item) => <ReviewCard key={item.id} item={item} />)}
+                </div>
+              ) : null}
+              {config.layout === "lists" ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.items.map((item) => <ProfileListCard key={item.id} item={item} />)}
+                </div>
+              ) : null}
+              {config.layout === "activity" ? <ActivityFeed items={group.items} actor={actor} compact={controls.view === "compact"} /> : null}
+            </section>
           ))}
         </div>
       )}
-
-      {config.layout === "reviews" && (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <ReviewCard key={item.id} item={item} />
-          ))}
-        </div>
-      )}
-
-      {config.layout === "lists" && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => (
-            <ProfileListCard key={item.id} item={item} />
-          ))}
-        </div>
-      )}
-
-      {config.layout === "activity" && <ActivityFeed items={items} actor={actor} />}
 
       {hasMore && (
         <button
@@ -526,11 +1016,7 @@ function ProfileSocialSection({ username }) {
   };
 
   if (status === "loading") {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-7 w-7 animate-spin text-emerald-400" />
-      </div>
-    );
+    return <div aria-busy="true" />;
   }
 
   if (status === "error") {
