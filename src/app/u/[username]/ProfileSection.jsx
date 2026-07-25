@@ -7,6 +7,8 @@ import { Loader2, ImageOff, MessageSquare, ListVideo } from "lucide-react";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
+import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
+import { useAuth } from "@/context/AuthContext";
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -110,12 +112,14 @@ function ProfileListCard({ item }) {
 }
 
 function ProfileContentSection({ username, section }) {
+  const { user: viewer } = useAuth();
   const config = SECTIONS[section];
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +203,7 @@ function ProfileContentSection({ username, section }) {
               key={`${item.mediaType}:${item.tmdbId}`}
               item={item}
               showStars={config.showStars}
+              viewerState={viewerTitleStates[titleStateKey(item)]}
             />
           ))}
         </div>

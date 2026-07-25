@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -8,6 +8,7 @@ import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
+import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import ProfileSection from "./ProfileSection";
 import {
   Activity,
@@ -437,6 +438,11 @@ export default function ProfileClient({ username }) {
   }, [state.profile, viewer?.username, refreshToken]);
 
   const { status, profile } = state;
+  const profileTitleItems = useMemo(
+    () => [...(profile?.favorites || []), ...(profile?.recentWatched || [])],
+    [profile?.favorites, profile?.recentWatched],
+  );
+  const viewerTitleStates = useViewerTitleStates(profileTitleItems, Boolean(viewer?.username));
 
   if (status === "loading") {
     return (
@@ -615,7 +621,11 @@ export default function ProfileClient({ username }) {
               {favorites?.length ? (
                 <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
                   {favorites.map((item) => (
-                    <PosterTile key={`${item.mediaType}:${item.tmdbId}`} item={item} />
+                    <PosterTile
+                      key={`${item.mediaType}:${item.tmdbId}`}
+                      item={item}
+                      viewerState={viewerTitleStates[titleStateKey(item)]}
+                    />
                   ))}
                 </div>
               ) : (
@@ -637,6 +647,7 @@ export default function ProfileClient({ username }) {
                       key={`${item.mediaType}:${item.tmdbId}`}
                       item={item}
                       showStars
+                      viewerState={viewerTitleStates[titleStateKey(item)]}
                     />
                   ))}
                 </div>
