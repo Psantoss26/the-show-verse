@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
-import { Loader2, ImageOff, MessageSquare, ListVideo } from "lucide-react";
+import {
+  BookmarkPlus,
+  Eye,
+  Heart,
+  ImageOff,
+  ListPlus,
+  ListVideo,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
@@ -18,7 +27,141 @@ const SECTIONS = {
   ratings: { layout: "posters", showStars: true, empty: "Sin puntuaciones." },
   reviews: { layout: "reviews", empty: "Sin reseñas." },
   lists: { layout: "lists", empty: "Sin listas públicas." },
+  activity: { layout: "activity", empty: "Aún no hay actividad pública." },
 };
+
+function relativeActivityTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "Ahora";
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `hace ${days} d`;
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function ActivityAvatar({ actor }) {
+  const name = actor?.displayName || actor?.username || "Usuario";
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[10px] font-black text-zinc-300">
+      {actor?.avatarUrl ? (
+        <OptimizedImage src={actor.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        name.slice(0, 2).toUpperCase()
+      )}
+    </span>
+  );
+}
+
+function ActivityTitle({ item, className = "" }) {
+  if (!item.tmdbId || !item.mediaType) return null;
+  const type = item.mediaType === "tv" ? "tv" : "movie";
+  return (
+    <Link href={`/details/${type}/${item.tmdbId}`} className={`font-bold text-white transition-colors hover:text-emerald-300 ${className}`}>
+      {item.title || "Ver ficha"}
+    </Link>
+  );
+}
+
+function ActivityReview({ item, actor }) {
+  const [showSpoiler, setShowSpoiler] = useState(false);
+  const type = item.mediaType === "tv" ? "tv" : "movie";
+  const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+
+  return (
+    <article className="rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent p-4 shadow-[0_16px_38px_rgba(0,0,0,0.2)] sm:p-5">
+      <div className="flex gap-3 sm:gap-4">
+        <ActivityAvatar actor={actor} />
+        <Link href={`/details/${type}/${item.tmdbId}`} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
+          {src ? (
+            <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
+          )}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
+            <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>
+            <span>ha reseñado</span>
+            <ActivityTitle item={item} />
+            {typeof item.rating === "number" && <Stars rating={item.rating} />}
+          </div>
+          {item.spoiler && !showSpoiler ? (
+            <button type="button" onClick={() => setShowSpoiler(true)} className="mt-3 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:text-amber-200">
+              Contiene spoilers — mostrar reseña
+            </button>
+          ) : (
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-200 sm:text-[15px] sm:leading-7">{item.body}</p>
+          )}
+          <time dateTime={item.createdAt} className="mt-3 block text-xs font-medium text-zinc-500">
+            {relativeActivityTime(item.createdAt)}
+          </time>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ActivityRow({ item, actor }) {
+  const definitions = {
+    watched: { icon: Eye, tone: "text-emerald-300", text: "ha visto" },
+    watchlist: { icon: BookmarkPlus, tone: "text-sky-300", text: "ha añadido a Pendientes" },
+    favorite: { icon: Heart, tone: "text-red-300", text: "ha añadido a Favoritos" },
+    rating: { tone: "text-amber-300", text: "ha puntuado" },
+    list: { icon: ListPlus, tone: "text-violet-300", text: "ha creado la lista" },
+    list_item: { icon: ListPlus, tone: "text-violet-300", text: "ha añadido a una lista" },
+  };
+  const definition = definitions[item.type] || definitions.watched;
+  const Icon = definition.icon;
+  const episodeLabel = item.type === "watched" && item.season && item.episode
+    ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
+    : "";
+
+  return (
+    <article className="flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 py-3 last:border-b-0 sm:px-4">
+      <ActivityAvatar actor={actor} />
+      {item.type === "rating" ? (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${definition.tone}`} aria-hidden="true">
+          {item.rating}
+        </span>
+      ) : (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${definition.tone}`} aria-hidden="true">
+          <Icon className={`h-5 w-5 ${item.type === "favorite" || item.type === "watchlist" ? "fill-current" : ""}`} />
+        </span>
+      )}
+      <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
+        <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>{" "}
+        {definition.text}{" "}
+        {episodeLabel}
+        {item.type === "list" ? (
+          <Link href={`/lists/${item.id.replace("list:", "")}`} className="font-bold text-white hover:text-emerald-300">{item.name}</Link>
+        ) : (
+          <ActivityTitle item={item} />
+        )}
+        {item.type === "list_item" && item.listName ? <span className="text-zinc-500"> · {item.listName}</span> : null}
+      </p>
+      <time dateTime={item.createdAt} className="shrink-0 text-xs font-medium text-zinc-600" title={new Date(item.createdAt).toLocaleString("es-ES")}>
+        {relativeActivityTime(item.createdAt)}
+      </time>
+    </article>
+  );
+}
+
+function ActivityFeed({ items, actor }) {
+  return (
+    <ol className="space-y-3" role="list">
+      {items.map((item) => (
+        <li key={item.id}>
+          {item.type === "review" ? <ActivityReview item={item} actor={actor} /> : <ActivityRow item={item} actor={actor} />}
+        </li>
+      ))}
+    </ol>
+  );
+}
 const EMPTY_SOCIAL_RELATION = Object.freeze({ users: [], hasMore: false, offset: 0 });
 
 function ReviewCard({ item }) {
@@ -111,7 +254,7 @@ function ProfileListCard({ item }) {
   );
 }
 
-function ProfileContentSection({ username, section }) {
+function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
   const [items, setItems] = useState([]);
@@ -224,6 +367,8 @@ function ProfileContentSection({ username, section }) {
           ))}
         </div>
       )}
+
+      {config.layout === "activity" && <ActivityFeed items={items} actor={actor} />}
 
       {hasMore && (
         <button
@@ -378,7 +523,7 @@ function ProfileSocialSection({ username }) {
   );
 }
 
-export default function ProfileSection({ username, section }) {
+export default function ProfileSection({ username, section, actor }) {
   if (section === "social") return <ProfileSocialSection username={username} />;
-  return <ProfileContentSection username={username} section={section} />;
+  return <ProfileContentSection username={username} section={section} actor={actor} />;
 }

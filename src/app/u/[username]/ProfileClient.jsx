@@ -89,7 +89,7 @@ function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
 }
 
 function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emerald-400" }) {
-  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
+  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
   const body = (
     <>
       <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
@@ -607,7 +607,7 @@ export default function ProfileClient({ username }) {
             {/* `key={tab}` remonta la sección al cambiar de pestaña: evita un
                 render intermedio con el layout nuevo pero los items del layout
                 anterior (que no comparten forma de `key`) → aviso de keys. */}
-            <ProfileSection key={tab} username={user.username} section={tab} />
+            <ProfileSection key={tab} username={user.username} section={tab} actor={user} />
           </div>
         ) : (
         <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -733,6 +733,7 @@ export default function ProfileClient({ username }) {
 function ProfileTabs({ tab, setTab, sections }) {
   const items = [
     { id: "profile", label: "Perfil" },
+    { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "statistics", label: "Estadísticas" },
     { id: "reviews", label: "Reseñas", count: sections?.reviews },
     { id: "watched", label: "Visionados", count: sections?.watched },
@@ -904,7 +905,7 @@ function HabitMetric({ icon: Icon, label, value, tone = "emerald" }) {
 
   return (
     <div
-      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-2 py-2.5 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07]"
+      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-white/10 to-white/5 px-2 py-2.5 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07]"
       aria-label={`${label}: ${value}`}
     >
       <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center ${toneClass}`}>

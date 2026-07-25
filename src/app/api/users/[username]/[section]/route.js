@@ -18,6 +18,7 @@ const ALLOWED = new Set([
   "favorites",
   "ratings",
   "lists",
+  "activity",
 ]);
 
 function respond(request, backend, successStatus = 200) {
