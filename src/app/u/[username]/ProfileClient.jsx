@@ -129,7 +129,7 @@ function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
 }
 
 function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emerald-400" }) {
-  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
+  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
   const body = (
     <>
       <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
