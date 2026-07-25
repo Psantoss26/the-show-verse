@@ -108,6 +108,7 @@ import LiquidButton from "@/components/LiquidButton";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
+import { isOwnedComment } from "@/lib/community/commentOwnership";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getImages,
@@ -3932,14 +3933,17 @@ export default function DetailsClient({
     };
   }, [initialComments]);
   const [tComments, setTComments] = useState(() => initialCommentsState);
+  const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
   const COMMENTS_SECTION_LIMIT = 5;
   const myComments = useMemo(() => {
-    return (tComments.items || []).filter(
-      (item) =>
-        item.user?.username === "Tú" ||
-        (traktUsername && item.user?.username === traktUsername)
+    return (tComments.items || []).filter((item) =>
+      isOwnedComment(item, {
+        appUsername: account?.username,
+        traktUsername,
+        ownedCommentIds,
+      }),
     );
-  }, [tComments.items, traktUsername]);
+  }, [account?.username, ownedCommentIds, tComments.items, traktUsername]);
 
   const handleCommentSubmit = async ({ comment, spoiler }) => {
     const result = await traktAddComment({
@@ -3949,10 +3953,17 @@ export default function DetailsClient({
       spoiler,
     });
 
+    const newCommentId = result?.id || Date.now();
+    setOwnedCommentIds((previous) => {
+      const next = new Set(previous);
+      next.add(String(newCommentId));
+      return next;
+    });
+
     // Si tiene éxito, actualizamos localmente el feed
     setTComments((prev) => {
       const newCommentItem = {
-        id: result?.id || Date.now(),
+        id: newCommentId,
         comment: result?.comment || comment,
         spoiler: result?.spoiler ?? spoiler,
         likes: 0,
@@ -4078,6 +4089,7 @@ export default function DetailsClient({
   useEffect(() => {
     setTSentiment(initialSentimentState);
     setTComments(initialCommentsState);
+    setOwnedCommentIds(new Set());
     setTCommentsTab("recent");
     setTSeasons({ loading: false, error: "", items: [] });
     setTLists(initialListsState);
