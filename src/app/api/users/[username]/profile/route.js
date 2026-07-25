@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  backendFetchJson,
+  backendFetchPublicJson,
   getCookieSecure,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
@@ -18,9 +18,9 @@ function respond(request, backend, successStatus = 200) {
 
 export async function GET(request, { params }) {
   const { username } = await params;
-  const backend = await backendFetchJson(
+  const backend = await backendFetchPublicJson(
     request,
-    `/v1/users/${encodeURIComponent(username)}/profile`,
+    `/v1/users/public/${encodeURIComponent(username)}/profile`,
   );
   return respond(request, backend);
 }

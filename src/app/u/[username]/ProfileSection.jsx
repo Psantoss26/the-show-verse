@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Loader2, ImageOff, MessageSquare, ListVideo } from "lucide-react";
+import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
 
@@ -16,6 +17,7 @@ const SECTIONS = {
   reviews: { layout: "reviews", empty: "Sin reseñas." },
   lists: { layout: "lists", empty: "Sin listas públicas." },
 };
+const EMPTY_SOCIAL_RELATION = Object.freeze({ users: [], hasMore: false, offset: 0 });
 
 function ReviewCard({ item }) {
   const [expanded, setExpanded] = useState(false);
@@ -24,10 +26,10 @@ function ReviewCard({ item }) {
     ? `https://image.tmdb.org/t/p/w185${item.posterPath}`
     : null;
   return (
-    <div className="flex gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+    <div className="flex gap-4 rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60">
       <Link
         href={`/details/${type}/${item.tmdbId}`}
-        className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10"
+        className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-md bg-zinc-900 shadow-sm"
       >
         {src ? (
           <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
@@ -70,14 +72,14 @@ function ProfileListCard({ item }) {
   return (
     <Link
       href={`/lists/${item.id}`}
-      className="group block rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-colors hover:bg-white/[0.04]"
+      className="group block rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60"
     >
       <div className="mb-3 flex items-center gap-1.5">
         {posters.length ? (
           posters.map((p, i) => (
             <div
               key={i}
-              className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-md bg-zinc-900 ring-1 ring-white/10"
+              className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-md bg-zinc-900 shadow-sm"
               style={{ marginLeft: i === 0 ? 0 : -14, zIndex: 10 - i }}
             >
               <OptimizedImage
@@ -107,7 +109,7 @@ function ProfileListCard({ item }) {
   );
 }
 
-export default function ProfileSection({ username, section }) {
+function ProfileContentSection({ username, section }) {
   const config = SECTIONS[section];
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -231,4 +233,147 @@ export default function ProfileSection({ username, section }) {
       )}
     </div>
   );
+}
+
+function SocialColumn({ title, empty, relation, data, loadingMore, onLoadMore }) {
+  return (
+    <section className="min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5">
+      <h2 className="mb-4 border-b border-white/10 pb-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
+        {title}
+      </h2>
+      {data.users.length ? (
+        <div className="space-y-2">
+          {data.users.map((member) => (
+            <MemberRow key={member.username} member={member} />
+          ))}
+        </div>
+      ) : (
+        <p className="py-8 text-center text-sm text-zinc-500">{empty}</p>
+      )}
+      {data.hasMore && (
+        <button
+          type="button"
+          onClick={() => onLoadMore(relation)}
+          disabled={loadingMore}
+          className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-xs font-bold text-zinc-300 transition-colors hover:bg-white/[0.09] disabled:opacity-60"
+        >
+          {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Cargar más
+        </button>
+      )}
+    </section>
+  );
+}
+
+function ProfileSocialSection({ username }) {
+  const [relations, setRelations] = useState({
+    followers: EMPTY_SOCIAL_RELATION,
+    following: EMPTY_SOCIAL_RELATION,
+  });
+  const [status, setStatus] = useState("loading");
+  const [loadingMore, setLoadingMore] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    setRelations({ followers: EMPTY_SOCIAL_RELATION, following: EMPTY_SOCIAL_RELATION });
+    (async () => {
+      try {
+        const fetchRelation = async (relation) => {
+          const response = await fetch(
+            `/api/users/${encodeURIComponent(username)}/${relation}?limit=30&offset=0`,
+            { cache: "no-store" },
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          return {
+            users: Array.isArray(payload.users) ? payload.users : [],
+            hasMore: Boolean(payload.hasMore),
+            offset: Number(payload.offset) || 0,
+          };
+        };
+        const [followers, following] = await Promise.all([
+          fetchRelation("followers"),
+          fetchRelation("following"),
+        ]);
+        if (!cancelled) {
+          setRelations({ followers, following });
+          setStatus("ready");
+        }
+      } catch {
+        if (!cancelled) setStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  const loadMore = async (relation) => {
+    const current = relations[relation];
+    if (!current?.hasMore || loadingMore) return;
+    setLoadingMore(relation);
+    try {
+      const response = await fetch(
+        `/api/users/${encodeURIComponent(username)}/${relation}?limit=30&offset=${current.offset}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      setRelations((previous) => ({
+        ...previous,
+        [relation]: {
+          users: [...current.users, ...(Array.isArray(payload.users) ? payload.users : [])],
+          hasMore: Boolean(payload.hasMore),
+          offset: Number(payload.offset) || current.offset,
+        },
+      }));
+    } catch {
+      // El botón se mantiene disponible para reintentar la carga.
+    } finally {
+      setLoadingMore(null);
+    }
+  };
+
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <p className="py-16 text-center text-sm text-zinc-500">
+        No se pudo cargar la información social. Inténtalo de nuevo.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <SocialColumn
+        title="Seguidores"
+        relation="followers"
+        data={relations.followers}
+        empty="Todavía no tiene seguidores."
+        loadingMore={loadingMore === "followers"}
+        onLoadMore={loadMore}
+      />
+      <SocialColumn
+        title="Siguiendo"
+        relation="following"
+        data={relations.following}
+        empty="Todavía no sigue a nadie."
+        loadingMore={loadingMore === "following"}
+        onLoadMore={loadMore}
+      />
+    </div>
+  );
+}
+
+export default function ProfileSection({ username, section }) {
+  if (section === "social") return <ProfileSocialSection username={username} />;
+  return <ProfileContentSection username={username} section={section} />;
 }

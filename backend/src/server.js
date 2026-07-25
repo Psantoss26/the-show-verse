@@ -27,6 +27,7 @@ import tmdbRoutes from './routes/tmdb.js';
 import importRoutes from './routes/import.js';
 import statsRoutes from './routes/stats.js';
 import usersRoutes from './routes/users.js';
+import publicUsersRoutes from './routes/publicUsers.js';
 import dashboardRoutes from './routes/dashboard.js';
 import calendarRoutes from './routes/calendar.js';
 import communityRoutes from './routes/community.js';
@@ -200,6 +201,7 @@ const apiV1 = async (app) => {
   app.register(tmdbRoutes, { prefix: '/tmdb' });
   app.register(importRoutes, { prefix: '/import' });
   app.register(statsRoutes, { prefix: '/stats' });
+  app.register(publicUsersRoutes, { prefix: '/users/public' });
   app.register(usersRoutes, { prefix: '/users' });
   app.register(dashboardRoutes, { prefix: '/dashboard' });
   app.register(calendarRoutes, { prefix: '/calendar' });
