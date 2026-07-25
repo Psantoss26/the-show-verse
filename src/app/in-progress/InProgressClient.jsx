@@ -52,6 +52,7 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 // ----------------------------
 // HELPERS
@@ -76,6 +77,17 @@ function formatLastWatched(iso) {
     month: "short",
     year: "numeric",
   }).format(d);
+}
+
+const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat("es-ES", {
+  month: "short",
+  year: "numeric",
+});
+
+function formatWatchMonthYear(iso) {
+  if (!iso) return "Sin fecha";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "Sin fecha" : MONTH_YEAR_FORMATTER.format(date);
 }
 
 function formatEpCode(season, number) {
@@ -807,6 +819,54 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
+function InProgressPosterHoverIndicator({
+  nextEpisode,
+  progressLabel,
+  progressColor,
+}) {
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
+      aria-hidden="true"
+    >
+      <span className="flex h-9 max-w-[7rem] shrink-0 items-center gap-1.5 px-2 text-emerald-400">
+        <Play className="h-4 w-4 shrink-0" fill="currentColor" />
+        <span className="truncate text-xs font-bold text-zinc-100">
+          {nextEpisode || "Próximo episodio"}
+        </span>
+      </span>
+      <span className={`flex h-9 shrink-0 items-center gap-1.5 px-2 text-xs font-bold ${progressColor}`}>
+        <BarChart3 className="h-4 w-4 shrink-0" />
+        <span className="whitespace-nowrap text-zinc-100">{progressLabel}</span>
+      </span>
+    </div>
+  );
+}
+
+function CompletedHoverIndicator({ lastWatchedAt, rating }) {
+  const ratingValue = Number(rating);
+  const ratingLabel = Number.isFinite(ratingValue)
+    ? ratingValue.toLocaleString("es-ES", { maximumFractionDigits: 1 })
+    : "—";
+
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
+      aria-hidden="true"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center text-emerald-400">
+        <CheckCircle2 className="h-5 w-5" />
+      </span>
+      <span className="flex h-9 shrink-0 items-center justify-center whitespace-nowrap px-2 text-xs font-bold uppercase tracking-wide text-zinc-100">
+        {formatWatchMonthYear(lastWatchedAt)}
+      </span>
+      <span className="flex h-9 min-w-10 shrink-0 items-center justify-center px-2 text-sm font-black tabular-nums text-amber-300">
+        {ratingLabel}
+      </span>
+    </div>
+  );
+}
+
 // ----------------------------
 // IN-PROGRESS CARD
 // ----------------------------
@@ -949,64 +1009,18 @@ const InProgressCard = memo(function InProgressCard({
               <CheckCircle2 className="absolute top-2.5 left-2.5 z-10 lg:hidden w-5 h-5 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
             )}
 
-            {/* Overlay con gradientes - desktop hover */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              {/* Top gradient con porcentaje */}
-              <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                {activeTab === "completed" ? (
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
-                ) : nextEpCode ? (
-                  <div className="px-2.5 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                    <Play className="w-2.5 h-2.5" fill="currentColor" />
-                    <span className="text-white drop-shadow-sm">{nextEpCode}</span>
-                  </div>
-                ) : (
-                  <div />
-                )}
-
-                {activeTab !== "completed" && (
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}
-                    >
-                      {progressPct}
-                    </span>
-                    <span
-                      className={`text-sm font-bold ${colors.text} opacity-80`}
-                    >
-                      %
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom gradient con título y detalles */}
-              <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">
-                      {title}
-                    </h3>
-
-                    <div className="space-y-0.5">
-                      <p className="text-sky-400 text-xs font-bold drop-shadow-md">
-                        {episodeProgress.label}
-                      </p>
-
-                      <p className="text-zinc-300 text-xs font-semibold drop-shadow-md flex items-center gap-1.5 mt-0.5">
-                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                        {lastWatched}
-                      </p>
-                    </div>
-                  </div>
-                  {activeTab === "completed" && item.user_rating && (
-                    <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                      {item.user_rating}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            {activeTab === "inprogress" ? (
+              <InProgressPosterHoverIndicator
+                nextEpisode={nextEpCode}
+                progressLabel={episodeProgress.label}
+                progressColor={colors.text}
+              />
+            ) : (
+              <CompletedHoverIndicator
+                lastWatchedAt={item.lastWatchedAt}
+                rating={item.user_rating ?? item.rating}
+              />
+            )}
           </div>
         </Link>
       </motion.div>
@@ -1048,30 +1062,17 @@ const InProgressCard = memo(function InProgressCard({
             <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
 
             {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
-            <div className="absolute top-3 right-3">
-              {activeTab === "completed" && !item.user_rating ? null : (
+            {activeTab !== "completed" && (
+              <div className="absolute top-3 right-3">
                 <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                  {activeTab === "completed" ? (
-                    <CircularProgress
-                      pct={Number(item.user_rating || 0) * 10}
-                      colors={{
-                        stroke: "#facc15",
-                        trail: "rgba(250,204,21,0.15)",
-                        text: "text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] !font-mono !text-[13px]",
-                      }}
-                      size={40}
-                      customText={item.user_rating}
-                    />
-                  ) : (
-                    <CircularProgress
-                      pct={progressPct}
-                      colors={colors}
-                      size={40}
-                    />
-                  )}
+                  <CircularProgress
+                    pct={progressPct}
+                    colors={colors}
+                    size={40}
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Next episode badge - solid dark bg */}
             {nextEpCode && (
@@ -1092,7 +1093,11 @@ const InProgressCard = memo(function InProgressCard({
             )}
 
             {/* Bottom info on backdrop */}
-            <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div
+              className={`absolute bottom-0 left-0 right-0 p-4 transition-opacity duration-200 ${
+                activeTab === "completed" ? "lg:group-hover:opacity-0" : ""
+              }`}
+            >
               <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">
                 {title}
               </h3>
@@ -1110,6 +1115,13 @@ const InProgressCard = memo(function InProgressCard({
                 </div>
               )}
             </div>
+
+            {activeTab === "completed" && (
+              <CompletedHoverIndicator
+                lastWatchedAt={item.lastWatchedAt}
+                rating={item.user_rating ?? item.rating}
+              />
+            )}
           </div>
 
           {/* Progress section */}
