@@ -995,7 +995,9 @@ export default function WatchNextAssistant({
         className={[
           "group relative grid shrink-0 place-items-center rounded-full transition-all duration-300 ease-out",
           open
-            ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
+            ? isMobile
+              ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
+              : "text-cyan-200"
             : [
                 // Mismo tratamiento que los iconos del navbar: en la fase
                 // inicial sobre el hero (heroNavMode) se aclara el icono y se le
@@ -1007,12 +1009,18 @@ export default function WatchNextAssistant({
                 heroNavMode ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]" : "",
               ].join(" "),
           "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 focus:outline-none",
-          isMobile ? "h-10 w-10 p-2" : "h-11 w-11 p-2",
+          isMobile ? "h-10 w-10 p-2" : "p-2",
         ].join(" ")}
         aria-label="Abrir recomendador de qué ver"
       >
+        {open && !isMobile && (
+          <span
+            className="absolute inset-0 rounded-full border border-cyan-500/10 bg-cyan-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(34,211,238,0.08)]"
+            aria-hidden="true"
+          />
+        )}
         <Sparkles
-          className={`transition-transform duration-300 ease-out group-hover:scale-110 ${isMobile ? "h-5 w-5" : "h-[22px] w-[22px]"}`}
+          className="relative z-10 h-5 w-5 transition-transform duration-200 group-hover:scale-110"
         />
       </button>
 

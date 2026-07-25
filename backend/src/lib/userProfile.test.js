@@ -1,0 +1,109 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  titleKey,
+  canFollow,
+  buildRatingHistogram,
+  dedupeRecentWatched,
+  normalizeProfileFavorites,
+  pageParams,
+  packPage,
+  PROFILE_FAVORITES_MAX,
+} from './userProfile.js';
+
+test('titleKey combines mediaType and numeric id', () => {
+  assert.equal(titleKey('movie', 27205), 'movie:27205');
+  assert.equal(titleKey('tv', '1399'), 'tv:1399');
+});
+
+test('canFollow rejects self-follow and missing ids', () => {
+  assert.equal(canFollow('a', 'b'), true);
+  assert.equal(canFollow('a', 'a'), false);
+  assert.equal(canFollow(null, 'b'), false);
+  assert.equal(canFollow('a', null), false);
+});
+
+test('buildRatingHistogram counts only real 1-10 ratings, ignoring the rest', () => {
+  const h = buildRatingHistogram([1, 1.4, 8.5, 10, 9.6, 'x', null, 0, 11]);
+  assert.equal(h.length, 10);
+  // 1 y 1.4 → índice 0. null(→0), 0 y 11 quedan FUERA de rango → ignorados.
+  assert.equal(h[0], 2);
+  // 8.5 → 9 (índice 8).
+  assert.equal(h[8], 1);
+  // 10 y 9.6(→10) → índice 9.
+  assert.equal(h[9], 2);
+  // Total contado = 5 (los 4 inválidos se descartan).
+  assert.equal(h.reduce((a, b) => a + b, 0), 5);
+});
+
+test('dedupeRecentWatched keeps the most recent occurrence per title', () => {
+  const rows = [
+    { tmdbId: 1, mediaType: 'movie', watchedAt: '2026-07-10' },
+    { tmdbId: 1, mediaType: 'movie', watchedAt: '2026-07-01' }, // duplicado (más antiguo)
+    { tmdbId: 1, mediaType: 'tv', watchedAt: '2026-07-09' }, // mismo id, otro tipo → distinto
+    { tmdbId: 2, mediaType: 'movie', watchedAt: '2026-07-08' },
+  ];
+  const out = dedupeRecentWatched(rows, 5);
+  assert.deepEqual(
+    out.map((r) => titleKey(r.mediaType, r.tmdbId)),
+    ['movie:1', 'tv:1', 'movie:2'],
+  );
+});
+
+test('dedupeRecentWatched respects the limit', () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ tmdbId: i, mediaType: 'movie' }));
+  assert.equal(dedupeRecentWatched(rows, 3).length, 3);
+});
+
+test('normalizeProfileFavorites caps at 5, dedupes, and assigns positions', () => {
+  const input = [
+    { tmdbId: 1, mediaType: 'movie', title: 'A', posterPath: '/a.jpg' },
+    { tmdbId: 1, mediaType: 'movie', title: 'A dup' }, // duplicado
+    { tmdbId: 2, mediaType: 'tv', title: 'B', posterPath: 'http://evil' }, // poster inválido → null
+    { tmdbId: -3, mediaType: 'movie' }, // id inválido → descartado
+    { tmdbId: 4, mediaType: 'anime' }, // tipo inválido → descartado
+    { tmdbId: 5, mediaType: 'movie' },
+    { tmdbId: 6, mediaType: 'movie' },
+    { tmdbId: 7, mediaType: 'movie' },
+    { tmdbId: 8, mediaType: 'movie' }, // se recorta (>5)
+  ];
+  const out = normalizeProfileFavorites(input);
+  assert.equal(out.length, PROFILE_FAVORITES_MAX);
+  assert.deepEqual(
+    out.map((f) => titleKey(f.mediaType, f.tmdbId)),
+    ['movie:1', 'tv:2', 'movie:5', 'movie:6', 'movie:7'],
+  );
+  assert.deepEqual(out.map((f) => f.position), [0, 1, 2, 3, 4]);
+  assert.equal(out[1].posterPath, null); // 'http://evil' rechazado
+  assert.equal(out[0].posterPath, '/a.jpg');
+});
+
+test('normalizeProfileFavorites tolerates non-array input', () => {
+  assert.deepEqual(normalizeProfileFavorites(null), []);
+  assert.deepEqual(normalizeProfileFavorites(undefined), []);
+  assert.deepEqual(normalizeProfileFavorites('nope'), []);
+});
+
+test('pageParams clamps limit and offset to safe bounds', () => {
+  assert.deepEqual(pageParams({}), { limit: 30, offset: 0 });
+  assert.deepEqual(pageParams({ limit: 10, offset: 20 }), { limit: 10, offset: 20 });
+  assert.deepEqual(pageParams({ limit: 999 }), { limit: 60, offset: 0 }); // tope 60
+  assert.deepEqual(pageParams({ limit: -5, offset: -3 }), { limit: 1, offset: 0 }); // se acota al mínimo
+  assert.deepEqual(pageParams({ limit: 0 }), { limit: 30, offset: 0 }); // 0 → por defecto
+  assert.deepEqual(pageParams({ limit: '15', offset: '5' }), { limit: 15, offset: 5 });
+});
+
+test('packPage detects hasMore via the limit+1 sentinel and trims it', () => {
+  // Se pidió limit+1 (4) y llegaron 4 → hay más; se recorta a 3.
+  const withMore = packPage([1, 2, 3, 4], 3, 0);
+  assert.deepEqual(withMore.items, [1, 2, 3]);
+  assert.equal(withMore.hasMore, true);
+  assert.equal(withMore.offset, 3);
+
+  // Llegaron 2 (< limit) → no hay más.
+  const noMore = packPage([1, 2], 3, 10);
+  assert.deepEqual(noMore.items, [1, 2]);
+  assert.equal(noMore.hasMore, false);
+  assert.equal(noMore.offset, 12);
+});

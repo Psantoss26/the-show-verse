@@ -3,7 +3,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Loader2, RotateCw, X } from "lucide-react";
+import { Loader2, RotateCw, X } from "lucide-react";
 
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import { getDetails } from "@/lib/api/tmdb";
@@ -155,27 +155,22 @@ export default function EpisodeRatingsModal({
         />
 
         <header className="flex shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-200 shadow-[0_0_24px_-10px_rgba(251,191,36,0.8)] sm:h-12 sm:w-12 sm:rounded-2xl">
-              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
-                Serie
-              </p>
-              <h2
-                id={titleId}
-                className="truncate text-lg font-black tracking-tight text-white sm:text-2xl"
-              >
-                Valoración de episodios
-              </h2>
-              <p
-                id={descriptionId}
-                className="truncate text-xs font-medium text-zinc-400 sm:text-sm"
-              >
-                {title || "Serie"} · puntuaciones por temporada
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
+              Serie
+            </p>
+            <h2
+              id={titleId}
+              className="truncate text-lg font-black tracking-tight text-white sm:text-2xl"
+            >
+              Valoración de episodios
+            </h2>
+            <p
+              id={descriptionId}
+              className="truncate text-xs font-medium text-zinc-400 sm:text-sm"
+            >
+              {title || "Serie"} · puntuaciones por temporada
+            </p>
           </div>
 
           <button

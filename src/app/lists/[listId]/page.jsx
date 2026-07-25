@@ -12,6 +12,7 @@ import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayou
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import { formatPageTitle } from '@/lib/pageTitle'
+import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsInitialState'
 
 import {
     getListDetails,
@@ -206,7 +207,7 @@ export default function ListDetailsPage() {
     const listIdRaw = params?.listId
     const listId = Array.isArray(listIdRaw) ? listIdRaw[0] : listIdRaw
 
-    const { session, account } = useAuth()
+    const { session, account, hydrated } = useAuth()
     const canUse = useMemo(() => !!session && !!account?.id, [session, account])
 
     const [data, setData] = useState(() => readTmdbListDetailsCache(listId))
@@ -460,7 +461,11 @@ export default function ListDetailsPage() {
     }
 
     // Si no hay sesión, no renderizamos (como ya hacías)
-    if (!canUse) return null
+    if (!shouldRenderCachedListDuringAuthHydration({
+        canUse,
+        hydrated,
+        hasCachedData: Boolean(data),
+    })) return null
     if (loading && !data) return null
 
     const tmdbListUrl = `https://www.themoviedb.org/list/${listId}`
