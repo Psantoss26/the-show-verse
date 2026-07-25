@@ -1887,6 +1887,7 @@ function FavoriteHoverIndicator({ type, watched, watchCount = 0, rating, compact
     : 0;
   const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
   const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const countClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
   const ratingClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
 
   return (
@@ -1898,7 +1899,7 @@ function FavoriteHoverIndicator({ type, watched, watchCount = 0, rating, compact
         {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
       </span>
       {type === "movie" ? (
-        <span className={`flex ${itemClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}>
+        <span className={`flex ${countClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}>
           {movieWatchCount}
         </span>
       ) : watched ? (

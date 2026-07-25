@@ -108,7 +108,12 @@ import LiquidButton from "@/components/LiquidButton";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
+import {
+  titleStateKey,
+  useViewerTitleStates,
+} from "@/components/social/useViewerTitleStates";
 import { isOwnedComment } from "@/lib/community/commentOwnership";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getImages,
@@ -1151,6 +1156,49 @@ function ProgressiveHeroLogo({ path, title }) {
 // COMPONENTE PRINCIPAL: DetailsClient
 // =====================================================================
 
+function RecommendationHoverIndicator({
+  favorite = false,
+  watchlist = false,
+  watched = false,
+  rating = null,
+}) {
+  const hasRating = Number.isFinite(Number(rating)) && Number(rating) > 0;
+  const hasCollectionIndicator = favorite || watchlist;
+
+  if (!hasCollectionIndicator && !watched && !hasRating) return null;
+
+  const ratingLabel = Number.isInteger(Number(rating))
+    ? String(rating)
+    : Number(rating).toFixed(1);
+
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full px-1.5 opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      {hasCollectionIndicator && (
+        <span className={`flex h-9 w-10 shrink-0 items-center justify-center ${favorite ? "text-red-400" : "text-sky-400"}`}>
+          {favorite ? (
+            <Heart className="h-5 w-5 fill-current" />
+          ) : (
+            <BookmarkPlus className="h-5 w-5 fill-current" />
+          )}
+        </span>
+      )}
+      {watched && (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400">
+          <Eye className="h-5 w-5" />
+        </span>
+      )}
+      {hasRating && (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none text-amber-300">
+          <span className="tabular-nums leading-none">{ratingLabel}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 /**
  * DetailsClient - Componente principal de la pagina de detalle.
  *
@@ -1242,6 +1290,23 @@ export default function DetailsClient({
            cookie.includes("backend_access_token=") ||
            cookie.includes("access_token=");
   });
+  const recommendationViewerItems = useMemo(
+    () =>
+      (Array.isArray(recommendations) ? recommendations : []).map((rec) => ({
+        tmdbId: rec?.id,
+        mediaType:
+          rec?.media_type === "movie" || rec?.media_type === "tv"
+            ? rec.media_type
+            : type === "tv"
+              ? "tv"
+              : "movie",
+      })),
+    [recommendations, type],
+  );
+  const recommendationViewerStates = useViewerTitleStates(
+    recommendationViewerItems,
+    authenticated || hasBackendSession,
+  );
 
   // -- Puntuacion del usuario en TMDb --
   const [userRating, setUserRating] = useState(null); // Rating actual (1-10)
@@ -7416,21 +7481,10 @@ export default function DetailsClient({
     }
   }, [sectionItems, activeSection]);
 
-  // =====================================================
-  // IMDb para recomendaciones: solo hover (no auto)
-  // =====================================================
-  const [recImdbRatings, setRecImdbRatings] = useState({});
-  const recImdbRatingsRef = useRef({});
-  const recImdbInFlightRef = useRef(new Set());
-  const recImdbTimersRef = useRef({});
-  const recImdbIdCacheRef = useRef({});
+  // Estados de cuenta de las recomendaciones: respaldo para sesiones TMDb.
   const [recAccountStates, setRecAccountStates] = useState({});
   const recAccountStatesRef = useRef({});
   const recAccountStateInFlightRef = useRef(new Set());
-
-  useEffect(() => {
-    recImdbRatingsRef.current = recImdbRatings;
-  }, [recImdbRatings]);
 
   useEffect(() => {
     recAccountStatesRef.current = recAccountStates;
@@ -7438,11 +7492,7 @@ export default function DetailsClient({
 
   useEffect(() => {
     // reset al cambiar de item
-    setRecImdbRatings({});
     setRecAccountStates({});
-    recImdbInFlightRef.current = new Set();
-    recImdbTimersRef.current = {};
-    recImdbIdCacheRef.current = {};
     recAccountStatesRef.current = {};
     recAccountStateInFlightRef.current = new Set();
   }, [id, type]);
@@ -7485,75 +7535,6 @@ export default function DetailsClient({
       }
     },
     [account?.id, session, type],
-  );
-
-  const prefetchRecImdb = useCallback(
-    (rec) => {
-      if (!rec?.id) return;
-      if (typeof window === "undefined") return;
-      if (!supportsHover) return;
-
-      const rid = rec.id;
-      // si ya está (aunque sea null) no vuelvas a pedir
-      if (recImdbRatingsRef.current?.[rid] !== undefined) return;
-      if (recImdbInFlightRef.current.has(rid)) return;
-
-      // pequeño delay para evitar peticiones al pasar el ratón rápido
-      if (recImdbTimersRef.current[rid]) return;
-      recImdbTimersRef.current[rid] = window.setTimeout(async () => {
-        recImdbInFlightRef.current.add(rid);
-
-        try {
-          const mediaType =
-            rec.media_type === "movie" || rec.media_type === "tv"
-              ? rec.media_type
-              : type === "tv"
-                ? "tv"
-                : "movie";
-
-          let imdbId = recImdbIdCacheRef.current?.[rid] || null;
-          if (!imdbId) {
-            const ext = await getExternalIds(mediaType, rid);
-            imdbId = ext?.imdb_id || null;
-            if (imdbId) recImdbIdCacheRef.current[rid] = imdbId;
-          }
-
-          if (!imdbId) {
-            setRecImdbRatings((prev) => ({ ...prev, [rid]: null }));
-            return;
-          }
-
-          // cache
-          const cached = readOmdbCache(imdbId);
-          if (cached?.imdbRating != null) {
-            setRecImdbRatings((prev) => ({
-              ...prev,
-              [rid]: cached.imdbRating,
-            }));
-            if (cached?.fresh) return;
-          }
-
-          const imdbDataset = await fetchImdbRatingByImdb(imdbId);
-          const safe =
-            typeof imdbDataset?.rating === "number" ? imdbDataset.rating : null;
-          setRecImdbRatings((prev) => ({ ...prev, [rid]: safe }));
-          writeOmdbCache(imdbId, {
-            imdbRating: safe,
-            imdbVotes:
-              typeof imdbDataset?.votes === "number" ? imdbDataset.votes : null,
-          });
-        } catch {
-          setRecImdbRatings((prev) => ({ ...prev, [rid]: null }));
-        } finally {
-          recImdbInFlightRef.current.delete(rid);
-          if (recImdbTimersRef.current[rid]) {
-            window.clearTimeout(recImdbTimersRef.current[rid]);
-            delete recImdbTimersRef.current[rid];
-          }
-        }
-      }, 180);
-    },
-    [type, supportsHover],
   );
 
   // Cargar providers desde JustWatch con caché en sessionStorage
@@ -9704,73 +9685,47 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       >
                         {recommendations.slice(0, 15).map((rec, index) => {
                           const recTitle = rec.title || rec.name;
-                          const recDate =
-                            rec.release_date || rec.first_air_date || "";
-                          const recYear = recDate ? recDate.slice(0, 4) : "";
-                          const isMovie = rec.media_type
-                            ? rec.media_type === "movie"
-                            : type === "movie";
                           const recType =
                             rec.media_type === "movie" ||
                             rec.media_type === "tv"
                               ? rec.media_type
-                              : isMovie
-                                ? "movie"
-                                : "tv";
+                              : type === "tv"
+                                ? "tv"
+                                : "movie";
                           const recAccountState =
                             recAccountStates[`${recType}:${rec.id}`] || null;
-                          const recIsFavorite = !!recAccountState?.favorite;
-                          const recIsWatchlist = !!recAccountState?.watchlist;
+                          const recViewerState =
+                            recommendationViewerStates[
+                              titleStateKey({
+                                tmdbId: rec.id,
+                                mediaType: recType,
+                              })
+                            ] || null;
+                          const recIsFavorite = Boolean(
+                            recViewerState?.favorite || recAccountState?.favorite,
+                          );
+                          const recIsWatchlist = Boolean(
+                            recViewerState?.watchlist || recAccountState?.watchlist,
+                          );
+                          const recIsWatched = Boolean(recViewerState?.watched);
+                          const recRating =
+                            recViewerState?.rating ?? recAccountState?.rating;
                           const recUserRating =
-                            typeof recAccountState?.rating === "number" &&
-                            Number.isFinite(recAccountState.rating) &&
-                            recAccountState.rating > 0
-                              ? recAccountState.rating
+                            typeof recRating === "number" &&
+                            Number.isFinite(recRating) &&
+                            recRating > 0
+                              ? recRating
                               : null;
-                          const recUserRatingLabel =
-                            recUserRating == null
-                              ? null
-                              : Number.isInteger(recUserRating)
-                                ? String(recUserRating)
-                                : recUserRating.toFixed(1);
-                          const recAccountBadgeColor =
-                            recIsFavorite && recIsWatchlist
-                              ? "bg-fuchsia-500/20 text-fuchsia-300"
-                              : recIsFavorite
-                                ? "bg-red-500/20 text-red-300"
-                                : "bg-blue-500/20 text-blue-300";
-
-                          const tmdbScore =
-                            typeof rec.vote_average === "number" &&
-                            rec.vote_average > 0
-                              ? rec.vote_average
-                              : null;
-
-                          const imdbScore =
-                            recImdbRatings[rec.id] != null
-                              ? recImdbRatings[rec.id]
-                              : undefined;
 
                           // En móvil, deshabilitar hover para mostrar solo las imágenes
                           const enableHover =
                             supportsHover && !isMobileViewport;
-                          const showAccountBadge =
-                            enableHover && (recIsFavorite || recIsWatchlist);
                           const recCardClass = enableHover
                             ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const recImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
-                          const recOverlayClass = enableHover
-                            ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                            : "hidden";
-                          const recHeaderInfoClass = enableHover
-                            ? "absolute inset-x-0 top-0 z-10 flex items-start justify-between p-2 opacity-0 transition-all duration-500 ease-out -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "hidden";
-                          const recFooterInfoClass = enableHover
-                            ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "hidden";
 
                           return (
                             <SwiperSlide key={rec.id}>
@@ -9779,8 +9734,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className={recCardClass}
                                 onMouseEnter={
                                   enableHover
-                                    ? () => {
-                                        prefetchRecImdb(rec);
+                                  ? () => {
                                         void prefetchRecAccountState(rec);
                                       }
                                     : undefined
@@ -9788,7 +9742,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 onFocus={
                                   enableHover
                                     ? () => {
-                                        prefetchRecImdb(rec);
                                         void prefetchRecAccountState(rec);
                                       }
                                     : undefined
@@ -9807,83 +9760,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     sizes="(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 180px"
                                     className={recImageClass}
                                   />
-
-                                  {enableHover && (
-                                    <div className="pointer-events-none absolute inset-x-0 top-0 z-[9] h-20 bg-gradient-to-b from-black/75 via-black/35 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100" />
-                                  )}
-
-                                  {showAccountBadge && (
-                                    <div
-                                      className={`hidden lg:flex items-center justify-center gap-1.5 absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${recAccountBadgeColor}`}
-                                      aria-hidden="true"
-                                    >
-                                      {recIsFavorite && (
-                                        <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />
-                                      )}
-                                      {recIsWatchlist && (
-                                        <BookmarkPlus className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />
-                                      )}
-                                    </div>
-                                  )}
-
-                                  <div className={recHeaderInfoClass}>
-                                    <div />
-
-                                    {(tmdbScore || imdbScore != null) && (
-                                      <div className="flex flex-col items-end gap-1">
-                                        {tmdbScore && (
-                                          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                            <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                                              {tmdbScore.toFixed(1)}
-                                            </span>
-                                            <OptimizedImage
-                                              src="/logo-TMDb.png"
-                                              alt=""
-                                              className="w-auto h-2.5 opacity-100"
-                                              loading="lazy"
-                                              decoding="async"
-                                            />
-                                          </div>
-                                        )}
-                                        {imdbScore != null && (
-                                          <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                                            <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                                              {Number(imdbScore).toFixed(1)}
-                                            </span>
-                                            <OptimizedImage
-                                              src="/logo-IMDb.svg"
-                                              alt=""
-                                              className="w-auto h-3 opacity-100"
-                                              loading="lazy"
-                                              decoding="async"
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className={recOverlayClass} />
-
-                                  <div className={recFooterInfoClass}>
-                                    <div className="flex items-end justify-between gap-3">
-                                      <div className="min-w-0 text-left flex-1">
-                                        <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
-                                          {recTitle}
-                                        </p>
-                                        {recYear && (
-                                          <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-                                            {recYear}
-                                          </p>
-                                        )}
-                                      </div>
-                                      {recUserRatingLabel && (
-                                        <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                                          {recUserRatingLabel}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
+                                  <RecommendationHoverIndicator
+                                    favorite={recIsFavorite}
+                                    watchlist={recIsWatchlist}
+                                    watched={recIsWatched}
+                                    rating={recUserRating}
+                                  />
                                 </div>
                               </Link>
                             </SwiperSlide>

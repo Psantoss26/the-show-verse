@@ -299,9 +299,7 @@ const backdropVariants = {
 
 // Panel anclado abajo: entra como una hoja de preview y sale hacia la ficha.
 // NO se anima `filter: blur` (re-desenfocaba el panel en cada frame, carísimo):
-// solo opacity + y + scale, que se componen en GPU. Además el backdrop-blur del
-// panel se DESACTIVA durante la entrada (ver `panelSettled`) para que el
-// transform no obligue a recalcular el backdrop-filter frame a frame.
+// solo opacity + y + scale, que se componen en GPU.
 const panelVariants = {
   hidden: { opacity: 0, y: 86, scale: 0.965 },
   visible: {
@@ -754,10 +752,10 @@ export default function DetailModal({
   //   2) NO declarar `will-change: opacity` en el drawer, que forzaba esa misma
   //      capa con alfa aunque ya no animemos la opacidad.
   //
-  // El backdrop-blur del panel solo se aplica una vez TERMINADA la animación
-  // de entrada/salida. Durante la entrada y salida el panel se desplaza por GPU
-  // (x transform); tener el backdrop-filter activo durante el movimiento obligaría
-  // a recalcular el desenfoque en cada frame (provocando ralentización y tirones).
+  // `panelSettled` solo limita `will-change` mientras se anima. El cristal del
+  // drawer se mantiene montado durante toda su vida: al cambiar de título el
+  // modal entrante arranca su fundido con este estado en false y, si el blur
+  // dependiera de él, se vería un flash transparente hasta que terminase.
   const [panelSettled, setPanelSettled] = useState(false);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
@@ -2317,9 +2315,10 @@ export default function DetailModal({
             montar) el cristal se veía correcto.
 
             El drawer sí la necesita: no tiene overlay detrás, así que sin esto
-            no habría desenfoque ninguno. Ahí `panelSettled` arranca en true, de
-            modo que el cristal está activo desde el primer frame. */}
-        {panelSettled && isRightPlacement && (
+            no habría desenfoque ninguno. Se mantiene desde el primer frame y
+            también durante el fundido entre títulos; solo se retira al cerrar
+            el modal. */}
+        {isRightPlacement && (
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-md"

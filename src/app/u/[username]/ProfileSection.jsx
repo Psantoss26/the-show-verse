@@ -155,13 +155,14 @@ function sectionMenuOptions(section) {
 }
 
 function getSectionPreference(cacheKey, section) {
+  const usesDiaryDefaults = section === "watched";
   return profileSectionPreferences.get(cacheKey) || {
     query: "",
     filter: "all",
     sort: "recent",
-    group: "none",
-    autoMonthGroup: false,
-    view: section === "activity" ? "list" : "grid",
+    group: usesDiaryDefaults ? "month" : "none",
+    autoMonthGroup: usesDiaryDefaults,
+    view: section === "activity" || usesDiaryDefaults ? "list" : "grid",
   };
 }
 const profileSectionCache = new Map();
