@@ -16,6 +16,7 @@ import {
   userListItems,
   titleComments,
 } from '../db/schema.js';
+import { getTitlePoster } from './tmdbPoster.js';
 
 const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
 const RECENT_WATCHED_LIMIT = 5;
@@ -256,6 +257,18 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     );
   }
 
+  // "Últimos visionados" del perfil: mismo problema de póster ausente que la
+  // pestaña Visionados → se rellena desde otras tablas / TMDb.
+  const recentWatchedItems = recentWatched.map((r) => ({
+    tmdbId: r.tmdbId,
+    mediaType: r.mediaType,
+    title: r.title,
+    posterPath: r.posterPath,
+    watchedAt: r.watchedAt,
+    rating: ratingByKey.get(titleKey(r.mediaType, r.tmdbId)) ?? null,
+  }));
+  await fillMissingPosters(db, targetId, recentWatchedItems);
+
   return {
     user: {
       id: targetUser.id,
@@ -279,14 +292,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       title: f.title,
       posterPath: f.posterPath,
     })),
-    recentWatched: recentWatched.map((r) => ({
-      tmdbId: r.tmdbId,
-      mediaType: r.mediaType,
-      title: r.title,
-      posterPath: r.posterPath,
-      watchedAt: r.watchedAt,
-      rating: ratingByKey.get(titleKey(r.mediaType, r.tmdbId)) ?? null,
-    })),
+    recentWatched: recentWatchedItems,
     followingPreview: followingPreviewRows.map((u) => ({
       username: u.username,
       displayName: u.displayName || u.username,
@@ -373,6 +379,40 @@ async function resolveTitleMetadata(db, targetId, keys) {
     }
   }
   return map;
+}
+
+// Rellena `posterPath` (y `title` si falta) en los items que vengan sin póster.
+// Los visionados (watch_history) suelen guardarse sin poster_path, así que:
+//   1) se busca el póster en otras tablas del usuario (favoritos, watchlist,
+//      puntuaciones…) — sin coste de red;
+//   2) lo que siga sin póster se resuelve en TMDb: para 'tv' el póster de la SERIE
+//      (episodios agrupados por serie), para 'movie' el de la película.
+// Muta y devuelve los mismos items. No-op si todos ya tienen póster.
+async function fillMissingPosters(db, targetId, items) {
+  const missing = items.filter((i) => !i.posterPath);
+  if (!missing.length) return items;
+
+  // 1) Referencia cruzada con el resto de tablas del usuario.
+  const meta = await resolveTitleMetadata(db, targetId, missing);
+  for (const it of missing) {
+    const m = meta.get(titleKey(it.mediaType, it.tmdbId));
+    if (m) {
+      if (!it.posterPath && m.posterPath) it.posterPath = m.posterPath;
+      if (!it.title && m.title) it.title = m.title;
+    }
+  }
+
+  // 2) Lo que aún falte → TMDb (cacheado en memoria por título).
+  const stillMissing = missing.filter((i) => !i.posterPath);
+  if (stillMissing.length) {
+    const posters = await Promise.all(
+      stillMissing.map((i) => getTitlePoster({ tmdbId: i.tmdbId, mediaType: i.mediaType })),
+    );
+    stillMissing.forEach((it, idx) => {
+      if (posters[idx]) it.posterPath = posters[idx];
+    });
+  }
+  return items;
 }
 
 // Reseñas nativas del usuario (+ su nota del título + título/póster best-effort).
@@ -516,6 +556,8 @@ export async function getUserWatched(db, targetId, opts = {}) {
     watchedAt: r.watchedAt,
     rating: ratingByKey.get(titleKey(r.mediaType, r.tmdbId)) ?? null,
   }));
+  // watch_history se guarda a menudo sin póster: se resuelve aquí (serie/película).
+  await fillMissingPosters(db, targetId, page.items);
   return page;
 }
 
