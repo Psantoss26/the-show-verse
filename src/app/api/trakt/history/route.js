@@ -204,20 +204,47 @@ export async function GET(request) {
   const targetCount = hasNumericLimit ? Math.floor(numericLimit) : null;
 
   try {
-    const qs = new URLSearchParams();
-    qs.set("page", String(page));
-    qs.set("limit", String(perPage));
-    if (type === "movies") qs.set("type", "movie");
-    if (type === "shows") qs.set("type", "tv");
-    if (from) qs.set("from", ymdToIsoStart(from));
-    if (to) qs.set("to", ymdToIsoEnd(to));
+    const rows = [];
+    let currentPage = page;
+    let lastPageSize = 0;
+    let lastBackend = null;
+    let backendFailure = null;
 
-    const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
-    if (backend.ok) {
-      const rows = Array.isArray(backend.json?.results) ? backend.json.results : [];
-      const enriched = await enrichBackendEpisodeTitles(
-        rows.map(mapBackendHistoryItem),
-      );
+    while (currentPage < page + 100) {
+      const qs = new URLSearchParams();
+      qs.set("page", String(currentPage));
+      qs.set("limit", String(perPage));
+      if (type === "movies") qs.set("type", "movie");
+      if (type === "shows") qs.set("type", "tv");
+      if (from) qs.set("from", ymdToIsoStart(from));
+      if (to) qs.set("to", ymdToIsoEnd(to));
+
+      const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
+      if (!backend.ok) {
+        backendFailure = backend;
+        break;
+      }
+
+      lastBackend = backend;
+      const pageRows = Array.isArray(backend.json?.results)
+        ? backend.json.results
+        : [];
+      rows.push(...pageRows);
+      lastPageSize = pageRows.length;
+
+      if (!fetchAll && (targetCount == null || targetCount <= perPage)) break;
+      if (!fetchAll && targetCount != null && rows.length >= targetCount) {
+        rows.length = targetCount;
+        break;
+      }
+      if (pageRows.length < perPage) break;
+
+      currentPage += 1;
+    }
+
+    if (lastBackend) {
+      const mapped = rows.map(mapBackendHistoryItem);
+      const enriched = enrich ? await enrichBackendEpisodeTitles(mapped) : mapped;
 
       const plays = enriched.length;
       const uniques = new Set(enriched.map((x) => `${x.type}:${x.tmdbId}`)).size;
@@ -232,15 +259,15 @@ export async function GET(request) {
           page,
           limit: perPage,
           returned: enriched.length,
-          hasMore: enriched.length >= perPage,
+          hasMore: !fetchAll && lastPageSize >= perPage && (targetCount == null || rows.length < targetCount),
         },
         source: "backend",
       });
-      setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
+      setBackendAuthCookies(res, lastBackend, { secure: request.nextUrl.protocol === "https:" });
       return res;
     }
-    if (!backend.skipped && backend.status !== 401) {
-      console.warn("Backend history failed; falling back to Trakt", backend.error);
+    if (backendFailure && !backendFailure.skipped && backendFailure.status !== 401) {
+      console.warn("Backend history failed; falling back to Trakt", backendFailure.error);
     }
   } catch (e) {
     console.warn("Backend history failed; falling back to Trakt", e);
