@@ -16,3 +16,6 @@
 // posición) la pone cada consumidor, porque es propia de cada superficie.
 export const LIQUID_GLASS_PANEL =
   "bg-black/[0.28] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)]";
+
+export const LIQUID_GLASS_TOOLTIP =
+  "bg-zinc-950/85 backdrop-blur-2xl saturate-[140%] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.9)]";

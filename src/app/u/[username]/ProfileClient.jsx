@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
 import ProfileSection from "./ProfileSection";
 import {
   Activity,
@@ -81,9 +82,10 @@ function profileCacheKey(username) {
 
 function ProfileBackdrop() {
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <div className="absolute -top-[10%] left-[10%] aspect-square h-[50vw] max-w-[700px] rounded-full bg-emerald-600/10 blur-[130px]" />
-      <div className="absolute bottom-[5%] right-[5%] aspect-square h-[45vw] max-w-[600px] rounded-full bg-emerald-800/10 blur-[130px]" />
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+      <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-teal-800/25 blur-[120px] sm:blur-[150px]" />
     </div>
   );
 }
@@ -300,7 +302,7 @@ function SidebarActivityTitle({ item }) {
   return (
     <Link
       href={`/details/${mediaType}/${item.tmdbId}`}
-      className="font-bold text-zinc-100 transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:text-emerald-300"
+      className="font-extrabold text-white transition-colors hover:text-emerald-400 focus-visible:outline-none focus-visible:text-emerald-400"
     >
       {item.title || "Ver ficha"}
     </Link>
@@ -313,24 +315,24 @@ function SidebarActivityText({ item }) {
     : "";
 
   if (item.type === "review") {
-    return <><span>ha reseñado </span><SidebarActivityTitle item={item} /></>;
+    return <><span className="text-zinc-300">ha reseñado </span><SidebarActivityTitle item={item} /></>;
   }
   if (item.type === "watchlist") {
-    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span> a Pendientes</span></>;
+    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Pendientes</span></>;
   }
   if (item.type === "favorite") {
-    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span> a Favoritos</span></>;
+    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Favoritos</span></>;
   }
   if (item.type === "rating") {
-    return <><span>ha puntuado </span><SidebarActivityTitle item={item} /><span>{typeof item.rating === "number" ? ` · ${item.rating}/10` : ""}</span></>;
+    return <><span className="text-zinc-300">ha puntuado </span><SidebarActivityTitle item={item} /><span className="text-zinc-300 font-medium">{typeof item.rating === "number" ? ` · ${item.rating}/10` : ""}</span></>;
   }
   if (item.type === "list") {
-    return <><span>ha creado la lista </span><Link href={`/lists/${String(item.id || "").replace("list:", "")}`} className="font-bold text-zinc-100 transition-colors hover:text-emerald-300">{item.name || "sin título"}</Link></>;
+    return <><span className="text-zinc-300">ha creado la lista </span><Link href={`/lists/${String(item.id || "").replace("list:", "")}`} className="font-extrabold text-white transition-colors hover:text-emerald-400">{item.name || "sin título"}</Link></>;
   }
   if (item.type === "list_item") {
-    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span>{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
+    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300">{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
   }
-  return <><span>ha visto </span><span>{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
+  return <><span className="text-zinc-300">ha visto </span><span className="text-zinc-300">{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
 }
 
 function ActivitySidebarPreview({ username, onOpen }) {
@@ -368,14 +370,14 @@ function ActivitySidebarPreview({ username, onOpen }) {
           {[0, 1, 2].map((index) => <div key={index} className="h-8 animate-pulse rounded-md bg-white/[0.035]" />)}
         </div>
       ) : items.length ? (
-        <ol className="relative ml-1 space-y-3 border-l border-white/[0.12] py-1" role="list">
+        <ol className="relative ml-1 space-y-3.5 border-l border-white/15 py-1" role="list">
           {items.map((item) => (
             <li key={item.id} className="relative pl-4">
-              <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400 ring-4 ring-black" aria-hidden="true" />
-              <p className="text-[13px] leading-5 text-zinc-400">
+              <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400/90 ring-4 ring-black shadow-[0_0_8px_rgba(52,211,153,0.4)]" aria-hidden="true" />
+              <p className="text-[13px] leading-5 text-zinc-300">
                 <SidebarActivityText item={item} />
               </p>
-              <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-medium text-zinc-600">
+              <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-semibold text-zinc-400">
                 {relativeSidebarActivityTime(item.createdAt)}
               </time>
             </li>
@@ -422,11 +424,11 @@ function StarRatingHistogram({ histogram }) {
               key={item.star}
               className="group relative flex h-full min-w-0 flex-1 items-end"
             >
-              <span className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-10 w-max -translate-x-1/2 rounded-lg border border-white/10 bg-slate-700 px-2.5 py-1.5 text-center text-[10px] font-bold text-white opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
-                <span className="block">{item.value} valoraciones</span>
-                <span className="mt-0.5 inline-flex items-center gap-0.5 text-emerald-300">
-                  <Star className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
-                  <span className="text-zinc-100">{starText}</span>
+              <span className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-30 w-max -translate-x-1/2 rounded-2xl ${LIQUID_GLASS_TOOLTIP} px-3 py-2 text-center text-xs font-bold text-white opacity-0 translate-y-1.5 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 will-change-transform transform-gpu shadow-2xl`}>
+                <span className="block text-white font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{item.value} {item.value === 1 ? "valoración" : "valoraciones"}</span>
+                <span className="mt-0.5 inline-flex items-center justify-center gap-1 text-emerald-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                  <span className="text-zinc-200 font-semibold">{starText}</span>
                 </span>
               </span>
               <span
@@ -827,7 +829,7 @@ export default function ProfileClient({ username }) {
             )}
           </div>
         ) : tab !== "profile" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-8">
+          <div className="sv-profile-entry sv-profile-entry--content mt-5 sm:mt-6">
             {/* `key={tab}` remonta la sección al cambiar de pestaña: evita un
                 render intermedio con el layout nuevo pero los items del layout
                 anterior (que no comparten forma de `key`) → aviso de keys. */}
@@ -978,7 +980,7 @@ function ProfileTabs({ tab, setTab, sections }) {
             type="button"
             onClick={() => setTab(it.id)}
             data-profile-tab-active={active || undefined}
-            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
+            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >

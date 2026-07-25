@@ -51,10 +51,10 @@ export default function PosterTile({ item, showStars = false, viewerState }) {
           </div>
         )}
 
-        {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient */}
+        {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient (sin bordes marcados) */}
         {hasViewerIndicators && (
           <div
-            className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full border border-white/10 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
+            className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
             aria-hidden="true"
           >
             {hasCollectionIndicator && (
@@ -67,12 +67,12 @@ export default function PosterTile({ item, showStars = false, viewerState }) {
               </span>
             )}
             {watched && (
-              <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400 ${hasCollectionIndicator ? "border-l border-white/10" : ""}`}>
+              <span className="flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400">
                 <Eye className="h-5 w-5" />
               </span>
             )}
             {hasUserRating && (
-              <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none text-amber-300 ${hasCollectionIndicator || watched ? "border-l border-white/10" : ""}`}>
+              <span className="flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none text-amber-300">
                 <span className="tabular-nums leading-none">{userRating}</span>
               </span>
             )}
