@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { applyArtworkOverrideChanges } from "@/lib/artworkApi";
+import { finalizeLogout } from "@/lib/auth/logoutFinalization";
 
 const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
@@ -480,12 +481,16 @@ export const AuthProvider = ({ children }) => {
       setPreferencesCached(false);
       setCookie("showverse_default_view", "grid");
       setPreferencesReady(true);
-      if (redirectTo && typeof window !== "undefined") {
-        window.location.replace(redirectTo);
-        return;
-      }
-      applyUser(null);
-      setHydrated(true);
+      const redirected = finalizeLogout({
+        applyUser,
+        setHydrated,
+        redirectTo,
+        replaceLocation:
+          typeof window !== "undefined"
+            ? (destination) => window.location.replace(destination)
+            : null,
+      });
+      if (redirected) return;
     }
   }, [applyUser]);
 
