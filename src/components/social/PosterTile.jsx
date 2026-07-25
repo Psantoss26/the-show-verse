@@ -11,66 +11,54 @@ function tmdbPoster(path, size = "w342") {
 }
 
 function detailsHref(item) {
-  const type = item?.mediaType === "tv" ? "tv" : "movie";
-  return `/details/${type}/${item?.tmdbId}`;
+  const type = item?.mediaType === "tv" || item?.media_type === "tv" ? "tv" : "movie";
+  return `/details/${type}/${item?.tmdbId || item?.id}`;
 }
 
-function ViewerStateIndicators({ state }) {
-  const favorite = Boolean(state?.favorite);
-  const watchlist = Boolean(state?.watchlist);
-  const watched = Boolean(state?.watched);
-  const rating = Number(state?.rating);
-  const hasRating = Number.isFinite(rating) && rating > 0;
-  if (!favorite && !watchlist && !watched && !hasRating) return null;
-
-  const summary = [
-    favorite && "en favoritos",
-    watchlist && "en pendientes",
-    watched && "vista",
-    hasRating && `puntuada con ${rating}`,
-  ].filter(Boolean).join(", ");
-
-  return (
-    <>
-      <span className="sr-only">En tu biblioteca: {summary}.</span>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-2 bottom-2 z-10 flex translate-y-1 items-center justify-center opacity-0 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-visible/card:translate-y-0 group-focus-visible/card:opacity-100"
-      >
-        <span className="inline-flex overflow-hidden rounded-full border border-white/20 bg-black/75 shadow-[0_8px_22px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          {(favorite || watchlist) && (
-            <span className={`inline-flex h-7 min-w-8 items-center justify-center px-2 ${watched || hasRating ? "border-r border-white/15" : ""} ${favorite ? "text-rose-300" : "text-sky-300"}`}>
-              {favorite ? <Heart className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4 fill-current" />}
-            </span>
-          )}
-          {watched && (
-            <span className={`inline-flex h-7 min-w-8 items-center justify-center px-2 text-emerald-300 ${hasRating ? "border-r border-white/15" : ""}`}>
-              <Eye className="h-4 w-4" />
-            </span>
-          )}
-          {hasRating && (
-            <span className="inline-flex h-7 min-w-9 items-center justify-center px-2 text-[0.6875rem] font-black tabular-nums text-yellow-300">
-              {rating}
-            </span>
-          )}
-        </span>
-      </span>
-    </>
-  );
-}
-
-// Tarjeta de póster con enlace a la ficha y, opcionalmente, la nota (estrellas).
 export default function PosterTile({ item, showStars = false, viewerState }) {
   const [failed, setFailed] = useState(false);
-  const src = tmdbPoster(item?.posterPath);
+  const src = tmdbPoster(item?.posterPath || item?.poster_path);
+
+  const title = item?.title || item?.name || "";
+  const year =
+    item?.year ||
+    (item?.releaseDate || item?.release_date || item?.firstAirDate || item?.first_air_date || "")?.slice(0, 4);
+  const mediaTypeLabel =
+    item?.mediaType === "tv" || item?.media_type === "tv" ? "Serie" : "Película";
+  const firstGenre = item?.genre || item?.firstGenre || mediaTypeLabel;
+
+  const favorite = Boolean(viewerState?.favorite || item?.isFavorite || item?.favorite);
+  const watchlist = Boolean(viewerState?.watchlist || item?.isWatchlist || item?.watchlist);
+  const watched = Boolean(viewerState?.watched || item?.watched);
+  const userRating = viewerState?.rating ?? item?.userRating ?? item?.user_rating;
+
+  const rawVote = item?.vote_average ?? (typeof item?.rating === "number" && !viewerState?.rating ? item.rating : null);
+  const tmdbScore = typeof rawVote === "number" && rawVote > 0 ? rawVote.toFixed(1) : null;
+
+  // Determinar color e iconos con bordes vectoriales nítidos para el badge de la esquina superior izquierda
+  let badgeColor = "bg-zinc-800/80 border-white/20 text-white";
+  if (favorite && watchlist) {
+    badgeColor = "bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300";
+  } else if (favorite) {
+    badgeColor = "bg-red-500/20 border-red-500/40 text-red-400";
+  } else if (watchlist) {
+    badgeColor = "bg-sky-500/20 border-sky-500/40 text-sky-400";
+  } else if (watched) {
+    badgeColor = "bg-emerald-500/20 border-emerald-500/40 text-emerald-400";
+  }
+
+  const showTopLeftBadge = favorite || watchlist || watched;
+
   return (
-    <Link href={detailsHref(item)} className="group/card relative block" title={item?.title || ""}>
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-all duration-300 group-hover/card:shadow-xl">
+    <Link href={detailsHref(item)} className="group/card relative block">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
+
+        {/* Imagen del póster */}
         {src && !failed ? (
           <OptimizedImage
             src={src}
-            alt={item?.title || ""}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-[1.06]"
+            alt={title}
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/card:scale-110"
             loading="lazy"
             draggable={false}
             onError={() => setFailed(true)}
@@ -80,8 +68,67 @@ export default function PosterTile({ item, showStars = false, viewerState }) {
             <ImageOff className="h-7 w-7 opacity-50" />
           </div>
         )}
-        <ViewerStateIndicators state={viewerState} />
+
+        {/* Insignia en esquina superior izquierda (con bordes de ultra alta resolución sin borrosidad GPU) */}
+        {showTopLeftBadge && (
+          <div
+            className={`hidden lg:flex items-center justify-center gap-1.5 absolute -top-px -left-px z-20 p-2 sm:p-2.5 rounded-br-2xl border backdrop-blur-xl shadow-md transition-all duration-300 ease-out origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 ${badgeColor}`}
+            aria-hidden="true"
+          >
+            {favorite && <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />}
+            {watchlist && <BookmarkPlus className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />}
+            {!favorite && !watchlist && watched && <Eye className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />}
+          </div>
+        )}
+
+        {/* Overlay con gradientes superior e inferior idéntico al de Favoritos */}
+        <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 pointer-events-none">
+          {/* Top gradient con valoración TMDb */}
+          <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover/card:translate-y-0 transition-transform duration-300">
+            <div />
+
+            <div className="flex flex-col items-end gap-1 pointer-events-auto">
+              {tmdbScore && (
+                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                  <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
+                    {tmdbScore}
+                  </span>
+                  <OptimizedImage
+                    src="/logo-TMDb.png"
+                    alt="TMDb"
+                    className="w-auto h-2.5 opacity-100"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom gradient con título, año/género y nota del usuario */}
+          <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover/card:translate-y-0 transition-transform duration-300">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0 text-left flex-1">
+                {title && (
+                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
+                    {title}
+                  </h3>
+                )}
+                {(year || firstGenre) && (
+                  <p className="text-yellow-500 text-xs font-bold mt-0.5 drop-shadow-md">
+                    {year}
+                    {year && firstGenre ? ` • ${firstGenre}` : firstGenre}
+                  </p>
+                )}
+              </div>
+              {userRating != null && Number(userRating) > 0 && (
+                <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
+                  {userRating}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+
       {showStars && typeof item?.rating === "number" && (
         <div className="mt-1.5 flex justify-center">
           <Stars rating={item.rating} />

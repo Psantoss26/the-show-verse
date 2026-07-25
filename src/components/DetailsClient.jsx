@@ -9723,10 +9723,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 : recUserRating.toFixed(1);
                           const recAccountBadgeColor =
                             recIsFavorite && recIsWatchlist
-                              ? "bg-fuchsia-500/15 border-fuchsia-500/30 text-fuchsia-300"
+                              ? "bg-fuchsia-500/20 text-fuchsia-300"
                               : recIsFavorite
-                                ? "bg-red-500/15 border-red-500/30 text-red-300"
-                                : "bg-blue-500/15 border-blue-500/30 text-blue-300";
+                                ? "bg-red-500/20 text-red-300"
+                                : "bg-blue-500/20 text-blue-300";
 
                           const tmdbScore =
                             typeof rec.vote_average === "number" &&
@@ -9802,7 +9802,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                   {showAccountBadge && (
                                     <div
-                                      className={`hidden lg:flex items-center justify-center gap-1.5 absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${recAccountBadgeColor}`}
+                                      className={`hidden lg:flex items-center justify-center gap-1.5 absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${recAccountBadgeColor}`}
                                       aria-hidden="true"
                                     >
                                       {recIsFavorite && (
