@@ -279,6 +279,47 @@ body {
   animation: scaleIn 0.4s ease-out forwards;
 }
 
+/* Entrada del contenido de Perfil: se limita a opacity/transform para que se
+   componga fuera del hilo principal. Las demoras cortas ordenan la jerarquía
+   sin convertir la carga en una animación lenta. */
+@keyframes sv-profile-entry {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.75rem, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.sv-profile-entry {
+  animation: sv-profile-entry 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sv-profile-entry--header {
+  animation-delay: 20ms;
+}
+
+.sv-profile-entry--tabs {
+  animation-delay: 80ms;
+}
+
+.sv-profile-entry--content {
+  animation-delay: 130ms;
+}
+
+.sv-profile-entry--aside {
+  animation-delay: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-profile-entry {
+    animation: none;
+  }
+}
+
 /* =========================
    Enhanced hover effects
    ========================= */
@@ -841,4 +882,3 @@ svg.recharts-surface *:focus {
   box-shadow: none !important;
   border: none !important;
 }
-

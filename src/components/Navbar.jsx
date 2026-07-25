@@ -1397,6 +1397,10 @@ export default function Navbar() {
   const isDetailsRoute =
     /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
     /^\/details\/tv\/[^/]+\/?$/.test(pathname || "");
+  // En escritorio, las fichas comparten la entrada transparente de los
+  // dashboards: el glass se reserva para cuando el usuario ya ha empezado a
+  // desplazarse. En móvil se mantiene la composición específica de la ficha.
+  const desktopDetailsNavMode = isDetailsRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
@@ -1660,8 +1664,10 @@ export default function Navbar() {
         className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
+            : desktopDetailsNavMode
+              ? "lg:bg-gradient-to-b lg:from-black/60 lg:via-black/25 lg:to-transparent"
             : isDetailsRoute
-              ? // FICHA: escritorio glass de siempre (lg:); MÓVIL transparente,
+              ? // FICHA: escritorio glass tras scroll (lg:); MÓVIL transparente,
                 // compacto y visible/interactivo desde la entrada. El fondo glass y
                 // el crecimiento de altura los aportan la capa interna y la fila
                 // móvil, GRADUALMENTE con el scroll (--sv-hero-scroll).
