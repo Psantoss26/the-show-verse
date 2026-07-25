@@ -26,6 +26,7 @@ import {
   getUserFavorites,
   getUserRatings,
   getUserLists,
+  getUserActivity,
 } from '../lib/userProfile.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
@@ -396,4 +397,5 @@ export default async function usersRoutes(fastify) {
   fastify.get('/:username/favorites', sectionEndpoint(getUserFavorites));
   fastify.get('/:username/ratings', sectionEndpoint(getUserRatings));
   fastify.get('/:username/lists', sectionEndpoint(getUserLists));
+  fastify.get('/:username/activity', sectionEndpoint(getUserActivity));
 }

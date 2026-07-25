@@ -33,7 +33,7 @@ export default function PosterTile({ item, showStars = false, viewerState }) {
 
   return (
     <Link href={detailsHref(item)} className="group/card relative block">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
 
         {/* Imagen del póster */}
         {src && !failed ? (

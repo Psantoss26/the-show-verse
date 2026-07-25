@@ -18,6 +18,7 @@ import {
   tmdbCache,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
+import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 
 const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
 const RECENT_WATCHED_LIMIT = 5;
@@ -523,7 +524,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
 // Conteos de cada sección para la barra de pestañas.
 export async function buildSectionCounts(db, targetId) {
   const distinctWatched = sql`COUNT(DISTINCT (${watchHistory.mediaType} || ':' || ${watchHistory.tmdbId}))`.mapWith(Number);
-  const [reviews, watched, watchlistC, favoritesC, ratingsC, listsC] = await Promise.all([
+  const [reviews, watched, watchlistC, favoritesC, ratingsC, listsC, activitySources] = await Promise.all([
     db
       .select({ n: count() })
       .from(titleComments)
@@ -547,6 +548,19 @@ export async function buildSectionCounts(db, targetId) {
       .select({ n: count() })
       .from(userLists)
       .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+    Promise.all([
+      db.select({ n: count() }).from(titleComments).where(and(eq(titleComments.userId, targetId), eq(titleComments.source, 'native'))),
+      db.select({ n: count() }).from(watchHistory).where(eq(watchHistory.userId, targetId)),
+      db.select({ n: count() }).from(watchlist).where(eq(watchlist.userId, targetId)),
+      db.select({ n: count() }).from(favorites).where(eq(favorites.userId, targetId)),
+      db.select({ n: count() }).from(userRatings).where(eq(userRatings.userId, targetId)),
+      db.select({ n: count() }).from(userLists).where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+      db
+        .select({ n: count() })
+        .from(userListItems)
+        .innerJoin(userLists, eq(userLists.id, userListItems.listId))
+        .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+    ]),
   ]);
   return {
     reviews: reviews[0]?.n || 0,
@@ -555,6 +569,7 @@ export async function buildSectionCounts(db, targetId) {
     favorites: favoritesC[0]?.n || 0,
     ratings: ratingsC[0]?.n || 0,
     lists: listsC[0]?.n || 0,
+    activity: activitySources.reduce((total, rows) => total + Number(rows[0]?.n || 0), 0),
   };
 }
 
@@ -587,15 +602,15 @@ async function resolveTitleMetadata(db, targetId, keys) {
   return map;
 }
 
-// Rellena `posterPath` (y `title` si falta) en los items que vengan sin póster.
+// Rellena `posterPath` y `title` cuando falten en los items de un perfil.
 // Los visionados (watch_history) suelen guardarse sin poster_path, así que:
 //   1) se busca el póster en otras tablas del usuario (favoritos, watchlist,
 //      puntuaciones…) — sin coste de red;
 //   2) lo que siga sin póster se resuelve en TMDb: para 'tv' el póster de la SERIE
 //      (episodios agrupados por serie), para 'movie' el de la película.
-// Muta y devuelve los mismos items. No-op si todos ya tienen póster.
+// Muta y devuelve los mismos items. No-op si todos ya tienen ambos datos.
 async function fillMissingPosters(db, targetId, items) {
-  const missing = items.filter((i) => !i.posterPath);
+  const missing = items.filter((i) => !i.posterPath || !i.title);
   if (!missing.length) return items;
 
   // 1) Referencia cruzada con el resto de tablas del usuario.
@@ -608,7 +623,25 @@ async function fillMissingPosters(db, targetId, items) {
     }
   }
 
-  // 2) Lo que aún falte → TMDb (cacheado en memoria por título).
+  // 2) Lo que aún falte → metadatos de TMDb. Además del póster permite que una
+  // reseña o actividad recién creada muestre el título aunque no estuviera aún
+  // en otra tabla del usuario.
+  const unresolved = missing.filter((i) => !i.posterPath || !i.title);
+  if (unresolved.length) {
+    const metadata = await getMediaMetadataMap(unresolved).catch(() => new Map());
+    for (const item of unresolved) {
+      const meta = metadataFor(metadata, item.mediaType, item.tmdbId);
+      if (!meta) continue;
+      if (!item.posterPath) item.posterPath = meta.poster_path || null;
+      if (!item.title) {
+        item.title = item.mediaType === 'movie'
+          ? meta.title || meta.original_title || null
+          : meta.name || meta.original_name || null;
+      }
+    }
+  }
+
+  // 3) Fallback ligero para los pósters que sigan sin resolverse.
   const stillMissing = missing.filter((i) => !i.posterPath);
   if (stillMissing.length) {
     const posters = await Promise.all(
@@ -824,6 +857,152 @@ export async function getUserLists(db, targetId, opts = {}) {
     updatedAt: l.updatedAt,
     previewPosters: previewByList.get(l.id) || [],
   }));
+  return page;
+}
+
+// Actividad pública del perfil. Se deriva de los registros ya persistidos en vez
+// de duplicarlos en otra tabla: así incluye también la actividad anterior a esta
+// vista y siempre refleja el estado real de cada sección.
+export async function getUserActivity(db, targetId, opts = {}) {
+  const { limit, offset } = pageParams(opts);
+  // Cada fuente se consulta hasta el punto que necesita la página. El tope evita
+  // que una URL manipulada convierta el feed en una consulta desproporcionada.
+  const sourceLimit = Math.min(1000, Math.max(limit + offset + 1, limit + 1));
+
+  const [reviewRows, watchedRows, watchlistRows, favoriteRows, ratingRows, listRows, listItemRows] = await Promise.all([
+    db
+      .select({
+        id: titleComments.id,
+        tmdbId: titleComments.tmdbId,
+        mediaType: titleComments.mediaType,
+        body: titleComments.body,
+        spoiler: titleComments.spoiler,
+        createdAt: titleComments.createdAt,
+      })
+      .from(titleComments)
+      .where(and(eq(titleComments.userId, targetId), eq(titleComments.source, 'native')))
+      .orderBy(desc(titleComments.createdAt))
+      .limit(sourceLimit),
+    db
+      .select({
+        id: watchHistory.id,
+        tmdbId: watchHistory.tmdbId,
+        mediaType: watchHistory.mediaType,
+        season: watchHistory.season,
+        episode: watchHistory.episode,
+        title: watchHistory.title,
+        posterPath: watchHistory.posterPath,
+        createdAt: watchHistory.watchedAt,
+      })
+      .from(watchHistory)
+      .where(eq(watchHistory.userId, targetId))
+      .orderBy(desc(watchHistory.watchedAt))
+      .limit(sourceLimit),
+    db
+      .select({
+        id: watchlist.id,
+        tmdbId: watchlist.tmdbId,
+        mediaType: watchlist.mediaType,
+        title: watchlist.title,
+        posterPath: watchlist.posterPath,
+        createdAt: watchlist.addedAt,
+      })
+      .from(watchlist)
+      .where(eq(watchlist.userId, targetId))
+      .orderBy(desc(watchlist.addedAt))
+      .limit(sourceLimit),
+    db
+      .select({
+        id: favorites.id,
+        tmdbId: favorites.tmdbId,
+        mediaType: favorites.mediaType,
+        title: favorites.title,
+        posterPath: favorites.posterPath,
+        createdAt: favorites.addedAt,
+      })
+      .from(favorites)
+      .where(eq(favorites.userId, targetId))
+      .orderBy(desc(favorites.addedAt))
+      .limit(sourceLimit),
+    db
+      .select({
+        id: userRatings.id,
+        tmdbId: userRatings.tmdbId,
+        mediaType: userRatings.mediaType,
+        season: userRatings.season,
+        episode: userRatings.episode,
+        title: userRatings.title,
+        posterPath: userRatings.posterPath,
+        rating: userRatings.rating,
+        createdAt: userRatings.ratedAt,
+      })
+      .from(userRatings)
+      .where(eq(userRatings.userId, targetId))
+      .orderBy(desc(userRatings.ratedAt))
+      .limit(sourceLimit),
+    db
+      .select({ id: userLists.id, name: userLists.name, createdAt: userLists.createdAt })
+      .from(userLists)
+      .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true)))
+      .orderBy(desc(userLists.createdAt))
+      .limit(sourceLimit),
+    db
+      .select({
+        id: userListItems.id,
+        tmdbId: userListItems.tmdbId,
+        mediaType: userListItems.mediaType,
+        title: userListItems.title,
+        posterPath: userListItems.posterPath,
+        listId: userLists.id,
+        listName: userLists.name,
+        createdAt: userListItems.addedAt,
+      })
+      .from(userListItems)
+      .innerJoin(userLists, eq(userLists.id, userListItems.listId))
+      .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true)))
+      .orderBy(desc(userListItems.addedAt))
+      .limit(sourceLimit),
+  ]);
+
+  const events = [
+    ...reviewRows.map((row) => ({ ...row, id: `review:${row.id}`, type: 'review' })),
+    ...watchedRows.map((row) => ({ ...row, id: `watched:${row.id}`, type: 'watched' })),
+    ...watchlistRows.map((row) => ({ ...row, id: `watchlist:${row.id}`, type: 'watchlist' })),
+    ...favoriteRows.map((row) => ({ ...row, id: `favorite:${row.id}`, type: 'favorite' })),
+    ...ratingRows.map((row) => ({
+      ...row,
+      id: `rating:${row.id}`,
+      type: 'rating',
+      // Las puntuaciones de episodios conservan la referencia al episodio, pero
+      // se enlazan y se hidratan como su serie padre.
+      mediaType: row.mediaType === 'episode' ? 'tv' : row.mediaType,
+    })),
+    ...listRows.map((row) => ({ ...row, id: `list:${row.id}`, type: 'list' })),
+    ...listItemRows.map((row) => ({ ...row, id: `list-item:${row.id}`, type: 'list_item' })),
+  ];
+
+  events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const page = packPage(events.slice(offset, offset + limit + 1), limit, offset);
+
+  const titleEvents = page.items.filter((item) => item.tmdbId && item.mediaType);
+  const reviewItems = page.items.filter((item) => item.type === 'review');
+  const reviewRatingRows = reviewItems.length
+    ? await db
+        .select({ tmdbId: userRatings.tmdbId, mediaType: userRatings.mediaType, rating: userRatings.rating })
+        .from(userRatings)
+        .where(and(
+          eq(userRatings.userId, targetId),
+          inArray(userRatings.tmdbId, reviewItems.map((item) => Number(item.tmdbId))),
+          inArray(userRatings.mediaType, ['movie', 'tv']),
+        ))
+    : [];
+  const reviewRatingByKey = new Map(
+    reviewRatingRows.map((row) => [titleKey(row.mediaType, row.tmdbId), Number(row.rating)]),
+  );
+  for (const item of reviewItems) {
+    item.rating = reviewRatingByKey.get(titleKey(item.mediaType, item.tmdbId)) ?? null;
+  }
+  await fillMissingPosters(db, targetId, titleEvents);
   return page;
 }
 
