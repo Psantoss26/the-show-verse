@@ -427,7 +427,6 @@ function HistoryCornerIndicator({
   editMode,
   confirmDel,
   onDelete,
-  dateParts,
   compact = false,
 }) {
   if (confirmDel) return null;
@@ -455,23 +454,29 @@ function HistoryCornerIndicator({
     );
   }
 
-  if (!dateParts) return null;
+  return null;
+}
+
+function HistoryHoverIndicator({ type, dateParts, compact = false }) {
+  const itemClassName = compact ? "h-7 w-7" : "h-9 w-8";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const dateClassName = compact ? "h-7 w-[3.65rem] text-[11px]" : "h-9 w-16 text-sm";
 
   return (
     <div
-      className={`${getHistoryIndicatorClass({
-        side: "right",
-        compact,
-        color: "light",
-      })} flex-col gap-0`}
-      aria-label={`Visto el ${dateParts.label}`}
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
     >
-      <span className="text-[8px] sm:text-[9px] font-black uppercase leading-none tracking-[0.08em] [text-box:trim-both_cap_alphabetic]">
-        {dateParts.month}
+      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
+        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
       </span>
-      <span className="mt-0.5 text-sm sm:text-base font-black leading-none tracking-tight [text-box:trim-both_cap_alphabetic]">
-        {dateParts.day}
-      </span>
+      {dateParts ? (
+        <span className={`flex ${dateClassName} shrink-0 items-center justify-center whitespace-nowrap font-bold uppercase leading-none tracking-wide text-zinc-100 antialiased [font-size-adjust:from-font] [text-box:trim-both_cap_alphabetic]`}>
+          <span className="tabular-nums leading-none">
+            {dateParts.day} {dateParts.month}
+          </span>
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -1766,27 +1771,23 @@ const HistoryItemCard = memo(function HistoryItemCard({
               />
             )}
           </div>
-          {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
-          <div
-            className={`absolute inset-x-0 top-0 h-16 sm:h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
-          />
-          <div
-            className={getHistoryIndicatorClass({
-              color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
-              visibility: isGroup ? "always" : "hover",
-            })}
-          >
-            {isGroup ? (
-              <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-                <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                <span>{groupCount}</span>
+          {isGroup && (
+            <>
+              <div className="absolute inset-x-0 top-0 z-10 h-16 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent sm:h-20" />
+              <div
+                className={getHistoryIndicatorClass({
+                  color: "emerald",
+                  visibility: "always",
+                })}
+              >
+                <div className="flex items-center gap-1 text-xs font-bold sm:text-sm">
+                  <Layers className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+                  <span>{groupCount}</span>
+                </div>
               </div>
-            ) : type === "movie" ? (
-              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            ) : (
-              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            )}
-          </div>
+            </>
+          )}
+          <HistoryHoverIndicator type={type} dateParts={watchedDate} />
         </div>
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1810,7 +1811,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
         editMode={editMode}
         confirmDel={confirmDel}
         onDelete={handleDeleteClick}
-        dateParts={watchedDate}
       />
 
       {/* Confirmación de borrado */}
@@ -1914,13 +1914,8 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   index = 0,
   totalItems = 0,
   editMode = false,
-  isMobile = false,
 }) {
   const type = getItemType(entry);
-  const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
-  const baseTitle = getMainTitle(entry);
-  const title = baseTitle;
-  const epBadge = type === "show" && epMeta ? formatEpisodeBadge(epMeta) : null;
   const isGroup = entry?._group && entry._group.length > 1;
   const groupCount = isGroup ? entry._group.length : 0;
   const watchedDate = formatWatchedBadgeDate(entry?.watched_at);
@@ -1990,56 +1985,24 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         {/* Poster Image */}
         <Poster entry={entry} className="w-full h-full" />
 
-        {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
-        <div
-          className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
-        />
-        <div
-          className={getHistoryIndicatorClass({
-            compact: true,
-            color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
-            visibility: isGroup ? "always" : "hover",
-          })}
-        >
-          {isGroup ? (
-            <div className="flex items-center gap-1 font-bold text-[10px] sm:text-xs">
-              <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>{groupCount}</span>
-            </div>
-          ) : type === "movie" ? (
-            <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          ) : (
-            <MonitorPlay className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          )}
-        </div>
-
-        {/* Overlay con gradientes (Desktop) */}
-        <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          {/* Top gradient para asegurar contraste visual del indicador */}
-          <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-            <div />
-          </div>
-
-          {/* Bottom gradient con título e info */}
-          <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-            <h5 className="text-white font-bold text-[10px] leading-tight line-clamp-2 mb-0.5">
-              {title}
-            </h5>
-
-            {isGroup ? (
-              <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
-                {groupCount} episodios agrupados
+        {isGroup && (
+          <>
+            <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
+            <div
+              className={getHistoryIndicatorClass({
+                compact: true,
+                color: "emerald",
+                visibility: "always",
+              })}
+            >
+              <div className="flex items-center gap-1 text-[10px] font-bold sm:text-xs">
+                <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>{groupCount}</span>
               </div>
-            ) : (
-              type === "show" &&
-              epBadge && (
-                <div className="text-[9px] text-emerald-300 font-semibold mt-0.5">
-                  {epBadge}
-                </div>
-              )
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
+        <HistoryHoverIndicator type={type} dateParts={watchedDate} compact />
 
         {/* Delete confirmation overlay */}
         <AnimatePresence>
@@ -2083,7 +2046,6 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         editMode={editMode}
         confirmDel={confirmDel}
         onDelete={handleDeleteClick}
-        dateParts={watchedDate}
         compact
       />
     </motion.div>
@@ -2245,27 +2207,23 @@ const HistoryGridCard = memo(function HistoryGridCard({
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         <Poster entry={entry} className="w-full h-full" />
 
-        {/* Gradiente superior suave para que los indicadores destaquen sobre fondos claros */}
-        <div
-          className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${isGroup || (isMobile && editMode) ? "opacity-100" : "opacity-0 lg:group-hover:opacity-100"}`}
-        />
-        <div
-          className={getHistoryIndicatorClass({
-            color: isGroup ? "emerald" : type === "movie" ? "sky" : "purple",
-            visibility: isGroup ? "always" : "hover",
-          })}
-        >
-          {isGroup ? (
-            <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-              <Layers className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              <span>{groupCount}</span>
+        {isGroup && (
+          <>
+            <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
+            <div
+              className={getHistoryIndicatorClass({
+                color: "emerald",
+                visibility: "always",
+              })}
+            >
+              <div className="flex items-center gap-1 text-xs font-bold sm:text-sm">
+                <Layers className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+                <span>{groupCount}</span>
+              </div>
             </div>
-          ) : type === "movie" ? (
-            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          ) : (
-            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          )}
-        </div>
+          </>
+        )}
+        <HistoryHoverIndicator type={type} dateParts={watchedDate} />
 
         {/* MÓVIL: banda inferior - solo en editMode */}
         {(!isMobile || editMode) && (
@@ -2281,53 +2239,6 @@ const HistoryGridCard = memo(function HistoryGridCard({
             {InfoContent}
           </div>
         )}
-
-        {/* DESKTOP: overlay más sutil con menos blur */}
-        <div
-          className={[
-            "absolute inset-0 z-10 hidden lg:flex flex-col justify-end p-3",
-            "bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300",
-            confirmDel ? "opacity-0 pointer-events-none" : "",
-          ].join(" ")}
-        >
-          <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-            <h5 className="text-white font-bold text-xs leading-tight line-clamp-2">
-              {title}
-            </h5>
-
-            {isGroup ? (
-              <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-zinc-300/90">
-                <span className="font-medium text-emerald-300/90">
-                  {groupCount} episodios agrupados
-                </span>
-                {groupRange && (
-                  <span className="text-zinc-400 text-[10px]">
-                    {groupRange}
-                  </span>
-                )}
-              </div>
-            ) : (
-              type === "show" &&
-              (epBadge || episodeTitle) && (
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-300/90">
-                  {epBadge && (
-                    <span className="shrink-0 font-medium text-emerald-300/90">
-                      {epBadge}
-                    </span>
-                  )}
-                  {epBadge && episodeTitle && (
-                    <span className="text-zinc-500">•</span>
-                  )}
-                  {episodeTitle && (
-                    <span className="min-w-0 truncate text-zinc-400">
-                      {episodeTitle}
-                    </span>
-                  )}
-                </div>
-              )
-            )}
-          </div>
-        </div>
 
         {/* Confirmación de borrado */}
         <AnimatePresence>
@@ -2371,7 +2282,6 @@ const HistoryGridCard = memo(function HistoryGridCard({
         editMode={editMode}
         confirmDel={confirmDel}
         onDelete={handleDeleteClick}
-        dateParts={watchedDate}
       />
     </div>
   );
