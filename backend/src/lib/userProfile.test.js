@@ -85,6 +85,23 @@ test('normalizeProfileFavorites tolerates non-array input', () => {
   assert.deepEqual(normalizeProfileFavorites('nope'), []);
 });
 
+test('normalizeProfileFavorites keeps five entries for each requested media type', () => {
+  const input = Array.from({ length: 6 }, (_, index) => ({
+    tmdbId: index + 1,
+    mediaType: 'movie',
+  })).concat(Array.from({ length: 6 }, (_, index) => ({
+    tmdbId: index + 101,
+    mediaType: 'tv',
+  })));
+
+  const movies = normalizeProfileFavorites(input, PROFILE_FAVORITES_MAX, 'movie');
+  const series = normalizeProfileFavorites(input, PROFILE_FAVORITES_MAX, 'tv');
+  assert.equal(movies.length, PROFILE_FAVORITES_MAX);
+  assert.equal(series.length, PROFILE_FAVORITES_MAX);
+  assert.ok(movies.every((item) => item.mediaType === 'movie'));
+  assert.ok(series.every((item) => item.mediaType === 'tv'));
+});
+
 test('pageParams clamps limit and offset to safe bounds', () => {
   assert.deepEqual(pageParams({}), { limit: 30, offset: 0 });
   assert.deepEqual(pageParams({ limit: 10, offset: 20 }), { limit: 10, offset: 20 });

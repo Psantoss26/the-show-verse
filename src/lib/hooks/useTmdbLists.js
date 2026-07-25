@@ -18,10 +18,12 @@ function uniqById(arr) {
 }
 
 export default function useTmdbLists() {
-    const { session, account } = useAuth()
-    const accountId = account?.id || null
+    const { authenticated } = useAuth()
 
-    const canUse = useMemo(() => !!session && !!accountId, [session, accountId])
+    // Aunque el nombre se conserva temporalmente para no romper imports, estas
+    // listas no dependen de TMDb: pertenecen al usuario autenticado en nuestro
+    // backend y usan su cookie de sesión propia.
+    const canUse = useMemo(() => Boolean(authenticated), [authenticated])
 
     const [lists, setLists] = useState([])
     const [loading, setLoading] = useState(false)
@@ -41,7 +43,7 @@ export default function useTmdbLists() {
         setLoading(true)
         setError('')
         try {
-            const json = await fetchUserLists({ accountId, sessionId: session, page: 1 })
+            const json = await fetchUserLists()
             const results = Array.isArray(json?.results) ? json.results : []
             setLists(results)
             setPage(1)
@@ -55,7 +57,7 @@ export default function useTmdbLists() {
             setInitialized(true)
             setLoading(false)
         }
-    }, [canUse, accountId, session])
+    }, [canUse])
 
     useEffect(() => {
         if (!canUse) {
@@ -63,7 +65,7 @@ export default function useTmdbLists() {
             return
         }
         setInitialized(false)
-    }, [canUse, accountId, session])
+    }, [canUse])
 
     const loadMore = useCallback(async () => {
         if (!canUse || loading || !hasMore) return
@@ -71,7 +73,7 @@ export default function useTmdbLists() {
         setLoading(true)
         setError('')
         try {
-            const json = await fetchUserLists({ accountId, sessionId: session, page: nextPage })
+            const json = await fetchUserLists()
             const results = Array.isArray(json?.results) ? json.results : []
             setLists((prev) => uniqById([...(prev || []), ...(results || [])]))
             setPage(nextPage)
@@ -81,7 +83,7 @@ export default function useTmdbLists() {
         } finally {
             setLoading(false)
         }
-    }, [canUse, loading, hasMore, page, accountId, session])
+    }, [canUse, loading, hasMore, page])
 
     useEffect(() => {
         refresh()
@@ -99,13 +101,13 @@ export default function useTmdbLists() {
 
         async create({ name, description }) {
             if (!canUse) throw new Error('Login requerido')
-            await createUserList({ sessionId: session, name, description })
+            await createUserList({ name, description })
             await refresh()
         },
 
         async del(listId) {
             if (!canUse) throw new Error('Login requerido')
-            await deleteUserList({ listId, sessionId: session })
+            await deleteUserList({ listId })
             await refresh()
         }
     }

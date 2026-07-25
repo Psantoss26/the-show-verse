@@ -20,6 +20,7 @@ import {
   canFollow,
   normalizeProfileFavorites,
   PROFILE_FAVORITES_MAX,
+  PROFILE_FAVORITES_TOTAL_MAX,
   getUserReviews,
   getUserWatched,
   getUserWatchlist,
@@ -91,6 +92,29 @@ export function getArtworkOverrides(uiSettings, { type, ids, kind }) {
   }
 
   return result;
+}
+
+function serializeProfileFavorite(favorite) {
+  return {
+    tmdbId: favorite.tmdbId,
+    mediaType: favorite.mediaType,
+    title: favorite.title,
+    posterPath: favorite.posterPath,
+  };
+}
+
+function profileFavoritesByType(items) {
+  const movies = normalizeProfileFavorites(
+    items.filter((item) => item.mediaType === 'movie'),
+    PROFILE_FAVORITES_MAX,
+    'movie',
+  );
+  const series = normalizeProfileFavorites(
+    items.filter((item) => item.mediaType === 'tv'),
+    PROFILE_FAVORITES_MAX,
+    'tv',
+  );
+  return { movies, series };
 }
 
 function normalizePreferences(row) {
@@ -226,44 +250,61 @@ export default async function usersRoutes(fastify) {
     return reply.send({ results });
   });
 
-  // GET /users/me/profile-favorites — selección curada del propio usuario.
+  // GET /users/me/profile-favorites — 5 películas y 5 series destacadas.
   fastify.get('/me/profile-favorites', async (req, reply) => {
     const rows = await db
       .select()
       .from(profileFavorites)
       .where(eq(profileFavorites.userId, req.user.id))
       .orderBy(profileFavorites.position)
-      .limit(PROFILE_FAVORITES_MAX);
+      .limit(PROFILE_FAVORITES_TOTAL_MAX);
+    const { movies, series } = profileFavoritesByType(rows);
     return reply.send({
-      favorites: rows.map((f) => ({
-        tmdbId: f.tmdbId,
-        mediaType: f.mediaType,
-        title: f.title,
-        posterPath: f.posterPath,
-      })),
+      movies: movies.map(serializeProfileFavorite),
+      series: series.map(serializeProfileFavorite),
+      // Compatibilidad con la versión anterior de la configuración.
+      favorites: [...movies, ...series]
+        .slice(0, PROFILE_FAVORITES_MAX)
+        .map(serializeProfileFavorite),
     });
   });
 
-  // PUT /users/me/profile-favorites — reemplaza la selección (≤5).
-  const favoritesBodySchema = z.object({
-    items: z
-      .array(
-        z.object({
-          tmdbId: z.coerce.number().int().positive(),
-          mediaType: z.enum(['movie', 'tv']),
-          title: z.string().max(512).nullish(),
-          posterPath: z.string().max(512).nullish(),
-        }),
-      )
-      .max(PROFILE_FAVORITES_MAX),
+  // PUT /users/me/profile-favorites — reemplaza ambas filas (≤5 por tipo).
+  const profileFavoriteSchema = z.object({
+    tmdbId: z.coerce.number().int().positive(),
+    mediaType: z.enum(['movie', 'tv']),
+    title: z.string().max(512).nullish(),
+    posterPath: z.string().max(512).nullish(),
   });
+  const favoritesBodySchema = z.object({
+    movies: z.array(profileFavoriteSchema).max(PROFILE_FAVORITES_MAX).optional(),
+    series: z.array(profileFavoriteSchema).max(PROFILE_FAVORITES_MAX).optional(),
+    // Aceptamos temporalmente el payload previo para no romper una pestaña
+    // abierta con la versión antigua de la interfaz.
+    items: z.array(profileFavoriteSchema).max(PROFILE_FAVORITES_MAX).optional(),
+  }).refine(
+    (value) => Array.isArray(value.movies) || Array.isArray(value.series) || Array.isArray(value.items),
+    { message: 'Indica las películas o series favoritas' },
+  );
 
   fastify.put('/me/profile-favorites', async (req, reply) => {
     const parsed = favoritesBodySchema.safeParse(req.body || {});
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
-    const clean = normalizeProfileFavorites(parsed.data.items);
+    const groupedPayload = Array.isArray(parsed.data.movies) || Array.isArray(parsed.data.series);
+    const legacyItems = groupedPayload ? [] : parsed.data.items || [];
+    const movies = normalizeProfileFavorites(
+      groupedPayload ? parsed.data.movies || [] : legacyItems.filter((item) => item.mediaType === 'movie'),
+      PROFILE_FAVORITES_MAX,
+      'movie',
+    );
+    const series = normalizeProfileFavorites(
+      groupedPayload ? parsed.data.series || [] : legacyItems.filter((item) => item.mediaType === 'tv'),
+      PROFILE_FAVORITES_MAX,
+      'tv',
+    );
+    const clean = [...movies, ...series];
 
     await db.transaction(async (tx) => {
       await tx.delete(profileFavorites).where(eq(profileFavorites.userId, req.user.id));
@@ -275,12 +316,9 @@ export default async function usersRoutes(fastify) {
     });
 
     return reply.send({
-      favorites: clean.map((f) => ({
-        tmdbId: f.tmdbId,
-        mediaType: f.mediaType,
-        title: f.title,
-        posterPath: f.posterPath,
-      })),
+      movies: movies.map(serializeProfileFavorite),
+      series: series.map(serializeProfileFavorite),
+      favorites: clean.slice(0, PROFILE_FAVORITES_MAX).map(serializeProfileFavorite),
     });
   });
 
@@ -396,6 +434,15 @@ export default async function usersRoutes(fastify) {
   fastify.get('/:username/watchlist', sectionEndpoint(getUserWatchlist));
   fastify.get('/:username/favorites', sectionEndpoint(getUserFavorites));
   fastify.get('/:username/ratings', sectionEndpoint(getUserRatings));
-  fastify.get('/:username/lists', sectionEndpoint(getUserLists));
+  fastify.get('/:username/lists', async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    const page = await getUserLists(db, target.id, {
+      limit: req.query?.limit,
+      offset: req.query?.offset,
+      includePrivateLists: target.id === req.user.id,
+    });
+    return reply.send(page);
+  });
   fastify.get('/:username/activity', sectionEndpoint(getUserActivity));
 }

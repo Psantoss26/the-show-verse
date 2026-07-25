@@ -5,19 +5,26 @@ import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
 import { BookmarkPlus, Eye, Heart, ImageOff } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import Stars from "./Stars";
 
 function tmdbPoster(path, size = "w342") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
 
+function mediaTypeOf(item) {
+  const type = item?.mediaType ?? item?.media_type;
+  return type === "tv" || type === "show" || type === "episode" ? "tv" : "movie";
+}
+
 function detailsHref(item) {
-  const type = item?.mediaType === "tv" || item?.media_type === "tv" ? "tv" : "movie";
-  return `/details/${type}/${item?.tmdbId || item?.id}`;
+  return `/details/${mediaTypeOf(item)}/${item?.tmdbId || item?.id}`;
 }
 
 export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default" }) {
   const [failed, setFailed] = useState(false);
+  const previewClick = usePreviewOpen();
+  const mediaType = mediaTypeOf(item);
   const src = tmdbPoster(item?.posterPath || item?.poster_path);
 
   const title = item?.title || item?.name || "";
@@ -48,7 +55,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       : "h-9 w-10 text-xl";
 
   return (
-    <Link href={detailsHref(item)} className="group/card relative block">
+    <Link href={detailsHref(item)} onClick={previewClick(item, { mediaType })} className="group/card relative block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
 
         {/* Imagen del póster */}

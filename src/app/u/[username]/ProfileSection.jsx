@@ -31,6 +31,7 @@ import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { useAuth } from "@/context/AuthContext";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -39,7 +40,7 @@ const SECTIONS = {
   favorites: { layout: "posters", showStars: false, empty: "Sin favoritos." },
   ratings: { layout: "posters", showStars: true, empty: "Sin puntuaciones." },
   reviews: { layout: "reviews", empty: "Sin reseñas." },
-  lists: { layout: "lists", empty: "Sin listas públicas." },
+  lists: { layout: "lists", empty: "Sin listas." },
   activity: { layout: "activity", empty: "Aún no hay actividad pública." },
 };
 
@@ -64,6 +65,35 @@ function getItemDate(item) {
 function getItemRating(item) {
   const rating = Number(item?.rating ?? item?.userRating ?? item?.user_rating ?? 0);
   return Number.isFinite(rating) ? rating : 0;
+}
+
+// Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
+// público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
+// preview debe recibir su temporada y episodio concretos.
+function getEpisodePreview(item) {
+  const mediaType = item?.mediaType || item?.media_type || item?.type;
+  if (mediaType !== "tv" && mediaType !== "show" && mediaType !== "episode") return undefined;
+
+  const rawSeason = item?.seasonNumber ?? item?.season_number ?? item?.season;
+  const rawEpisode = item?.episodeNumber ?? item?.episode_number ?? item?.episode;
+  if (rawSeason == null || rawSeason === "" || rawEpisode == null || rawEpisode === "") return undefined;
+
+  const seasonNumber = Number(rawSeason);
+  const episodeNumber = Number(rawEpisode);
+  const showId = item?.showId ?? item?.show_id ?? item?.tmdbId ?? item?.tmdb_id ?? item?.id;
+
+  if (!Number.isInteger(seasonNumber) || seasonNumber < 0 || !Number.isInteger(episodeNumber) || episodeNumber < 0 || showId == null) {
+    return undefined;
+  }
+
+  return {
+    showId,
+    seasonNumber,
+    episodeNumber,
+    name: item?.episodeTitle ?? item?.episode_title ?? item?.episodeName ?? item?.episode_name ?? null,
+    still_path: item?.stillPath ?? item?.still_path ?? null,
+    showName: item?.showName ?? item?.show_name ?? item?.showTitle ?? item?.show_title ?? item?.seriesName ?? item?.series_name ?? item?.title ?? null,
+  };
 }
 
 function activityTypeLabel(type) {
@@ -423,10 +453,15 @@ function ActivityAvatar({ actor }) {
 }
 
 function ActivityTitle({ item, className = "" }) {
+  const previewClick = usePreviewOpen();
   if (!item.tmdbId || !item.mediaType) return null;
-  const type = item.mediaType === "tv" ? "tv" : "movie";
+  const type = item.mediaType === "tv" || item.mediaType === "episode" ? "tv" : "movie";
   return (
-    <Link href={`/details/${type}/${item.tmdbId}`} className={`font-bold text-white transition-colors hover:text-emerald-300 ${className}`}>
+    <Link
+      href={`/details/${type}/${item.tmdbId}`}
+      onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
+      className={`font-bold text-white transition-colors hover:text-emerald-300 ${className}`}
+    >
       {item.title || "Ver ficha"}
     </Link>
   );
@@ -434,6 +469,7 @@ function ActivityTitle({ item, className = "" }) {
 
 function ActivityReview({ item, actor, compact = false }) {
   const [showSpoiler, setShowSpoiler] = useState(false);
+  const previewClick = usePreviewOpen();
   const type = item.mediaType === "tv" ? "tv" : "movie";
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
@@ -441,7 +477,7 @@ function ActivityReview({ item, actor, compact = false }) {
     <article className={`rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
       <div className="flex gap-3 sm:gap-4">
         <ActivityAvatar actor={actor} />
-        <Link href={`/details/${type}/${item.tmdbId}`} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
+        <Link href={`/details/${type}/${item.tmdbId}`} onClick={previewClick(item)} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
           {src ? (
             <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
           ) : (
@@ -535,6 +571,7 @@ const EMPTY_SOCIAL_RELATIONS = Object.freeze({
 
 function ReviewCard({ item }) {
   const [expanded, setExpanded] = useState(false);
+  const previewClick = usePreviewOpen();
   const type = item.mediaType === "tv" ? "tv" : "movie";
   const src = item.posterPath
     ? `https://image.tmdb.org/t/p/w185${item.posterPath}`
@@ -543,6 +580,7 @@ function ReviewCard({ item }) {
     <div className="flex gap-4 rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60">
       <Link
         href={`/details/${type}/${item.tmdbId}`}
+        onClick={previewClick(item)}
         className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm"
       >
         {src ? (
@@ -557,6 +595,7 @@ function ReviewCard({ item }) {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/details/${type}/${item.tmdbId}`}
+            onClick={previewClick(item)}
             className="text-sm font-bold text-white hover:text-emerald-400"
           >
             {item.title || "Ver ficha"}
@@ -624,6 +663,7 @@ function ProfileListCard({ item }) {
 }
 
 function ProfileMediaListItem({ item, showStars, viewerState, compact = false }) {
+  const previewClick = usePreviewOpen();
   const type = getItemMediaType(item);
   const title = getItemTitle(item) || "Sin título";
   const src = item?.posterPath || item?.poster_path || item?.profilePosterPath;
@@ -635,6 +675,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
   return (
     <Link
       href={`/details/${type}/${item?.tmdbId || item?.id}`}
+      onClick={previewClick(item, { mediaType: type })}
       className="group flex min-w-0 items-center gap-3 rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
     >
       <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>

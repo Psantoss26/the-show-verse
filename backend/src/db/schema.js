@@ -193,7 +193,7 @@ export const userLists = pgTable('user_lists', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
-  isPublic: boolean('is_public').default(false).notNull(),
+  isPublic: boolean('is_public').default(true).notNull(),
   sortBy: text('sort_by').default('added_at'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -407,7 +407,8 @@ export const follows = pgTable('follows', {
 }));
 
 // ─────────────────────────────────────────────
-// PROFILE FAVORITES (los ≤5 títulos destacados del perfil, curados a mano;
+// PROFILE FAVORITES (hasta 5 películas y 5 series destacadas del perfil,
+// curadas a mano;
 // distintos del corazón/favoritos). Estilo "Favorite Films" de Letterboxd.
 // ─────────────────────────────────────────────
 export const profileFavorites = pgTable('profile_favorites', {
@@ -417,7 +418,7 @@ export const profileFavorites = pgTable('profile_favorites', {
   mediaType: text('media_type').notNull(),                // 'movie' | 'tv'
   title: text('title'),
   posterPath: text('poster_path'),
-  position: integer('position').default(0).notNull(),     // 0-4 (orden de exhibición)
+  position: integer('position').default(0).notNull(),     // 0-4 por tipo (orden de exhibición)
   addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   uniqueFavorite: uniqueIndex('idx_profile_favorites_unique').on(t.userId, t.tmdbId, t.mediaType),

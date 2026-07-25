@@ -10,6 +10,28 @@ import {
 } from '../lib/userProfile.js';
 
 export default async function publicUsersRoutes(fastify) {
+  // GET /users/public/resolve-usernames?usernames=a,b — resuelve en bloque los
+  // handles que pertenecen a miembros reales. Se usa en comentarios importados
+  // para no convertir autores externos (por ejemplo, de Trakt) en enlaces rotos.
+  fastify.get('/resolve-usernames', async (req, reply) => {
+    const requested = String(req.query?.usernames || '')
+      .split(',')
+      .map((username) => username.trim())
+      .filter((username) => username.length > 0 && username.length <= 64)
+      .slice(0, 40);
+    const unique = [...new Map(requested.map((username) => [username.toLowerCase(), username])).values()];
+
+    const matches = await Promise.all(
+      unique.map((username) => findUserByUsername(db, username)),
+    );
+
+    return reply.send({
+      usernames: matches
+        .filter(Boolean)
+        .map((user) => user.username),
+    });
+  });
+
   // GET /users/public/:username/profile — perfil y estadísticas agregadas.
   // `req.user` es opcional: si existe, permite conservar isSelf/isFollowing.
   fastify.get('/:username/profile', async (req, reply) => {

@@ -48,10 +48,10 @@ export async function fetchUserLists() {
   return { results, page: 1, total_pages: 1 };
 }
 
-export async function createUserList({ name, description } = {}) {
+export async function createUserList({ name, description, isPublic = true } = {}) {
   const json = await api('', {
     method: 'POST',
-    body: JSON.stringify({ name, description: description || undefined }),
+    body: JSON.stringify({ name, description: description || undefined, isPublic }),
   });
   return { success: true, list_id: json?.list?.id || null };
 }
@@ -80,6 +80,7 @@ export async function getListDetails({ listId, signal } = {}) {
     name: list.name || '',
     description: list.description || '',
     public: !!list.isPublic,
+    canEdit: json?.canEdit !== false,
     item_count: items.length,
     page: 1,
     total_pages: 1,
