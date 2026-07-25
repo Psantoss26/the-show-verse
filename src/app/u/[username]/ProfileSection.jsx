@@ -29,6 +29,11 @@ const SECTIONS = {
   lists: { layout: "lists", empty: "Sin listas públicas." },
   activity: { layout: "activity", empty: "Aún no hay actividad pública." },
 };
+const profileSectionCache = new Map();
+
+function profileSectionCacheKey(username, section) {
+  return `${String(username || "").trim().toLocaleLowerCase()}:${section}`;
+}
 
 function relativeActivityTime(value) {
   const date = new Date(value);
@@ -163,6 +168,10 @@ function ActivityFeed({ items, actor }) {
   );
 }
 const EMPTY_SOCIAL_RELATION = Object.freeze({ users: [], hasMore: false, offset: 0 });
+const EMPTY_SOCIAL_RELATIONS = Object.freeze({
+  followers: EMPTY_SOCIAL_RELATION,
+  following: EMPTY_SOCIAL_RELATION,
+});
 
 function ReviewCard({ item }) {
   const [expanded, setExpanded] = useState(false);
@@ -257,18 +266,28 @@ function ProfileListCard({ item }) {
 function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
-  const [items, setItems] = useState([]);
-  const [status, setStatus] = useState("loading");
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const cacheKey = profileSectionCacheKey(username, section);
+  const [items, setItems] = useState(() => profileSectionCache.get(cacheKey)?.items || []);
+  const [status, setStatus] = useState(() => profileSectionCache.has(cacheKey) ? "ready" : "loading");
+  const [offset, setOffset] = useState(() => profileSectionCache.get(cacheKey)?.offset || 0);
+  const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
 
   useEffect(() => {
     let cancelled = false;
-    setStatus("loading");
-    setItems([]);
-    setOffset(0);
+    const cachedSection = profileSectionCache.get(cacheKey);
+    if (cachedSection) {
+      setItems(cachedSection.items);
+      setHasMore(cachedSection.hasMore);
+      setOffset(cachedSection.offset);
+      setStatus("ready");
+    } else {
+      setStatus("loading");
+      setItems([]);
+      setHasMore(false);
+      setOffset(0);
+    }
     (async () => {
       try {
         const res = await fetch(
@@ -278,18 +297,24 @@ function ProfileContentSection({ username, section, actor }) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;
-        setItems(Array.isArray(data.items) ? data.items : []);
-        setHasMore(Boolean(data.hasMore));
-        setOffset(Number(data.offset) || 0);
+        const nextSection = {
+          items: Array.isArray(data.items) ? data.items : [],
+          hasMore: Boolean(data.hasMore),
+          offset: Number(data.offset) || 0,
+        };
+        profileSectionCache.set(cacheKey, nextSection);
+        setItems(nextSection.items);
+        setHasMore(nextSection.hasMore);
+        setOffset(nextSection.offset);
         setStatus("ready");
       } catch {
-        if (!cancelled) setStatus("error");
+        if (!cancelled && !cachedSection) setStatus("error");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [username, section]);
+  }, [username, section, cacheKey]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -299,10 +324,17 @@ function ProfileContentSection({ username, section, actor }) {
         `/api/users/${encodeURIComponent(username)}/${section}?limit=30&offset=${offset}`,
         { cache: "no-store" },
       );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setItems((prev) => [...prev, ...(Array.isArray(data.items) ? data.items : [])]);
-      setHasMore(Boolean(data.hasMore));
-      setOffset(Number(data.offset) || offset);
+      const nextSection = {
+        items: [...items, ...(Array.isArray(data.items) ? data.items : [])],
+        hasMore: Boolean(data.hasMore),
+        offset: Number(data.offset) || offset,
+      };
+      profileSectionCache.set(cacheKey, nextSection);
+      setItems(nextSection.items);
+      setHasMore(nextSection.hasMore);
+      setOffset(nextSection.offset);
     } catch {
       // reintentar manualmente
     } finally {
@@ -416,17 +448,21 @@ function SocialColumn({ title, empty, relation, data, loadingMore, onLoadMore })
 }
 
 function ProfileSocialSection({ username }) {
-  const [relations, setRelations] = useState({
-    followers: EMPTY_SOCIAL_RELATION,
-    following: EMPTY_SOCIAL_RELATION,
-  });
-  const [status, setStatus] = useState("loading");
+  const cacheKey = profileSectionCacheKey(username, "social");
+  const [relations, setRelations] = useState(() => profileSectionCache.get(cacheKey)?.relations || EMPTY_SOCIAL_RELATIONS);
+  const [status, setStatus] = useState(() => profileSectionCache.has(cacheKey) ? "ready" : "loading");
   const [loadingMore, setLoadingMore] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    setStatus("loading");
-    setRelations({ followers: EMPTY_SOCIAL_RELATION, following: EMPTY_SOCIAL_RELATION });
+    const cachedSection = profileSectionCache.get(cacheKey);
+    if (cachedSection) {
+      setRelations(cachedSection.relations);
+      setStatus("ready");
+    } else {
+      setStatus("loading");
+      setRelations(EMPTY_SOCIAL_RELATIONS);
+    }
     (async () => {
       try {
         const fetchRelation = async (relation) => {
@@ -447,17 +483,19 @@ function ProfileSocialSection({ username }) {
           fetchRelation("following"),
         ]);
         if (!cancelled) {
-          setRelations({ followers, following });
+          const nextRelations = { followers, following };
+          profileSectionCache.set(cacheKey, { relations: nextRelations });
+          setRelations(nextRelations);
           setStatus("ready");
         }
       } catch {
-        if (!cancelled) setStatus("error");
+        if (!cancelled && !cachedSection) setStatus("error");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [username]);
+  }, [username, cacheKey]);
 
   const loadMore = async (relation) => {
     const current = relations[relation];
@@ -470,14 +508,16 @@ function ProfileSocialSection({ username }) {
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
-      setRelations((previous) => ({
-        ...previous,
+      const nextRelations = {
+        ...relations,
         [relation]: {
           users: [...current.users, ...(Array.isArray(payload.users) ? payload.users : [])],
           hasMore: Boolean(payload.hasMore),
           offset: Number(payload.offset) || current.offset,
         },
-      }));
+      };
+      profileSectionCache.set(cacheKey, { relations: nextRelations });
+      setRelations(nextRelations);
     } catch {
       // El botón se mantiene disponible para reintentar la carga.
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -62,6 +62,18 @@ const RatingsBarChart = dynamic(
 // ficha de título el perfil se pinta de inmediato y se refresca en segundo
 // plano, en lugar de volver a mostrar una pantalla de espera.
 const profileCache = new Map();
+const PROFILE_TAB_IDS = [
+  "profile",
+  "statistics",
+  "activity",
+  "watched",
+  "reviews",
+  "favorites",
+  "watchlist",
+  "ratings",
+  "lists",
+  "social",
+];
 
 function profileCacheKey(username) {
   return String(username || "").trim().toLocaleLowerCase();
@@ -139,7 +151,7 @@ function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emera
 
 function ProfilePosterGrid({ items, showStars = false, viewerTitleStates }) {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+    <div data-profile-horizontal-scroll className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
       {items.map((item) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
@@ -525,6 +537,7 @@ function buildAnalyticsFromPrivateProfile(payload) {
 
 export default function ProfileClient({ username }) {
   const { user: viewer, logout } = useAuth();
+  const profileSwipe = useRef(null);
   const [state, setState] = useState(() => {
     const key = profileCacheKey(username);
     const profile = profileCache.get(key) || null;
@@ -670,12 +683,50 @@ export default function ProfileClient({ username }) {
   const monthlyActivity = resolvedAnalytics?.monthlyActivity?.at(-1) || {};
   const thisMonth = resolvedAnalytics?.thisMonth || monthlyActivity;
 
+  const handleProfileTouchStart = (event) => {
+    if (window.matchMedia("(min-width: 640px)").matches || event.touches.length !== 1) return;
+    const target = event.target;
+    const ignoreSwipe = target instanceof Element && Boolean(
+      target.closest("[data-profile-horizontal-scroll], a, button, input, textarea, select, [contenteditable='true']"),
+    );
+    profileSwipe.current = {
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY,
+      ignoreSwipe,
+    };
+  };
+
+  const handleProfileTouchEnd = (event) => {
+    const gesture = profileSwipe.current;
+    profileSwipe.current = null;
+    if (!gesture || gesture.ignoreSwipe || event.changedTouches.length !== 1) return;
+
+    const deltaX = event.changedTouches[0].clientX - gesture.x;
+    const deltaY = event.changedTouches[0].clientY - gesture.y;
+    if (Math.abs(deltaX) < 64 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+
+    setTab((currentTab) => {
+      const currentIndex = PROFILE_TAB_IDS.indexOf(currentTab);
+      const direction = deltaX < 0 ? 1 : -1;
+      const nextIndex = Math.min(
+        PROFILE_TAB_IDS.length - 1,
+        Math.max(0, currentIndex + direction),
+      );
+      return PROFILE_TAB_IDS[nextIndex];
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-black text-zinc-100 pb-24">
+    <div
+      className="min-h-screen bg-black text-zinc-100 pb-0 lg:pb-24"
+      onTouchStart={handleProfileTouchStart}
+      onTouchEnd={handleProfileTouchEnd}
+      onTouchCancel={() => { profileSwipe.current = null; }}
+    >
       {/* Fondo decorativo sutil */}
       <ProfileBackdrop />
 
-      <div className="relative z-10 mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
+      <div className="relative z-10 mx-auto max-w-[1500px] px-4 pb-8 pt-4 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
         {/* ── CABECERA ── */}
         <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between lg:gap-6">
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 sm:h-26 sm:w-26" />
@@ -893,20 +944,32 @@ export default function ProfileClient({ username }) {
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
 function ProfileTabs({ tab, setTab, sections }) {
+  const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
-    { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "statistics", label: "Estadísticas" },
+    { id: "activity", label: "Actividad", count: sections?.activity },
+    { id: "watched", label: "Diario", count: sections?.watched },
     { id: "reviews", label: "Reseñas", count: sections?.reviews },
-    { id: "watched", label: "Visionados", count: sections?.watched },
-    { id: "watchlist", label: "Watchlist", count: sections?.watchlist },
     { id: "favorites", label: "Favoritos", count: sections?.favorites },
+    { id: "watchlist", label: "Pendientes", count: sections?.watchlist },
     { id: "ratings", label: "Puntuaciones", count: sections?.ratings },
     { id: "lists", label: "Listas", count: sections?.lists },
     { id: "social", label: "Social" },
   ];
+
+  useEffect(() => {
+    const activeTab = navRef.current?.querySelector("[data-profile-tab-active='true']");
+    if (!activeTab) return;
+    activeTab.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [tab]);
+
   return (
-    <nav className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] sm:mt-8 [&::-webkit-scrollbar]:hidden">
+    <nav ref={navRef} className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] sm:mt-8 [&::-webkit-scrollbar]:hidden">
       {items.map((it) => {
         const active = tab === it.id;
         return (
@@ -914,7 +977,8 @@ function ProfileTabs({ tab, setTab, sections }) {
             key={it.id}
             type="button"
             onClick={() => setTab(it.id)}
-            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-1 py-2.5 text-[9px] font-bold uppercase tracking-[0.08em] transition-colors sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
+            data-profile-tab-active={active || undefined}
+            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
@@ -976,7 +1040,6 @@ function ProfileAnalytics({ analytics }) {
   const hasActivity = analytics.monthlyActivity?.some((item) => item.total > 0);
   return (
     <section className="space-y-4">
-      <SectionHeader label="Actividad y estadísticas" />
       <div className="grid min-w-0 gap-4 xl:grid-cols-12">
         <AnalyticsCard
           title="Actividad mensual"
@@ -1067,7 +1130,7 @@ function HabitMetric({ icon: Icon, label, value, tone = "emerald" }) {
 
   return (
     <div
-      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-white/10 to-white/5 px-2 py-2.5 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07]"
+      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-zinc-900/30 px-2 py-2.5 text-center shadow-sm"
       aria-label={`${label}: ${value}`}
     >
       <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center ${toneClass}`}>
