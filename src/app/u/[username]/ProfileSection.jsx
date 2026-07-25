@@ -31,7 +31,7 @@ function ReviewCard({ item }) {
     <div className="flex gap-4 rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60">
       <Link
         href={`/details/${type}/${item.tmdbId}`}
-        className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-md bg-zinc-900 shadow-sm"
+        className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm"
       >
         {src ? (
           <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
@@ -81,7 +81,7 @@ function ProfileListCard({ item }) {
           posters.map((p, i) => (
             <div
               key={i}
-              className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-md bg-zinc-900 shadow-sm"
+              className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm"
               style={{ marginLeft: i === 0 ? 0 : -14, zIndex: 10 - i }}
             >
               <OptimizedImage
@@ -93,7 +93,7 @@ function ProfileListCard({ item }) {
             </div>
           ))
         ) : (
-          <div className="flex h-16 w-11 items-center justify-center rounded-md bg-zinc-900 text-zinc-700">
+          <div className="flex h-16 w-11 items-center justify-center rounded-xl bg-zinc-900 text-zinc-700">
             <ListVideo className="h-5 w-5" />
           </div>
         )}
