@@ -156,12 +156,12 @@ export default function ProfileFavoritesEditor() {
           const item = items[idx];
           if (!loaded) {
             return (
-              <div key={idx} className="aspect-[2/3] animate-pulse rounded-lg bg-white/5" />
+              <div key={idx} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />
             );
           }
           if (item) {
             return (
-              <div key={keyOf(item)} className="group relative aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10">
+              <div key={keyOf(item)} className="group relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10">
                 {item.posterPath ? (
                   <OptimizedImage
                     src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
@@ -188,7 +188,7 @@ export default function ProfileFavoritesEditor() {
           return (
             <div
               key={`empty-${idx}`}
-              className="flex aspect-[2/3] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.015] text-zinc-700"
+              className="flex aspect-[2/3] items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.015] text-zinc-700"
             >
               <Plus className="h-5 w-5" />
             </div>

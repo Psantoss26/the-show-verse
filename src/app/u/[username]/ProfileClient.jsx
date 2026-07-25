@@ -89,7 +89,7 @@ function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
 }
 
 function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emerald-400" }) {
-  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
+  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
   const body = (
     <>
       <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
@@ -184,7 +184,7 @@ function PendingPreview({ username, items, onOpen }) {
               <Link
                 key={`${item.mediaType}:${item.tmdbId}`}
                 href={href}
-                className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-md bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
+                className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
                 style={{ left: `${leftPercent}%`, zIndex: index + 1 }}
               >
                 {source ? (
@@ -904,7 +904,7 @@ function HabitMetric({ icon: Icon, label, value, tone = "emerald" }) {
 
   return (
     <div
-      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-2 py-2.5 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07]"
+      className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-2 py-2.5 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07]"
       aria-label={`${label}: ${value}`}
     >
       <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center ${toneClass}`}>
