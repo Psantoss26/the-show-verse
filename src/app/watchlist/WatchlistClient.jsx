@@ -60,6 +60,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 // ================== UTILS & CACHE ==================
 
@@ -1615,6 +1616,42 @@ function TvGlyph({ className = "" }) {
 }
 
 // ================== CARD COMPONENTS ==================
+function WatchlistHoverIndicator({
+  type,
+  tmdbScore,
+  imdbScore,
+  compact = false,
+}) {
+  const normalizedTmdbScore = Number(tmdbScore);
+  const normalizedImdbScore = Number(imdbScore);
+  const hasTmdbScore = Number.isFinite(normalizedTmdbScore) && normalizedTmdbScore > 0;
+  const hasImdbScore = Number.isFinite(normalizedImdbScore) && normalizedImdbScore > 0;
+  const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const scoreClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
+
+  return (
+    <div
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
+        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
+      </span>
+      {hasTmdbScore ? (
+        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400`}>
+          {normalizedTmdbScore.toFixed(1)}
+        </span>
+      ) : null}
+      {hasImdbScore ? (
+        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300`}>
+          {normalizedImdbScore.toFixed(1)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 const WatchlistCard = memo(function WatchlistCard({
   item,
   index = 0,
@@ -1622,20 +1659,13 @@ const WatchlistCard = memo(function WatchlistCard({
   viewMode = "grid",
   imageMode = "poster",
   imdbScore: initialImdbScore,
-  traktScore: initialTraktScore,
-  userRating,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
   const year =
     item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
-  const genreIds = item.genre_ids || [];
-  const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
-  const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
-
   const [imdbScore, setImdbScore] = useState(initialImdbScore);
-  const [traktScore, setTraktScore] = useState(initialTraktScore);
   const [loadingScores, setLoadingScores] = useState(false);
 
   // Sync scores from parent when they arrive progressively
@@ -1644,12 +1674,6 @@ const WatchlistCard = memo(function WatchlistCard({
       setImdbScore(initialImdbScore);
     }
   }, [initialImdbScore]);
-
-  useEffect(() => {
-    if (initialTraktScore !== undefined && initialTraktScore !== null) {
-      setTraktScore(initialTraktScore);
-    }
-  }, [initialTraktScore]);
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -1668,7 +1692,7 @@ const WatchlistCard = memo(function WatchlistCard({
 
   // Load scores on hover if not in cache
   const handleHover = useCallback(async () => {
-    if (loadingScores || (imdbScore && traktScore)) return;
+    if (loadingScores || imdbScore) return;
 
     setLoadingScores(true);
 
@@ -1698,37 +1722,10 @@ const WatchlistCard = memo(function WatchlistCard({
         }
       }
 
-      // Load Trakt score if not available
-      if (!traktScore) {
-        const cachedTrakt = readScoreCache("trakt");
-        if (cachedTrakt.has(itemId)) {
-          setTraktScore(cachedTrakt.get(itemId));
-        } else {
-          // Fetch from API
-          try {
-            const traktData = await traktGetScoreboard({
-              type,
-              tmdbId: item.id,
-            });
-            const traktRating = traktData?.community?.rating;
-
-            if (
-              traktRating &&
-              typeof traktRating === "number" &&
-              !isNaN(traktRating)
-            ) {
-              setTraktScore(traktRating);
-              updateScoreCache("trakt", itemId, traktRating);
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch Trakt score for ${item.id}:`, err);
-          }
-        }
-      }
     } finally {
       setLoadingScores(false);
     }
-  }, [imdbScore, traktScore, loadingScores, item, type]);
+  }, [imdbScore, loadingScores, item]);
 
   // En navegación de historial (atrás/adelante) NO se anima la entrada: la página
   // debe verse estática, tal cual estaba antes de salir.
@@ -1818,89 +1815,12 @@ const WatchlistCard = memo(function WatchlistCard({
             onMouseEnter={handleHover}
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
-            <div
-              className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                type === "movie"
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`}
-            >
-              {type === "movie" ? (
-                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              ) : (
-                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              )}
-            </div>
-            {/* Overlay con gradientes */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              {/* Top gradient con tipo y ratings */}
-              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div />
-
-                <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                  {rating && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                        {rating}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-TMDb.png"
-                        alt=""
-                        className="w-auto h-2.5 opacity-100"
-                      />
-                    </div>
-                  )}
-                  {imdbScore && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                        {typeof imdbScore === "number"
-                          ? imdbScore.toFixed(1)
-                          : imdbScore}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-IMDb.svg"
-                        alt=""
-                        className="w-auto h-3 opacity-100"
-                      />
-                    </div>
-                  )}
-                  {traktScore && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
-                        {typeof traktScore === "number"
-                          ? traktScore.toFixed(1)
-                          : traktScore}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-Trakt.png"
-                        alt=""
-                        className="w-auto h-2.5 opacity-100"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bottom gradient con título y año */}
-              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0 text-left flex-1">
-                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
-                      {title}
-                    </h3>
-                    <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
-                      {year}
-                      {firstGenre && ` • ${firstGenre}`}
-                    </p>
-                  </div>
-                  {userRating && (
-                    <span className="text-yellow-400 text-lg font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                      {userRating}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            <WatchlistHoverIndicator
+              type={type}
+              tmdbScore={item.vote_average}
+              imdbScore={imdbScore}
+              compact
+            />
           </motion.div>
         </Link>
       </motion.div>
@@ -1921,89 +1841,11 @@ const WatchlistCard = memo(function WatchlistCard({
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
-          <div
-            className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-              type === "movie"
-                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-            }`}
-          >
-            {type === "movie" ? (
-              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            ) : (
-              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            )}
-          </div>
-          {/* Overlay con gradientes */}
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            {/* Top gradient con tipo y ratings */}
-            <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <div />
-
-              <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                {rating && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                      {rating}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-TMDb.png"
-                      alt=""
-                      className="w-auto h-2.5 opacity-100"
-                    />
-                  </div>
-                )}
-                {imdbScore && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                      {typeof imdbScore === "number"
-                        ? imdbScore.toFixed(1)
-                        : imdbScore}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-IMDb.svg"
-                      alt=""
-                      className="w-auto h-3 opacity-100"
-                    />
-                  </div>
-                )}
-                {traktScore && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
-                      {typeof traktScore === "number"
-                        ? traktScore.toFixed(1)
-                        : traktScore}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-Trakt.png"
-                      alt=""
-                      className="w-auto h-2.5 opacity-100"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom gradient con título y año */}
-            <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 text-left flex-1">
-                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
-                    {title}
-                  </h3>
-                  <p className="text-yellow-500 text-xs font-bold mt-0.5 drop-shadow-md">
-                    {year}
-                    {firstGenre && ` • ${firstGenre}`}
-                  </p>
-                </div>
-                {userRating && (
-                  <span className="text-yellow-400 text-xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                    {userRating}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+          <WatchlistHoverIndicator
+            type={type}
+            tmdbScore={item.vote_average}
+            imdbScore={imdbScore}
+          />
         </div>
       </Link>
     </motion.div>
@@ -3659,10 +3501,6 @@ export default function WatchlistClient() {
                                   viewMode={viewMode}
                                   imageMode={imageMode}
                                   imdbScore={imdbScores.get(getScoreItemKey(item))}
-                                  traktScore={traktScores.get(
-                                    getScoreItemKey(item),
-                                  )}
-                                  userRating={item.user_rating}
                                 />
                               );
                             })}
@@ -3687,8 +3525,6 @@ export default function WatchlistClient() {
                             viewMode={viewMode}
                             imageMode={imageMode}
                             imdbScore={imdbScores.get(getScoreItemKey(item))}
-                            traktScore={traktScores.get(getScoreItemKey(item))}
-                            userRating={item.user_rating}
                           />
                         );
                       })}
@@ -3712,8 +3548,6 @@ export default function WatchlistClient() {
                 viewMode={viewMode}
                 imageMode={imageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
-                traktScore={traktScores.get(getScoreItemKey(item))}
-                userRating={item.user_rating}
               />
             ))}
           </div>

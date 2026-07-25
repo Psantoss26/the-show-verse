@@ -70,7 +70,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
         {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient (sin bordes marcados) */}
         {hasViewerIndicators && (
           <div
-            className={`pointer-events-none absolute ${compactIndicator || useProfileIndicatorSize ? "bottom-1.5" : "bottom-2"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
+            className={`pointer-events-none absolute ${compactIndicator ? "bottom-1.5 px-1" : useProfileIndicatorSize ? "bottom-1.5 px-1.5" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
             aria-hidden="true"
           >
             {hasCollectionIndicator && (
