@@ -7,17 +7,20 @@ import { Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import { formatPageTitle } from '@/lib/pageTitle'
+import {
+    getCommunityListDetailsCacheKey,
+    resolveCommunityListDetailsInitialState,
+} from '@/lib/lists/detailsInitialState'
 
 const PAGE_SIZE = 48
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
 
-function getDetailsCacheKey(username, listId) {
-    if (!username || !listId) return null
-    return `showverse:list-details:trakt:${username}:${listId}:v1`
+function getDetailsCacheKey(listId) {
+    return getCommunityListDetailsCacheKey(listId)
 }
 
-function readDetailsCache(username, listId) {
-    const key = getDetailsCacheKey(username, listId)
+function readDetailsCache(listId) {
+    const key = getDetailsCacheKey(listId)
     if (!key || typeof window === 'undefined') return null
     try {
         const raw = window.sessionStorage.getItem(key)
@@ -30,8 +33,8 @@ function readDetailsCache(username, listId) {
     }
 }
 
-function writeDetailsCache(username, listId, data) {
-    const key = getDetailsCacheKey(username, listId)
+function writeDetailsCache(listId, data) {
+    const key = getDetailsCacheKey(listId)
     if (!key || typeof window === 'undefined') return
     try {
         window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }))
@@ -91,15 +94,9 @@ export default function TraktListDetailsClient({ username, listId }) {
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
-    const [state, setState] = useState({
-        loading: true,
-        loadingMore: false,
-        error: null,
-        list: null,
-        items: [],
-        page: 1,
-        hasMore: false,
-    })
+    const [state, setState] = useState(() =>
+        resolveCommunityListDetailsInitialState(readDetailsCache(listId)),
+    )
 
     useEffect(() => {
         stateRef.current = state
@@ -134,16 +131,8 @@ export default function TraktListDetailsClient({ username, listId }) {
     useEffect(() => {
         let cancelled = false
         if (!baseApiUrl) return
-        const cached = readDetailsCache(username, listId)
-        setState({
-            loading: !cached,
-            loadingMore: false,
-            error: null,
-            list: cached?.list || null,
-            items: Array.isArray(cached?.items) ? cached.items : [],
-            page: cached?.page || 1,
-            hasMore: !!cached?.hasMore,
-        })
+        const cached = readDetailsCache(listId)
+        setState(resolveCommunityListDetailsInitialState(cached))
 
             ; (async () => {
                 try {
@@ -162,7 +151,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                         hasMore: computeHasMore(json?.list, items.length),
                     }
 
-                    writeDetailsCache(username, listId, nextState)
+                    writeDetailsCache(listId, nextState)
 
                     setState(nextState)
                 } catch (e) {
@@ -212,7 +201,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                     page: nextPage,
                     hasMore: computeHasMore(json?.list || p.list, items.length),
                 }
-                writeDetailsCache(username, listId, nextState)
+                writeDetailsCache(listId, nextState)
                 return nextState
             })
         } catch (e) {

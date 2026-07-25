@@ -28,6 +28,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import { useTranslation } from "@/lib/i18n";
 import {
   getPlexConnection,
@@ -231,16 +232,27 @@ function SettingActionRow({ icon: Icon, avatarSrc, title, description, buttonLab
   );
 }
 
-function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
+function ProfileNamesModal({
+  isOpen,
+  onClose,
+  currentUsername,
+  currentDisplayName,
+  onSave,
+  loading,
+}) {
   const [username, setUsername] = useState(currentUsername || "");
+  const [displayName, setDisplayName] = useState(
+    currentDisplayName || currentUsername || "",
+  );
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setUsername(currentUsername || "");
+      setDisplayName(currentDisplayName || currentUsername || "");
       setError("");
     }
-  }, [isOpen, currentUsername]);
+  }, [isOpen, currentDisplayName, currentUsername]);
 
   if (!isOpen) return null;
 
@@ -255,12 +267,24 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
       setError("Solo se permiten letras, números, guiones (-) y guiones bajos (_).");
       return;
     }
+    const cleanedDisplayName = displayName.trim();
+    if (!cleanedDisplayName) {
+      setError("El nombre visible no puede estar vacío.");
+      return;
+    }
+    if (cleanedDisplayName.length > 50) {
+      setError("El nombre visible no puede superar los 50 caracteres.");
+      return;
+    }
     setError("");
     try {
-      await onSave(cleaned);
+      await onSave({
+        username: cleaned,
+        displayName: cleanedDisplayName,
+      });
       onClose();
     } catch (err) {
-      setError(err?.message || "No se pudo actualizar el nombre de usuario.");
+      setError(err?.message || "No se pudieron actualizar los nombres del perfil.");
     }
   };
 
@@ -277,6 +301,9 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-names-modal-title"
         className={`${GLASS_SURFACE} relative z-10 w-full max-w-md rounded-3xl p-6 border border-white/10 shadow-2xl`}
       >
         <div className="flex items-center justify-between mb-5">
@@ -285,8 +312,13 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
               <AtSign className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-white">Cambiar nombre de usuario</h3>
-              <p className="text-xs text-zinc-400">Actualiza tu identificador único en la plataforma.</p>
+              <h3
+                id="profile-names-modal-title"
+                className="text-lg font-black text-white"
+              >
+                Editar nombres del perfil
+              </h3>
+              <p className="text-xs text-zinc-400">Configura cómo te identificas y cómo te ven los demás.</p>
             </div>
           </div>
           <button
@@ -301,17 +333,24 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+            <div
+              role="alert"
+              className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300"
+            >
               {error}
             </div>
           )}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+            <label
+              htmlFor="profile-username"
+              className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2"
+            >
               Nombre de usuario
             </label>
             <div className="relative">
               <AtSign className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <input
+                id="profile-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -319,13 +358,50 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
                 maxLength={30}
                 pattern="[a-zA-Z0-9_-]+"
                 required
+                autoComplete="username"
+                aria-describedby="profile-username-help"
                 placeholder="nuevo_usuario"
                 disabled={loading}
                 className="h-11 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
               />
             </div>
-            <p className="mt-1.5 text-[11px] text-zinc-500">
+            <p
+              id="profile-username-help"
+              className="mt-1.5 text-[11px] text-zinc-500"
+            >
               Entre 3 y 30 caracteres. Solo letras, números, guiones y guiones bajos.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="profile-display-name"
+              className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2"
+            >
+              Nombre visible
+            </label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input
+                id="profile-display-name"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                minLength={1}
+                maxLength={50}
+                required
+                autoComplete="nickname"
+                aria-describedby="profile-display-name-help"
+                placeholder="Tu nombre visible"
+                disabled={loading}
+                className="h-11 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
+              />
+            </div>
+            <p
+              id="profile-display-name-help"
+              className="mt-1.5 text-[11px] text-zinc-500"
+            >
+              Es el nombre que se muestra en tu perfil, comentarios y resultados de búsqueda.
             </p>
           </div>
 
@@ -340,7 +416,7 @@ function UsernameModal({ isOpen, onClose, currentUsername, onSave, loading }) {
             </button>
             <button
               type="submit"
-              disabled={loading || !username.trim()}
+              disabled={loading || !username.trim() || !displayName.trim()}
               className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-black transition flex items-center gap-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -942,19 +1018,19 @@ function ProfileSettingsClient() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showProfileNamesModal, setShowProfileNamesModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
 
-  const saveUsername = async (newUsername) => {
+  const saveProfileNames = async ({ username, displayName }) => {
     setProfileSaving(true);
     setError("");
     setSaved(false);
     try {
-      await updateProfile({ username: newUsername });
+      await updateProfile({ username, displayName });
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
     } catch (err) {
-      setError(err?.message || "No se pudo actualizar el nombre de usuario.");
+      setError(err?.message || "No se pudieron actualizar los nombres del perfil.");
       throw err;
     } finally {
       setProfileSaving(false);
@@ -1587,11 +1663,15 @@ function ProfileSettingsClient() {
                   <div className="space-y-4">
                     <SettingActionRow
                       icon={AtSign}
-                      title={t("settings_username", "Nombre de usuario")}
-                      description={user?.username ? `@${user.username}` : "Establece tu identificador único de usuario"}
+                      title={t("settings_profile_names", "Nombres del perfil")}
+                      description={
+                        user?.username
+                          ? `${user?.displayName || user.username} · @${user.username}`
+                          : "Configura tu nombre visible y tu identificador único"
+                      }
                       buttonLabel="Cambiar"
                       disabled={profileSaving}
-                      onClick={() => setShowUsernameModal(true)}
+                      onClick={() => setShowProfileNamesModal(true)}
                     />
 
                     <SettingActionRow
@@ -1637,6 +1717,7 @@ function ProfileSettingsClient() {
                         })
                       }
                     />
+                    <ProfileFavoritesEditor />
                   </div>
 
                   <div className="space-y-4">
@@ -2279,12 +2360,13 @@ function ProfileSettingsClient() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showUsernameModal && (
-          <UsernameModal
-            isOpen={showUsernameModal}
-            onClose={() => setShowUsernameModal(false)}
+        {showProfileNamesModal && (
+          <ProfileNamesModal
+            isOpen={showProfileNamesModal}
+            onClose={() => setShowProfileNamesModal(false)}
             currentUsername={user?.username || ""}
-            onSave={saveUsername}
+            currentDisplayName={user?.displayName || user?.username || ""}
+            onSave={saveProfileNames}
             loading={profileSaving}
           />
         )}

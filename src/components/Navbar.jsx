@@ -34,6 +34,10 @@ import {
   FolderKanban,
   History,
   Trash2,
+  Users,
+  Check,
+  SlidersHorizontal,
+  UserRoundSearch,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -63,6 +67,67 @@ const SEARCH_FALLBACK_MIN_LEN = 5;
 // y así no colar ruido del prefijo corto (que puede devolver cientos de títulos).
 const FALLBACK_TITLE_MIN_SIMILARITY = 0.6;
 const SEARCH_LANGUAGES = ["es-ES", "en-US"];
+const SEARCH_FILTER_OPTIONS = [
+  {
+    id: "all",
+    labelKey: "search_filter_all",
+    fallbackLabel: "Todo",
+    Icon: SlidersHorizontal,
+  },
+  {
+    id: "movies",
+    labelKey: "search_filter_movies",
+    fallbackLabel: "Películas",
+    Icon: FilmIcon,
+  },
+  {
+    id: "series",
+    labelKey: "search_filter_series",
+    fallbackLabel: "Series",
+    Icon: TvIcon,
+  },
+  {
+    id: "collections",
+    labelKey: "search_filter_collections",
+    fallbackLabel: "Colecciones",
+    Icon: FolderKanban,
+  },
+  {
+    id: "users",
+    labelKey: "search_filter_users",
+    fallbackLabel: "Usuarios",
+    Icon: Users,
+  },
+  {
+    id: "people",
+    labelKey: "search_filter_people",
+    fallbackLabel: "Actores y directores",
+    Icon: UserRoundSearch,
+  },
+];
+
+function isActorOrDirector(item) {
+  return ["Acting", "Directing"].includes(item?.known_for_department);
+}
+
+function normalizeUserSearchResult(user) {
+  if (!user?.username) return null;
+  return {
+    ...user,
+    id: user.id || user.username,
+    media_type: "user",
+    title: user.displayName || user.username,
+  };
+}
+
+function getSearchInitials(source) {
+  return String(source || "TSV")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
 
 function scoreSearchResult(item, normalizedQuery) {
   const titles = getTitleCandidates(item);
@@ -176,15 +241,30 @@ function SearchBar({
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [completedSearch, setCompletedSearch] = useState(null);
   const [searchHistory, setSearchHistory] = useState([]);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
+  const filterButtonRef = useRef(null);
+  const filterMenuRef = useRef(null);
   const inputRef = useRef(null);
   const dropdownId = useId();
+  const filterMenuId = useId();
   const [showCollection, setShowCollection] = useState(false);
   const [portalHostReady, setPortalHostReady] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState(null);
+  const [filterMenuPosition, setFilterMenuPosition] = useState(null);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
+  const activeFilterOption =
+    SEARCH_FILTER_OPTIONS.find((option) => option.id === activeFilter) ||
+    SEARCH_FILTER_OPTIONS[0];
+  const ActiveFilterIcon = activeFilterOption.Icon;
+  const translatedFilterOptions = SEARCH_FILTER_OPTIONS.map((option) => ({
+    ...option,
+    label: t(option.labelKey, option.fallbackLabel),
+  }));
 
   useEffect(() => {
     setPortalHostReady(true);
@@ -212,9 +292,11 @@ function SearchBar({
       if (
         searchRef.current &&
         !searchRef.current.contains(e.target) &&
-        !dropdownRef.current?.contains(e.target)
+        !dropdownRef.current?.contains(e.target) &&
+        !filterMenuRef.current?.contains(e.target)
       ) {
         setShowDropdown(false);
+        setShowFilterMenu(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -234,7 +316,7 @@ function SearchBar({
       if (!rect) return;
 
       const next = {
-        top: rect.bottom + (isMobile ? 12 : 8),
+        top: rect.bottom + (isMobile ? 16 : 8),
         left: rect.left,
         width: rect.width,
       };
@@ -261,6 +343,53 @@ function SearchBar({
     };
   }, [showDropdown, isMobile]);
 
+  useLayoutEffect(() => {
+    if (!showFilterMenu || !filterButtonRef.current) {
+      setFilterMenuPosition(null);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updatePosition = () => {
+      frameId = 0;
+      const rect = filterButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const viewportPadding = 16;
+      const width = Math.min(272, window.innerWidth - viewportPadding * 2);
+      const left = Math.min(
+        window.innerWidth - width - viewportPadding,
+        Math.max(viewportPadding, rect.right - width),
+      );
+      const next = {
+        top: rect.bottom + 10,
+        left,
+        width,
+      };
+
+      setFilterMenuPosition((current) =>
+        current &&
+        current.top === next.top &&
+        current.left === next.left &&
+        current.width === next.width
+          ? current
+          : next,
+      );
+    };
+    const schedulePositionUpdate = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updatePosition);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", schedulePositionUpdate);
+    window.addEventListener("scroll", schedulePositionUpdate, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", schedulePositionUpdate);
+      window.removeEventListener("scroll", schedulePositionUpdate, true);
+    };
+  }, [showFilterMenu]);
+
   const openSearchHistory = () => {
     const history = readSearchHistory();
     setSearchHistory(history);
@@ -271,6 +400,7 @@ function SearchBar({
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setCompletedSearch(null);
       if (inputRef.current === document.activeElement) {
         openSearchHistory();
       } else {
@@ -284,6 +414,7 @@ function SearchBar({
     pendingCollectionRef.current = null;
 
     setIsSearching(true);
+    setCompletedSearch(null);
     const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
     const trimmedQuery = query.trim();
     const normalizedQuery = normalizeSearchText(trimmedQuery);
@@ -291,6 +422,38 @@ function SearchBar({
 
     const searchTimer = setTimeout(async () => {
       try {
+        const fetchUserResults = async () => {
+          try {
+            const params = new URLSearchParams({
+              q: trimmedQuery,
+              limit: "12",
+            });
+            const response = await fetch(
+              `/api/users/search?${params.toString()}`,
+              {
+                signal: controller.signal,
+              },
+            );
+            if (!response.ok) return [];
+            const payload = await response.json();
+            return (payload.results || [])
+              .map(normalizeUserSearchResult)
+              .filter(Boolean);
+          } catch (error) {
+            if (error?.name === "AbortError") throw error;
+            return [];
+          }
+        };
+
+        if (activeFilter === "users") {
+          const userResults = await fetchUserResults();
+          setResults(userResults);
+          setShowDropdown(true);
+          setIsSearching(false);
+          setCompletedSearch({ query: trimmedQuery, filter: activeFilter });
+          return;
+        }
+
         // Motor de fetch+ensamblado, reutilizable para la consulta original y para
         // el prefijo del fallback. El scoring es SIEMPRE contra la consulta original
         // normalizada, así el fuzzy elige el título correcto aunque hayamos buscado
@@ -342,14 +505,30 @@ function SearchBar({
             personPage2Raw,
             collRaw,
           ] = await Promise.all([
-            fetchResults("/search/multi"),
-            fetchResults("/search/movie"),
-            fetchResults("/search/movie", 2),
-            fetchResults("/search/tv"),
-            fetchResults("/search/tv", 2),
-            fetchResults("/search/person"),
-            fetchResults("/search/person", 2),
-            fetchResults("/search/collection"),
+            activeFilter === "all"
+              ? fetchResults("/search/multi")
+              : Promise.resolve([]),
+            ["all", "movies"].includes(activeFilter)
+              ? fetchResults("/search/movie")
+              : Promise.resolve([]),
+            ["all", "movies"].includes(activeFilter)
+              ? fetchResults("/search/movie", 2)
+              : Promise.resolve([]),
+            ["all", "series"].includes(activeFilter)
+              ? fetchResults("/search/tv")
+              : Promise.resolve([]),
+            ["all", "series"].includes(activeFilter)
+              ? fetchResults("/search/tv", 2)
+              : Promise.resolve([]),
+            ["all", "people"].includes(activeFilter)
+              ? fetchResults("/search/person")
+              : Promise.resolve([]),
+            ["all", "people"].includes(activeFilter)
+              ? fetchResults("/search/person", 2)
+              : Promise.resolve([]),
+            ["all", "collections"].includes(activeFilter)
+              ? fetchResults("/search/collection")
+              : Promise.resolve([]),
           ]);
 
           const multiResults = multiRaw
@@ -377,22 +556,37 @@ function SearchBar({
               (b.popularity || 0) - (a.popularity || 0),
           );
 
-          const collResults = collRaw.map((c) => ({
-            ...c,
-            media_type: "collection",
-            title: c.name,
-          }));
+          const seenCollections = new Set();
+          const collResults = collRaw
+            .filter((collection) => {
+              if (!collection?.id || seenCollections.has(collection.id)) {
+                return false;
+              }
+              seenCollections.add(collection.id);
+              return true;
+            })
+            .map((collection) => ({
+              ...collection,
+              media_type: "collection",
+              title: collection.name,
+            }));
 
           return { items, collResults };
         };
 
+        const userResultsPromise =
+          activeFilter === "all" ? fetchUserResults() : Promise.resolve([]);
         let { items, collResults } = await fetchAndAssemble(trimmedQuery);
+        if (activeFilter === "people") {
+          items = items.filter(isActorOrDirector);
+        }
 
         // Sin resultados y consulta con cuerpo: TMDB no tolera erratas pero SÍ busca
         // por prefijo. Reintentamos con un prefijo recortado (la errata suele ir al
         // final) y conservamos solo candidatos con relevancia fuzzy real respecto a
         // la consulta ORIGINAL (para no colar el ruido de un prefijo corto).
         if (
+          activeFilter !== "collections" &&
           items.length === 0 &&
           normalizedQuery.length >= SEARCH_FALLBACK_MIN_LEN
         ) {
@@ -425,7 +619,12 @@ function SearchBar({
                   .some((tok) => tokenFuzzyMatches(tok, titleTokens));
               });
             };
-            const filtered = alt.items.filter(isRelevant);
+            const filtered = alt.items
+              .filter(isRelevant)
+              .filter(
+                (item) =>
+                  activeFilter !== "people" || isActorOrDirector(item),
+              );
             if (filtered.length) {
               items = filtered;
               collResults = alt.collResults;
@@ -433,23 +632,50 @@ function SearchBar({
           }
         }
 
-        // Precargar la MEJOR colección (fuzzy-aware) para mostrarla tras la pausa.
-        const bestColl = collResults
+        const sortedCollections = collResults
           .slice()
           .sort(
             (a, b) =>
               scoreSearchResult(b, normalizedQuery) -
               scoreSearchResult(a, normalizedQuery),
-          )[0];
-        pendingCollectionRef.current = bestColl || null;
+          );
+        const userResults = await userResultsPromise;
 
-        setResults(items);
+        let nextResults =
+          activeFilter === "all"
+            ? items.filter(
+                (item) =>
+                  item.media_type !== "person" || isActorOrDirector(item),
+              )
+            : items;
+        if (activeFilter === "people") {
+          nextResults = items.filter(isActorOrDirector);
+        } else if (activeFilter === "collections") {
+          nextResults = sortedCollections;
+        } else if (activeFilter === "all" && userResults.length > 0) {
+          const TOP_MULTI = 3;
+          nextResults = [
+            ...nextResults.slice(0, TOP_MULTI),
+            ...userResults.slice(0, 2),
+            ...nextResults.slice(TOP_MULTI),
+          ];
+        }
+
+        // En el filtro general se conserva la inserción diferida de la mejor
+        // colección para que no desplace los títulos más relevantes al escribir.
+        pendingCollectionRef.current =
+          activeFilter === "all" ? sortedCollections[0] || null : null;
+
+        setResults(nextResults);
         setShowDropdown(true);
         setIsSearching(false);
+        setCompletedSearch({ query: trimmedQuery, filter: activeFilter });
       } catch (err) {
         if (err?.name === "AbortError") return;
-        console.error("Error buscando en TMDb:", err);
+        console.error("Error en la búsqueda global:", err);
         setIsSearching(false);
+        setCompletedSearch({ query: trimmedQuery, filter: activeFilter });
+        setShowDropdown(true);
       }
     }, 300);
 
@@ -457,11 +683,17 @@ function SearchBar({
       clearTimeout(searchTimer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, activeFilter]);
 
   // Insertar colección precargada instantáneamente cuando se activa
   useEffect(() => {
-    if (!showCollection || !pendingCollectionRef.current) return;
+    if (
+      activeFilter !== "all" ||
+      !showCollection ||
+      !pendingCollectionRef.current
+    ) {
+      return;
+    }
 
     setResults((prev) => {
       if (prev.some((r) => r.media_type === "collection" && r.id === pendingCollectionRef.current.id)) return prev;
@@ -472,16 +704,56 @@ function SearchBar({
         ...prev.slice(TOP_MULTI),
       ];
     });
-  }, [showCollection]);
+  }, [showCollection, activeFilter]);
 
   const handleResultClick = (item) => {
-    const selectedTitle = getPrimarySearchTitle(item) || query;
+    const selectedTitle =
+      item.media_type === "user"
+        ? item.displayName || item.username
+        : getPrimarySearchTitle(item) || query;
     setSearchHistory(addSearchHistory(selectedTitle));
     setShowDropdown(false);
+    setShowFilterMenu(false);
     setQuery("");
     setResults([]);
     inputRef.current?.blur();
     if (onResultClick) onResultClick();
+  };
+
+  const handleFilterToggle = () => {
+    const nextOpen = !showFilterMenu;
+    setShowFilterMenu(nextOpen);
+    if (nextOpen) {
+      setShowDropdown(false);
+    } else if (query.trim()) {
+      setShowDropdown(true);
+    } else {
+      openSearchHistory();
+    }
+  };
+
+  const handleFilterSelect = (filterId) => {
+    setShowFilterMenu(false);
+
+    if (filterId === activeFilter) {
+      if (query.trim()) setShowDropdown(true);
+      else openSearchHistory();
+      inputRef.current?.focus();
+      return;
+    }
+
+    setActiveFilter(filterId);
+    setResults([]);
+    setCompletedSearch(null);
+    pendingCollectionRef.current = null;
+
+    if (query.trim()) {
+      setIsSearching(true);
+      setShowDropdown(false);
+    } else {
+      openSearchHistory();
+    }
+    inputRef.current?.focus();
   };
 
   const handleHistoryClick = (historyQuery) => {
@@ -527,6 +799,11 @@ function SearchBar({
           textClass: "text-amber-300",
           dotClass: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]",
         };
+      case "user":
+        return {
+          textClass: "text-cyan-300",
+          dotClass: "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]",
+        };
       default:
         return {
           textClass: "text-zinc-300",
@@ -535,20 +812,30 @@ function SearchBar({
     }
   };
 
-  const getMediaTypeLabel = (mediaType) => {
-    switch (mediaType) {
+  const getMediaTypeLabel = (item) => {
+    switch (item.media_type) {
       case "movie":
         return t("search_badge_movie", "Película");
       case "tv":
         return t("search_badge_tv", "Serie");
       case "person":
-        return t("search_badge_person", "Persona");
+        return item.known_for_department === "Directing"
+          ? t("search_badge_director", "Director/a")
+          : t("search_badge_actor", "Actor/actriz");
       case "collection":
         return t("search_badge_collection", "Colección");
+      case "user":
+        return t("search_badge_user", "Usuario");
       default:
-        return mediaType;
+        return item.media_type;
     }
   };
+
+  const currentSearchComplete =
+    Boolean(query.trim()) &&
+    completedSearch?.query === query.trim() &&
+    completedSearch?.filter === activeFilter &&
+    !isSearching;
 
   return (
     <div
@@ -567,9 +854,12 @@ function SearchBar({
           }}
           className={`
             relative flex items-center w-full transition-all duration-300 ease-out
-            rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group
-            hover:bg-black/30
-            focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10
+            rounded-full group
+            ${
+              isMobile
+                ? `${LIQUID_GLASS_PANEL} border border-white/[0.1] hover:bg-black/[0.34] focus-within:bg-black/[0.38] focus-within:ring-2 focus-within:ring-white/[0.12]`
+                : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10"
+            }
             ${isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"}
           `}
         >
@@ -587,6 +877,7 @@ function SearchBar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => {
+              setShowFilterMenu(false);
               if (query.trim()) {
                 setShowDropdown(true);
               } else {
@@ -598,6 +889,10 @@ function SearchBar({
             }}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
+                if (showFilterMenu) {
+                  setShowFilterMenu(false);
+                  return;
+                }
                 setShowDropdown(false);
                 inputRef.current?.blur();
                 onEscape?.();
@@ -638,6 +933,35 @@ function SearchBar({
                 <XIcon className="w-4 h-4" />
               </button>
             )}
+
+            <button
+              ref={filterButtonRef}
+              type="button"
+              onClick={handleFilterToggle}
+              aria-label={`${t("search_filter_button", "Filtrar búsqueda")}: ${t(
+                activeFilterOption.labelKey,
+                activeFilterOption.fallbackLabel,
+              )}`}
+              aria-controls={showFilterMenu ? filterMenuId : undefined}
+              aria-expanded={showFilterMenu}
+              aria-haspopup="menu"
+              title={`${t("search_filter_button", "Filtrar búsqueda")}: ${t(
+                activeFilterOption.labelKey,
+                activeFilterOption.fallbackLabel,
+              )}`}
+              className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[color,background-color,box-shadow,transform] duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${
+                showFilterMenu
+                  ? "bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+                  : activeFilter === "all"
+                    ? "text-white/55 hover:bg-white/[0.08] hover:text-white"
+                    : "bg-emerald-400/[0.14] text-emerald-200 shadow-[inset_0_0_0_1px_rgba(110,231,183,0.18),0_4px_12px_rgba(16,185,129,0.08)] hover:bg-emerald-400/[0.2]"
+              }`}
+            >
+              <ActiveFilterIcon
+                className="h-[18px] w-[18px]"
+                aria-hidden="true"
+              />
+            </button>
           </div>
         </div>
       </form>
@@ -645,9 +969,79 @@ function SearchBar({
       {portalHostReady &&
         createPortal(
           <AnimatePresence>
+            {showFilterMenu && filterMenuPosition && (
+              <motion.div
+                ref={filterMenuRef}
+                id={filterMenuId}
+                role="menu"
+                aria-label={t("search_filter_menu", "Filtros de búsqueda")}
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                style={filterMenuPosition}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  setShowFilterMenu(false);
+                  filterButtonRef.current?.focus();
+                }}
+                className={`fixed z-[100000] overflow-hidden rounded-2xl border border-white/[0.1] p-2 text-white ${LIQUID_GLASS_PANEL}`}
+              >
+                <p className="px-3 pb-2 pt-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
+                  {t("search_filter_menu", "Filtrar por")}
+                </p>
+                <div className="space-y-1">
+                  {translatedFilterOptions.map(
+                    ({ id, label, Icon: FilterIcon }) => {
+                      const isActive = activeFilter === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={isActive}
+                          onClick={() => handleFilterSelect(id)}
+                          className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80 ${
+                            isActive
+                              ? "bg-emerald-400/15 text-emerald-200"
+                              : "text-white/75 hover:bg-white/[0.08] hover:text-white"
+                          }`}
+                        >
+                          <FilterIcon
+                            className={`h-4 w-4 shrink-0 ${
+                              isActive ? "text-emerald-300" : "text-white/45"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {label}
+                          </span>
+                          {isActive && (
+                            <Check
+                              className="h-4 w-4 shrink-0 text-emerald-300"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+
+      {portalHostReady &&
+        createPortal(
+          <AnimatePresence>
             {showDropdown &&
               dropdownPosition &&
-              (results.length > 0 || !query.trim()) && (
+              (results.length > 0 ||
+                !query.trim() ||
+                currentSearchComplete) && (
                 <motion.div
                   ref={dropdownRef}
                   id={dropdownId}
@@ -729,12 +1123,35 @@ function SearchBar({
               </div>
             ) : (
               <>
-                <div className="p-2">
-                  {results.slice(0, 8).map((item) => {
+                {results.length === 0 && currentSearchComplete ? (
+                  <div className="flex min-h-28 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
+                    <SearchIcon
+                      className="h-5 w-5 text-white/30"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm font-semibold text-white/65">
+                      {t(
+                        "search_filter_no_results",
+                        "No hay resultados para este filtro.",
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2">
+                    {results.slice(0, 8).map((item) => {
                     const isCollection = item.media_type === "collection";
-                    const href = isCollection
-                      ? `/lists/collection/${item.id}`
-                      : `/details/${item.media_type}/${item.id}`;
+                    const isUser = item.media_type === "user";
+                    const resultLabel =
+                      item.displayName ||
+                      item.title ||
+                      item.name ||
+                      item.username ||
+                      "Resultado";
+                    const href = isUser
+                      ? `/u/${encodeURIComponent(item.username)}`
+                      : isCollection
+                        ? `/lists/collection/${item.id}`
+                        : `/details/${item.media_type}/${item.id}`;
                     return (
                       <Link
                         key={`${item.media_type}-${item.id}`}
@@ -743,22 +1160,43 @@ function SearchBar({
                       >
                         <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
                           <div className="relative flex-shrink-0">
-                            <OptimizedImage
-                              src={
-                                item.poster_path || item.profile_path
-                                  ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                                  : "/default-poster.png"
-                              }
-                              alt={item.title || item.name || "Resultado"}
-                              width={48}
-                              height={64}
-                              className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
-                            />
+                            {isUser ? (
+                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-neutral-900 text-xs font-black text-white shadow-lg transition-colors group-hover:border-cyan-300/30">
+                                {item.avatarUrl ? (
+                                  <OptimizedImage
+                                    src={item.avatarUrl}
+                                    alt={resultLabel}
+                                    width={48}
+                                    height={48}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{getSearchInitials(resultLabel)}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <OptimizedImage
+                                src={
+                                  item.poster_path || item.profile_path
+                                    ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
+                                    : "/default-poster.png"
+                                }
+                                alt={resultLabel}
+                                width={48}
+                                height={64}
+                                className="w-12 h-16 rounded-lg shadow-lg object-cover border border-white/10 group-hover:border-white/20 transition-colors"
+                              />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-base line-clamp-1 text-white group-hover:text-blue-300 transition-colors">
-                              {item.title || item.name}
+                              {resultLabel}
                             </p>
+                            {isUser && (
+                              <p className="mt-0.5 truncate text-xs font-medium text-white/40">
+                                @{item.username}
+                              </p>
+                            )}
                             <div className="flex items-center gap-2 mt-1">
                               <span
                                 className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${getBadgeConfig(item.media_type).textClass}`}
@@ -766,8 +1204,28 @@ function SearchBar({
                                 <span
                                   className={`w-1.5 h-1.5 rounded-full ${getBadgeConfig(item.media_type).dotClass}`}
                                 />
-                                {getMediaTypeLabel(item.media_type)}
+                                {getMediaTypeLabel(item)}
                               </span>
+                              {isUser &&
+                                typeof item.followerCount === "number" && (
+                                  <>
+                                    <span className="text-zinc-600 text-[10px]">
+                                      ●
+                                    </span>
+                                    <span className="text-xs font-semibold text-zinc-400">
+                                      {item.followerCount}{" "}
+                                      {item.followerCount === 1
+                                        ? t(
+                                            "search_user_follower",
+                                            "seguidor",
+                                          )
+                                        : t(
+                                            "search_user_followers",
+                                            "seguidores",
+                                          )}
+                                    </span>
+                                  </>
+                                )}
                               {item.release_date && (
                                 <>
                                   <span className="text-zinc-600 text-[10px]">
@@ -797,8 +1255,9 @@ function SearchBar({
                         </div>
                       </Link>
                     );
-                  })}
-                </div>
+                    })}
+                  </div>
+                )}
                 {results.length > 8 && (
                   <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
                     Mostrando 8 de {results.length} resultados
@@ -1335,7 +1794,7 @@ export default function Navbar() {
 
           {/* Centro: en modo compacto la búsqueda se abre únicamente en el
               carril libre entre ambos grupos; en modo normal permanece visible. */}
-          <div className="flex min-w-0 items-center justify-center gap-2">
+          <div className="flex min-w-0 items-center justify-center">
             {(!desktopSearchCompact || desktopSearchOpen) && (
               <SearchBar
                 autoFocus={desktopSearchCompact && desktopSearchOpen}
@@ -1351,9 +1810,6 @@ export default function Navbar() {
                 }
               />
             )}
-            {!desktopSearchCompact && (
-              <WatchNextAssistant heroNavMode={heroNavMode} />
-            )}
           </div>
 
           {/* Derecha */}
@@ -1362,9 +1818,7 @@ export default function Navbar() {
             className="flex shrink-0 items-center gap-2 pr-12"
           >
             <div className="flex items-center gap-2">
-              {desktopSearchCompact && (
-                <WatchNextAssistant heroNavMode={heroNavMode} />
-              )}
+              <WatchNextAssistant heroNavMode={heroNavMode} />
 
               <Link
                 href="/lists"
@@ -1945,13 +2399,13 @@ export default function Navbar() {
               <div className="relative mb-4 w-full">
                 <SearchBar
                   isMobile={true}
-                  formClassName="pr-[4.75rem]"
+                  formClassName="pr-[3.75rem]"
                   onResultClick={() => setShowMobileSearch(false)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowMobileSearch(false)}
-                  className="absolute right-0 top-0 p-3 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 text-white transition-all active:scale-95"
+                  className={`absolute right-0 top-0 flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.1] text-white transition-all active:scale-95 hover:bg-black/[0.34] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${LIQUID_GLASS_PANEL}`}
                   aria-label="Cerrar búsqueda"
                 >
                   <XIcon className="w-6 h-6" />

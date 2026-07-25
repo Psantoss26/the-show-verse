@@ -6814,11 +6814,6 @@ export default function DetailsClient({
           data.number_of_episodes ? ` · ${data.number_of_episodes} Eps.` : ""
         }`
       : null;
-  const seriesFormatValue =
-    type === "tv"
-      ? [seasonEpisodeValue, episodeRuntimeFormatValue].filter(Boolean).join(" · ")
-      : null;
-
   const displayRuntimeValue =
     type === "tv" ? seasonEpisodeValue : runtimeValue || episodeRuntimeValue;
 
@@ -9335,7 +9330,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 formatValue={
                   type === "movie"
                     ? displayRuntimeValue || "—"
-                    : seriesFormatValue || "—"
+                    : seasonEpisodeValue || "—"
+                }
+                durationValue={
+                  type === "tv" ? episodeRuntimeFormatValue || "—" : null
                 }
                 releaseDateValue={releaseDateValue}
                 lastAirDateValue={lastAirDateValue}

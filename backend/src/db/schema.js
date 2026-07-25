@@ -387,3 +387,40 @@ export const communityListItems = pgTable('community_list_items', {
   byTitleIdx: index('idx_community_list_items_title').on(t.tmdbId, t.mediaType),
   byListIdx: index('idx_community_list_items_list').on(t.listId, t.position),
 }));
+
+// ─────────────────────────────────────────────
+// FOLLOWS (grafo social: follower → following)
+// ─────────────────────────────────────────────
+export const follows = pgTable('follows', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  followerId: uuid('follower_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  followingId: uuid('following_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  // Un par (seguidor, seguido) es único: seguir es idempotente.
+  uniquePair: uniqueIndex('idx_follows_pair').on(t.followerId, t.followingId),
+  // "¿Quién sigue a X?" → índice por seguido. El de seguidor lo cubre el único.
+  followingIdx: index('idx_follows_following').on(t.followingId, t.createdAt),
+  followerIdx: index('idx_follows_follower').on(t.followerId, t.createdAt),
+  // No autoseguirse.
+  notSelf: check('chk_follows_not_self', sql`follower_id <> following_id`),
+}));
+
+// ─────────────────────────────────────────────
+// PROFILE FAVORITES (los ≤5 títulos destacados del perfil, curados a mano;
+// distintos del corazón/favoritos). Estilo "Favorite Films" de Letterboxd.
+// ─────────────────────────────────────────────
+export const profileFavorites = pgTable('profile_favorites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),                // 'movie' | 'tv'
+  title: text('title'),
+  posterPath: text('poster_path'),
+  position: integer('position').default(0).notNull(),     // 0-4 (orden de exhibición)
+  addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueFavorite: uniqueIndex('idx_profile_favorites_unique').on(t.userId, t.tmdbId, t.mediaType),
+  userIdIdx: index('idx_profile_favorites_user').on(t.userId, t.position),
+  mediaTypeCheck: check('chk_profile_favorites_media_type', sql`media_type IN ('movie', 'tv')`),
+}));

@@ -1,10 +1,32 @@
 // src/routes/users.js
-// User-owned profile settings and preferences.
+// User-owned profile settings and preferences + capa social (Phase 1):
+// búsqueda de usuarios, seguir/dejar de seguir, perfil público y favoritos
+// curados del perfil.
 
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { userPreferences } from '../db/schema.js';
+import {
+  userPreferences,
+  users,
+  follows,
+  profileFavorites,
+} from '../db/schema.js';
+import {
+  buildUserProfile,
+  searchUsers,
+  findUserByUsername,
+  isFollowing,
+  canFollow,
+  normalizeProfileFavorites,
+  PROFILE_FAVORITES_MAX,
+  getUserReviews,
+  getUserWatched,
+  getUserWatchlist,
+  getUserFavorites,
+  getUserRatings,
+  getUserLists,
+} from '../lib/userProfile.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 const artworkChangeSchema = z.object({
@@ -186,4 +208,192 @@ export default async function usersRoutes(fastify) {
 
     return reply.send({ preferences: normalizePreferences(preferences) });
   });
+
+  // ══════════════════════════════════════════════
+  // SOCIAL (Phase 1): búsqueda, follow, perfil público, favoritos del perfil
+  // ══════════════════════════════════════════════
+
+  // GET /users/search?q= — descubrimiento de miembros.
+  fastify.get('/search', async (req, reply) => {
+    const q = String(req.query?.q || '').trim();
+    if (q.length < 1) return reply.send({ results: [] });
+    const results = await searchUsers(db, {
+      query: q,
+      viewerId: req.user.id,
+      limit: req.query?.limit,
+    });
+    return reply.send({ results });
+  });
+
+  // GET /users/me/profile-favorites — selección curada del propio usuario.
+  fastify.get('/me/profile-favorites', async (req, reply) => {
+    const rows = await db
+      .select()
+      .from(profileFavorites)
+      .where(eq(profileFavorites.userId, req.user.id))
+      .orderBy(profileFavorites.position)
+      .limit(PROFILE_FAVORITES_MAX);
+    return reply.send({
+      favorites: rows.map((f) => ({
+        tmdbId: f.tmdbId,
+        mediaType: f.mediaType,
+        title: f.title,
+        posterPath: f.posterPath,
+      })),
+    });
+  });
+
+  // PUT /users/me/profile-favorites — reemplaza la selección (≤5).
+  const favoritesBodySchema = z.object({
+    items: z
+      .array(
+        z.object({
+          tmdbId: z.coerce.number().int().positive(),
+          mediaType: z.enum(['movie', 'tv']),
+          title: z.string().max(512).nullish(),
+          posterPath: z.string().max(512).nullish(),
+        }),
+      )
+      .max(PROFILE_FAVORITES_MAX),
+  });
+
+  fastify.put('/me/profile-favorites', async (req, reply) => {
+    const parsed = favoritesBodySchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+    const clean = normalizeProfileFavorites(parsed.data.items);
+
+    await db.transaction(async (tx) => {
+      await tx.delete(profileFavorites).where(eq(profileFavorites.userId, req.user.id));
+      if (clean.length) {
+        await tx.insert(profileFavorites).values(
+          clean.map((f) => ({ ...f, userId: req.user.id })),
+        );
+      }
+    });
+
+    return reply.send({
+      favorites: clean.map((f) => ({
+        tmdbId: f.tmdbId,
+        mediaType: f.mediaType,
+        title: f.title,
+        posterPath: f.posterPath,
+      })),
+    });
+  });
+
+  // GET /users/:username/profile — perfil público agregado.
+  fastify.get('/:username/profile', async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    const profile = await buildUserProfile(db, target, req.user.id);
+    return reply.send({ profile });
+  });
+
+  // POST /users/:username/follow — seguir (idempotente).
+  fastify.post('/:username/follow', async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    if (!canFollow(req.user.id, target.id)) {
+      return reply.status(400).send({ error: 'No puedes seguirte a ti mismo' });
+    }
+    await db
+      .insert(follows)
+      .values({ followerId: req.user.id, followingId: target.id })
+      .onConflictDoNothing();
+    return reply.send({ following: true });
+  });
+
+  // DELETE /users/:username/follow — dejar de seguir (idempotente).
+  fastify.delete('/:username/follow', async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    await db
+      .delete(follows)
+      .where(and(eq(follows.followerId, req.user.id), eq(follows.followingId, target.id)));
+    return reply.send({ following: false });
+  });
+
+  // GET /users/:username/followers — quién sigue a este usuario.
+  // GET /users/:username/following — a quién sigue este usuario.
+  const listFollowRelation = async (req, reply, relation) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+
+    const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 30));
+    const offset = Math.max(0, Number(req.query?.offset) || 0);
+
+    // followers: usuarios cuyo followingId = target (join por followerId).
+    // following: usuarios que target sigue (join por followingId).
+    const joinCol = relation === 'followers' ? follows.followerId : follows.followingId;
+    const filterCol = relation === 'followers' ? follows.followingId : follows.followerId;
+
+    const rows = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        createdAt: follows.createdAt,
+      })
+      .from(follows)
+      .innerJoin(users, eq(users.id, joinCol))
+      .where(and(eq(filterCol, target.id), eq(users.isActive, true)))
+      .orderBy(desc(follows.createdAt))
+      .limit(limit + 1)
+      .offset(offset);
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+
+    // Estado de seguimiento del visor respecto a cada usuario listado.
+    const viewerId = req.user.id;
+    const followingSet = new Set();
+    if (page.length) {
+      const ids = page.map((r) => r.id);
+      const viewerFollows = await db
+        .select({ followingId: follows.followingId })
+        .from(follows)
+        .where(and(eq(follows.followerId, viewerId), inArray(follows.followingId, ids)));
+      for (const r of viewerFollows) followingSet.add(r.followingId);
+    }
+
+    return reply.send({
+      users: page.map((r) => ({
+        username: r.username,
+        displayName: r.displayName || r.username,
+        avatarUrl: r.avatarUrl || null,
+        isFollowing: followingSet.has(r.id),
+        isSelf: r.id === viewerId,
+      })),
+      hasMore,
+      offset: offset + page.length,
+    });
+  };
+
+  fastify.get('/:username/followers', (req, reply) =>
+    listFollowRelation(req, reply, 'followers'),
+  );
+  fastify.get('/:username/following', (req, reply) =>
+    listFollowRelation(req, reply, 'following'),
+  );
+
+  // ── Secciones del perfil (Phase 2): lectores paginados por username ──
+  const sectionEndpoint = (fetcher) => async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    const page = await fetcher(db, target.id, {
+      limit: req.query?.limit,
+      offset: req.query?.offset,
+    });
+    return reply.send(page);
+  };
+
+  fastify.get('/:username/reviews', sectionEndpoint(getUserReviews));
+  fastify.get('/:username/watched', sectionEndpoint(getUserWatched));
+  fastify.get('/:username/watchlist', sectionEndpoint(getUserWatchlist));
+  fastify.get('/:username/favorites', sectionEndpoint(getUserFavorites));
+  fastify.get('/:username/ratings', sectionEndpoint(getUserRatings));
+  fastify.get('/:username/lists', sectionEndpoint(getUserLists));
 }

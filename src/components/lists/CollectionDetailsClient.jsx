@@ -8,6 +8,7 @@ import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import { formatPageTitle } from '@/lib/pageTitle'
+import { resolveCollectionDetailsInitialState } from '@/lib/lists/detailsInitialState'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 
@@ -68,12 +69,9 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
 }
 
 export default function CollectionDetailsClient({ collectionId }) {
-    const [state, setState] = useState({
-        loading: true,
-        error: null,
-        collection: null,
-        parts: [],
-    })
+    const [state, setState] = useState(() =>
+        resolveCollectionDetailsInitialState(readCollectionDetailsCache(collectionId)),
+    )
 
     const [imdbRatings, setImdbRatings] = useState({})
     const imdbIdCacheRef = useRef({})
@@ -131,12 +129,7 @@ export default function CollectionDetailsClient({ collectionId }) {
         let cancelled = false
         if (!collectionId) return
         const cached = readCollectionDetailsCache(collectionId)
-        setState({
-            loading: !cached,
-            error: null,
-            collection: cached?.collection || null,
-            parts: Array.isArray(cached?.parts) ? cached.parts : [],
-        })
+        setState(resolveCollectionDetailsInitialState(cached))
 
         ; (async () => {
             try {

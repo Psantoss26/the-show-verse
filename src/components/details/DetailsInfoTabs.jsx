@@ -42,6 +42,7 @@ export default function DetailsInfoTabs({
   mediaType,
   originalTitle,
   formatValue,
+  durationValue,
   releaseDateValue,
   status,
   lastAirDateValue,
@@ -158,13 +159,32 @@ export default function DetailsInfoTabs({
                       />
                     </div>
                   )}
-                  <VisualMetaCard
-                    icon={Layers}
-                    label={mediaType === "movie" ? "Duración" : "Formato"}
-                    value={formatValue || "—"}
-                    isLoading={metadataLoading}
-                    className="w-full"
-                  />
+                  {mediaType === "movie" ? (
+                    <VisualMetaCard
+                      icon={Layers}
+                      label="Duración"
+                      value={formatValue || "—"}
+                      isLoading={metadataLoading}
+                      className="w-full"
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <VisualMetaCard
+                        icon={Layers}
+                        label="Formato"
+                        value={formatValue || "—"}
+                        isLoading={metadataLoading}
+                        className="min-w-0"
+                      />
+                      <VisualMetaCard
+                        icon={Layers}
+                        label="Duración"
+                        value={durationValue || "—"}
+                        isLoading={metadataLoading}
+                        className="min-w-0"
+                      />
+                    </div>
+                  )}
                   <VisualMetaCard
                     icon={BadgeCheck}
                     label="Estado"

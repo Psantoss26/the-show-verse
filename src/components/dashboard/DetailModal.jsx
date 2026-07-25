@@ -1956,7 +1956,6 @@ export default function DetailModal({
         title: "Web oficial",
         icon: "/logo-Web.png",
         href: officialSiteUrl,
-        wrapperClassName: "hidden sm:block",
       });
     }
 
