@@ -2637,12 +2637,8 @@ export default function DetailModal({
                   watchlist={watchlist}
                   watchlistLoading={loadingStates || updating}
                   onToggleWatchlist={handleToggleWatchlist}
-                  onAddToList={mediaType === "tv" ? undefined : openListsModal}
-                  listActive={
-                    mediaType === "tv"
-                      ? false
-                      : Object.values(membershipMap || {}).some(Boolean)
-                  }
+                  onAddToList={openListsModal}
+                  listActive={Object.values(membershipMap || {}).some(Boolean)}
                   showComments={traktConnected || traktStatus.connected}
                   commentsActive={false}
                   onComments={(event) => {

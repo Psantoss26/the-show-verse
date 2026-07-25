@@ -25,6 +25,7 @@ const RECENT_WATCHED_LIMIT = 5;
 const WATCHLIST_PREVIEW_LIMIT = 5;
 const FOLLOWING_PREVIEW_LIMIT = 12;
 export const PROFILE_FAVORITES_MAX = 5;
+export const PROFILE_FAVORITES_TOTAL_MAX = PROFILE_FAVORITES_MAX * 2;
 const LIST_PREVIEW_LIMIT = 5;
 const PROFILE_ANALYTICS_HISTORY_LIMIT = 1500;
 const DEFAULT_MOVIE_RUNTIME_MINS = 100;
@@ -93,21 +94,23 @@ export function dedupeRecentWatched(rows, limit = RECENT_WATCHED_LIMIT) {
 
 // Valida y normaliza la selección curada de favoritos del perfil: descarta
 // entradas mal formadas, deduplica por título, recorta a `max` y reasigna
-// `position` 0..n según el orden recibido.
-export function normalizeProfileFavorites(items, max = PROFILE_FAVORITES_MAX) {
+// `position` 0..n según el orden recibido. Cuando se recibe `mediaType`, la
+// selección queda limitada a esa fila (películas o series).
+export function normalizeProfileFavorites(items, max = PROFILE_FAVORITES_MAX, mediaType = null) {
   const seen = new Set();
   const out = [];
   for (const raw of Array.isArray(items) ? items : []) {
     const tmdbId = Number(raw?.tmdbId);
-    const mediaType = raw?.mediaType;
     if (!Number.isInteger(tmdbId) || tmdbId <= 0) continue;
-    if (mediaType !== 'movie' && mediaType !== 'tv') continue;
-    const key = titleKey(mediaType, tmdbId);
+    const itemMediaType = raw?.mediaType;
+    if (itemMediaType !== 'movie' && itemMediaType !== 'tv') continue;
+    if (mediaType && itemMediaType !== mediaType) continue;
+    const key = titleKey(itemMediaType, tmdbId);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({
       tmdbId,
-      mediaType,
+      mediaType: itemMediaType,
       title: typeof raw.title === 'string' ? raw.title.slice(0, 512) : null,
       posterPath:
         typeof raw.posterPath === 'string' && raw.posterPath.startsWith('/')
@@ -377,13 +380,13 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     db.select({ n: count() }).from(follows).where(eq(follows.followingId, targetId)),
     db.select({ n: count() }).from(follows).where(eq(follows.followerId, targetId)),
     db.select({ n: count() }).from(userRatings).where(eq(userRatings.userId, targetId)),
-    // Favoritos curados (≤5, por posición).
+    // Favoritos curados (≤5 películas y ≤5 series, por posición).
     db
       .select()
       .from(profileFavorites)
       .where(eq(profileFavorites.userId, targetId))
       .orderBy(profileFavorites.position)
-      .limit(PROFILE_FAVORITES_MAX),
+      .limit(PROFILE_FAVORITES_TOTAL_MAX),
     // Historial reciente (se deduplica por título después).
     db
       .select()
@@ -420,7 +423,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       .limit(FOLLOWING_PREVIEW_LIMIT),
     isFollowing(db, viewerId, targetId),
     // Conteos de las secciones (Phase 2) para la barra de pestañas.
-    buildSectionCounts(db, targetId),
+    buildSectionCounts(db, targetId, { includePrivateLists: Boolean(viewerId && viewerId === targetId) }),
   ]);
 
   const recentWatched = dedupeRecentWatched(recentRows, RECENT_WATCHED_LIMIT);
@@ -474,6 +477,23 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
   }));
   await fillMissingPosters(db, targetId, pendingPreview);
 
+  const serializeProfileFavorite = (favorite) => ({
+    tmdbId: favorite.tmdbId,
+    mediaType: favorite.mediaType,
+    title: favorite.title,
+    posterPath: favorite.posterPath,
+  });
+  const favoriteMovies = normalizeProfileFavorites(
+    favoriteRows.filter((favorite) => favorite.mediaType === 'movie'),
+    PROFILE_FAVORITES_MAX,
+    'movie',
+  ).map(serializeProfileFavorite);
+  const favoriteSeries = normalizeProfileFavorites(
+    favoriteRows.filter((favorite) => favorite.mediaType === 'tv'),
+    PROFILE_FAVORITES_MAX,
+    'tv',
+  ).map(serializeProfileFavorite);
+
   return {
     user: {
       id: targetUser.id,
@@ -491,12 +511,11 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       followers: followersRows[0]?.n || 0,
       following: followingRows[0]?.n || 0,
     },
-    favorites: favoriteRows.map((f) => ({
-      tmdbId: f.tmdbId,
-      mediaType: f.mediaType,
-      title: f.title,
-      posterPath: f.posterPath,
-    })),
+    // `favorites` se conserva para clientes anteriores; los nuevos clientes
+    // consumen las dos filas explícitas para no mezclar películas y series.
+    favorites: [...favoriteMovies, ...favoriteSeries].slice(0, PROFILE_FAVORITES_MAX),
+    favoriteMovies,
+    favoriteSeries,
     recentWatched: recentWatchedItems,
     pendingPreview,
     followingPreview: followingPreviewRows.map((u) => ({
@@ -522,8 +541,11 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
 // ─────────────────────────────────────────────
 
 // Conteos de cada sección para la barra de pestañas.
-export async function buildSectionCounts(db, targetId) {
+export async function buildSectionCounts(db, targetId, { includePrivateLists = false } = {}) {
   const distinctWatched = sql`COUNT(DISTINCT (${watchHistory.mediaType} || ':' || ${watchHistory.tmdbId}))`.mapWith(Number);
+  const listVisibility = includePrivateLists
+    ? eq(userLists.userId, targetId)
+    : and(eq(userLists.userId, targetId), eq(userLists.isPublic, true));
   const [reviews, watched, watchlistC, favoritesC, ratingsC, listsC, activitySources] = await Promise.all([
     db
       .select({ n: count() })
@@ -547,19 +569,19 @@ export async function buildSectionCounts(db, targetId) {
     db
       .select({ n: count() })
       .from(userLists)
-      .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+      .where(listVisibility),
     Promise.all([
       db.select({ n: count() }).from(titleComments).where(and(eq(titleComments.userId, targetId), eq(titleComments.source, 'native'))),
       db.select({ n: count() }).from(watchHistory).where(eq(watchHistory.userId, targetId)),
       db.select({ n: count() }).from(watchlist).where(eq(watchlist.userId, targetId)),
       db.select({ n: count() }).from(favorites).where(eq(favorites.userId, targetId)),
       db.select({ n: count() }).from(userRatings).where(eq(userRatings.userId, targetId)),
-      db.select({ n: count() }).from(userLists).where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+      db.select({ n: count() }).from(userLists).where(listVisibility),
       db
         .select({ n: count() })
         .from(userListItems)
         .innerJoin(userLists, eq(userLists.id, userListItems.listId))
-        .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true))),
+        .where(listVisibility),
     ]),
   ]);
   return {
@@ -802,24 +824,29 @@ export async function getUserWatched(db, targetId, opts = {}) {
 
 // Listas PÚBLICAS del usuario, con conteo y pósters de preview.
 export async function getUserLists(db, targetId, opts = {}) {
-  const { limit, offset } = pageParams(opts);
+  const { limit, offset, includePrivateLists = false } = opts;
+  const page = pageParams({ limit, offset });
+  const listVisibility = includePrivateLists
+    ? eq(userLists.userId, targetId)
+    : and(eq(userLists.userId, targetId), eq(userLists.isPublic, true));
   const rows = await db
     .select({
       id: userLists.id,
       name: userLists.name,
       description: userLists.description,
+      isPublic: userLists.isPublic,
       updatedAt: userLists.updatedAt,
     })
     .from(userLists)
-    .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true)))
+    .where(listVisibility)
     .orderBy(desc(userLists.updatedAt))
-    .limit(limit + 1)
-    .offset(offset);
+    .limit(page.limit + 1)
+    .offset(page.offset);
 
-  const page = packPage(rows, limit, offset);
-  if (!page.items.length) return page;
+  const result = packPage(rows, page.limit, page.offset);
+  if (!result.items.length) return result;
 
-  const listIds = page.items.map((l) => l.id);
+  const listIds = result.items.map((l) => l.id);
   // Conteo exacto (grouped count) + pósters de preview, en paralelo. Se evita el
   // subquery correlacionado (frágil al interpolar la columna con Drizzle).
   const [countRows, previewRows] = await Promise.all([
@@ -849,15 +876,16 @@ export async function getUserLists(db, targetId, opts = {}) {
     previewByList.set(p.listId, arr);
   }
 
-  page.items = page.items.map((l) => ({
+  result.items = result.items.map((l) => ({
     id: l.id,
     name: l.name,
     description: l.description || null,
+    isPublic: Boolean(l.isPublic),
     itemCount: countByList.get(l.id) || 0,
     updatedAt: l.updatedAt,
     previewPosters: previewByList.get(l.id) || [],
   }));
-  return page;
+  return result;
 }
 
 // Actividad pública del perfil. Se deriva de los registros ya persistidos en vez

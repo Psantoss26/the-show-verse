@@ -34,7 +34,6 @@ import {
     Check,
     Search,
     Plus,
-    ExternalLink,
     Flame,
     Star,
     Clapperboard,
@@ -226,6 +225,10 @@ export default function ListDetailsPage() {
     // Tabs
     const [tab, setTab] = useState('items')
     const items = Array.isArray(data?.items) ? data.items : []
+    // La edición solo se habilita cuando el backend confirma que esta lista
+    // pertenece a la sesión actual. Así una caché antigua no expone controles
+    // de gestión al abrir una lista desde otro perfil.
+    const canManage = Boolean(canUse && data?.canEdit === true)
     const idsInList = useMemo(() => new Set(items.map((x) => x?.id)), [items])
     const filterableItems = useMemo(
         () => items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' })),
@@ -339,15 +342,17 @@ export default function ListDetailsPage() {
         }
     }, [cat, tab, addMode])
 
-    const handleRemove = async (movieId) => {
-        if (!canUse || !listId) return
+    const handleRemove = async (movie) => {
+        const movieId = typeof movie === 'object' ? movie?.id : movie
+        const mediaType = typeof movie === 'object' && movie?.media_type === 'tv' ? 'tv' : 'movie'
+        if (!canManage || !listId || !movieId) return
         setBusyId(movieId)
         setErr('')
         try {
-            await removeMovieFromList({ listId, sessionId: session, movieId })
+            await removeMovieFromList({ listId, movieId, mediaType })
             setData((prev) => {
                 if (!prev) return prev
-                const nextItems = (prev.items || []).filter((x) => x?.id !== movieId)
+                const nextItems = (prev.items || []).filter((x) => !(x?.id === movieId && (x?.media_type || 'movie') === mediaType))
                 const next = {
                     ...prev,
                     items: nextItems,
@@ -365,7 +370,7 @@ export default function ListDetailsPage() {
     }
 
     const handleAdd = async (movie) => {
-        if (!canUse || !listId) return
+        if (!canManage || !listId) return
         if (!movie?.id) return
         if (idsInList.has(movie.id)) return
 
@@ -374,7 +379,6 @@ export default function ListDetailsPage() {
         try {
             await addMovieToList({
                 listId,
-                sessionId: session,
                 movieId: movie.id,
                 mediaType: movie.media_type === 'tv' ? 'tv' : 'movie',
                 title: movie.title || movie.name || null,
@@ -382,7 +386,7 @@ export default function ListDetailsPage() {
             })
             setData((prev) => {
                 if (!prev) return prev
-                const nextItems = [{ ...movie, media_type: 'movie' }, ...(prev.items || [])]
+                const nextItems = [{ ...movie, media_type: movie.media_type === 'tv' ? 'tv' : 'movie' }, ...(prev.items || [])]
                 const next = { ...prev, items: nextItems, item_count: (prev.item_count || 0) + 1 }
                 writeTmdbListDetailsCache(listId, next)
                 return next
@@ -396,13 +400,13 @@ export default function ListDetailsPage() {
     }
 
     const handleClear = async () => {
-        if (!canUse || !listId) return
+        if (!canManage || !listId) return
         const ok = window.confirm('¿Vaciar la lista por completo?')
         if (!ok) return
         setClearing(true)
         setErr('')
         try {
-            await clearList({ listId, sessionId: session, confirm: true })
+            await clearList({ listId })
             await load()
         } catch (e) {
             setErr(e?.message || 'Error vaciando lista')
@@ -412,13 +416,13 @@ export default function ListDetailsPage() {
     }
 
     const handleDeleteList = async () => {
-        if (!canUse || !listId) return
+        if (!canManage || !listId) return
         const ok = window.confirm('¿Borrar la lista definitivamente?')
         if (!ok) return
         setDeleting(true)
         setErr('')
         try {
-            await deleteUserList({ listId, sessionId: session })
+            await deleteUserList({ listId })
             router.push('/lists')
         } catch (e) {
             setErr(e?.message || 'Error borrando lista')
@@ -428,7 +432,7 @@ export default function ListDetailsPage() {
     }
 
     const handleSaveEdit = async () => {
-        if (!canUse || !listId) return
+        if (!canManage || !listId) return
         const n = editName.trim()
         if (!n) return
 
@@ -437,7 +441,6 @@ export default function ListDetailsPage() {
         try {
             const res = await updateUserList({
                 listId,
-                sessionId: session,
                 name: n,
                 description: editDesc,
                 language: data?.iso_639_1 || 'es',
@@ -468,7 +471,6 @@ export default function ListDetailsPage() {
     })) return null
     if (loading && !data) return null
 
-    const tmdbListUrl = `https://www.themoviedb.org/list/${listId}`
     const gridItems = tab === 'items' ? items : addMode === 'search' ? searchRes : catRes
     const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path) || gridItems.find((item) => item?.poster_path || item?.backdrop_path)
     const coverPath = coverItem?.poster_path || coverItem?.backdrop_path || null
@@ -478,59 +480,49 @@ export default function ListDetailsPage() {
         <UnifiedListDetailsLayout
             title={!editing ? (data?.name || 'Lista') : editName}
             description={!editing ? (data?.description || '') : editDesc}
-            sourceLabel="Lista de TMDb"
+            sourceLabel="Lista de usuario"
             posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
-            badges={data ? [`${items.length} items`, 'TMDb'] : ['TMDb']}
+            badges={data ? [`${items.length} items`, 'The Show Verse'] : ['The Show Verse']}
             stats={[
                 { label: 'Elementos', value: items.length },
-                { label: 'Fuente', value: 'TMDb' },
+                { label: 'Fuente', value: 'The Show Verse' },
                 { label: 'Modo', value: tab === 'items' ? 'Lista' : 'Añadir' },
             ]}
             backHref="/lists"
             rightActions={
                 <>
-                    <button
+                    {canManage && <button
                         onClick={() => setEditing(true)}
                         disabled={editing}
                         className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition disabled:opacity-50"
                         title="Editar detalles"
                     >
                         <Pencil className="w-5 h-5" />
-                    </button>
+                    </button>}
 
-                    <a
-                        href={tmdbListUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 transition"
-                        title="Abrir en TMDb"
-                    >
-                        <ExternalLink className="w-5 h-5" />
-                    </a>
-
-                    <button
+                    {canManage && <button
                         onClick={handleClear}
                         disabled={clearing || items.length === 0}
                         className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-yellow-400 hover:border-yellow-500/50 transition disabled:opacity-50"
                         title="Vaciar lista"
                     >
                         {clearing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eraser className="w-5 h-5" />}
-                    </button>
+                    </button>}
 
-                    <button
+                    {canManage && <button
                         onClick={handleDeleteList}
                         disabled={deleting}
                         className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-500/50 transition disabled:opacity-50"
                         title="Borrar lista"
                     >
                         {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                    </button>
+                    </button>}
                 </>
             }
             tabs={[
-                { id: 'items', label: 'Películas', icon: ListVideo },
-                { id: 'add', label: 'Añadir', icon: Plus }
+                { id: 'items', label: 'Títulos', icon: ListVideo },
+                ...(canManage ? [{ id: 'add', label: 'Añadir', icon: Plus }] : [])
             ]}
             activeTab={tab}
             onTabChange={(next) => {
@@ -600,14 +592,14 @@ export default function ListDetailsPage() {
                             </div>
 
                             <div className="flex gap-3">
-                                <button
+                                {canManage && <button
                                     onClick={handleSaveEdit}
                                     disabled={savingEdit || !editName.trim()}
                                     className="flex items-center gap-2 rounded-full bg-purple-500/25 px-6 py-2.5 font-bold text-purple-100 shadow-lg backdrop-blur-[28px] transition hover:bg-purple-500/35 disabled:opacity-50"
                                 >
                                     {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     Guardar
-                                </button>
+                                </button>}
 
                                 <button
                                     onClick={() => {
@@ -639,7 +631,7 @@ export default function ListDetailsPage() {
                     <ListVideo className="w-12 h-12 text-zinc-700 mb-4" />
                     <h3 className="text-lg font-bold text-zinc-300">Lista vacía</h3>
                     <p className="text-zinc-500 mt-1 text-sm">
-                        Usa la pestaña <b>Añadir</b> para agregar películas.
+                        {canManage ? <>Usa la pestaña <b>Añadir</b> para agregar títulos.</> : "Esta lista todavía no tiene títulos."}
                     </p>
                 </div>
             ) : tab === 'items' && items.length > 0 ? (
@@ -663,18 +655,18 @@ export default function ListDetailsPage() {
                                     voteAverage={it?.vote_average}
                                     disableHover={viewMode === 'compact'}
                                 />
-                                <button
+                                {canManage && <button
                                     type="button"
                                     disabled={busyId === id}
                                     onClick={(e) => {
                                         e.preventDefault()
                                         e.stopPropagation()
-                                        handleRemove(id)
+                                        handleRemove(it)
                                     }}
                                     className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
                                 >
                                     {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                </button>
+                                </button>}
                             </div>
                         )
                     }}
@@ -708,13 +700,13 @@ export default function ListDetailsPage() {
                                     </div>
                                 )}
 
-                                <button
+                                {canManage && <button
                                     type="button"
                                     disabled={busyId === id || (tab === 'add' && inList)}
                                     onClick={(e) => {
                                         e.preventDefault()
                                         e.stopPropagation()
-                                        if (tab === 'items') handleRemove(id)
+                                        if (tab === 'items') handleRemove(it)
                                         else handleAdd(it)
                                     }}
                                     className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full shadow-lg backdrop-blur-[28px] transition-all
@@ -733,7 +725,7 @@ export default function ListDetailsPage() {
                                     ) : (
                                         <Plus className="w-5 h-5" />
                                     )}
-                                </button>
+                                </button>}
                             </div>
                         )
                     })}

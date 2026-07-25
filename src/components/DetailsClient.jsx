@@ -1539,13 +1539,11 @@ export default function DetailsClient({
   }, [endpointType, id]);
 
   // =====================================================================
-  // LISTAS DE USUARIO (TMDb) - solo disponible para peliculas
-  // Permite agregar peliculas a listas personalizadas, crear nuevas listas,
-  // y detectar en que listas ya esta presente la pelicula.
+  // LISTAS PROPIAS DEL USUARIO — persistidas en nuestro backend. Permiten
+  // guardar tanto películas como series; TMDb solo aporta sus metadatos.
   // =====================================================================
 
-  // Las listas de TMDb solo funcionan para peliculas (no series) y requieren API key
-  const canUseLists = endpointType === "movie" && !!TMDB_API_KEY;
+  const canUseLists = authenticated || hasBackendSession;
 
   // -- Estado del modal de listas --
   const [listModalOpen, setListModalOpen] = useState(false);
@@ -1554,7 +1552,7 @@ export default function DetailsClient({
   const [userLists, setUserLists] = useState([]); // Todas las listas del usuario
   const [listQuery, setListQuery] = useState(""); // Filtro de busqueda en el modal
 
-  // Mapa de pertenencia: { listId: true/false } indica si la pelicula esta en cada lista
+  // Mapa de pertenencia: { listId: true/false } indica si el título está en cada lista.
   const [membershipMap, setMembershipMap] = useState({});
   const [listsPresenceLoading, setListsPresenceLoading] = useState(false);
   const [busyListId, setBusyListId] = useState(null); // Lista en proceso de modificacion
@@ -1788,7 +1786,7 @@ export default function DetailsClient({
     return () => document.removeEventListener("pointerdown", onDown);
   }, [supportsHover, mobileClearOpen]);
 
-  // ID numerico de la pelicula (necesario para la API de listas de TMDb)
+  // ID numérico del título guardado en la BBDD propia.
   const movieId = useMemo(() => {
     const n = Number(id);
     return Number.isFinite(n) ? n : null;
@@ -1825,7 +1823,6 @@ export default function DetailsClient({
    * Usa un abortRef para cancelar si el componente se desmonta.
    */
   const loadListsIfNeeded = async ({ abortRef } = {}) => {
-    if (!session || !account?.id) return [];
     if (!canUseLists) return [];
     if (Array.isArray(userLists) && userLists.length > 0) return userLists;
 
@@ -1838,7 +1835,7 @@ export default function DetailsClient({
   };
 
   /**
-   * Comprueba en cuales listas esta presente la pelicula actual.
+   * Comprueba en cuáles listas está presente el título actual.
    * Realiza peticiones en paralelo (concurrencia 5) para cada lista del usuario.
    * @param {Object} options
    * @param {Array}  options.lists    - Listas a comprobar (si no se pasa, las carga)
@@ -1850,8 +1847,7 @@ export default function DetailsClient({
     silent = false,
     abortRef,
   } = {}) => {
-    if (!session || !account?.id || !movieId) return;
-    if (!canUseLists) return;
+    if (!canUseLists || !movieId) return;
 
     if (!silent) setListsLoading(true);
     else setListsPresenceLoading(true);
@@ -1870,8 +1866,8 @@ export default function DetailsClient({
       let idx = 0;
       const nextMap = {};
 
-      // Presencia por lista: el backend no tiene un endpoint item_status, así que
-      // pedimos los items de cada lista y comprobamos si el tmdbId está dentro.
+      // Presencia por lista: pedimos los items de cada lista y comprobamos el
+      // identificador y tipo de contenido guardados en nuestra BBDD.
       const worker = async () => {
         while (!abortRef?.current && idx < ids.length) {
           const listId = ids[idx++];
@@ -1882,7 +1878,7 @@ export default function DetailsClient({
             const present = items.some(
               (it) =>
                 String(it?.id) === String(movieId) &&
-                (it?.media_type || "movie") === "movie",
+                (it?.media_type || "movie") === endpointType,
             );
             nextMap[lid] = !!present;
           } catch {
@@ -1913,7 +1909,7 @@ export default function DetailsClient({
   // Se ejecuta en modo silencioso (sin spinner principal).
   useEffect(() => {
     const abortRef = { current: false };
-    if (!session || !account?.id || !canUseLists || !movieId) {
+    if (!canUseLists || !movieId) {
       setMembershipMap({});
       setListsPresenceLoading(false);
       return;
@@ -1924,7 +1920,7 @@ export default function DetailsClient({
       abortRef.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, account?.id, canUseLists, movieId]);
+  }, [canUseLists, movieId, endpointType]);
 
   // Abre el modal de listas: carga listas y presencia
   const openListsModal = async () => {
@@ -1949,10 +1945,9 @@ export default function DetailsClient({
     setNewListDesc("");
   };
 
-  // Agrega la pelicula a una lista especifica con actualizacion optimista del estado
+  // Agrega el título actual a una lista específica con actualización optimista.
   const handleAddToSpecificList = async (listId) => {
-    if (!session || !account?.id || !movieId) return;
-    if (!canUseLists) return;
+    if (!canUseLists || !movieId) return;
 
     const lid = getListId(listId);
     if (!lid) return;
@@ -1965,7 +1960,7 @@ export default function DetailsClient({
       await backendAddMovieToList({
         listId: lid,
         movieId,
-        mediaType: "movie",
+        mediaType: endpointType,
         title: title || undefined,
         posterPath: data?.poster_path || undefined,
       });
@@ -1988,10 +1983,9 @@ export default function DetailsClient({
     }
   };
 
-  // Crea una nueva lista en el backend y agrega la pelicula actual
+  // Crea una nueva lista propia en el backend y agrega el título actual.
   const handleCreateListAndAdd = async () => {
-    if (!session || !account?.id || !movieId) return;
-    if (!canUseLists) return;
+    if (!canUseLists || !movieId) return;
 
     const n = newListName.trim();
     if (!n) return;
@@ -2011,7 +2005,7 @@ export default function DetailsClient({
       await backendAddMovieToList({
         listId: newListId,
         movieId,
-        mediaType: "movie",
+        mediaType: endpointType,
         title: title || undefined,
         posterPath: data?.poster_path || undefined,
       });
@@ -3998,6 +3992,9 @@ export default function DetailsClient({
     };
   }, [initialComments]);
   const [tComments, setTComments] = useState(() => initialCommentsState);
+  const [commentProfileUsernames, setCommentProfileUsernames] = useState(
+    () => new Map(),
+  );
   const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
   const COMMENTS_SECTION_LIMIT = 5;
   const myComments = useMemo(() => {
@@ -4009,6 +4006,53 @@ export default function DetailsClient({
       }),
     );
   }, [account?.username, ownedCommentIds, tComments.items, traktUsername]);
+
+  // Los comentarios pueden venir de Trakt y sus handles no tienen por qué
+  // pertenecer a The Show Verse. Resolvemos todos los autores visibles de una
+  // vez para enlazar solo perfiles que existan realmente en nuestra BBDD.
+  useEffect(() => {
+    const usernames = [
+      ...new Set(
+        (tComments.items || [])
+          .map((comment) => String(comment?.user?.username || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (!usernames.length) {
+      setCommentProfileUsernames(new Map());
+      return undefined;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    fetch(
+      `/api/users/resolve-usernames?usernames=${encodeURIComponent(usernames.join(","))}`,
+      { cache: "no-store", signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        const resolved = new Map(
+          (Array.isArray(payload?.usernames) ? payload.usernames : []).map(
+            (username) => [String(username).toLowerCase(), String(username)],
+          ),
+        );
+        setCommentProfileUsernames(resolved);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") {
+          setCommentProfileUsernames(new Map());
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [tComments.items]);
 
   const handleCommentSubmit = async ({ comment, spoiler }) => {
     const result = await traktAddComment({
@@ -11428,6 +11472,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 ? formatDateTimeEs(c.created_at)
                                 : "";
                               const likes = Number(c?.likes || 0);
+                              const commentUsername = String(
+                                user?.username || "",
+                              ).trim();
+                              const profileUsername = commentProfileUsernames.get(
+                                commentUsername.toLowerCase(),
+                              );
+                              const authorName =
+                                user?.name || user?.username || "Usuario";
 
                               return (
                                 <div
@@ -11449,11 +11501,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className="min-w-0 flex-1">
                                     <div className="mb-1 flex items-baseline justify-between gap-2">
                                       <div className="flex items-center gap-2">
-                                        <span className="font-bold text-white group-hover:text-yellow-400 transition-colors cursor-pointer">
-                                          {user?.name ||
-                                            user?.username ||
-                                            "Usuario"}
-                                        </span>
+                                        {profileUsername ? (
+                                          <Link
+                                            href={`/u/${encodeURIComponent(profileUsername)}`}
+                                            className="font-bold text-white transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                                          >
+                                            {authorName}
+                                          </Link>
+                                        ) : (
+                                          <span className="font-bold text-white">
+                                            {authorName}
+                                          </span>
+                                        )}
                                         {user?.vip && (
                                           <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">
                                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />

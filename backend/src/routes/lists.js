@@ -10,7 +10,11 @@ import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 const listSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  isPublic: z.boolean().optional().default(false),
+  // Las listas creadas en The Show Verse son contenido de comunidad por
+  // defecto. La propiedad sigue existiendo para que el creador pueda decidir
+  // ocultarla más adelante, pero crear una lista ya no la deja fuera de su
+  // perfil por accidente.
+  isPublic: z.boolean().optional().default(true),
   sortBy: z.enum(['added_at', 'title', 'position']).optional().default('added_at'),
 });
 
@@ -60,15 +64,19 @@ export default async function listsRoutes(fastify) {
     return reply.status(201).send({ list });
   });
 
-  // GET /lists/:id — Detalle de una lista con items
+  // GET /lists/:id — Detalle de una lista con items. El propietario puede
+  // abrir cualquier lista suya; el resto de usuarios autenticados solo las
+  // públicas que aparecen en el perfil de su creador.
   fastify.get('/:id', async (req, reply) => {
     const [list] = await db
       .select()
       .from(userLists)
-      .where(and(eq(userLists.id, req.params.id), eq(userLists.userId, req.user.id)))
+      .where(eq(userLists.id, req.params.id))
       .limit(1);
 
-    if (!list) return reply.status(404).send({ error: 'List not found' });
+    if (!list || (list.userId !== req.user.id && !list.isPublic)) {
+      return reply.status(404).send({ error: 'List not found' });
+    }
 
     const items = await db
       .select()
@@ -76,7 +84,11 @@ export default async function listsRoutes(fastify) {
       .where(eq(userListItems.listId, list.id))
       .orderBy(asc(userListItems.position), desc(userListItems.addedAt));
 
-    return reply.send({ list, items });
+    return reply.send({
+      list,
+      items,
+      canEdit: list.userId === req.user.id,
+    });
   });
 
   // PATCH /lists/:id — Editar lista

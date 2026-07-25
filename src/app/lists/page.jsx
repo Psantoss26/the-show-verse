@@ -19,7 +19,7 @@ import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
-import { getListDetails } from "@/lib/api/tmdbLists";
+import { getListDetails } from "@/lib/api/backendLists";
 import { getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
@@ -67,14 +67,14 @@ const VALID_SORT_MODES = new Set([
   "name_desc",
 ]);
 const VALID_VIEW_MODES = new Set(["grid", "rows", "list"]);
-const VALID_SOURCES = new Set(["tmdb", "trakt", "collections"]);
+const VALID_SOURCES = new Set(["personal", "trakt", "collections"]);
 const VALID_TRAKT_MODES = new Set(["trending", "popular"]);
 
 const LIST_ROW_ACCENTS = {
-  tmdb: {
-    borderColor: "rgba(59, 130, 246, 0.44)",
-    shadowColor: "59, 130, 246",
-    textClass: "text-blue-400",
+  personal: {
+    borderColor: "rgba(168, 85, 247, 0.44)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
   },
   trakt: {
     borderColor: "rgba(168, 85, 247, 0.44)",
@@ -167,7 +167,13 @@ function readListsMenuPrefs() {
       viewMode: VALID_VIEW_MODES.has(parsed?.viewMode)
         ? parsed.viewMode
         : "rows",
-      source: VALID_SOURCES.has(parsed?.source) ? parsed.source : "trakt",
+      // Migración silenciosa de las preferencias antiguas: "tmdb" era el
+      // nombre histórico de las listas propias, no su proveedor real.
+      source: parsed?.source === "tmdb"
+        ? "personal"
+        : VALID_SOURCES.has(parsed?.source)
+          ? parsed.source
+          : "trakt",
       traktMode: VALID_TRAKT_MODES.has(parsed?.traktMode)
         ? parsed.traktMode
         : "popular",
@@ -836,7 +842,7 @@ function getTraktListKey(list) {
 
 function buildInternalUrl(list) {
   const src = list?.source;
-  if (src === "tmdb") return `/lists/${list?.id}`;
+  if (src === "personal") return `/lists/${list?.id}`;
 
   if (src === "trakt") {
     // Comunidad: el detalle se sirve por id interno (uuid) desde nuestra BBDD.
@@ -853,7 +859,7 @@ function buildInternalUrl(list) {
 
 function buildExternalUrl(list) {
   const src = list?.source;
-  if (src === "tmdb") return `https://www.themoviedb.org/list/${list?.id}`;
+  if (src === "personal") return null;
   if (src === "trakt") return list?.traktUrl || null;
   if (src === "collections")
     return `https://www.themoviedb.org/collection/${list?.id}`;
@@ -1324,7 +1330,7 @@ export default function ListsPage() {
     canUse,
     lists,
     loading,
-    initialized: tmdbInitialized,
+    initialized: personalInitialized,
     error,
     refresh,
     loadMore,
@@ -1351,7 +1357,7 @@ export default function ListsPage() {
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente
-  const [source, setSource] = useState("trakt"); // 'tmdb' | 'trakt' | 'collections'
+  const [source, setSource] = useState("trakt"); // 'personal' | 'trakt' | 'collections'
   const [traktMode, setTraktMode] = useState("popular"); // trending | popular
   const [prefsHydrated, setPrefsHydrated] = useState(false);
 
@@ -1402,7 +1408,7 @@ export default function ListsPage() {
     else setAuthStatus("anonymous");
   }, [session, account]);
 
-  const safeTmdbLists = Array.isArray(lists) ? lists : [];
+  const safePersonalLists = Array.isArray(lists) ? lists : [];
   const collectionsQueryKey =
     source !== "collections"
       ? null
@@ -1509,12 +1515,12 @@ export default function ListsPage() {
 
   // ✅ lista activa según fuente
   const fetchedActiveLists = useMemo(() => {
-    if (source === "tmdb") {
-      return safeTmdbLists.map((l) => ({
+    if (source === "personal") {
+      return safePersonalLists.map((l) => ({
         ...l,
-        source: "tmdb",
-        internalUrl: buildInternalUrl({ ...l, source: "tmdb" }),
-        externalUrl: buildExternalUrl({ ...l, source: "tmdb" }),
+        source: "personal",
+        internalUrl: buildInternalUrl({ ...l, source: "personal" }),
+        externalUrl: null,
       }));
     }
 
@@ -1545,7 +1551,7 @@ export default function ListsPage() {
     }));
   }, [
     source,
-    safeTmdbLists,
+    safePersonalLists,
     trakt?.lists,
     featuredCollections,
     searchedCollections,
@@ -1578,7 +1584,7 @@ export default function ListsPage() {
       return sortLists(activeLists, sortMode);
     }
 
-    // Para TMDb y Trakt, filtrar localmente
+    // Para las listas propias y de comunidad, filtrar localmente.
     const base = q
       ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
       : activeLists;
@@ -1600,15 +1606,15 @@ export default function ListsPage() {
   }, [source, traktMode]);
 
   const listsTitle =
-    source === "tmdb"
+    source === "personal"
       ? "Mis Listas"
       : source === "trakt"
         ? "Listas de la comunidad"
         : "Colecciones";
 
   const subtitle =
-    source === "tmdb"
-      ? `${safeTmdbLists.length} listas creadas`
+    source === "personal"
+      ? `${safePersonalLists.length} listas creadas`
       : source === "trakt"
         ? `${visibleCount} listas`
         : `${visibleCount} colecciones`;
@@ -1649,7 +1655,7 @@ export default function ListsPage() {
       controllersRef.current.set(cacheKey, ctrl);
 
       try {
-        if (src === "tmdb") {
+        if (src === "personal") {
           const json = await getListDetails({
             listId,
             page: 1,
@@ -1743,12 +1749,12 @@ export default function ListsPage() {
   const handleDelete = async (e, listId) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!canUse || source !== "tmdb") return;
+    if (!canUse || source !== "personal") return;
     const ok = window.confirm("¿Seguro que quieres borrar esta lista?");
     if (!ok) return;
 
     // abort preview si estaba cargando
-    const cacheKey = getListCacheKey("tmdb", listId);
+    const cacheKey = getListCacheKey("personal", listId);
     const ctrl = controllersRef.current.get(cacheKey);
     if (ctrl) ctrl.abort();
 
@@ -1769,7 +1775,7 @@ export default function ListsPage() {
     inFlight.current.clear();
     setItemsMap({});
 
-    if (source === "tmdb") refresh();
+    if (source === "personal") refresh();
     else if (source === "trakt") trakt?.refresh?.();
     else {
       // collections: limpiar búsqueda y re-fetch destacadas
@@ -1789,7 +1795,7 @@ export default function ListsPage() {
   };
 
   const loadingUnified =
-    source === "tmdb"
+    source === "personal"
       ? loading
       : source === "trakt"
         ? trakt?.loading
@@ -1800,8 +1806,8 @@ export default function ListsPage() {
       ? true
       : !prefsHydrated
         ? false
-        : source === "tmdb"
-          ? !!tmdbInitialized
+        : source === "personal"
+          ? !!personalInitialized
           : source === "trakt"
             ? !!trakt?.initialized
             : collectionsResolvedKey === collectionsQueryKey;
@@ -1814,7 +1820,7 @@ export default function ListsPage() {
   }, [authStatus, sourceInitialized, hasCompletedInitialLoad]);
 
   const errorUnified =
-    source === "tmdb" ? error : source === "trakt" ? trakt?.error : "";
+    source === "personal" ? error : source === "trakt" ? trakt?.error : "";
 
   const loadingMessage =
     authStatus === "checking"
@@ -1828,9 +1834,9 @@ export default function ListsPage() {
   const showContentLoader = false;
 
   // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
-  const canEdit = !!canUse && source === "tmdb";
+  const canEdit = !!canUse && source === "personal";
 
-  if (authStatus === "anonymous" && source === "tmdb") {
+  if (authStatus === "anonymous" && source === "personal") {
     return (
       <div className="min-h-screen bg-[#101010] text-gray-100 flex items-center justify-center">
         <div className="max-w-md text-center px-4">
@@ -1965,7 +1971,7 @@ export default function ListsPage() {
                       <InlineDropdown
                         label="Fuente"
                         valueLabel={
-                          source === "tmdb"
+                          source === "personal"
                             ? "Mis listas"
                             : source === "trakt"
                               ? "Comunidad"
@@ -1976,9 +1982,9 @@ export default function ListsPage() {
                         {({ close }) => (
                           <>
                             <DropdownItem
-                              active={source === "tmdb"}
+                              active={source === "personal"}
                               onClick={() => {
-                                startTransition(() => setSource("tmdb"));
+                                startTransition(() => setSource("personal"));
                                 close();
                               }}
                             >
@@ -2220,7 +2226,7 @@ export default function ListsPage() {
             <InlineDropdown
               label="Fuente"
               valueLabel={
-                source === "tmdb"
+                source === "personal"
                   ? "Mis listas"
                   : source === "trakt"
                     ? "Comunidad"
@@ -2231,9 +2237,9 @@ export default function ListsPage() {
               {({ close }) => (
                 <>
                   <DropdownItem
-                    active={source === "tmdb"}
+                    active={source === "personal"}
                     onClick={() => {
-                      startTransition(() => setSource("tmdb"));
+                      startTransition(() => setSource("personal"));
                       close();
                     }}
                   >
@@ -2451,7 +2457,7 @@ export default function ListsPage() {
                 : "No hay listas"}
             </h3>
             <p className="text-zinc-500 mt-2">
-              {source === "tmdb"
+              {source === "personal"
                 ? "Crea una nueva lista arriba para empezar."
                 : "Prueba cambiando el modo o el buscador."}
             </p>
@@ -2506,8 +2512,8 @@ export default function ListsPage() {
           </>
         )}
 
-        {/* ✅ LoadMore SOLO TMDb */}
-        {source === "tmdb" && hasMore && !loadingUnified && (
+        {/* Carga adicional de listas propias si el backend la expone. */}
+        {source === "personal" && hasMore && !loadingUnified && (
           <div className="flex justify-center pt-8">
             <button
               onClick={loadMore}

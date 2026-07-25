@@ -1,0 +1,1 @@
+ALTER TABLE "user_lists" ALTER COLUMN "is_public" SET DEFAULT true;

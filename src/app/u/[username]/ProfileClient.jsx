@@ -10,6 +10,7 @@ import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import ProfileSection from "./ProfileSection";
 import {
   Activity,
@@ -151,9 +152,21 @@ function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emera
   return <div className={className}>{body}</div>;
 }
 
-function ProfilePosterGrid({ items, showStars = false, viewerTitleStates }) {
+function ProfilePosterGrid({
+  items,
+  showStars = false,
+  viewerTitleStates,
+  label,
+  prioritizeHorizontalScroll = false,
+}) {
   return (
-    <div data-profile-horizontal-scroll className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+    <div
+      data-profile-horizontal-scroll
+      data-profile-favorites-scroll={prioritizeHorizontalScroll || undefined}
+      role="region"
+      aria-label={label}
+      className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0"
+    >
       {items.map((item) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
@@ -192,6 +205,7 @@ function SectionHeader({ label, action, onClick }) {
 }
 
 function PendingPreview({ username, items, onOpen }) {
+  const previewClick = usePreviewOpen();
   const [pendingItems, setPendingItems] = useState(() => (
     Array.isArray(items) ? items.slice(0, 5) : []
   ));
@@ -244,6 +258,7 @@ function PendingPreview({ username, items, onOpen }) {
               <Link
                 key={`${item.mediaType}:${item.tmdbId}`}
                 href={href}
+                onClick={previewClick(item)}
                 className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
                 style={{ left: `${leftPercent}%`, zIndex: index + 1 }}
               >
@@ -298,11 +313,13 @@ function relativeSidebarActivityTime(value) {
 }
 
 function SidebarActivityTitle({ item }) {
+  const previewClick = usePreviewOpen();
   if (!item?.tmdbId || !item?.mediaType) return null;
   const mediaType = item.mediaType === "tv" ? "tv" : "movie";
   return (
     <Link
       href={`/details/${mediaType}/${item.tmdbId}`}
+      onClick={previewClick(item)}
       className="font-extrabold text-white transition-colors hover:text-emerald-400 focus-visible:outline-none focus-visible:text-emerald-400"
     >
       {item.title || "Ver ficha"}
@@ -630,9 +647,17 @@ export default function ProfileClient({ username }) {
     };
   }, [profile, viewer?.username, refreshToken]);
 
+  const profileFavoriteMovies = useMemo(() => {
+    if (Array.isArray(profile?.favoriteMovies)) return profile.favoriteMovies;
+    return (profile?.favorites || []).filter((item) => item?.mediaType === "movie");
+  }, [profile?.favoriteMovies, profile?.favorites]);
+  const profileFavoriteSeries = useMemo(() => {
+    if (Array.isArray(profile?.favoriteSeries)) return profile.favoriteSeries;
+    return (profile?.favorites || []).filter((item) => item?.mediaType === "tv");
+  }, [profile?.favoriteSeries, profile?.favorites]);
   const profileTitleItems = useMemo(
-    () => [...(profile?.favorites || []), ...(profile?.recentWatched || [])],
-    [profile?.favorites, profile?.recentWatched],
+    () => [...profileFavoriteMovies, ...profileFavoriteSeries, ...(profile?.recentWatched || [])],
+    [profileFavoriteMovies, profileFavoriteSeries, profile?.recentWatched],
   );
   const viewerTitleStates = useViewerTitleStates(profileTitleItems, Boolean(viewer?.username));
 
@@ -674,7 +699,6 @@ export default function ProfileClient({ username }) {
   const {
     user,
     counts,
-    favorites,
     recentWatched,
     pendingPreview,
     followingPreview,
@@ -689,20 +713,23 @@ export default function ProfileClient({ username }) {
   const handleProfileTouchStart = (event) => {
     if (window.matchMedia("(min-width: 640px)").matches || event.touches.length !== 1) return;
     const target = event.target;
-    const ignoreSwipe = target instanceof Element && Boolean(
-      target.closest("[data-profile-horizontal-scroll], a, button, input, textarea, select, [contenteditable='true']"),
+    // El carrusel de Favoritos es la única zona que conserva el gesto
+    // horizontal propio. El resto de la vista debe poder cambiar de sección,
+    // incluso si el toque comienza sobre un control o una tarjeta.
+    const prioritizeHorizontalScroll = target instanceof Element && Boolean(
+      target.closest("[data-profile-favorites-scroll]"),
     );
     profileSwipe.current = {
       x: event.touches[0].clientX,
       y: event.touches[0].clientY,
-      ignoreSwipe,
+      prioritizeHorizontalScroll,
     };
   };
 
   const handleProfileTouchEnd = (event) => {
     const gesture = profileSwipe.current;
     profileSwipe.current = null;
-    if (!gesture || gesture.ignoreSwipe || event.changedTouches.length !== 1) return;
+    if (!gesture || gesture.prioritizeHorizontalScroll || event.changedTouches.length !== 1) return;
 
     const deltaX = event.changedTouches[0].clientX - gesture.x;
     const deltaY = event.changedTouches[0].clientY - gesture.y;
@@ -722,9 +749,9 @@ export default function ProfileClient({ username }) {
   return (
     <div
       className="min-h-screen bg-black text-zinc-100 pb-0 lg:pb-24"
-      onTouchStart={handleProfileTouchStart}
-      onTouchEnd={handleProfileTouchEnd}
-      onTouchCancel={() => { profileSwipe.current = null; }}
+      onTouchStartCapture={handleProfileTouchStart}
+      onTouchEndCapture={handleProfileTouchEnd}
+      onTouchCancelCapture={() => { profileSwipe.current = null; }}
     >
       {/* Fondo decorativo sutil */}
       <ProfileBackdrop />
@@ -840,16 +867,39 @@ export default function ProfileClient({ username }) {
         <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
           {/* ── COLUMNA PRINCIPAL ── */}
           <div className="sv-profile-entry sv-profile-entry--content space-y-10">
-            {/* Favoritos curados */}
+            {/* Favoritos curados, separados por tipo para mostrar cinco de cada uno. */}
             <section>
-              <SectionHeader label="Favoritos" />
-              {favorites?.length ? (
-                <ProfilePosterGrid items={favorites} viewerTitleStates={viewerTitleStates} />
+              <SectionHeader label="Películas favoritas" />
+              {profileFavoriteMovies.length ? (
+                <ProfilePosterGrid
+                  items={profileFavoriteMovies}
+                  viewerTitleStates={viewerTitleStates}
+                  label="Películas favoritas"
+                  prioritizeHorizontalScroll
+                />
               ) : (
                 <p className="text-sm text-zinc-600">
                   {isSelf
-                    ? "Aún no has elegido tus títulos favoritos. Edítalos en Ajustes."
-                    : "Este miembro todavía no ha destacado favoritos."}
+                    ? "Aún no has elegido películas favoritas. Edítalas en Ajustes."
+                    : "Este miembro todavía no ha destacado películas favoritas."}
+                </p>
+              )}
+            </section>
+
+            <section>
+              <SectionHeader label="Series favoritas" />
+              {profileFavoriteSeries.length ? (
+                <ProfilePosterGrid
+                  items={profileFavoriteSeries}
+                  viewerTitleStates={viewerTitleStates}
+                  label="Series favoritas"
+                  prioritizeHorizontalScroll
+                />
+              ) : (
+                <p className="text-sm text-zinc-600">
+                  {isSelf
+                    ? "Aún no has elegido series favoritas. Edítalas en Ajustes."
+                    : "Este miembro todavía no ha destacado series favoritas."}
                 </p>
               )}
             </section>
@@ -862,6 +912,7 @@ export default function ProfileClient({ username }) {
                   items={recentWatched}
                   showStars
                   viewerTitleStates={viewerTitleStates}
+                  label="Actividad reciente"
                 />
               ) : (
                 <p className="text-sm text-zinc-600">Sin actividad reciente.</p>
@@ -972,7 +1023,12 @@ function ProfileTabs({ tab, setTab, sections }) {
   }, [tab]);
 
   return (
-    <nav ref={navRef} className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [touch-action:pan-y] sm:mt-8 [&::-webkit-scrollbar]:hidden">
+    <nav
+      ref={navRef}
+      data-profile-horizontal-scroll
+      aria-label="Secciones del perfil"
+      className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:mt-8 [&::-webkit-scrollbar]:hidden"
+    >
       {items.map((it) => {
         const active = tab === it.id;
         return (
@@ -1075,7 +1131,7 @@ function ProfileAnalytics({ analytics }) {
         </AnalyticsCard>
         <aside
           aria-label="Resumen de hábitos"
-          className="grid min-w-0 grid-cols-2 gap-2 xl:col-span-3"
+          className="grid min-w-0 grid-cols-3 gap-2 sm:grid-cols-2 xl:col-span-3"
         >
           <HabitMetrics insights={analytics.insights} />
         </aside>
