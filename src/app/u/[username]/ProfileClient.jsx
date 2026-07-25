@@ -184,7 +184,6 @@ function PendingPreview({ username, items, onOpen }) {
               <Link
                 key={`${item.mediaType}:${item.tmdbId}`}
                 href={href}
-                title={titleText}
                 className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-md bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
                 style={{ left: `${leftPercent}%`, zIndex: index + 1 }}
               >
@@ -251,7 +250,6 @@ function StarRatingHistogram({ histogram }) {
             <li
               key={item.star}
               className="group relative flex h-full min-w-0 flex-1 items-end"
-              title={label}
             >
               <span className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-10 w-max -translate-x-1/2 rounded-lg border border-white/10 bg-slate-700 px-2.5 py-1.5 text-center text-[10px] font-bold text-white opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
                 <span className="block">{item.value} valoraciones</span>
@@ -705,7 +703,6 @@ export default function ProfileClient({ username }) {
                     <Link
                       key={f.username}
                       href={`/u/${f.username}`}
-                      title={f.displayName}
                       className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-[10px] font-black text-white transition-transform hover:scale-110 shadow-sm"
                     >
                       {f.avatarUrl ? (
