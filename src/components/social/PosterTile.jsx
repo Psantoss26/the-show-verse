@@ -69,10 +69,10 @@ export default function PosterTile({ item, showStars = false, viewerState }) {
           </div>
         )}
 
-        {/* Insignia en esquina superior izquierda (con bordes de ultra alta resolución sin borrosidad GPU) */}
+        {/* Insignia con el mismo borde parcial que las tarjetas de Favoritos. */}
         {showTopLeftBadge && (
           <div
-            className={`hidden lg:flex items-center justify-center gap-1.5 absolute -top-px -left-px z-20 p-2 sm:p-2.5 rounded-br-2xl border backdrop-blur-xl shadow-md transition-all duration-300 ease-out origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 ${badgeColor}`}
+            className={`hidden lg:flex items-center justify-center gap-1.5 absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 ${badgeColor}`}
             aria-hidden="true"
           >
             {favorite && <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] fill-current" />}
