@@ -20,7 +20,6 @@ import {
   ChevronDown,
   X,
   Loader2,
-  BarChart3,
   TrendingUp,
   Calendar,
   Film,
@@ -821,7 +820,7 @@ function DropdownItem({ active, onClick, children }) {
 
 function InProgressPosterHoverIndicator({
   nextEpisode,
-  progressLabel,
+  progressPct,
   progressColor,
 }) {
   return (
@@ -829,15 +828,14 @@ function InProgressPosterHoverIndicator({
       className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
-      <span className="flex h-9 max-w-[7rem] shrink-0 items-center gap-1.5 px-2 text-emerald-400">
+      <span className="mr-1 flex h-9 max-w-[7rem] shrink-0 items-center gap-1.5 px-2 text-emerald-400">
         <Play className="h-4 w-4 shrink-0" fill="currentColor" />
-        <span className="truncate text-xs font-bold text-zinc-100">
+        <span className="truncate text-xs font-bold leading-none text-zinc-100 [text-box:trim-both_cap_alphabetic]">
           {nextEpisode || "Próximo episodio"}
         </span>
       </span>
-      <span className={`flex h-9 shrink-0 items-center gap-1.5 px-2 text-xs font-bold ${progressColor}`}>
-        <BarChart3 className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap text-zinc-100">{progressLabel}</span>
+      <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${progressColor}`}>
+        <span className="leading-none">{progressPct}%</span>
       </span>
     </div>
   );
@@ -854,14 +852,16 @@ function CompletedHoverIndicator({ lastWatchedAt, rating }) {
       className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center text-emerald-400">
+      <span className="flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400">
         <CheckCircle2 className="h-5 w-5" />
       </span>
-      <span className="flex h-9 shrink-0 items-center justify-center whitespace-nowrap px-2 text-xs font-bold uppercase tracking-wide text-zinc-100">
-        {formatWatchMonthYear(lastWatchedAt)}
+      <span className="flex h-9 w-[4.75rem] shrink-0 items-center justify-center whitespace-nowrap text-[11px] font-bold uppercase tracking-wide text-zinc-100">
+        <span className="leading-none [text-box:trim-both_cap_alphabetic]">
+          {formatWatchMonthYear(lastWatchedAt)}
+        </span>
       </span>
-      <span className="flex h-9 min-w-10 shrink-0 items-center justify-center px-2 text-sm font-black tabular-nums text-amber-300">
-        {ratingLabel}
+      <span className="flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums text-amber-300">
+        <span className="leading-none">{ratingLabel}</span>
       </span>
     </div>
   );
@@ -1012,7 +1012,7 @@ const InProgressCard = memo(function InProgressCard({
             {activeTab === "inprogress" ? (
               <InProgressPosterHoverIndicator
                 nextEpisode={nextEpCode}
-                progressLabel={episodeProgress.label}
+                progressPct={progressPct}
                 progressColor={colors.text}
               />
             ) : (
@@ -1062,17 +1062,30 @@ const InProgressCard = memo(function InProgressCard({
             <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
 
             {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
-            {activeTab !== "completed" && (
-              <div className="absolute top-3 right-3">
+            <div className="absolute top-3 right-3">
+              {activeTab === "completed" && !item.user_rating ? null : (
                 <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
-                  <CircularProgress
-                    pct={progressPct}
-                    colors={colors}
-                    size={40}
-                  />
+                  {activeTab === "completed" ? (
+                    <CircularProgress
+                      pct={Number(item.user_rating || 0) * 10}
+                      colors={{
+                        stroke: "#facc15",
+                        trail: "rgba(250,204,21,0.15)",
+                        text: "text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] !font-mono !text-[13px]",
+                      }}
+                      size={40}
+                      customText={item.user_rating}
+                    />
+                  ) : (
+                    <CircularProgress
+                      pct={progressPct}
+                      colors={colors}
+                      size={40}
+                    />
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Next episode badge - solid dark bg */}
             {nextEpCode && (
@@ -1093,11 +1106,7 @@ const InProgressCard = memo(function InProgressCard({
             )}
 
             {/* Bottom info on backdrop */}
-            <div
-              className={`absolute bottom-0 left-0 right-0 p-4 transition-opacity duration-200 ${
-                activeTab === "completed" ? "lg:group-hover:opacity-0" : ""
-              }`}
-            >
+            <div className="absolute bottom-0 left-0 right-0 p-4">
               <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">
                 {title}
               </h3>
@@ -1116,12 +1125,6 @@ const InProgressCard = memo(function InProgressCard({
               )}
             </div>
 
-            {activeTab === "completed" && (
-              <CompletedHoverIndicator
-                lastWatchedAt={item.lastWatchedAt}
-                rating={item.user_rating ?? item.rating}
-              />
-            )}
           </div>
 
           {/* Progress section */}
