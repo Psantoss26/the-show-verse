@@ -512,6 +512,39 @@ function DeleteConfirm({ busy, onCancel, onConfirm, rounded = "rounded-2xl" }) {
   );
 }
 
+function ContinueWatchingPosterHoverIndicator({
+  platform,
+  platformIconUrl,
+  pct,
+  progressColor,
+}) {
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-3 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
+      aria-hidden="true"
+    >
+      <span className="flex h-9 w-10 shrink-0 items-center justify-center">
+        {platformIconUrl ? (
+          <OptimizedImage
+            src={platformIconUrl}
+            alt=""
+            width={20}
+            height={20}
+            className="h-5 w-5 object-contain brightness-110"
+          />
+        ) : (
+          <span className="max-w-8 truncate text-[9px] font-black uppercase text-zinc-200">
+            {platform || "—"}
+          </span>
+        )}
+      </span>
+      <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${progressColor}`}>
+        <span className="leading-none">{pct}%</span>
+      </span>
+    </div>
+  );
+}
+
 const ProgressCard = memo(function ProgressCard({
   item,
   index = 0,
@@ -632,51 +665,12 @@ const ProgressCard = memo(function ProgressCard({
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartImage item={item} kind="poster" alt={title} />
 
-            {/* Overlay con gradientes - desktop hover (igual que En progreso) */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                {labelText ? (
-                  <div className="px-2.5 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                    <Play className="w-2.5 h-2.5" fill="currentColor" />
-                    <span className="text-white drop-shadow-sm">{labelText}</span>
-                  </div>
-                ) : (
-                  <div />
-                )}
-                {/* En modo borrar, el hueco superior derecho lo ocupa la papelera:
-                    ocultamos el porcentaje para que no se solapen. */}
-                {!canDelete && (
-                  <div className="flex items-center gap-1">
-                    <span className={`text-2xl font-black tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${colors.text}`}>{pct}</span>
-                    <span className={`text-sm font-bold ${colors.text} opacity-80`}>%</span>
-                  </div>
-                )}
-              </div>
-              <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm mb-1">{title}</h3>
-                <div className="space-y-0.5">
-                  <p className="text-zinc-300 text-xs font-semibold drop-shadow-md flex items-center gap-1.5 mt-0.5">
-                    <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                    {lastWatched}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Platform logo badge - bottom right corner */}
-            {platform && (
-              platformIconUrl ? (
-                <img
-                  src={platformIconUrl}
-                  alt={platform}
-                  className="absolute bottom-3 right-3 z-15 w-7 h-7 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.6)] object-contain brightness-110 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105"
-                />
-              ) : (
-                <div className="absolute bottom-3 right-3 z-15 px-2 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] border-none text-[10px] font-black uppercase tracking-wider text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  {platform}
-                </div>
-              )
-            )}
+            <ContinueWatchingPosterHoverIndicator
+              platform={platform}
+              platformIconUrl={platformIconUrl}
+              pct={pct}
+              progressColor={colors.text}
+            />
             {canDelete && (
               <DeleteTrigger
                 onClick={handleTrash}
@@ -736,10 +730,12 @@ const ProgressCard = memo(function ProgressCard({
             {/* Platform logo badge - bottom right corner */}
             {platform && (
               platformIconUrl ? (
-                <img
+                <OptimizedImage
                   src={platformIconUrl}
                   alt={platform}
-                  className="absolute bottom-3 right-3 z-10 w-7 h-7 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.6)] object-contain brightness-110 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105"
+                  width={28}
+                  height={28}
+                  className="absolute bottom-3 right-3 z-10 h-7 w-7 rounded-lg object-contain brightness-110 opacity-0 shadow-[0_2px_8px_rgba(0,0,0,0.6)] transition-all duration-300 group-hover:scale-105 group-hover:opacity-100"
                 />
               ) : (
                 <div className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded-lg bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.06)_60%,rgba(0,0,0,0.3)_100%)] bg-black/35 shadow-[0_4px_12px_rgba(0,0,0,0.5)] border-none text-[10px] font-black uppercase tracking-wider text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
