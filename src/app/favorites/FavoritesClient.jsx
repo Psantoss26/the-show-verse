@@ -25,6 +25,7 @@ import {
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Heart,
+  Eye,
   Film,
   FilterX,
   ChevronDown,
@@ -64,6 +65,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -377,6 +379,11 @@ function getScoreItemKey(item) {
   return item?.id == null ? "" : `${getFavoriteItemType(item)}:${item.id}`;
 }
 
+function getFavoriteHistoryKey(item) {
+  if (item?.id == null) return "";
+  return `${getFavoriteItemType(item) === "tv" ? "show" : "movie"}:${item.id}`;
+}
+
 function readScoreCacheEntries(source) {
   if (typeof window === "undefined") return new Map();
   try {
@@ -445,21 +452,6 @@ function writeScoreCache(source, scoresMap, refreshedIds = null) {
     window.localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
     console.warn("Failed to write score cache:", e);
-  }
-}
-
-function updateScoreCache(source, id, score) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = `showverse:scores:${source}:v2`;
-    const raw = window.localStorage.getItem(key);
-    const data = raw ? JSON.parse(raw) : {};
-
-    data[id] = { score, t: Date.now() };
-
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to update score cache:", e);
   }
 }
 
@@ -1888,14 +1880,49 @@ function GroupDivider({
 }
 
 // ================== CARD COMPONENTS ==================
+function FavoriteHoverIndicator({ type, watched, watchCount = 0, rating, compact = false }) {
+  const hasRating = rating != null && Number(rating) > 0;
+  const movieWatchCount = Number.isFinite(Number(watchCount))
+    ? Math.max(0, Number(watchCount))
+    : 0;
+  const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const ratingClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
+
+  return (
+    <div
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
+        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
+      </span>
+      {type === "movie" ? (
+        <span className={`flex ${itemClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}>
+          {movieWatchCount}
+        </span>
+      ) : watched ? (
+        <span className={`flex ${itemClassName} shrink-0 items-center justify-center text-emerald-400`}>
+          <Eye className={iconClassName} />
+        </span>
+      ) : null}
+      {hasRating ? (
+        <span className={`flex ${ratingClassName} shrink-0 items-center justify-center font-black leading-none text-amber-300`}>
+          <span className="tabular-nums leading-none">{rating}</span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 const FavoriteCard = memo(function FavoriteCard({
   item,
   index = 0,
   totalItems = 0,
   viewMode = "grid",
   imageMode = "poster",
-  imdbScore: initialImdbScore,
-  traktScore: initialTraktScore,
+  watched = false,
+  watchCount = 0,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1903,26 +1930,6 @@ const FavoriteCard = memo(function FavoriteCard({
     item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
   const userRating = item.user_rating || null;
-  const genreIds = item.genre_ids || [];
-  const genreMap = type === "movie" ? MOVIE_GENRES : TV_GENRES;
-  const firstGenre = genreIds.length > 0 ? genreMap[genreIds[0]] : null;
-
-  const [imdbScore, setImdbScore] = useState(initialImdbScore);
-  const [traktScore, setTraktScore] = useState(initialTraktScore);
-  const [loadingScores, setLoadingScores] = useState(false);
-
-  // Sync scores from parent when they arrive progressively
-  useEffect(() => {
-    if (initialImdbScore !== undefined && initialImdbScore !== null) {
-      setImdbScore(initialImdbScore);
-    }
-  }, [initialImdbScore]);
-
-  useEffect(() => {
-    if (initialTraktScore !== undefined && initialTraktScore !== null) {
-      setTraktScore(initialTraktScore);
-    }
-  }, [initialTraktScore]);
 
   const href =
     type === "movie" ? `/details/movie/${item.id}` : `/details/tv/${item.id}`;
@@ -1938,70 +1945,6 @@ const FavoriteCard = memo(function FavoriteCard({
   // Dynamic aspect ratio based on image mode
   const aspectRatio =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
-
-  // Load scores on hover if not in cache
-  const handleHover = useCallback(async () => {
-    if (loadingScores || (imdbScore && traktScore)) return;
-
-    setLoadingScores(true);
-
-    try {
-      const itemId = getScoreItemKey(item);
-
-      // Load IMDb score if not available
-      if (!imdbScore) {
-        const cachedImdb = readScoreCache("imdb");
-        if (cachedImdb.has(itemId)) {
-          setImdbScore(cachedImdb.get(itemId));
-        } else {
-          try {
-            const batchScores = await fetchImdbScoresForItems([item]);
-            const imdbRating = batchScores[itemId]?.rating;
-
-            if (imdbRating) {
-              const numRating = Number(imdbRating);
-              if (Number.isFinite(numRating) && numRating > 0) {
-                setImdbScore(numRating);
-                updateScoreCache("imdb", itemId, numRating);
-              }
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch IMDb score for ${item.id}:`, err);
-          }
-        }
-      }
-
-      // Load Trakt score if not available
-      if (!traktScore) {
-        const cachedTrakt = readScoreCache("trakt");
-        if (cachedTrakt.has(itemId)) {
-          setTraktScore(cachedTrakt.get(itemId));
-        } else {
-          // Fetch from API
-          try {
-            const traktData = await traktGetScoreboard({
-              type,
-              tmdbId: item.id,
-            });
-            const traktRating = traktData?.community?.rating;
-
-            if (
-              traktRating &&
-              typeof traktRating === "number" &&
-              !isNaN(traktRating)
-            ) {
-              setTraktScore(traktRating);
-              updateScoreCache("trakt", itemId, traktRating);
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch Trakt score for ${item.id}:`, err);
-          }
-        }
-      }
-    } finally {
-      setLoadingScores(false);
-    }
-  }, [imdbScore, traktScore, loadingScores, item, type]);
 
   // En navegación de historial (atrás/adelante) NO se anima la entrada: la página
   // debe verse estática, tal cual estaba antes de salir.
@@ -2099,96 +2042,13 @@ const FavoriteCard = memo(function FavoriteCard({
             style={{
               transformOrigin: "center center",
             }}
-            onMouseEnter={handleHover}
           >
             <SmartPoster
               item={item}
               title={title}
               mode={effectiveImageMode}
             />
-            <div
-              className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                type === "movie"
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`}
-            >
-              {type === "movie" ? (
-                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              ) : (
-                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              )}
-            </div>
-            {/* Overlay con gradientes */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              {/* Top gradient con tipo y ratings */}
-              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div />
-
-                <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                  {rating && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                        {rating}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-TMDb.png"
-                        alt=""
-                        className="w-auto h-2.5 opacity-100"
-                      />
-                    </div>
-                  )}
-                  {imdbScore && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                        {typeof imdbScore === "number"
-                          ? imdbScore.toFixed(1)
-                          : imdbScore}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-IMDb.svg"
-                        alt=""
-                        className="w-auto h-3 opacity-100"
-                      />
-                    </div>
-                  )}
-                  {traktScore && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
-                        {typeof traktScore === "number"
-                          ? traktScore.toFixed(1)
-                          : traktScore}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-Trakt.png"
-                        alt=""
-                        className="w-auto h-2.5 opacity-100"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bottom gradient con título y año */}
-              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0 text-left flex-1">
-                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
-                      {title}
-                    </h3>
-                    <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
-                      {year}
-                      {firstGenre && ` • ${firstGenre}`}
-                    </p>
-                  </div>
-                  {userRating && (
-                    <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                      {userRating}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            <FavoriteHoverIndicator type={type} watched={watched} watchCount={watchCount} rating={userRating} compact />
           </motion.div>
         </Link>
       </motion.div>
@@ -2210,7 +2070,6 @@ const FavoriteCard = memo(function FavoriteCard({
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
-          onMouseEnter={handleHover}
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
           <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
@@ -2219,89 +2078,7 @@ const FavoriteCard = memo(function FavoriteCard({
             title={title}
             mode={effectiveImageMode}
           />
-          <div
-            className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-              type === "movie"
-                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-            }`}
-          >
-            {type === "movie" ? (
-              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            ) : (
-              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            )}
-          </div>
-          {/* Overlay con gradientes */}
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            {/* Top gradient con tipo y ratings */}
-            <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <div />
-
-              <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                {rating && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                      {rating}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-TMDb.png"
-                      alt=""
-                      className="w-auto h-2.5 opacity-100"
-                    />
-                  </div>
-                )}
-                {imdbScore && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-yellow-400 text-xs font-black font-mono tracking-tight">
-                      {typeof imdbScore === "number"
-                        ? imdbScore.toFixed(1)
-                        : imdbScore}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-IMDb.svg"
-                      alt=""
-                      className="w-auto h-3 opacity-100"
-                    />
-                  </div>
-                )}
-                {traktScore && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-pink-400 text-xs font-black font-mono tracking-tight">
-                      {typeof traktScore === "number"
-                        ? traktScore.toFixed(1)
-                        : traktScore}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-Trakt.png"
-                      alt=""
-                      className="w-auto h-2.5 opacity-100"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom gradient con título y año */}
-            <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 text-left flex-1">
-                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
-                    {title}
-                  </h3>
-                  <p className="text-yellow-500 text-xs font-bold mt-0.5 drop-shadow-md">
-                    {year}
-                    {firstGenre && ` • ${firstGenre}`}
-                  </p>
-                </div>
-                {userRating && (
-                  <span className="text-yellow-400 text-2xl font-black font-mono tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,1)] shrink-0">
-                    {userRating}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+          <FavoriteHoverIndicator type={type} watched={watched} watchCount={watchCount} rating={userRating} />
         </div>
       </Link>
     </motion.div>
@@ -2364,9 +2141,11 @@ export default function FavoritesClient() {
     isBackNav ? Number.MAX_SAFE_INTEGER : FAVORITES_INITIAL_RENDER_LIMIT,
   );
 
-  // Watch history for sorting
+  // El historial alimenta tanto la ordenación como el indicador de visionado.
   const [watchDates, setWatchDates] = useState(new Map());
+  const [watchCounts, setWatchCounts] = useState(new Map());
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialFavoritesViewMode);
@@ -2893,18 +2672,17 @@ export default function FavoritesClient() {
     };
   }, [items, needsTraktScores, freezeOrder]);
 
-  // Load watch history for sorting
+  // Cargar el historial una vez para mantener sincronizados ordenación e indicador.
   useEffect(() => {
     if (items.length === 0) return;
-    if (!sortBy.startsWith("watched-")) return;
-    if (loadingHistory) return;
+    if (loadingHistory || historyLoaded) return;
 
     const loadWatchHistory = async () => {
       setLoadingHistory(true);
 
       try {
         // Fetch all watch history from Trakt
-        const response = await fetch("/api/trakt/history?type=all&limit=1000");
+        const response = await fetch("/api/trakt/history?type=all&limit=all&enrich=0");
         if (!response.ok) {
           console.warn("Failed to load watch history");
           setLoadingHistory(false);
@@ -2917,14 +2695,17 @@ export default function FavoritesClient() {
           return;
         }
 
-        // Build a map of tmdbId -> last watched date
+        // Guardamos tanto la última fecha como el total de visionados.
         const watchMap = new Map();
+        const countMap = new Map();
 
         for (const entry of data.items) {
           const key = `${entry.type}:${entry.tmdbId}`;
           const watched_at = entry.watched_at;
 
           if (!watched_at) continue;
+
+          countMap.set(key, (countMap.get(key) || 0) + 1);
 
           // Keep the most recent watch date for each item
           if (
@@ -2936,15 +2717,17 @@ export default function FavoritesClient() {
         }
 
         setWatchDates(watchMap);
+        setWatchCounts(countMap);
       } catch (error) {
         console.error("Error loading watch history:", error);
       } finally {
         setLoadingHistory(false);
+        setHistoryLoaded(true);
       }
     };
 
     loadWatchHistory();
-  }, [sortBy, items]);
+  }, [historyLoaded, items, loadingHistory]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -4203,10 +3986,8 @@ export default function FavoritesClient() {
                                     totalItems={sorted.length}
                                     viewMode={viewMode}
                                     imageMode={imageMode}
-                                    imdbScore={imdbScores.get(getScoreItemKey(item))}
-                                    traktScore={traktScores.get(
-                                      getScoreItemKey(item),
-                                    )}
+                                    watched={watchDates.has(getFavoriteHistoryKey(item))}
+                                    watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                                   />
                                 );
                               })}
@@ -4230,8 +4011,8 @@ export default function FavoritesClient() {
                               totalItems={sorted.length}
                               viewMode={viewMode}
                               imageMode={imageMode}
-                              imdbScore={imdbScores.get(getScoreItemKey(item))}
-                              traktScore={traktScores.get(getScoreItemKey(item))}
+                              watched={watchDates.has(getFavoriteHistoryKey(item))}
+                              watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                             />
                           );
                         })}
@@ -4254,8 +4035,8 @@ export default function FavoritesClient() {
                   totalItems={sorted.length}
                   viewMode={viewMode}
                   imageMode={imageMode}
-                  imdbScore={imdbScores.get(getScoreItemKey(item))}
-                  traktScore={traktScores.get(getScoreItemKey(item))}
+                  watched={watchDates.has(getFavoriteHistoryKey(item))}
+                  watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                 />
               ))}
             </div>

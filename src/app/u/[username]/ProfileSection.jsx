@@ -695,6 +695,8 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
           item={item}
           showStars={showStars}
           viewerState={viewerTitleStates[titleStateKey(item)]}
+          starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
+          compactIndicator={view === "compact"}
         />
       ))}
     </div>
