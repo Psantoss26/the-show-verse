@@ -189,6 +189,9 @@ const DATE_FMT_FULL_DAY = new Intl.DateTimeFormat("es-ES", {
 const DATE_FMT_MONTH_SHORT = new Intl.DateTimeFormat("es-ES", {
   month: "short",
 });
+const DATE_FMT_MONTH_LONG = new Intl.DateTimeFormat("es-ES", {
+  month: "long",
+});
 const DATE_FMT_DAY_NUM = new Intl.DateTimeFormat("es-ES", { day: "numeric" });
 
 function formatDateHeader(date, mode = "day") {
@@ -208,11 +211,12 @@ function formatWatchedBadgeDate(value) {
     .replace(".", "")
     .slice(0, 3)
     .toUpperCase();
+  const monthLong = DATE_FMT_MONTH_LONG.format(d);
   const day = DATE_FMT_DAY_NUM.format(d);
   return {
     month,
     day,
-    label: `${day} ${month.toLowerCase()}`,
+    label: `${day} ${monthLong}`,
   };
 }
 
@@ -464,14 +468,14 @@ function HistoryHoverIndicator({ type, dateParts, compact = false }) {
 
   return (
     <div
-      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
       <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
         {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
       </span>
       {dateParts ? (
-        <span className={`flex ${dateClassName} shrink-0 items-center justify-center whitespace-nowrap font-bold uppercase leading-none tracking-wide text-zinc-100 antialiased [font-size-adjust:from-font] [text-box:trim-both_cap_alphabetic]`}>
+        <span className={`flex ${dateClassName} shrink-0 items-center justify-center whitespace-nowrap font-bold uppercase leading-none tracking-wide text-zinc-100 subpixel-antialiased [text-box:trim-both_cap_alphabetic]`}>
           <span className="tabular-nums leading-none">
             {dateParts.day} {dateParts.month}
           </span>
@@ -1787,7 +1791,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
               </div>
             </>
           )}
-          <HistoryHoverIndicator type={type} dateParts={watchedDate} />
         </div>
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -1796,6 +1799,15 @@ const HistoryItemCard = memo(function HistoryItemCard({
             {title}
           </h4>
         </div>
+
+        {watchedDate && (
+          <time
+            dateTime={entry?.watched_at || undefined}
+            className="text-xs font-medium leading-tight text-zinc-400"
+          >
+            {watchedDate.label}
+          </time>
+        )}
 
         {(isGroup || (type === "show" && epMeta?.title)) && (
           <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
