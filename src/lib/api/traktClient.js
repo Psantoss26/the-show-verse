@@ -6,6 +6,7 @@ import {
   clearWatchDerivedCaches,
 } from "@/lib/userLists/optimisticListCache";
 import { normalizeHistoryEntryIds } from "@/lib/trakt/historyEntryIds";
+import { unwrapCommentResponse } from "@/lib/community/commentResponse";
 
 async function safeJson(res) {
   try {
@@ -790,7 +791,7 @@ export async function traktAddComment({ type, tmdbId, comment, spoiler }) {
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error al publicar comentario");
-  return json;
+  return unwrapCommentResponse(json);
 }
 
 export async function traktUpdateComment({
@@ -808,7 +809,7 @@ export async function traktUpdateComment({
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error || "Error al actualizar comentario");
-  return json;
+  return unwrapCommentResponse(json);
 }
 
 export async function traktDeleteComment({ commentId, type = "movie", tmdbId = 0 }) {
