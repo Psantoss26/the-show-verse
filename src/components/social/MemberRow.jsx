@@ -19,10 +19,10 @@ export default function MemberRow({ member }) {
   if (!member?.username) return null;
   const label = member.displayName || member.username;
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.04]">
+    <div className="flex items-center gap-3 rounded-xl bg-zinc-900/40 p-3 transition-all hover:bg-zinc-900/60">
       <Link
         href={`/u/${member.username}`}
-        className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-sm font-black text-white ring-1 ring-white/10"
+        className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-sm font-black text-white shadow-sm"
       >
         {member.avatarUrl ? (
           <OptimizedImage

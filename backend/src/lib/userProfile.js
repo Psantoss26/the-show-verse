@@ -180,6 +180,8 @@ async function buildPublicProfileAnalytics(db, targetId, ratingValues) {
   const dayKeys = new Set();
   const genreCounts = {};
   const watchedShows = new Set();
+  const currentMonthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const thisMonth = { movies: 0, episodes: 0, total: 0, minutes: 0 };
   let movieMinutes = 0;
   let episodeMinutes = 0;
 
@@ -208,6 +210,12 @@ async function buildPublicProfileAnalytics(db, targetId, ratingValues) {
     else {
       episodeMinutes += runtime;
       watchedShows.add(row.tmdbId);
+    }
+    if (key === currentMonthKey) {
+      if (row.mediaType === 'movie') thisMonth.movies += 1;
+      else thisMonth.episodes += 1;
+      thisMonth.total += 1;
+      thisMonth.minutes += runtime;
     }
 
     const cached = metadata.get(`tmdb:${row.mediaType === 'movie' ? 'movie' : 'tv'}:${row.tmdbId}`)
@@ -257,6 +265,7 @@ async function buildPublicProfileAnalytics(db, targetId, ratingValues) {
     totalMinutes: movieMinutes + episodeMinutes,
     shows: watchedShows.size,
     formattedTotalTime: `${Math.floor((movieMinutes + episodeMinutes) / 60)}h ${(movieMinutes + episodeMinutes) % 60}m`,
+    thisMonth,
     monthlyActivity,
     timeDistribution: [
       { name: 'Películas', value: movieMinutes, color: '#3b82f6' },

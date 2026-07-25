@@ -139,7 +139,7 @@ async function refreshBackendAccessToken(baseUrl, refreshToken) {
 async function fetchBackendOnce(baseUrl, path, init, accessToken) {
   const headers = new Headers(init.headers || {});
   headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${accessToken}`);
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
   if (init.body != null && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -188,6 +188,28 @@ export async function backendFetchJson(request, path, init = {}) {
     }
   }
 
+  return { ...result, refreshedTokens };
+}
+
+// Igual que backendFetchJson, pero para recursos que se pueden consultar sin
+// sesión. Si hay token, se adjunta para que el backend pueda devolver el estado
+// contextual del visor (por ejemplo, si sigue al miembro del perfil).
+export async function backendFetchPublicJson(request, path, init = {}) {
+  const baseUrl = getBackendBaseUrl();
+  let accessToken = getBackendAccessToken(request);
+  const refreshToken = getBackendRefreshToken(request);
+
+  if (!baseUrl) {
+    return { ok: false, skipped: true, status: 0, json: null, error: "Backend base URL is not configured" };
+  }
+
+  let refreshedTokens = null;
+  if (!accessToken && refreshToken) {
+    refreshedTokens = await refreshBackendAccessToken(baseUrl, refreshToken);
+    accessToken = refreshedTokens?.accessToken || null;
+  }
+
+  const result = await fetchBackendOnce(baseUrl, path, init, accessToken);
   return { ...result, refreshedTokens };
 }
 

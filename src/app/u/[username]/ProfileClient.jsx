@@ -70,7 +70,7 @@ function getInitials(source) {
     .join("");
 }
 
-function ProfileAvatar({ user, size = "h-20 w-20 sm:h-24 sm:w-24" }) {
+function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
   return (
     <div className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-xl font-black text-white ring-2 ring-white/10`}>
       {user?.avatarUrl ? (
@@ -121,7 +121,7 @@ function SectionHeader({ label, action, onClick }) {
             className="group -my-1 -ml-1 inline-flex items-center gap-1 rounded-md px-1 py-1 text-xs font-bold uppercase tracking-widest [font:inherit] transition-colors hover:text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
           >
             <span>{label}</span>
-            <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
+            <ChevronRight className="relative -top-px h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
           </button>
         ) : label}
       </h2>
@@ -130,8 +130,39 @@ function SectionHeader({ label, action, onClick }) {
   );
 }
 
-function PendingPreview({ items, onOpen }) {
-  const pendingItems = Array.isArray(items) ? items.slice(0, 5) : [];
+function PendingPreview({ username, items, onOpen }) {
+  const [pendingItems, setPendingItems] = useState(() => (
+    Array.isArray(items) ? items.slice(0, 5) : []
+  ));
+  const [pendingStatus, setPendingStatus] = useState(() => (
+    Array.isArray(items) && items.length ? "ready" : "loading"
+  ));
+
+  useEffect(() => {
+    let cancelled = false;
+    setPendingStatus("loading");
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/users/${encodeURIComponent(username)}/watchlist?limit=5&offset=0`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (cancelled) return;
+        setPendingItems(Array.isArray(payload.items) ? payload.items.slice(0, 5) : []);
+        setPendingStatus("ready");
+      } catch {
+        if (!cancelled) setPendingStatus("ready");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  const maxItems = pendingItems.length;
+
   return (
     <section>
       <SectionHeader
@@ -139,40 +170,46 @@ function PendingPreview({ items, onOpen }) {
         onClick={onOpen}
       />
       {pendingItems.length ? (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="group relative block h-36 w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.025] text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
-          aria-label="Ver todos los títulos pendientes"
-        >
+        /* Mazo de pósters apilados sin fondo ni borde contenedor */
+        <div className="relative flex h-[170px] sm:h-[190px] w-full items-center justify-start overflow-visible py-3">
           {pendingItems.map((item, index) => {
             const source = item.posterPath ? `https://image.tmdb.org/t/p/w342${item.posterPath}` : null;
+            const href = `/details/${item.mediaType === "tv" ? "tv" : "movie"}/${item.tmdbId}`;
+            const titleText = item.title || item.name || "Título";
+            const cardWidthPercent = 28;
+            const leftPercent = maxItems > 1 ? (index * (100 - cardWidthPercent)) / (maxItems - 1) : 0;
+
             return (
-              <div
+              <Link
                 key={`${item.mediaType}:${item.tmdbId}`}
-                className="absolute bottom-[-0.65rem] aspect-[2/3] w-[30%] overflow-hidden rounded-t-xl bg-zinc-900 shadow-2xl ring-1 ring-white/10 transition-transform duration-300 group-hover:-translate-y-1"
-                style={{ left: `${index * 18}%`, zIndex: index + 1 }}
+                href={href}
+                title={titleText}
+                className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-md bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
+                style={{ left: `${leftPercent}%`, zIndex: index + 1 }}
               >
                 {source ? (
                   <OptimizedImage
                     src={source}
-                    alt=""
-                    className="h-full w-full object-cover"
+                    alt={titleText}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover/poster:scale-105"
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-zinc-700">
-                    <Film className="h-5 w-5" aria-hidden="true" />
+                  <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-zinc-600">
+                    <Film className="h-6 w-6 opacity-60" aria-hidden="true" />
+                    <span className="mt-1 line-clamp-2 text-[10px] font-semibold text-zinc-400">
+                      {titleText}
+                    </span>
                   </div>
                 )}
-              </div>
+              </Link>
             );
           })}
-          <span className="absolute inset-x-0 bottom-0 z-10 h-14 bg-gradient-to-t from-black/80 to-transparent" aria-hidden="true" />
-          <span className="absolute bottom-3 left-3 z-20 text-xs font-black text-white">
-            {pendingItems.length} {pendingItems.length === 1 ? "título reciente" : "títulos recientes"}
-          </span>
-        </button>
+        </div>
+      ) : pendingStatus === "loading" ? (
+        <div className="flex h-24 w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.025]">
+          <Loader2 className="h-5 w-5 animate-spin text-emerald-400/70" aria-label="Cargando pendientes" />
+        </div>
       ) : (
         <button
           type="button"
@@ -295,10 +332,13 @@ function buildAnalyticsFromPrivateProfile(payload) {
   const movieMinutes = Number(payload.stats?.movies?.minutes || 0);
   const episodeMinutes = Number(payload.stats?.episodes?.minutes || 0);
   const totalMinutes = movieMinutes + episodeMinutes;
+  const currentMonth = monthlyActivity.at(-1) || { movies: 0, episodes: 0, total: 0 };
+  const thisMonth = { ...currentMonth, minutes: 0 };
 
   return {
     totalMinutes,
     formattedTotalTime: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+    thisMonth,
     monthlyActivity,
     timeDistribution: [
       { name: "Películas", value: movieMinutes, color: "#3b82f6" },
@@ -451,7 +491,8 @@ export default function ProfileClient({ username }) {
     sections,
   } = profile;
   const resolvedAnalytics = analytics || privateAnalytics;
-  const collectionCount = Number(sections?.favorites || 0) + Number(sections?.watchlist || 0);
+  const monthlyActivity = resolvedAnalytics?.monthlyActivity?.at(-1) || {};
+  const thisMonth = resolvedAnalytics?.thisMonth || monthlyActivity;
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 pb-24">
@@ -464,7 +505,7 @@ export default function ProfileClient({ username }) {
       <div className="relative z-10 mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
         {/* ── CABECERA ── */}
         <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <ProfileAvatar user={user} size="h-20 w-20 self-center sm:h-24 sm:w-24 lg:self-auto" />
+          <ProfileAvatar user={user} size="h-22 w-22 self-center sm:h-26 sm:w-26 lg:self-auto" />
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start sm:gap-4">
               <h1 className="min-w-0 text-[clamp(2.25rem,4.1vw,3.5rem)] font-black leading-[0.92] tracking-[-0.06em] text-white">
@@ -614,10 +655,10 @@ export default function ProfileClient({ username }) {
                 onClick={() => setTab("statistics")}
               />
               <dl className="grid grid-cols-2 gap-3">
-                <StatCell value={stats.totalRatings} label="Valoraciones" />
-                <StatCell value={collectionCount} label="Colección" />
-                <StatCell value={resolvedAnalytics?.shows || 0} label="Series" />
-                <StatCell value={formatProfileTime(resolvedAnalytics?.totalMinutes)} label="Tiempo visto" />
+                <StatCell value={thisMonth.movies || 0} label="Películas" />
+                <StatCell value={thisMonth.episodes || 0} label="Episodios" />
+                <StatCell value={thisMonth.total || 0} label="Visionados" />
+                <StatCell value={formatProfileTime(thisMonth.minutes)} label="Tiempo visto" />
               </dl>
             </section>
 
@@ -639,21 +680,14 @@ export default function ProfileClient({ username }) {
               )}
             </section>
 
-            <PendingPreview items={pendingPreview} onOpen={() => setTab("watchlist")} />
+            <PendingPreview username={user.username} items={pendingPreview} onOpen={() => setTab("watchlist")} />
 
             {/* Siguiendo (avatares) */}
             {followingPreview?.length > 0 && (
               <section>
                 <SectionHeader
                   label="Siguiendo"
-                  action={
-                    <Link
-                      href={`/u/${user.username}/following`}
-                      className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:text-emerald-400"
-                    >
-                      Ver todos
-                    </Link>
-                  }
+                  onClick={() => setTab("social")}
                 />
                 <div className="flex flex-wrap gap-2">
                   {followingPreview.map((f) => (
@@ -661,7 +695,7 @@ export default function ProfileClient({ username }) {
                       key={f.username}
                       href={`/u/${f.username}`}
                       title={f.displayName}
-                      className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-[10px] font-black text-white ring-1 ring-white/10 transition-transform hover:scale-110 hover:ring-emerald-400/50"
+                      className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-[10px] font-black text-white transition-transform hover:scale-110 shadow-sm"
                     >
                       {f.avatarUrl ? (
                         <OptimizedImage
@@ -698,6 +732,7 @@ function ProfileTabs({ tab, setTab, sections }) {
     { id: "favorites", label: "Favoritos", count: sections?.favorites },
     { id: "ratings", label: "Puntuaciones", count: sections?.ratings },
     { id: "lists", label: "Listas", count: sections?.lists },
+    { id: "social", label: "Social" },
   ];
   return (
     <nav className="mt-8 flex gap-1 overflow-x-auto border-b border-white/10 pb-px [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -708,13 +743,13 @@ function ProfileTabs({ tab, setTab, sections }) {
             key={it.id}
             type="button"
             onClick={() => setTab(it.id)}
-            className={`relative flex-shrink-0 whitespace-nowrap px-3.5 py-2.5 text-sm font-bold transition-colors ${
+            className={`relative flex-shrink-0 whitespace-nowrap px-3.5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {it.label}
             {typeof it.count === "number" && (
-              <span className={`ml-1.5 text-xs font-semibold ${active ? "text-emerald-400" : "text-zinc-600"}`}>
+              <span className={`ml-1.5 text-[10px] font-semibold tracking-normal ${active ? "text-emerald-400" : "text-zinc-600"}`}>
                 {it.count}
               </span>
             )}
@@ -730,7 +765,7 @@ function ProfileTabs({ tab, setTab, sections }) {
 
 function StatCell({ value, label }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3 text-center">
+    <div className="rounded-xl bg-zinc-900/40 px-3 py-3 text-center shadow-sm">
       <span className="block text-lg font-black text-white">{value ?? 0}</span>
       <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-500">
         {label}
@@ -748,7 +783,7 @@ function formatProfileTime(minutes) {
 function AnalyticsCard({ title, subtitle, icon: Icon, iconClassName = "text-emerald-400", children, className = "" }) {
   return (
     <section
-      className={`min-w-0 rounded-2xl border border-white/[0.075] bg-white/[0.025] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-5 ${className}`}
+      className={`min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5 ${className}`}
     >
       <div className="mb-3 flex items-center gap-3">
         {Icon && (

@@ -16,11 +16,10 @@ export default function Stars({ rating, className = "" }) {
       className={`inline-flex items-center gap-[1px] text-emerald-400 ${className}`}
       aria-label={`${five.toFixed(1)} de 5`}
     >
-      {Array.from({ length: 5 }).map((_, i) => {
-        if (i < fullCount) return <Star key={i} className="h-3.5 w-3.5 fill-current" />;
-        if (i === fullCount && half) return <StarHalf key={i} className="h-3.5 w-3.5 fill-current" />;
-        return <Star key={i} className="h-3.5 w-3.5 text-white/15" />;
-      })}
+      {Array.from({ length: fullCount }, (_, index) => (
+        <Star key={index} className="h-3.5 w-3.5 fill-current" />
+      ))}
+      {half && <StarHalf className="h-3.5 w-3.5 fill-current" />}
     </span>
   );
 }

@@ -21,7 +21,7 @@ export default function PosterTile({ item, showStars = false }) {
   const src = tmdbPoster(item?.posterPath);
   return (
     <Link href={detailsHref(item)} className="group/card block" title={item?.title || ""}>
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md ring-1 ring-white/5 transition-all duration-300 group-hover/card:ring-emerald-400/50">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-all duration-300 group-hover/card:shadow-xl">
         {src && !failed ? (
           <OptimizedImage
             src={src}
