@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   backendFetchJson,
+  backendFetchPublicJson,
   getCookieSecure,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
@@ -40,9 +41,12 @@ export async function GET(request, { params }) {
     const v = searchParams.get(key);
     if (v) qs.set(key, v);
   }
-  const backend = await backendFetchJson(
-    request,
-    `/v1/users/${encodeURIComponent(username)}/${section}?${qs.toString()}`,
-  );
+  const path = section === "activity"
+    ? `/v1/users/public/${encodeURIComponent(username)}/activity?${qs.toString()}`
+    : `/v1/users/${encodeURIComponent(username)}/${section}?${qs.toString()}`;
+  const fetchBackend = section === "activity"
+    ? backendFetchPublicJson
+    : backendFetchJson;
+  const backend = await fetchBackend(request, path);
   return respond(request, backend);
 }

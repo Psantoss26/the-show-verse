@@ -58,6 +58,32 @@ const RatingsBarChart = dynamic(
   { ssr: false, loading: () => <ChartLoading /> },
 );
 
+// Conserva la última ficha durante la vida de la pestaña. Al volver desde una
+// ficha de título el perfil se pinta de inmediato y se refresca en segundo
+// plano, en lugar de volver a mostrar una pantalla de espera.
+const profileCache = new Map();
+
+function profileCacheKey(username) {
+  return String(username || "").trim().toLocaleLowerCase();
+}
+
+function ProfileBackdrop() {
+  return (
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div className="absolute -top-[10%] left-[10%] aspect-square h-[50vw] max-w-[700px] rounded-full bg-emerald-600/10 blur-[130px]" />
+      <div className="absolute bottom-[5%] right-[5%] aspect-square h-[45vw] max-w-[600px] rounded-full bg-emerald-800/10 blur-[130px]" />
+    </div>
+  );
+}
+
+function ProfilePendingSurface() {
+  return (
+    <div className="relative min-h-screen bg-black text-zinc-100" aria-busy="true">
+      <ProfileBackdrop />
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // Utilidades de presentación
 // ─────────────────────────────────────────────
@@ -223,6 +249,120 @@ function PendingPreview({ username, items, onOpen }) {
   );
 }
 
+function relativeSidebarActivityTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "ahora";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} d`;
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(date);
+}
+
+function SidebarActivityTitle({ item }) {
+  if (!item?.tmdbId || !item?.mediaType) return null;
+  const mediaType = item.mediaType === "tv" ? "tv" : "movie";
+  return (
+    <Link
+      href={`/details/${mediaType}/${item.tmdbId}`}
+      className="font-bold text-zinc-100 transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:text-emerald-300"
+    >
+      {item.title || "Ver ficha"}
+    </Link>
+  );
+}
+
+function SidebarActivityText({ item }) {
+  const episodeLabel = item.type === "watched" && item.season && item.episode
+    ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
+    : "";
+
+  if (item.type === "review") {
+    return <><span>ha reseñado </span><SidebarActivityTitle item={item} /></>;
+  }
+  if (item.type === "watchlist") {
+    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span> a Pendientes</span></>;
+  }
+  if (item.type === "favorite") {
+    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span> a Favoritos</span></>;
+  }
+  if (item.type === "rating") {
+    return <><span>ha puntuado </span><SidebarActivityTitle item={item} /><span>{typeof item.rating === "number" ? ` · ${item.rating}/10` : ""}</span></>;
+  }
+  if (item.type === "list") {
+    return <><span>ha creado la lista </span><Link href={`/lists/${String(item.id || "").replace("list:", "")}`} className="font-bold text-zinc-100 transition-colors hover:text-emerald-300">{item.name || "sin título"}</Link></>;
+  }
+  if (item.type === "list_item") {
+    return <><span>ha añadido </span><SidebarActivityTitle item={item} /><span>{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
+  }
+  return <><span>ha visto </span><span>{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
+}
+
+function ActivitySidebarPreview({ username, onOpen }) {
+  const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/users/${encodeURIComponent(username)}/activity?limit=5&offset=0`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (cancelled) return;
+        setItems(Array.isArray(payload.items) ? payload.items.slice(0, 5) : []);
+        setStatus("ready");
+      } catch {
+        if (!cancelled) setStatus("ready");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  return (
+    <section>
+      <SectionHeader label="Actividad" onClick={onOpen} />
+      {status === "loading" ? (
+        <div className="space-y-3 py-1" aria-label="Cargando actividad">
+          {[0, 1, 2].map((index) => <div key={index} className="h-8 animate-pulse rounded-md bg-white/[0.035]" />)}
+        </div>
+      ) : items.length ? (
+        <ol className="relative ml-1 space-y-3 border-l border-white/[0.12] py-1" role="list">
+          {items.map((item) => (
+            <li key={item.id} className="relative pl-4">
+              <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400 ring-4 ring-black" aria-hidden="true" />
+              <p className="text-[13px] leading-5 text-zinc-400">
+                <SidebarActivityText item={item} />
+              </p>
+              <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-medium text-zinc-600">
+                {relativeSidebarActivityTime(item.createdAt)}
+              </time>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex h-20 w-full items-center justify-center rounded-2xl border border-dashed border-white/[0.08] px-4 text-center text-xs font-semibold text-zinc-500 transition-colors hover:border-emerald-400/35 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+        >
+          Aún no hay actividad pública.
+        </button>
+      )}
+    </section>
+  );
+}
+
 function buildHalfStarHistogram(histogram) {
   return Array.from({ length: 10 }, (_, index) => ({
     star: (index + 1) / 2,
@@ -366,7 +506,11 @@ function buildAnalyticsFromPrivateProfile(payload) {
 
 export default function ProfileClient({ username }) {
   const { user: viewer, logout } = useAuth();
-  const [state, setState] = useState({ status: "loading", profile: null });
+  const [state, setState] = useState(() => {
+    const key = profileCacheKey(username);
+    const profile = profileCache.get(key) || null;
+    return { key, status: profile ? "ready" : "pending", profile };
+  });
   const [tab, setTab] = useState("profile");
   const [refreshToken, setRefreshToken] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -378,7 +522,9 @@ export default function ProfileClient({ username }) {
   useEffect(() => {
     let cancelled = false;
     const isRefresh = refreshToken > 0;
-    if (!isRefresh) setState({ status: "loading", profile: null });
+    const key = profileCacheKey(username);
+    const cachedProfile = profileCache.get(key) || null;
+    if (!isRefresh) setState({ key, status: cachedProfile ? "ready" : "pending", profile: cachedProfile });
     else setSyncing(true);
     (async () => {
       try {
@@ -386,14 +532,19 @@ export default function ProfileClient({ username }) {
           cache: "no-store",
         });
         if (res.status === 404) {
-          if (!cancelled) setState({ status: "notfound", profile: null });
+          if (!cancelled) setState({ key, status: "notfound", profile: null });
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (!cancelled) setState({ status: "ready", profile: data.profile });
+        if (!cancelled) {
+          profileCache.set(key, data.profile);
+          setState({ key, status: "ready", profile: data.profile });
+        }
       } catch {
-        if (!cancelled && !isRefresh) setState({ status: "error", profile: null });
+        if (!cancelled && !isRefresh && !cachedProfile) {
+          setState({ key, status: "error", profile: null });
+        }
       } finally {
         if (!cancelled && isRefresh) setSyncing(false);
       }
@@ -403,8 +554,17 @@ export default function ProfileClient({ username }) {
     };
   }, [username, refreshToken]);
 
+  const activeCacheKey = profileCacheKey(username);
+  const isCurrentProfile = state.key === activeCacheKey;
+  const profile = isCurrentProfile
+    ? state.profile
+    : profileCache.get(activeCacheKey) || null;
+  const status = isCurrentProfile
+    ? state.status
+    : profile ? "ready" : "pending";
+
   useEffect(() => {
-    const currentProfile = state.profile;
+    const currentProfile = profile;
     const isOwnProfile = Boolean(
       currentProfile?.isSelf ||
       (viewer?.username && viewer.username === currentProfile?.user?.username),
@@ -433,22 +593,15 @@ export default function ProfileClient({ username }) {
     return () => {
       cancelled = true;
     };
-  }, [state.profile, viewer?.username, refreshToken]);
+  }, [profile, viewer?.username, refreshToken]);
 
-  const { status, profile } = state;
   const profileTitleItems = useMemo(
     () => [...(profile?.favorites || []), ...(profile?.recentWatched || [])],
     [profile?.favorites, profile?.recentWatched],
   );
   const viewerTitleStates = useViewerTitleStates(profileTitleItems, Boolean(viewer?.username));
 
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
+  if (status === "pending") return <ProfilePendingSurface />;
 
   if (status === "notfound") {
     return (
@@ -501,31 +654,31 @@ export default function ProfileClient({ username }) {
   return (
     <div className="min-h-screen bg-black text-zinc-100 pb-24">
       {/* Fondo decorativo sutil */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] left-[10%] h-[50vw] max-w-[700px] aspect-square rounded-full bg-emerald-600/10 blur-[130px]" />
-        <div className="absolute bottom-[5%] right-[5%] h-[45vw] max-w-[600px] aspect-square rounded-full bg-emerald-800/10 blur-[130px]" />
-      </div>
+      <ProfileBackdrop />
 
       <div className="relative z-10 mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
         {/* ── CABECERA ── */}
-        <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <ProfileAvatar user={user} size="h-22 w-22 self-center sm:h-26 sm:w-26 lg:self-auto" />
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start sm:gap-4">
-              <h1 className="min-w-0 text-[clamp(2.25rem,4.1vw,3.5rem)] font-black leading-[0.92] tracking-[-0.06em] text-white">
-                {user.displayName}<span className="text-emerald-400">.</span>
-              </h1>
+        <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between lg:gap-6">
+          <ProfileAvatar user={user} size="h-16 w-16 shrink-0 sm:h-26 sm:w-26" />
+          <div className="min-w-0 flex-1 text-left">
+            <div className="flex min-w-0 items-center justify-between gap-2 lg:flex-wrap lg:justify-start lg:gap-4">
+              <div className="min-w-0">
+                <h1 className="truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-[clamp(2.25rem,4.1vw,3.5rem)]">
+                  {user.displayName}<span className="text-emerald-400">.</span>
+                </h1>
+                <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 sm:mt-2 sm:text-sm">@{user.username}</p>
+              </div>
               {isSelf ? (
-                <div className="flex shrink-0 items-center gap-2" aria-label="Acciones de perfil">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Acciones de perfil">
                   <LiquidButton
                     onClick={() => window.location.assign("/profile/settings")}
                     disabled={syncing}
                     activeColor="teal"
                     groupId="profile-header-actions"
                     title="Configuración"
-                  className="!border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                  className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <Settings className="h-5 w-5" />
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => setRefreshToken((value) => value + 1)}
@@ -534,9 +687,9 @@ export default function ProfileClient({ username }) {
                     activeColor="green"
                     groupId="profile-header-actions"
                     title="Sincronizar"
-                    className="!border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <RotateCcw className={`h-5 w-5 ${syncing ? "animate-spin" : ""}`} />
+                    <RotateCcw className={`h-4 w-4 sm:h-5 sm:w-5 ${syncing ? "animate-spin" : ""}`} />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => logout({ redirectTo: "/login" })}
@@ -544,9 +697,9 @@ export default function ProfileClient({ username }) {
                     activeColor="red"
                     groupId="profile-header-actions"
                     title="Desconectar"
-                    className="!border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
+                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
                   >
-                    <LogOut className="h-5 w-5" />
+                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
                   </LiquidButton>
                 </div>
               ) : (
@@ -556,16 +709,15 @@ export default function ProfileClient({ username }) {
                 />
               )}
             </div>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-zinc-500">@{user.username}</p>
             {user.bio && (
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-400">
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}
               </p>
             )}
           </div>
 
           {/* Contadores */}
-          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4 sm:gap-3 lg:pl-4">
+          <div className="order-3 grid w-full grid-cols-4 gap-2 sm:gap-3 lg:order-none lg:w-auto lg:pl-4">
             <CountStat value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
             <CountStat value={stats.episodes} label="Episodios" icon={Tv} iconClassName="text-violet-400" />
             <CountStat
@@ -586,10 +738,12 @@ export default function ProfileClient({ username }) {
         </header>
 
         {/* ── BARRA DE PESTAÑAS ── */}
-        <ProfileTabs tab={tab} setTab={setTab} sections={sections} />
+        <div className="sv-profile-entry sv-profile-entry--tabs">
+          <ProfileTabs tab={tab} setTab={setTab} sections={sections} />
+        </div>
 
         {tab === "statistics" ? (
-          <div className="mt-8">
+          <div className="sv-profile-entry sv-profile-entry--content mt-8">
             {resolvedAnalytics ? (
               <ProfileAnalytics analytics={resolvedAnalytics} />
             ) : (
@@ -603,7 +757,7 @@ export default function ProfileClient({ username }) {
             )}
           </div>
         ) : tab !== "profile" ? (
-          <div className="mt-8">
+          <div className="sv-profile-entry sv-profile-entry--content mt-8">
             {/* `key={tab}` remonta la sección al cambiar de pestaña: evita un
                 render intermedio con el layout nuevo pero los items del layout
                 anterior (que no comparten forma de `key`) → aviso de keys. */}
@@ -612,7 +766,7 @@ export default function ProfileClient({ username }) {
         ) : (
         <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
           {/* ── COLUMNA PRINCIPAL ── */}
-          <div className="space-y-10">
+          <div className="sv-profile-entry sv-profile-entry--content space-y-10">
             {/* Favoritos curados */}
             <section>
               <SectionHeader label="Favoritos" />
@@ -656,20 +810,22 @@ export default function ProfileClient({ username }) {
           </div>
 
           {/* ── COLUMNA LATERAL ── */}
-          <aside className="space-y-8 xl:sticky xl:top-24 xl:self-start">
+          <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 xl:sticky xl:top-24 xl:self-start">
             {/* Estadísticas */}
             <section>
               <SectionHeader
                 label="Estadísticas"
                 onClick={() => setTab("statistics")}
               />
-              <dl className="grid grid-cols-2 gap-3">
+              <dl className="grid grid-cols-4 gap-2">
                 <StatCell value={thisMonth.movies || 0} label="Películas" />
                 <StatCell value={thisMonth.episodes || 0} label="Episodios" />
                 <StatCell value={thisMonth.total || 0} label="Visionados" />
                 <StatCell value={formatProfileTime(thisMonth.minutes)} label="Tiempo visto" />
               </dl>
             </section>
+
+            <ActivitySidebarPreview username={user.username} onOpen={() => setTab("activity")} />
 
             <section>
               <SectionHeader
@@ -774,9 +930,9 @@ function ProfileTabs({ tab, setTab, sections }) {
 
 function StatCell({ value, label }) {
   return (
-    <div className="rounded-xl bg-zinc-900/40 px-3 py-3 text-center shadow-sm">
-      <span className="block text-lg font-black text-white">{value ?? 0}</span>
-      <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+    <div className="min-w-0 rounded-xl bg-zinc-900/40 px-1.5 py-2.5 text-center shadow-sm sm:px-2">
+      <span className="block text-base font-black leading-none text-white sm:text-lg">{value ?? 0}</span>
+      <span className="mt-1 block text-[8px] font-bold uppercase leading-3 tracking-[0.08em] text-zinc-500 sm:text-[9px]">
         {label}
       </span>
     </div>
