@@ -13,7 +13,7 @@ export const PROFILE_TAB_IDS = Object.freeze([
 
 export const PROFILE_SECTION_IDS = new Set(PROFILE_TAB_IDS.filter((section) => section !== "profile"));
 
-export function profileTabHref(username, section = "profile") {
-  const base = `/u/${encodeURIComponent(String(username || "").trim())}`;
+export function profileTabHref(username, section = "profile", basePath = null) {
+  const base = basePath || `/u/${encodeURIComponent(String(username || "").trim())}`;
   return section === "profile" ? base : `${base}/${section}`;
 }

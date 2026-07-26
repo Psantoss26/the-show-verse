@@ -1252,23 +1252,67 @@ function profileGridColumnCount(view) {
   return 3;
 }
 
-// La primera página debe cerrar exactamente la última fila de la cuadrícula.
-// Antes siempre se pedían 30 títulos: en la compacta de escritorio (8
-// columnas) se pintaban seis de la cuarta fila y una segunda petición añadía
-// los dos restantes, produciendo el parpadeo de entrada.
-function profileInitialPageSize(config, controls) {
-  if (
-    config?.layout !== "posters" ||
-    controls?.group !== "none" ||
-    (controls?.view !== "grid" && controls?.view !== "compact")
-  ) {
-    return 30;
+// Tamaño de página del backend (máximo permitido). Igual que el Historial, se
+// piden lotes grandes para llenar la pantalla de una vez y minimizar reflows.
+const PROFILE_SECTION_PAGE_SIZE = 60;
+// Límite duro de lotes encadenados al llenar la primera pantalla (evita bucles).
+const PROFILE_FILL_MAX_PAGES = 6;
+
+// Estima cuántas TARJETAS hacen falta para cubrir el viewport (con algo de
+// sobrellenado), alineadas a filas completas. Sirve tanto para el objetivo de
+// carga inicial como para el número de esqueletos, de modo que la altura del
+// esqueleto se parezca a la del contenido final y no haya salto/parpadeo.
+function estimateFillCount(config, controls) {
+  if (typeof window === "undefined") return 30;
+  const isPosters = config?.layout === "posters";
+  const view = controls?.view;
+  const columns = isPosters && view !== "list" ? profileGridColumnCount(view) || 1 : 1;
+  const viewportHeight = window.innerHeight || 800;
+
+  let rowHeight;
+  if (!isPosters || view === "list") {
+    rowHeight = 88; // filas de lista / reseñas / actividad (aprox.)
+  } else {
+    const container = Math.min(window.innerWidth || 1120, 1120) - 32;
+    const gap = 12;
+    const cardWidth = (container - gap * (columns - 1)) / columns;
+    rowHeight = cardWidth * 1.5 + 28 + gap; // póster 2:3 + fila de estrellas + gap
   }
 
-  const columns = profileGridColumnCount(controls.view);
-  if (!columns) return 30;
-  const remainder = 30 % columns;
-  return remainder === 0 ? 30 : 30 + (columns - remainder);
+  const rows = Math.ceil((viewportHeight * 1.25) / Math.max(rowHeight, 1)) + 1;
+  const target = rows * columns;
+  const aligned = columns > 1 ? Math.ceil(target / columns) * columns : target;
+  const floor = isPosters ? 24 : 12;
+  return Math.min(240, Math.max(floor, aligned));
+}
+
+// Esqueleto de carga inicial: rellena el espacio con marcadores en pulso
+// imitando el layout real, para no mostrar un hueco en blanco (parpadeo).
+function SectionSkeleton({ config, controls, count }) {
+  const isPosters = config?.layout === "posters";
+  const view = controls?.view;
+  const total = Math.max(1, Math.min(count || 24, 60));
+
+  if (isPosters && view !== "list") {
+    const gridClass = view === "compact"
+      ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8"
+      : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6";
+    return (
+      <div className={`grid gap-3 ${gridClass}`} aria-busy="true" aria-hidden="true">
+        {Array.from({ length: total }).map((_, index) => (
+          <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/[0.06]" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2" aria-busy="true" aria-hidden="true">
+      {Array.from({ length: total }).map((_, index) => (
+        <div key={index} className="h-[88px] animate-pulse rounded-2xl bg-white/[0.06]" />
+      ))}
+    </div>
+  );
 }
 
 function ProfileContentSection({ username, section, actor }) {
@@ -1282,17 +1326,13 @@ function ProfileContentSection({ username, section, actor }) {
   const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
-  // Diario colapsa varios episodios en una única tarjeta. Su sentinel puede
-  // quedar dentro del viewport tras la primera carga y disparar otra página
-  // antes del primer pintado estable, haciendo parpadear las últimas tarjetas.
-  // Las demás secciones no reducen su altura de esta forma.
-  const [diaryAutoLoadEnabled, setDiaryAutoLoadEnabled] = useState(() => section !== "watched");
   const loadMoreRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
   const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
   const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section, profileKey));
-  const initialPageSizeRef = useRef(30);
+  // Nº de tarjetas objetivo para llenar la primera pantalla (carga y esqueleto).
+  const fillTargetRef = useRef(30);
 
   // La lectura se realiza antes del primer pintado del navegador para que la
   // cuadrícula/lista/compacta guardada no llegue a verse como el modo por
@@ -1301,24 +1341,9 @@ function ProfileContentSection({ username, section, actor }) {
     const storedView = readStoredProfileView(profileKey);
     if (storedView) profileViewPreferences.set(profileKey, storedView);
     const nextControls = getSectionPreference(cacheKey, section, profileKey);
-    initialPageSizeRef.current = profileInitialPageSize(config, nextControls);
+    fillTargetRef.current = estimateFillCount(config, nextControls);
     setControls(nextControls);
   }, [cacheKey, config, profileKey, section]);
-
-  // El infinito de Diario empieza con el primer desplazamiento real. Así se
-  // preserva la carga automática, pero la primera cuadrícula/lista no recibe
-  // una página extra mientras sus grupos de episodios aún se están asentando.
-  useEffect(() => {
-    if (section !== "watched") {
-      setDiaryAutoLoadEnabled(true);
-      return undefined;
-    }
-
-    setDiaryAutoLoadEnabled(false);
-    const enableAutoLoad = () => setDiaryAutoLoadEnabled(true);
-    window.addEventListener("scroll", enableAutoLoad, { passive: true, once: true });
-    return () => window.removeEventListener("scroll", enableAutoLoad);
-  }, [section]);
 
   const updateControls = (patch) => {
     setControls((current) => {
@@ -1374,53 +1399,87 @@ function ProfileContentSection({ username, section, actor }) {
     [displayItems, effectiveGroup, menuEnabled, section],
   );
 
+  // Carga inicial estilo Historial: en lugar de una página pequeña que luego
+  // dispara peticiones visibles, se encadenan lotes GRANDES hasta llenar la
+  // pantalla y se COMITEA UNA sola vez. Así el usuario pasa del esqueleto a la
+  // cuadrícula ya llena, sin reflows intermedios ni tarjetas que parpadean.
+  // Diario colapsa episodios consecutivos en una tarjeta, por lo que se cuenta
+  // sobre las tarjetas colapsadas, no sobre las filas crudas.
   useEffect(() => {
     let cancelled = false;
     const cachedSection = profileSectionCache.get(cacheKey);
     if (cachedSection) {
+      // Vuelta atrás / cambio de pestaña ya visitada: se pinta desde caché sin
+      // volver a pedir (evita el parpadeo de recarga y conserva el scroll).
       setItems(cachedSection.items);
       setHasMore(cachedSection.hasMore);
       setOffset(cachedSection.offset);
       setStatus("ready");
-    } else {
-      setStatus("loading");
-      setItems([]);
-      setHasMore(false);
-      setOffset(0);
+      return () => {
+        cancelled = true;
+      };
     }
+
+    setStatus("loading");
+    setItems([]);
+    setHasMore(false);
+    setOffset(0);
     setLoadMoreError(false);
+
+    const cardCount = (arr) =>
+      section === "watched" ? collapseDiaryEpisodes(arr).length : arr.length;
+
     (async () => {
-      try {
-        const initialPageSize = initialPageSizeRef.current;
-        const res = await fetch(
-          `/api/users/${encodeURIComponent(username)}/${section}?limit=${initialPageSize}&offset=0`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+      const target = fillTargetRef.current;
+      const accumulated = [];
+      let nextOffset = 0;
+      let more = true;
+      let failed = false;
+
+      for (let page = 0; page < PROFILE_FILL_MAX_PAGES; page += 1) {
         if (cancelled) return;
-        const nextSection = {
-          items: Array.isArray(data.items) ? data.items : [],
-          hasMore: Boolean(data.hasMore),
-          offset: Number(data.offset) || 0,
-        };
-        profileSectionCache.set(cacheKey, nextSection);
-        setItems(nextSection.items);
-        setHasMore(nextSection.hasMore);
-        setOffset(nextSection.offset);
-        setStatus("ready");
-      } catch {
-        if (!cancelled && !cachedSection) setStatus("error");
+        try {
+          const res = await fetch(
+            `/api/users/${encodeURIComponent(username)}/${section}?limit=${PROFILE_SECTION_PAGE_SIZE}&offset=${nextOffset}`,
+            { cache: "no-store" },
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const pageItems = Array.isArray(data.items) ? data.items : [];
+          accumulated.push(...pageItems);
+          more = Boolean(data.hasMore) && pageItems.length > 0;
+          nextOffset = Number(data.offset) || nextOffset + pageItems.length;
+        } catch {
+          failed = true;
+          break;
+        }
+        // Basta con cubrir el viewport: el resto se carga al desplazarse.
+        if (!more || cardCount(accumulated) >= target) break;
       }
+
+      if (cancelled) return;
+      if (failed && accumulated.length === 0) {
+        setStatus("error");
+        return;
+      }
+
+      const nextSection = { items: accumulated, hasMore: more, offset: nextOffset };
+      profileSectionCache.set(cacheKey, nextSection);
+      setItems(accumulated);
+      setHasMore(more);
+      setOffset(nextOffset);
+      setLoadMoreError(failed);
+      setStatus("ready");
     })();
+
     return () => {
       cancelled = true;
     };
   }, [username, section, cacheKey, config]);
 
-  const loadMore = useCallback(async ({ limit = 30 } = {}) => {
+  const loadMore = useCallback(async ({ limit = PROFILE_SECTION_PAGE_SIZE } = {}) => {
     if (loadingMoreRef.current || !hasMore) return;
-    const pageSize = Math.min(30, Math.max(1, Number(limit) || 30));
+    const pageSize = Math.min(PROFILE_SECTION_PAGE_SIZE, Math.max(1, Number(limit) || PROFILE_SECTION_PAGE_SIZE));
     loadingMoreRef.current = true;
     setLoadingMore(true);
     setLoadMoreError(false);
@@ -1462,7 +1521,6 @@ function ProfileContentSection({ username, section, actor }) {
       !hasMore ||
       loadingMore ||
       loadMoreError ||
-      (section === "watched" && !diaryAutoLoadEnabled) ||
       typeof IntersectionObserver === "undefined"
     ) {
       return undefined;
@@ -1478,31 +1536,33 @@ function ProfileContentSection({ username, section, actor }) {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [diaryAutoLoadEnabled, hasMore, loadMore, loadMoreError, loadingMore, section, status]);
+  }, [hasMore, loadMore, loadMoreError, loadingMore, status]);
 
   // En grid, una vista con más columnas puede dejar la última fila incompleta
   // aunque ya hubiese una página cargada. Pedimos exactamente las tarjetas que
   // faltan para completar esa fila cuando haya más resultados disponibles.
+  // Diario colapsa episodios (el nº de filas crudas no equivale al de tarjetas),
+  // así que su última fila se completa vía sobrellenado + carga al desplazarse.
   useEffect(() => {
     const canCompleteGrid =
       config?.layout === "posters" &&
+      section !== "watched" &&
       effectiveGroup === "none" &&
       (controls.view === "grid" || controls.view === "compact") &&
       hasMore &&
       !loadingMore &&
-      !loadMoreError &&
-      (section !== "watched" || diaryAutoLoadEnabled);
+      !loadMoreError;
     const columns = canCompleteGrid ? profileGridColumnCount(controls.view) : 0;
     const remainder = columns > 0 ? visibleItems.length % columns : 0;
     if (columns > 0 && remainder > 0) {
       loadMore({ limit: columns - remainder });
     }
-  }, [config?.layout, controls.view, diaryAutoLoadEnabled, effectiveGroup, hasMore, loadMore, loadMoreError, loadingMore, section, visibleItems.length]);
+  }, [config?.layout, controls.view, effectiveGroup, hasMore, loadMore, loadMoreError, loadingMore, section, visibleItems.length]);
 
   if (!config) return null;
 
   if (status === "loading") {
-    return <div aria-busy="true" />;
+    return <SectionSkeleton config={config} controls={controls} count={fillTargetRef.current} />;
   }
 
   if (status === "error") {
