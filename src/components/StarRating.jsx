@@ -1,7 +1,7 @@
 "use client";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import { createPortal } from "react-dom";
@@ -54,6 +54,7 @@ export default function StarRating({
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
+  const titleId = useId();
 
   // valor actual del slider
   const [value, setValue] = useState(hasRating ? rating : clamp(8, min, max));
@@ -195,12 +196,15 @@ export default function StarRating({
               className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
               role="dialog"
               aria-modal="true"
-              aria-label="Puntuación del usuario"
+              aria-labelledby={titleId}
             >
               <div className="flex items-center justify-between bg-white/[0.025] px-6 py-5">
-                <span className="text-xs font-bold uppercase tracking-widest text-white/55">
-                  Tu reseña
-                </span>
+                <h2
+                  id={titleId}
+                  className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl"
+                >
+                  Puntuación
+                </h2>
                 <button
                   type="button"
                   onClick={closeFromEvent}

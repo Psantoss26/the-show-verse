@@ -508,6 +508,20 @@ function getHistoryIndicatorClass({
   ].join(" ");
 }
 
+function HistoryGroupedEpisodesIndicator({ count, compact = false }) {
+  return (
+    <div
+      className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compact ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}
+      aria-hidden="true"
+    >
+      <div className={`flex items-center font-bold ${compact ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
+        <Layers className={compact ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} />
+        <span>{count}</span>
+      </div>
+    </div>
+  );
+}
+
 function HistoryCornerIndicator({
   editMode,
   confirmDel,
@@ -1771,17 +1785,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
           {isGroup && (
             <>
               <div className="absolute inset-x-0 top-0 z-10 h-16 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent sm:h-20" />
-              <div
-                className={getHistoryIndicatorClass({
-                  color: "emerald",
-                  visibility: "always",
-                })}
-              >
-                <div className="flex items-center gap-1 text-xs font-bold sm:text-sm">
-                  <Layers className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-                  <span>{groupCount}</span>
-                </div>
-              </div>
+              <HistoryGroupedEpisodesIndicator count={groupCount} />
             </>
           )}
         </div>
@@ -1972,10 +1976,10 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <motion.div
-      className={`relative aspect-[2/3] compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
+      className={`relative aspect-[2/3] compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300 ${disabledCls}`}
       whileHover={{
         scale: 1.15,
-        zIndex: 50,
+        zIndex: 100,
         boxShadow:
           "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
       }}
@@ -1984,8 +1988,6 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         transformOrigin: "center center",
       }}
     >
-      {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {/* Poster Image */}
         <Poster entry={entry} className="w-full h-full" />
@@ -1993,18 +1995,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         {isGroup && (
           <>
             <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-            <div
-              className={getHistoryIndicatorClass({
-                compact: true,
-                color: "emerald",
-                visibility: "always",
-              })}
-            >
-              <div className="flex items-center gap-1 text-[10px] font-bold sm:text-xs">
-                <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>{groupCount}</span>
-              </div>
-            </div>
+            <HistoryGroupedEpisodesIndicator count={groupCount} compact />
           </>
         )}
         <HistoryHoverIndicator type={type} dateParts={watchedDate} compact />
@@ -2060,10 +2051,13 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = !isBackNav && index < 60;
+  const shellClassName =
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   if (!href || isGroup)
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -2080,6 +2074,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   return (
     <motion.div
+      className={shellClassName}
       initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -2215,17 +2210,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
         {isGroup && (
           <>
             <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-            <div
-              className={getHistoryIndicatorClass({
-                color: "emerald",
-                visibility: "always",
-              })}
-            >
-              <div className="flex items-center gap-1 text-xs font-bold sm:text-sm">
-                <Layers className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-                <span>{groupCount}</span>
-              </div>
-            </div>
+            <HistoryGroupedEpisodesIndicator count={groupCount} />
           </>
         )}
         <HistoryHoverIndicator type={type} dateParts={watchedDate} />
