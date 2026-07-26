@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
-import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import ProfileSection from "./ProfileSection";
+import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import {
   Activity,
   Award,
   CalendarDays,
+  CheckCircle2,
   ChevronRight,
   Clock3,
   Film,
@@ -26,7 +29,6 @@ import {
   RotateCcw,
   Settings,
   Star,
-  Tv,
   Target,
   UserRoundCheck,
   Users,
@@ -64,21 +66,37 @@ const RatingsBarChart = dynamic(
 // ficha de título el perfil se pinta de inmediato y se refresca en segundo
 // plano, en lugar de volver a mostrar una pantalla de espera.
 const profileCache = new Map();
-const PROFILE_TAB_IDS = [
-  "profile",
-  "statistics",
-  "activity",
-  "watched",
-  "reviews",
-  "favorites",
-  "watchlist",
-  "ratings",
-  "lists",
-  "social",
-];
+const PROFILE_CACHE_STORAGE_PREFIX = "showverse:profile:snapshot:v1:";
 
 function profileCacheKey(username) {
   return String(username || "").trim().toLocaleLowerCase();
+}
+
+function getCachedProfile(key) {
+  const memory = profileCache.get(key);
+  if (memory) return memory;
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const snapshot = JSON.parse(window.sessionStorage.getItem(`${PROFILE_CACHE_STORAGE_PREFIX}${key}`) || "null");
+    if (snapshot?.user?.username) {
+      profileCache.set(key, snapshot);
+      return snapshot;
+    }
+  } catch {
+    // Una instantánea dañada nunca debe bloquear la carga de la ficha.
+  }
+  return null;
+}
+
+function cacheProfile(key, profile) {
+  if (!key || !profile) return;
+  profileCache.set(key, profile);
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`${PROFILE_CACHE_STORAGE_PREFIX}${key}`, JSON.stringify(profile));
+  } catch {
+    // La caché en memoria sigue evitando el estado vacío durante esta sesión.
+  }
 }
 
 function ProfileBackdrop() {
@@ -162,7 +180,7 @@ function ProfilePosterGrid({
   return (
     <div
       data-profile-horizontal-scroll
-      data-profile-favorites-scroll={prioritizeHorizontalScroll || undefined}
+      data-profile-swipe-exempt={prioritizeHorizontalScroll || undefined}
       role="region"
       aria-label={label}
       className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0"
@@ -555,27 +573,38 @@ function buildAnalyticsFromPrivateProfile(payload) {
 // Componente principal
 // ─────────────────────────────────────────────
 
-export default function ProfileClient({ username }) {
+export default function ProfileClient({ username, initialTab = "profile" }) {
   const { user: viewer, logout } = useAuth();
+  const router = useRouter();
   const profileSwipe = useRef(null);
+  // Debe ser idéntico al HTML que produce el servidor. La instantánea de
+  // sessionStorage se restaura justo después de hidratar, antes del primer
+  // pintado, para no comprometer la hidratación ni mostrar un vacío al volver.
   const [state, setState] = useState(() => {
     const key = profileCacheKey(username);
-    const profile = profileCache.get(key) || null;
-    return { key, status: profile ? "ready" : "pending", profile };
+    return { key, status: "pending", profile: null };
   });
-  const [tab, setTab] = useState("profile");
+  const tab = PROFILE_TAB_IDS.includes(initialTab) ? initialTab : "profile";
   const [refreshToken, setRefreshToken] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [privateAnalytics, setPrivateAnalytics] = useState(null);
 
-  // Al cambiar de usuario, volver a la pestaña de resumen.
-  useEffect(() => setTab("profile"), [username]);
+  useLayoutEffect(() => {
+    const key = profileCacheKey(username);
+    const cachedProfile = getCachedProfile(key);
+    if (!cachedProfile) return;
+    setState((current) => (
+      current.key === key && current.profile === cachedProfile && current.status === "ready"
+        ? current
+        : { key, status: "ready", profile: cachedProfile }
+    ));
+  }, [username]);
 
   useEffect(() => {
     let cancelled = false;
     const isRefresh = refreshToken > 0;
     const key = profileCacheKey(username);
-    const cachedProfile = profileCache.get(key) || null;
+    const cachedProfile = getCachedProfile(key);
     if (!isRefresh) setState({ key, status: cachedProfile ? "ready" : "pending", profile: cachedProfile });
     else setSyncing(true);
     (async () => {
@@ -590,7 +619,7 @@ export default function ProfileClient({ username }) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
-          profileCache.set(key, data.profile);
+          cacheProfile(key, data.profile);
           setState({ key, status: "ready", profile: data.profile });
         }
       } catch {
@@ -610,10 +639,14 @@ export default function ProfileClient({ username }) {
   const isCurrentProfile = state.key === activeCacheKey;
   const profile = isCurrentProfile
     ? state.profile
-    : profileCache.get(activeCacheKey) || null;
+    : null;
   const status = isCurrentProfile
     ? state.status
-    : profile ? "ready" : "pending";
+    : "pending";
+  const navigateToTab = useCallback((nextTab) => {
+    if (!PROFILE_TAB_IDS.includes(nextTab) || nextTab === tab) return;
+    router.push(profileTabHref(username, nextTab), { scroll: false });
+  }, [router, tab, username]);
 
   useEffect(() => {
     const currentProfile = profile;
@@ -713,37 +746,34 @@ export default function ProfileClient({ username }) {
   const handleProfileTouchStart = (event) => {
     if (window.matchMedia("(min-width: 640px)").matches || event.touches.length !== 1) return;
     const target = event.target;
-    // El carrusel de Favoritos es la única zona que conserva el gesto
-    // horizontal propio. El resto de la vista debe poder cambiar de sección,
-    // incluso si el toque comienza sobre un control o una tarjeta.
-    const prioritizeHorizontalScroll = target instanceof Element && Boolean(
-      target.closest("[data-profile-favorites-scroll]"),
+    // Las filas desplazables y el menú de pestañas consumen su gesto
+    // horizontal propio. Fuera de esas zonas el gesto cambia de sección.
+    const preservesHorizontalScroll = target instanceof Element && Boolean(
+      target.closest("[data-profile-swipe-exempt]"),
     );
     profileSwipe.current = {
       x: event.touches[0].clientX,
       y: event.touches[0].clientY,
-      prioritizeHorizontalScroll,
+      preservesHorizontalScroll,
     };
   };
 
   const handleProfileTouchEnd = (event) => {
     const gesture = profileSwipe.current;
     profileSwipe.current = null;
-    if (!gesture || gesture.prioritizeHorizontalScroll || event.changedTouches.length !== 1) return;
+    if (!gesture || gesture.preservesHorizontalScroll || event.changedTouches.length !== 1) return;
 
     const deltaX = event.changedTouches[0].clientX - gesture.x;
     const deltaY = event.changedTouches[0].clientY - gesture.y;
     if (Math.abs(deltaX) < 64 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
 
-    setTab((currentTab) => {
-      const currentIndex = PROFILE_TAB_IDS.indexOf(currentTab);
-      const direction = deltaX < 0 ? 1 : -1;
-      const nextIndex = Math.min(
-        PROFILE_TAB_IDS.length - 1,
-        Math.max(0, currentIndex + direction),
-      );
-      return PROFILE_TAB_IDS[nextIndex];
-    });
+    const currentIndex = PROFILE_TAB_IDS.indexOf(tab);
+    const direction = deltaX < 0 ? 1 : -1;
+    const nextIndex = Math.min(
+      PROFILE_TAB_IDS.length - 1,
+      Math.max(0, currentIndex + direction),
+    );
+    navigateToTab(PROFILE_TAB_IDS[nextIndex]);
   };
 
   return (
@@ -819,7 +849,7 @@ export default function ProfileClient({ username }) {
           {/* Contadores */}
           <div className="order-3 grid w-full grid-cols-4 gap-2 sm:gap-3 lg:order-none lg:w-auto lg:pl-4">
             <CountStat value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
-            <CountStat value={stats.episodes} label="Episodios" icon={Tv} iconClassName="text-violet-400" />
+            <CountStat value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" />
             <CountStat
               value={counts.following}
               label="Siguiendo"
@@ -839,7 +869,7 @@ export default function ProfileClient({ username }) {
 
         {/* ── BARRA DE PESTAÑAS ── */}
         <div className="sv-profile-entry sv-profile-entry--tabs">
-          <ProfileTabs tab={tab} setTab={setTab} sections={sections} />
+          <ProfileTabs tab={tab} username={user.username} sections={sections} />
         </div>
 
         {tab === "statistics" ? (
@@ -913,6 +943,7 @@ export default function ProfileClient({ username }) {
                   showStars
                   viewerTitleStates={viewerTitleStates}
                   label="Actividad reciente"
+                  prioritizeHorizontalScroll
                 />
               ) : (
                 <p className="text-sm text-zinc-600">Sin actividad reciente.</p>
@@ -926,7 +957,7 @@ export default function ProfileClient({ username }) {
             <section>
               <SectionHeader
                 label="Estadísticas"
-                onClick={() => setTab("statistics")}
+                onClick={() => navigateToTab("statistics")}
               />
               <dl className="grid grid-cols-4 gap-2">
                 <StatCell value={thisMonth.movies || 0} label="Películas" />
@@ -936,19 +967,19 @@ export default function ProfileClient({ username }) {
               </dl>
             </section>
 
-            <ActivitySidebarPreview username={user.username} onOpen={() => setTab("activity")} />
+            <ActivitySidebarPreview username={user.username} onOpen={() => navigateToTab("activity")} />
 
             <section>
               <SectionHeader
                 label="Puntuaciones"
-                onClick={() => setTab("ratings")}
+                onClick={() => navigateToTab("ratings")}
               />
               {stats.totalRatings > 0 ? (
                 <StarRatingHistogram histogram={stats.ratingHistogram} />
               ) : (
                 <button
                   type="button"
-                  onClick={() => setTab("ratings")}
+                  onClick={() => navigateToTab("ratings")}
                   className="flex h-20 w-full items-center justify-center rounded-2xl border border-dashed border-white/[0.08] px-4 text-center text-xs font-semibold text-zinc-500 transition-colors hover:border-emerald-400/35 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
                 >
                   Aún no hay puntuaciones.
@@ -956,14 +987,14 @@ export default function ProfileClient({ username }) {
               )}
             </section>
 
-            <PendingPreview username={user.username} items={pendingPreview} onOpen={() => setTab("watchlist")} />
+            <PendingPreview username={user.username} items={pendingPreview} onOpen={() => navigateToTab("watchlist")} />
 
             {/* Siguiendo (avatares) */}
             {followingPreview?.length > 0 && (
               <section>
                 <SectionHeader
                   label="Siguiendo"
-                  onClick={() => setTab("social")}
+                  onClick={() => navigateToTab("social")}
                 />
                 <div className="flex flex-wrap gap-2">
                   {followingPreview.map((f) => (
@@ -997,7 +1028,7 @@ export default function ProfileClient({ username }) {
 
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
-function ProfileTabs({ tab, setTab, sections }) {
+function ProfileTabs({ tab, username, sections }) {
   const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
@@ -1026,16 +1057,17 @@ function ProfileTabs({ tab, setTab, sections }) {
     <nav
       ref={navRef}
       data-profile-horizontal-scroll
+      data-profile-swipe-exempt
       aria-label="Secciones del perfil"
       className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:mt-8 [&::-webkit-scrollbar]:hidden"
     >
       {items.map((it) => {
         const active = tab === it.id;
         return (
-          <button
+          <Link
             key={it.id}
-            type="button"
-            onClick={() => setTab(it.id)}
+            href={profileTabHref(username, it.id)}
+            scroll={false}
             data-profile-tab-active={active || undefined}
             className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -1050,7 +1082,7 @@ function ProfileTabs({ tab, setTab, sections }) {
             {active && (
               <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />
             )}
-          </button>
+          </Link>
         );
       })}
     </nav>

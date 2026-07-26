@@ -53,6 +53,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "seasonNumbers vacío" }, { status: 400 });
     }
 
+    // Cada fila de episodio conserva el progreso, pero comparte la identidad
+    // de esta acción para que el perfil muestre una sola serie completada.
+    const activityGroup = isAdd ? `show-complete:${showTmdbId}:${crypto.randomUUID()}` : undefined;
+
     let lastBackend = null;
     let anyOk = false;
     for (const season of cleanSeasons) {
@@ -71,6 +75,7 @@ export async function POST(request) {
           episodes: isAdd ? episodes : undefined,
           title: title || undefined,
           posterPath: posterPath || undefined,
+          activityGroup,
         }),
       });
       if (res.ok) {
