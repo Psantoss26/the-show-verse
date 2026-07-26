@@ -57,6 +57,24 @@ export const refreshTokens = pgTable('refresh_tokens', {
 }));
 
 // ─────────────────────────────────────────────
+// EMAIL CHANGE TOKENS
+// ─────────────────────────────────────────────
+// El correo no se cambia hasta que el usuario demuestra que controla la nueva
+// dirección. Sólo se guarda el hash del token de un solo uso, nunca el token
+// que viaja en el enlace de verificación.
+export const emailChangeTokens = pgTable('email_change_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  tokenHash: text('token_hash').unique().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  userIdIdx: index('idx_email_change_tokens_user_id').on(t.userId),
+  expiresAtIdx: index('idx_email_change_tokens_expires_at').on(t.expiresAt),
+}));
+
+// ─────────────────────────────────────────────
 // CONNECTED ACCOUNTS (OAuth / Trakt import)
 // ─────────────────────────────────────────────
 export const connectedAccounts = pgTable('connected_accounts', {

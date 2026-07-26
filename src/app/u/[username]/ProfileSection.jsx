@@ -103,6 +103,55 @@ function getEpisodePreview(item) {
   };
 }
 
+function getDiaryEpisode(item) {
+  const season = Number(item?.season ?? item?.seasonNumber ?? item?.season_number);
+  const episode = Number(item?.episode ?? item?.episodeNumber ?? item?.episode_number);
+  if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return null;
+  return { season, episode };
+}
+
+function formatDiaryEpisode(episode) {
+  return episode ? `T${episode.season} · E${episode.episode}` : null;
+}
+
+function formatDiaryEpisodeRange(items) {
+  const episodes = items.map(getDiaryEpisode).filter(Boolean);
+  if (episodes.length < 2) return null;
+  const seasons = [...new Set(episodes.map((entry) => entry.season))];
+  if (seasons.length === 1) {
+    const numbers = episodes.map((entry) => entry.episode).sort((a, b) => a - b);
+    return `T${seasons[0]} · E${numbers[0]}–E${numbers[numbers.length - 1]}`;
+  }
+  const first = episodes[0];
+  const last = episodes[episodes.length - 1];
+  return `T${first.season} E${first.episode} – T${last.season} E${last.episode}`;
+}
+
+// Mismo criterio que Historial: sólo se colapsan episodios consecutivos de la
+// misma serie; las películas y cada episodio siguen siendo registros reales.
+function collapseDiaryEpisodes(items) {
+  const result = [];
+  for (const item of items) {
+    const episode = getDiaryEpisode(item);
+    const previous = result.at(-1);
+    const previousEpisodes = previous?.episodeGroup;
+    const sameShow =
+      getItemMediaType(item) === "tv" &&
+      episode &&
+      previousEpisodes &&
+      getItemMediaType(previous) === "tv" &&
+      Number(previous.tmdbId) === Number(item.tmdbId);
+
+    if (sameShow) {
+      previous.episodeGroup.push(item);
+      continue;
+    }
+
+    result.push({ ...item, ...(episode ? { episodeGroup: [item] } : {}) });
+  }
+  return result;
+}
+
 function activityTypeLabel(type) {
   return {
     watched: "Visionados",

@@ -98,6 +98,8 @@ export const openApiDocument = {
         properties: {
           id: { type: 'string', format: 'uuid' },
           email: { type: 'string', format: 'email' },
+          emailVerified: { type: 'boolean' },
+          hasPassword: { type: 'boolean' },
           username: { type: 'string' },
           displayName: { type: 'string', nullable: true },
           avatarUrl: { type: 'string', nullable: true },
@@ -434,6 +436,83 @@ export const openApiDocument = {
         security: [{ bearerAuth: [] }],
         responses: {
           200: { description: 'All sessions revoked.' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/v1/auth/account/email/change-request': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Send a verification link before changing the account email',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: { type: 'string', format: 'email' },
+                  currentPassword: { type: 'string', description: 'Required when the account already has a password.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Verification email sent, or the current address is already verified.' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'Email is already used by another account.' },
+          503: { description: 'Email delivery is not configured.' },
+        },
+      },
+    },
+    '/v1/auth/account/email/confirm': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Confirm an email change using its one-time verification token',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token'],
+                properties: { token: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Email verified and all refresh sessions revoked.' },
+          400: { description: 'Verification link is invalid or expired.' },
+          409: { description: 'Email is already used by another account.' },
+        },
+      },
+    },
+    '/v1/auth/account/password': {
+      put: {
+        tags: ['Auth'],
+        summary: 'Change or create an account password and revoke all sessions',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['newPassword'],
+                properties: {
+                  currentPassword: { type: 'string', description: 'Required when the account already has a password.' },
+                  newPassword: { type: 'string', minLength: 8, maxLength: 128 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password updated and all refresh sessions revoked.' },
           401: { $ref: '#/components/responses/Unauthorized' },
         },
       },

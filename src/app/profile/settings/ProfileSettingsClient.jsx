@@ -24,6 +24,9 @@ import {
   Unlink,
   AtSign,
   ImageIcon,
+  KeyRound,
+  Mail,
+  MailCheck,
   X,
   Upload,
 } from "lucide-react";
@@ -424,6 +427,204 @@ function ProfileNamesModal({
             </button>
           </div>
         </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function AccountSecurityModal({
+  isOpen,
+  onClose,
+  currentEmail,
+  emailVerified,
+  hasPassword,
+  onPasswordChanged,
+}) {
+  const [email, setEmail] = useState(currentEmail || "");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [emailState, setEmailState] = useState({ loading: false, message: "", error: "" });
+  const [passwordState, setPasswordState] = useState({ loading: false, error: "" });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setEmail(currentEmail || "");
+    setEmailPassword("");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setEmailState({ loading: false, message: "", error: "" });
+    setPasswordState({ loading: false, error: "" });
+  }, [currentEmail, isOpen]);
+
+  if (!isOpen) return null;
+
+  const requestEmailChange = async (event) => {
+    event.preventDefault();
+    setEmailState({ loading: true, message: "", error: "" });
+    try {
+      const response = await fetch("/api/auth/account/email/change-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          ...(hasPassword ? { currentPassword: emailPassword } : {}),
+        }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json?.error || "No se pudo solicitar el cambio de correo.");
+      setEmailState({
+        loading: false,
+        error: "",
+        message: json?.alreadyVerified
+          ? "Este correo ya está verificado."
+          : "Te hemos enviado un enlace. El correo no se actualizará hasta que lo confirmes.",
+      });
+      setEmailPassword("");
+    } catch (error) {
+      setEmailState({ loading: false, message: "", error: error?.message || "No se pudo solicitar el cambio de correo." });
+    }
+  };
+
+  const changePassword = async (event) => {
+    event.preventDefault();
+    if (newPassword.length < 8) {
+      setPasswordState({ loading: false, error: "La nueva contraseña debe tener al menos 8 caracteres." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordState({ loading: false, error: "Las contraseñas no coinciden." });
+      return;
+    }
+
+    setPasswordState({ loading: true, error: "" });
+    try {
+      const response = await fetch("/api/auth/account/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...(hasPassword ? { currentPassword } : {}),
+          newPassword,
+        }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json?.error || "No se pudo cambiar la contraseña.");
+      await onPasswordChanged();
+    } catch (error) {
+      setPasswordState({ loading: false, error: error?.message || "No se pudo cambiar la contraseña." });
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/80 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 10 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-security-modal-title"
+        className={`${GLASS_SURFACE} relative z-10 my-auto w-full max-w-lg rounded-3xl p-5 sm:p-6`}
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-400">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 id="account-security-modal-title" className="text-lg font-black text-white">Seguridad de la cuenta</h3>
+              <p className="mt-0.5 text-xs text-zinc-400">Actualiza tus credenciales de acceso de forma segura.</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          <form onSubmit={requestEmailChange} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Mail className="h-4.5 w-4.5 text-emerald-400" />
+                <div>
+                  <h4 className="text-sm font-bold text-white">Correo electrónico</h4>
+                  <p className="mt-0.5 text-xs text-zinc-400">{emailVerified ? "Correo verificado" : "Correo pendiente de verificar"}</p>
+                </div>
+              </div>
+              {emailVerified ? <MailCheck className="h-4.5 w-4.5 text-emerald-400" aria-label="Correo verificado" /> : null}
+            </div>
+            <label htmlFor="account-email" className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">Nuevo correo</label>
+            <input
+              id="account-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => { setEmail(event.target.value); setEmailState((state) => ({ ...state, error: "", message: "" })); }}
+              required
+              disabled={emailState.loading}
+              className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-base font-medium text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
+            />
+            {hasPassword && (
+              <>
+                <label htmlFor="account-email-password" className="mb-2 mt-3 block text-xs font-bold uppercase tracking-wider text-zinc-400">Contraseña actual</label>
+                <input
+                  id="account-email-password"
+                  name="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={emailPassword}
+                  onChange={(event) => setEmailPassword(event.target.value)}
+                  required
+                  disabled={emailState.loading}
+                  className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-base font-medium text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60"
+                />
+              </>
+            )}
+            {emailState.error ? <p role="alert" className="mt-3 text-xs text-red-300">{emailState.error}</p> : null}
+            {emailState.message ? <p role="status" className="mt-3 text-xs text-emerald-300">{emailState.message}</p> : null}
+            <button type="submit" disabled={emailState.loading} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
+              {emailState.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Enviar verificación
+            </button>
+          </form>
+
+          <form onSubmit={changePassword} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
+            <div className="mb-4 flex items-center gap-2.5">
+              <KeyRound className="h-4.5 w-4.5 text-emerald-400" />
+              <div>
+                <h4 className="text-sm font-bold text-white">{hasPassword ? "Cambiar contraseña" : "Crear contraseña"}</h4>
+                <p className="mt-0.5 text-xs text-zinc-400">{hasPassword ? "Cerrarás sesión en todos tus dispositivos." : "Añade una contraseña para poder iniciar sesión también con correo."}</p>
+              </div>
+            </div>
+            {hasPassword && (
+              <>
+                <label htmlFor="account-current-password" className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">Contraseña actual</label>
+                <input id="account-current-password" name="currentPassword" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required disabled={passwordState.loading} className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-base font-medium text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60" />
+              </>
+            )}
+            <label htmlFor="account-new-password" className="mb-2 mt-3 block text-xs font-bold uppercase tracking-wider text-zinc-400">Nueva contraseña</label>
+            <input id="account-new-password" name="newPassword" type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setPasswordState((state) => ({ ...state, error: "" })); }} required disabled={passwordState.loading} className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-base font-medium text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60" />
+            <label htmlFor="account-confirm-password" className="mb-2 mt-3 block text-xs font-bold uppercase tracking-wider text-zinc-400">Repite la nueva contraseña</label>
+            <input id="account-confirm-password" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordState((state) => ({ ...state, error: "" })); }} required disabled={passwordState.loading} className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-base font-medium text-white outline-none transition focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 disabled:opacity-60" />
+            {passwordState.error ? <p role="alert" className="mt-3 text-xs text-red-300">{passwordState.error}</p> : null}
+            <button type="submit" disabled={passwordState.loading} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-xs font-black text-black transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60">
+              {passwordState.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {hasPassword ? "Cambiar contraseña" : "Crear contraseña"}
+            </button>
+          </form>
+        </div>
       </motion.div>
     </div>
   );
@@ -1011,6 +1212,7 @@ function ProfileSettingsClient() {
     authenticated,
     hydrated,
     user,
+    logout,
   } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("personalization");
@@ -1020,6 +1222,7 @@ function ProfileSettingsClient() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [showProfileNamesModal, setShowProfileNamesModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showAccountSecurityModal, setShowAccountSecurityModal] = useState(false);
 
   const saveProfileNames = async ({ username, displayName }) => {
     setProfileSaving(true);
@@ -1682,6 +1885,18 @@ function ProfileSettingsClient() {
                       buttonLabel="Cambiar"
                       disabled={profileSaving}
                       onClick={() => setShowAvatarModal(true)}
+                    />
+
+                    <SettingActionRow
+                      icon={Shield}
+                      title="Correo y contraseña"
+                      description={
+                        user?.emailVerified
+                          ? "Correo verificado y opciones de acceso seguras"
+                          : "Verifica tu correo y administra la contraseña de acceso"
+                      }
+                      buttonLabel="Gestionar"
+                      onClick={() => setShowAccountSecurityModal(true)}
                     />
                   </div>
 
@@ -2380,6 +2595,19 @@ function ProfileSettingsClient() {
             currentAvatarUrl={user?.avatarUrl || ""}
             onSave={saveAvatar}
             loading={profileSaving}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAccountSecurityModal && (
+          <AccountSecurityModal
+            isOpen={showAccountSecurityModal}
+            onClose={() => setShowAccountSecurityModal(false)}
+            currentEmail={user?.email || ""}
+            emailVerified={Boolean(user?.emailVerified)}
+            hasPassword={Boolean(user?.hasPassword)}
+            onPasswordChanged={() => logout({ redirectTo: "/login" })}
           />
         )}
       </AnimatePresence>

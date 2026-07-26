@@ -2,12 +2,14 @@
 // Endpoints de autenticación: register, login, refresh, logout, me
 
 import bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import {
   users,
   refreshTokens,
+  emailChangeTokens,
   userPreferences,
   connectedAccounts,
   watchHistory,
@@ -20,6 +22,7 @@ import {
   hashToken,
   refreshTokenExpiresAt,
 } from '../lib/jwt.js';
+import { sendEmailChangeVerification } from '../lib/email.js';
 import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
 import { syncDedupKey } from './netflixSyncDedup.js';
 import {
@@ -30,6 +33,7 @@ import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
 import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
+const EMAIL_CHANGE_TOKEN_TTL_MS = 30 * 60 * 1000;
 export const MAX_AVATAR_DATA_URL_LENGTH = 480_000;
 
 const httpsAvatarUrlSchema = z
@@ -64,6 +68,20 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const changeEmailRequestSchema = z.object({
+  email: z.string().trim().email().max(320),
+  currentPassword: z.string().min(1).max(128).optional(),
+});
+
+const confirmEmailChangeSchema = z.object({
+  token: z.string().min(32).max(256),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128).optional(),
+  newPassword: z.string().min(8).max(128),
 });
 
 const tmdbSessionSchema = z.object({
@@ -128,6 +146,42 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
+function hashEmailChangeToken(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function getFrontendUrl() {
+  const candidate = String(process.env.FRONTEND_URL || '').split(',')[0]?.trim();
+  if (!candidate) {
+    const error = new Error('FRONTEND_URL is required to send email verification links');
+    error.status = 503;
+    throw error;
+  }
+
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    const error = new Error('FRONTEND_URL is invalid');
+    error.status = 500;
+    throw error;
+  }
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    emailVerified: Boolean(user.emailVerified),
+    hasPassword: Boolean(user.passwordHash),
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    bio: user.bio,
+    plan: user.plan,
+    planExpiresAt: user.planExpiresAt,
+  };
+}
 
 function normalizeUsername(value, fallback) {
   const base = String(value || fallback || 'user')
@@ -606,7 +660,11 @@ export default async function authRoutes(fastify) {
     });
 
     return reply.status(201).send({
-      user,
+      user: {
+        ...user,
+        emailVerified: false,
+        hasPassword: true,
+      },
       accessToken,
       refreshToken,
     });
@@ -653,6 +711,8 @@ export default async function authRoutes(fastify) {
       user: {
         id: user.id,
         email: user.email,
+        emailVerified: user.emailVerified,
+        hasPassword: true,
         username: user.username,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
@@ -766,10 +826,183 @@ export default async function authRoutes(fastify) {
   });
 
   // ──────────────────────────────────────────────
+  // POST /auth/account/email/change-request
+  // El correo no se actualiza aquí: primero se verifica el control de la nueva
+  // dirección mediante un enlace de un solo uso.
+  // ──────────────────────────────────────────────
+  fastify.post(
+    '/account/email/change-request',
+    {
+      preHandler: fastify.requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: '1 hour' } },
+    },
+    async (req, reply) => {
+      const parsed = changeEmailRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+      }
+
+      const email = parsed.data.email.toLowerCase();
+      const currentPassword = parsed.data.currentPassword;
+
+      if (req.user.passwordHash) {
+        if (!currentPassword || !(await bcrypt.compare(currentPassword, req.user.passwordHash))) {
+          return reply.status(401).send({ error: 'Current password is incorrect' });
+        }
+      }
+
+      if (email === req.user.email && req.user.emailVerified) {
+        return reply.send({ ok: true, alreadyVerified: true, email });
+      }
+
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (existing && existing.id !== req.user.id) {
+        return reply.status(409).send({ error: 'Email already registered' });
+      }
+
+      let frontendUrl;
+      try {
+        frontendUrl = getFrontendUrl();
+      } catch (error) {
+        return reply.status(error.status || 503).send({ error: error.message });
+      }
+
+      const token = randomBytes(32).toString('base64url');
+      const tokenHash = hashEmailChangeToken(token);
+      const expiresAt = new Date(Date.now() + EMAIL_CHANGE_TOKEN_TTL_MS);
+      const verificationUrl = new URL('/auth/verify-email', frontendUrl);
+      verificationUrl.searchParams.set('token', token);
+
+      await db.transaction(async (tx) => {
+        await tx.delete(emailChangeTokens).where(eq(emailChangeTokens.userId, req.user.id));
+        await tx.insert(emailChangeTokens).values({
+          userId: req.user.id,
+          email,
+          tokenHash,
+          expiresAt,
+        });
+      });
+
+      try {
+        await sendEmailChangeVerification({
+          to: email,
+          verificationUrl: verificationUrl.toString(),
+        });
+      } catch (error) {
+        await db.delete(emailChangeTokens).where(eq(emailChangeTokens.tokenHash, tokenHash));
+        return reply.status(error.status || 502).send({
+          error: error.message || 'No se pudo enviar el correo de verificación',
+        });
+      }
+
+      return reply.send({
+        ok: true,
+        pendingEmail: email,
+        expiresAt: expiresAt.toISOString(),
+      });
+    },
+  );
+
+  // ──────────────────────────────────────────────
+  // POST /auth/account/email/confirm
+  // Es pública para que el enlace pueda abrirse en cualquier dispositivo. El
+  // token aleatorio, de un uso y con caducidad es la credencial de esta acción.
+  // ──────────────────────────────────────────────
+  fastify.post('/account/email/confirm', async (req, reply) => {
+    const parsed = confirmEmailChangeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid verification link' });
+    }
+
+    const tokenHash = hashEmailChangeToken(parsed.data.token);
+    let consumed;
+    try {
+      consumed = await db.transaction(async (tx) => {
+        const [token] = await tx
+          .delete(emailChangeTokens)
+          .where(eq(emailChangeTokens.tokenHash, tokenHash))
+          .returning();
+
+        if (!token || token.expiresAt <= new Date()) return null;
+
+        const [emailOwner] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, token.email))
+          .limit(1);
+
+        if (emailOwner && emailOwner.id !== token.userId) {
+          const error = new Error('Email already registered');
+          error.status = 409;
+          throw error;
+        }
+
+        await tx
+          .update(users)
+          .set({ email: token.email, emailVerified: true, updatedAt: new Date() })
+          .where(eq(users.id, token.userId));
+        await tx.delete(refreshTokens).where(eq(refreshTokens.userId, token.userId));
+        return token;
+      });
+    } catch (error) {
+      return reply.status(error.status || 500).send({
+        error: error.message || 'No se pudo confirmar el correo',
+      });
+    }
+
+    if (!consumed) {
+      return reply.status(400).send({ error: 'This verification link is invalid or has expired' });
+    }
+
+    return reply.send({ ok: true, email: consumed.email, sessionsRevoked: true });
+  });
+
+  // ──────────────────────────────────────────────
+  // PUT /auth/account/password
+  // Requiere la contraseña actual si ya existe una. Las cuentas OAuth pueden
+  // crear una primera contraseña desde una sesión autenticada.
+  // ──────────────────────────────────────────────
+  fastify.put(
+    '/account/password',
+    {
+      preHandler: fastify.requireAuth,
+      config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+    },
+    async (req, reply) => {
+      const parsed = changePasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+      }
+
+      if (req.user.passwordHash) {
+        if (!parsed.data.currentPassword || !(await bcrypt.compare(parsed.data.currentPassword, req.user.passwordHash))) {
+          return reply.status(401).send({ error: 'Current password is incorrect' });
+        }
+      }
+
+      const passwordHash = await bcrypt.hash(parsed.data.newPassword, BCRYPT_ROUNDS);
+      await db.transaction(async (tx) => {
+        await tx
+          .update(users)
+          .set({ passwordHash, updatedAt: new Date() })
+          .where(eq(users.id, req.user.id));
+        await tx.delete(refreshTokens).where(eq(refreshTokens.userId, req.user.id));
+      });
+
+      return reply.send({ ok: true, sessionsRevoked: true });
+    },
+  );
+
+  // ──────────────────────────────────────────────
   // GET /auth/me — Perfil del usuario autenticado
   // ──────────────────────────────────────────────
   fastify.get('/me', { preHandler: fastify.requireAuth }, async (req, reply) => {
-    return reply.send({ user: req.user });
+    return reply.send({ user: publicUser(req.user) });
   });
 
   // ──────────────────────────────────────────────
@@ -813,6 +1046,8 @@ export default async function authRoutes(fastify) {
       .returning({
         id: users.id,
         email: users.email,
+        emailVerified: users.emailVerified,
+        passwordHash: users.passwordHash,
         username: users.username,
         displayName: users.displayName,
         avatarUrl: users.avatarUrl,
@@ -820,7 +1055,7 @@ export default async function authRoutes(fastify) {
         plan: users.plan,
       });
 
-    return reply.send({ user: updated });
+    return reply.send({ user: publicUser(updated) });
   });
 
   // ──────────────────────────────────────────────
