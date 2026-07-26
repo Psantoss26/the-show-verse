@@ -9,6 +9,7 @@ import {
   BookmarkPlus,
   Check,
   ChevronDown,
+  ChevronRight,
   Eye,
   Filter,
   Grid2X2,
@@ -16,6 +17,7 @@ import {
   Image,
   ImageOff,
   LayoutGrid,
+  Layers,
   Layers3,
   List,
   ListPlus,
@@ -33,7 +35,8 @@ import Stars from "@/components/social/Stars";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { useAuth } from "@/context/AuthContext";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
-import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import useModalGuard from "@/hooks/useModalGuard";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -50,6 +53,10 @@ const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watc
 const profileSectionPreferences = new Map();
 const profileViewPreferences = new Map();
 const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v1:";
+// Caché de stills de episodios por serie/temporada. El modal puede abrirse más
+// de una vez y la ruta de temporada ya está revalidada; conservarla aquí evita
+// volver a pedir las mismas imágenes panorámicas durante la sesión.
+const diarySeasonStillsCache = new Map();
 
 function getItemTitle(item) {
   return String(item?.title || item?.name || item?.movie?.title || item?.show?.title || item?.listName || "");
@@ -71,13 +78,14 @@ function getItemRating(item) {
   return Number.isFinite(rating) ? rating : 0;
 }
 
-// Las secciones pueden contener registros históricos del mismo título. La
-// identidad visual debe ser el id de la fila y no sólo el TMDb id; de lo
-// contrario React reutiliza/duplica tarjetas cuando se ordena o pagina.
+// Las secciones pueden contener registros históricos del mismo título e
+// incluso duplicados procedentes de cargas consecutivas. Conservamos el id de
+// la fila como base, pero añadimos su posición para que dos ocurrencias del
+// mismo registro nunca compartan identidad visual en React.
 function profileItemKey(item, index = 0) {
-  if (item?.id) return `record:${item.id}`;
   const date = getItemDate(item)?.getTime() || "undated";
-  return `${getItemMediaType(item)}:${item?.tmdbId || item?.id || "unknown"}:${date}:${index}`;
+  if (item?.id) return `record:${item.id}:${date}:${index}`;
+  return `${getItemMediaType(item)}:${item?.tmdbId || "unknown"}:${date}:${index}`;
 }
 
 function hasActivityPoster(item) {
@@ -135,6 +143,70 @@ function formatDiaryEpisodeRange(items) {
   const first = episodes[0];
   const last = episodes[episodes.length - 1];
   return `T${first.season} E${first.episode} – T${last.season} E${last.episode}`;
+}
+
+function diaryEpisodeStillKey(season, episode) {
+  return `${season}:${episode}`;
+}
+
+function loadDiarySeasonStills(showId, season) {
+  const cacheKey = `${showId}:${season}`;
+  const cached = diarySeasonStillsCache.get(cacheKey);
+  if (cached) return cached instanceof Promise ? cached : Promise.resolve(cached);
+
+  const request = fetch(`/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(season)}`)
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const stills = new Map(
+        (Array.isArray(payload?.episodes) ? payload.episodes : [])
+          .filter((episode) => episode?.still_path)
+          .map((episode) => [
+            diaryEpisodeStillKey(Number(episode.season_number), Number(episode.episode_number)),
+            episode.still_path,
+          ]),
+      );
+      diarySeasonStillsCache.set(cacheKey, stills);
+      return stills;
+    })
+    .catch(() => {
+      const stills = new Map();
+      diarySeasonStillsCache.set(cacheKey, stills);
+      return stills;
+    });
+
+  diarySeasonStillsCache.set(cacheKey, request);
+  return request;
+}
+
+function useDiaryEpisodeStills(showId, episodes) {
+  const seasonSignature = useMemo(
+    () => [...new Set((episodes || []).map(getDiaryEpisode).filter(Boolean).map((episode) => episode.season))].sort((a, b) => a - b).join(","),
+    [episodes],
+  );
+  const [stills, setStills] = useState(() => new Map());
+
+  useEffect(() => {
+    const seasons = seasonSignature ? seasonSignature.split(",").map(Number).filter(Number.isInteger) : [];
+    if (!showId || !seasons.length) {
+      setStills(new Map());
+      return undefined;
+    }
+
+    let cancelled = false;
+    Promise.all(seasons.map((season) => loadDiarySeasonStills(showId, season))).then((results) => {
+      if (cancelled) return;
+      const next = new Map();
+      for (const result of results) {
+        for (const [key, path] of result) next.set(key, path);
+      }
+      setStills(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [seasonSignature, showId]);
+
+  return stills;
 }
 
 // Mismo criterio que Historial: sólo se colapsan episodios consecutivos de la
@@ -905,12 +977,125 @@ function DiaryListItem({ item, viewerState, expanded, onToggle, nested = false }
   );
 }
 
+function DiaryGroupedEpisodeRow({ item, stillPath }) {
+  const previewClick = usePreviewOpen();
+  const episode = getDiaryEpisode(item);
+  const title = getItemTitle(item) || "Episodio";
+  // Una miniatura panorámica no debe reutilizar un póster vertical: se recorta
+  // y da una falsa sensación de backdrop. Sólo se muestra el still real del
+  // episodio (o un estado neutro si TMDb no dispone de él).
+  const imagePath = stillPath || item?.stillPath || item?.still_path || item?.backdropPath || item?.backdrop_path;
+  const href = episode
+    ? `/details/tv/${item.tmdbId}/season/${episode.season}/episode/${episode.episode}`
+    : `/details/tv/${item.tmdbId}`;
+
+  return (
+    <div className="group/subitem relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] transition-all duration-300 hover:border-white/10 hover:bg-white/[0.06]">
+      <Link
+        href={href}
+        onClick={previewClick(item, { mediaType: "tv", episode: getEpisodePreview(item) })}
+        className="flex items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70"
+      >
+        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
+          {imagePath ? (
+            <OptimizedImage src={`https://image.tmdb.org/t/p/w780${imagePath}`} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 pr-12 sm:pr-14">
+          <p className="text-sm font-bold text-emerald-300 sm:text-[15px]">{formatDiaryEpisode(episode) || "—"}</p>
+          <p className="mt-0.5 line-clamp-1 text-xs text-zinc-300 sm:text-sm">{title}</p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-500 transition-colors group-hover/subitem:text-emerald-400" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
+function DiaryGroupedEpisodesModal({ entry, onClose }) {
+  const [mounted, setMounted] = useState(false);
+  const previewClick = usePreviewOpen();
+  const episodes = Array.isArray(entry?.episodeGroup) ? entry.episodeGroup : [];
+  const title = getItemTitle(entry) || "Serie";
+  const posterPath = entry?.posterPath || entry?.poster_path;
+  const href = `/details/tv/${entry?.tmdbId || entry?.id}`;
+  const episodeStills = useDiaryEpisodeStills(entry?.tmdbId, episodes);
+
+  useEffect(() => setMounted(true), []);
+  useModalGuard({ open: mounted, onClose });
+
+  if (!mounted || !episodes.length) return null;
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6"
+      style={{ right: "var(--sv-drawer-width, 0px)" }}
+      data-detail-modal-layer=""
+      onClick={(event) => event.stopPropagation()}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }}
+        aria-hidden="true"
+      />
+      <motion.section
+        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diary-grouped-episodes-title"
+        aria-describedby="diary-grouped-episodes-description"
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        <div className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_42%)]" aria-hidden="true" />
+        <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-5 py-4 sm:px-8 sm:pb-6 sm:pt-8">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-inner sm:w-12">
+              {posterPath ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${posterPath}`} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+            </div>
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Serie</p>
+              <h2 id="diary-grouped-episodes-title" className="truncate text-lg font-black tracking-tight text-white sm:text-xl">
+                <Link href={href} onClick={previewClick(entry, { mediaType: "tv" })} className="transition-colors hover:text-emerald-300">{title}</Link>
+              </h2>
+              <p id="diary-grouped-episodes-description" className="mt-0.5 text-xs font-medium text-zinc-400 sm:text-sm">{episodes.length} episodios agrupados</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300" title="Cerrar (Esc)" aria-label="Cerrar episodios agrupados">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
+          {episodes.map((episode, index) => {
+            const episodeMeta = getDiaryEpisode(episode);
+            const stillPath = episodeMeta
+              ? episodeStills.get(diaryEpisodeStillKey(episodeMeta.season, episodeMeta.episode))
+              : null;
+            return <DiaryGroupedEpisodeRow key={`${episode.id || episode.tmdbId || "episode"}-${index}`} item={episode} stillPath={stillPath} />;
+          })}
+        </div>
+      </motion.section>
+    </motion.div>,
+    document.body,
+  );
+}
+
 function DiaryPosterItems({ items, view, viewerTitleStates }) {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
-  // Igual que el resto de superficies del Perfil, Diario usa la selección de
-  // portada inglesa de DetailsClient sin alterar el registro de historial.
-  const { items: posterItems, isResolving: isResolvingPosters } = useEnglishPosterItems(items, true, true, true);
-  const collapsedItems = useMemo(() => collapseDiaryEpisodes(posterItems), [posterItems]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const collapsedItems = useMemo(() => collapseDiaryEpisodes(items), [items]);
   const toggleGroup = (id) => {
     setExpandedGroups((current) => {
       const next = new Set(current);
@@ -919,10 +1104,6 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
       return next;
     });
   };
-
-  // No se insertan placeholders ni el artwork local: las tarjetas entran una
-  // vez resueltas sus portadas inglesas, igual que las demás filas del Perfil.
-  if (isResolvingPosters) return null;
 
   if (view === "list") {
     return (
@@ -971,6 +1152,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
       {collapsedItems.map((item) => {
         const group = item.episodeGroup;
         const grouped = group?.length > 1;
+        const compactCard = view === "compact";
         const key = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
         return (
           <div key={key} className="relative">
@@ -980,15 +1162,28 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
               viewerState={viewerTitleStates[titleStateKey(item)]}
               starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
               compactIndicator={view === "compact"}
+              onClick={grouped ? (event) => {
+                event.preventDefault();
+                setSelectedGroup(item);
+              } : undefined}
             />
             {grouped ? (
-              <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-lg bg-black/70 px-1.5 py-1 text-[10px] font-black tabular-nums text-emerald-200 shadow-lg backdrop-blur-md">
-                {group.length} eps.
-              </span>
+              <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
+                <div className={`pointer-events-none absolute left-0 top-0 z-20 flex scale-100 items-center justify-center rounded-br-2xl border-b border-r border-emerald-500/30 bg-emerald-500/15 text-emerald-300 opacity-100 shadow-sm backdrop-blur-md transition-all duration-300 ease-out ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
+                  <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
+                    <Layers className={compactCard ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} aria-hidden="true" />
+                    <span>{group.length}</span>
+                  </div>
+                </div>
+              </>
             ) : null}
           </div>
         );
       })}
+      <AnimatePresence>
+        {selectedGroup ? <DiaryGroupedEpisodesModal entry={selectedGroup} onClose={() => setSelectedGroup(null)} /> : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1087,6 +1282,11 @@ function ProfileContentSection({ username, section, actor }) {
   const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
+  // Diario colapsa varios episodios en una única tarjeta. Su sentinel puede
+  // quedar dentro del viewport tras la primera carga y disparar otra página
+  // antes del primer pintado estable, haciendo parpadear las últimas tarjetas.
+  // Las demás secciones no reducen su altura de esta forma.
+  const [diaryAutoLoadEnabled, setDiaryAutoLoadEnabled] = useState(() => section !== "watched");
   const loadMoreRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
@@ -1104,6 +1304,21 @@ function ProfileContentSection({ username, section, actor }) {
     initialPageSizeRef.current = profileInitialPageSize(config, nextControls);
     setControls(nextControls);
   }, [cacheKey, config, profileKey, section]);
+
+  // El infinito de Diario empieza con el primer desplazamiento real. Así se
+  // preserva la carga automática, pero la primera cuadrícula/lista no recibe
+  // una página extra mientras sus grupos de episodios aún se están asentando.
+  useEffect(() => {
+    if (section !== "watched") {
+      setDiaryAutoLoadEnabled(true);
+      return undefined;
+    }
+
+    setDiaryAutoLoadEnabled(false);
+    const enableAutoLoad = () => setDiaryAutoLoadEnabled(true);
+    window.addEventListener("scroll", enableAutoLoad, { passive: true, once: true });
+    return () => window.removeEventListener("scroll", enableAutoLoad);
+  }, [section]);
 
   const updateControls = (patch) => {
     setControls((current) => {
@@ -1247,6 +1462,7 @@ function ProfileContentSection({ username, section, actor }) {
       !hasMore ||
       loadingMore ||
       loadMoreError ||
+      (section === "watched" && !diaryAutoLoadEnabled) ||
       typeof IntersectionObserver === "undefined"
     ) {
       return undefined;
@@ -1262,7 +1478,7 @@ function ProfileContentSection({ username, section, actor }) {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, loadMoreError, loadingMore, status]);
+  }, [diaryAutoLoadEnabled, hasMore, loadMore, loadMoreError, loadingMore, section, status]);
 
   // En grid, una vista con más columnas puede dejar la última fila incompleta
   // aunque ya hubiese una página cargada. Pedimos exactamente las tarjetas que
@@ -1274,13 +1490,14 @@ function ProfileContentSection({ username, section, actor }) {
       (controls.view === "grid" || controls.view === "compact") &&
       hasMore &&
       !loadingMore &&
-      !loadMoreError;
+      !loadMoreError &&
+      (section !== "watched" || diaryAutoLoadEnabled);
     const columns = canCompleteGrid ? profileGridColumnCount(controls.view) : 0;
     const remainder = columns > 0 ? visibleItems.length % columns : 0;
     if (columns > 0 && remainder > 0) {
       loadMore({ limit: columns - remainder });
     }
-  }, [config?.layout, controls.view, effectiveGroup, hasMore, loadMore, loadMoreError, loadingMore, visibleItems.length]);
+  }, [config?.layout, controls.view, diaryAutoLoadEnabled, effectiveGroup, hasMore, loadMore, loadMoreError, loadingMore, section, visibleItems.length]);
 
   if (!config) return null;
 

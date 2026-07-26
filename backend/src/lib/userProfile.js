@@ -32,6 +32,9 @@ const PROFILE_ANALYTICS_HISTORY_LIMIT = 1500;
 const DEFAULT_MOVIE_RUNTIME_MINS = 100;
 const DEFAULT_EPISODE_RUNTIME_MINS = 45;
 const PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT = 5000;
+const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
+const profileEnglishPosterMemory = new Map();
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
 export function pageParams({ limit, offset } = {}) {
@@ -56,6 +59,131 @@ export function packPage(rows, limit, offset) {
 // el frontend: `mediaType:tmdbId`).
 export function titleKey(mediaType, tmdbId) {
   return `${mediaType}:${Number(tmdbId)}`;
+}
+
+function profileEnglishPosterCacheKey(mediaType, tmdbId) {
+  return `profile:english-poster:${titleKey(mediaType, tmdbId)}`;
+}
+
+function pickHighestQualityPoster(posters) {
+  if (!posters.length) return null;
+  const maxVotes = Math.max(...posters.map((poster) => Number(poster.vote_count) || 0));
+  return [...posters]
+    .filter((poster) => (Number(poster.vote_count) || 0) === maxVotes)
+    .sort((a, b) => {
+      const voteAverage = (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0);
+      if (voteAverage) return voteAverage;
+      return (Number(b.width) || 0) - (Number(a.width) || 0);
+    })[0] || null;
+}
+
+// Mismo criterio de DetailsClient: inglés, luego arte sin idioma y, por último,
+// cualquier alternativa que no sea española. Se exporta para cubrir el criterio
+// sin requerir red en los tests.
+export function pickBestEnglishPosterPath(posters) {
+  const valid = Array.isArray(posters)
+    ? posters.filter((poster) => typeof poster?.file_path === 'string' && poster.file_path)
+    : [];
+  const languageOf = (poster) => String(poster?.iso_639_1 || '').toLowerCase();
+  const english = valid.filter((poster) => ['en', 'en-us'].includes(languageOf(poster)));
+  const neutral = valid.filter((poster) => !poster?.iso_639_1);
+  const nonSpanish = valid.filter((poster) => !['es', 'es-es'].includes(languageOf(poster)));
+  const best = pickHighestQualityPoster(english.length ? english : neutral.length ? neutral : nonSpanish);
+  return best?.file_path || null;
+}
+
+async function mapWithConcurrency(values, worker, concurrency = PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY) {
+  const results = new Array(values.length);
+  let nextIndex = 0;
+  const run = async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(values[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, run));
+  return results;
+}
+
+async function resolveEnglishPosterPaths(db, items) {
+  const entries = [...new Map(
+    (items || [])
+      .filter((item) => Number(item?.tmdbId) && ['movie', 'tv'].includes(item?.mediaType))
+      .map((item) => [titleKey(item.mediaType, item.tmdbId), item]),
+  ).values()];
+  if (!entries.length) return new Map();
+
+  const now = new Date();
+  const resolved = new Map();
+  const cacheKeys = entries.map((item) => profileEnglishPosterCacheKey(item.mediaType, item.tmdbId));
+  for (const item of entries) {
+    const key = titleKey(item.mediaType, item.tmdbId);
+    const memory = profileEnglishPosterMemory.get(key);
+    if (memory?.expiresAt > now) resolved.set(key, memory.posterPath);
+  }
+
+  try {
+    const cachedRows = await db
+      .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data, expiresAt: tmdbCache.expiresAt })
+      .from(tmdbCache)
+      .where(inArray(tmdbCache.cacheKey, cacheKeys));
+    for (const row of cachedRows) {
+      const entry = entries.find((item) => profileEnglishPosterCacheKey(item.mediaType, item.tmdbId) === row.cacheKey);
+      const posterPath = row?.data?.posterPath;
+      const expiresAt = new Date(row.expiresAt);
+      const hasPosterDecision = Object.hasOwn(row?.data || {}, 'posterPath');
+      if (!entry || Number.isNaN(expiresAt.getTime()) || expiresAt <= now || !hasPosterDecision) continue;
+      const key = titleKey(entry.mediaType, entry.tmdbId);
+      resolved.set(key, posterPath);
+      profileEnglishPosterMemory.set(key, { posterPath, expiresAt });
+    }
+  } catch {
+    // La caché es una optimización: un fallo de lectura no bloquea el perfil.
+  }
+
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) return resolved;
+  const missing = entries.filter((item) => !resolved.has(titleKey(item.mediaType, item.tmdbId)));
+  const expiresAt = new Date(now.getTime() + PROFILE_ENGLISH_POSTER_TTL_MS);
+  await mapWithConcurrency(missing, async (item) => {
+    const key = titleKey(item.mediaType, item.tmdbId);
+    let posterPath = null;
+    let settled = false;
+    try {
+      const response = await fetch(
+        `https://api.themoviedb.org/3/${item.mediaType}/${item.tmdbId}/images?api_key=${apiKey}&include_image_language=en,null`,
+        { signal: AbortSignal.timeout(8000) },
+      );
+      if (response.ok) {
+        const payload = await response.json();
+        posterPath = pickBestEnglishPosterPath(payload?.posters);
+        settled = true;
+      }
+    } catch {
+      // Se conserva el póster de historial si TMDb no está disponible.
+    }
+    if (!settled) return null;
+
+    resolved.set(key, posterPath);
+    profileEnglishPosterMemory.set(key, { posterPath, expiresAt });
+    await db
+      .insert(tmdbCache)
+      .values({
+        cacheKey: profileEnglishPosterCacheKey(item.mediaType, item.tmdbId),
+        data: { posterPath },
+        fetchedAt: now,
+        expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: tmdbCache.cacheKey,
+        set: { data: { posterPath }, fetchedAt: now, expiresAt },
+      })
+      .catch(() => {});
+    return posterPath;
+  });
+
+  return resolved;
 }
 
 // ¿Puede `followerId` seguir a `followingId`? No a uno mismo, ambos requeridos.
@@ -827,6 +955,9 @@ export async function getUserReviews(db, targetId, opts = {}) {
 }
 
 // Genérico para watchlist/favorites (misma forma: título + póster + addedAt).
+// Las entradas antiguas pueden no conservar el artwork cacheado; se completa
+// antes de responder para que las vistas de Perfil no reemplacen portadas por
+// tarjetas de texto al refrescar su previa lateral.
 async function getSimpleTitleList(db, table, targetId, opts) {
   const { limit, offset } = pageParams(opts);
   const rows = await db
@@ -842,14 +973,16 @@ async function getSimpleTitleList(db, table, targetId, opts) {
     .orderBy(desc(table.addedAt))
     .limit(limit + 1)
     .offset(offset);
-  return packPage(rows, limit, offset);
+  const page = packPage(rows, limit, offset);
+  await fillMissingPosters(db, targetId, page.items);
+  return page;
 }
 
-export function getUserWatchlist(db, targetId, opts = {}) {
+export async function getUserWatchlist(db, targetId, opts = {}) {
   return getSimpleTitleList(db, watchlist, targetId, opts);
 }
 
-export function getUserFavorites(db, targetId, opts = {}) {
+export async function getUserFavorites(db, targetId, opts = {}) {
   return getSimpleTitleList(db, favorites, targetId, opts);
 }
 
@@ -902,7 +1035,10 @@ export async function getUserWatched(db, targetId, opts = {}) {
     })
     .from(watchHistory)
     .where(eq(watchHistory.userId, targetId))
-    .orderBy(desc(watchHistory.watchedAt), desc(watchHistory.createdAt))
+    // Las series completadas insertan varios episodios con la misma fecha.
+    // El ID deja el orden totalmente determinado entre páginas y evita que
+    // `offset` devuelva otra combinación de tarjetas en cada carga.
+    .orderBy(desc(watchHistory.watchedAt), desc(watchHistory.createdAt), desc(watchHistory.id))
     .limit(limit + 1)
     .offset(offset);
 
@@ -929,6 +1065,14 @@ export async function getUserWatched(db, targetId, opts = {}) {
   }));
   // watch_history se guarda a menudo sin póster: se resuelve aquí (serie/película).
   await fillMissingPosters(db, targetId, page.items);
+  // Diario recibe la misma selección de portada inglesa de DetailsClient antes
+  // de responder. Así la UI no necesita renderizar artwork español, placeholders
+  // ni una segunda pasada visual para sustituir cada tarjeta.
+  const englishPosters = await resolveEnglishPosterPaths(db, page.items);
+  page.items = page.items.map((item) => ({
+    ...item,
+    posterPath: englishPosters.get(titleKey(item.mediaType, item.tmdbId)) || item.posterPath,
+  }));
   return page;
 }
 

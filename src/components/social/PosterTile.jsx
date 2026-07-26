@@ -44,7 +44,7 @@ function episodePreviewOf(item, mediaType) {
   };
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default" }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -78,7 +78,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       : "h-9 w-10 text-xl";
 
   return (
-    <Link href={detailsHref(item)} onClick={previewClick(item, { mediaType, episode: episodePreviewOf(item, mediaType) })} className="group/card relative block">
+    <Link href={detailsHref(item)} onClick={onClick || previewClick(item, { mediaType, episode: episodePreviewOf(item, mediaType) })} className="group/card relative block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
 
         {/* Imagen del póster */}
