@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import OptimizedImage from "@/components/OptimizedImage";
-import { Search, X, Plus, Loader2, ImageOff, Check } from "lucide-react";
+import { Search, Trash2, Plus, Loader2, ImageOff, Check } from "lucide-react";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 const MAX_PER_TYPE = 5;
@@ -36,9 +36,86 @@ function payloadItem(item) {
   };
 }
 
-function FavoriteRow({ type, items, loaded, onRemove }) {
+function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
   const label = type === "movie" ? "Películas favoritas" : "Series favoritas";
   const posterItems = useEnglishPosterItems(items);
+  const dragRef = useRef(null);
+  const dragPreviewRef = useRef(null);
+  const [draggingKey, setDraggingKey] = useState(null);
+  const [dropTargetKey, setDropTargetKey] = useState(null);
+  const [deleteArmedKey, setDeleteArmedKey] = useState(null);
+  const [dragPreview, setDragPreview] = useState(null);
+
+  const clearDrag = () => {
+    dragRef.current = null;
+    setDraggingKey(null);
+    setDropTargetKey(null);
+    setDragPreview(null);
+  };
+
+  const moveDragPreview = (x, y) => {
+    if (dragPreviewRef.current) {
+      dragPreviewRef.current.style.translate = `${x + 14}px ${y + 14}px`;
+    }
+  };
+
+  const onPointerDown = (event, item) => {
+    if (event.button !== 0 || !item) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const { width, height } = event.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      key: keyOf(item),
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      width,
+      height,
+      item,
+      didDrag: false,
+      targetKey: null,
+    };
+  };
+
+  const onPointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.didDrag && distance < 8) return;
+    if (!drag.didDrag) {
+      drag.didDrag = true;
+      setDragPreview({
+        item: drag.item,
+        width: drag.width,
+        height: drag.height,
+        x: event.clientX + 14,
+        y: event.clientY + 14,
+      });
+    }
+    moveDragPreview(event.clientX, event.clientY);
+
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest("[data-profile-favorite-card]");
+    const targetKey = target?.dataset.profileFavoriteCard || null;
+    drag.targetKey = targetKey && targetKey !== drag.key ? targetKey : null;
+    setDraggingKey(drag.key);
+    setDropTargetKey(drag.targetKey);
+  };
+
+  const onPointerEnd = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+
+    if (drag.didDrag) {
+      if (drag.targetKey) onReorder(type, drag.key, drag.targetKey);
+      setDeleteArmedKey(null);
+    } else if (event.pointerType !== "mouse") {
+      setDeleteArmedKey((current) => (current === drag.key ? null : drag.key));
+    }
+    clearDrag();
+  };
 
   return (
     <section aria-labelledby={`profile-favorites-${type}`}>
@@ -58,10 +135,24 @@ function FavoriteRow({ type, items, loaded, onRemove }) {
             return <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />;
           }
           if (item) {
+            const itemKey = keyOf(item);
+            const deleteArmed = deleteArmedKey === itemKey;
             return (
               <div
-                key={keyOf(item)}
-                className="group relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10"
+                key={itemKey}
+                data-profile-favorite-card={itemKey}
+                onPointerDown={(event) => onPointerDown(event, item)}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerEnd}
+                onPointerCancel={clearDrag}
+                onDragStart={(event) => event.preventDefault()}
+                className={`group relative aspect-[2/3] touch-none overflow-hidden rounded-xl bg-zinc-900 ring-1 transition-[transform,box-shadow,ring-color] duration-150 select-none ${
+                  draggingKey === itemKey
+                    ? "z-10 scale-[0.96] cursor-grabbing opacity-45 ring-emerald-300/90 shadow-[0_12px_24px_rgba(16,185,129,0.25)]"
+                    : dropTargetKey === itemKey
+                      ? "scale-[1.035] cursor-grab ring-emerald-300/90 shadow-[0_0_0_2px_rgba(16,185,129,0.18)]"
+                      : "cursor-grab ring-white/10"
+                }`}
               >
                 {item.posterPath ? (
                   <OptimizedImage
@@ -77,11 +168,17 @@ function FavoriteRow({ type, items, loaded, onRemove }) {
                 )}
                 <button
                   type="button"
-                  onClick={() => onRemove(item)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(item);
+                  }}
                   aria-label={`Quitar ${item.title || label}`}
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity hover:bg-red-500 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 group-hover:opacity-100"
+                  className={`absolute right-1 top-1 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-red-500 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 ${
+                    deleteArmed ? "scale-100 opacity-100" : "scale-90 opacity-0 group-hover:scale-100 group-hover:opacity-100"
+                  }`}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             );
@@ -97,6 +194,31 @@ function FavoriteRow({ type, items, loaded, onRemove }) {
           );
         })}
       </div>
+      {dragPreview ? (
+        <div
+          ref={dragPreviewRef}
+          aria-hidden="true"
+          className="pointer-events-none fixed left-0 top-0 z-50 overflow-hidden rounded-xl bg-zinc-900 shadow-[0_20px_42px_rgba(0,0,0,0.5)] ring-2 ring-emerald-300/90 will-change-transform"
+          style={{
+            width: dragPreview.width,
+            height: dragPreview.height,
+            translate: `${dragPreview.x}px ${dragPreview.y}px`,
+          }}
+        >
+          {dragPreview.item.posterPath ? (
+            <OptimizedImage
+              src={`https://image.tmdb.org/t/p/w342${dragPreview.item.posterPath}`}
+              alt=""
+              className="h-full w-full object-cover"
+              priority
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-zinc-700">
+              <ImageOff className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -113,6 +235,7 @@ export default function ProfileFavoritesEditor() {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const reqIdRef = useRef(0);
+  const persistRequestRef = useRef(0);
 
   useEffect(() => () => {
     if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
@@ -171,6 +294,7 @@ export default function ProfileFavoritesEditor() {
   }, [query]);
 
   const persist = async (next) => {
+    const requestId = ++persistRequestRef.current;
     setSaving(true);
     setSavedTick(false);
     try {
@@ -183,7 +307,9 @@ export default function ProfileFavoritesEditor() {
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (response.ok) setItemsByType(normalizeGroups(data));
+      if (response.ok && requestId === persistRequestRef.current) {
+        setItemsByType(normalizeGroups(data));
+      }
       if (response.ok) {
         setSavedTick(true);
         if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
@@ -222,6 +348,20 @@ export default function ProfileFavoritesEditor() {
     persist(next);
   };
 
+  const reorder = (type, sourceKey, targetKey) => {
+    if (type !== "movie" && type !== "tv" || sourceKey === targetKey) return;
+    const currentItems = itemsByType[type];
+    const sourceIndex = currentItems.findIndex((item) => keyOf(item) === sourceKey);
+    const targetIndex = currentItems.findIndex((item) => keyOf(item) === targetKey);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const reordered = [...currentItems];
+    [reordered[sourceIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[sourceIndex]];
+    const next = { ...itemsByType, [type]: reordered };
+    setItemsByType(next);
+    persist(next);
+  };
+
   const completelyFull = itemsByType.movie.length >= MAX_PER_TYPE && itemsByType.tv.length >= MAX_PER_TYPE;
 
   return (
@@ -239,8 +379,8 @@ export default function ProfileFavoritesEditor() {
       </p>
 
       <div className="space-y-5">
-        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} onRemove={remove} />
-        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} onRemove={remove} />
+        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} onRemove={remove} onReorder={reorder} />
+        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} onRemove={remove} onReorder={reorder} />
       </div>
 
       {!completelyFull && (
