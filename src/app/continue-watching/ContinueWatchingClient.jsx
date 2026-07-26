@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import {
   Tv,
   Play,
@@ -565,6 +566,8 @@ const ProgressCard = memo(function ProgressCard({
   const platformIconUrl = platformIcon(item.platform);
   const lastWatched = formatLastWatched(item.lastWatchedAt);
   const animDelay = Math.min(index * 0.05, 0.4);
+  // Al volver atrás/adelante NO se anima la entrada: la página se ve estática.
+  const isBackNav = useIsHistoryNavigation();
 
   // Estado de confirmación por tarjeta. Al salir del modo borrar se resetea.
   const [confirmDel, setConfirmDel] = useState(false);
@@ -590,7 +593,7 @@ const ProgressCard = memo(function ProgressCard({
 
   if (viewMode === "compact") {
     return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
+      <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="relative block overflow-hidden rounded-xl bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
@@ -660,7 +663,7 @@ const ProgressCard = memo(function ProgressCard({
 
   if (viewMode === "poster") {
     return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}>
+      <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartImage item={item} kind="poster" alt={title} />
@@ -695,7 +698,7 @@ const ProgressCard = memo(function ProgressCard({
 
   // ==== CARDS (por defecto) ====
   return (
-    <motion.div initial={{ opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4, delay: animDelay, ease: [0.25, 0.46, 0.45, 0.94] }}>
+    <motion.div initial={isBackNav ? false : { opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4, delay: isBackNav ? 0 : animDelay, ease: [0.25, 0.46, 0.45, 0.94] }}>
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
