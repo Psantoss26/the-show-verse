@@ -18,7 +18,30 @@ function mediaTypeOf(item) {
 }
 
 function detailsHref(item) {
-  return `/details/${mediaTypeOf(item)}/${item?.tmdbId || item?.id}`;
+  const mediaType = mediaTypeOf(item);
+  const season = Number(item?.season ?? item?.seasonNumber ?? item?.season_number);
+  const episode = Number(item?.episode ?? item?.episodeNumber ?? item?.episode_number);
+  if (
+    mediaType === "tv" &&
+    Number.isInteger(season) && season >= 0 &&
+    Number.isInteger(episode) && episode >= 0
+  ) {
+    return `/details/tv/${item?.tmdbId || item?.id}/season/${season}/episode/${episode}`;
+  }
+  return `/details/${mediaType}/${item?.tmdbId || item?.id}`;
+}
+
+function episodePreviewOf(item, mediaType) {
+  if (mediaType !== "tv") return undefined;
+  const seasonNumber = Number(item?.season ?? item?.seasonNumber ?? item?.season_number);
+  const episodeNumber = Number(item?.episode ?? item?.episodeNumber ?? item?.episode_number);
+  if (!Number.isInteger(seasonNumber) || seasonNumber < 0 || !Number.isInteger(episodeNumber) || episodeNumber < 0) return undefined;
+  return {
+    showId: item?.tmdbId || item?.id,
+    seasonNumber,
+    episodeNumber,
+    showName: item?.title || item?.name || null,
+  };
 }
 
 export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default" }) {
@@ -55,7 +78,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       : "h-9 w-10 text-xl";
 
   return (
-    <Link href={detailsHref(item)} onClick={previewClick(item, { mediaType })} className="group/card relative block">
+    <Link href={detailsHref(item)} onClick={previewClick(item, { mediaType, episode: episodePreviewOf(item, mediaType) })} className="group/card relative block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
 
         {/* Imagen del póster */}

@@ -33,6 +33,7 @@ import Stars from "@/components/social/Stars";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { useAuth } from "@/context/AuthContext";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -68,6 +69,15 @@ function getItemDate(item) {
 function getItemRating(item) {
   const rating = Number(item?.rating ?? item?.userRating ?? item?.user_rating ?? 0);
   return Number.isFinite(rating) ? rating : 0;
+}
+
+// Las secciones pueden contener registros históricos del mismo título. La
+// identidad visual debe ser el id de la fila y no sólo el TMDb id; de lo
+// contrario React reutiliza/duplica tarjetas cuando se ordena o pagina.
+function profileItemKey(item, index = 0) {
+  if (item?.id) return `record:${item.id}`;
+  const date = getItemDate(item)?.getTime() || "undated";
+  return `${getItemMediaType(item)}:${item?.tmdbId || item?.id || "unknown"}:${date}:${index}`;
 }
 
 function hasActivityPoster(item) {
@@ -294,7 +304,10 @@ function getSectionPreference(cacheKey, section, profileKey) {
 const profileSectionCache = new Map();
 
 function profileSectionCacheKey(username, section) {
-  return `${String(username || "").trim().toLocaleLowerCase()}:${section}`;
+  // Diario pasó de títulos deduplicados a registros de historial. Versionar la
+  // clave evita restaurar en esta sesión la instantánea anterior al cambio.
+  const version = section === "watched" ? "v2" : "v1";
+  return `${String(username || "").trim().toLocaleLowerCase()}:${section}:${version}`;
 }
 
 function relativeActivityTime(value) {
@@ -835,6 +848,151 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
   );
 }
 
+function DiaryListItem({ item, viewerState, expanded, onToggle, nested = false }) {
+  const previewClick = usePreviewOpen();
+  const type = getItemMediaType(item);
+  const episode = getDiaryEpisode(item);
+  const episodeGroup = Array.isArray(item?.episodeGroup) ? item.episodeGroup : null;
+  const grouped = episodeGroup?.length > 1;
+  const title = getItemTitle(item) || "Sin título";
+  const src = item?.posterPath || item?.poster_path;
+  const date = getItemDate(item);
+  const href = type === "tv" && episode
+    ? `/details/tv/${item.tmdbId}/season/${episode.season}/episode/${episode.episode}`
+    : `/details/${type}/${item?.tmdbId || item?.id}`;
+  const rating = viewerState?.rating ?? item?.rating;
+
+  return (
+    <article className={`rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg ${nested ? "ml-5 border-l border-emerald-400/20 pl-3" : ""}`}>
+      <div className="flex min-w-0 items-center gap-3 p-2.5">
+        <Link
+          href={href}
+          onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
+          className="h-20 w-[3.55rem] shrink-0 overflow-hidden rounded-xl bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+          aria-label={`Ver ${title}`}
+        >
+          {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="block truncate text-sm font-bold text-white transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70">
+            {title}
+          </Link>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+            {grouped ? (
+              <span className="font-semibold text-emerald-300">{episodeGroup.length} episodios</span>
+            ) : episode ? (
+              <span className="font-semibold text-emerald-300">{formatDiaryEpisode(episode)}</span>
+            ) : (
+              <span>Película</span>
+            )}
+            {grouped && formatDiaryEpisodeRange(episodeGroup) ? <span>{formatDiaryEpisodeRange(episodeGroup)}</span> : null}
+            {date ? <time dateTime={date.toISOString()}>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date)}</time> : null}
+          </div>
+        </div>
+        {grouped ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-emerald-300 transition hover:bg-emerald-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            aria-label={expanded ? "Ocultar episodios" : "Mostrar episodios"}
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+          </button>
+        ) : Number(rating) > 0 ? <span className="pr-1 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
+      </div>
+    </article>
+  );
+}
+
+function DiaryPosterItems({ items, view, viewerTitleStates }) {
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  // Igual que el resto de superficies del Perfil, Diario usa la selección de
+  // portada inglesa de DetailsClient sin alterar el registro de historial.
+  const { items: posterItems, isResolving: isResolvingPosters } = useEnglishPosterItems(items, true, true, true);
+  const collapsedItems = useMemo(() => collapseDiaryEpisodes(posterItems), [posterItems]);
+  const toggleGroup = (id) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // No se insertan placeholders ni el artwork local: las tarjetas entran una
+  // vez resueltas sus portadas inglesas, igual que las demás filas del Perfil.
+  if (isResolvingPosters) return null;
+
+  if (view === "list") {
+    return (
+      <div className="space-y-2">
+        {collapsedItems.map((item) => {
+          const group = item.episodeGroup;
+          const groupId = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
+          const expanded = expandedGroups.has(groupId);
+          return (
+            <div key={groupId} className="space-y-2">
+              <DiaryListItem
+                item={item}
+                viewerState={viewerTitleStates[titleStateKey(item)]}
+                expanded={expanded}
+                onToggle={() => toggleGroup(groupId)}
+              />
+              <AnimatePresence initial={false}>
+                {group?.length > 1 && expanded ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    {group.map((episode) => (
+                      <DiaryListItem
+                        key={episode.id}
+                        item={episode}
+                        viewerState={viewerTitleStates[titleStateKey(episode)]}
+                        nested
+                      />
+                    ))}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
+      {collapsedItems.map((item) => {
+        const group = item.episodeGroup;
+        const grouped = group?.length > 1;
+        const key = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
+        return (
+          <div key={key} className="relative">
+            <PosterTile
+              item={item}
+              showStars
+              viewerState={viewerTitleStates[titleStateKey(item)]}
+              starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
+              compactIndicator={view === "compact"}
+            />
+            {grouped ? (
+              <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-lg bg-black/70 px-1.5 py-1 text-[10px] font-black tabular-nums text-emerald-200 shadow-lg backdrop-blur-md">
+                {group.length} eps.
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProfileGroupHeading({ children }) {
   return (
     <h2 className="mb-3 flex items-center gap-2 border-b border-emerald-400/15 pb-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
@@ -858,9 +1016,9 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
   if (view === "list") {
     return (
       <div className="space-y-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <ProfileMediaListItem
-            key={`${getItemMediaType(item)}:${item.tmdbId || item.id}`}
+            key={profileItemKey(item, index)}
             item={item}
             showStars={showStars}
             viewerState={viewerTitleStates[titleStateKey(item)]}
@@ -872,9 +1030,9 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
 
   return (
     <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <PosterTile
-          key={`${getItemMediaType(item)}:${item.tmdbId || item.id}`}
+          key={profileItemKey(item, index)}
           item={item}
           showStars={showStars}
           viewerState={viewerTitleStates[titleStateKey(item)]}
@@ -899,6 +1057,25 @@ function profileGridColumnCount(view) {
   return 3;
 }
 
+// La primera página debe cerrar exactamente la última fila de la cuadrícula.
+// Antes siempre se pedían 30 títulos: en la compacta de escritorio (8
+// columnas) se pintaban seis de la cuarta fila y una segunda petición añadía
+// los dos restantes, produciendo el parpadeo de entrada.
+function profileInitialPageSize(config, controls) {
+  if (
+    config?.layout !== "posters" ||
+    controls?.group !== "none" ||
+    (controls?.view !== "grid" && controls?.view !== "compact")
+  ) {
+    return 30;
+  }
+
+  const columns = profileGridColumnCount(controls.view);
+  if (!columns) return 30;
+  const remainder = 30 % columns;
+  return remainder === 0 ? 30 : 30 + (columns - remainder);
+}
+
 function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
@@ -915,6 +1092,7 @@ function ProfileContentSection({ username, section, actor }) {
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
   const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
   const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section, profileKey));
+  const initialPageSizeRef = useRef(30);
 
   // La lectura se realiza antes del primer pintado del navegador para que la
   // cuadrícula/lista/compacta guardada no llegue a verse como el modo por
@@ -922,8 +1100,10 @@ function ProfileContentSection({ username, section, actor }) {
   useLayoutEffect(() => {
     const storedView = readStoredProfileView(profileKey);
     if (storedView) profileViewPreferences.set(profileKey, storedView);
-    setControls(getSectionPreference(cacheKey, section, profileKey));
-  }, [cacheKey, profileKey, section]);
+    const nextControls = getSectionPreference(cacheKey, section, profileKey);
+    initialPageSizeRef.current = profileInitialPageSize(config, nextControls);
+    setControls(nextControls);
+  }, [cacheKey, config, profileKey, section]);
 
   const updateControls = (patch) => {
     setControls((current) => {
@@ -996,8 +1176,9 @@ function ProfileContentSection({ username, section, actor }) {
     setLoadMoreError(false);
     (async () => {
       try {
+        const initialPageSize = initialPageSizeRef.current;
         const res = await fetch(
-          `/api/users/${encodeURIComponent(username)}/${section}?limit=30&offset=0`,
+          `/api/users/${encodeURIComponent(username)}/${section}?limit=${initialPageSize}&offset=0`,
           { cache: "no-store" },
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1020,7 +1201,7 @@ function ProfileContentSection({ username, section, actor }) {
     return () => {
       cancelled = true;
     };
-  }, [username, section, cacheKey]);
+  }, [username, section, cacheKey, config]);
 
   const loadMore = useCallback(async ({ limit = 30 } = {}) => {
     if (loadingMoreRef.current || !hasMore) return;
@@ -1147,12 +1328,20 @@ function ProfileContentSection({ username, section, actor }) {
                   : <ProfileGroupHeading>{group.label}</ProfileGroupHeading>
                 : null}
               {config.layout === "posters" ? (
-                <ProfilePosterItems
-                  items={group.items}
-                  view={menuEnabled ? controls.view : "grid"}
-                  showStars={config.showStars}
-                  viewerTitleStates={viewerTitleStates}
-                />
+                section === "watched" ? (
+                  <DiaryPosterItems
+                    items={group.items}
+                    view={menuEnabled ? controls.view : "grid"}
+                    viewerTitleStates={viewerTitleStates}
+                  />
+                ) : (
+                  <ProfilePosterItems
+                    items={group.items}
+                    view={menuEnabled ? controls.view : "grid"}
+                    showStars={config.showStars}
+                    viewerTitleStates={viewerTitleStates}
+                  />
+                )
               ) : null}
               {config.layout === "reviews" ? (
                 <div className="space-y-3">
