@@ -11,12 +11,25 @@ import {
   countCompletedShows,
   pageParams,
   packPage,
+  pickBestEnglishPosterPath,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
 
 test('titleKey combines mediaType and numeric id', () => {
   assert.equal(titleKey('movie', 27205), 'movie:27205');
   assert.equal(titleKey('tv', '1399'), 'tv:1399');
+});
+
+test('pickBestEnglishPosterPath keeps the DetailsClient artwork priority', () => {
+  const posters = [
+    { file_path: '/spanish.jpg', iso_639_1: 'es', vote_count: 100 },
+    { file_path: '/neutral.jpg', iso_639_1: null, vote_count: 80 },
+    { file_path: '/english-low.jpg', iso_639_1: 'en', vote_count: 2, width: 1200 },
+    { file_path: '/english-best.jpg', iso_639_1: 'en', vote_count: 8, width: 900 },
+  ];
+  assert.equal(pickBestEnglishPosterPath(posters), '/english-best.jpg');
+  assert.equal(pickBestEnglishPosterPath(posters.slice(0, 2)), '/neutral.jpg');
+  assert.equal(pickBestEnglishPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), null);
 });
 
 test('canFollow rejects self-follow and missing ids', () => {

@@ -23,14 +23,8 @@ function posterKey(item) {
  * de DetailsClient. Si la consulta no devuelve artwork válido, mantiene el
  * posterPath recibido de la BBDD como fallback.
  */
-export function useEnglishPosterItems(
-  items,
-  enabled = true,
-  hideFallbackUntilResolved = false,
-  returnStatus = false,
-) {
+export function useEnglishPosterItems(items, enabled = true) {
   const [resolvedPosters, setResolvedPosters] = useState(() => new Map());
-  const [settledPosterKeys, setSettledPosterKeys] = useState(() => new Set());
   const itemKeys = useMemo(
     () => (items || []).map(posterKey).filter(Boolean).join("|"),
     [items],
@@ -51,18 +45,6 @@ export function useEnglishPosterItems(
       }
       return changed ? next : current;
     });
-    setSettledPosterKeys((current) => {
-      const next = new Set(current);
-      let changed = false;
-      for (const key of itemKeys.split("|")) {
-        if (englishPosterCache.has(key) && !next.has(key)) {
-          next.add(key);
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
-
     const missingItems = [];
     const seen = new Set();
     for (const item of items || []) {
@@ -76,18 +58,12 @@ export function useEnglishPosterItems(
     let cancelled = false;
     void Promise.all(
       missingItems.map(async ({ key, item }) => {
-        try {
-          const mediaType = key.startsWith("tv:") ? "tv" : "movie";
-          const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
-          const images = await fetchTmdbImages(mediaType, tmdbId);
-          const posterPath = pickBestEnglishPoster(images?.posters || [])?.file_path || null;
-          if (posterPath) englishPosterCache.set(key, posterPath);
-          return [key, posterPath];
-        } catch {
-          // La superficie que oculta el fallback se revela igualmente con el
-          // artwork persistido si TMDb no puede resolver una alternativa.
-          return [key, null];
-        }
+        const mediaType = key.startsWith("tv:") ? "tv" : "movie";
+        const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
+        const images = await fetchTmdbImages(mediaType, tmdbId);
+        const posterPath = pickBestEnglishPoster(images?.posters || [])?.file_path || null;
+        if (posterPath) englishPosterCache.set(key, posterPath);
+        return [key, posterPath];
       }),
     ).then((entries) => {
       if (cancelled) return;
@@ -102,17 +78,6 @@ export function useEnglishPosterItems(
         }
         return changed ? next : current;
       });
-      setSettledPosterKeys((current) => {
-        const next = new Set(current);
-        let changed = false;
-        for (const [key] of entries) {
-          if (!next.has(key)) {
-            next.add(key);
-            changed = true;
-          }
-        }
-        return changed ? next : current;
-      });
     });
 
     return () => {
@@ -120,29 +85,13 @@ export function useEnglishPosterItems(
     };
   }, [enabled, itemKeys, items]);
 
-  const posterItems = useMemo(
+  return useMemo(
     () => (items || []).map((item) => {
       const key = posterKey(item);
-      // La caché compartida puede ya contener la elección inglesa de otra
-      // superficie. Léela también durante el render para no pintar el fallback
-      // original durante un frame antes de que el efecto sincronice el estado.
-      const posterPath = resolvedPosters.get(key) || englishPosterCache.get(key);
+      const posterPath = resolvedPosters.get(key);
       if (posterPath) return { ...item, posterPath, poster_path: posterPath };
-      if (enabled && hideFallbackUntilResolved && key && !settledPosterKeys.has(key)) {
-        return { ...item, posterPath: null, poster_path: null };
-      }
       return item;
     }),
-    [enabled, hideFallbackUntilResolved, items, resolvedPosters, settledPosterKeys],
+    [items, resolvedPosters],
   );
-
-  const isResolving = useMemo(
-    () => enabled && (items || []).some((item) => {
-      const key = posterKey(item);
-      return key && !englishPosterCache.has(key) && !settledPosterKeys.has(key);
-    }),
-    [enabled, items, settledPosterKeys],
-  );
-
-  return returnStatus ? { items: posterItems, isResolving } : posterItems;
 }
