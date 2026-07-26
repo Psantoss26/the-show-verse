@@ -10,6 +10,7 @@
     "deploy:check": "NODE_ENV=production node src/scripts/check-deploy.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node src/db/migrate.js",
+    "activity:group-legacy-show": "node src/scripts/group-legacy-show-activity.js",
     "db:studio": "drizzle-kit studio",
     "db:seed": "node src/db/seed.js",
     "test": "DATABASE_URL=${DATABASE_URL:-postgresql://ci:ci@127.0.0.1:5432/ci_test} node --test src/**/*.test.js"
