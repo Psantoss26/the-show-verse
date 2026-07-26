@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
@@ -375,9 +377,28 @@ function SidebarActivityText({ item }) {
   return <><span className="text-zinc-300">ha visto </span><span className="text-zinc-300">{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
 }
 
+// Revelado "punto a punto" del timeline de actividad lateral: la línea se dibuja
+// de arriba abajo mientras cada punto y su fila entran escalonados (no de golpe).
+const activityTimelineContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.13, delayChildren: 0.06 } },
+};
+const activityTimelineRow = {
+  hidden: { opacity: 0, x: -6 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+};
+const activityTimelineDot = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: { scale: 1, opacity: 1, transition: { type: "spring", stiffness: 480, damping: 20 } },
+};
+
 function ActivitySidebarPreview({ username, onOpen }) {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
+  // Al volver atrás o con "reducir movimiento" NO se anima: se pinta estático.
+  const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const animate = !isBackNav && !reduceMotion;
 
   useEffect(() => {
     let cancelled = false;
@@ -410,19 +431,37 @@ function ActivitySidebarPreview({ username, onOpen }) {
           {[0, 1, 2].map((index) => <div key={index} className="h-8 animate-pulse rounded-md bg-white/[0.035]" />)}
         </div>
       ) : items.length ? (
-        <ol className="relative ml-1 space-y-3.5 border-l border-white/15 py-1" role="list">
+        <motion.ol
+          className="relative ml-1 space-y-3.5 py-1"
+          role="list"
+          variants={activityTimelineContainer}
+          initial={animate ? "hidden" : false}
+          animate="visible"
+        >
           {items.map((item) => (
-            <li key={item.id} className="relative pl-4">
-              <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400/90 ring-4 ring-black shadow-[0_0_8px_rgba(52,211,153,0.4)]" aria-hidden="true" />
+            <motion.li key={item.id} className="relative pl-4" variants={activityTimelineRow}>
+              <motion.span
+                variants={activityTimelineDot}
+                className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400/90 ring-4 ring-black shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                aria-hidden="true"
+              />
               <p className="text-[13px] leading-5 text-zinc-300">
                 <SidebarActivityText item={item} />
               </p>
               <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-semibold text-zinc-400">
                 {relativeSidebarActivityTime(item.createdAt)}
               </time>
-            </li>
+            </motion.li>
           ))}
-        </ol>
+          {/* Línea vertical que se "dibuja" de arriba abajo acompañando a los puntos. */}
+          <motion.span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 bottom-0 w-px origin-top bg-white/15"
+            initial={animate ? { scaleY: 0 } : false}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: Math.max(0.4, items.length * 0.13 + 0.25), ease: [0.22, 1, 0.36, 1] }}
+          />
+        </motion.ol>
       ) : (
         <button
           type="button"

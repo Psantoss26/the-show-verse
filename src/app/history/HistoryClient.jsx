@@ -3396,9 +3396,9 @@ export default function HistoryClient() {
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.5 }}
+                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
@@ -3410,9 +3410,9 @@ export default function HistoryClient() {
                   />
                 </motion.div>
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.6 }}
+                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
@@ -3424,9 +3424,9 @@ export default function HistoryClient() {
                   />
                 </motion.div>
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.7 }}
+                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
@@ -3438,9 +3438,9 @@ export default function HistoryClient() {
                   />
                 </motion.div>
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: 0.8 }}
+                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
                   className="w-full min-w-0"
                 >
                   <StatCard

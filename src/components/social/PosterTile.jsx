@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import OptimizedImage from "@/components/OptimizedImage";
 import { BookmarkPlus, Eye, Heart, ImageOff } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -44,7 +45,7 @@ function episodePreviewOf(item, mediaType) {
   };
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", onClick }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -78,8 +79,23 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       : "h-9 w-10 text-xl";
 
   return (
-    <Link href={detailsHref(item)} onClick={onClick || previewClick(item, { mediaType, episode: episodePreviewOf(item, mediaType) })} className="group/card relative block">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300">
+    <Link
+      href={detailsHref(item)}
+      onClick={onClick || previewClick(item, { mediaType, episode: episodePreviewOf(item, mediaType) })}
+      className={`group/card relative block ${hoverExpand ? "z-0 overflow-visible focus-within:z-[40] hover:z-[50]" : ""}`}
+    >
+      <motion.div
+        className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300"
+        whileHover={hoverExpand ? {
+          scale: 1.15,
+          zIndex: 100,
+          boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+        } : undefined}
+        transition={hoverExpand
+          ? { type: "spring", stiffness: 300, damping: 20 }
+          : { duration: 0.3 }}
+        style={hoverExpand ? { transformOrigin: "center center" } : undefined}
+      >
 
         {/* Imagen del póster */}
         {src && !failed ? (
@@ -125,7 +141,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
           </div>
         )}
 
-      </div>
+      </motion.div>
 
       {showStars && typeof item?.rating === "number" && (
         <div className="mt-1.5 flex justify-center">

@@ -3269,9 +3269,9 @@ export default function FavoritesClient() {
         {/* Header */}
         <motion.header
           className="mb-6 sm:mb-10"
-          initial={{ opacity: 0, y: -20 }}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -3289,9 +3289,9 @@ export default function FavoritesClient() {
                 {/* Action buttons next to title */}
                 <div className="flex items-center gap-2">
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4, delay: 0.3 }}
+                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
                   >
                     <LiquidButton
                       onClick={() => window.location.reload()}
@@ -3309,9 +3309,9 @@ export default function FavoritesClient() {
                   </motion.div>
 
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4, delay: 0.4 }}
+                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
                   >
                     <LiquidButton
                       onClick={handleTmdbLogout}
@@ -3335,9 +3335,9 @@ export default function FavoritesClient() {
             {!loading && (
               <motion.div
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-                initial={{ opacity: 0, y: 20 }}
+                initial={isBackNav ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
+                transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
               >
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-red-400">
