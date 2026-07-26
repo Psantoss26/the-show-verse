@@ -501,6 +501,14 @@ function formatStarValue(value) {
 function StarRatingHistogram({ histogram }) {
   const ratings = buildHalfStarHistogram(histogram);
   const max = Math.max(1, ...ratings.map((item) => item.value));
+  const [selectedStar, setSelectedStar] = useState(null);
+  const handleStarSelection = useCallback((star) => {
+    // El estado fijado es una alternativa al hover solo para pantallas táctiles.
+    // En escritorio el globo sigue siendo estrictamente temporal al pasar el
+    // cursor por la barra, sin posibilidad de dejarlo fijado con un clic.
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    setSelectedStar((current) => current === star ? null : star);
+  }, []);
   // Entrada: cada barra "crece" desde su base, escalonada de izquierda a derecha.
   // No se anima al volver atrás ni con "reducir movimiento".
   const isBackNav = useIsHistoryNavigation();
@@ -515,35 +523,55 @@ function StarRatingHistogram({ histogram }) {
         {ratings.map((item, index) => {
           const starText = `${formatStarValue(item.star)} ${item.star === 1 ? "estrella" : "estrellas"}`;
           const label = `${item.value} valoraciones con ${starText}`;
+          const isSelected = selectedStar === item.star;
           return (
             <li
               key={item.star}
-              className="group relative flex h-full min-w-0 flex-1 items-end"
+              className="relative flex h-full min-w-0 flex-1 items-end"
             >
-              <span className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-30 w-max -translate-x-1/2 rounded-2xl ${LIQUID_GLASS_TOOLTIP} px-3 py-2 text-center text-xs font-bold text-white opacity-0 translate-y-1.5 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 will-change-transform transform-gpu shadow-2xl`}>
-                <span className="block text-white font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{item.value} {item.value === 1 ? "valoración" : "valoraciones"}</span>
-                <span className="mt-0.5 inline-flex items-center justify-center gap-1 text-emerald-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  <Star className="h-3 w-3 fill-current" aria-hidden="true" />
-                  <span className="text-zinc-200 font-semibold">{starText}</span>
-                </span>
-              </span>
-              {/* Envoltorio que anima el crecimiento (scaleY desde la base); el
-                  <span> interior conserva el hover (scale-x) sin conflicto. */}
-              <motion.span
-                className="block w-full origin-bottom"
-                style={{ height: `${Math.max(5, (item.value / max) * 100)}%` }}
-                initial={animate ? { scaleY: 0 } : false}
-                animate={{ scaleY: 1 }}
-                transition={{ duration: 0.55, delay: animate ? 0.28 + index * 0.045 : 0, ease: [0.22, 1, 0.36, 1] }}
-                aria-hidden="true"
+              <button
+                type="button"
+                aria-label={label}
+                aria-pressed={isSelected}
+                onClick={() => handleStarSelection(item.star)}
+                className="group relative flex h-full w-full min-w-0 items-end border-0 bg-transparent p-0 text-left focus-visible:outline-none"
               >
-                <span className="block h-full w-full rounded-t-sm bg-gradient-to-t from-slate-500/85 to-slate-300/90 transition-transform duration-200 group-hover:scale-x-110 group-hover:from-emerald-500/80 group-hover:to-emerald-300" />
-              </motion.span>
-              <span className="sr-only">{label}</span>
+                <span
+                  className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-30 w-max -translate-x-1/2 rounded-2xl ${LIQUID_GLASS_TOOLTIP} px-3 py-2 text-center text-xs font-bold text-white opacity-0 translate-y-1.5 scale-95 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-visible:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:scale-100 ${isSelected ? "opacity-100 translate-y-0 scale-100" : ""} will-change-transform transform-gpu shadow-2xl`}
+                >
+                  <span className="block text-white font-extrabold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{item.value} {item.value === 1 ? "valoración" : "valoraciones"}</span>
+                  <span className="mt-0.5 inline-flex items-center justify-center gap-1 text-emerald-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                    <span className="text-zinc-200 font-semibold">{starText}</span>
+                  </span>
+                </span>
+                {/* Envoltorio que anima el crecimiento (scaleY desde la base); el
+                    <span> interior conserva el hover (scale-x) sin conflicto. */}
+                <motion.span
+                  className="block w-full origin-bottom"
+                  style={{ height: `${Math.max(5, (item.value / max) * 100)}%` }}
+                  initial={animate ? { scaleY: 0 } : false}
+                  animate={{ scaleY: 1 }}
+                  transition={{ duration: 0.55, delay: animate ? 0.28 + index * 0.045 : 0, ease: [0.22, 1, 0.36, 1] }}
+                  aria-hidden="true"
+                >
+                  <span className={`block h-full w-full rounded-t-sm bg-gradient-to-t from-slate-500/85 to-slate-300/90 transition-transform duration-200 group-hover:scale-x-110 group-hover:from-emerald-500/80 group-hover:to-emerald-300 group-focus-visible:scale-x-110 group-focus-visible:from-emerald-500/80 group-focus-visible:to-emerald-300 ${isSelected ? "scale-x-110 from-emerald-500/80 to-emerald-300" : ""}`} />
+                </motion.span>
+              </button>
             </li>
           );
         })}
       </ul>
+      <span className="sr-only" aria-live="polite">
+        {selectedStar === null
+          ? ""
+          : (() => {
+            const selected = ratings.find((item) => item.star === selectedStar);
+            return selected
+              ? `${selected.value} ${selected.value === 1 ? "valoración" : "valoraciones"} con ${formatStarValue(selected.star)} ${selected.star === 1 ? "estrella" : "estrellas"}`
+              : "";
+          })()}
+      </span>
       <span className="mb-1 inline-flex shrink-0 items-center gap-px text-emerald-400" aria-hidden="true">
         {Array.from({ length: 5 }).map((_, index) => (
           <Star key={index} className="h-3 w-3 fill-current" />

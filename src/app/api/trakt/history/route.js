@@ -259,7 +259,12 @@ export async function GET(request) {
           page,
           limit: perPage,
           returned: enriched.length,
-          hasMore: !fetchAll && lastPageSize >= perPage && (targetCount == null || rows.length < targetCount),
+          // Hay más si la última página del backend vino LLENA (== perPage). El
+          // cliente pide page/limit de 1 sola página, así que `rows.length` es
+          // exactamente `perPage` en el límite (p. ej. 200) y NO debe usarse como
+          // tope: comparar `rows.length < targetCount` daba 200<200=false y
+          // cortaba la carga infinita justo al llegar a los 200 elementos.
+          hasMore: !fetchAll && lastPageSize >= perPage,
         },
         source: "backend",
       });
