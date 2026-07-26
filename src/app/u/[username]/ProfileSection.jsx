@@ -1200,22 +1200,22 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
               starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
               compactIndicator={view === "compact"}
               hoverExpand={view === "compact"}
+              cornerOverlay={grouped ? (
+                <>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
+                  <div className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
+                    <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
+                      <Layers className={compactCard ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} aria-hidden="true" />
+                      <span>{group.length}</span>
+                    </div>
+                  </div>
+                </>
+              ) : null}
               onClick={grouped ? (event) => {
                 event.preventDefault();
                 setSelectedGroup(item);
               } : undefined}
             />
-            {grouped ? (
-              <>
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-                <div className={`pointer-events-none absolute left-0 top-0 z-20 flex scale-100 items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 opacity-100 shadow-sm backdrop-blur-md transition-all duration-300 ease-out ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
-                  <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
-                    <Layers className={compactCard ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} aria-hidden="true" />
-                    <span>{group.length}</span>
-                  </div>
-                </div>
-              </>
-            ) : null}
           </ProfileEntrance>
         );
       })}

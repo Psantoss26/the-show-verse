@@ -45,7 +45,7 @@ function episodePreviewOf(item, mediaType) {
   };
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, onClick }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -112,6 +112,8 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
             <ImageOff className="h-7 w-7 opacity-50" />
           </div>
         )}
+
+        {cornerOverlay}
 
         {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient (sin bordes marcados) */}
         {hasViewerIndicators && (
