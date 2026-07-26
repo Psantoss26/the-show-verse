@@ -858,6 +858,7 @@ export async function getUserRatings(db, targetId, opts = {}) {
   const { limit, offset } = pageParams(opts);
   const rows = await db
     .select({
+      id: userRatings.id,
       tmdbId: userRatings.tmdbId,
       mediaType: userRatings.mediaType,
       title: userRatings.title,
