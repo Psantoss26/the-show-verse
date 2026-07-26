@@ -26,6 +26,8 @@ export function sanitizeBackendUser(user) {
   return {
     id: user.id,
     email: user.email || null,
+    emailVerified: Boolean(user.emailVerified),
+    hasPassword: Boolean(user.hasPassword),
     username: user.username || null,
     displayName: user.displayName || user.username || null,
     avatarUrl: user.avatarUrl || null,

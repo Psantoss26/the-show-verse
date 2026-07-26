@@ -882,21 +882,26 @@ export async function getUserRatings(db, targetId, opts = {}) {
   return page;
 }
 
-// Visionados: títulos DISTINTOS, el más reciente primero, con la nota del usuario.
+// Diario: registros reales de historial, no títulos deduplicados. Así una serie
+// conserva cada episodio que se ha visto; el cliente puede colapsar episodios
+// consecutivos igual que Historial sin perder el detalle al desplegarlos.
 export async function getUserWatched(db, targetId, opts = {}) {
   const { limit, offset } = pageParams(opts);
   const rows = await db
     .select({
+      id: watchHistory.id,
       tmdbId: watchHistory.tmdbId,
       mediaType: watchHistory.mediaType,
-      title: sql`(array_agg(${watchHistory.title} ORDER BY ${watchHistory.watchedAt} DESC))[1]`,
-      posterPath: sql`(array_agg(${watchHistory.posterPath} ORDER BY ${watchHistory.watchedAt} DESC))[1]`,
-      watchedAt: sql`MAX(${watchHistory.watchedAt})`,
+      season: watchHistory.season,
+      episode: watchHistory.episode,
+      title: watchHistory.title,
+      posterPath: watchHistory.posterPath,
+      activityGroup: watchHistory.activityGroup,
+      watchedAt: watchHistory.watchedAt,
     })
     .from(watchHistory)
     .where(eq(watchHistory.userId, targetId))
-    .groupBy(watchHistory.tmdbId, watchHistory.mediaType)
-    .orderBy(sql`MAX(${watchHistory.watchedAt}) DESC`)
+    .orderBy(desc(watchHistory.watchedAt), desc(watchHistory.createdAt))
     .limit(limit + 1)
     .offset(offset);
 
@@ -910,10 +915,14 @@ export async function getUserWatched(db, targetId, opts = {}) {
   const ratingByKey = new Map(ratingRows.map((r) => [titleKey(r.mediaType, r.tmdbId), Number(r.rating)]));
 
   page.items = page.items.map((r) => ({
+    id: r.id,
     tmdbId: r.tmdbId,
     mediaType: r.mediaType,
+    season: r.season,
+    episode: r.episode,
     title: r.title,
     posterPath: r.posterPath,
+    activityGroup: r.activityGroup,
     watchedAt: r.watchedAt,
     rating: ratingByKey.get(titleKey(r.mediaType, r.tmdbId)) ?? null,
   }));
