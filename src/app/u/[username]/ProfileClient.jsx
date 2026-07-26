@@ -577,7 +577,7 @@ function buildAnalyticsFromPrivateProfile(payload) {
 // Componente principal
 // ─────────────────────────────────────────────
 
-export default function ProfileClient({ username, initialTab = "profile" }) {
+export default function ProfileClient({ username, initialTab = "profile", routeBase = null }) {
   const { user: viewer, logout } = useAuth();
   const router = useRouter();
   const profileSwipe = useRef(null);
@@ -588,10 +588,37 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
     const key = profileCacheKey(username);
     return { key, status: "pending", profile: null };
   });
-  const tab = PROFILE_TAB_IDS.includes(initialTab) ? initialTab : "profile";
+  const routeTab = PROFILE_TAB_IDS.includes(initialTab) ? initialTab : "profile";
+  // La primera ruta hija todavía puede no estar en la caché del App Router.
+  // Conservamos la estructura del perfil y cambiamos su contenido de forma
+  // optimista mientras Next termina de sincronizar la URL, para que el primer
+  // clic no remonte ni vuelva a animar cabecera, métricas y navegación.
+  const [pendingTab, setPendingTab] = useState(null);
+  const tab = pendingTab || routeTab;
   const [refreshToken, setRefreshToken] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [privateAnalytics, setPrivateAnalytics] = useState(null);
+
+  useEffect(() => {
+    if (pendingTab === routeTab) setPendingTab(null);
+  }, [pendingTab, routeTab]);
+
+  useEffect(() => {
+    const prefetchSections = () => {
+      for (const section of PROFILE_TAB_IDS) {
+        router.prefetch(profileTabHref(username, section, routeBase));
+      }
+    };
+
+    if (typeof window === "undefined") return undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(prefetchSections, { timeout: 1500 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = window.setTimeout(prefetchSections, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [routeBase, router, username]);
 
   useLayoutEffect(() => {
     const key = profileCacheKey(username);
@@ -649,8 +676,9 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
     : "pending";
   const navigateToTab = useCallback((nextTab) => {
     if (!PROFILE_TAB_IDS.includes(nextTab) || nextTab === tab) return;
-    router.push(profileTabHref(username, nextTab), { scroll: false });
-  }, [router, tab, username]);
+    setPendingTab(nextTab);
+    router.push(profileTabHref(username, nextTab, routeBase), { scroll: false });
+  }, [routeBase, router, tab, username]);
 
   useEffect(() => {
     const currentProfile = profile;
@@ -873,7 +901,13 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
 
         {/* ── BARRA DE PESTAÑAS ── */}
         <div className="sv-profile-entry sv-profile-entry--tabs">
-          <ProfileTabs tab={tab} username={user.username} sections={sections} />
+          <ProfileTabs
+            tab={tab}
+            username={user.username}
+            sections={sections}
+            onNavigate={navigateToTab}
+            routeBase={routeBase}
+          />
         </div>
 
         {tab === "statistics" ? (
@@ -1035,7 +1069,7 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
 
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
-function ProfileTabs({ tab, username, sections }) {
+function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
   const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
@@ -1070,11 +1104,28 @@ function ProfileTabs({ tab, username, sections }) {
     >
       {items.map((it) => {
         const active = tab === it.id;
+        const handleNavigate = (event) => {
+          // Se conservan los modificadores del enlace para abrir en otra
+          // pestaña o copiar la URL. Para la navegación normal adelantamos el
+          // estado local antes de que llegue el primer RSC de la ruta hija.
+          if (
+            active ||
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) return;
+          event.preventDefault();
+          onNavigate?.(it.id);
+        };
         return (
           <Link
             key={it.id}
-            href={profileTabHref(username, it.id)}
+            href={profileTabHref(username, it.id, routeBase)}
             scroll={false}
+            onClick={handleNavigate}
             data-profile-tab-active={active || undefined}
             className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"

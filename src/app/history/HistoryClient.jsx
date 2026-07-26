@@ -59,6 +59,10 @@ const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 const RESTORATION_COMPLETE_KEY = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_EVENT = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_MAX_AGE_MS = 30_000;
+// Los stills reales pertenecen a cada episodio, no al backdrop general de la
+// serie. La caché evita repetir consultas de una misma temporada al volver a
+// abrir el modal durante la sesión.
+const historySeasonStillsCache = new Map();
 
 function isTraktUnavailableError(error) {
   const status = Number(error?.status || error?.payload?.upstreamStatus || 0);
@@ -267,6 +271,83 @@ function getEpisodeMeta(entry) {
     null;
 
   return { season, episode, title };
+}
+
+function historyEpisodeStillKey(season, episode) {
+  return `${season}:${episode}`;
+}
+
+function loadHistorySeasonStills(showId, season) {
+  const cacheKey = `${showId}:${season}`;
+  const cached = historySeasonStillsCache.get(cacheKey);
+  if (cached) return cached instanceof Promise ? cached : Promise.resolve(cached);
+
+  const request = fetch(
+    `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(season)}`,
+  )
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const stills = new Map(
+        (Array.isArray(payload?.episodes) ? payload.episodes : [])
+          .filter((episode) => episode?.still_path)
+          .map((episode) => [
+            historyEpisodeStillKey(
+              Number(episode.season_number),
+              Number(episode.episode_number),
+            ),
+            episode.still_path,
+          ]),
+      );
+      historySeasonStillsCache.set(cacheKey, stills);
+      return stills;
+    })
+    .catch(() => {
+      const stills = new Map();
+      historySeasonStillsCache.set(cacheKey, stills);
+      return stills;
+    });
+
+  historySeasonStillsCache.set(cacheKey, request);
+  return request;
+}
+
+function useHistoryEpisodeStills(showId, episodes) {
+  const seasonSignature = useMemo(
+    () =>
+      [...new Set((episodes || []).map(getEpisodeMeta).filter(Boolean).map((episode) => episode.season))]
+        .sort((a, b) => a - b)
+        .join(","),
+    [episodes],
+  );
+  const [stills, setStills] = useState(() => new Map());
+
+  useEffect(() => {
+    const seasons = seasonSignature
+      ? seasonSignature.split(",").map(Number).filter(Number.isInteger)
+      : [];
+    if (!showId || !seasons.length) {
+      setStills(new Map());
+      return undefined;
+    }
+
+    let cancelled = false;
+    Promise.all(seasons.map((season) => loadHistorySeasonStills(showId, season))).then(
+      (results) => {
+        if (cancelled) return;
+        const next = new Map();
+        for (const result of results) {
+          for (const [key, path] of result) next.set(key, path);
+        }
+        setStills(next);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [seasonSignature, showId]);
+
+  return stills;
 }
 
 // IMPORTANTE: si es episodio, prioriza el TMDb de la SERIE (show)
@@ -1539,94 +1620,6 @@ function Poster({ entry, className = "" }) {
   );
 }
 
-// SmartPoster for Compact view - transitions from poster to backdrop on hover
-function SmartPoster({ entry, title, mode = "poster" }) {
-  const type = getItemType(entry);
-  const id = getTmdbId(entry);
-  const [src, setSrc] = useState(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let abort = false;
-    setSrc(null);
-    setReady(false);
-
-    const load = async () => {
-      const tmdbType = type === "show" ? "tv" : "movie";
-      const key = `${tmdbType}:${id}`;
-
-      // BACKDROP MODE
-      if (mode === "backdrop") {
-        // Resolvemos SIEMPRE el backdrop final antes de mostrar nada (sin flash
-        // de una imagen que luego se sobreescribe) y con fallback para no dejar
-        // la tarjeta vacía.
-        let finalPath;
-        if (backdropCache.has(key)) {
-          finalPath = backdropCache.get(key) || entry?.backdrop_path || entry?.poster_path || null;
-        } else {
-          const bestBackdrop = await getBestBackdropCached(tmdbType, id);
-          if (bestBackdrop) {
-            finalPath = bestBackdrop;
-          } else {
-            const r = await fetchTmdbPoster({ type, tmdbId: id });
-            finalPath = r?.backdrop_path || r?.poster_path || entry?.backdrop_path || entry?.poster_path || null;
-          }
-        }
-
-        if (finalPath && !abort) {
-          const url = `https://image.tmdb.org/t/p/w780${finalPath}`;
-          await preloadImage(url);
-          if (!abort) {
-            setSrc(url);
-            setReady(true);
-          }
-        }
-        return;
-      }
-
-      // POSTER MODE
-      const finalPath = await resolveFinalPosterPath({ type, id, entry });
-      if (finalPath) {
-        const url = `https://image.tmdb.org/t/p/w500${finalPath}`;
-        await preloadImage(url);
-        if (!abort) {
-          setSrc(url);
-          setReady(true);
-        }
-      }
-    };
-
-    if (type && id) load();
-    return () => {
-      abort = true;
-    };
-  }, [mode, type, id, entry]);
-
-  return (
-    <div className="absolute inset-0 w-full h-full">
-      <div
-        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
-      >
-        <Film className="w-8 h-8 text-zinc-700" />
-      </div>
-
-      {src && (
-        <OptimizedImage
-          src={src}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
-        />
-      )}
-    </div>
-  );
-}
-
 // Tarjeta modo LISTA
 const HistoryItemCard = memo(function HistoryItemCard({
   entry,
@@ -2328,7 +2321,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   );
 });
 
-function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
+function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy, stillPath }) {
   const meta = getEpisodeMeta(entry);
   const href = getDetailsHref(entry);
   const historyId = getHistoryId(entry);
@@ -2378,11 +2371,18 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
         className={`flex items-center gap-3 p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
         <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
-          <SmartPoster
-            entry={entry}
-            title={meta?.title || "Episodio"}
-            mode="backdrop"
-          />
+          {stillPath || entry?.still_path || entry?.stillPath ? (
+            <OptimizedImage
+              src={`https://image.tmdb.org/t/p/w780${stillPath || entry?.still_path || entry?.stillPath}`}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-zinc-700">
+              <Film className="h-5 w-5" aria-hidden="true" />
+            </span>
+          )}
         </div>
         <div className="flex-1 min-w-0 pr-12 sm:pr-14">
           <p className="text-sm font-bold text-emerald-300 sm:text-[15px]">
@@ -2446,6 +2446,8 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy }) {
 function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
   const title = getMainTitle(entry);
   const tmdbId = getTmdbId(entry);
+  const episodes = Array.isArray(entry?._group) ? entry._group : [];
+  const episodeStills = useHistoryEpisodeStills(tmdbId, episodes);
   const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
   const [mounted, setMounted] = useState(false);
   // Pulsar el título/póster de la serie abre su PREVIEW (drawer), no navega.
@@ -2534,7 +2536,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
                 id="history-grouped-episodes-description"
                 className="mt-0.5 text-xs font-medium text-zinc-400 sm:text-sm"
               >
-                {entry._group.length} episodios agrupados
+                {episodes.length} episodios agrupados
               </p>
             </div>
           </div>
@@ -2550,18 +2552,25 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
         </header>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
-          {entry._group.map((ep, idx) => (
-            <EpisodeSubItem
+          {episodes.map((ep, idx) => {
+            const episodeMeta = getEpisodeMeta(ep);
+            const stillPath = episodeMeta
+              ? episodeStills.get(
+                  historyEpisodeStillKey(episodeMeta.season, episodeMeta.episode),
+                )
+              : null;
+            return <EpisodeSubItem
               // `getHistoryId(ep)` puede repetirse dentro de un grupo (para estas
               // entradas coincide con el tmdbId de la serie, igual en todos los
               // episodios), así que se combina con el índice para que la key sea
               // ÚNICA y no dispare el aviso de React de keys duplicadas.
               key={`ep-${getHistoryId(ep) ?? "x"}-${idx}`}
               entry={ep}
+              stillPath={stillPath}
               onRemoveFromHistory={onRemoveFromHistory}
               isBusy={busyId === `del:${getHistoryId(ep)}`}
-            />
-          ))}
+            />;
+          })}
         </div>
       </motion.section>
     </motion.div>,
