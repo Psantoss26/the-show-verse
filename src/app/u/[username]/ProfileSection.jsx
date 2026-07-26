@@ -33,6 +33,7 @@ import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useAuth } from "@/context/AuthContext";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -777,13 +778,15 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
 function ActivityFeed({ items, actor, compact = false, posterList = false }) {
   return (
     <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <li key={item.id}>
-          {item.type === "review" ? (
-            <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} />
-          ) : (
-            <ActivityRow item={item} actor={actor} compact={compact} posterList={posterList} />
-          )}
+          <ProfileEntrance index={index} total={items.length}>
+            {item.type === "review" ? (
+              <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} />
+            ) : (
+              <ActivityRow item={item} actor={actor} compact={compact} posterList={posterList} />
+            )}
+          </ProfileEntrance>
         </li>
       ))}
     </ol>
@@ -1108,12 +1111,12 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
   if (view === "list") {
     return (
       <div className="space-y-2">
-        {collapsedItems.map((item) => {
+        {collapsedItems.map((item, index) => {
           const group = item.episodeGroup;
           const groupId = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
           const expanded = expandedGroups.has(groupId);
           return (
-            <div key={groupId} className="space-y-2">
+            <ProfileEntrance key={groupId} index={index} total={collapsedItems.length} className="space-y-2">
               <DiaryListItem
                 item={item}
                 viewerState={viewerTitleStates[titleStateKey(item)]}
@@ -1140,7 +1143,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
                   </motion.div>
                 ) : null}
               </AnimatePresence>
-            </div>
+            </ProfileEntrance>
           );
         })}
       </div>
@@ -1149,13 +1152,13 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
 
   return (
     <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
-      {collapsedItems.map((item) => {
+      {collapsedItems.map((item, index) => {
         const group = item.episodeGroup;
         const grouped = group?.length > 1;
         const compactCard = view === "compact";
         const key = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
         return (
-          <div key={key} className="relative">
+          <ProfileEntrance key={key} index={index} total={collapsedItems.length} className="relative">
             <PosterTile
               item={item}
               showStars
@@ -1178,7 +1181,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
                 </div>
               </>
             ) : null}
-          </div>
+          </ProfileEntrance>
         );
       })}
       <AnimatePresence>
@@ -1212,12 +1215,13 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
     return (
       <div className="space-y-2">
         {items.map((item, index) => (
-          <ProfileMediaListItem
-            key={profileItemKey(item, index)}
-            item={item}
-            showStars={showStars}
-            viewerState={viewerTitleStates[titleStateKey(item)]}
-          />
+          <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length}>
+            <ProfileMediaListItem
+              item={item}
+              showStars={showStars}
+              viewerState={viewerTitleStates[titleStateKey(item)]}
+            />
+          </ProfileEntrance>
         ))}
       </div>
     );
@@ -1226,14 +1230,15 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
   return (
     <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
       {items.map((item, index) => (
-        <PosterTile
-          key={profileItemKey(item, index)}
-          item={item}
-          showStars={showStars}
-          viewerState={viewerTitleStates[titleStateKey(item)]}
-          starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
-          compactIndicator={view === "compact"}
-        />
+        <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length}>
+          <PosterTile
+            item={item}
+            showStars={showStars}
+            viewerState={viewerTitleStates[titleStateKey(item)]}
+            starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
+            compactIndicator={view === "compact"}
+          />
+        </ProfileEntrance>
       ))}
     </div>
   );
@@ -1286,32 +1291,28 @@ function estimateFillCount(config, controls) {
   return Math.min(240, Math.max(floor, aligned));
 }
 
-// Esqueleto de carga inicial: rellena el espacio con marcadores en pulso
-// imitando el layout real, para no mostrar un hueco en blanco (parpadeo).
-function SectionSkeleton({ config, controls, count }) {
-  const isPosters = config?.layout === "posters";
-  const view = controls?.view;
-  const total = Math.max(1, Math.min(count || 24, 60));
-
-  if (isPosters && view !== "list") {
-    const gridClass = view === "compact"
-      ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8"
-      : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6";
-    return (
-      <div className={`grid gap-3 ${gridClass}`} aria-busy="true" aria-hidden="true">
-        {Array.from({ length: total }).map((_, index) => (
-          <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/[0.06]" />
-        ))}
-      </div>
-    );
-  }
-
+// Animación de entrada de cada tarjeta de sección. Mismo criterio que las
+// páginas de usuario (favoritos/watchlist): sube + aparece + escala, escalonada
+// por índice (con tope para listas largas) y DESACTIVADA al volver atrás
+// (la página se restaura estática). Las tarjetas ya montadas no re-animan; solo
+// las nuevas (primer pintado / cargas al desplazarse) entran con animación.
+function ProfileEntrance({ index = 0, total = 0, className, children }) {
+  const isBackNav = useIsHistoryNavigation();
+  const animDelay = total > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  const shouldAnimate = !isBackNav && index < 24;
   return (
-    <div className="space-y-2" aria-busy="true" aria-hidden="true">
-      {Array.from({ length: total }).map((_, index) => (
-        <div key={index} className="h-[88px] animate-pulse rounded-2xl bg-white/[0.06]" />
-      ))}
-    </div>
+    <motion.div
+      className={className}
+      initial={shouldAnimate ? { opacity: 0, y: 12, scale: 0.98 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: 0.32,
+        delay: shouldAnimate ? animDelay : 0,
+        ease: [0.25, 0.1, 0.25, 1],
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -1562,7 +1563,9 @@ function ProfileContentSection({ username, section, actor }) {
   if (!config) return null;
 
   if (status === "loading") {
-    return <SectionSkeleton config={config} controls={controls} count={fillTargetRef.current} />;
+    // Sin tarjetas vacías: se reserva altura para evitar saltos y el contenido
+    // final aparece directamente (con su animación de entrada) al estar listo.
+    return <div aria-busy="true" className="min-h-[60vh]" />;
   }
 
   if (status === "error") {
@@ -1622,12 +1625,20 @@ function ProfileContentSection({ username, section, actor }) {
               ) : null}
               {config.layout === "reviews" ? (
                 <div className="space-y-3">
-                  {group.items.map((item) => <ReviewCard key={item.id} item={item} />)}
+                  {group.items.map((item, index) => (
+                    <ProfileEntrance key={item.id} index={index} total={group.items.length}>
+                      <ReviewCard item={item} />
+                    </ProfileEntrance>
+                  ))}
                 </div>
               ) : null}
               {config.layout === "lists" ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.items.map((item) => <ProfileListCard key={item.id} item={item} />)}
+                  {group.items.map((item, index) => (
+                    <ProfileEntrance key={item.id} index={index} total={group.items.length}>
+                      <ProfileListCard item={item} />
+                    </ProfileEntrance>
+                  ))}
                 </div>
               ) : null}
               {config.layout === "activity" ? (
