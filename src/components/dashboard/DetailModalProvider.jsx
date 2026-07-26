@@ -30,7 +30,7 @@ import {
 } from "react";
 import { AnimatePresence } from "framer-motion";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
@@ -116,20 +116,10 @@ function readPreviewFromLocation() {
 
 export default function DetailModalProvider({ children, placement = "center" }) {
   const router = useRouter();
-  const pathname = usePathname();
   // En MÓVIL, por defecto NO se abre el modal de preview: se navega a la ficha
-  // completa (DetailsClient / EpisodeDetails). El drawer lateral es solo
-  // escritorio. Excepción: las páginas de PERFIL (`/u/...`) abren el modal
-  // centrado también en móvil, en lugar de navegar. Se decide por pathname (no
-  // por una prop del page.jsx contenedor) a propósito: la prop viajaría en el
-  // render del Server Component y el Router Cache podría servir una versión
-  // previa; con el pathname en el propio cliente el comportamiento es inmediato.
-  const allowMobileModal = Boolean(pathname && pathname.startsWith("/u/"));
+  // completa (DetailsClient / EpisodeDetails). La preview lateral es solo de
+  // escritorio, también para las páginas de usuario y Configuración.
   const isMobile = useIsMobile();
-  const isMobileRef = useRef(isMobile);
-  isMobileRef.current = isMobile;
-  const allowMobileModalRef = useRef(allowMobileModal);
-  allowMobileModalRef.current = allowMobileModal;
   // En móvil el drawer derecho no aplica: si se abre el modal, es centrado.
   const effectivePlacement = placement === "right" && !isMobile ? "right" : "center";
 
@@ -163,9 +153,8 @@ export default function DetailModalProvider({ children, placement = "center" }) 
     (item, opts = {}) => {
       if (!item || item.id == null || typeof window === "undefined") return;
 
-      // MÓVIL: por defecto no se abre el modal; se navega a la ficha completa.
-      // En páginas de perfil (`/u/...`) sí se abre el modal (centrado) en móvil.
-      if (isMobileRef.current && !allowMobileModalRef.current) {
+      // MÓVIL: se navega siempre a la ficha completa; la preview es de escritorio.
+      if (isMobile) {
         let href;
         if (
           item.media_type === "episode" &&
@@ -226,7 +215,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
         commit([item]);
       }
     },
-    [commit, router],
+    [commit, isMobile, router],
   );
 
   const closeDetailModal = useCallback(() => {

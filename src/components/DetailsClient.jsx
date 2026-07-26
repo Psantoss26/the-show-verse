@@ -175,7 +175,7 @@ import {
   mergeUniqueImages,
   buildOriginalImageUrl,
   preloadTmdb,
-  pickBestImage,
+  pickBestEnglishPoster,
   pickBestNeutralPosterByResVotes,
   isLanguageNeutralImage,
   resolveNeutralBackdropPath,
@@ -294,32 +294,6 @@ function getSoundtrackSourceBadge(source) {
     textClass: "text-emerald-400",
     dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
   };
-}
-
-function pickBestEnglishPoster(list) {
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const isEnglishPoster = (img) => {
-    const language = String(img?.iso_639_1 || "").toLowerCase();
-    return img?.file_path && (language === "en" || language === "en-us");
-  };
-  const isSpanishPoster = (img) => {
-    const language = String(img?.iso_639_1 || "").toLowerCase();
-    return language === "es" || language === "es-es";
-  };
-
-  const englishPosters = list.filter(isEnglishPoster);
-  if (englishPosters.length) return pickBestImage(englishPosters);
-
-  const neutralPosters = list.filter(
-    (img) => img?.file_path && !img?.iso_639_1,
-  );
-  if (neutralPosters.length) return pickBestImage(neutralPosters);
-
-  const nonSpanishPosters = list.filter(
-    (img) => img?.file_path && !isSpanishPoster(img),
-  );
-  return pickBestImage(nonSpanishPosters);
 }
 
 // ---------------------------------------------------------------------------
