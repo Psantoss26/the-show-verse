@@ -419,6 +419,7 @@ export default async function historyRoutes(fastify) {
       })).optional(),
       title: z.string().optional(),
       posterPath: z.string().optional(),
+      activityGroup: z.string().min(1).max(160).optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -426,7 +427,7 @@ export default async function historyRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { tmdbId, season, watched, watchedAt, episodes = [], title, posterPath } = parsed.data;
+    const { tmdbId, season, watched, watchedAt, episodes = [], title, posterPath, activityGroup } = parsed.data;
 
     if (watched && episodes.length > 0) {
       const requestedEpisodeNumbers = [...new Set(episodes.map((ep) => ep.episode))];
@@ -454,6 +455,7 @@ export default async function historyRoutes(fastify) {
         watchedAt: watchedAt ? new Date(watchedAt) : new Date(),
         title: title || null,
         posterPath: posterPath || null,
+        activityGroup: activityGroup || null,
       })).filter((ep) => !watchedEpisodes.has(ep.episode));
 
       if (values.length > 0) {

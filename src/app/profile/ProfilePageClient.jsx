@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Loader2, LogIn } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import ProfileClient from "@/app/u/[username]/ProfileClient";
 
 // El perfil propio utiliza el mismo lienzo que cualquier miembro. Así las
@@ -35,5 +36,9 @@ export default function ProfilePageClient() {
     );
   }
 
-  return <ProfileClient username={user.username} />;
+  return (
+    <DetailModalProvider placement="right">
+      <ProfileClient username={user.username} />
+    </DetailModalProvider>
+  );
 }

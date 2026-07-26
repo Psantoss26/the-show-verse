@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import {
   Filter,
   Grid2X2,
   Heart,
+  Image,
   ImageOff,
   LayoutGrid,
   Layers3,
@@ -46,6 +47,8 @@ const SECTIONS = {
 
 const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watchlist", "ratings"]);
 const profileSectionPreferences = new Map();
+const profileViewPreferences = new Map();
+const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v1:";
 
 function getItemTitle(item) {
   return String(item?.title || item?.name || item?.movie?.title || item?.show?.title || item?.listName || "");
@@ -180,19 +183,59 @@ function sectionMenuOptions(section) {
       ...(activity ? [["action", "Acción"]] : [["type", "Tipo"]]),
       ...(ratings ? [["rating", "Estrellas"]] : []),
     ],
-    views: activity ? [["list", "Lista", List], ["compact", "Compacta", LayoutGrid]] : [["grid", "Cuadrícula", Grid2X2], ["compact", "Compacta", LayoutGrid], ["list", "Lista", List]],
+    views: activity
+      ? [["list", "Lista", List], ["poster-list", "Lista con póster", Image]]
+      : [["grid", "Cuadrícula", Grid2X2], ["compact", "Compacta", LayoutGrid], ["list", "Lista", List]],
   };
 }
 
-function getSectionPreference(cacheKey, section) {
+function profileViewPreferenceKey(username) {
+  return String(username || "").trim().toLocaleLowerCase();
+}
+
+function supportsProfileView(section, view) {
+  return sectionMenuOptions(section).views.some(([value]) => value === view);
+}
+
+function readStoredProfileView(profileKey) {
+  if (!profileKey || typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage.getItem(`${PROFILE_VIEW_STORAGE_PREFIX}${profileKey}`);
+    return value === "grid" || value === "compact" || value === "list" || value === "poster-list" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProfileView(profileKey, view) {
+  if (!profileKey || !view) return;
+  profileViewPreferences.set(profileKey, view);
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${PROFILE_VIEW_STORAGE_PREFIX}${profileKey}`, view);
+  } catch {
+    // El modo sigue vivo durante la sesión aunque el almacenamiento no exista.
+  }
+}
+
+function getSectionPreference(cacheKey, section, profileKey) {
   const usesDiaryDefaults = section === "watched";
-  return profileSectionPreferences.get(cacheKey) || {
+  const current = profileSectionPreferences.get(cacheKey);
+  const fallbackView = section === "activity" || usesDiaryDefaults ? "list" : "grid";
+  const sharedView = profileViewPreferences.get(profileKey);
+  const view = supportsProfileView(section, sharedView)
+    ? sharedView
+    : supportsProfileView(section, current?.view)
+      ? current.view
+      : fallbackView;
+  return {
     query: "",
     filter: "all",
     sort: "recent",
     group: usesDiaryDefaults ? "month" : "none",
     autoMonthGroup: usesDiaryDefaults,
-    view: section === "activity" || usesDiaryDefaults ? "list" : "grid",
+    ...current,
+    view,
   };
 }
 const profileSectionCache = new Map();
@@ -467,7 +510,35 @@ function ActivityTitle({ item, className = "" }) {
   );
 }
 
-function ActivityReview({ item, actor, compact = false }) {
+function ActivityPoster({ item, className = "" }) {
+  const previewClick = usePreviewOpen();
+  const type = item?.mediaType === "tv" || item?.mediaType === "episode" ? "tv" : "movie";
+  const src = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+  const poster = src ? (
+    <OptimizedImage src={src} alt={item?.title || ""} className="h-full w-full object-cover" loading="lazy" />
+  ) : (
+    <span className="flex h-full w-full items-center justify-center text-zinc-700">
+      <ImageOff className="h-4 w-4" aria-hidden="true" />
+    </span>
+  );
+
+  if (!item?.tmdbId || !item?.mediaType) {
+    return <span aria-hidden="true" className={`${className} flex items-center justify-center bg-zinc-900`}>{poster}</span>;
+  }
+
+  return (
+    <Link
+      href={`/details/${type}/${item.tmdbId}`}
+      onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
+      className={`${className} shrink-0 overflow-hidden bg-zinc-900 ring-1 ring-white/10 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+      aria-label={`Ver ${item.title || "ficha"}`}
+    >
+      {poster}
+    </Link>
+  );
+}
+
+function ActivityReview({ item, actor, compact = false, posterList = false }) {
   const [showSpoiler, setShowSpoiler] = useState(false);
   const previewClick = usePreviewOpen();
   const type = item.mediaType === "tv" ? "tv" : "movie";
@@ -476,14 +547,20 @@ function ActivityReview({ item, actor, compact = false }) {
   return (
     <article className={`rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
       <div className="flex gap-3 sm:gap-4">
-        <ActivityAvatar actor={actor} />
-        <Link href={`/details/${type}/${item.tmdbId}`} onClick={previewClick(item)} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
-          {src ? (
-            <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
-          )}
-        </Link>
+        {posterList ? (
+          <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
+        ) : (
+          <>
+            <ActivityAvatar actor={actor} />
+            <Link href={`/details/${type}/${item.tmdbId}`} onClick={previewClick(item)} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
+              {src ? (
+                <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
+              )}
+            </Link>
+          </>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
             <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>
@@ -507,7 +584,7 @@ function ActivityReview({ item, actor, compact = false }) {
   );
 }
 
-function ActivityRow({ item, actor, compact = false }) {
+function ActivityRow({ item, actor, compact = false, posterList = false }) {
   const definitions = {
     watched: { icon: Eye, tone: "text-emerald-300", text: "ha visto" },
     watchlist: { icon: BookmarkPlus, tone: "text-sky-300", text: "ha añadido a Pendientes" },
@@ -518,13 +595,20 @@ function ActivityRow({ item, actor, compact = false }) {
   };
   const definition = definitions[item.type] || definitions.watched;
   const Icon = definition.icon;
+  const actionText = item.type === "watched" && item.completedShow
+    ? "ha completado"
+    : definition.text;
   const episodeLabel = item.type === "watched" && item.season && item.episode
     ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
     : "";
 
   return (
     <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 sm:px-4 ${compact ? "py-2" : "py-3"}`}>
-      <ActivityAvatar actor={actor} />
+      {posterList ? (
+        <ActivityPoster item={item} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
+      ) : (
+        <ActivityAvatar actor={actor} />
+      )}
       {item.type === "rating" ? (
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${definition.tone}`} aria-hidden="true">
           {item.rating}
@@ -536,7 +620,7 @@ function ActivityRow({ item, actor, compact = false }) {
       )}
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
         <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>{" "}
-        {definition.text}{" "}
+        {actionText}{" "}
         {episodeLabel}
         {item.type === "list" ? (
           <Link href={`/lists/${item.id.replace("list:", "")}`} className="font-bold text-white hover:text-emerald-300">{item.name}</Link>
@@ -552,12 +636,16 @@ function ActivityRow({ item, actor, compact = false }) {
   );
 }
 
-function ActivityFeed({ items, actor, compact = false }) {
+function ActivityFeed({ items, actor, compact = false, posterList = false }) {
   return (
     <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
       {items.map((item) => (
         <li key={item.id}>
-          {item.type === "review" ? <ActivityReview item={item} actor={actor} compact={compact} /> : <ActivityRow item={item} actor={actor} compact={compact} />}
+          {item.type === "review" ? (
+            <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} />
+          ) : (
+            <ActivityRow item={item} actor={actor} compact={compact} posterList={posterList} />
+          )}
         </li>
       ))}
     </ol>
@@ -749,6 +837,7 @@ function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
   const cacheKey = profileSectionCacheKey(username, section);
+  const profileKey = profileViewPreferenceKey(username);
   const [items, setItems] = useState(() => profileSectionCache.get(cacheKey)?.items || []);
   const [status, setStatus] = useState(() => profileSectionCache.has(cacheKey) ? "ready" : "loading");
   const [offset, setOffset] = useState(() => profileSectionCache.get(cacheKey)?.offset || 0);
@@ -756,17 +845,23 @@ function ProfileContentSection({ username, section, actor }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
   const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
-  const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section));
+  const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section, profileKey));
 
-  useEffect(() => {
-    setControls(getSectionPreference(cacheKey, section));
-  }, [cacheKey, section]);
+  // La lectura se realiza antes del primer pintado del navegador para que la
+  // cuadrícula/lista/compacta guardada no llegue a verse como el modo por
+  // defecto al entrar o volver a una sección.
+  useLayoutEffect(() => {
+    const storedView = readStoredProfileView(profileKey);
+    if (storedView) profileViewPreferences.set(profileKey, storedView);
+    setControls(getSectionPreference(cacheKey, section, profileKey));
+  }, [cacheKey, profileKey, section]);
 
   const updateControls = (patch) => {
     setControls((current) => {
       const isManualGroupChange = Object.hasOwn(patch, "group") && !Object.hasOwn(patch, "autoMonthGroup");
       const next = { ...current, ...patch, ...(isManualGroupChange ? { autoMonthGroup: false } : {}) };
       profileSectionPreferences.set(cacheKey, next);
+      if (Object.hasOwn(patch, "view")) saveProfileView(profileKey, next.view);
       return next;
     });
   };
@@ -930,7 +1025,13 @@ function ProfileContentSection({ username, section, actor }) {
                   {group.items.map((item) => <ProfileListCard key={item.id} item={item} />)}
                 </div>
               ) : null}
-              {config.layout === "activity" ? <ActivityFeed items={group.items} actor={actor} compact={controls.view === "compact"} /> : null}
+              {config.layout === "activity" ? (
+                <ActivityFeed
+                  items={group.items}
+                  actor={actor}
+                  posterList={controls.view === "poster-list"}
+                />
+              ) : null}
             </section>
           ))}
         </div>

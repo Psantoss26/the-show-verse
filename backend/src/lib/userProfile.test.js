@@ -6,7 +6,9 @@ import {
   canFollow,
   buildRatingHistogram,
   dedupeRecentWatched,
+  collapseGroupedWatchActivity,
   normalizeProfileFavorites,
+  countCompletedShows,
   pageParams,
   packPage,
   PROFILE_FAVORITES_MAX,
@@ -56,6 +58,21 @@ test('dedupeRecentWatched respects the limit', () => {
   assert.equal(dedupeRecentWatched(rows, 3).length, 3);
 });
 
+test('collapseGroupedWatchActivity shows a completed series as one event', () => {
+  const out = collapseGroupedWatchActivity([
+    { id: 'ep-1', tmdbId: 10, mediaType: 'tv', season: 1, episode: 1, activityGroup: 'show-complete:10:run' },
+    { id: 'ep-2', tmdbId: 10, mediaType: 'tv', season: 1, episode: 2, activityGroup: 'show-complete:10:run' },
+    { id: 'ep-3', tmdbId: 11, mediaType: 'tv', season: 1, episode: 1, activityGroup: null },
+  ]);
+
+  assert.equal(out.length, 2);
+  assert.equal(out[0].id, 'ep-3');
+  assert.equal(out[1].tmdbId, 10);
+  assert.equal(out[1].season, null);
+  assert.equal(out[1].episode, null);
+  assert.equal(out[1].completedShow, true);
+});
+
 test('normalizeProfileFavorites caps at 5, dedupes, and assigns positions', () => {
   const input = [
     { tmdbId: 1, mediaType: 'movie', title: 'A', posterPath: '/a.jpg' },
@@ -100,6 +117,20 @@ test('normalizeProfileFavorites keeps five entries for each requested media type
   assert.equal(series.length, PROFILE_FAVORITES_MAX);
   assert.ok(movies.every((item) => item.mediaType === 'movie'));
   assert.ok(series.every((item) => item.mediaType === 'tv'));
+});
+
+test('countCompletedShows only counts series with every aired episode watched', () => {
+  const metadata = new Map([
+    ['tmdb:tv:1', { seasons: [{ season_number: 1, episode_count: 2 }] }],
+    ['tmdb:tv:2', { seasons: [{ season_number: 1, episode_count: 2 }] }],
+  ]);
+  const rows = [
+    { tmdbId: 1, season: 1, episode: 1 },
+    { tmdbId: 1, season: 1, episode: 2 },
+    { tmdbId: 1, season: 1, episode: 2 }, // rewatch, no duplica la serie
+    { tmdbId: 2, season: 1, episode: 1 }, // falta el segundo episodio
+  ];
+  assert.equal(countCompletedShows(rows, metadata), 1);
 });
 
 test('pageParams clamps limit and offset to safe bounds', () => {

@@ -92,11 +92,15 @@ export const watchHistory = pgTable('watch_history', {
   // Confianza de la resolución del visionado sincronizado:
   //   'high' | 'medium' | 'low'  ('low' = fallback a nivel serie sin episodio).
   confidence: text('confidence').default('high'),
+  // Agrupa los episodios insertados por una única acción de serie completada.
+  // El historial sigue siendo detallado; el feed público los representa juntos.
+  activityGroup: text('activity_group'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   userIdIdx: index('idx_watch_history_user_id').on(t.userId),
   tmdbIdx: index('idx_watch_history_tmdb').on(t.userId, t.tmdbId, t.mediaType),
   watchedAtIdx: index('idx_watch_history_watched_at').on(t.userId, t.watchedAt),
+  activityGroupIdx: index('idx_watch_history_activity_group').on(t.userId, t.activityGroup),
   mediaTypeCheck: check('chk_watch_history_media_type', sql`media_type IN ('movie', 'tv')`),
 }));
 

@@ -977,6 +977,7 @@ export function useTraktEpisodesWatched({
             tmdbId: tmdbIdNum,
             seasonNumbers,
             watchedAt: watchedAtOrNull,
+            title: title || undefined,
           }),
         });
 
@@ -1026,7 +1027,7 @@ export function useTraktEpisodesWatched({
         setEpisodeBusyKey("");
       }
     },
-    [type, connected, episodeBusyKey, id, seasons, reloadTraktStatus, applyWatchedBySeasonState],
+    [type, connected, episodeBusyKey, id, seasons, title, reloadTraktStatus, applyWatchedBySeasonState],
   );
 
   const onAddShowPlay = useCallback(

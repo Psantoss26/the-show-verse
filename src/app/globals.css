@@ -751,6 +751,10 @@ html {
   .sv-mobile-actions-reveal > * > :nth-child(7) { animation-delay: 480ms; }
   .sv-mobile-actions-reveal > * > :nth-child(8) { animation-delay: 530ms; }
   .sv-mobile-actions-reveal > * > :nth-child(9) { animation-delay: 580ms; }
+  /* En series, el separador de escritorio sigue ocupando posición en el DOM.
+     La acción de reseña puede ser por ello el décimo hijo: debe conservar el
+     mismo escalonado en vez de entrar de inmediato. */
+  .sv-mobile-actions-reveal > * > :nth-child(10) { animation-delay: 630ms; }
 }
 
 @keyframes sv-mobile-detail-poster-reveal {

@@ -19,6 +19,7 @@ import {
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
+import { computeShowProgress } from './showProgress.js';
 
 const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
 const RECENT_WATCHED_LIMIT = 5;
@@ -30,6 +31,7 @@ const LIST_PREVIEW_LIMIT = 5;
 const PROFILE_ANALYTICS_HISTORY_LIMIT = 1500;
 const DEFAULT_MOVIE_RUNTIME_MINS = 100;
 const DEFAULT_EPISODE_RUNTIME_MINS = 45;
+const PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT = 5000;
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
 export function pageParams({ limit, offset } = {}) {
@@ -92,6 +94,30 @@ export function dedupeRecentWatched(rows, limit = RECENT_WATCHED_LIMIT) {
   return out;
 }
 
+// «Marcar serie» crea una fila de historial por episodio para conservar el
+// progreso. Todas comparten activityGroup y se leen como una única actividad.
+export function collapseGroupedWatchActivity(rows) {
+  const singles = [];
+  const grouped = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row?.activityGroup) {
+      singles.push(row);
+      continue;
+    }
+    if (!grouped.has(row.activityGroup)) {
+      grouped.set(row.activityGroup, {
+        ...row,
+        season: null,
+        episode: null,
+        completedShow: true,
+      });
+    }
+  }
+
+  return [...singles, ...grouped.values()];
+}
+
 // Valida y normaliza la selección curada de favoritos del perfil: descarta
 // entradas mal formadas, deduplica por título, recorta a `max` y reasigna
 // `position` 0..n según el orden recibido. Cuando se recibe `mediaType`, la
@@ -123,9 +149,74 @@ export function normalizeProfileFavorites(items, max = PROFILE_FAVORITES_MAX, me
   return out;
 }
 
+// Cuenta series realmente terminadas usando el mismo criterio que la página
+// Completadas: todos los episodios emitidos conocidos deben tener al menos un
+// visionado. Los rewatches se contabilizan como plays adicionales, no como
+// nuevas series completadas.
+export function countCompletedShows(rows, metadataByKey) {
+  const playsByShow = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const tmdbId = Number(row?.tmdbId);
+    const season = Number(row?.season);
+    const episode = Number(row?.episode);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !Number.isInteger(season) || season <= 0 || !Number.isInteger(episode) || episode <= 0) continue;
+
+    const playCounts = playsByShow.get(tmdbId) || new Map();
+    const episodeKey = `${season}-${episode}`;
+    playCounts.set(episodeKey, (playCounts.get(episodeKey) || 0) + 1);
+    playsByShow.set(tmdbId, playCounts);
+  }
+
+  let completed = 0;
+  for (const [tmdbId, playCounts] of playsByShow) {
+    const metadata = metadataByKey?.get(`tmdb:tv:${tmdbId}`)
+      || metadataByKey?.get(`tv:${tmdbId}`)
+      || {};
+    const seasonEpisodeCounts = {};
+    for (const season of Array.isArray(metadata.seasons) ? metadata.seasons : []) {
+      const seasonNumber = Number(season?.season_number);
+      const episodeCount = Number(season?.episode_count || 0);
+      if (seasonNumber > 0 && episodeCount > 0) seasonEpisodeCounts[seasonNumber] = episodeCount;
+    }
+    if (computeShowProgress(playCounts, seasonEpisodeCounts).baseComplete) completed += 1;
+  }
+  return completed;
+}
+
 function mediaCacheKeys(mediaType, tmdbId) {
   const media = mediaType === 'movie' ? 'movie' : 'tv';
   return [`tmdb:${media}:${tmdbId}`, `${media}:${tmdbId}`];
+}
+
+async function getCompletedShowsCount(db, targetId) {
+  const rows = await db
+    .select({
+      tmdbId: watchHistory.tmdbId,
+      season: watchHistory.season,
+      episode: watchHistory.episode,
+    })
+    .from(watchHistory)
+    .where(
+      and(
+        eq(watchHistory.userId, targetId),
+        eq(watchHistory.mediaType, 'tv'),
+        isNotNull(watchHistory.season),
+        isNotNull(watchHistory.episode),
+      ),
+    )
+    .orderBy(desc(watchHistory.watchedAt))
+    .limit(PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT);
+  if (!rows.length) return 0;
+
+  const cacheKeys = [...new Set(rows.flatMap((row) => mediaCacheKeys('tv', row.tmdbId)))];
+  const cachedRows = cacheKeys.length
+    ? await db
+      .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data })
+      .from(tmdbCache)
+      .where(inArray(tmdbCache.cacheKey, cacheKeys))
+    : [];
+  const metadataByKey = new Map(cachedRows.map((row) => [row.cacheKey, row.data || {}]));
+  return countCompletedShows(rows, metadataByKey);
 }
 
 function publicMonthLabel(date) {
@@ -338,6 +429,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     filmsRows,
     thisYearRows,
     episodesRows,
+    completedShows,
     followersRows,
     followingRows,
     totalRatingsRows,
@@ -377,6 +469,8 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
           isNotNull(watchHistory.episode),
         ),
       ),
+    // Series completadas: comparte el criterio de progreso de /completed.
+    getCompletedShowsCount(db, targetId),
     db.select({ n: count() }).from(follows).where(eq(follows.followingId, targetId)),
     db.select({ n: count() }).from(follows).where(eq(follows.followerId, targetId)),
     db.select({ n: count() }).from(userRatings).where(eq(userRatings.userId, targetId)),
@@ -526,6 +620,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     stats: {
       films: filmsRows[0]?.n || 0,
       episodes: episodesRows[0]?.n || 0,
+      completedShows,
       thisYear: thisYearRows[0]?.n || 0,
       totalRatings: totalRatingsRows[0]?.n || 0,
       ratingHistogram: buildRatingHistogram(ratingValueRows.map((r) => r.rating)),
@@ -572,7 +667,12 @@ export async function buildSectionCounts(db, targetId, { includePrivateLists = f
       .where(listVisibility),
     Promise.all([
       db.select({ n: count() }).from(titleComments).where(and(eq(titleComments.userId, targetId), eq(titleComments.source, 'native'))),
-      db.select({ n: count() }).from(watchHistory).where(eq(watchHistory.userId, targetId)),
+      db
+        .select({
+          n: sql`count(distinct coalesce(${watchHistory.activityGroup}, ${watchHistory.id}::text))`,
+        })
+        .from(watchHistory)
+        .where(eq(watchHistory.userId, targetId)),
       db.select({ n: count() }).from(watchlist).where(eq(watchlist.userId, targetId)),
       db.select({ n: count() }).from(favorites).where(eq(favorites.userId, targetId)),
       db.select({ n: count() }).from(userRatings).where(eq(userRatings.userId, targetId)),
@@ -920,6 +1020,7 @@ export async function getUserActivity(db, targetId, opts = {}) {
         episode: watchHistory.episode,
         title: watchHistory.title,
         posterPath: watchHistory.posterPath,
+        activityGroup: watchHistory.activityGroup,
         createdAt: watchHistory.watchedAt,
       })
       .from(watchHistory)
@@ -994,7 +1095,11 @@ export async function getUserActivity(db, targetId, opts = {}) {
 
   const events = [
     ...reviewRows.map((row) => ({ ...row, id: `review:${row.id}`, type: 'review' })),
-    ...watchedRows.map((row) => ({ ...row, id: `watched:${row.id}`, type: 'watched' })),
+    ...collapseGroupedWatchActivity(watchedRows).map((row) => ({
+      ...row,
+      id: row.activityGroup ? `watched-group:${row.activityGroup}` : `watched:${row.id}`,
+      type: 'watched',
+    })),
     ...watchlistRows.map((row) => ({ ...row, id: `watchlist:${row.id}`, type: 'watchlist' })),
     ...favoriteRows.map((row) => ({ ...row, id: `favorite:${row.id}`, type: 'favorite' })),
     ...ratingRows.map((row) => ({

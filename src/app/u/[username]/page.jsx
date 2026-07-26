@@ -1,6 +1,3 @@
-import ProfileClient from "./ProfileClient";
-import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
-
 export async function generateMetadata({ params }) {
   const { username } = await params;
   return {
@@ -9,11 +6,7 @@ export async function generateMetadata({ params }) {
   };
 }
 
-export default async function UserProfilePage({ params }) {
-  const { username } = await params;
-  return (
-    <DetailModalProvider placement="right">
-      <ProfileClient username={username} />
-    </DetailModalProvider>
-  );
+export default function UserProfilePage() {
+  // El contenido visible lo mantiene el layout persistente de usuario.
+  return null;
 }
