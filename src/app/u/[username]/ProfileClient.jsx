@@ -823,13 +823,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between lg:gap-6">
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 sm:h-26 sm:w-26" />
           <div className="min-w-0 flex-1 text-left">
-            <div className="flex min-w-0 items-center justify-between gap-2 lg:flex-wrap lg:justify-start lg:gap-4">
-              <div className="min-w-0">
-                <h1 className="truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-[clamp(2.25rem,4.1vw,3.5rem)]">
-                  {user.displayName}<span className="text-emerald-400">.</span>
-                </h1>
-                <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 sm:mt-2 sm:text-sm">@{user.username}</p>
-              </div>
+            <div className="flex min-w-0 items-center justify-between gap-2 lg:justify-start lg:gap-4">
+              <h1 className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white lg:flex-none sm:text-[clamp(2.25rem,4.1vw,3.5rem)]">
+                {user.displayName}<span className="text-emerald-400">.</span>
+              </h1>
               {isSelf ? (
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Acciones de perfil">
                   <LiquidButton
@@ -871,6 +868,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 />
               )}
             </div>
+            <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 sm:mt-2 sm:text-sm">@{user.username}</p>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}
