@@ -1139,13 +1139,20 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
         const compactCard = view === "compact";
         const key = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
         return (
-          <ProfileEntrance key={key} index={index} total={collapsedItems.length} animateWithin={animateWithin} className="relative">
+          <ProfileEntrance
+            key={key}
+            index={index}
+            total={collapsedItems.length}
+            animateWithin={animateWithin}
+            className={`relative ${compactCard ? "z-0 overflow-visible focus-within:z-[40] hover:z-[50]" : ""}`}
+          >
             <PosterTile
               item={item}
               showStars
               viewerState={viewerTitleStates[titleStateKey(item)]}
               starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
               compactIndicator={view === "compact"}
+              hoverExpand={view === "compact"}
               onClick={grouped ? (event) => {
                 event.preventDefault();
                 setSelectedGroup(item);
@@ -1154,7 +1161,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
             {grouped ? (
               <>
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-                <div className={`pointer-events-none absolute left-0 top-0 z-20 flex scale-100 items-center justify-center rounded-br-2xl border-b border-r border-emerald-500/30 bg-emerald-500/15 text-emerald-300 opacity-100 shadow-sm backdrop-blur-md transition-all duration-300 ease-out ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
+                <div className={`pointer-events-none absolute left-0 top-0 z-20 flex scale-100 items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 opacity-100 shadow-sm backdrop-blur-md transition-all duration-300 ease-out ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
                   <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
                     <Layers className={compactCard ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} aria-hidden="true" />
                     <span>{group.length}</span>
@@ -1211,13 +1218,20 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
   return (
     <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
       {items.map((item, index) => (
-        <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length} animateWithin={animateWithin}>
+        <ProfileEntrance
+          key={profileItemKey(item, index)}
+          index={index}
+          total={items.length}
+          animateWithin={animateWithin}
+          className={view === "compact" ? "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]" : undefined}
+        >
           <PosterTile
             item={item}
             showStars={showStars}
             viewerState={viewerTitleStates[titleStateKey(item)]}
             starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
             compactIndicator={view === "compact"}
+            hoverExpand={view === "compact"}
           />
         </ProfileEntrance>
       ))}

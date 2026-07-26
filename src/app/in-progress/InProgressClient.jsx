@@ -2,7 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -1257,6 +1257,7 @@ export default function InProgressClient({
   mode = "inprogress",
 }) {
   const { session, account, hydrated } = useAuth();
+  const isBackNav = useIsHistoryNavigation();
   const initialAuthLoading = !!initialAuth?.loading;
   const initialAuthConnected = !!initialAuth?.connected;
   const [auth, setAuth] = useState(initialAuth);
@@ -1293,6 +1294,35 @@ export default function InProgressClient({
   const filtersRef = useRef(null);
   const filtersSticky = useStickyToolbarState(filtersRef);
   const [uiReady, setUiReady] = useState(false);
+
+  // Al volver desde una ficha, restauramos la caché antes del primer paint. Así
+  // las métricas conservan sus valores en vez de mostrar el estado de carga y
+  // actualizarse un instante después de que el navegador recupere el scroll.
+  useLayoutEffect(() => {
+    if (!isBackNav) return;
+
+    const cachedInProgress = readSessionCache(
+      IN_PROGRESS_CACHE_KEY,
+      IN_PROGRESS_CACHE_TTL,
+    );
+    if (cachedInProgress?.items || cachedInProgress?.stats) {
+      setItems(Array.isArray(cachedInProgress.items) ? cachedInProgress.items : []);
+      setStats(cachedInProgress.stats || null);
+      setDataLoaded(true);
+      setLoading(false);
+    }
+
+    const cachedCompleted = readSessionCache(
+      COMPLETED_CACHE_KEY,
+      COMPLETED_CACHE_TTL,
+    );
+    if (cachedCompleted?.items || cachedCompleted?.stats) {
+      setCompletedItems(Array.isArray(cachedCompleted.items) ? cachedCompleted.items : []);
+      setCompletedStats(cachedCompleted.stats || null);
+      setCompletedLoaded(true);
+      setCompletedLoading(false);
+    }
+  }, [isBackNav]);
 
   useEffect(() => {
     setUiReady(true);
@@ -1933,9 +1963,9 @@ export default function InProgressClient({
         {/* ========== HEADER (same pattern as History, Favorites, Watchlist, Calendar) ========== */}
         <motion.header
           className="mb-6 lg:mb-10"
-          initial={{ opacity: 0, y: -20 }}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -1954,9 +1984,9 @@ export default function InProgressClient({
                 {/* Action buttons next to title */}
                 <div className="flex items-center gap-2">
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4, delay: 0.3 }}
+                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
                   >
                     <LiquidButton
                       onClick={() =>
@@ -1976,9 +2006,9 @@ export default function InProgressClient({
                   </motion.div>
 
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4, delay: 0.4 }}
+                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
                   >
                     <LiquidButton
                       onClick={() => setShowDisconnectModal(true)}
@@ -2004,15 +2034,15 @@ export default function InProgressClient({
             {/* Stats cards on the right (same as History) */}
             <motion.div
               className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-              initial={{ opacity: 0, y: 20 }}
+              initial={isBackNav ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
             >
               <motion.div
                 className="w-full min-w-0"
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
+                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
               >
                 <StatCard
                   label="Series"
@@ -2024,9 +2054,9 @@ export default function InProgressClient({
               </motion.div>
               <motion.div
                 className="w-full min-w-0"
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
+                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
               >
                 <StatCard
                   label="Progreso Medio"
@@ -2038,9 +2068,9 @@ export default function InProgressClient({
               </motion.div>
               <motion.div
                 className="w-full min-w-0"
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.7 }}
+                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
               >
                 <StatCard
                   label="Eps. Vistos"
@@ -2052,9 +2082,9 @@ export default function InProgressClient({
               </motion.div>
               <motion.div
                 className="w-full min-w-0"
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.8 }}
+                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
               >
                 <StatCard
                   label="Eps. Restantes"
@@ -2074,9 +2104,9 @@ export default function InProgressClient({
           className={`sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
-          initial={{ opacity: 0, y: 10 }}
+          initial={isBackNav ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
         >
           {/* El panel desplaza la lista antes de que la barra se fije; una vez
               adherida, conserva el comportamiento de overlay. */}
