@@ -306,7 +306,8 @@ function PendingPreview({ username, items, onOpen }) {
           })}
         </div>
       ) : pendingStatus === "loading" ? (
-        <div className="flex h-24 w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.025]">
+        // Misma altura que el mazo de pósters para que al cargar no salte lo de debajo.
+        <div className="flex h-[170px] sm:h-[190px] w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.025]">
           <Loader2 className="h-5 w-5 animate-spin text-emerald-400/70" aria-label="Cargando pendientes" />
         </div>
       ) : (
@@ -427,9 +428,18 @@ function ActivitySidebarPreview({ username, onOpen }) {
     <section>
       <SectionHeader label="Actividad" onClick={onOpen} />
       {status === "loading" ? (
-        <div className="space-y-3 py-1" aria-label="Cargando actividad">
-          {[0, 1, 2].map((index) => <div key={index} className="h-8 animate-pulse rounded-md bg-white/[0.035]" />)}
-        </div>
+        // El esqueleto REPLICA la estructura del timeline (5 filas con punto +
+        // texto + hora) para reservar su altura final: así, al llegar los datos,
+        // nada de lo que hay debajo (Puntuaciones…) salta de posición.
+        <ol className="relative ml-1 space-y-3.5 py-1" aria-label="Cargando actividad">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <li key={index} className="relative pl-4">
+              <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-white/10" aria-hidden="true" />
+              <div className="h-5 w-11/12 animate-pulse rounded bg-white/[0.06]" />
+              <div className="mt-0.5 h-4 w-10 animate-pulse rounded bg-white/[0.045]" />
+            </li>
+          ))}
+        </ol>
       ) : items.length ? (
         <motion.ol
           className="relative ml-1 space-y-3.5 py-1"
@@ -445,10 +455,12 @@ function ActivitySidebarPreview({ username, onOpen }) {
                 className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-400/90 ring-4 ring-black shadow-[0_0_8px_rgba(52,211,153,0.4)]"
                 aria-hidden="true"
               />
-              <p className="text-[13px] leading-5 text-zinc-300">
+              {/* Una sola línea (truncada): altura fija por item → el esqueleto la
+                  reserva exactamente y nada de debajo salta al cargar. */}
+              <p className="truncate text-[13px] leading-5 text-zinc-300">
                 <SidebarActivityText item={item} />
               </p>
-              <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-semibold text-zinc-400">
+              <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-semibold leading-4 text-zinc-400">
                 {relativeSidebarActivityTime(item.createdAt)}
               </time>
             </motion.li>
@@ -489,13 +501,18 @@ function formatStarValue(value) {
 function StarRatingHistogram({ histogram }) {
   const ratings = buildHalfStarHistogram(histogram);
   const max = Math.max(1, ...ratings.map((item) => item.value));
+  // Entrada: cada barra "crece" desde su base, escalonada de izquierda a derecha.
+  // No se anima al volver atrás ni con "reducir movimiento".
+  const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const animate = !isBackNav && !reduceMotion;
   if (!ratings.length) return null;
 
   return (
     <div className="flex h-20 items-end gap-1.5" aria-label="Distribución de puntuaciones por medias estrellas">
       <Star className="mb-1.5 h-3.5 w-3.5 shrink-0 fill-emerald-400 text-emerald-400" aria-hidden="true" />
       <ul className="flex h-full min-w-0 flex-1 items-end gap-1" role="list">
-        {ratings.map((item) => {
+        {ratings.map((item, index) => {
           const starText = `${formatStarValue(item.star)} ${item.star === 1 ? "estrella" : "estrellas"}`;
           const label = `${item.value} valoraciones con ${starText}`;
           return (
@@ -510,11 +527,18 @@ function StarRatingHistogram({ histogram }) {
                   <span className="text-zinc-200 font-semibold">{starText}</span>
                 </span>
               </span>
-              <span
-                className="block w-full rounded-t-sm bg-gradient-to-t from-slate-500/85 to-slate-300/90 transition-transform duration-200 group-hover:scale-x-110 group-hover:from-emerald-500/80 group-hover:to-emerald-300"
+              {/* Envoltorio que anima el crecimiento (scaleY desde la base); el
+                  <span> interior conserva el hover (scale-x) sin conflicto. */}
+              <motion.span
+                className="block w-full origin-bottom"
                 style={{ height: `${Math.max(5, (item.value / max) * 100)}%` }}
+                initial={animate ? { scaleY: 0 } : false}
+                animate={{ scaleY: 1 }}
+                transition={{ duration: 0.55, delay: animate ? 0.28 + index * 0.045 : 0, ease: [0.22, 1, 0.36, 1] }}
                 aria-hidden="true"
-              />
+              >
+                <span className="block h-full w-full rounded-t-sm bg-gradient-to-t from-slate-500/85 to-slate-300/90 transition-transform duration-200 group-hover:scale-x-110 group-hover:from-emerald-500/80 group-hover:to-emerald-300" />
+              </motion.span>
               <span className="sr-only">{label}</span>
             </li>
           );
@@ -619,13 +643,19 @@ function buildAnalyticsFromPrivateProfile(payload) {
 export default function ProfileClient({ username, initialTab = "profile", routeBase = null }) {
   const { user: viewer, logout } = useAuth();
   const router = useRouter();
+  const isBackNav = useIsHistoryNavigation();
   const profileSwipe = useRef(null);
-  // Debe ser idéntico al HTML que produce el servidor. La instantánea de
-  // sessionStorage se restaura justo después de hidratar, antes del primer
-  // pintado, para no comprometer la hidratación ni mostrar un vacío al volver.
+  // Al volver desde DetailsClient este montaje sólo existe en el cliente y ya
+  // conocemos que es una navegación de historial. Sembrar la instantánea aquí
+  // evita el frame vacío entre la restauración de scroll y el layout effect.
+  // En una carga normal `isBackNav` es false, por lo que el HTML inicial sigue
+  // siendo idéntico al del servidor y no se compromete la hidratación.
   const [state, setState] = useState(() => {
     const key = profileCacheKey(username);
-    return { key, status: "pending", profile: null };
+    const cachedProfile = isBackNav ? getCachedProfile(key) : null;
+    return cachedProfile
+      ? { key, status: "ready", profile: cachedProfile }
+      : { key, status: "pending", profile: null };
   });
   const routeTab = PROFILE_TAB_IDS.includes(initialTab) ? initialTab : "profile";
   // La primera ruta hija todavía puede no estar en la caché del App Router.
