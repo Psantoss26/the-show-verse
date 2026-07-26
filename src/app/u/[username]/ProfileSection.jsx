@@ -376,6 +376,53 @@ function getSectionPreference(cacheKey, section, profileKey) {
   };
 }
 const profileSectionCache = new Map();
+const PROFILE_SECTION_CACHE_STORAGE_PREFIX = "showverse:profile:section-snapshot:v1:";
+
+function getCachedProfileSection(cacheKey) {
+  const memory = profileSectionCache.get(cacheKey);
+  if (memory) return memory;
+  if (!cacheKey || typeof window === "undefined") return null;
+
+  try {
+    const snapshot = JSON.parse(
+      window.sessionStorage.getItem(
+        `${PROFILE_SECTION_CACHE_STORAGE_PREFIX}${cacheKey}`,
+      ) || "null",
+    );
+    if (!Array.isArray(snapshot?.items)) return null;
+
+    const cached = {
+      items: snapshot.items,
+      hasMore: Boolean(snapshot.hasMore),
+      offset: Math.max(0, Number(snapshot.offset) || 0),
+    };
+    profileSectionCache.set(cacheKey, cached);
+    return cached;
+  } catch {
+    // Una instantánea dañada no debe impedir la carga normal de la sección.
+    return null;
+  }
+}
+
+function cacheProfileSection(cacheKey, sectionState) {
+  if (!cacheKey || !Array.isArray(sectionState?.items)) return;
+  const cached = {
+    items: sectionState.items,
+    hasMore: Boolean(sectionState.hasMore),
+    offset: Math.max(0, Number(sectionState.offset) || 0),
+  };
+  profileSectionCache.set(cacheKey, cached);
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      `${PROFILE_SECTION_CACHE_STORAGE_PREFIX}${cacheKey}`,
+      JSON.stringify(cached),
+    );
+  } catch {
+    // La caché en memoria basta para esta navegación si sessionStorage no cabe.
+  }
+}
 
 function profileSectionCacheKey(username, section) {
   // Diario pasó de títulos deduplicados a registros de historial. Versionar la
@@ -1316,13 +1363,22 @@ function ProfileEntrance({ index = 0, total = 0, animateWithin = 24, className, 
 
 function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
+  const isBackNav = useIsHistoryNavigation();
   const config = SECTIONS[section];
   const cacheKey = profileSectionCacheKey(username, section);
   const profileKey = profileViewPreferenceKey(username);
-  const [items, setItems] = useState(() => profileSectionCache.get(cacheKey)?.items || []);
-  const [status, setStatus] = useState(() => profileSectionCache.has(cacheKey) ? "ready" : "loading");
-  const [offset, setOffset] = useState(() => profileSectionCache.get(cacheKey)?.offset || 0);
-  const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
+  // En una vuelta desde DetailsClient la instantánea de la sección debe estar
+  // disponible en el primer frame, no esperar a que un efecto vuelva a leerla.
+  // La ruta normal continúa usando sólo la caché viva en memoria para mantener
+  // la hidratación estable.
+  const [initialSection] = useState(() => {
+    const memory = profileSectionCache.get(cacheKey);
+    return memory || (isBackNav ? getCachedProfileSection(cacheKey) : null);
+  });
+  const [items, setItems] = useState(() => initialSection?.items || []);
+  const [status, setStatus] = useState(() => initialSection ? "ready" : "loading");
+  const [offset, setOffset] = useState(() => initialSection?.offset || 0);
+  const [hasMore, setHasMore] = useState(() => initialSection?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
   const loadMoreRef = useRef(null);
@@ -1419,7 +1475,7 @@ function ProfileContentSection({ username, section, actor }) {
   // sobre las tarjetas colapsadas, no sobre las filas crudas.
   useEffect(() => {
     let cancelled = false;
-    const cachedSection = profileSectionCache.get(cacheKey);
+    const cachedSection = getCachedProfileSection(cacheKey);
     if (cachedSection) {
       // Vuelta atrás / cambio de pestaña ya visitada: se pinta desde caché sin
       // volver a pedir (evita el parpadeo de recarga y conserva el scroll).
@@ -1476,7 +1532,7 @@ function ProfileContentSection({ username, section, actor }) {
       }
 
       const nextSection = { items: accumulated, hasMore: more, offset: nextOffset };
-      profileSectionCache.set(cacheKey, nextSection);
+      cacheProfileSection(cacheKey, nextSection);
       setItems(accumulated);
       setHasMore(more);
       setOffset(nextOffset);
@@ -1507,7 +1563,7 @@ function ProfileContentSection({ username, section, actor }) {
       const nextItems = Array.isArray(data.items) ? data.items : [];
       setItems((currentItems) => {
         const mergedItems = [...currentItems, ...nextItems];
-        profileSectionCache.set(cacheKey, {
+        cacheProfileSection(cacheKey, {
           items: mergedItems,
           hasMore: nextHasMore,
           offset: nextOffset,
