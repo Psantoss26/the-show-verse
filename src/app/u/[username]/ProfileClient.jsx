@@ -11,6 +11,7 @@ import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
@@ -176,7 +177,10 @@ function ProfilePosterGrid({
   viewerTitleStates,
   label,
   prioritizeHorizontalScroll = false,
+  preferEnglishPosters = false,
 }) {
+  const posterItems = useEnglishPosterItems(items, preferEnglishPosters);
+
   return (
     <div
       data-profile-horizontal-scroll
@@ -185,7 +189,7 @@ function ProfilePosterGrid({
       aria-label={label}
       className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0"
     >
-      {items.map((item) => (
+      {posterItems.map((item) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
           className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start sm:w-auto"
@@ -906,6 +910,7 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
                   viewerTitleStates={viewerTitleStates}
                   label="Películas favoritas"
                   prioritizeHorizontalScroll
+                  preferEnglishPosters
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -924,6 +929,7 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
                   viewerTitleStates={viewerTitleStates}
                   label="Series favoritas"
                   prioritizeHorizontalScroll
+                  preferEnglishPosters
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -944,6 +950,7 @@ export default function ProfileClient({ username, initialTab = "profile" }) {
                   viewerTitleStates={viewerTitleStates}
                   label="Actividad reciente"
                   prioritizeHorizontalScroll
+                  preferEnglishPosters
                 />
               ) : (
                 <p className="text-sm text-zinc-600">Sin actividad reciente.</p>

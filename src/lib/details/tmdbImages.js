@@ -70,6 +70,32 @@ export function pickBestImage(list) {
     return sorted[0] || null
 }
 
+// El póster principal de DetailsClient prioriza arte en inglés, conserva el
+// textless como segundo recurso y evita caer en arte español cuando TMDb no
+// ofrece ninguna de las dos opciones. Compartirlo entre superficies evita que
+// una misma ficha cambie de idioma según el lugar donde se muestre.
+export function pickBestEnglishPoster(list) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const isEnglishPoster = (img) => {
+        const language = String(img?.iso_639_1 || '').toLowerCase()
+        return img?.file_path && (language === 'en' || language === 'en-us')
+    }
+    const isSpanishPoster = (img) => {
+        const language = String(img?.iso_639_1 || '').toLowerCase()
+        return language === 'es' || language === 'es-es'
+    }
+
+    const englishPosters = list.filter(isEnglishPoster)
+    if (englishPosters.length) return pickBestImage(englishPosters)
+
+    const neutralPosters = list.filter((img) => img?.file_path && !img?.iso_639_1)
+    if (neutralPosters.length) return pickBestImage(neutralPosters)
+
+    const nonSpanishPosters = list.filter((img) => img?.file_path && !isSpanishPoster(img))
+    return pickBestImage(nonSpanishPosters)
+}
+
 export function pickBestNeutralPosterByResVotes(list, opts = {}) {
     const { resolutionWindow = 0.98, minWidth = 600 } = opts
     if (!Array.isArray(list) || list.length === 0) return null

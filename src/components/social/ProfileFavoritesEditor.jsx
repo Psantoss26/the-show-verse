@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Search, X, Plus, Loader2, ImageOff, Check } from "lucide-react";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 const MAX_PER_TYPE = 5;
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -37,6 +38,7 @@ function payloadItem(item) {
 
 function FavoriteRow({ type, items, loaded, onRemove }) {
   const label = type === "movie" ? "Películas favoritas" : "Series favoritas";
+  const posterItems = useEnglishPosterItems(items);
 
   return (
     <section aria-labelledby={`profile-favorites-${type}`}>
@@ -51,7 +53,7 @@ function FavoriteRow({ type, items, loaded, onRemove }) {
       </div>
       <div className="grid grid-cols-5 gap-2 sm:gap-3">
         {Array.from({ length: MAX_PER_TYPE }).map((_, index) => {
-          const item = items[index];
+          const item = posterItems[index];
           if (!loaded) {
             return <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />;
           }

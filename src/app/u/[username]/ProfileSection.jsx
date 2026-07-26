@@ -70,6 +70,10 @@ function getItemRating(item) {
   return Number.isFinite(rating) ? rating : 0;
 }
 
+function hasActivityPoster(item) {
+  return typeof item?.posterPath === "string" && item.posterPath.trim().length > 0;
+}
+
 // Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
 // público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
 // preview debe recibir su temporada y episodio concretos.
@@ -908,10 +912,22 @@ function ProfileContentSection({ username, section, actor }) {
     });
   }, [controls, items, menuEnabled, section]);
 
+  // El modo con póster es una representación de títulos, no del registro
+  // textual de actividad. Las acciones como crear una lista no tienen artwork
+  // asociado y no deben producir una tarjeta vacía.
+  const displayItems = useMemo(
+    () => (
+      section === "activity" && controls.view === "poster-list"
+        ? visibleItems.filter(hasActivityPoster)
+        : visibleItems
+    ),
+    [controls.view, section, visibleItems],
+  );
+
   const effectiveGroup = controls.group;
   const groups = useMemo(
-    () => (menuEnabled ? groupProfileItems(visibleItems, effectiveGroup, section) : [{ key: "all", label: null, items: visibleItems }]),
-    [effectiveGroup, menuEnabled, section, visibleItems],
+    () => (menuEnabled ? groupProfileItems(displayItems, effectiveGroup, section) : [{ key: "all", label: null, items: displayItems }]),
+    [displayItems, effectiveGroup, menuEnabled, section],
   );
 
   useEffect(() => {
@@ -1063,10 +1079,14 @@ function ProfileContentSection({ username, section, actor }) {
     <div>
       {menuEnabled ? <ProfileSectionToolbar section={section} controls={controls} onChange={updateControls} /> : null}
 
-      {visibleItems.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-14 text-center">
           <Search className="h-8 w-8 text-zinc-700" aria-hidden="true" />
-          <p className="text-sm text-zinc-500">No hay resultados con estos filtros.</p>
+          <p className="text-sm text-zinc-500">
+            {section === "activity" && controls.view === "poster-list"
+              ? "No hay acciones con portada para mostrar."
+              : "No hay resultados con estos filtros."}
+          </p>
         </div>
       ) : (
         <div className="space-y-7">
