@@ -59,6 +59,7 @@ const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 const RESTORATION_COMPLETE_KEY = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_EVENT = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_MAX_AGE_MS = 30_000;
+const RESTORATION_RELEASE_FALLBACK_MS = 5_250;
 // Los stills reales pertenecen a cada episodio, no al backdrop general de la
 // serie. La caché evita repetir consultas de una misma temporada al volver a
 // abrir el modal durante la sesión.
@@ -2732,6 +2733,39 @@ export default function HistoryClient() {
         onRestorationComplete,
       );
   }, [isBackNav]);
+
+  // La restauración global señala su final habitualmente mediante el evento de
+  // arriba. Si la ruta no tenía una posición guardada (o esa restauración se
+  // cancela antes de iniciar), el evento no existe y no podemos dejar el
+  // centinela de paginación bloqueado durante todo el montaje. Un gesto real
+  // del usuario prueba que ya quiere navegar el contenido y libera la carga;
+  // el límite coincide con la ventana máxima del restaurador como respaldo.
+  useEffect(() => {
+    if (!isBackNav || backScrollRestored) return undefined;
+
+    const releaseInfiniteScroll = () => setBackScrollRestored(true);
+    const releaseTimer = window.setTimeout(
+      releaseInfiniteScroll,
+      RESTORATION_RELEASE_FALLBACK_MS,
+    );
+
+    window.addEventListener("wheel", releaseInfiniteScroll, {
+      once: true,
+      passive: true,
+    });
+    window.addEventListener("touchstart", releaseInfiniteScroll, {
+      once: true,
+      passive: true,
+    });
+    window.addEventListener("keydown", releaseInfiniteScroll, { once: true });
+
+    return () => {
+      window.clearTimeout(releaseTimer);
+      window.removeEventListener("wheel", releaseInfiniteScroll);
+      window.removeEventListener("touchstart", releaseInfiniteScroll);
+      window.removeEventListener("keydown", releaseInfiniteScroll);
+    };
+  }, [backScrollRestored, isBackNav]);
 
   const toggleExpandGroup = useCallback((groupKey) => {
     setExpandedGroups((prev) => {
