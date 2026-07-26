@@ -2032,7 +2032,7 @@ const FavoriteCard = memo(function FavoriteCard({
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]`}
+            className={`relative ${aspectRatio} group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300`}
             whileHover={{
               scale: 1.15,
               zIndex: 100,

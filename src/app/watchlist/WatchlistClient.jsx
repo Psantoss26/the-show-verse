@@ -1733,6 +1733,8 @@ const WatchlistCard = memo(function WatchlistCard({
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = !isBackNav && index < 24;
+  const shellClassName =
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   if (viewMode === "list") {
     return (
@@ -1789,6 +1791,7 @@ const WatchlistCard = memo(function WatchlistCard({
   if (viewMode === "compact") {
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1801,10 +1804,10 @@ const WatchlistCard = memo(function WatchlistCard({
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
+            className={`relative ${aspectRatio} group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300`}
             whileHover={{
               scale: 1.15,
-              zIndex: 50,
+              zIndex: 100,
               boxShadow:
                 "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
             }}
