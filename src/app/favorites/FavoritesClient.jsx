@@ -51,6 +51,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
@@ -1920,6 +1921,7 @@ const FavoriteCard = memo(function FavoriteCard({
   item,
   index = 0,
   totalItems = 0,
+  animateWithin = 24,
   viewMode = "grid",
   imageMode = "poster",
   watched = false,
@@ -1952,7 +1954,8 @@ const FavoriteCard = memo(function FavoriteCard({
   const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < 24;
+  // Se anima todo lo que cabe en pantalla en la vista actual (no un tope fijo).
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
   // El hover DEBE ganar al foco. Antes ambos valían z-50: al pulsar una tarjeta
   // para abrir la preview, su <Link> conserva el foco y su envoltorio se quedaba
   // clavado en 50; al pasar luego el ratón por otra, esa también subía a 50 y el
@@ -3189,6 +3192,23 @@ export default function FavoritesClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
+  // Nº de tarjetas a animar a la entrada = las que caben en pantalla en la vista
+  // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
+  const entranceVisibleCount = estimateVisibleCards({
+    columns: pickResponsiveColumns(
+      viewMode === "list"
+        ? { base: 1, xl: 2 }
+        : viewMode === "compact"
+          ? imageMode === "backdrop"
+            ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
+            : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
+          : imageMode === "backdrop"
+            ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
+            : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
+    ),
+    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
+  });
+
   if (!hydrated && !hasBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
@@ -3985,6 +4005,7 @@ export default function FavoritesClient() {
                                     item={item}
                                     index={currentGlobalIdx}
                                     totalItems={sorted.length}
+                                    animateWithin={entranceVisibleCount}
                                     viewMode={viewMode}
                                     imageMode={imageMode}
                                     watched={watchDates.has(getFavoriteHistoryKey(item))}
@@ -4010,6 +4031,7 @@ export default function FavoritesClient() {
                               item={item}
                               index={currentGlobalIdx}
                               totalItems={sorted.length}
+                              animateWithin={entranceVisibleCount}
                               viewMode={viewMode}
                               imageMode={imageMode}
                               watched={watchDates.has(getFavoriteHistoryKey(item))}
@@ -4034,6 +4056,7 @@ export default function FavoritesClient() {
                   item={item}
                   index={idx}
                   totalItems={sorted.length}
+                  animateWithin={entranceVisibleCount}
                   viewMode={viewMode}
                   imageMode={imageMode}
                   watched={watchDates.has(getFavoriteHistoryKey(item))}

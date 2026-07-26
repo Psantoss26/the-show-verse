@@ -46,6 +46,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
@@ -1656,6 +1657,7 @@ const WatchlistCard = memo(function WatchlistCard({
   item,
   index = 0,
   totalItems = 0,
+  animateWithin = 24,
   viewMode = "grid",
   imageMode = "poster",
   imdbScore: initialImdbScore,
@@ -1732,7 +1734,8 @@ const WatchlistCard = memo(function WatchlistCard({
   const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < 24;
+  // Se anima todo lo que cabe en pantalla en la vista actual (no un tope fijo).
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
@@ -2744,6 +2747,23 @@ export default function WatchlistClient() {
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
   };
 
+  // Nº de tarjetas a animar a la entrada = las que caben en pantalla en la vista
+  // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
+  const entranceVisibleCount = estimateVisibleCards({
+    columns: pickResponsiveColumns(
+      viewMode === "list"
+        ? { base: 1, xl: 2 }
+        : viewMode === "compact"
+          ? imageMode === "backdrop"
+            ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
+            : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
+          : imageMode === "backdrop"
+            ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
+            : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
+    ),
+    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
+  });
+
   if (!hydrated && !hasBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
@@ -3501,6 +3521,7 @@ export default function WatchlistClient() {
                                   item={item}
                                   index={currentGlobalIdx}
                                   totalItems={sorted.length}
+                                  animateWithin={entranceVisibleCount}
                                   viewMode={viewMode}
                                   imageMode={imageMode}
                                   imdbScore={imdbScores.get(getScoreItemKey(item))}
@@ -3525,6 +3546,7 @@ export default function WatchlistClient() {
                             item={item}
                             index={currentGlobalIdx}
                             totalItems={sorted.length}
+                            animateWithin={entranceVisibleCount}
                             viewMode={viewMode}
                             imageMode={imageMode}
                             imdbScore={imdbScores.get(getScoreItemKey(item))}
@@ -3548,6 +3570,7 @@ export default function WatchlistClient() {
                 item={item}
                 index={idx}
                 totalItems={sorted.length}
+                animateWithin={entranceVisibleCount}
                 viewMode={viewMode}
                 imageMode={imageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
