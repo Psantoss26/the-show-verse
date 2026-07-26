@@ -38,6 +38,7 @@ import { useAuth } from "@/context/AuthContext";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -703,7 +704,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
             <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>
-            <span>ha reseñado</span>
+            <span>ha escrito una reseña de</span>
             <ActivityTitle item={item} />
             {typeof item.rating === "number" && <Stars rating={item.rating} />}
           </div>
@@ -775,12 +776,12 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
   );
 }
 
-function ActivityFeed({ items, actor, compact = false, posterList = false }) {
+function ActivityFeed({ items, actor, compact = false, posterList = false, animateWithin }) {
   return (
     <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
       {items.map((item, index) => (
         <li key={item.id}>
-          <ProfileEntrance index={index} total={items.length}>
+          <ProfileEntrance index={index} total={items.length} animateWithin={animateWithin}>
             {item.type === "review" ? (
               <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} />
             ) : (
@@ -923,7 +924,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
   );
 }
 
-function DiaryListItem({ item, viewerState, expanded, onToggle, nested = false }) {
+function DiaryListItem({ item, viewerState, onOpenGroup }) {
   const previewClick = usePreviewOpen();
   const type = getItemMediaType(item);
   const episode = getDiaryEpisode(item);
@@ -936,46 +937,52 @@ function DiaryListItem({ item, viewerState, expanded, onToggle, nested = false }
     ? `/details/tv/${item.tmdbId}/season/${episode.season}/episode/${episode.episode}`
     : `/details/${type}/${item?.tmdbId || item?.id}`;
   const rating = viewerState?.rating ?? item?.rating;
+  const cardClassName = "flex w-full min-w-0 items-center gap-3 p-2.5 text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70";
+  const cardContent = (
+    <>
+      <span className="h-20 w-[3.55rem] shrink-0 overflow-hidden rounded-xl bg-zinc-900">
+        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">{title}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+          {grouped ? (
+            <span className="font-semibold text-emerald-300">{episodeGroup.length} episodios</span>
+          ) : episode ? (
+            <span className="font-semibold text-emerald-300">{formatDiaryEpisode(episode)}</span>
+          ) : (
+            <span>Película</span>
+          )}
+          {grouped && formatDiaryEpisodeRange(episodeGroup) ? <span>{formatDiaryEpisodeRange(episodeGroup)}</span> : null}
+          {date ? <time dateTime={date.toISOString()}>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date)}</time> : null}
+        </span>
+      </span>
+      {grouped ? <ChevronRight className="h-5 w-5 shrink-0 text-emerald-300" aria-hidden="true" /> : Number(rating) > 0 ? <span className="pr-1 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
+    </>
+  );
 
   return (
-    <article className={`rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg ${nested ? "ml-5 border-l border-emerald-400/20 pl-3" : ""}`}>
-      <div className="flex min-w-0 items-center gap-3 p-2.5">
+    <article className="group overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg">
+      {grouped ? (
+        <button
+          type="button"
+          onClick={() => onOpenGroup?.(item)}
+          className={cardClassName}
+          aria-haspopup="dialog"
+          aria-label={`Ver ${episodeGroup.length} episodios agrupados de ${title}`}
+        >
+          {cardContent}
+        </button>
+      ) : (
         <Link
           href={href}
           onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
-          className="h-20 w-[3.55rem] shrink-0 overflow-hidden rounded-xl bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+          className={cardClassName}
           aria-label={`Ver ${title}`}
         >
-          {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+          {cardContent}
         </Link>
-        <div className="min-w-0 flex-1">
-          <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="block truncate text-sm font-bold text-white transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70">
-            {title}
-          </Link>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
-            {grouped ? (
-              <span className="font-semibold text-emerald-300">{episodeGroup.length} episodios</span>
-            ) : episode ? (
-              <span className="font-semibold text-emerald-300">{formatDiaryEpisode(episode)}</span>
-            ) : (
-              <span>Película</span>
-            )}
-            {grouped && formatDiaryEpisodeRange(episodeGroup) ? <span>{formatDiaryEpisodeRange(episodeGroup)}</span> : null}
-            {date ? <time dateTime={date.toISOString()}>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date)}</time> : null}
-          </div>
-        </div>
-        {grouped ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-emerald-300 transition hover:bg-emerald-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
-            aria-label={expanded ? "Ocultar episodios" : "Mostrar episodios"}
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
-          </button>
-        ) : Number(rating) > 0 ? <span className="pr-1 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
-      </div>
+      )}
     </article>
   );
 }
@@ -1095,58 +1102,32 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
   );
 }
 
-function DiaryPosterItems({ items, view, viewerTitleStates }) {
-  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const collapsedItems = useMemo(() => collapseDiaryEpisodes(items), [items]);
-  const toggleGroup = (id) => {
-    setExpandedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   if (view === "list") {
     return (
-      <div className="space-y-2">
-        {collapsedItems.map((item, index) => {
-          const group = item.episodeGroup;
-          const groupId = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
-          const expanded = expandedGroups.has(groupId);
-          return (
-            <ProfileEntrance key={groupId} index={index} total={collapsedItems.length} className="space-y-2">
-              <DiaryListItem
-                item={item}
-                viewerState={viewerTitleStates[titleStateKey(item)]}
-                expanded={expanded}
-                onToggle={() => toggleGroup(groupId)}
-              />
-              <AnimatePresence initial={false}>
-                {group?.length > 1 && expanded ? (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    {group.map((episode) => (
-                      <DiaryListItem
-                        key={episode.id}
-                        item={episode}
-                        viewerState={viewerTitleStates[titleStateKey(episode)]}
-                        nested
-                      />
-                    ))}
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-            </ProfileEntrance>
-          );
-        })}
-      </div>
+      <>
+        <div className="space-y-2">
+          {collapsedItems.map((item, index) => {
+            const group = item.episodeGroup;
+            const groupId = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
+            return (
+              <ProfileEntrance key={groupId} index={index} total={collapsedItems.length} animateWithin={animateWithin}>
+                <DiaryListItem
+                  item={item}
+                  viewerState={viewerTitleStates[titleStateKey(item)]}
+                  onOpenGroup={setSelectedGroup}
+                />
+              </ProfileEntrance>
+            );
+          })}
+        </div>
+        <AnimatePresence>
+          {selectedGroup ? <DiaryGroupedEpisodesModal entry={selectedGroup} onClose={() => setSelectedGroup(null)} /> : null}
+        </AnimatePresence>
+      </>
     );
   }
 
@@ -1158,7 +1139,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates }) {
         const compactCard = view === "compact";
         const key = String(group?.[0]?.id || item.id || `${item.tmdbId}:${item.watchedAt}`);
         return (
-          <ProfileEntrance key={key} index={index} total={collapsedItems.length} className="relative">
+          <ProfileEntrance key={key} index={index} total={collapsedItems.length} animateWithin={animateWithin} className="relative">
             <PosterTile
               item={item}
               showStars
@@ -1210,12 +1191,12 @@ function ProfileMonthHeading({ children }) {
   );
 }
 
-function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
+function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animateWithin }) {
   if (view === "list") {
     return (
       <div className="space-y-2">
         {items.map((item, index) => (
-          <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length}>
+          <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length} animateWithin={animateWithin}>
             <ProfileMediaListItem
               item={item}
               showStars={showStars}
@@ -1230,7 +1211,7 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
   return (
     <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
       {items.map((item, index) => (
-        <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length}>
+        <ProfileEntrance key={profileItemKey(item, index)} index={index} total={items.length} animateWithin={animateWithin}>
           <PosterTile
             item={item}
             showStars={showStars}
@@ -1296,10 +1277,13 @@ function estimateFillCount(config, controls) {
 // por índice (con tope para listas largas) y DESACTIVADA al volver atrás
 // (la página se restaura estática). Las tarjetas ya montadas no re-animan; solo
 // las nuevas (primer pintado / cargas al desplazarse) entran con animación.
-function ProfileEntrance({ index = 0, total = 0, className, children }) {
+function ProfileEntrance({ index = 0, total = 0, animateWithin = 24, className, children }) {
   const isBackNav = useIsHistoryNavigation();
   const animDelay = total > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < 24;
+  // Se animan todas las tarjetas que caben en pantalla en el modo de vista
+  // actual (no un tope fijo): así, p. ej., en una cuadrícula de 8×4 visibles se
+  // animan las 4 filas, no solo 3. `animateWithin` = estimación de llenado.
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
   return (
     <motion.div
       className={className}
@@ -1384,21 +1368,34 @@ function ProfileContentSection({ username, section, actor }) {
 
   // El modo con póster es una representación de títulos, no del registro
   // textual de actividad. Las acciones como crear una lista no tienen artwork
-  // asociado y no deben producir una tarjeta vacía.
-  const displayItems = useMemo(
+  // asociado y no deben producir una tarjeta vacía. A esos títulos se les
+  // aplica el mismo resolvedor de póster inglés que el resto de Perfil.
+  const activityPosterSourceItems = useMemo(
     () => (
       section === "activity" && controls.view === "poster-list"
         ? visibleItems.filter(hasActivityPoster)
-        : visibleItems
+        : []
     ),
     [controls.view, section, visibleItems],
   );
+  const activityPosterItems = useEnglishPosterItems(
+    activityPosterSourceItems,
+    section === "activity" && controls.view === "poster-list",
+  );
+  const displayItems = section === "activity" && controls.view === "poster-list"
+    ? activityPosterItems
+    : visibleItems;
 
   const effectiveGroup = controls.group;
   const groups = useMemo(
     () => (menuEnabled ? groupProfileItems(displayItems, effectiveGroup, section) : [{ key: "all", label: null, items: displayItems }]),
     [displayItems, effectiveGroup, menuEnabled, section],
   );
+
+  // Nº de tarjetas a animar a la entrada = las que caben en pantalla en el modo
+  // de vista actual (mismo cálculo que el llenado). Así se anima todo lo visible
+  // (p. ej. 4 filas de 8 en cuadrícula), no un tope fijo de 3 filas.
+  const entranceCount = estimateFillCount(config, controls);
 
   // Carga inicial estilo Historial: en lugar de una página pequeña que luego
   // dispara peticiones visibles, se encadenan lotes GRANDES hasta llenar la
@@ -1613,6 +1610,7 @@ function ProfileContentSection({ username, section, actor }) {
                     items={group.items}
                     view={menuEnabled ? controls.view : "grid"}
                     viewerTitleStates={viewerTitleStates}
+                    animateWithin={entranceCount}
                   />
                 ) : (
                   <ProfilePosterItems
@@ -1620,13 +1618,14 @@ function ProfileContentSection({ username, section, actor }) {
                     view={menuEnabled ? controls.view : "grid"}
                     showStars={config.showStars}
                     viewerTitleStates={viewerTitleStates}
+                    animateWithin={entranceCount}
                   />
                 )
               ) : null}
               {config.layout === "reviews" ? (
                 <div className="space-y-3">
                   {group.items.map((item, index) => (
-                    <ProfileEntrance key={item.id} index={index} total={group.items.length}>
+                    <ProfileEntrance key={item.id} index={index} total={group.items.length} animateWithin={entranceCount}>
                       <ReviewCard item={item} />
                     </ProfileEntrance>
                   ))}
@@ -1635,7 +1634,7 @@ function ProfileContentSection({ username, section, actor }) {
               {config.layout === "lists" ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {group.items.map((item, index) => (
-                    <ProfileEntrance key={item.id} index={index} total={group.items.length}>
+                    <ProfileEntrance key={item.id} index={index} total={group.items.length} animateWithin={entranceCount}>
                       <ProfileListCard item={item} />
                     </ProfileEntrance>
                   ))}
@@ -1646,6 +1645,7 @@ function ProfileContentSection({ username, section, actor }) {
                   items={group.items}
                   actor={actor}
                   posterList={controls.view === "poster-list"}
+                  animateWithin={entranceCount}
                 />
               ) : null}
             </section>

@@ -355,7 +355,7 @@ function SidebarActivityText({ item }) {
     : "";
 
   if (item.type === "review") {
-    return <><span className="text-zinc-300">ha reseñado </span><SidebarActivityTitle item={item} /></>;
+    return <><span className="text-zinc-300">ha escrito una reseña de </span><SidebarActivityTitle item={item} /></>;
   }
   if (item.type === "watchlist") {
     return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Pendientes</span></>;
