@@ -833,6 +833,19 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates }) {
   );
 }
 
+function profileGridColumnCount(view) {
+  if (typeof window === "undefined") return 0;
+  const width = window.innerWidth;
+  if (view === "compact") {
+    if (width >= 768) return 8;
+    if (width >= 640) return 5;
+    return 4;
+  }
+  if (width >= 768) return 6;
+  if (width >= 640) return 4;
+  return 3;
+}
+
 function ProfileContentSection({ username, section, actor }) {
   const { user: viewer } = useAuth();
   const config = SECTIONS[section];
@@ -843,6 +856,9 @@ function ProfileContentSection({ username, section, actor }) {
   const [offset, setOffset] = useState(() => profileSectionCache.get(cacheKey)?.offset || 0);
   const [hasMore, setHasMore] = useState(() => profileSectionCache.get(cacheKey)?.hasMore || false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const loadMoreRef = useRef(null);
+  const loadingMoreRef = useRef(false);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
   const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
   const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section, profileKey));
@@ -912,6 +928,7 @@ function ProfileContentSection({ username, section, actor }) {
       setHasMore(false);
       setOffset(0);
     }
+    setLoadMoreError(false);
     (async () => {
       try {
         const res = await fetch(
@@ -940,31 +957,84 @@ function ProfileContentSection({ username, section, actor }) {
     };
   }, [username, section, cacheKey]);
 
-  const loadMore = async () => {
-    if (loadingMore || !hasMore) return;
+  const loadMore = useCallback(async ({ limit = 30 } = {}) => {
+    if (loadingMoreRef.current || !hasMore) return;
+    const pageSize = Math.min(30, Math.max(1, Number(limit) || 30));
+    loadingMoreRef.current = true;
     setLoadingMore(true);
+    setLoadMoreError(false);
     try {
       const res = await fetch(
-        `/api/users/${encodeURIComponent(username)}/${section}?limit=30&offset=${offset}`,
+        `/api/users/${encodeURIComponent(username)}/${section}?limit=${pageSize}&offset=${offset}`,
         { cache: "no-store" },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const nextSection = {
-        items: [...items, ...(Array.isArray(data.items) ? data.items : [])],
-        hasMore: Boolean(data.hasMore),
-        offset: Number(data.offset) || offset,
-      };
-      profileSectionCache.set(cacheKey, nextSection);
-      setItems(nextSection.items);
-      setHasMore(nextSection.hasMore);
-      setOffset(nextSection.offset);
+      const nextHasMore = Boolean(data.hasMore);
+      const nextOffset = Number(data.offset) || offset;
+      const nextItems = Array.isArray(data.items) ? data.items : [];
+      setItems((currentItems) => {
+        const mergedItems = [...currentItems, ...nextItems];
+        profileSectionCache.set(cacheKey, {
+          items: mergedItems,
+          hasMore: nextHasMore,
+          offset: nextOffset,
+        });
+        return mergedItems;
+      });
+      setHasMore(nextHasMore);
+      setOffset(nextOffset);
     } catch {
-      // reintentar manualmente
+      setLoadMoreError(true);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  };
+  }, [cacheKey, hasMore, offset, section, username]);
+
+  // El historial carga al acercarse al final; las secciones paginadas del
+  // perfil usan el mismo patrón y conservan un botón solo para reintentar un
+  // fallo de red.
+  useEffect(() => {
+    if (
+      status !== "ready" ||
+      !hasMore ||
+      loadingMore ||
+      loadMoreError ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return undefined;
+    }
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore();
+      },
+      { threshold: 0.01, rootMargin: "0px 0px 360px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, loadMoreError, loadingMore, status]);
+
+  // En grid, una vista con más columnas puede dejar la última fila incompleta
+  // aunque ya hubiese una página cargada. Pedimos exactamente las tarjetas que
+  // faltan para completar esa fila cuando haya más resultados disponibles.
+  useEffect(() => {
+    const canCompleteGrid =
+      config?.layout === "posters" &&
+      effectiveGroup === "none" &&
+      (controls.view === "grid" || controls.view === "compact") &&
+      hasMore &&
+      !loadingMore &&
+      !loadMoreError;
+    const columns = canCompleteGrid ? profileGridColumnCount(controls.view) : 0;
+    const remainder = columns > 0 ? visibleItems.length % columns : 0;
+    if (columns > 0 && remainder > 0) {
+      loadMore({ limit: columns - remainder });
+    }
+  }, [config?.layout, controls.view, effectiveGroup, hasMore, loadMore, loadMoreError, loadingMore, visibleItems.length]);
 
   if (!config) return null;
 
@@ -1038,15 +1108,24 @@ function ProfileContentSection({ username, section, actor }) {
       )}
 
       {hasMore && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={loadingMore}
-          className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 text-sm font-bold text-zinc-300 hover:bg-white/10 disabled:opacity-60"
-        >
-          {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Cargar más
-        </button>
+        <div ref={loadMoreRef} className="mt-6 flex min-h-10 w-full items-center justify-center" aria-live="polite">
+          {loadingMore ? (
+            <span className="inline-flex items-center gap-2 text-sm font-bold text-zinc-400">
+              <Loader2 className="h-4 w-4 animate-spin text-emerald-400" aria-hidden="true" />
+              Cargando más...
+            </span>
+          ) : loadMoreError ? (
+            <button
+              type="button"
+              onClick={() => loadMore()}
+              className="text-sm font-bold text-emerald-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+            >
+              Reintentar cargar más
+            </button>
+          ) : (
+            <span className="sr-only">Desplázate para cargar más títulos.</span>
+          )}
+        </div>
       )}
     </div>
   );
