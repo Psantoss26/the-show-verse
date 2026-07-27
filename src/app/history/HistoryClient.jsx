@@ -53,9 +53,11 @@ import {
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import {
+  historyEntryMatchesTarget,
   mergeHistoryTopSnapshot,
   selectHistoryCacheEnvelope,
 } from "@/lib/userLists/historyCacheSnapshot";
+import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 200;
@@ -3088,6 +3090,42 @@ export default function HistoryClient() {
   useEffect(() => {
     loadAuth();
   }, [loadAuth]);
+
+  // DetailModal y DetailsClient pueden borrar una reproducción concreta o todo
+  // el historial de una película/serie mientras esta página permanece montada
+  // en segundo plano. Aplicamos la misma baja a `raw` inmediatamente; si la
+  // página estaba desmontada, readHistoryCache recuperará esta mutación desde
+  // localStorage al volver.
+  useEffect(() => {
+    const onHistoryChange = (event) => {
+      const detail = event?.detail;
+      if (
+        detail?.added !== false ||
+        !Array.isArray(detail?.listTypes) ||
+        !detail.listTypes.includes("history")
+      ) {
+        return;
+      }
+
+      setRaw((previous) => {
+        const nextItems = (previous || []).filter((item) => {
+          if (detail.historyId != null) {
+            return String(getHistoryId(item)) !== String(detail.historyId);
+          }
+          return !historyEntryMatchesTarget(item, detail);
+        });
+        if (nextItems.length === previous.length) return previous;
+        writeHistoryCache(nextItems, {
+          hasMore: hasMoreHistoryRef.current,
+          nextPage: nextHistoryPageRef.current,
+        });
+        return nextItems;
+      });
+    };
+
+    window.addEventListener(LIST_CHANGED_EVENT, onHistoryChange);
+    return () => window.removeEventListener(LIST_CHANGED_EVENT, onHistoryChange);
+  }, []);
 
   useEffect(() => {
     if (auth.loading || !auth.connected) return;

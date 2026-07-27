@@ -2,9 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  historyEntryMatchesTarget,
   mergeHistoryTopSnapshot,
   selectHistoryCacheEnvelope,
 } from "./historyCacheSnapshot.js";
+import {
+  cacheRemoveHistory,
+  cacheRemoveHistoryItem,
+} from "./optimisticListCache.js";
+
+const HISTORY_CACHE_KEY = "showverse:history:items:v4";
+
+function createMemoryStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+}
 
 test("uses the persisted optimistic history update when its snapshot time matches memory", () => {
   const memory = {
@@ -105,4 +127,141 @@ test("keeps an optimistic play when the fresh top page has not confirmed it yet"
     }),
     [optimistic],
   );
+});
+
+test("matches a movie removed from DetailsClient against its canonical history entry", () => {
+  const entry = {
+    type: "movie",
+    movie: { ids: { tmdb: 453 } },
+    history_id: "movie-play",
+  };
+
+  assert.equal(
+    historyEntryMatchesTarget(entry, { mediaType: "movie", tmdbId: 453 }),
+    true,
+  );
+  assert.equal(
+    historyEntryMatchesTarget(entry, { mediaType: "tv", tmdbId: 453 }),
+    false,
+  );
+});
+
+test("matches episode, season and complete-show removals against TV history entries", () => {
+  const episode = {
+    type: "episode",
+    show: { ids: { tmdb: 1399 } },
+    episode: { season: 6, number: 4 },
+    history_id: "episode-play",
+  };
+
+  assert.equal(
+    historyEntryMatchesTarget(episode, {
+      mediaType: "tv",
+      tmdbId: 1399,
+      season: 6,
+      episode: 4,
+    }),
+    true,
+  );
+  assert.equal(
+    historyEntryMatchesTarget(episode, {
+      mediaType: "tv",
+      tmdbId: 1399,
+      season: 6,
+    }),
+    true,
+  );
+  assert.equal(
+    historyEntryMatchesTarget(episode, {
+      mediaType: "tv",
+      tmdbId: 1399,
+    }),
+    true,
+  );
+  assert.equal(
+    historyEntryMatchesTarget(episode, {
+      mediaType: "tv",
+      tmdbId: 1399,
+      season: 6,
+      episode: 5,
+    }),
+    false,
+  );
+});
+
+test("matches the optimistic TV shape used before returning from DetailsClient", () => {
+  const optimistic = {
+    type: "tv",
+    tmdbId: 1399,
+    season: 1,
+    episode_number: 2,
+    _optimistic: true,
+  };
+
+  assert.equal(
+    historyEntryMatchesTarget(optimistic, {
+      mediaType: "show",
+      tmdbId: 1399,
+      season: 1,
+      episode: 2,
+    }),
+    true,
+  );
+});
+
+test("removes DetailsClient targets from the persisted History snapshot before back navigation", () => {
+  const storage = createMemoryStorage({
+    [HISTORY_CACHE_KEY]: JSON.stringify({
+      t: 100,
+      items: [
+        {
+          type: "movie",
+          movie: { ids: { tmdb: 453 } },
+          history_id: "movie-play",
+        },
+        {
+          type: "episode",
+          show: { ids: { tmdb: 1399 } },
+          episode: { season: 6, number: 4 },
+          history_id: "episode-play",
+        },
+        {
+          type: "episode",
+          show: { ids: { tmdb: 1399 } },
+          episode: { season: 6, number: 5 },
+          history_id: "other-episode",
+        },
+      ],
+      hasMore: true,
+      nextPage: 2,
+    }),
+  });
+  const events = [];
+  globalThis.window = {
+    localStorage: storage,
+    dispatchEvent(event) {
+      events.push(event);
+    },
+  };
+
+  try {
+    cacheRemoveHistoryItem({
+      type: "tv",
+      tmdbId: 1399,
+      season: 6,
+      episode: 4,
+    });
+    cacheRemoveHistory("movie-play");
+
+    const snapshot = JSON.parse(storage.getItem(HISTORY_CACHE_KEY));
+    assert.deepEqual(
+      snapshot.items.map((item) => item.history_id),
+      ["other-episode"],
+    );
+    assert.equal(events.length, 2);
+    assert.equal(events[0].detail.added, false);
+    assert.deepEqual(events[0].detail.listTypes, ["history"]);
+  } finally {
+    delete globalThis.window;
+  }
 });

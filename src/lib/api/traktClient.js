@@ -3,6 +3,7 @@ import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import {
   cacheAddHistory,
   cacheRemoveHistory,
+  cacheRemoveHistoryItem,
   clearWatchDerivedCaches,
 } from "@/lib/userLists/optimisticListCache";
 import { normalizeHistoryEntryIds } from "@/lib/trakt/historyEntryIds";
@@ -267,7 +268,11 @@ export async function traktSetWatched({ type, tmdbId, watched, watchedAt, title,
   // Historial: al MARCAR visto (no al quitar) añadimos la entrada de forma
   // OPTIMISTA para que el título aparezca al instante en /history junto al resto
   // (es el botón "visto" de la ficha, la vía principal de añadir al historial).
-  if (watched) cacheAddHistory({ type, tmdbId, watchedAt, title, posterPath });
+  if (watched) {
+    cacheAddHistory({ type, tmdbId, watchedAt, title, posterPath });
+  } else {
+    cacheRemoveHistoryItem({ type, tmdbId });
+  }
   return json;
 }
 
@@ -463,6 +468,14 @@ export async function traktSetEpisodeWatched({
   if (!res.ok)
     throw new Error(json?.error || `Trakt episode watched HTTP ${res.status}`);
   clearWatchDerivedCaches();
+  if (!watched) {
+    cacheRemoveHistoryItem({
+      type: "tv",
+      tmdbId,
+      season,
+      episode,
+    });
+  }
   return json; // { watchedBySeason }
 }
 
@@ -490,6 +503,9 @@ export async function traktSetSeasonWatched({
   if (!res.ok)
     throw new Error(json?.error || `Trakt season watched HTTP ${res.status}`);
   clearWatchDerivedCaches();
+  if (!watched) {
+    cacheRemoveHistoryItem({ type: "tv", tmdbId, season });
+  }
   return json;
 }
 
@@ -674,6 +690,7 @@ export async function traktRemoveHistoryEntries({ ids } = {}) {
     throw new Error(
       json?.error || `Trakt remove history entries HTTP ${res.status}`,
     );
+  for (const historyId of safeIds) cacheRemoveHistory(historyId);
   return json;
 }
 

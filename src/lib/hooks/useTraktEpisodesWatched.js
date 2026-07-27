@@ -34,6 +34,7 @@ import {
   traktRemoveHistoryEntries,
   invalidateTraktGetCache,
 } from "@/lib/api/traktClient";
+import { cacheRemoveHistoryItem } from "@/lib/userLists/optimisticListCache";
 
 const SHOW_BUSY_KEY = "SHOW";
 
@@ -998,6 +999,12 @@ export function useTraktEpisodesWatched({
 
         if (!res.ok)
           throw new Error(json?.error || "Error marcando serie en Trakt");
+        if (!watchedAtOrNull) {
+          cacheRemoveHistoryItem({
+            type: "tv",
+            tmdbId: tmdbIdNum,
+          });
+        }
         invalidateTraktGetCache({
           tmdbId: tmdbIdNum,
           traktId: traktResolvedIdRef.current ?? undefined,

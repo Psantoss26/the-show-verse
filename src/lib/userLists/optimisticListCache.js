@@ -23,7 +23,8 @@
 // instantáneo: su caché va por sessionStorage y por NOMBRE de usuario, así que
 // no se puede parchear directamente desde aquí (no conocemos el username).
 
-import { recordPendingListChange } from "./pendingListAdditions";
+import { recordPendingListChange } from "./pendingListAdditions.js";
+import { historyEntryMatchesTarget } from "./historyCacheSnapshot.js";
 
 function recordProfilePending(listType, { type, mediaId, tmdbId, title, posterPath, rating }, added) {
   try {
@@ -297,6 +298,37 @@ export function cacheRemoveHistory(historyId) {
     "history",
     (it) => String(it?.history_id ?? it?.id) === target,
   );
+  emitListChanged(["history"], {
+    added: false,
+    historyId: target,
+  });
+}
+
+export function cacheRemoveHistoryItem({
+  type,
+  mediaType,
+  tmdbId,
+  mediaId,
+  season,
+  episode,
+}) {
+  const id = Number(tmdbId ?? mediaId);
+  if (!Number.isFinite(id)) return;
+  const normalizedMediaType = normalizeType(mediaType ?? type);
+  const target = {
+    mediaType: normalizedMediaType,
+    tmdbId: id,
+    season,
+    episode,
+  };
+  remove("history", (item) => historyEntryMatchesTarget(item, target));
+  emitListChanged(["history"], {
+    added: false,
+    mediaType: normalizedMediaType,
+    tmdbId: id,
+    season: season ?? null,
+    episode: episode ?? null,
+  });
 }
 
 // Marcar visto cambia la página "En progreso" (y "Completadas"): invalidamos sus
