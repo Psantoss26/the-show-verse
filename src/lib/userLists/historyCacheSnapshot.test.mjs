@@ -7,6 +7,7 @@ import {
   selectHistoryCacheEnvelope,
 } from "./historyCacheSnapshot.js";
 import {
+  cacheAddHistory,
   cacheRemoveHistory,
   cacheRemoveHistoryItem,
 } from "./optimisticListCache.js";
@@ -124,9 +125,90 @@ test("keeps an optimistic play when the fresh top page has not confirmed it yet"
       idOf: (item) => item.history_id,
       optimisticKeyOf: (item) =>
         `${item.tmdbId}:${String(item.watched_at).slice(0, 10)}`,
+      now: new Date("2026-07-27T10:01:00.000Z").getTime(),
     }),
     [optimistic],
   );
+});
+
+test("drops an expired optimistic play once an authoritative refresh still does not contain it", () => {
+  const optimistic = {
+    history_id: "optimistic:9",
+    tmdbId: 9,
+    watched_at: "2026-07-27T10:00:00.000Z",
+    _optimistic: true,
+  };
+
+  assert.deepEqual(
+    mergeHistoryTopSnapshot([optimistic], [], {
+      idOf: (item) => item.history_id,
+      optimisticKeyOf: (item) =>
+        `${item.tmdbId}:${String(item.watched_at).slice(0, 10)}`,
+      now: new Date("2026-07-27T10:10:00.000Z").getTime(),
+      optimisticGraceMs: 5 * 60 * 1000,
+      freshHasMore: false,
+    }),
+    [],
+  );
+});
+
+test("removes stale canonical entries from the refreshed top window but preserves older pages", () => {
+  const previous = [
+    {
+      history_id: "deleted-on-server",
+      watched_at: "2026-07-27T10:00:00.000Z",
+    },
+    {
+      history_id: "older-page",
+      watched_at: "2025-01-01T10:00:00.000Z",
+    },
+  ];
+  const fresh = [
+    {
+      history_id: "current-top",
+      watched_at: "2026-07-27T09:00:00.000Z",
+    },
+  ];
+
+  assert.deepEqual(
+    mergeHistoryTopSnapshot(previous, fresh, {
+      idOf: (item) => item.history_id,
+      optimisticKeyOf: () => null,
+      freshHasMore: true,
+    }).map((item) => item.history_id),
+    ["older-page", "current-top"],
+  );
+});
+
+test("stores the canonical history id returned by the add mutation", () => {
+  const storage = createMemoryStorage({
+    [HISTORY_CACHE_KEY]: JSON.stringify({
+      t: 100,
+      items: [],
+      hasMore: false,
+      nextPage: 1,
+    }),
+  });
+  globalThis.window = {
+    localStorage: storage,
+    dispatchEvent() {},
+  };
+
+  try {
+    cacheAddHistory({
+      type: "movie",
+      tmdbId: 453,
+      watchedAt: "2026-07-27",
+      title: "Disclosure Day",
+      historyId: "canonical-play",
+    });
+
+    const snapshot = JSON.parse(storage.getItem(HISTORY_CACHE_KEY));
+    assert.equal(snapshot.items[0].history_id, "canonical-play");
+    assert.equal(snapshot.items[0]._optimistic, false);
+  } finally {
+    delete globalThis.window;
+  }
 });
 
 test("matches a movie removed from DetailsClient against its canonical history entry", () => {

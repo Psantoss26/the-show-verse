@@ -316,8 +316,18 @@ export async function traktHistoryOp({
   }
   // Actualización OPTIMISTA de la caché de la página Historial: la nueva
   // visualización aparece al instante al entrar en /history, junto al resto.
-  if (op === "add") cacheAddHistory({ type, tmdbId, watchedAt, title, posterPath });
-  else if (op === "remove" && historyId != null) cacheRemoveHistory(historyId);
+  if (op === "add") {
+    cacheAddHistory({
+      type,
+      tmdbId,
+      watchedAt,
+      title,
+      posterPath,
+      historyId: json?.historyId ?? json?.id ?? null,
+    });
+  } else if (op === "remove" && historyId != null) {
+    cacheRemoveHistory(historyId);
+  }
   return json;
 }
 
