@@ -92,6 +92,70 @@ export function getPendingListChanges(listType) {
   return { additions, removedKeys };
 }
 
+function buildPendingTmdbItem(entry, addedIndex) {
+  const mediaType = normalizeMediaType(entry?.mediaType);
+  const title = entry?.title || "";
+  return {
+    id: Number(entry?.tmdbId),
+    media_type: mediaType,
+    title,
+    name: title,
+    title_es: title,
+    poster_path: entry?.posterPath || null,
+    backdrop_path: null,
+    release_date: null,
+    first_air_date: null,
+    vote_average: null,
+    genre_ids: [],
+    user_rating: typeof entry?.rating === "number" ? entry.rating : null,
+    _addedIndex: addedIndex,
+    _optimistic: true,
+  };
+}
+
+/**
+ * Fusiona cambios pendientes con la forma de datos que consumen las páginas
+ * completas de Favoritos y Pendientes. Es pura para poder verificar que el
+ * primer lote ya contiene las altas recientes y no las inserta en otro render.
+ */
+export function mergePendingTmdbItems(
+  items,
+  { additions = [], removedKeys = new Set() } = {},
+) {
+  const source = Array.isArray(items) ? items : [];
+  const removed = removedKeys instanceof Set
+    ? removedKeys
+    : new Set(removedKeys || []);
+  const base = removed.size
+    ? source.filter((item) => !removed.has(pendingItemKey(item?.media_type, item?.id)))
+    : source;
+  const present = new Set(
+    base.map((item) => pendingItemKey(item?.media_type, item?.id)),
+  );
+  const missing = additions.filter((entry) => !present.has(entry?.key));
+
+  if (!missing.length && base.length === source.length) return items;
+
+  const minAddedIndex = base.reduce(
+    (minimum, item) =>
+      Math.min(minimum, Number.isFinite(Number(item?._addedIndex))
+        ? Number(item._addedIndex)
+        : 0),
+    0,
+  );
+  const prepend = missing.map((entry, index) =>
+    buildPendingTmdbItem(
+      entry,
+      minAddedIndex - missing.length + index,
+    ),
+  );
+  return prepend.length ? [...prepend, ...base] : base;
+}
+
+export function mergePendingTmdbListItems(items, listType) {
+  return mergePendingTmdbItems(items, getPendingListChanges(listType));
+}
+
 /**
  * Poda las entradas ya confirmadas por los datos frescos (o caducadas). `presentKeys`
  * = claves (pendingItemKey) que YA vienen en la respuesta fresca del backend.

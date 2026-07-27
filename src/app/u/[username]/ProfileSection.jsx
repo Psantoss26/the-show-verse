@@ -764,7 +764,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
   return (
-    <article className={`rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
+    <article className={`rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
       <div className="flex gap-3 sm:gap-4">
         {posterList ? (
           <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
@@ -985,7 +985,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
     <Link
       href={`/details/${type}/${item?.tmdbId || item?.id}`}
       onClick={previewClick(item, { mediaType: type })}
-      className="group flex min-w-0 items-center gap-3 rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
+      className="group flex min-w-0 items-center gap-3 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
     >
       <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
         {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
@@ -1041,7 +1041,7 @@ function DiaryListItem({ item, viewerState, onOpenGroup }) {
   );
 
   return (
-    <article className="group overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg">
+    <article className="group overflow-hidden rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg">
       {grouped ? (
         <button
           type="button"
@@ -1181,6 +1181,17 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
   );
 }
 
+const PROFILE_POSTER_GRID_CLASS = Object.freeze({
+  grid: "grid gap-3 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6",
+  compact: "grid gap-2 grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8",
+});
+
+function profilePosterGridClass(view) {
+  return view === "compact"
+    ? PROFILE_POSTER_GRID_CLASS.compact
+    : PROFILE_POSTER_GRID_CLASS.grid;
+}
+
 function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const collapsedItems = useMemo(() => collapseDiaryEpisodes(items), [items]);
@@ -1211,7 +1222,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
   }
 
   return (
-    <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
+    <div className={profilePosterGridClass(view)}>
       {collapsedItems.map((item, index) => {
         const group = item.episodeGroup;
         const grouped = group?.length > 1;
@@ -1295,7 +1306,7 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
   }
 
   return (
-    <div className={`grid gap-3 ${view === "compact" ? "grid-cols-4 sm:grid-cols-5 md:grid-cols-8" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}>
+    <div className={profilePosterGridClass(view)}>
       {items.map((item, index) => (
         <ProfileEntrance
           key={profileItemKey(item, index)}
@@ -1322,11 +1333,14 @@ function profileGridColumnCount(view) {
   if (typeof window === "undefined") return 0;
   const width = window.innerWidth;
   if (view === "compact") {
-    if (width >= 768) return 8;
+    if (width >= 1280) return 8;
+    if (width >= 1024) return 7;
+    if (width >= 768) return 6;
     if (width >= 640) return 5;
     return 4;
   }
-  if (width >= 768) return 6;
+  if (width >= 1024) return 6;
+  if (width >= 768) return 5;
   if (width >= 640) return 4;
   return 3;
 }
@@ -1353,7 +1367,7 @@ function estimateFillCount(config, controls) {
     rowHeight = 88; // filas de lista / reseñas / actividad (aprox.)
   } else {
     const container = Math.min(window.innerWidth || 1120, 1120) - 32;
-    const gap = 12;
+    const gap = view === "compact" ? 8 : 12;
     const cardWidth = (container - gap * (columns - 1)) / columns;
     rowHeight = cardWidth * 1.5 + 28 + gap; // póster 2:3 + fila de estrellas + gap
   }
