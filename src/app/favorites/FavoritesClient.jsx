@@ -53,6 +53,7 @@ import {
 } from "@/lib/hooks/useIsHistoryNavigation";
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
+import { readCachedUserId } from "@/lib/auth/currentUser";
 import {
   mergePendingTmdbListItems,
   prunePendingListChanges,
@@ -257,6 +258,12 @@ function readFavoritesCache() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.items)) return null;
+    // La caché es GLOBAL (una sola clave). Solo se usa si pertenece a la cuenta
+    // ACTUAL: sin esto, al cambiar de usuario la restauración "atrás" pintaba la
+    // lista del usuario anterior. Formato viejo sin `owner` → se descarta (una vez).
+    const currentUserId = readCachedUserId();
+    const owner = parsed.owner != null ? String(parsed.owner) : null;
+    if (!currentUserId || owner !== currentUserId) return null;
     const age = Date.now() - Number(parsed.t || 0);
     if (age > FAVORITES_CACHE_HARD_MAX_AGE) {
       window.localStorage.removeItem(FAVORITES_CACHE_KEY);
@@ -279,6 +286,7 @@ function writeFavoritesCache(items, ratedItems = []) {
       FAVORITES_CACHE_KEY,
       JSON.stringify({
         t: Date.now(),
+        owner: readCachedUserId(),
         items: Array.isArray(items) ? items : [],
         ratedItems: Array.isArray(ratedItems) ? ratedItems : [],
       }),

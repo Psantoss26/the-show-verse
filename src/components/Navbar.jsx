@@ -344,7 +344,7 @@ function SearchBar({
   }, [showDropdown, isMobile]);
 
   useLayoutEffect(() => {
-    if (!showFilterMenu || !filterButtonRef.current) {
+    if (!showFilterMenu || !filterButtonRef.current || !searchRef.current) {
       setFilterMenuPosition(null);
       return undefined;
     }
@@ -352,17 +352,18 @@ function SearchBar({
     let frameId = 0;
     const updatePosition = () => {
       frameId = 0;
-      const rect = filterButtonRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const filterBtnRect = filterButtonRef.current?.getBoundingClientRect();
+      const searchRect = searchRef.current?.getBoundingClientRect();
+      if (!filterBtnRect || !searchRect) return;
 
       const viewportPadding = 16;
       const width = Math.min(272, window.innerWidth - viewportPadding * 2);
       const left = Math.min(
         window.innerWidth - width - viewportPadding,
-        Math.max(viewportPadding, rect.right - width),
+        Math.max(viewportPadding, filterBtnRect.right - width),
       );
       const next = {
-        top: rect.bottom + 10,
+        top: searchRect.bottom + (isMobile ? 16 : 8),
         left,
         width,
       };
@@ -388,7 +389,7 @@ function SearchBar({
       window.removeEventListener("resize", schedulePositionUpdate);
       window.removeEventListener("scroll", schedulePositionUpdate, true);
     };
-  }, [showFilterMenu]);
+  }, [showFilterMenu, isMobile]);
 
   const openSearchHistory = () => {
     const history = readSearchHistory();
@@ -975,10 +976,10 @@ function SearchBar({
                 id={filterMenuId}
                 role="menu"
                 aria-label={t("search_filter_menu", "Filtros de búsqueda")}
-                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                initial={{ opacity: 0, y: -10, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
+                exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 style={filterMenuPosition}
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
@@ -986,47 +987,57 @@ function SearchBar({
                   setShowFilterMenu(false);
                   filterButtonRef.current?.focus();
                 }}
-                className={`fixed z-[100000] overflow-hidden rounded-2xl border border-white/[0.1] p-2 text-white ${LIQUID_GLASS_PANEL}`}
+                className={`fixed z-[100000] overflow-hidden rounded-2xl text-white ${LIQUID_GLASS_PANEL}`}
               >
-                <p className="px-3 pb-2 pt-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
-                  {t("search_filter_menu", "Filtrar por")}
-                </p>
-                <div className="space-y-1">
-                  {translatedFilterOptions.map(
-                    ({ id, label, Icon: FilterIcon }) => {
-                      const isActive = activeFilter === id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={isActive}
-                          onClick={() => handleFilterSelect(id)}
-                          className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80 ${
-                            isActive
-                              ? "bg-emerald-400/15 text-emerald-200"
-                              : "text-white/75 hover:bg-white/[0.08] hover:text-white"
-                          }`}
-                        >
-                          <FilterIcon
-                            className={`h-4 w-4 shrink-0 ${
-                              isActive ? "text-emerald-300" : "text-white/45"
-                            }`}
-                            aria-hidden="true"
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {label}
-                          </span>
-                          {isActive && (
-                            <Check
-                              className="h-4 w-4 shrink-0 text-emerald-300"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </button>
-                      );
-                    },
-                  )}
+                <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/45 select-none">
+                      <SlidersHorizontal
+                        className="h-3.5 w-3.5 text-emerald-400/80 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{t("search_filter_menu", "Filtrar por")}</span>
+                    </div>
+                    <div className="space-y-1" role="none">
+                      {translatedFilterOptions.map(
+                        ({ id, label, Icon: FilterIcon }) => {
+                          const isActive = activeFilter === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={isActive}
+                              onClick={() => handleFilterSelect(id)}
+                              className={`group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80 ${
+                                isActive
+                                  ? "bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/20 active:bg-emerald-400/25"
+                                  : "text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15"
+                              }`}
+                            >
+                              <FilterIcon
+                                className={`h-4 w-4 shrink-0 transition-colors ${
+                                  isActive
+                                    ? "text-emerald-300"
+                                    : "text-white/45 group-hover:text-amber-300"
+                                }`}
+                                aria-hidden="true"
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {label}
+                              </span>
+                              {isActive && (
+                                <Check
+                                  className="h-4 w-4 shrink-0 text-emerald-300"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1056,19 +1067,19 @@ function SearchBar({
                   <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
                     {!query.trim() ? (
               <div className="p-2">
-                <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
-                    <History className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" />
-                    <span>{t("search_history_title", "Búsquedas recientes")}</span>
+                <div className="flex items-center justify-between gap-3 px-3 pt-2 pb-1.5">
+                  <div className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/45 select-none">
+                    <History className="h-3.5 w-3.5 text-amber-400/80 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{t("search_history_title", "Búsquedas recientes")}</span>
                   </div>
                   {searchHistory.length > 0 && (
                     <button
                       type="button"
                       onClick={handleHistoryClear}
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                      className="group inline-flex items-center gap-1.5 rounded-full bg-white/[0.08] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/50 backdrop-blur-md transition-all duration-200 hover:bg-rose-500/20 hover:text-rose-200 active:scale-95 focus-visible:outline-none"
                     >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {t("search_history_clear_all", "Borrar todo")}
+                      <Trash2 className="h-3 w-3 shrink-0 text-white/40 transition-colors duration-200 group-hover:text-rose-300" aria-hidden="true" />
+                      <span>{t("search_history_clear_all", "Borrar todo")}</span>
                     </button>
                   )}
                 </div>
@@ -1077,12 +1088,12 @@ function SearchBar({
                     {searchHistory.map((historyQuery) => (
                       <li
                         key={historyQuery}
-                        className="group flex min-h-11 items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10"
+                        className="group flex min-h-10 items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10"
                       >
                         <button
                           type="button"
                           onClick={() => handleHistoryClick(historyQuery)}
-                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
                         >
                           <History
                             className="h-4 w-4 shrink-0 text-white/35 transition-colors group-hover:text-amber-300"
@@ -1099,9 +1110,9 @@ function SearchBar({
                             "search_history_remove",
                             "Eliminar del historial",
                           )}: ${historyQuery}`}
-                          className="mr-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                          className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
                         >
-                          <XIcon className="h-4 w-4" aria-hidden="true" />
+                          <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </li>
                     ))}
