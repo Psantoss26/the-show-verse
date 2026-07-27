@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
-import { LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import ProfileSection from "./ProfileSection";
@@ -20,12 +20,15 @@ import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import {
   Activity,
   Award,
+  BookmarkPlus,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Eye,
   Film,
   Flame,
+  Heart,
   Loader2,
   LogOut,
   PieChart,
@@ -180,6 +183,7 @@ function ProfilePosterGrid({
   label,
   prioritizeHorizontalScroll = false,
   preferEnglishPosters = false,
+  fixedIndicator = false,
 }) {
   const posterItems = useEnglishPosterItems(items, preferEnglishPosters);
 
@@ -201,6 +205,7 @@ function ProfilePosterGrid({
             showStars={showStars}
             viewerState={viewerTitleStates[titleStateKey(item)]}
             indicatorSize="profile"
+            fixedIndicator={fixedIndicator}
           />
         </div>
       ))}
@@ -301,6 +306,14 @@ function PendingPreview({ username, items, onOpen }) {
                     </span>
                   </div>
                 )}
+                <div
+                  className={`pointer-events-none absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl`}
+                  aria-hidden="true"
+                >
+                  <span className="flex h-6 w-7 items-center justify-center text-sky-400">
+                    <BookmarkPlus className="h-3.5 w-3.5 fill-current" />
+                  </span>
+                </div>
               </Link>
             );
           })}
@@ -1040,6 +1053,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   label="Películas favoritas"
                   prioritizeHorizontalScroll
                   preferEnglishPosters
+                  fixedIndicator="favorite"
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -1059,6 +1073,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   label="Series favoritas"
                   prioritizeHorizontalScroll
                   preferEnglishPosters
+                  fixedIndicator="favorite"
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
