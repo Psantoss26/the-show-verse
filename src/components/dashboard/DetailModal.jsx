@@ -60,9 +60,14 @@ import {
 import {
   addMovieToList as backendAddMovieToList,
   createUserList as backendCreateUserList,
+  getListDetails as backendGetListDetails,
 } from "@/lib/api/backendLists";
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import LiquidButton from "@/components/LiquidButton";
+import {
+  buildListMembershipMap,
+  selectOwnedComments,
+} from "@/lib/details/detailActionState";
 
 import {
   buildImg,
@@ -122,6 +127,7 @@ import {
   traktAddComment,
   traktUpdateComment,
   traktDeleteComment,
+  traktGetComments,
   traktGetItemStatus,
   traktAddWatchPlay,
   traktUpdateWatchPlay,
@@ -1341,6 +1347,7 @@ export default function DetailModal({
   const [listModalOpen, setListModalOpen] = useState(false);
   const [listQuery, setListQuery] = useState("");
   const [membershipMap, setMembershipMap] = useState({});
+  const [listsPresenceLoading, setListsPresenceLoading] = useState(true);
   const [busyListId, setBusyListId] = useState(null);
   const [listsError, setListsError] = useState("");
   const [creatingList, setCreatingList] = useState(false);
@@ -1348,10 +1355,62 @@ export default function DetailModal({
   const [newListName, setNewListName] = useState("");
   const [newListDesc, setNewListDesc] = useState("");
 
-  // Al cambiar de título, olvida la pertenencia local (se calcula optimista).
+  // Al cambiar de título, olvida la pertenencia local mientras se consulta el
+  // estado persistido de todas las listas del usuario.
   useEffect(() => {
     setMembershipMap({});
-  }, [item]);
+    setListsPresenceLoading(true);
+  }, [item?.id, mediaType]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (listsLoadingHook) {
+      setListsPresenceLoading(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const lists = Array.isArray(userLists) ? userLists : [];
+    if (!item?.id || lists.length === 0) {
+      setMembershipMap({});
+      setListsPresenceLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setListsPresenceLoading(true);
+    Promise.all(
+      lists.map(async (list) => {
+        const listId = list?.id;
+        if (listId == null) return null;
+        try {
+          const details = await backendGetListDetails({ listId });
+          return { listId, items: details?.items || [] };
+        } catch {
+          return { listId, items: [] };
+        }
+      }),
+    )
+      .then((snapshots) => {
+        if (cancelled) return;
+        setMembershipMap(
+          buildListMembershipMap(snapshots.filter(Boolean), {
+            tmdbId: item.id,
+            mediaType,
+          }),
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setListsPresenceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.id, listsLoadingHook, mediaType, userLists]);
 
   const openListsModal = (event) => {
     stopNestedModalOpeningEvent(event);
@@ -1548,21 +1607,137 @@ export default function DetailModal({
   const { isConnected: traktConnected } = useTraktAuth();
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const traktType = mediaType === "tv" ? "show" : "movie";
+  const [titleComments, setTitleComments] = useState([]);
+  const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
+  const [traktUsername, setTraktUsername] = useState(null);
+  const myComments = useMemo(
+    () =>
+      selectOwnedComments(titleComments, {
+        appUsername: account?.username,
+        traktUsername,
+        ownedCommentIds,
+      }),
+    [account?.username, ownedCommentIds, titleComments, traktUsername],
+  );
+
+  useEffect(() => {
+    if (!traktConnected) {
+      setTraktUsername(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetch("/api/trakt/profile?userOnly=1", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (!cancelled) {
+          setTraktUsername(payload?.user?.username || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTraktUsername(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [traktConnected]);
+
+  useEffect(() => {
+    setTitleComments([]);
+    setOwnedCommentIds(new Set());
+    if (!item?.id || isEpisode) return undefined;
+
+    let cancelled = false;
+    traktGetComments({
+      type: traktType,
+      tmdbId: item.id,
+      sort: "newest",
+      page: 1,
+      limit: 50,
+    })
+      .then((payload) => {
+        if (!cancelled) {
+          setTitleComments(
+            Array.isArray(payload?.items) ? payload.items : [],
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTitleComments([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEpisode, item?.id, traktType]);
 
   const handleCommentSubmit = async ({ comment, spoiler }) => {
-    await traktAddComment({ type: traktType, tmdbId: item.id, comment, spoiler });
+    const result = await traktAddComment({
+      type: traktType,
+      tmdbId: item.id,
+      comment,
+      spoiler,
+    });
+    const commentId = result?.id || Date.now();
+    const nextComment = {
+      ...result,
+      id: commentId,
+      comment: result?.comment || comment,
+      spoiler: result?.spoiler ?? spoiler,
+      created_at: result?.created_at || new Date().toISOString(),
+      user: result?.user || {
+        username: account?.username || "Tú",
+        name: account?.name || account?.username || "Tú",
+        images: { avatar: { full: account?.avatarUrl || "" } },
+      },
+    };
+
+    setOwnedCommentIds((previous) => {
+      const next = new Set(previous);
+      next.add(String(commentId));
+      return next;
+    });
+    setTitleComments((previous) => [
+      nextComment,
+      ...previous.filter(
+        (entry) => String(entry?.id) !== String(commentId),
+      ),
+    ]);
+    return result;
   };
   const handleCommentUpdate = async ({ commentId, comment, spoiler }) => {
-    await traktUpdateComment({
+    const result = await traktUpdateComment({
       commentId,
       comment,
       spoiler,
       type: traktType,
       tmdbId: item.id,
     });
+    setTitleComments((previous) =>
+      previous.map((entry) =>
+        String(entry?.id) === String(commentId)
+          ? {
+              ...entry,
+              ...result,
+              comment: result?.comment || comment,
+              spoiler: result?.spoiler ?? spoiler,
+            }
+          : entry,
+      ),
+    );
+    return result;
   };
   const handleCommentDelete = async ({ commentId }) => {
     await traktDeleteComment({ commentId, type: traktType, tmdbId: item.id });
+    setOwnedCommentIds((previous) => {
+      const next = new Set(previous);
+      next.delete(String(commentId));
+      return next;
+    });
+    setTitleComments((previous) =>
+      previous.filter((entry) => String(entry?.id) !== String(commentId)),
+    );
   };
 
   /* ------------------------------ visto en Trakt ------------------------------ */
@@ -2127,7 +2302,7 @@ export default function DetailModal({
         onUpdate={handleCommentUpdate}
         onDelete={handleCommentDelete}
         title={title}
-        myComments={[]}
+        myComments={myComments}
       />
 
       {/* Enlaces externos — mismo listado que la ficha completa */}
@@ -2657,9 +2832,10 @@ export default function DetailModal({
                   watchlistLoading={loadingStates || updating}
                   onToggleWatchlist={handleToggleWatchlist}
                   onAddToList={openListsModal}
+                  listBusy={listsLoadingHook || listsPresenceLoading}
                   listActive={Object.values(membershipMap || {}).some(Boolean)}
-                  showComments={traktConnected || traktStatus.connected}
-                  commentsActive={false}
+                  showComments={ratingActionConnected}
+                  commentsActive={myComments.length > 0}
                   onComments={(event) => {
                     stopNestedModalOpeningEvent(event);
                     setCommentModalOpen(true);

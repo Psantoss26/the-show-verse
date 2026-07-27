@@ -23,17 +23,23 @@ import {
   MessageSquare,
 } from "lucide-react";
 
-// Contenedor con el mismo escalado responsivo (container queries) que la fila
-// original de DetailsClient. Se mantiene idéntico para no re-estilar.
-const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
-                [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
-                [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
+// Normaliza cualquier LiquidButton descendiente, incluidos los controles
+// compuestos (TraktWatchedControl y StarRating), para que siempre rellene la
+// celda que le corresponde y escale su icono con el mismo criterio.
+const MOBILE_ACTION_BUTTON_CLASS = `
                 [&_[data-liquid-button]:not(.labeled)]:!w-full [&_[data-liquid-button]:not(.labeled)]:!h-auto [&_[data-liquid-button]:not(.labeled)]:aspect-square [&_[data-liquid-button]:not(.labeled)]:[container-type:inline-size]
                 [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
                 [&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]
                 [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
+
+// Contenedor con el mismo escalado responsivo (container queries) que la fila
+// original de DetailsClient. Se mantiene idéntico para no re-estilar.
+const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
+                [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
+                [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
+                ${MOBILE_ACTION_BUTTON_CLASS}`;
 
 // Retardo entre celdas para que el cambio se lea de izquierda a derecha, en orden.
 const SLOT_STAGGER = 0.045;
@@ -152,7 +158,7 @@ export default function DetailActionsRow({
       {shouldCombineMedia && (
         <div className="block sm:hidden w-full">
           <div
-            className={`flex flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px]`}
+            className={`flex flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px] ${MOBILE_ACTION_BUTTON_CLASS}`}
           >
             {/* Slot 1: Trigger Principal (Play -> X) */}
             <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
