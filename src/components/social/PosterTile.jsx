@@ -45,7 +45,7 @@ function episodePreviewOf(item, mediaType) {
   };
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, onClick }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -53,27 +53,42 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
   const title = item?.title || item?.name || "";
 
-  const favorite = Boolean(viewerState?.favorite || item?.isFavorite || item?.favorite);
-  const watchlist = Boolean(viewerState?.watchlist || item?.isWatchlist || item?.watchlist);
+  const isFixedFavorite = fixedIndicator === "favorite" || fixedIndicator === "favorites";
+  const isFixedWatchlist = fixedIndicator === "watchlist" || fixedIndicator === "pending";
+  const isFixed = Boolean(fixedIndicator);
+
+  const favorite = Boolean(
+    viewerState?.favorite ??
+    item?.isFavorite ??
+    item?.favorite ??
+    (isFixedFavorite ? true : isFixedWatchlist ? false : false)
+  );
+  const watchlist = Boolean(
+    viewerState?.watchlist ??
+    item?.isWatchlist ??
+    item?.watchlist ??
+    (isFixedWatchlist ? true : isFixedFavorite ? false : false)
+  );
   const watched = Boolean(viewerState?.watched || item?.watched);
-  const userRating = viewerState?.rating ?? item?.userRating ?? item?.user_rating;
+  const userRating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? (!showStars ? item?.rating : undefined);
 
   const hasUserRating = userRating != null && Number(userRating) > 0;
-  const hasCollectionIndicator = favorite || watchlist;
+  const hasCollectionIndicator = favorite || watchlist || isFixed;
   const hasViewerIndicators = hasCollectionIndicator || watched || hasUserRating;
   const useProfileIndicatorSize = indicatorSize === "profile";
-  const indicatorItemClassName = compactIndicator
-    ? "h-7 w-8"
+  const useCompactSize = compactIndicator || isFixed;
+  const indicatorItemClassName = useCompactSize
+    ? "h-6 w-7 sm:h-6.5 sm:w-7.5"
     : useProfileIndicatorSize
       ? "h-8 w-9"
       : "h-9 w-10";
-  const indicatorIconClassName = compactIndicator
-    ? "h-4 w-4"
+  const indicatorIconClassName = useCompactSize
+    ? "h-3.5 w-3.5 sm:h-4 sm:w-4"
     : useProfileIndicatorSize
       ? "h-[1.125rem] w-[1.125rem]"
       : "h-5 w-5";
-  const indicatorRatingClassName = compactIndicator
-    ? "h-7 w-8 text-base"
+  const indicatorRatingClassName = useCompactSize
+    ? "h-6 w-7 text-xs sm:h-6.5 sm:w-7.5 sm:text-sm font-black"
     : useProfileIndicatorSize
       ? "h-8 w-9 text-lg"
       : "h-9 w-10 text-xl";
@@ -117,10 +132,12 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
         {cornerOverlay}
 
-        {/* Estados personales: barra liquid glass idéntica a los modales de DetailsClient (sin bordes marcados) */}
-        {hasViewerIndicators && (
+        {/* Estados personales: barra liquid glass en hover (cuando no es fixedIndicator) */}
+        {!fixedIndicator && hasViewerIndicators && (
           <div
-            className={`pointer-events-none absolute ${compactIndicator ? "bottom-1.5 px-1" : useProfileIndicatorSize ? "bottom-1.5 px-1.5" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
+            className={`pointer-events-none absolute ${
+              useCompactSize ? "bottom-1.5 px-1 sm:px-1.5" : useProfileIndicatorSize ? "bottom-1.5 px-1.5" : "bottom-2 px-1.5"
+            } left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
             aria-hidden="true"
           >
             {hasCollectionIndicator && (
@@ -147,11 +164,39 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
       </motion.div>
 
-      {showStars && typeof item?.rating === "number" && (
+      {/* Indicador fijo en la misma posición inferior que las estrellas de Puntuaciones (debajo del póster) */}
+      {fixedIndicator && hasViewerIndicators ? (
+        <div className="mt-1.5 flex justify-center">
+          <div
+            className={`inline-flex items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-md`}
+            aria-hidden="true"
+          >
+            {hasCollectionIndicator && (
+              <span className={`flex ${indicatorItemClassName} shrink-0 items-center justify-center ${favorite ? "text-red-400" : "text-sky-400"}`}>
+                {favorite ? (
+                  <Heart className={`${indicatorIconClassName} fill-current`} />
+                ) : (
+                  <BookmarkPlus className={`${indicatorIconClassName} fill-current`} />
+                )}
+              </span>
+            )}
+            {watched && (
+              <span className={`flex ${indicatorItemClassName} shrink-0 items-center justify-center text-emerald-400`}>
+                <Eye className={indicatorIconClassName} />
+              </span>
+            )}
+            {hasUserRating && (
+              <span className={`flex ${indicatorRatingClassName} shrink-0 items-center justify-center font-black leading-none text-amber-300`}>
+                <span className="tabular-nums leading-none">{userRating}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      ) : showStars && typeof item?.rating === "number" ? (
         <div className="mt-1.5 flex justify-center">
           <Stars rating={item.rating} iconClassName={starIconClassName} />
         </div>
-      )}
+      ) : null}
     </Link>
   );
 }

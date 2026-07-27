@@ -1305,7 +1305,7 @@ function ProfileMonthHeading({ children }) {
   );
 }
 
-function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animateWithin }) {
+function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animateWithin, fixedIndicator = false }) {
   if (view === "list") {
     return (
       <div className="space-y-2">
@@ -1339,6 +1339,7 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
             starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
             compactIndicator={view === "compact"}
             hoverExpand={view === "compact"}
+            fixedIndicator={fixedIndicator}
           />
         </ProfileEntrance>
       ))}
@@ -1883,6 +1884,7 @@ function ProfileContentSection({ username, section, actor }) {
                     showStars={config.showStars}
                     viewerTitleStates={viewerTitleStates}
                     animateWithin={entranceCount}
+                    fixedIndicator={section === "favorites" ? "favorite" : section === "watchlist" ? "watchlist" : false}
                   />
                 )
               ) : null}

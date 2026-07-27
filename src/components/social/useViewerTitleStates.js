@@ -28,11 +28,9 @@ export function useViewerTitleStates(items, enabled = true) {
   useEffect(() => {
     let cancelled = false;
     if (!enabled || !requestedItems.length) {
-      setStates({});
       return undefined;
     }
 
-    setStates({});
     (async () => {
       try {
         const chunks = [];
@@ -50,9 +48,12 @@ export function useViewerTitleStates(items, enabled = true) {
           const payload = await response.json();
           return payload?.states && typeof payload.states === "object" ? payload.states : {};
         }));
-        if (!cancelled) setStates(Object.assign({}, ...responses));
+        if (!cancelled) {
+          const merged = Object.assign({}, ...responses);
+          setStates((prev) => ({ ...prev, ...merged }));
+        }
       } catch {
-        if (!cancelled) setStates({});
+        // En caso de fallo de red se conservan los estados ya cargados sin vaciar la interfaz.
       }
     })();
 
