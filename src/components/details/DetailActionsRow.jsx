@@ -114,18 +114,14 @@ export default function DetailActionsRow({
 
   return (
     <>
-      {/* VISTA MÓVIL EXCLUSIVA PARA SERIES COMBINADAS (DESPLAZAMIENTO FLUIDO SIN DEFORMACIÓN DE FORMA) */}
+      {/* VISTA MÓVIL EXCLUSIVA PARA SERIES COMBINADAS (8 SLOTS PERMANENTES PARA ZERO DEFORMACIÓN Y CONMUTACIÓN PERFECTA) */}
       {shouldCombineMedia && (
         <div className="block sm:hidden w-full">
           <div
             className={`flex flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px]`}
           >
-            {/* 1. Botón Disparador Principal (Play -> X al expandir) */}
-            <motion.div
-              layout="position"
-              key="trigger-slot"
-              className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-            >
+            {/* Slot 1: Trigger Principal (Play -> X) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
               <LiquidButton
                 onClick={() => setMediaExpanded((v) => !v)}
                 disabled={!trailerAvailable && !soundtrackAvailable}
@@ -152,9 +148,9 @@ export default function DetailActionsRow({
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={mediaExpanded ? "close" : "play"}
-                    initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
+                    initial={{ scale: 0.6, opacity: 0, rotate: -45 }}
                     animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    exit={{ scale: 0.5, opacity: 0, rotate: 45 }}
+                    exit={{ scale: 0.6, opacity: 0, rotate: 45 }}
                     transition={{ duration: 0.16, ease: "easeOut" }}
                     className="flex items-center justify-center w-full h-full"
                   >
@@ -168,21 +164,19 @@ export default function DetailActionsRow({
                   </motion.div>
                 </AnimatePresence>
               </LiquidButton>
-            </motion.div>
+            </div>
 
-            {/* 2 & 3. Botones Tráiler y Soundtrack (Se muestran al expandir sin deformar la forma) */}
-            <AnimatePresence mode="popLayout">
-              {mediaExpanded && (
-                <>
-                  {/* Ver Tráiler */}
+            {/* Slot 2: Ver Tráiler (Expandido) <-> Valoración de episodios (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
                   <motion.div
-                    layout="position"
-                    key="m-trailer-btn"
-                    initial={{ opacity: 0, scale: 0.6 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.6 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
+                    key="slot2-trailer"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
                   >
                     <LiquidButton
                       onClick={(e) => {
@@ -213,16 +207,43 @@ export default function DetailActionsRow({
                       )}
                     </LiquidButton>
                   </motion.div>
-
-                  {/* Soundtrack */}
+                ) : (
                   <motion.div
-                    layout="position"
-                    key="m-soundtrack-btn"
-                    initial={{ opacity: 0, scale: 0.6 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.6 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
+                    key="slot2-ratings"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onEpisodeRatings && (
+                      <LiquidButton
+                        onClick={onEpisodeRatings}
+                        active
+                        activeColor="yellow"
+                        groupId="details-actions"
+                        className="!bg-white !text-black !w-full !h-auto aspect-square"
+                        title="Valoración de episodios"
+                      >
+                        <BarChart3 />
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Slot 3: Soundtrack (Expandido) <-> Episodios vistos / Trakt (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot3-soundtrack"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
                   >
                     <LiquidButton
                       onClick={(e) => {
@@ -246,147 +267,245 @@ export default function DetailActionsRow({
                       <Music2 />
                     </LiquidButton>
                   </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                ) : (
+                  <motion.div
+                    key="slot3-trakt"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {trakt && (
+                      <TraktWatchedControl
+                        connected={trakt.connected}
+                        watched={trakt.watched}
+                        plays={trakt.plays}
+                        badge={trakt.badge}
+                        busy={!!trakt.busy}
+                        loading={trakt.loading}
+                        onOpen={trakt.onOpen}
+                        progressOverride={trakt.progressOverride}
+                      />
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {/* 4. Valoración de episodios */}
-            {onEpisodeRatings && (
-              <motion.div
-                layout="position"
-                key="m-ratings-slot"
-                className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-              >
-                <LiquidButton
-                  onClick={onEpisodeRatings}
-                  active
-                  activeColor="yellow"
-                  groupId="details-actions"
-                  className="!bg-white !text-black !w-full !h-auto aspect-square"
-                  title="Valoración de episodios"
-                  aria-label="Abrir valoración de episodios"
-                  aria-haspopup="dialog"
-                  aria-expanded={episodeRatingsOpen}
-                >
-                  <BarChart3 />
-                </LiquidButton>
-              </motion.div>
-            )}
+            {/* Slot 4: Valoración de episodios (Expandido) <-> Puntuación estrellas (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot4-ratings"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onEpisodeRatings && (
+                      <LiquidButton
+                        onClick={onEpisodeRatings}
+                        active
+                        activeColor="yellow"
+                        groupId="details-actions"
+                        className="!bg-white !text-black !w-full !h-auto aspect-square"
+                        title="Valoración de episodios"
+                      >
+                        <BarChart3 />
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="slot4-rate"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {rate && (
+                      <StarRating
+                        rating={rate.rating}
+                        max={rate.max}
+                        loading={rate.loading}
+                        onRate={rate.onRate}
+                        connected={rate.connected}
+                        onConnect={rate.onConnect}
+                      />
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {/* 5. Trakt Watched Control (Episodios Vistos) */}
-            {trakt && (
-              <motion.div
-                layout="position"
-                key="m-trakt-slot"
-                className="flex-1 min-w-[34px] max-w-[60px]"
-              >
-                <TraktWatchedControl
-                  connected={trakt.connected}
-                  watched={trakt.watched}
-                  plays={trakt.plays}
-                  badge={trakt.badge}
-                  busy={!!trakt.busy}
-                  loading={trakt.loading}
-                  onOpen={trakt.onOpen}
-                  progressOverride={trakt.progressOverride}
-                />
-              </motion.div>
-            )}
+            {/* Slot 5: Episodios vistos / Trakt (Expandido) <-> Favorito (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot5-trakt"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {trakt && (
+                      <TraktWatchedControl
+                        connected={trakt.connected}
+                        watched={trakt.watched}
+                        plays={trakt.plays}
+                        badge={trakt.badge}
+                        busy={!!trakt.busy}
+                        loading={trakt.loading}
+                        onOpen={trakt.onOpen}
+                        progressOverride={trakt.progressOverride}
+                      />
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="slot5-fav"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onToggleFavorite && (
+                      <LiquidButton
+                        onClick={onToggleFavorite}
+                        disabled={favoriteLoading}
+                        active={favorite}
+                        activeColor="red"
+                        groupId="details-actions"
+                        className="!w-full !h-auto aspect-square"
+                        title={
+                          favorite
+                            ? "Quitar de favoritos"
+                            : "Añadir a favoritos"
+                        }
+                      >
+                        {favoriteLoading ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Heart className={favorite ? "fill-current" : ""} />
+                        )}
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {/* 6. Star Rating */}
-            {rate && (
-              <motion.div
-                layout="position"
-                key="m-rate-slot"
-                className="flex-1 min-w-[34px] max-w-[60px]"
-              >
-                <StarRating
-                  rating={rate.rating}
-                  max={rate.max}
-                  loading={rate.loading}
-                  onRate={rate.onRate}
-                  connected={rate.connected}
-                  onConnect={rate.onConnect}
-                />
-              </motion.div>
-            )}
+            {/* Slot 6: Puntuación estrellas (Expandido) <-> Pendientes (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot6-rate"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {rate && (
+                      <StarRating
+                        rating={rate.rating}
+                        max={rate.max}
+                        loading={rate.loading}
+                        onRate={rate.onRate}
+                        connected={rate.connected}
+                        onConnect={rate.onConnect}
+                      />
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="slot6-watchlist"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onToggleWatchlist && (
+                      <LiquidButton
+                        onClick={onToggleWatchlist}
+                        disabled={watchlistLoading}
+                        active={watchlist}
+                        activeColor="blue"
+                        groupId="details-actions"
+                        className="!w-full !h-auto aspect-square"
+                        title={
+                          watchlist
+                            ? "Quitar de pendientes"
+                            : "Añadir a pendientes"
+                        }
+                      >
+                        {watchlistLoading ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <BookmarkPlus
+                            className={watchlist ? "fill-current" : ""}
+                          />
+                        )}
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {/* 7. Favorito */}
-            {onToggleFavorite && (
-              <motion.div
-                layout="position"
-                key="m-fav-slot"
-                className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-              >
-                <LiquidButton
-                  onClick={onToggleFavorite}
-                  disabled={favoriteLoading}
-                  active={favorite}
-                  activeColor="red"
-                  groupId="details-actions"
-                  className="!w-full !h-auto aspect-square"
-                  title={
-                    favoriteLoading
-                      ? "Cargando estado de favoritos..."
-                      : favorite
-                        ? "Quitar de favoritos"
-                        : "Añadir a favoritos"
-                  }
-                >
-                  {favoriteLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Heart className={favorite ? "fill-current" : ""} />
-                  )}
-                </LiquidButton>
-              </motion.div>
-            )}
-
-            {/* 8. Pendiente (Watchlist) */}
-            {onToggleWatchlist && (
-              <motion.div
-                layout="position"
-                key="m-watchlist-slot"
-                className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-              >
-                <LiquidButton
-                  onClick={onToggleWatchlist}
-                  disabled={watchlistLoading}
-                  active={watchlist}
-                  activeColor="blue"
-                  groupId="details-actions"
-                  className="!w-full !h-auto aspect-square"
-                  title={
-                    watchlistLoading
-                      ? "Cargando estado de pendientes..."
-                      : watchlist
-                        ? "Quitar de lista de pendientes"
-                        : "Añadir a lista de pendientes"
-                  }
-                >
-                  {watchlistLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-                  )}
-                </LiquidButton>
-              </motion.div>
-            )}
-
-            {/* 9 & 10. Añadir a Lista y Reseñas (Ocultos al expandir con popLayout sin deformar la forma) */}
-            <AnimatePresence mode="popLayout">
-              {!mediaExpanded && (
-                <>
-                  {onAddToList && (
-                    <motion.div
-                      layout="position"
-                      key="m-list-slot"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-                    >
+            {/* Slot 7: Favoritos (Expandido) <-> Añadir a lista (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot7-fav"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onToggleFavorite && (
+                      <LiquidButton
+                        onClick={onToggleFavorite}
+                        disabled={favoriteLoading}
+                        active={favorite}
+                        activeColor="red"
+                        groupId="details-actions"
+                        className="!w-full !h-auto aspect-square"
+                        title={
+                          favorite
+                            ? "Quitar de favoritos"
+                            : "Añadir a favoritos"
+                        }
+                      >
+                        {favoriteLoading ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Heart className={favorite ? "fill-current" : ""} />
+                        )}
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="slot7-list"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onAddToList && (
                       <LiquidButton
                         onClick={onAddToList}
                         disabled={listBusy}
@@ -397,11 +516,7 @@ export default function DetailActionsRow({
                           listActive ? "!bg-white !text-black" : ""
                         }`}
                         title={
-                          listBusy
-                            ? "Comprobando listas..."
-                            : listActive
-                              ? "Gestionar en listas"
-                              : "Añadir a lista"
+                          listActive ? "Gestionar en listas" : "Añadir a lista"
                         }
                       >
                         {listBusy ? (
@@ -410,19 +525,58 @@ export default function DetailActionsRow({
                           <ListVideo />
                         )}
                       </LiquidButton>
-                    </motion.div>
-                  )}
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-                  {showComments && (
-                    <motion.div
-                      layout="position"
-                      key="m-comments-slot"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className="flex-1 min-w-[34px] max-w-[60px] aspect-square"
-                    >
+            {/* Slot 8: Pendientes (Expandido) <-> Reseñas (Replegado) */}
+            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+              <AnimatePresence mode="wait" initial={false}>
+                {mediaExpanded ? (
+                  <motion.div
+                    key="slot8-watchlist"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {onToggleWatchlist && (
+                      <LiquidButton
+                        onClick={onToggleWatchlist}
+                        disabled={watchlistLoading}
+                        active={watchlist}
+                        activeColor="blue"
+                        groupId="details-actions"
+                        className="!w-full !h-auto aspect-square"
+                        title={
+                          watchlist
+                            ? "Quitar de pendientes"
+                            : "Añadir a pendientes"
+                        }
+                      >
+                        {watchlistLoading ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <BookmarkPlus
+                            className={watchlist ? "fill-current" : ""}
+                          />
+                        )}
+                      </LiquidButton>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="slot8-comments"
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.6, opacity: 0 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="w-full h-full"
+                  >
+                    {showComments && (
                       <LiquidButton
                         onClick={onComments}
                         active={commentsActive}
@@ -431,19 +585,15 @@ export default function DetailActionsRow({
                         className={`!w-full !h-auto aspect-square ${
                           commentsActive ? "!bg-white !text-black" : ""
                         }`}
-                        title={
-                          commentsActive
-                            ? "Ver reseñas de la comunidad (tienes reseñas)"
-                            : "Ver reseñas de la comunidad"
-                        }
+                        title="Ver reseñas de la comunidad"
                       >
                         <MessageSquare />
                       </LiquidButton>
-                    </motion.div>
-                  )}
-                </>
-              )}
-            </AnimatePresence>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       )}
