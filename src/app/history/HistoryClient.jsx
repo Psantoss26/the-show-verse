@@ -2976,6 +2976,10 @@ export default function HistoryClient() {
         );
 
         if (refreshTop) {
+          const freshHasMore =
+            typeof json?.pagination?.hasMore === "boolean"
+              ? json.pagination.hasMore
+              : items.length >= HISTORY_PAGE_SIZE;
           // Fusiona la página 1 fresca con lo cacheado (solo añade lo nuevo por
           // arriba); conserva cursor/hasMore y TODAS las páginas ya cargadas.
           // Si el pintado inicial contenía una entrada optimista, la sustituimos
@@ -2984,6 +2988,7 @@ export default function HistoryClient() {
             const merged = mergeHistoryTopSnapshot(prev, sorted, {
               idOf: getHistoryId,
               optimisticKeyOf: getOptimisticHistoryMatchKey,
+              freshHasMore,
             });
             const nextItems = merged.sort(
               (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),

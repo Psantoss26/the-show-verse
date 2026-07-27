@@ -19,6 +19,19 @@ export function selectHistoryCacheEnvelope(memory, persisted) {
   return safePersistedTime >= safeMemoryTime ? persisted : memory;
 }
 
+function optimisticCreatedAtMs(item) {
+  const explicit = Number(item?._optimistic_created_at);
+  if (Number.isFinite(explicit)) return explicit;
+
+  const id = String(item?.history_id ?? item?.id ?? "");
+  const idTimestamp = Number(id.split(":").at(-1));
+  if (id.startsWith("optimistic:") && Number.isFinite(idTimestamp)) {
+    return idTimestamp;
+  }
+
+  return new Date(item?.watched_at).getTime();
+}
+
 /**
  * Fusiona la primera página canónica con todas las páginas ya restauradas.
  * Cuando una entrada optimista ya tiene equivalente canónico, la sustituye en
@@ -28,11 +41,30 @@ export function selectHistoryCacheEnvelope(memory, persisted) {
 export function mergeHistoryTopSnapshot(
   previous,
   fresh,
-  { idOf, optimisticKeyOf },
+  {
+    idOf,
+    optimisticKeyOf,
+    freshHasMore,
+    now = Date.now(),
+    optimisticGraceMs = 5 * 60 * 1000,
+  },
 ) {
   const current = Array.isArray(previous) ? previous : [];
   const incoming = Array.isArray(fresh) ? fresh : [];
   const confirmedByKey = new Map();
+  const incomingIds = new Set(
+    incoming
+      .map((item) => idOf(item))
+      .filter((id) => id != null)
+      .map(String),
+  );
+  const incomingTimes = incoming
+    .map((item) => new Date(item?.watched_at).getTime())
+    .filter(Number.isFinite);
+  const oldestIncomingTime = incomingTimes.length
+    ? Math.min(...incomingTimes)
+    : null;
+  const hasAuthoritativeTop = incoming.length > 0 || freshHasMore === false;
 
   for (const item of incoming) {
     const key = optimisticKeyOf(item);
@@ -40,12 +72,42 @@ export function mergeHistoryTopSnapshot(
   }
 
   const base = current.filter((item) => {
-    if (!item?._optimistic) return true;
-    const key = optimisticKeyOf(item);
-    const remaining = key ? confirmedByKey.get(key) || 0 : 0;
-    if (remaining <= 0) return true;
-    confirmedByKey.set(key, remaining - 1);
-    return false;
+    const id = idOf(item);
+    if (id != null && incomingIds.has(String(id))) return false;
+
+    if (item?._optimistic) {
+      const key = optimisticKeyOf(item);
+      const remaining = key ? confirmedByKey.get(key) || 0 : 0;
+      if (remaining > 0) {
+        confirmedByKey.set(key, remaining - 1);
+        return false;
+      }
+
+      const age = Number(now) - optimisticCreatedAtMs(item);
+      if (
+        Number.isFinite(age) &&
+        age >= 0 &&
+        age <= optimisticGraceMs
+      ) {
+        return true;
+      }
+      // Tras una respuesta autoritativa, un alta temporal que sigue sin existir
+      // en servidor ya no representa un visionado real. Esto limpia registros
+      // huérfanos persistidos únicamente en un dispositivo.
+      return !hasAuthoritativeTop;
+    }
+
+    // Si la respuesta contiene todo el historial, cualquier registro ausente ya
+    // fue eliminado en servidor. Con paginación conservamos las páginas antiguas,
+    // pero retiramos ausencias inequívocas dentro de la ventana superior fresca.
+    if (freshHasMore === false) return false;
+    if (oldestIncomingTime != null) {
+      const watchedAtMs = new Date(item?.watched_at).getTime();
+      if (Number.isFinite(watchedAtMs) && watchedAtMs > oldestIncomingTime) {
+        return false;
+      }
+    }
+    return true;
   });
 
   const seen = new Set(base.map((item) => String(idOf(item))));

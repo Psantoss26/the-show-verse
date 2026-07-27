@@ -92,18 +92,29 @@ function tmdbKeyOf(it) {
   return `${it?.media_type}:${it?.id}`;
 }
 
-function buildHistoryEntry({ type, tmdbId, watchedAt, title, posterPath }) {
+function buildHistoryEntry({
+  type,
+  tmdbId,
+  watchedAt,
+  title,
+  posterPath,
+  historyId,
+}) {
   const id = Number(tmdbId);
   if (!Number.isFinite(id)) return null;
-  const tempId = `optimistic:${id}:${Date.now()}`;
+  const createdAt = Date.now();
+  const hasCanonicalId = historyId != null && String(historyId).length > 0;
+  const entryId = hasCanonicalId
+    ? String(historyId)
+    : `optimistic:${id}:${createdAt}`;
   const watched =
     typeof watchedAt === "string" && watchedAt
       ? watchedAt
       : new Date().toISOString();
   const safeTitle = title || "";
   return {
-    id: tempId,
-    history_id: tempId,
+    id: entryId,
+    history_id: entryId,
     type: type || "movie",
     tmdbId: id,
     watched_at: watched,
@@ -111,7 +122,8 @@ function buildHistoryEntry({ type, tmdbId, watchedAt, title, posterPath }) {
     title_es: safeTitle,
     poster_path: posterPath || null,
     backdrop_path: null,
-    _optimistic: true,
+    _optimistic: !hasCanonicalId,
+    _optimistic_created_at: hasCanonicalId ? null : createdAt,
   };
 }
 
