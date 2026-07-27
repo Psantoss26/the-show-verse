@@ -16,6 +16,26 @@
 //
 // IMPORTANTE: ninguna función de este módulo debe lanzar; un fallo aquí jamás
 // puede romper la mutación que la invoca.
+//
+// Además de las cachés localStorage de las páginas de usuario, registramos el
+// cambio en un store "pendiente" (independiente del usuario) que las secciones
+// de Perfil (Diario/Favoritos/Pendientes/Puntuaciones) fusionan en su pintado
+// instantáneo: su caché va por sessionStorage y por NOMBRE de usuario, así que
+// no se puede parchear directamente desde aquí (no conocemos el username).
+
+import { recordPendingListChange } from "./pendingListAdditions";
+
+function recordProfilePending(listType, { type, mediaId, tmdbId, title, posterPath, rating }, added) {
+  try {
+    recordPendingListChange(
+      listType,
+      { tmdbId: tmdbId ?? mediaId, mediaType: type, title, posterPath, rating },
+      added,
+    );
+  } catch {
+    // El store pendiente es best-effort; nunca debe romper la mutación.
+  }
+}
 
 // ── Núcleo PURO (sin window, testeable) ───────────────────────────────────────
 
@@ -151,6 +171,30 @@ function mutateEnvelope(config, mutator) {
   writeCache(config.cacheKey, mutator(envelope, "items"));
 }
 
+// ── Evento en vivo ────────────────────────────────────────────────────────────
+// Además de actualizar la caché (para el pintado instantáneo de la PRÓXIMA
+// visita), avisamos a las páginas/secciones YA MONTADAS para que reflejen el
+// cambio en tiempo real (p. ej. quitar de Favoritos desde el DetailModal abierto
+// sobre la propia página de Favoritos, o actualizar una sección de Perfil).
+export const LIST_CHANGED_EVENT = "showverse:list-changed";
+
+function normalizeType(type) {
+  return type === "tv" || type === "show" ? "tv" : "movie";
+}
+function keyFor(type, mediaId) {
+  return `${normalizeType(type)}:${Number(mediaId)}`;
+}
+function emitListChanged(listTypes, detail) {
+  try {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent(LIST_CHANGED_EVENT, { detail: { listTypes, ...detail } }),
+    );
+  } catch {
+    // Un fallo al notificar nunca debe romper la mutación.
+  }
+}
+
 // ── API pública ───────────────────────────────────────────────────────────────
 
 function add(list, item) {
@@ -171,23 +215,80 @@ function remove(list, predicate) {
 }
 
 export function cacheAddFavorite(args) {
-  add("favorites", buildTmdbListItem(args));
+  const item = buildTmdbListItem(args);
+  add("favorites", item);
+  recordProfilePending("favorites", args, true);
+  emitListChanged(["favorites"], {
+    added: true,
+    key: keyFor(args.type, args.mediaId),
+    tmdbId: Number(args.mediaId),
+    mediaType: normalizeType(args.type),
+    title: args.title || "",
+    posterPath: args.posterPath || null,
+    item,
+  });
 }
 export function cacheRemoveFavorite({ type, mediaId }) {
-  const key = `${type === "tv" || type === "show" ? "tv" : "movie"}:${Number(mediaId)}`;
+  const key = keyFor(type, mediaId);
   remove("favorites", (it) => tmdbKeyOf(it) === key);
+  recordProfilePending("favorites", { type, mediaId }, false);
+  emitListChanged(["favorites"], { added: false, key, tmdbId: Number(mediaId), mediaType: normalizeType(type) });
 }
 
 export function cacheAddWatchlist(args) {
-  add("watchlist", buildTmdbListItem(args));
+  const item = buildTmdbListItem(args);
+  add("watchlist", item);
+  recordProfilePending("watchlist", args, true);
+  emitListChanged(["watchlist"], {
+    added: true,
+    key: keyFor(args.type, args.mediaId),
+    tmdbId: Number(args.mediaId),
+    mediaType: normalizeType(args.type),
+    title: args.title || "",
+    posterPath: args.posterPath || null,
+    item,
+  });
 }
 export function cacheRemoveWatchlist({ type, mediaId }) {
-  const key = `${type === "tv" || type === "show" ? "tv" : "movie"}:${Number(mediaId)}`;
+  const key = keyFor(type, mediaId);
   remove("watchlist", (it) => tmdbKeyOf(it) === key);
+  recordProfilePending("watchlist", { type, mediaId }, false);
+  emitListChanged(["watchlist"], { added: false, key, tmdbId: Number(mediaId), mediaType: normalizeType(type) });
 }
 
 export function cacheAddHistory(args) {
   add("history", buildHistoryEntry(args));
+  // El Diario del Perfil (sección "watched") agrupa por título; el alta optimista
+  // hace que el título recién visto aparezca al instante junto al resto.
+  recordProfilePending("watched", args, true);
+  emitListChanged(["history", "watched"], {
+    added: true,
+    key: keyFor(args.type, args.tmdbId ?? args.mediaId),
+    tmdbId: Number(args.tmdbId ?? args.mediaId),
+    mediaType: normalizeType(args.type),
+    title: args.title || "",
+    posterPath: args.posterPath || null,
+  });
+}
+
+// Puntuaciones (sección "puntuaciones" del Perfil): no tiene caché de página
+// propia, solo se refleja en el Perfil, así que basta con el pendiente + evento.
+export function cacheAddRating({ type, mediaId, tmdbId, title, posterPath, rating }) {
+  recordProfilePending("ratings", { type, mediaId, tmdbId, title, posterPath, rating }, true);
+  emitListChanged(["ratings"], {
+    added: true,
+    key: keyFor(type, tmdbId ?? mediaId),
+    tmdbId: Number(tmdbId ?? mediaId),
+    mediaType: normalizeType(type),
+    title: title || "",
+    posterPath: posterPath || null,
+    rating: typeof rating === "number" ? rating : null,
+  });
+}
+export function cacheRemoveRating({ type, mediaId, tmdbId }) {
+  const id = tmdbId ?? mediaId;
+  recordProfilePending("ratings", { type, mediaId: id, tmdbId: id }, false);
+  emitListChanged(["ratings"], { added: false, key: keyFor(type, id), tmdbId: Number(id), mediaType: normalizeType(type) });
 }
 export function cacheRemoveHistory(historyId) {
   if (historyId == null) return;

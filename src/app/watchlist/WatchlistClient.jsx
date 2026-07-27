@@ -47,6 +47,7 @@ import {
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
+import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
@@ -2167,6 +2168,30 @@ export default function WatchlistClient() {
       controller.abort();
     };
   }, [session, account, preserveAddedOrderSnapshot]);
+
+  // Cambios en vivo desde una ficha / DetailModal (p. ej. quitar de Pendientes
+  // desde el drawer abierto sobre esta misma página): se refleja al instante.
+  useEffect(() => {
+    const onChange = (event) => {
+      const detail = event?.detail;
+      if (!detail || !Array.isArray(detail.listTypes) || !detail.listTypes.includes("watchlist")) return;
+      const tmdbId = Number(detail.tmdbId);
+      if (!Number.isFinite(tmdbId)) return;
+      const matches = (it) => {
+        const raw = it?.media_type || (it?.title ? "movie" : "tv");
+        const mt = raw === "tv" || raw === "show" ? "tv" : "movie";
+        return Number(it?.id) === tmdbId && mt === detail.mediaType;
+      };
+      setItems((prev) => {
+        const exists = prev.some(matches);
+        if (!detail.added) return exists ? prev.filter((it) => !matches(it)) : prev;
+        if (exists || !detail.item) return prev;
+        return [detail.item, ...prev];
+      });
+    };
+    window.addEventListener(LIST_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(LIST_CHANGED_EVENT, onChange);
+  }, []);
 
   // Prefetch IMDb scores in background (non-blocking)
   useEffect(() => {
