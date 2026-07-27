@@ -937,7 +937,6 @@ const InProgressCard = memo(function InProgressCard({
                 >
                   {progressPct}%
                 </span>
-                <span>{episodeProgress.label}</span>
                 {nextEpCode && (
                   <>
                     <span>•</span>
