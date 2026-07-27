@@ -12,6 +12,7 @@ import {
   getUserReviews,
   pageParams,
   packPage,
+  applyResolvedEnglishPosterPaths,
   pickBestEnglishPosterPath,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
@@ -80,6 +81,39 @@ test('pickBestEnglishPosterPath keeps the DetailsClient artwork priority', () =>
   assert.equal(pickBestEnglishPosterPath(posters), '/english-best.jpg');
   assert.equal(pickBestEnglishPosterPath(posters.slice(0, 2)), '/neutral.jpg');
   assert.equal(pickBestEnglishPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), null);
+});
+
+test('Profile Watchlist replaces persisted Spanish posters with the resolved English artwork', () => {
+  const items = [{
+    tmdbId: 453,
+    mediaType: 'movie',
+    title: 'Example',
+    posterPath: '/spanish-persisted.jpg',
+  }];
+  const resolved = new Map([
+    [titleKey('movie', 453), '/english.jpg'],
+  ]);
+
+  assert.equal(
+    applyResolvedEnglishPosterPaths(items, resolved, { strict: true })[0].posterPath,
+    '/english.jpg',
+  );
+});
+
+test('Profile Watchlist never falls back to a persisted Spanish poster after a settled empty decision', () => {
+  const items = [{
+    tmdbId: 453,
+    mediaType: 'movie',
+    posterPath: '/spanish-persisted.jpg',
+  }];
+  const resolved = new Map([
+    [titleKey('movie', 453), null],
+  ]);
+
+  assert.equal(
+    applyResolvedEnglishPosterPaths(items, resolved, { strict: true })[0].posterPath,
+    null,
+  );
 });
 
 test('canFollow rejects self-follow and missing ids', () => {

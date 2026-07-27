@@ -6,6 +6,10 @@ import { db } from '../db/client.js';
 import { watchlist, userRatings } from '../db/schema.js';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
+import {
+  resolveEnglishPosterPaths,
+  titleKey,
+} from '../lib/userProfile.js';
 
 const itemSchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -78,7 +82,23 @@ export default async function watchlistRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { tmdbId, mediaType, title, posterPath, priority = 0 } = parsed.data;
+    const { tmdbId, mediaType, title, priority = 0 } = parsed.data;
+    const resolvedPosters = await resolveEnglishPosterPaths(db, [{
+      tmdbId,
+      mediaType,
+    }]);
+    const posterKey = titleKey(mediaType, tmdbId);
+    const hasEnglishPosterDecision = resolvedPosters.has(posterKey);
+    const englishPosterPath =
+      resolvedPosters.get(posterKey) || null;
+    const updateValues = {
+      addedAt: new Date(),
+      priority,
+      ...(title ? { title } : {}),
+      ...(hasEnglishPosterDecision
+        ? { posterPath: englishPosterPath }
+        : {}),
+    };
 
     const [item] = await db
       .insert(watchlist)
@@ -87,16 +107,23 @@ export default async function watchlistRoutes(fastify) {
         tmdbId,
         mediaType,
         title: title || null,
-        posterPath: posterPath || null,
+        posterPath: englishPosterPath,
         priority,
       })
       .onConflictDoUpdate({
         target: [watchlist.userId, watchlist.tmdbId, watchlist.mediaType],
-        set: { addedAt: new Date(), priority },
+        set: updateValues,
       })
       .returning();
 
-    return reply.status(201).send({ item });
+    return reply.status(201).send({
+      item: {
+        ...item,
+        // Un valor antiguo sin decisión de idioma no debe entrar en la caché
+        // optimista del cliente durante un fallo transitorio de TMDb.
+        posterPath: hasEnglishPosterDecision ? englishPosterPath : null,
+      },
+    });
   });
 
   // DELETE /watchlist/:tmdbId/:mediaType
