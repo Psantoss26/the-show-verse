@@ -52,6 +52,10 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import {
+  mergeHistoryTopSnapshot,
+  selectHistoryCacheEnvelope,
+} from "@/lib/userLists/historyCacheSnapshot";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 200;
@@ -109,21 +113,29 @@ function readHistoryCache() {
   if (typeof window === "undefined") return null;
 
   const inMemory = normalizeHistoryCache(historySessionCache);
-  if (inMemory) return inMemory;
-
   try {
     const raw = window.localStorage.getItem(HISTORY_CACHE_KEY);
-    if (!raw) return null;
+    if (!raw) return inMemory;
     const parsed = JSON.parse(raw);
-    const cached = normalizeHistoryCache(parsed);
-    if (!cached) {
+    const persisted = normalizeHistoryCache(parsed);
+    if (!persisted) {
       window.localStorage.removeItem(HISTORY_CACHE_KEY);
-      return null;
+      return inMemory;
     }
-    historySessionCache = parsed;
-    return cached;
+
+    // La copia en memoria protege la restauración de listas largas cuando
+    // localStorage se queda sin cuota. No puede ser, sin embargo, una lectura
+    // ciega: cacheAddHistory actualiza la copia persistida desde DetailsClient.
+    // Con fechas iguales, esa copia contiene la mutación optimista y debe ganar;
+    // con una fecha más nueva en memoria, conservamos las páginas adicionales.
+    const selected = selectHistoryCacheEnvelope(
+      inMemory ? historySessionCache : null,
+      parsed,
+    );
+    historySessionCache = selected;
+    return normalizeHistoryCache(selected);
   } catch {
-    return null;
+    return inMemory;
   }
 }
 
@@ -229,6 +241,7 @@ function formatWatchedBadgeDate(value) {
 function getItemType(entry) {
   const t = entry?.type;
   if (t === "movie" || t === "show") return t;
+  if (t === "tv") return "show";
   if (t === "episode" || t === "episodes") return "show";
   if (entry?.movie) return "movie";
   if (entry?.show) return "show";
@@ -443,6 +456,23 @@ function getMainTitle(entry) {
 
 function getHistoryId(entry) {
   return entry?.id || entry?.history_id || null;
+}
+
+function getOptimisticHistoryMatchKey(entry) {
+  const type = getItemType(entry);
+  const tmdbId = getTmdbId(entry);
+  const watchedAt = String(entry?.watched_at || "");
+  const watchedDay = watchedAt.length >= 10 ? watchedAt.slice(0, 10) : "";
+  if (!type || !tmdbId || !watchedDay) return null;
+
+  const episode = getEpisodeMeta(entry);
+  return [
+    type,
+    tmdbId,
+    watchedDay,
+    episode?.season ?? "",
+    episode?.episode ?? "",
+  ].join(":");
 }
 
 function getDetailsHref(entry) {
@@ -2946,18 +2976,13 @@ export default function HistoryClient() {
         if (refreshTop) {
           // Fusiona la página 1 fresca con lo cacheado (solo añade lo nuevo por
           // arriba); conserva cursor/hasMore y TODAS las páginas ya cargadas.
+          // Si el pintado inicial contenía una entrada optimista, la sustituimos
+          // por su registro canónico para no duplicarla tras la revalidación.
           setRaw((prev) => {
-            const seen = new Set(
-              (prev || []).map((x) => String(getHistoryId(x))),
-            );
-            const merged = [...(prev || [])];
-            for (const item of sorted) {
-              const id = String(getHistoryId(item));
-              if (!seen.has(id)) {
-                seen.add(id);
-                merged.push(item);
-              }
-            }
+            const merged = mergeHistoryTopSnapshot(prev, sorted, {
+              idOf: getHistoryId,
+              optimisticKeyOf: getOptimisticHistoryMatchKey,
+            });
             const nextItems = merged.sort(
               (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
             );
