@@ -49,6 +49,10 @@ import {
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import {
+  mergePendingTmdbListItems,
+  prunePendingListChanges,
+} from "@/lib/userLists/pendingListAdditions";
+import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
   reconcileAddedOrderSnapshot,
@@ -204,7 +208,7 @@ function readWatchlistCache() {
       return null;
     }
     return {
-      items: parsed.items,
+      items: mergePendingTmdbListItems(parsed.items, "watchlist"),
       fresh: age < WATCHLIST_CACHE_TTL_MS,
     };
   } catch {
@@ -2112,10 +2116,18 @@ export default function WatchlistClient() {
         const watchlist = data?.watchlist || [];
 
         // Add index for sorting by added date (most recent first from API)
-        const watchlistWithIndex = watchlist.map((item, index) => ({
+        const freshWatchlistWithIndex = watchlist.map((item, index) => ({
           ...item,
           _addedIndex: index,
         }));
+        prunePendingListChanges(
+          "watchlist",
+          new Set(freshWatchlistWithIndex.map(userListItemKey)),
+        );
+        const watchlistWithIndex = mergePendingTmdbListItems(
+          freshWatchlistWithIndex,
+          "watchlist",
+        );
 
         // Load namespaced cached scores before rendering grouped views.
         // Missing IMDb/Trakt scores stay in their explicit "Sin puntuación"

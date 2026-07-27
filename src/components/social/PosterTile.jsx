@@ -85,7 +85,9 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       className={`group/card relative block ${hoverExpand ? "z-0 overflow-visible focus-within:z-[40] hover:z-[50]" : ""}`}
     >
       <motion.div
-        className="relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300"
+        className={`relative aspect-[2/3] overflow-hidden bg-zinc-900 shadow-md transition-shadow duration-300 ${
+          hoverExpand ? "rounded-lg" : "rounded-xl"
+        }`}
         whileHover={hoverExpand ? {
           scale: 1.15,
           zIndex: 100,

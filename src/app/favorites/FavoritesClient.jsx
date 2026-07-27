@@ -54,6 +54,10 @@ import {
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import {
+  mergePendingTmdbListItems,
+  prunePendingListChanges,
+} from "@/lib/userLists/pendingListAdditions";
+import {
   resolveUserListInitialSnapshot,
   shouldPreserveAddedOrderSnapshot,
   reconcileAddedOrderSnapshot,
@@ -259,7 +263,7 @@ function readFavoritesCache() {
       return null;
     }
     return {
-      items: parsed.items,
+      items: mergePendingTmdbListItems(parsed.items, "favorites"),
       ratedItems: Array.isArray(parsed.ratedItems) ? parsed.ratedItems : [],
       fresh: age < FAVORITES_CACHE_TTL_MS,
     };
@@ -2389,11 +2393,19 @@ export default function FavoritesClient() {
         const data = JSON.parse(text);
         const favorites = data?.favorites || [];
 
-        const favoritesWithMeta = favorites.map((item, index) => ({
+        const freshFavoritesWithMeta = favorites.map((item, index) => ({
           ...item,
           user_rating: item.user_rating ?? null,
           _addedIndex: index,
         }));
+        prunePendingListChanges(
+          "favorites",
+          new Set(freshFavoritesWithMeta.map(userListItemKey)),
+        );
+        const favoritesWithMeta = mergePendingTmdbListItems(
+          freshFavoritesWithMeta,
+          "favorites",
+        );
 
         if (!cancelled) {
           // Load namespaced cached scores before rendering grouped views.

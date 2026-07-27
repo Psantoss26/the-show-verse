@@ -915,7 +915,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       {/* Fondo decorativo sutil */}
       <ProfileBackdrop />
 
-      <div className="relative z-10 mx-auto max-w-[1500px] px-4 pb-8 pt-4 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
+      <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
         {/* ── CABECERA ── */}
         <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between lg:gap-6">
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 sm:h-26 sm:w-26" />
