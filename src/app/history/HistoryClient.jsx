@@ -38,6 +38,7 @@ import {
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
@@ -1642,6 +1643,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
   onRemoveFromHistory,
   index = 0,
   totalItems = 0,
+  animateWithin = 24,
   editMode = false,
 }) {
   const type = getItemType(entry);
@@ -1864,9 +1866,10 @@ const HistoryItemCard = memo(function HistoryItemCard({
   // Reduce animation delay for large lists
   const isBackNav = useIsHistoryNavigation();
   const animDelay =
-    totalItems > 20 ? Math.min(index * 0.02, 0.3) : index * 0.05;
-  // En navegación de historial (atrás/adelante) no se anima la entrada.
-  const shouldAnimate = !isBackNav && index < 50;
+    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  // En navegación de historial (atrás/adelante) no se anima la entrada. Se anima
+  // solo lo que cabe en pantalla (cascada tarjeta-a-tarjeta, como Favoritos).
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
 
   if (!href || isGroup)
     return (
@@ -1923,6 +1926,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   onRemoveFromHistory,
   index = 0,
   totalItems = 0,
+  animateWithin = 24,
   editMode = false,
 }) {
   const type = getItemType(entry);
@@ -2051,7 +2055,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const isBackNav = useIsHistoryNavigation();
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < 60;
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
@@ -2100,6 +2104,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   onRemoveFromHistory,
   index = 0,
   totalItems = 0,
+  animateWithin = 24,
   editMode = false,
   isMobile = false,
 }) {
@@ -2279,26 +2284,26 @@ const HistoryGridCard = memo(function HistoryGridCard({
 
   const isBackNav = useIsHistoryNavigation();
   const animDelay =
-    totalItems > 20 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < 60;
+    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
 
   if (!href || isGroup)
     return (
       <motion.div
-        initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+        transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
       >
         <div className="block cursor-pointer">{CardInner}</div>
       </motion.div>
     );
   return (
     <motion.div
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+      transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
     >
       <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}
@@ -3247,6 +3252,33 @@ export default function HistoryClient() {
     }));
   }, [grouped]);
 
+  // Índice GLOBAL de cada tarjeta (para la cascada continua tarjeta-a-tarjeta,
+  // igual que Favoritos) y su total, en vez de reiniciar el índice por grupo/día.
+  const historyCardOrder = useMemo(() => {
+    const offsets = [];
+    let acc = 0;
+    for (const g of groupedWithCollapse) {
+      offsets.push(acc);
+      acc += g.collapsedItems.length;
+    }
+    return { offsets, total: acc };
+  }, [groupedWithCollapse]);
+
+  // Nº de tarjetas a animar = las que caben en pantalla en la vista actual.
+  const historyEntranceCount =
+    typeof window === "undefined"
+      ? 40
+      : viewMode === "list"
+        ? Math.min(120, (Math.ceil(window.innerHeight / 130) + 2) * pickResponsiveColumns({ base: 1, xl: 2 }))
+        : estimateVisibleCards({
+            columns: pickResponsiveColumns(
+              viewMode === "grid"
+                ? { base: 3, sm: 4, md: 5, lg: 6 }
+                : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 },
+            ),
+            aspect: 1.5,
+          });
+
   // Resetear expansiones cuando cambian filtros/ordenación/datos
   useEffect(() => {
     setExpandedGroups(new Set());
@@ -4049,6 +4081,9 @@ export default function HistoryClient() {
             ) : (
               <div className="space-y-8">
                 {groupedWithCollapse.map((g, groupIndex) => {
+                  // Índice global de la primera tarjeta de este grupo → cascada
+                  // continua tarjeta-a-tarjeta en toda la lista (como Favoritos).
+                  const baseIndex = historyCardOrder.offsets[groupIndex] ?? 0;
                   const renderItems = (
                     CardComponent,
                     entry,
@@ -4076,8 +4111,9 @@ export default function HistoryClient() {
                             <CardComponent
                               entry={entry}
                               busy={false}
-                              index={idx}
-                              totalItems={g.collapsedItems.length}
+                              index={baseIndex + idx}
+                              totalItems={historyCardOrder.total}
+                              animateWithin={historyEntranceCount}
                               editMode={editMode}
                               isMobile={isMobile}
                               {...extraProps}
@@ -4109,8 +4145,9 @@ export default function HistoryClient() {
                         entry={entry}
                         busy={mutatingId === `del:${getHistoryId(entry)}`}
                         onRemoveFromHistory={removeFromHistory}
-                        index={idx}
-                        totalItems={g.collapsedItems.length}
+                        index={baseIndex + idx}
+                        totalItems={historyCardOrder.total}
+                        animateWithin={historyEntranceCount}
                         editMode={editMode}
                         isMobile={isMobile}
                         {...extraProps}
@@ -4119,12 +4156,9 @@ export default function HistoryClient() {
                   };
 
                   return (
-                    <motion.div
-                      key={g.key}
-                      initial={isBackNav ? false : { opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
-                    >
+                    // El grupo (cabecera de día + rejilla) NO se anima como bloque:
+                    // sus tarjetas entran una a una (cascada global), como Favoritos.
+                    <div key={g.key}>
                       <div className="flex items-center gap-3 py-1.5 sm:py-4 mb-2">
                         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/40 to-emerald-500/15" />
                         <div className="relative overflow-hidden inline-flex max-w-[80%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-1.5 text-xs sm:text-sm">
@@ -4158,7 +4192,7 @@ export default function HistoryClient() {
                           )}
                         </div>
                       )}
-                    </motion.div>
+                    </div>
                   );
                 })}
 
