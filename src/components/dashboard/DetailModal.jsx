@@ -54,6 +54,10 @@ import { useAuth } from "@/context/AuthContext";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
+  cacheAddRating,
+  cacheRemoveRating,
+} from "@/lib/userLists/optimisticListCache";
+import {
   addMovieToList as backendAddMovieToList,
   createUserList as backendCreateUserList,
 } from "@/lib/api/backendLists";
@@ -1295,6 +1299,17 @@ export default function DetailModal({
       }
 
       const savedRating = json.rating == null ? null : Number(json.rating);
+      if (savedRating == null) {
+        cacheRemoveRating({ type: mediaType, mediaId: item.id });
+      } else {
+        cacheAddRating({
+          type: mediaType,
+          mediaId: item.id,
+          title,
+          posterPath: posterForMutation,
+          rating: savedRating,
+        });
+      }
       setUserRating(savedRating);
       setTraktStatus((prev) => ({
         ...prev,
