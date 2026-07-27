@@ -469,9 +469,14 @@ function cacheProfileSection(cacheKey, sectionState) {
 function profileSectionCacheKey(username, section) {
   // Diario pasó de títulos deduplicados a registros de historial. Versionar la
   // clave evita restaurar en esta sesión la instantánea anterior al cambio.
-  // Pendientes v2 descarta snapshots que todavía podían contener pósters ES.
+  // v2 descarta snapshots que todavía podían contener pósters ES.
   const version =
-    section === "watched" || section === "watchlist" ? "v2" : "v1";
+    section === "watched" ||
+    section === "watchlist" ||
+    section === "favorites" ||
+    section === "ratings"
+      ? "v2"
+      : "v1";
   return `${String(username || "").trim().toLocaleLowerCase()}:${section}:${version}`;
 }
 

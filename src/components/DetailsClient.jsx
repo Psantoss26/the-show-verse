@@ -6110,11 +6110,15 @@ export default function DetailsClient({
       if (savedRating == null) {
         cacheRemoveRating({ type, mediaId: id });
       } else {
+        const resolvedPosterPath =
+          json?.source === "backend" && json?.item
+            ? json.item.posterPath || null
+            : basePosterDisplayPath || data?.poster_path || null;
         cacheAddRating({
           type,
           mediaId: id,
           title,
-          posterPath: basePosterDisplayPath || data?.poster_path || null,
+          posterPath: resolvedPosterPath,
           rating: savedRating,
         });
       }

@@ -1015,7 +1015,14 @@ export async function getUserWatchlist(db, targetId, opts = {}) {
 }
 
 export async function getUserFavorites(db, targetId, opts = {}) {
-  return getSimpleTitleList(db, favorites, targetId, opts);
+  const page = await getSimpleTitleList(db, favorites, targetId, opts);
+  const englishPosters = await resolveEnglishPosterPaths(db, page.items);
+  page.items = applyResolvedEnglishPosterPaths(
+    page.items,
+    englishPosters,
+    { strict: true },
+  );
+  return page;
 }
 
 // Puntuaciones a nivel título, más recientes primero.
@@ -1045,6 +1052,12 @@ export async function getUserRatings(db, targetId, opts = {}) {
     .offset(offset);
   const page = packPage(rows, limit, offset);
   page.items = page.items.map((r) => ({ ...r, rating: Number(r.rating) }));
+  const englishPosters = await resolveEnglishPosterPaths(db, page.items);
+  page.items = applyResolvedEnglishPosterPaths(
+    page.items,
+    englishPosters,
+    { strict: true },
+  );
   return page;
 }
 

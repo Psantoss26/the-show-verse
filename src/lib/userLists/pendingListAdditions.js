@@ -10,7 +10,9 @@
 // los FUSIONEN en su pintado instantáneo (aparecen a la vez que el resto). Cuando
 // los datos frescos ya reflejan el cambio, la entrada se poda.
 
-const STORAGE_KEY = "showverse:pending-list-additions:v1";
+// v2 descarta altas optimistas antiguas que podían conservar pósters ES antes
+// de que Favoritos, Pendientes y Puntuaciones recibieran artwork canónico.
+const STORAGE_KEY = "showverse:pending-list-additions:v2";
 const HISTORY_REMOVALS_BUCKET = "watchedHistoryRemovals";
 // Caducidad de seguridad: si un fetch fresco nunca llega a confirmar el alta, la
 // entrada expira y no se queda "pegada" para siempre. Se usa una ventana amplia

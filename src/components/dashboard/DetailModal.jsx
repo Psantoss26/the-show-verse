@@ -1302,11 +1302,15 @@ export default function DetailModal({
       if (savedRating == null) {
         cacheRemoveRating({ type: mediaType, mediaId: item.id });
       } else {
+        const resolvedPosterPath =
+          json?.source === "backend" && json?.item
+            ? json.item.posterPath || null
+            : posterForMutation;
         cacheAddRating({
           type: mediaType,
           mediaId: item.id,
           title,
-          posterPath: posterForMutation,
+          posterPath: resolvedPosterPath,
           rating: savedRating,
         });
       }

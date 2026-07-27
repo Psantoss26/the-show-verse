@@ -53,6 +53,7 @@ export async function POST(req) {
       ok: true,
       rating: rating == null ? null : normalizeRating(rating),
       source: "backend",
+      item: backend.json?.item || null,
     });
     setBackendAuthCookies(res, backend, {
       secure: req.nextUrl?.protocol === "https:",
