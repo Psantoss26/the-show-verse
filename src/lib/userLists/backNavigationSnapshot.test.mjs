@@ -44,6 +44,18 @@ test("keeps stale snapshots hidden on a normal page entry", () => {
   );
 });
 
+test("does NOT restore even a fresh cache on a normal entry (cross-device safety)", () => {
+  // Aunque la caché sea reciente ("fresh"), en una entrada normal no se pinta:
+  // podría no reflejar cambios hechos desde otro dispositivo. Se carga fresco.
+  assert.deepEqual(
+    resolveUserListInitialSnapshot({ fresh: true, items: [{ id: 1 }] }, false),
+    {
+      hasBackNavigationSnapshot: false,
+      shouldRestoreSnapshot: false,
+    },
+  );
+});
+
 test("does not invent a restorable snapshot when the cache is empty", () => {
   assert.deepEqual(
     resolveUserListInitialSnapshot({ fresh: true, items: [] }, true),
