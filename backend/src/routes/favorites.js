@@ -6,6 +6,10 @@ import { db } from '../db/client.js';
 import { favorites, userRatings } from '../db/schema.js';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
+import {
+  resolveEnglishPosterPaths,
+  titleKey,
+} from '../lib/userProfile.js';
 
 const itemSchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -80,7 +84,14 @@ export default async function favoritesRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { tmdbId, mediaType, title, posterPath } = parsed.data;
+    const { tmdbId, mediaType, title } = parsed.data;
+    const resolvedPosters = await resolveEnglishPosterPaths(db, [{
+      tmdbId,
+      mediaType,
+    }]);
+    const posterKey = titleKey(mediaType, tmdbId);
+    const hasEnglishPosterDecision = resolvedPosters.has(posterKey);
+    const englishPosterPath = resolvedPosters.get(posterKey) || null;
 
     const [item] = await db
       .insert(favorites)
@@ -89,15 +100,26 @@ export default async function favoritesRoutes(fastify) {
         tmdbId,
         mediaType,
         title: title || null,
-        posterPath: posterPath || null,
+        posterPath: englishPosterPath,
       })
       .onConflictDoUpdate({
         target: [favorites.userId, favorites.tmdbId, favorites.mediaType],
-        set: { addedAt: new Date() }, // si ya existe, refresca la fecha
+        set: {
+          addedAt: new Date(),
+          ...(title ? { title } : {}),
+          // Una mutación nueva nunca vuelve a persistir el póster recibido por
+          // el cliente: si TMDb no puede decidir el idioma, se guarda sin él.
+          posterPath: hasEnglishPosterDecision ? englishPosterPath : null,
+        },
       })
       .returning();
 
-    return reply.status(201).send({ item });
+    return reply.status(201).send({
+      item: {
+        ...item,
+        posterPath: hasEnglishPosterDecision ? englishPosterPath : null,
+      },
+    });
   });
 
   // ──────────────────────────────────────────────

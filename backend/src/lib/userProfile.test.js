@@ -83,7 +83,7 @@ test('pickBestEnglishPosterPath keeps the DetailsClient artwork priority', () =>
   assert.equal(pickBestEnglishPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), null);
 });
 
-test('Profile Watchlist replaces persisted Spanish posters with the resolved English artwork', () => {
+test('Profile title lists replace persisted Spanish posters with the resolved English artwork', () => {
   const items = [{
     tmdbId: 453,
     mediaType: 'movie',
@@ -100,7 +100,7 @@ test('Profile Watchlist replaces persisted Spanish posters with the resolved Eng
   );
 });
 
-test('Profile Watchlist never falls back to a persisted Spanish poster after a settled empty decision', () => {
+test('Profile title lists never fall back to a persisted Spanish poster after a settled empty decision', () => {
   const items = [{
     tmdbId: 453,
     mediaType: 'movie',

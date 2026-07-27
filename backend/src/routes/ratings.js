@@ -5,6 +5,10 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { userRatings } from '../db/schema.js';
 import { eq, and, desc, isNull } from 'drizzle-orm';
+import {
+  resolveEnglishPosterPaths,
+  titleKey,
+} from '../lib/userProfile.js';
 
 const ratingSchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -78,6 +82,19 @@ export default async function ratingsRoutes(fastify) {
     }
 
     const { tmdbId, mediaType, rating, season, episode, title, posterPath } = parsed.data;
+    const isProfileTitleRating =
+      (mediaType === 'movie' || mediaType === 'tv') &&
+      season == null &&
+      episode == null;
+    const resolvedPosters = isProfileTitleRating
+      ? await resolveEnglishPosterPaths(db, [{ tmdbId, mediaType }])
+      : new Map();
+    const posterKey = titleKey(mediaType, tmdbId);
+    const hasEnglishPosterDecision =
+      isProfileTitleRating && resolvedPosters.has(posterKey);
+    const storedPosterPath = isProfileTitleRating
+      ? (resolvedPosters.get(posterKey) || null)
+      : (posterPath || null);
 
     const [existing] = await db
       .select({ id: userRatings.id })
@@ -93,7 +110,7 @@ export default async function ratingsRoutes(fastify) {
       season: season || null,
       episode: episode || null,
       title: title || null,
-      posterPath: posterPath || null,
+      posterPath: storedPosterPath,
       updatedAt: new Date(),
     };
 
@@ -108,7 +125,14 @@ export default async function ratingsRoutes(fastify) {
           .values(values)
           .returning();
 
-    return reply.status(201).send({ item });
+    return reply.status(201).send({
+      item: {
+        ...item,
+        posterPath: isProfileTitleRating
+          ? (hasEnglishPosterDecision ? storedPosterPath : null)
+          : item.posterPath,
+      },
+    });
   });
 
   // DELETE /ratings/:tmdbId/:mediaType — Quitar rating

@@ -730,7 +730,18 @@ export async function markAsFavorite({
   // Actualización OPTIMISTA de la caché de la página Favoritos: el título recién
   // añadido aparece al instante al entrar en /favorites, junto al resto (el
   // refresco en segundo plano reescribe la lista con los datos completos).
-  if (favorite) cacheAddFavorite({ type, mediaId, title, posterPath });
+  if (favorite) {
+    const resolvedPosterPath =
+      data?.source === "backend" && data?.item
+        ? data.item.posterPath || null
+        : posterPath;
+    cacheAddFavorite({
+      type,
+      mediaId,
+      title,
+      posterPath: resolvedPosterPath,
+    });
+  }
   else cacheRemoveFavorite({ type, mediaId });
   return data;
 }
