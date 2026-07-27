@@ -306,14 +306,6 @@ function PendingPreview({ username, items, onOpen }) {
                     </span>
                   </div>
                 )}
-                <div
-                  className={`pointer-events-none absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl`}
-                  aria-hidden="true"
-                >
-                  <span className="flex h-6 w-7 items-center justify-center text-sky-400">
-                    <BookmarkPlus className="h-3.5 w-3.5 fill-current" />
-                  </span>
-                </div>
               </Link>
             );
           })}

@@ -45,38 +45,45 @@ function episodePreviewOf(item, mediaType) {
   };
 }
 
+function clampScore(score) {
+  const num = Number(score);
+  return Number.isNaN(num) ? null : Math.max(0, Math.min(10, num));
+}
+
 export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
   const src = tmdbPoster(item?.posterPath || item?.poster_path);
-
   const title = item?.title || item?.name || "";
 
+  const isFixedSelfWatchlist = fixedIndicator === "watchlist-self";
   const isFixedFavorite = fixedIndicator === "favorite" || fixedIndicator === "favorites";
   const isFixedWatchlist = fixedIndicator === "watchlist" || fixedIndicator === "pending";
-  const isFixed = Boolean(fixedIndicator);
 
   const favorite = Boolean(
     viewerState?.favorite ??
     item?.isFavorite ??
     item?.favorite ??
-    (isFixedFavorite ? true : isFixedWatchlist ? false : false)
+    (isFixedFavorite && !viewerState ? true : false)
   );
   const watchlist = Boolean(
     viewerState?.watchlist ??
     item?.isWatchlist ??
     item?.watchlist ??
-    (isFixedWatchlist ? true : isFixedFavorite ? false : false)
+    (isFixedSelfWatchlist ? true : isFixedWatchlist && !viewerState ? true : false)
   );
   const watched = Boolean(viewerState?.watched || item?.watched);
   const userRating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? (!showStars ? item?.rating : undefined);
 
+  const tmdbScore = clampScore(item?.vote_average ?? item?.voteAverage ?? item?.tmdbScore ?? item?.tmdb_rating ?? item?.rating);
+  const imdbScore = clampScore(item?.imdbScore ?? item?.imdb_score ?? item?.imdbRating ?? item?.imdb_rating ?? item?._imdb?.rating);
+
   const hasUserRating = userRating != null && Number(userRating) > 0;
-  const hasCollectionIndicator = favorite || watchlist || isFixed;
-  const hasViewerIndicators = hasCollectionIndicator || watched || hasUserRating;
+  const hasCollectionIndicator = favorite || watchlist;
+  const hasViewerIndicators = isFixedSelfWatchlist || hasCollectionIndicator || watched || hasUserRating;
   const useProfileIndicatorSize = indicatorSize === "profile";
-  const useCompactSize = compactIndicator || isFixed;
+  const useCompactSize = compactIndicator || Boolean(fixedIndicator);
   const indicatorItemClassName = useCompactSize
     ? "h-6 w-7 sm:h-6.5 sm:w-7.5"
     : useProfileIndicatorSize
