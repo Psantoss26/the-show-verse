@@ -907,6 +907,11 @@ async function fillMissingPosters(db, targetId, items) {
 // Reseñas nativas del usuario (+ su nota del título + título/póster best-effort).
 export async function getUserReviews(db, targetId, opts = {}) {
   const { limit, offset } = pageParams(opts);
+  // Inyectable únicamente para pruebas; en producción completa los datos desde
+  // las tablas del usuario y, si no existen ahí, desde TMDb.
+  const hydrateMissing = typeof opts.hydrateMissing === 'function'
+    ? opts.hydrateMissing
+    : fillMissingPosters;
   const rows = await db
     .select({
       id: titleComments.id,
@@ -951,6 +956,10 @@ export async function getUserReviews(db, targetId, opts = {}) {
       rating: ratingByKey.get(key) ?? null,
     };
   });
+  // Una reseña puede existir sin que el usuario haya añadido el título a otra
+  // lista. En ese caso resolveTitleMetadata no tiene de dónde sacar el título
+  // ni el póster, así que completamos ambos antes de responder al perfil.
+  await hydrateMissing(db, targetId, page.items);
   return page;
 }
 

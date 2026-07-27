@@ -124,6 +124,7 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (RT, MC, premios)
+import { cacheAddRating, cacheRemoveRating } from "@/lib/userLists/optimisticListCache";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
@@ -1133,40 +1134,52 @@ function ProgressiveHeroLogo({ path, title }) {
 function RecommendationHoverIndicator({
   favorite = false,
   watchlist = false,
-  watched = false,
-  rating = null,
+  userRating = null,
+  tmdbRating = null,
+  imdbRating = null,
 }) {
-  const hasRating = Number.isFinite(Number(rating)) && Number(rating) > 0;
-  const hasCollectionIndicator = favorite || watchlist;
+  // Favorito tiene prioridad si, por una importación antigua, el título
+  // aparece también en Pendientes. El resto de recomendaciones conservan sus
+  // puntuaciones públicas aunque no pertenezcan a ninguna lista.
+  const isFavorite = Boolean(favorite);
+  const isWatchlist = !isFavorite && Boolean(watchlist);
+  const normalizedUserRating = Number(userRating);
+  const normalizedTmdbRating = Number(tmdbRating);
+  const normalizedImdbRating = Number(imdbRating);
+  const hasUserRating = Number.isFinite(normalizedUserRating) && normalizedUserRating > 0;
+  const hasTmdbRating = Number.isFinite(normalizedTmdbRating) && normalizedTmdbRating > 0;
+  const hasImdbRating = Number.isFinite(normalizedImdbRating) && normalizedImdbRating > 0;
+  const scoreClassName = "flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums";
 
-  if (!hasCollectionIndicator && !watched && !hasRating) return null;
-
-  const ratingLabel = Number.isInteger(Number(rating))
-    ? String(rating)
-    : Number(rating).toFixed(1);
+  if (!isFavorite && !isWatchlist && !hasTmdbRating && !hasImdbRating) return null;
 
   return (
     <div
       className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full px-1.5 opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
       aria-hidden="true"
     >
-      {hasCollectionIndicator && (
-        <span className={`flex h-9 w-10 shrink-0 items-center justify-center ${favorite ? "text-red-400" : "text-sky-400"}`}>
-          {favorite ? (
+      {(isFavorite || isWatchlist) && (
+        <span className={`flex h-9 w-10 shrink-0 items-center justify-center ${isFavorite ? "text-red-400" : "text-sky-400"}`}>
+          {isFavorite ? (
             <Heart className="h-5 w-5 fill-current" />
           ) : (
             <BookmarkPlus className="h-5 w-5 fill-current" />
           )}
         </span>
       )}
-      {watched && (
-        <span className="flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400">
-          <Eye className="h-5 w-5" />
+      {isFavorite && hasUserRating && (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {Number.isInteger(normalizedUserRating) ? normalizedUserRating : normalizedUserRating.toFixed(1)}
         </span>
       )}
-      {hasRating && (
-        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none text-amber-300">
-          <span className="tabular-nums leading-none">{ratingLabel}</span>
+      {!isFavorite && hasTmdbRating && (
+        <span className={`${scoreClassName} text-sky-400`}>
+          {normalizedTmdbRating.toFixed(1)}
+        </span>
+      )}
+      {!isFavorite && hasImdbRating && (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {normalizedImdbRating.toFixed(1)}
         </span>
       )}
     </div>
@@ -3480,6 +3493,16 @@ export default function DetailsClient({
       });
       if (!res.ok) throw new Error("Error al guardar puntuación en TMDb");
 
+      // Alta optimista en Puntuaciones del Perfil: la nota recién puesta aparece
+      // al instante junto al resto (el refresco reescribe con los datos reales).
+      cacheAddRating({
+        type,
+        mediaId: id,
+        title,
+        posterPath: basePosterDisplayPath || data?.poster_path || null,
+        rating: value,
+      });
+
       // Sincronizacion opcional hacia Trakt conservando el mismo valor que TMDb.
       if (!skipSync && syncTrakt && trakt.connected) {
         await setTraktRatingSafe(value);
@@ -3506,6 +3529,9 @@ export default function DetailsClient({
         headers: { "Content-Type": "application/json;charset=utf-8" },
       });
       if (!res.ok) throw new Error("Error al borrar puntuación en TMDb");
+
+      // Baja optimista: la nota desaparece al instante de Puntuaciones del Perfil.
+      cacheRemoveRating({ type, mediaId: id });
 
       if (!skipSync && syncTrakt && trakt.connected) {
         await setTraktRatingSafe(null);
@@ -5794,6 +5820,17 @@ export default function DetailsClient({
 
   const [collectionData, setCollectionData] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
+  const collectionViewerItems = useMemo(
+    () =>
+      (Array.isArray(collectionData?.items) ? collectionData.items : []).map(
+        (item) => ({ tmdbId: item?.id, mediaType: "movie" }),
+      ),
+    [collectionData?.items],
+  );
+  const collectionViewerStates = useViewerTitleStates(
+    collectionViewerItems,
+    authenticated || hasBackendSession,
+  );
 
   // Carga los datos de la coleccion si la pelicula pertenece a una
   useEffect(() => {
@@ -7503,16 +7540,28 @@ export default function DetailsClient({
   const [recAccountStates, setRecAccountStates] = useState({});
   const recAccountStatesRef = useRef({});
   const recAccountStateInFlightRef = useRef(new Set());
+  const [recImdbRatings, setRecImdbRatings] = useState({});
+  const recImdbRatingsRef = useRef({});
+  const recImdbRatingInFlightRef = useRef(new Set());
+  const recImdbRequestScopeRef = useRef(0);
 
   useEffect(() => {
     recAccountStatesRef.current = recAccountStates;
   }, [recAccountStates]);
 
   useEffect(() => {
+    recImdbRatingsRef.current = recImdbRatings;
+  }, [recImdbRatings]);
+
+  useEffect(() => {
     // reset al cambiar de item
     setRecAccountStates({});
     recAccountStatesRef.current = {};
     recAccountStateInFlightRef.current = new Set();
+    setRecImdbRatings({});
+    recImdbRatingsRef.current = {};
+    recImdbRatingInFlightRef.current = new Set();
+    recImdbRequestScopeRef.current += 1;
   }, [id, type]);
 
   const prefetchRecAccountState = useCallback(
@@ -7554,6 +7603,73 @@ export default function DetailsClient({
     },
     [account?.id, session, type],
   );
+
+  // IMDb no se incluye en el payload ligero de recomendaciones. Se resuelve
+  // al interesarse por una tarjeta no favorita y se memoriza por ficha durante
+  // la visita para no repetir ni el lookup externo ni la consulta de
+  // puntuación al volver a pasar el cursor por la tarjeta.
+  const prefetchRecImdbRating = useCallback(async (rec, mediaType) => {
+    if (!rec?.id || (mediaType !== "movie" && mediaType !== "tv")) return;
+
+    const key = `${mediaType}:${rec.id}`;
+    if (Object.prototype.hasOwnProperty.call(recImdbRatingsRef.current, key)) return;
+    const inFlight = recImdbRatingInFlightRef.current;
+    if (inFlight.has(key)) return;
+
+    const requestScope = recImdbRequestScopeRef.current;
+    inFlight.add(key);
+    try {
+      const externalIds = rec?.imdb_id || rec?.imdbId
+        ? null
+        : await getExternalIds(mediaType, rec.id);
+      const imdbId = rec?.imdb_id || rec?.imdbId || externalIds?.imdb_id || null;
+      const payload = await fetchImdbRatingByImdb(imdbId, { timeoutMs: 5_000 });
+      const rating = Number(payload?.rating);
+      const nextRating = Number.isFinite(rating) && rating > 0 ? rating : null;
+      if (requestScope !== recImdbRequestScopeRef.current) return;
+
+      recImdbRatingsRef.current = {
+        ...recImdbRatingsRef.current,
+        [key]: nextRating,
+      };
+      setRecImdbRatings((current) => ({ ...current, [key]: nextRating }));
+    } catch {
+      if (requestScope !== recImdbRequestScopeRef.current) return;
+      recImdbRatingsRef.current = {
+        ...recImdbRatingsRef.current,
+        [key]: null,
+      };
+      setRecImdbRatings((current) => ({ ...current, [key]: null }));
+    } finally {
+      inFlight.delete(key);
+    }
+  }, []);
+
+  // En cuanto se conozca que una recomendación está en Pendientes se adelanta
+  // su IMDb en segundo plano. Así el indicador aparece completo en el primer
+  // hover; el mismo callback cubre los estados TMDb que se resuelven después
+  // de pasar por primera vez por una tarjeta.
+  useEffect(() => {
+    for (const rec of (Array.isArray(recommendations) ? recommendations : []).slice(0, 15)) {
+      if (!rec?.id) continue;
+      const mediaType =
+        rec.media_type === "movie" || rec.media_type === "tv"
+          ? rec.media_type
+          : type === "tv"
+            ? "tv"
+            : "movie";
+      const key = `${mediaType}:${rec.id}`;
+      const viewerState = recommendationViewerStates[
+        titleStateKey({ tmdbId: rec.id, mediaType })
+      ];
+      const accountState = recAccountStates[key];
+      const isFavorite = Boolean(viewerState?.favorite || accountState?.favorite);
+      const isWatchlist = Boolean(viewerState?.watchlist || accountState?.watchlist);
+      if (isWatchlist && !isFavorite) {
+        void prefetchRecImdbRating(rec, mediaType);
+      }
+    }
+  }, [recommendations, recAccountStates, recommendationViewerStates, prefetchRecImdbRating, type]);
 
   // Cargar providers desde JustWatch con caché en sessionStorage
   useEffect(() => {
@@ -9701,7 +9817,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {recommendations.slice(0, 15).map((rec, index) => {
+                        {recommendations.slice(0, 15).map((rec) => {
                           const recTitle = rec.title || rec.name;
                           const recType =
                             rec.media_type === "movie" ||
@@ -9725,7 +9841,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const recIsWatchlist = Boolean(
                             recViewerState?.watchlist || recAccountState?.watchlist,
                           );
-                          const recIsWatched = Boolean(recViewerState?.watched);
                           const recRating =
                             recViewerState?.rating ?? recAccountState?.rating;
                           const recUserRating =
@@ -9734,6 +9849,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             recRating > 0
                               ? recRating
                               : null;
+                          const recImdbRating =
+                            recImdbRatings[`${recType}:${rec.id}`] ?? null;
+                          const prefetchRecommendationHoverData = () => {
+                            void prefetchRecAccountState(rec);
+                            if (!recIsFavorite) {
+                              void prefetchRecImdbRating(rec, recType);
+                            }
+                          };
 
                           // En móvil, deshabilitar hover para mostrar solo las imágenes
                           const enableHover =
@@ -9752,16 +9875,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className={recCardClass}
                                 onMouseEnter={
                                   enableHover
-                                  ? () => {
-                                        void prefetchRecAccountState(rec);
-                                      }
+                                    ? prefetchRecommendationHoverData
                                     : undefined
                                 }
                                 onFocus={
                                   enableHover
-                                    ? () => {
-                                        void prefetchRecAccountState(rec);
-                                      }
+                                    ? prefetchRecommendationHoverData
                                     : undefined
                                 }
                               >
@@ -9781,8 +9900,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <RecommendationHoverIndicator
                                     favorite={recIsFavorite}
                                     watchlist={recIsWatchlist}
-                                    watched={recIsWatched}
-                                    rating={recUserRating}
+                                    userRating={recUserRating}
+                                    tmdbRating={rec.vote_average}
+                                    imdbRating={recImdbRating}
                                   />
                                 </div>
                               </Link>
@@ -9843,9 +9963,34 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         className="pb-8"
                       >
                         {collectionData.items.map((m) => {
-                          const colYear = m.release_date
-                            ? m.release_date.slice(0, 4)
-                            : "";
+                          const colAccountState =
+                            recAccountStates[`movie:${m.id}`] || null;
+                          const colViewerState =
+                            collectionViewerStates[
+                              titleStateKey({ tmdbId: m.id, mediaType: "movie" })
+                            ] || null;
+                          const colIsFavorite = Boolean(
+                            colViewerState?.favorite || colAccountState?.favorite,
+                          );
+                          const colIsWatchlist = Boolean(
+                            colViewerState?.watchlist || colAccountState?.watchlist,
+                          );
+                          const colRating =
+                            colViewerState?.rating ?? colAccountState?.rating;
+                          const colUserRating =
+                            typeof colRating === "number" &&
+                            Number.isFinite(colRating) &&
+                            colRating > 0
+                              ? colRating
+                              : null;
+                          const colImdbRating =
+                            recImdbRatings[`movie:${m.id}`] ?? null;
+                          const prefetchCollectionHoverData = () => {
+                            void prefetchRecAccountState(m);
+                            if (!colIsFavorite) {
+                              void prefetchRecImdbRating(m, "movie");
+                            }
+                          };
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const colCardClass = enableHover
@@ -9854,12 +9999,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const colImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             : "w-full h-full object-cover";
-                          const colOverlayClass = enableHover
-                            ? "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                            : "hidden";
-                          const colFooterInfoClass = enableHover
-                            ? "absolute bottom-0 left-0 right-0 p-3 pb-4 opacity-0 transition-all duration-500 ease-out translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
-                            : "hidden";
 
                           return (
                             <SwiperSlide key={m.id}>
@@ -9867,6 +10006,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 href={`/details/movie/${m.id}`}
                                 className={colCardClass}
                                 aria-label={m.title}
+                                onMouseEnter={
+                                  enableHover
+                                    ? prefetchCollectionHoverData
+                                    : undefined
+                                }
+                                onFocus={
+                                  enableHover
+                                    ? prefetchCollectionHoverData
+                                    : undefined
+                                }
                               >
                                 <div className="aspect-[2/3] overflow-hidden relative">
                                   {m.poster_path ? (
@@ -9883,18 +10032,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   )}
 
-                                  <div className={colOverlayClass} />
-
-                                  <div className={colFooterInfoClass}>
-                                    <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-2 drop-shadow-sm">
-                                      {m.title}
-                                    </p>
-                                    {colYear && (
-                                      <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-                                        {colYear}
-                                      </p>
-                                    )}
-                                  </div>
+                                  <RecommendationHoverIndicator
+                                    favorite={colIsFavorite}
+                                    watchlist={colIsWatchlist}
+                                    userRating={colUserRating}
+                                    tmdbRating={m.vote_average}
+                                    imdbRating={colImdbRating}
+                                  />
                                 </div>
                               </Link>
                             </SwiperSlide>

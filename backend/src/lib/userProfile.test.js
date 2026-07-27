@@ -9,15 +9,65 @@ import {
   collapseGroupedWatchActivity,
   normalizeProfileFavorites,
   countCompletedShows,
+  getUserReviews,
   pageParams,
   packPage,
   pickBestEnglishPosterPath,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
 
+function queryRows(rows) {
+  const query = {
+    from: () => query,
+    where: () => query,
+    orderBy: () => query,
+    limit: () => query,
+    offset: () => rows,
+    then: (resolve, reject) => Promise.resolve(rows).then(resolve, reject),
+  };
+  return query;
+}
+
+function reviewQueryDb(reviewRows) {
+  let selectCount = 0;
+  return {
+    select: () => {
+      const rows = selectCount === 0 ? reviewRows : [];
+      selectCount += 1;
+      return queryRows(rows);
+    },
+  };
+}
+
 test('titleKey combines mediaType and numeric id', () => {
   assert.equal(titleKey('movie', 27205), 'movie:27205');
   assert.equal(titleKey('tv', '1399'), 'tv:1399');
+});
+
+test('getUserReviews hydrates title and poster for a review-only user', async () => {
+  const page = await getUserReviews(
+    reviewQueryDb([{
+      id: 'review-1',
+      tmdbId: 453,
+      mediaType: 'movie',
+      body: 'Una reseña sin elementos en otras listas.',
+      spoiler: false,
+      likes: 0,
+      createdAt: new Date('2026-07-27T00:00:00.000Z'),
+    }]),
+    'reviewer-1',
+    {
+      hydrateMissing: async (_db, userId, items) => {
+        assert.equal(userId, 'reviewer-1');
+        assert.equal(items.length, 1);
+        items[0].title = 'Ejemplo';
+        items[0].posterPath = '/ejemplo.jpg';
+      },
+    },
+  );
+
+  assert.equal(page.items[0].title, 'Ejemplo');
+  assert.equal(page.items[0].posterPath, '/ejemplo.jpg');
 });
 
 test('pickBestEnglishPosterPath keeps the DetailsClient artwork priority', () => {

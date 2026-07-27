@@ -39,6 +39,38 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import {
+  getPendingListChanges,
+  prunePendingListChanges,
+  pendingItemKey,
+} from "@/lib/userLists/pendingListAdditions";
+import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
+
+// Sección de Perfil ↔ lista del store de altas optimistas.
+const PROFILE_PENDING_LIST_BY_SECTION = {
+  watched: "watched",
+  favorites: "favorites",
+  watchlist: "watchlist",
+  ratings: "ratings",
+};
+
+// Construye un item de sección de Perfil a partir de una entrada pendiente, con
+// el campo de fecha correcto para que el orden "más reciente" lo ponga arriba.
+function buildPendingProfileItem(entry, section) {
+  const iso = new Date(entry?.at || Date.now()).toISOString();
+  const dateField =
+    section === "watched" ? "watchedAt" : section === "ratings" ? "ratedAt" : "addedAt";
+  const item = {
+    tmdbId: entry.tmdbId,
+    mediaType: entry.mediaType,
+    title: entry.title || "",
+    posterPath: entry.posterPath || null,
+    [dateField]: iso,
+    _optimistic: true,
+  };
+  if (section === "ratings" && typeof entry.rating === "number") item.rating = entry.rating;
+  return item;
+}
 
 // Configuración por sección: tipo de layout + textos.
 const SECTIONS = {
@@ -1410,10 +1442,53 @@ function ProfileContentSection({ username, section, actor }) {
     });
   };
 
+  // ¿Se está viendo el PROPIO perfil? Solo entonces tiene sentido fusionar las
+  // altas optimistas (afectan a las listas del usuario logueado).
+  const isSelfProfile =
+    Boolean(viewer?.username) &&
+    String(viewer.username).toLowerCase() === String(username).toLowerCase();
+  const pendingListType = PROFILE_PENDING_LIST_BY_SECTION[section] || null;
+
+  // Cambios en vivo: cuando se añade/quita/puntúa desde una ficha (o el modal
+  // abierto sobre el propio Perfil), el store optimista cambia y disparamos este
+  // contador para volver a fusionar y reflejarlo AL INSTANTE, sin recargar.
+  const [pendingVersion, setPendingVersion] = useState(0);
+  useEffect(() => {
+    if (!isSelfProfile || !pendingListType) return undefined;
+    const onChange = (event) => {
+      const types = event?.detail?.listTypes;
+      if (Array.isArray(types) && types.includes(pendingListType)) {
+        setPendingVersion((value) => value + 1);
+      }
+    };
+    window.addEventListener(LIST_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(LIST_CHANGED_EVENT, onChange);
+  }, [isSelfProfile, pendingListType]);
+
+  // Fusiona los títulos recién añadidos (store optimista) en el pintado
+  // instantáneo, para que aparezcan A LA VEZ que el resto y no "después" cuando
+  // la revalidación (lenta en producción) confirme. Se deduplica contra lo ya
+  // presente; en cuanto los datos frescos lo incluyen, el efecto de carga poda
+  // la entrada pendiente y este merge deja de añadirla. Las bajas (removedKeys)
+  // filtran también los items ya presentes en `items`.
+  const sourceItems = useMemo(() => {
+    if (!isSelfProfile || !pendingListType) return items;
+    const { additions, removedKeys } = getPendingListChanges(pendingListType);
+    if (!additions.length && !removedKeys.size) return items;
+    const keyOf = (it) => pendingItemKey(getItemMediaType(it), it?.tmdbId ?? it?.id);
+    const present = new Set(items.map(keyOf));
+    const base = removedKeys.size ? items.filter((it) => !removedKeys.has(keyOf(it))) : items;
+    const prepend = additions
+      .filter((a) => !present.has(a.key))
+      .map((a) => buildPendingProfileItem(a, section));
+    return prepend.length ? [...prepend, ...base] : base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, isSelfProfile, pendingListType, section, pendingVersion]);
+
   const visibleItems = useMemo(() => {
-    if (!menuEnabled) return items;
+    if (!menuEnabled) return sourceItems;
     const query = controls.query.trim().toLocaleLowerCase();
-    const filtered = items.filter((item) => {
+    const filtered = sourceItems.filter((item) => {
       const matchesQuery = !query || getItemTitle(item).toLocaleLowerCase().includes(query);
       if (!matchesQuery) return false;
       if (controls.filter === "all") return true;
@@ -1434,7 +1509,7 @@ function ProfileContentSection({ username, section, actor }) {
       const bDate = getItemDate(b)?.getTime() || 0;
       return controls.sort === "oldest" ? aDate - bDate : bDate - aDate;
     });
-  }, [controls, items, menuEnabled, section]);
+  }, [controls, sourceItems, menuEnabled, section]);
 
   // El modo con póster es una representación de títulos, no del registro
   // textual de actividad. Las acciones como crear una lista no tienen artwork
@@ -1538,6 +1613,15 @@ function ProfileContentSection({ username, section, actor }) {
       setOffset(nextOffset);
       setLoadMoreError(failed);
       setStatus("ready");
+
+      // Datos frescos ya confirmados → poda las altas optimistas que ya vienen
+      // incluidas (o las caducadas), para no duplicar ni "arrastrar" pendientes.
+      if (pendingListType && !failed) {
+        prunePendingListChanges(
+          pendingListType,
+          new Set(accumulated.map((it) => pendingItemKey(getItemMediaType(it), it?.tmdbId ?? it?.id))),
+        );
+      }
     })();
 
     return () => {
