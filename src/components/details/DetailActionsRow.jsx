@@ -527,11 +527,9 @@ export default function DetailActionsRow({
                         onClick={onAddToList}
                         disabled={listBusy}
                         active={listActive}
-                        activeColor="emerald"
+                        activeColor="purple"
                         groupId="details-actions"
-                        className={`!w-full !h-auto aspect-square ${
-                          listActive ? "!bg-white !text-black" : ""
-                        }`}
+                        className="!w-full !h-auto aspect-square"
                         title={
                           listActive ? "Gestionar en listas" : "Añadir a lista"
                         }
@@ -597,11 +595,9 @@ export default function DetailActionsRow({
                       <LiquidButton
                         onClick={onComments}
                         active={commentsActive}
-                        activeColor="violet"
+                        activeColor="orange"
                         groupId="details-actions"
-                        className={`!w-full !h-auto aspect-square ${
-                          commentsActive ? "!bg-white !text-black" : ""
-                        }`}
+                        className="!w-full !h-auto aspect-square"
                         title="Ver reseñas de la comunidad"
                       >
                         <MessageSquare />
@@ -838,9 +834,8 @@ export default function DetailActionsRow({
             onClick={onAddToList}
             disabled={listBusy}
             active={listActive}
-            activeColor="emerald"
+            activeColor="purple"
             groupId="details-actions"
-            className={listActive ? "!bg-white !text-black" : ""}
             title={
               listBusy
                 ? "Comprobando listas..."
@@ -859,9 +854,8 @@ export default function DetailActionsRow({
           <LiquidButton
             onClick={onComments}
             active={commentsActive}
-            activeColor="violet"
+            activeColor="orange"
             groupId="details-actions"
-            className={commentsActive ? "!bg-white !text-black" : ""}
             title={
               commentsActive
                 ? "Ver reseñas de la comunidad (tienes reseñas)"
