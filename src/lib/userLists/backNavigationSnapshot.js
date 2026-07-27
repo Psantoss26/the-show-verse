@@ -1,17 +1,20 @@
 // Decide qué caché puede pintar una página de usuario en su primer render.
-// En una entrada normal solo usamos datos recientes para no mostrar contenido
-// obsoleto. Al volver con atrás/adelante, la instantánea representa exactamente
-// la vista que el usuario acaba de dejar y puede restaurarse aunque haya vencido
-// el TTL de refresco; la petición habitual seguirá actualizándola después.
+//
+// SOLO se restaura la instantánea al volver con atrás/adelante: ahí representa
+// exactamente la vista que el usuario acaba de dejar (y conviene restaurarla al
+// instante para conservar el scroll). En una entrada NORMAL no se pinta la caché
+// aunque sea "reciente": esa caché es LOCAL de cada dispositivo, así que puede no
+// reflejar cambios hechos desde otro dispositivo con el mismo usuario. Pintarla
+// mostraría primero lo viejo y, tras revalidar (lento en móvil/producción), los
+// títulos nuevos "aparecerían después". En su lugar se carga fresco y se pinta
+// TODO a la vez. (La caché sigue sirviendo de respaldo offline en `loadX`.)
 export function resolveUserListInitialSnapshot(cache, isBackNavigation) {
   const hasItems = Array.isArray(cache?.items) && cache.items.length > 0;
   const hasBackNavigationSnapshot = Boolean(isBackNavigation && hasItems);
 
   return {
     hasBackNavigationSnapshot,
-    shouldRestoreSnapshot: Boolean(
-      hasItems && (cache?.fresh || hasBackNavigationSnapshot),
-    ),
+    shouldRestoreSnapshot: hasBackNavigationSnapshot,
   };
 }
 
