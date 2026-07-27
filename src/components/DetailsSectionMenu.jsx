@@ -114,7 +114,7 @@ export default function DetailsSectionMenu({
       <nav className={["mx-auto w-full", maxWidthClass].join(" ")}>
         <div
           className={[
-            "relative isolate overflow-hidden rounded-2xl sm:rounded-3xl",
+            "relative isolate overflow-hidden rounded-2xl",
             "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40",
             "backdrop-blur-[50px]",
             "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
