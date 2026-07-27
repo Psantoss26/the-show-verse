@@ -23,14 +23,28 @@
 // instantáneo: su caché va por sessionStorage y por NOMBRE de usuario, así que
 // no se puede parchear directamente desde aquí (no conocemos el username).
 
-import { recordPendingListChange } from "./pendingListAdditions.js";
+import {
+  recordPendingHistoryRemoval,
+  recordPendingListChange,
+} from "./pendingListAdditions.js";
 import { historyEntryMatchesTarget } from "./historyCacheSnapshot.js";
 
-function recordProfilePending(listType, { type, mediaId, tmdbId, title, posterPath, rating }, added) {
+function recordProfilePending(
+  listType,
+  { type, mediaId, tmdbId, title, posterPath, rating, historyId },
+  added,
+) {
   try {
     recordPendingListChange(
       listType,
-      { tmdbId: tmdbId ?? mediaId, mediaType: type, title, posterPath, rating },
+      {
+        tmdbId: tmdbId ?? mediaId,
+        mediaType: type,
+        title,
+        posterPath,
+        rating,
+        historyId,
+      },
       added,
     );
   } catch {
@@ -310,7 +324,8 @@ export function cacheRemoveHistory(historyId) {
     "history",
     (it) => String(it?.history_id ?? it?.id) === target,
   );
-  emitListChanged(["history"], {
+  recordPendingHistoryRemoval({ historyId: target });
+  emitListChanged(["history", "watched"], {
     added: false,
     historyId: target,
   });
@@ -334,7 +349,13 @@ export function cacheRemoveHistoryItem({
     episode,
   };
   remove("history", (item) => historyEntryMatchesTarget(item, target));
-  emitListChanged(["history"], {
+  recordPendingHistoryRemoval({
+    mediaType: normalizedMediaType,
+    tmdbId: id,
+    season,
+    episode,
+  });
+  emitListChanged(["history", "watched"], {
     added: false,
     mediaType: normalizedMediaType,
     tmdbId: id,

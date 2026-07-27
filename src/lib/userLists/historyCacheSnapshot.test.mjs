@@ -342,7 +342,7 @@ test("removes DetailsClient targets from the persisted History snapshot before b
     );
     assert.equal(events.length, 2);
     assert.equal(events[0].detail.added, false);
-    assert.deepEqual(events[0].detail.listTypes, ["history"]);
+    assert.deepEqual(events[0].detail.listTypes, ["history", "watched"]);
   } finally {
     delete globalThis.window;
   }

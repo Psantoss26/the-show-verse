@@ -11,6 +11,7 @@
 // los datos frescos ya reflejan el cambio, la entrada se poda.
 
 const STORAGE_KEY = "showverse:pending-list-additions:v1";
+const HISTORY_REMOVALS_BUCKET = "watchedHistoryRemovals";
 // Caducidad de seguridad: si un fetch fresco nunca llega a confirmar el alta, la
 // entrada expira y no se queda "pegada" para siempre. Se usa una ventana amplia
 // (24 h) porque las secciones de Perfil pueden pintar desde caché sin revalidar
@@ -22,6 +23,53 @@ function normalizeMediaType(mediaType) {
   return mediaType === "tv" || mediaType === "show" || mediaType === "episode"
     ? "tv"
     : "movie";
+}
+
+function historyRecordId(item) {
+  const id = item?.historyId ?? item?.history_id ?? item?.id;
+  return id == null ? null : String(id);
+}
+
+function historyRecordEpisode(item) {
+  const season = Number(
+    item?.season ?? item?.seasonNumber ?? item?.season_number,
+  );
+  const episode = Number(
+    item?.episode ?? item?.episodeNumber ?? item?.episode_number,
+  );
+  return {
+    season: Number.isFinite(season) ? season : null,
+    episode: Number.isFinite(episode) ? episode : null,
+  };
+}
+
+function historyRemovalMatchesItem(removal, item) {
+  const removalId =
+    removal?.historyId == null ? null : String(removal.historyId);
+  if (removalId) return historyRecordId(item) === removalId;
+
+  const targetId = Number(removal?.tmdbId);
+  const itemId = Number(item?.tmdbId ?? item?.tmdb_id);
+  if (!Number.isFinite(targetId) || itemId !== targetId) return false;
+  if (
+    normalizeMediaType(removal?.mediaType) !==
+    normalizeMediaType(item?.mediaType ?? item?.media_type ?? item?.type)
+  ) {
+    return false;
+  }
+
+  const targetSeason = Number(removal?.season);
+  const targetEpisode = Number(removal?.episode);
+  const needsSeason =
+    removal?.season != null && Number.isFinite(targetSeason);
+  const needsEpisode =
+    removal?.episode != null && Number.isFinite(targetEpisode);
+  if (!needsSeason && !needsEpisode) return true;
+
+  const itemEpisode = historyRecordEpisode(item);
+  if (needsSeason && itemEpisode.season !== targetSeason) return false;
+  if (needsEpisode && itemEpisode.episode !== targetEpisode) return false;
+  return true;
 }
 
 export function pendingItemKey(mediaType, tmdbId) {
@@ -66,11 +114,234 @@ export function recordPendingListChange(listType, item, added) {
     title: item?.title ?? item?.name ?? null,
     posterPath: item?.posterPath ?? item?.poster_path ?? null,
     rating: typeof item?.rating === "number" ? item.rating : null,
+    historyId:
+      item?.historyId ?? item?.history_id ?? null,
     at: Date.now(),
     removed: !added,
   };
   data[listType] = bucket;
   writeStore(data);
+}
+
+/**
+ * Conserva la baja de un registro de Historial mientras Diario sigue mostrando
+ * una instantánea anterior en sessionStorage. Admite una reproducción concreta
+ * o todos los registros de un título/temporada/episodio.
+ */
+export function recordPendingHistoryRemoval({
+  historyId,
+  mediaType,
+  tmdbId,
+  season,
+  episode,
+} = {}) {
+  if (typeof window === "undefined") return;
+  const exactId = historyId == null ? null : String(historyId);
+  const numericTmdbId = Number(tmdbId);
+  if (!exactId && !Number.isFinite(numericTmdbId)) return;
+
+  const normalizedType = normalizeMediaType(mediaType);
+  const key = exactId
+    ? `id:${exactId}`
+    : [
+        "target",
+        normalizedType,
+        numericTmdbId,
+        season ?? "*",
+        episode ?? "*",
+      ].join(":");
+  const data = readStore();
+  const bucket = data[HISTORY_REMOVALS_BUCKET] || {};
+  bucket[key] = {
+    historyId: exactId,
+    mediaType: normalizedType,
+    tmdbId: Number.isFinite(numericTmdbId) ? numericTmdbId : null,
+    season: season ?? null,
+    episode: episode ?? null,
+    at: Date.now(),
+  };
+  data[HISTORY_REMOVALS_BUCKET] = bucket;
+  writeStore(data);
+}
+
+export function getPendingHistoryRemovals() {
+  const bucket = readStore()[HISTORY_REMOVALS_BUCKET] || {};
+  const now = Date.now();
+  return Object.values(bucket).filter(
+    (entry) =>
+      entry &&
+      now - Number(entry.at || 0) >= 0 &&
+      now - Number(entry.at || 0) <= MAX_AGE_MS,
+  );
+}
+
+export function filterPendingHistoryRemovals(
+  items,
+  removals = getPendingHistoryRemovals(),
+) {
+  const source = Array.isArray(items) ? items : [];
+  const activeRemovals = Array.isArray(removals) ? removals : [];
+  if (!activeRemovals.length) return items;
+  return source.filter(
+    (item) =>
+      !activeRemovals.some((removal) =>
+        historyRemovalMatchesItem(removal, item),
+      ),
+  );
+}
+
+/**
+ * Sustituye silenciosamente la ventana superior de Diario por la respuesta
+ * fresca y conserva las páginas antiguas ya cargadas. Así una baja del servidor
+ * desaparece sin vaciar la sección ni perder el punto de scroll.
+ */
+export function mergeFreshDiaryItems(
+  cachedItems,
+  freshItems,
+  { freshHasMore = false } = {},
+) {
+  const cached = Array.isArray(cachedItems) ? cachedItems : [];
+  const fresh = Array.isArray(freshItems) ? freshItems : [];
+  if (!freshHasMore) return fresh;
+
+  const freshIds = new Set(
+    fresh.map(historyRecordId).filter(Boolean),
+  );
+  const freshTimes = fresh
+    .map((item) => {
+      const value = item?.watchedAt ?? item?.watched_at;
+      return new Date(value).getTime();
+    })
+    .filter(Number.isFinite);
+  const oldestFreshTime = freshTimes.length
+    ? Math.min(...freshTimes)
+    : null;
+
+  const preserved = cached.filter((item) => {
+    const id = historyRecordId(item);
+    if (id && freshIds.has(id)) return false;
+    if (oldestFreshTime == null) return true;
+    const value = item?.watchedAt ?? item?.watched_at;
+    const watchedAt = new Date(value).getTime();
+    return !Number.isFinite(watchedAt) || watchedAt <= oldestFreshTime;
+  });
+  return [...fresh, ...preserved];
+}
+
+function profileListItemKey(item) {
+  const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
+  if (tmdbId == null) return null;
+  return pendingItemKey(
+    item?.mediaType ?? item?.media_type ?? item?.type,
+    tmdbId,
+  );
+}
+
+function profileListItemDate(item) {
+  const value =
+    item?.ratedAt ??
+    item?.rated_at ??
+    item?.addedAt ??
+    item?.added_at;
+  const timestamp = value == null ? NaN : new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function buildPendingProfileListItem(entry, section, existing = null) {
+  const current = existing && typeof existing === "object" ? existing : {};
+  const dateField = section === "ratings" ? "ratedAt" : "addedAt";
+  const item = {
+    ...current,
+    tmdbId: Number(entry.tmdbId),
+    mediaType: normalizeMediaType(entry.mediaType),
+    title: entry.title || current.title || current.name || "",
+    posterPath:
+      entry.posterPath ||
+      current.posterPath ||
+      current.poster_path ||
+      null,
+    [dateField]: new Date(entry.at || Date.now()).toISOString(),
+    _optimistic: true,
+  };
+  if (section === "ratings" && typeof entry.rating === "number") {
+    item.rating = entry.rating;
+  }
+  return item;
+}
+
+/**
+ * Aplica al snapshot paginado de Perfil los cambios optimistas de las listas
+ * simples. Las altas se colocan en la cabecera y las actualizaciones de una
+ * puntuación reemplazan el valor anterior sin duplicar la tarjeta.
+ */
+export function mergePendingProfileListItems(
+  items,
+  section,
+  { additions = [], removedKeys = new Set() } = {},
+) {
+  const source = Array.isArray(items) ? items : [];
+  const removed =
+    removedKeys instanceof Set
+      ? removedKeys
+      : new Set(removedKeys || []);
+  const validAdditions = (Array.isArray(additions) ? additions : []).filter(
+    (entry) => entry?.key && Number.isFinite(Number(entry?.tmdbId)),
+  );
+  if (!removed.size && !validAdditions.length) return items;
+
+  const existingByKey = new Map(
+    source
+      .map((item) => [profileListItemKey(item), item])
+      .filter(([key]) => Boolean(key)),
+  );
+  const addedKeys = new Set(validAdditions.map((entry) => entry.key));
+  const base = source.filter((item) => {
+    const key = profileListItemKey(item);
+    return !removed.has(key) && !addedKeys.has(key);
+  });
+  const prepend = validAdditions
+    .filter((entry) => !removed.has(entry.key))
+    .map((entry) =>
+      buildPendingProfileListItem(
+        entry,
+        section,
+        existingByKey.get(entry.key),
+      ),
+    );
+  return [...prepend, ...base];
+}
+
+/**
+ * Reemplaza la ventana superior de una sección paginada de Perfil con datos
+ * frescos y conserva las páginas antiguas ya cargadas. Los elementos que
+ * desaparecieron dentro de la ventana autoritativa no sobreviven en la caché.
+ */
+export function mergeFreshProfileListItems(
+  cachedItems,
+  freshItems,
+  { freshHasMore = false } = {},
+) {
+  const cached = Array.isArray(cachedItems) ? cachedItems : [];
+  const fresh = Array.isArray(freshItems) ? freshItems : [];
+  if (!freshHasMore) return fresh;
+
+  const freshKeys = new Set(
+    fresh.map(profileListItemKey).filter(Boolean),
+  );
+  const freshTimes = fresh
+    .map(profileListItemDate)
+    .filter((value) => value != null);
+  const oldestFreshTime = freshTimes.length
+    ? Math.min(...freshTimes)
+    : null;
+  const preserved = cached.filter((item) => {
+    const key = profileListItemKey(item);
+    if (key && freshKeys.has(key)) return false;
+    if (oldestFreshTime == null) return true;
+    const timestamp = profileListItemDate(item);
+    return timestamp == null || timestamp <= oldestFreshTime;
+  });
+  return [...fresh, ...preserved];
 }
 
 /**
@@ -160,7 +431,11 @@ export function mergePendingTmdbListItems(items, listType) {
  * Poda las entradas ya confirmadas por los datos frescos (o caducadas). `presentKeys`
  * = claves (pendingItemKey) que YA vienen en la respuesta fresca del backend.
  */
-export function prunePendingListChanges(listType, presentKeys) {
+export function prunePendingListChanges(
+  listType,
+  presentKeys,
+  { completeSnapshot = true } = {},
+) {
   const data = readStore();
   const bucket = data[listType];
   if (!bucket) return;
@@ -169,8 +444,12 @@ export function prunePendingListChanges(listType, presentKeys) {
   let changed = false;
   for (const [key, entry] of Object.entries(bucket)) {
     const expired = now - (entry?.at || 0) > MAX_AGE_MS;
-    // Alta confirmada = ya está en frescos. Baja confirmada = ya NO está.
-    const confirmed = entry?.removed ? !present.has(key) : present.has(key);
+    // Alta confirmada = ya está en frescos. Una baja solo puede confirmarse por
+    // ausencia cuando la respuesta cubre TODA la lista; en una página parcial,
+    // el título podría encontrarse en un lote posterior.
+    const confirmed = entry?.removed
+      ? completeSnapshot && !present.has(key)
+      : present.has(key);
     if (expired || confirmed) {
       delete bucket[key];
       changed = true;

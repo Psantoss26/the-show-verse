@@ -40,7 +40,12 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import {
+  filterPendingHistoryRemovals,
   getPendingListChanges,
+  getPendingHistoryRemovals,
+  mergeFreshDiaryItems,
+  mergeFreshProfileListItems,
+  mergePendingProfileListItems,
   prunePendingListChanges,
   pendingItemKey,
 } from "@/lib/userLists/pendingListAdditions";
@@ -54,13 +59,14 @@ const PROFILE_PENDING_LIST_BY_SECTION = {
   ratings: "ratings",
 };
 
-// Construye un item de sección de Perfil a partir de una entrada pendiente, con
-// el campo de fecha correcto para que el orden "más reciente" lo ponga arriba.
+// Diario necesita conservar el historyId de cada reproducción. Las otras listas
+// simples se fusionan mediante mergePendingProfileListItems.
 function buildPendingProfileItem(entry, section) {
   const iso = new Date(entry?.at || Date.now()).toISOString();
   const dateField =
     section === "watched" ? "watchedAt" : section === "ratings" ? "ratedAt" : "addedAt";
   const item = {
+    id: entry.historyId || undefined,
     tmdbId: entry.tmdbId,
     mediaType: entry.mediaType,
     title: entry.title || "",
@@ -1487,15 +1493,24 @@ function ProfileContentSection({ username, section, actor }) {
   // filtran también los items ya presentes en `items`.
   const sourceItems = useMemo(() => {
     if (!isSelfProfile || !pendingListType) return items;
-    const { additions, removedKeys } = getPendingListChanges(pendingListType);
-    if (!additions.length && !removedKeys.size) return items;
+    const changes = getPendingListChanges(pendingListType);
+    if (section !== "watched") {
+      return mergePendingProfileListItems(items, section, changes);
+    }
+    const { additions, removedKeys } = changes;
+    const historyRemovals =
+      getPendingHistoryRemovals();
+    if (!additions.length && !removedKeys.size && !historyRemovals.length) {
+      return items;
+    }
     const keyOf = (it) => pendingItemKey(getItemMediaType(it), it?.tmdbId ?? it?.id);
     const present = new Set(items.map(keyOf));
     const base = removedKeys.size ? items.filter((it) => !removedKeys.has(keyOf(it))) : items;
     const prepend = additions
       .filter((a) => !present.has(a.key))
       .map((a) => buildPendingProfileItem(a, section));
-    return prepend.length ? [...prepend, ...base] : base;
+    const merged = prepend.length ? [...prepend, ...base] : base;
+    return filterPendingHistoryRemovals(merged, historyRemovals);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, isSelfProfile, pendingListType, section, pendingVersion]);
 
@@ -1564,30 +1579,69 @@ function ProfileContentSection({ username, section, actor }) {
   // sobre las tarjetas colapsadas, no sobre las filas crudas.
   useEffect(() => {
     let cancelled = false;
-    const cachedSection = getCachedProfileSection(cacheKey);
+    let cachedSection = getCachedProfileSection(cacheKey);
+    if (
+      cachedSection &&
+      isSelfProfile &&
+      pendingListType &&
+      section !== "watched"
+    ) {
+      const patchedItems = mergePendingProfileListItems(
+        cachedSection.items,
+        section,
+        getPendingListChanges(pendingListType),
+      );
+      if (patchedItems !== cachedSection.items) {
+        cachedSection = {
+          ...cachedSection,
+          items: patchedItems,
+          offset: Math.max(
+            0,
+            cachedSection.offset + patchedItems.length - cachedSection.items.length,
+          ),
+        };
+        cacheProfileSection(cacheKey, cachedSection);
+      }
+    }
     if (cachedSection) {
       // Vuelta atrás / cambio de pestaña ya visitada: se pinta desde caché sin
-      // volver a pedir (evita el parpadeo de recarga y conserva el scroll).
+      // vaciar el contenido (evita el parpadeo y conserva el scroll).
       setItems(cachedSection.items);
       setHasMore(cachedSection.hasMore);
       setOffset(cachedSection.offset);
       setStatus("ready");
-      return () => {
-        cancelled = true;
-      };
+      // Las listas que admiten mutaciones conservan la instantánea visible y
+      // revalidan su ventana superior en segundo plano. Las demás secciones
+      // mantienen el comportamiento estático anterior.
+      if (!pendingListType) {
+        return () => {
+          cancelled = true;
+        };
+      }
     }
 
-    setStatus("loading");
-    setItems([]);
-    setHasMore(false);
-    setOffset(0);
-    setLoadMoreError(false);
+    if (!cachedSection) {
+      setStatus("loading");
+      setItems([]);
+      setHasMore(false);
+      setOffset(0);
+      setLoadMoreError(false);
+    }
 
     const cardCount = (arr) =>
       section === "watched" ? collapseDiaryEpisodes(arr).length : arr.length;
 
     (async () => {
-      const target = fillTargetRef.current;
+      // En una sección cacheada se vuelve a cubrir silenciosamente todo el
+      // tramo que ya estaba cargado (hasta el límite de seguridad), no solo el
+      // viewport. Así una baja situada en una página antigua también se
+      // reconcilia sin obligar al usuario a volver a desplazarse hasta ella.
+      const target = cachedSection
+        ? Math.min(
+            PROFILE_SECTION_PAGE_SIZE * PROFILE_FILL_MAX_PAGES,
+            Math.max(fillTargetRef.current, cachedSection.offset),
+          )
+        : fillTargetRef.current;
       const accumulated = [];
       let nextOffset = 0;
       let more = true;
@@ -1598,7 +1652,10 @@ function ProfileContentSection({ username, section, actor }) {
         try {
           const res = await fetch(
             `/api/users/${encodeURIComponent(username)}/${section}?limit=${PROFILE_SECTION_PAGE_SIZE}&offset=${nextOffset}`,
-            { cache: "no-store" },
+            {
+              cache: "no-store",
+              ...(cachedSection ? { priority: "low" } : {}),
+            },
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
@@ -1616,15 +1673,34 @@ function ProfileContentSection({ username, section, actor }) {
 
       if (cancelled) return;
       if (failed && accumulated.length === 0) {
+        if (cachedSection) return;
         setStatus("error");
         return;
       }
 
-      const nextSection = { items: accumulated, hasMore: more, offset: nextOffset };
+      let reconciledItems = accumulated;
+      if (cachedSection && section === "watched") {
+        reconciledItems = mergeFreshDiaryItems(
+          cachedSection.items,
+          accumulated,
+          { freshHasMore: more },
+        );
+      } else if (cachedSection && pendingListType) {
+        reconciledItems = mergeFreshProfileListItems(
+          cachedSection.items,
+          accumulated,
+          { freshHasMore: more },
+        );
+      }
+      const nextSection = {
+        items: reconciledItems,
+        hasMore: more,
+        offset: cachedSection ? reconciledItems.length : nextOffset,
+      };
       cacheProfileSection(cacheKey, nextSection);
-      setItems(accumulated);
-      setHasMore(more);
-      setOffset(nextOffset);
+      setItems(reconciledItems);
+      setHasMore(nextSection.hasMore);
+      setOffset(nextSection.offset);
       setLoadMoreError(failed);
       setStatus("ready");
 
@@ -1634,6 +1710,7 @@ function ProfileContentSection({ username, section, actor }) {
         prunePendingListChanges(
           pendingListType,
           new Set(accumulated.map((it) => pendingItemKey(getItemMediaType(it), it?.tmdbId ?? it?.id))),
+          { completeSnapshot: !more },
         );
       }
     })();
@@ -1641,7 +1718,15 @@ function ProfileContentSection({ username, section, actor }) {
     return () => {
       cancelled = true;
     };
-  }, [username, section, cacheKey, config]);
+  }, [
+    username,
+    section,
+    cacheKey,
+    config,
+    isSelfProfile,
+    pendingListType,
+    pendingVersion,
+  ]);
 
   const loadMore = useCallback(async ({ limit = PROFILE_SECTION_PAGE_SIZE } = {}) => {
     if (loadingMoreRef.current || !hasMore) return;

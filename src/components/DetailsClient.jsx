@@ -6105,10 +6105,23 @@ export default function DetailsClient({
         }
         throw new Error(json?.error || "Error al guardar puntuación");
       }
-      setUserRating(json.rating);
+      const savedRating =
+        json.rating == null ? null : Number(json.rating);
+      if (savedRating == null) {
+        cacheRemoveRating({ type, mediaId: id });
+      } else {
+        cacheAddRating({
+          type,
+          mediaId: id,
+          title,
+          posterPath: basePosterDisplayPath || data?.poster_path || null,
+          rating: savedRating,
+        });
+      }
+      setUserRating(savedRating);
       setTrakt((prev) => ({
         ...prev,
-        rating: json.rating == null ? null : Number(json.rating),
+        rating: savedRating,
       }));
       return true;
     } catch (err) {
