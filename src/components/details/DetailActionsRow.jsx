@@ -35,6 +35,40 @@ const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-
                 [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
 
+// Retardo entre celdas para que el cambio se lea de izquierda a derecha, en orden.
+const SLOT_STAGGER = 0.045;
+
+// Una celda de la fila de acciones móvil combinada (solo series). Alterna su
+// contenido según `expanded` con un cross-fade de SOLO opacidad: sin escala, así
+// el botón NO cambia de tamaño. El contenido entrante lleva un retardo por índice
+// (SLOT_STAGGER) → la conmutación avanza en orden de izquierda a derecha, mientras
+// el saliente se desvanece rápido. La celda mantiene tamaño fijo (aspect-square),
+// por lo que la fila nunca se deforma ni cambia el tamaño de los botones.
+function ActionSlot({ index = 0, expanded, expandedContent, collapsedContent }) {
+  return (
+    <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={expanded ? "expanded" : "collapsed"}
+          initial={{ opacity: 0 }}
+          animate={{
+            opacity: 1,
+            transition: {
+              duration: 0.2,
+              ease: "easeOut",
+              delay: index * SLOT_STAGGER,
+            },
+          }}
+          exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
+          className="w-full h-full"
+        >
+          {expanded ? expandedContent : collapsedContent}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /**
  * Fila de acciones presentacional. Cada elemento aparece solo si su
  * handler/flag correspondiente está presente.
@@ -148,9 +182,9 @@ export default function DetailActionsRow({
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={mediaExpanded ? "close" : "play"}
-                    initial={{ scale: 0.6, opacity: 0, rotate: -45 }}
-                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    exit={{ scale: 0.6, opacity: 0, rotate: 45 }}
+                    initial={{ opacity: 0, rotate: -30 }}
+                    animate={{ opacity: 1, rotate: 0 }}
+                    exit={{ opacity: 0, rotate: 30 }}
                     transition={{ duration: 0.16, ease: "easeOut" }}
                     className="flex items-center justify-center w-full h-full"
                   >
@@ -167,71 +201,54 @@ export default function DetailActionsRow({
             </div>
 
             {/* Slot 2: Ver Tráiler (Expandido) <-> Valoración de episodios (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot2-trailer"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
+            <ActionSlot
+              index={1}
+              expanded={mediaExpanded}
+              expandedContent={
+                <LiquidButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMediaExpanded(false);
+                    if (onTrailer) onTrailer();
+                  }}
+                  disabled={!trailerAvailable}
+                  active={!!trailerAvailable}
+                  loading={trailerLoading}
+                  activeColor="yellow"
+                  groupId="details-actions"
+                  className={`!w-full !h-auto aspect-square ${
+                    trailerAvailable ? "!bg-white !text-black" : ""
+                  }`}
+                  title={
+                    trailerPlaying
+                      ? "Ocultar tráiler"
+                      : trailerAvailable
+                        ? "Ver Tráiler"
+                        : "Sin Tráiler"
+                  }
+                >
+                  {trailerPlaying ? (
+                    <X />
+                  ) : (
+                    <Play className={trailerAvailable ? "ml-0.5" : ""} />
+                  )}
+                </LiquidButton>
+              }
+              collapsedContent={
+                onEpisodeRatings && (
+                  <LiquidButton
+                    onClick={onEpisodeRatings}
+                    active
+                    activeColor="yellow"
+                    groupId="details-actions"
+                    className="!bg-white !text-black !w-full !h-auto aspect-square"
+                    title="Valoración de episodios"
                   >
-                    <LiquidButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMediaExpanded(false);
-                        if (onTrailer) onTrailer();
-                      }}
-                      disabled={!trailerAvailable}
-                      active={!!trailerAvailable}
-                      loading={trailerLoading}
-                      activeColor="yellow"
-                      groupId="details-actions"
-                      className={`!w-full !h-auto aspect-square ${
-                        trailerAvailable ? "!bg-white !text-black" : ""
-                      }`}
-                      title={
-                        trailerPlaying
-                          ? "Ocultar tráiler"
-                          : trailerAvailable
-                            ? "Ver Tráiler"
-                            : "Sin Tráiler"
-                      }
-                    >
-                      {trailerPlaying ? (
-                        <X />
-                      ) : (
-                        <Play className={trailerAvailable ? "ml-0.5" : ""} />
-                      )}
-                    </LiquidButton>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot2-ratings"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onEpisodeRatings && (
-                      <LiquidButton
-                        onClick={onEpisodeRatings}
-                        active
-                        activeColor="yellow"
-                        groupId="details-actions"
-                        className="!bg-white !text-black !w-full !h-auto aspect-square"
-                        title="Valoración de episodios"
-                      >
-                        <BarChart3 />
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                    <BarChart3 />
+                  </LiquidButton>
+                )
+              }
+            />
 
             {/* Slot 3: Soundtrack (Expandido) <-> Episodios vistos / Trakt (Replegado) */}
             <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
