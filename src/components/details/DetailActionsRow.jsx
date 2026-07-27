@@ -5,14 +5,8 @@
 // de episodios, control de visto en Trakt, puntuación, favorito, pendiente, listas
 // y reseñas). Componente 100% PRESENTACIONAL: toda la lógica/estado vive en el
 // consumidor (DetailsClient o DetailModal), que pasa handlers + flags por props.
-//
-// Se extrajo VERBATIM de DetailsClient para que ambas superficies (ficha completa
-// y ficha rápida del dashboard) rendericen la MISMA fila con idéntico estilo.
-// Cada botón se renderiza SOLO si se le pasa su handler/flag correspondiente, de
-// modo que DetailsClient muestra el set completo y el modal el subconjunto que
-// desee, sin re-estilar nada.
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import LiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
@@ -29,157 +23,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 
-/**
- * Botón combinado de Tráiler + Soundtrack para la vista móvil de series.
- * Muestra el icono de tráiler y, al pulsarlo, cambia su icono a 'X' y despliega
- * de forma fluida una sección hacia la derecha albergando los botones de Tráiler y Soundtrack.
- */
-function CombinedMediaButton({
-  onTrailer,
-  trailerAvailable,
-  trailerLoading,
-  trailerPlaying,
-  onSoundtrack,
-  soundtrackAvailable,
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    if (!expanded) return;
-    const handleOutsideClick = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setExpanded(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    document.addEventListener("touchstart", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("touchstart", handleOutsideClick);
-    };
-  }, [expanded]);
-
-  const handleMainClick = () => {
-    setExpanded((prev) => !prev);
-  };
-
-  const handleTrailerClick = (e) => {
-    e.stopPropagation();
-    setExpanded(false);
-    if (onTrailer) onTrailer();
-  };
-
-  const handleSoundtrackClick = (e) => {
-    e.stopPropagation();
-    setExpanded(false);
-    if (onSoundtrack) onSoundtrack();
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative block sm:hidden flex-1 min-w-[34px] max-w-[60px] aspect-square"
-    >
-      {/* Sección desplegada HACIA LA DERECHA */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, x: -12, scale: 0.88 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -12, scale: 0.88 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-[calc(100%+6px)] top-1/2 -translate-y-1/2 z-[100] flex items-center gap-1.5 p-1 rounded-2xl bg-black/80 bg-gradient-to-r from-white/15 via-white/5 to-black/80 backdrop-blur-xl border border-white/15 shadow-[0_8px_28px_rgba(0,0,0,0.75)]"
-          >
-            {/* Botón Ver Tráiler */}
-            <LiquidButton
-              onClick={handleTrailerClick}
-              disabled={!trailerAvailable}
-              active={!!trailerAvailable}
-              loading={trailerLoading}
-              activeColor="yellow"
-              groupId="details-actions"
-              className={`!w-9 !h-9 aspect-square ${
-                trailerAvailable ? "!bg-white !text-black shadow-md" : ""
-              }`}
-              title={
-                trailerPlaying
-                  ? "Ocultar tráiler"
-                  : trailerAvailable
-                    ? "Ver Tráiler"
-                    : "Sin Tráiler"
-              }
-            >
-              {trailerPlaying ? (
-                <X className="w-4 h-4" />
-              ) : (
-                <Play className={`w-4 h-4 ${trailerAvailable ? "ml-0.5" : ""}`} />
-              )}
-            </LiquidButton>
-
-            {/* Botón Soundtrack */}
-            <LiquidButton
-              onClick={handleSoundtrackClick}
-              disabled={!soundtrackAvailable}
-              active={!!soundtrackAvailable}
-              activeColor="yellow"
-              groupId="details-actions"
-              className={`!w-9 !h-9 aspect-square ${
-                soundtrackAvailable ? "!bg-white !text-black shadow-md" : ""
-              }`}
-              title={
-                soundtrackAvailable
-                  ? "Reproducir soundtrack"
-                  : "Sin soundtrack"
-              }
-            >
-              <Music2 className="w-4 h-4" />
-            </LiquidButton>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Botón principal inicial (Tráiler -> pasa a 'X' al desplegar) */}
-      <LiquidButton
-        onClick={handleMainClick}
-        disabled={!trailerAvailable && !soundtrackAvailable}
-        active={!!trailerAvailable || !!soundtrackAvailable}
-        loading={trailerLoading}
-        activeColor="yellow"
-        groupId="details-actions"
-        className={`!w-full !h-auto aspect-square ${
-          trailerAvailable || soundtrackAvailable ? "!bg-white !text-black" : ""
-        } ${
-          expanded
-            ? "ring-2 ring-yellow-400/90 shadow-[0_0_14px_rgba(250,204,21,0.6)]"
-            : ""
-        }`}
-        title={
-          expanded
-            ? "Cerrar opciones multimedia"
-            : "Opciones multimedia (Tráiler y Soundtrack)"
-        }
-        aria-expanded={expanded}
-        aria-haspopup="true"
-      >
-        {expanded ? (
-          <X />
-        ) : trailerPlaying ? (
-          <X />
-        ) : (
-          <Play className={trailerAvailable ? "ml-0.5" : ""} />
-        )}
-      </LiquidButton>
-    </div>
-  );
-}
-
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
-// NOTA: los selectores excluyen `.labeled` además de `.separator`. Un botón
-// "labeled" (p. ej. el tráiler con texto en la preview del dashboard) no debe
-// heredar el tamaño cuadrado/tope de ancho de los botones-icono. Si no hay
-// ningún hijo `.labeled` el comportamiento es idéntico al anterior.
 const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
                 [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
                 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
@@ -193,72 +38,20 @@ const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-
 /**
  * Fila de acciones presentacional. Cada elemento aparece solo si su
  * handler/flag correspondiente está presente.
- *
- * @param {object}   props
- * @param {string}   [props.className]        Clase extra a añadir al contenedor.
- * @param {boolean}  [props.showSeparator=true] Muestra el separador vertical.
- *
- * @param {Function} [props.onTrailer]        Click en "Ver tráiler".
- * @param {boolean}  [props.trailerAvailable] ¿Hay tráiler? (habilita/estiliza).
- * @param {boolean}  [props.trailerLoading]   Estado de carga del tráiler (opcional).
- *
- * @param {Function} [props.onSoundtrack]     Click en soundtrack.
- * @param {boolean}  [props.soundtrackAvailable] ¿Hay soundtrack?
- *
- * @param {Function} [props.onEpisodeRatings] Click en "Valoración de episodios" (TV).
- * @param {boolean}  [props.episodeRatingsOpen] aria-expanded del botón anterior.
- *
- * @param {object}   [props.trakt]            TraktWatchedControl:
- *                                            { connected, watched, plays, badge, busy, loading, onOpen }.
- * @param {object}   [props.rate]             StarRating (Puntuar):
- *                                            { rating, max, loading, onRate, connected, onConnect }.
- *
- * @param {boolean}  [props.favorite]         Estado favorito.
- * @param {boolean}  [props.favoriteLoading]  Cargando favorito.
- * @param {Function} [props.onToggleFavorite] Alternar favorito.
- *
- * @param {boolean}  [props.watchlist]        Estado pendiente.
- * @param {boolean}  [props.watchlistLoading] Cargando pendiente.
- * @param {Function} [props.onToggleWatchlist] Alternar pendiente.
- *
- * @param {Function} [props.onAddToList]      Abrir "Añadir a lista".
- * @param {boolean}  [props.listBusy]         Cargando presencia en listas.
- * @param {boolean}  [props.listActive]       ¿Está en alguna lista?
- *
- * @param {boolean}  [props.showComments]     Mostrar botón de reseñas (Trakt conectado).
- * @param {boolean}  [props.commentsActive]   ¿El usuario ya tiene reseñas?
- * @param {Function} [props.onComments]       Abrir modal de reseñas.
  */
 export default function DetailActionsRow({
   className = "",
   showSeparator = true,
-  // En móvil, por defecto cada botón se limita a 60px (evita botones enormes en
-  // la ficha completa). Con `fillMobile` se quita ese tope para que los botones
-  // crezcan y ocupen TODO el ancho disponible (usado en el modal del dashboard,
-  // más ancho, donde con el tope quedaban centrados dejando huecos laterales).
   fillMobile = false,
-  // Separación entre botones en móvil (en sm+ siempre es gap-3). Por defecto
-  // gap-1 (como DetailsClient); el modal la sube un poco para no verlos pegados.
   mobileGapClass = "gap-1",
-  // Tamaño de los botones-icono en modo "labeled-row" (píldora de tráiler +
-  // iconos): "md" es el tamaño original de las previews del dashboard; "lg" los
-  // agranda (usado en FeaturedHero, una superficie grande).
   size = "md",
 
   onTrailer,
   trailerAvailable = false,
   trailerLoading,
-  // Si se pasa, el botón de tráiler se muestra como PÍLDORA con texto (icono +
-  // etiqueta) en vez de icono-only. Solo lo usa la preview del dashboard;
-  // DetailModal y DetailsClient lo omiten y mantienen el icono.
   trailerLabel = null,
-  // Estado "reproduciendo": cambia el botón a X + "Ocultar" mientras el tráiler
-  // se está reproduciendo (la preview del dashboard lo pasa = showTrailer).
   trailerPlaying = false,
 
-  // Píldora de REPRODUCCIÓN (Continuar viendo): { label, onPlay, title }. Ocupa el
-  // MISMO slot que el tráiler (mutuamente excluyente con onTrailer): en vez de "Ver
-  // tráiler" muestra "Reproducir T·E" y reproduce el episodio/película en curso.
   play = null,
 
   onSoundtrack,
@@ -288,6 +81,8 @@ export default function DetailActionsRow({
   commentsActive = false,
   onComments,
 }) {
+  const [mediaExpanded, setMediaExpanded] = useState(false);
+
   const shouldCombineMedia =
     (combineTrailerSoundtrack !== undefined
       ? combineTrailerSoundtrack
@@ -301,8 +96,7 @@ export default function DetailActionsRow({
   const mobileCapClass = fillMobile
     ? ""
     : "[&>*:not(.separator)]:max-w-[60px]";
-  // Tamaño de los botones-icono en labeled-row (w-10/h-10 por defecto; w-12/h-12
-  // + icono mayor en "lg"). Se aplica solo cuando la fila es labeled-row.
+  // Tamaño de los botones-icono en labeled-row
   const labeledSizeClass =
     size === "lg"
       ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6"
@@ -347,19 +141,53 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {/* Botón combinado Tráiler + Soundtrack para la vista móvil de series */}
+      {/* SLOT 1 (Móvil Series): Botón disparador multimedia (Play -> X al expandir) */}
       {shouldCombineMedia && (
-        <CombinedMediaButton
-          onTrailer={onTrailer}
-          trailerAvailable={trailerAvailable}
-          trailerLoading={trailerLoading}
-          trailerPlaying={trailerPlaying}
-          onSoundtrack={onSoundtrack}
-          soundtrackAvailable={soundtrackAvailable}
-        />
+        <LiquidButton
+          onClick={() => setMediaExpanded((v) => !v)}
+          disabled={!trailerAvailable && !soundtrackAvailable}
+          active={!!trailerAvailable || !!soundtrackAvailable}
+          loading={trailerLoading}
+          activeColor="yellow"
+          groupId="details-actions"
+          className={`block sm:hidden ${
+            trailerAvailable || soundtrackAvailable
+              ? "!bg-white !text-black"
+              : ""
+          } ${
+            mediaExpanded
+              ? "ring-2 ring-yellow-400/90 shadow-[0_0_14px_rgba(250,204,21,0.6)]"
+              : ""
+          }`}
+          title={
+            mediaExpanded
+              ? "Cerrar opciones multimedia"
+              : "Opciones multimedia (Tráiler y Soundtrack)"
+          }
+          aria-expanded={mediaExpanded}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={mediaExpanded ? "close" : "play"}
+              initial={{ scale: 0.6, opacity: 0, rotate: -45 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={{ scale: 0.6, opacity: 0, rotate: 45 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center justify-center w-full h-full"
+            >
+              {mediaExpanded ? (
+                <X />
+              ) : trailerPlaying ? (
+                <X />
+              ) : (
+                <Play className={trailerAvailable ? "ml-0.5" : ""} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </LiquidButton>
       )}
 
-      {/* Botón de reproducción de tráiler */}
+      {/* Botón de reproducción de tráiler (Desktop / Normal) */}
       {onTrailer && (
         <LiquidButton
           onClick={onTrailer}
@@ -422,7 +250,7 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {/* Botón de música/soundtrack - Abre canciones encontradas en Spotify */}
+      {/* Botón de música/soundtrack (Desktop / Normal) */}
       {onSoundtrack && (
         <LiquidButton
           onClick={onSoundtrack}
@@ -444,7 +272,50 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {onEpisodeRatings && (
+      {/* SLOT 2: Valoración de episodios en desktop / normal, o Ver Tráiler si en móvil series está desplegado */}
+      {shouldCombineMedia && mediaExpanded ? (
+        <LiquidButton
+          onClick={(e) => {
+            e.stopPropagation();
+            setMediaExpanded(false);
+            if (onTrailer) onTrailer();
+          }}
+          disabled={!trailerAvailable}
+          active={!!trailerAvailable}
+          loading={trailerLoading}
+          activeColor="yellow"
+          groupId="details-actions"
+          className={`block sm:hidden ${
+            trailerAvailable ? "!bg-white !text-black" : ""
+          }`}
+          title={
+            trailerPlaying
+              ? "Ocultar tráiler"
+              : trailerAvailable
+                ? "Ver Tráiler"
+                : "Sin Tráiler"
+          }
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key="m-trailer"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center justify-center w-full h-full"
+            >
+              {trailerPlaying ? (
+                <X />
+              ) : (
+                <Play className={trailerAvailable ? "ml-0.5" : ""} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </LiquidButton>
+      ) : null}
+
+      {onEpisodeRatings && (!shouldCombineMedia || !mediaExpanded) && (
         <LiquidButton
           onClick={onEpisodeRatings}
           active
@@ -464,8 +335,41 @@ export default function DetailActionsRow({
         <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
       )}
 
-      {/* Control de visto/no visto en Trakt - Muestra estado de visualización y plays */}
-      {trakt && (
+      {/* SLOT 3: TraktWatchedControl en desktop / normal, o Soundtrack si en móvil series está desplegado */}
+      {shouldCombineMedia && mediaExpanded ? (
+        <LiquidButton
+          onClick={(e) => {
+            e.stopPropagation();
+            setMediaExpanded(false);
+            if (onSoundtrack) onSoundtrack();
+          }}
+          disabled={!soundtrackAvailable}
+          active={!!soundtrackAvailable}
+          activeColor="yellow"
+          groupId="details-actions"
+          className={`block sm:hidden ${
+            soundtrackAvailable ? "!bg-white !text-black" : ""
+          }`}
+          title={
+            soundtrackAvailable ? "Reproducir soundtrack" : "Sin soundtrack"
+          }
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key="m-soundtrack"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center justify-center w-full h-full"
+            >
+              <Music2 />
+            </motion.div>
+          </AnimatePresence>
+        </LiquidButton>
+      ) : null}
+
+      {trakt && (!shouldCombineMedia || !mediaExpanded) && (
         <TraktWatchedControl
           connected={trakt.connected}
           watched={trakt.watched}
@@ -478,7 +382,7 @@ export default function DetailActionsRow({
         />
       )}
 
-      {/* Componente de puntuación con estrellas - Rating unificado TMDb + Trakt */}
+      {/* Componente de puntuación con estrellas */}
       {rate && (
         <StarRating
           rating={rate.rating}
@@ -490,7 +394,7 @@ export default function DetailActionsRow({
         />
       )}
 
-      {/* Botón de Favoritos - Añade o quita el contenido de la lista de favoritos del usuario */}
+      {/* Botón de Favoritos */}
       {onToggleFavorite && (
         <LiquidButton
           onClick={onToggleFavorite}
@@ -516,12 +420,12 @@ export default function DetailActionsRow({
           {favoriteLoading ? (
             <Loader2 className="animate-spin" />
           ) : (
-            <Heart className={`${favorite ? "fill-current" : ""}`} />
+            <Heart className={favorite ? "fill-current" : ""} />
           )}
         </LiquidButton>
       )}
 
-      {/* Botón de Watchlist - Añade o quita el contenido de la lista de pendientes */}
+      {/* Botón de Pendientes (Watchlist) */}
       {onToggleWatchlist && (
         <LiquidButton
           onClick={onToggleWatchlist}
@@ -533,48 +437,61 @@ export default function DetailActionsRow({
             watchlistLoading
               ? "Cargando estado de pendientes..."
               : watchlist
-                ? "Quitar de pendientes"
-                : "Añadir a pendientes"
+                ? "Quitar de lista de pendientes"
+                : "Añadir a lista de pendientes"
           }
           aria-label={
             watchlistLoading
               ? "Cargando estado de pendientes"
               : watchlist
-                ? "Quitar de pendientes"
-                : "Añadir a pendientes"
+                ? "Quitar de lista de pendientes"
+                : "Añadir a lista de pendientes"
           }
         >
           {watchlistLoading ? (
             <Loader2 className="animate-spin" />
           ) : (
-            <BookmarkPlus className={`${watchlist ? "fill-current" : ""}`} />
+            <BookmarkPlus className={watchlist ? "fill-current" : ""} />
           )}
         </LiquidButton>
       )}
 
-      {/* Botón de añadir a listas personalizadas - Solo visible si el usuario tiene acceso a listas */}
+      {/* Añadir a lista */}
       {onAddToList && (
         <LiquidButton
           onClick={onAddToList}
           disabled={listBusy}
           active={listActive}
-          activeColor="purple"
+          activeColor="emerald"
           groupId="details-actions"
-          title="Añadir a lista"
+          className={listActive ? "!bg-white !text-black" : ""}
+          title={
+            listBusy
+              ? "Comprobando listas..."
+              : listActive
+                ? "Gestionar en listas"
+                : "Añadir a lista"
+          }
+          aria-label="Añadir o gestionar en listas de reproducción"
         >
           {listBusy ? <Loader2 className="animate-spin" /> : <ListVideo />}
         </LiquidButton>
       )}
 
-      {/* Botón de Reseñas / Comentarios en Trakt */}
-      {showComments && onComments && (
+      {/* Botón de Reseñas / Comentarios */}
+      {showComments && (
         <LiquidButton
           onClick={onComments}
           active={commentsActive}
-          activeColor="orange"
+          activeColor="violet"
           groupId="details-actions"
-          title="Escribir reseña en Trakt"
-          aria-label="Escribir reseña en Trakt"
+          className={commentsActive ? "!bg-white !text-black" : ""}
+          title={
+            commentsActive
+              ? "Ver reseñas de la comunidad (tienes reseñas)"
+              : "Ver reseñas de la comunidad"
+          }
+          aria-label="Ver reseñas de la comunidad"
         >
           <MessageSquare />
         </LiquidButton>
