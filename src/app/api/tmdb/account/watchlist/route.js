@@ -126,7 +126,11 @@ export async function POST(req) {
         })
 
     if (backend.ok) {
-      const res = NextResponse.json({ ok: true, source: 'backend' })
+      const res = NextResponse.json({
+        ok: true,
+        source: 'backend',
+        item: backend.json?.item || null,
+      })
       setBackendAuthCookies(res, backend, { secure: req.nextUrl?.protocol === 'https:' })
       return res
     }

@@ -767,7 +767,18 @@ export async function markInWatchlist({
     throw new Error(data?.error || 'No se pudo actualizar la lista de pendientes');
   }
   // Actualización OPTIMISTA de la caché de la página Pendientes.
-  if (watchlist) cacheAddWatchlist({ type, mediaId, title, posterPath });
+  if (watchlist) {
+    const resolvedPosterPath =
+      data?.source === "backend" && data?.item
+        ? data.item.posterPath || null
+        : posterPath;
+    cacheAddWatchlist({
+      type,
+      mediaId,
+      title,
+      posterPath: resolvedPosterPath,
+    });
+  }
   else cacheRemoveWatchlist({ type, mediaId });
   return data;
 }

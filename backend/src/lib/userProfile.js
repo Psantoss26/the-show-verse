@@ -92,6 +92,22 @@ export function pickBestEnglishPosterPath(posters) {
   return best?.file_path || null;
 }
 
+export function applyResolvedEnglishPosterPaths(
+  items,
+  resolvedPosters,
+  { strict = false } = {},
+) {
+  const resolved =
+    resolvedPosters instanceof Map ? resolvedPosters : new Map();
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const key = titleKey(item?.mediaType, item?.tmdbId);
+    if (resolved.has(key)) {
+      return { ...item, posterPath: resolved.get(key) || null };
+    }
+    return strict ? { ...item, posterPath: null } : item;
+  });
+}
+
 async function mapWithConcurrency(values, worker, concurrency = PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY) {
   const results = new Array(values.length);
   let nextIndex = 0;
@@ -106,7 +122,7 @@ async function mapWithConcurrency(values, worker, concurrency = PROFILE_ENGLISH_
   return results;
 }
 
-async function resolveEnglishPosterPaths(db, items) {
+export async function resolveEnglishPosterPaths(db, items) {
   const entries = [...new Map(
     (items || [])
       .filter((item) => Number(item?.tmdbId) && ['movie', 'tv'].includes(item?.mediaType))
@@ -988,7 +1004,14 @@ async function getSimpleTitleList(db, table, targetId, opts) {
 }
 
 export async function getUserWatchlist(db, targetId, opts = {}) {
-  return getSimpleTitleList(db, watchlist, targetId, opts);
+  const page = await getSimpleTitleList(db, watchlist, targetId, opts);
+  const englishPosters = await resolveEnglishPosterPaths(db, page.items);
+  page.items = applyResolvedEnglishPosterPaths(
+    page.items,
+    englishPosters,
+    { strict: true },
+  );
+  return page;
 }
 
 export async function getUserFavorites(db, targetId, opts = {}) {

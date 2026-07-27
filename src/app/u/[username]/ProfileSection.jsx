@@ -92,7 +92,7 @@ const SECTIONS = {
 const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watchlist", "ratings"]);
 const profileSectionPreferences = new Map();
 const profileViewPreferences = new Map();
-const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v1:";
+const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v2:";
 // Caché de stills de episodios por serie/temporada. El modal puede abrirse más
 // de una vez y la ruta de temporada ya está revalidada; conservarla aquí evita
 // volver a pedir las mismas imágenes panorámicas durante la sesión.
@@ -352,8 +352,8 @@ function sectionMenuOptions(section) {
       ...(ratings ? [["rating-desc", "Mejor puntuación"], ["rating-asc", "Menor puntuación"]] : []),
     ],
     groups: [
-      ["month", "Mes"],
       ["none", "Sin agrupar"],
+      ["month", "Mes"],
       ["year", "Año"],
       ...(activity ? [["action", "Acción"]] : [["type", "Tipo"]]),
       ...(ratings ? [["rating", "Estrellas"]] : []),
@@ -364,8 +364,12 @@ function sectionMenuOptions(section) {
   };
 }
 
-function profileViewPreferenceKey(username) {
-  return String(username || "").trim().toLocaleLowerCase();
+function profileViewPreferenceKey(username, section) {
+  const normalizedUsername = String(username || "").trim().toLocaleLowerCase();
+  const normalizedSection = String(section || "").trim().toLocaleLowerCase();
+  return normalizedUsername && normalizedSection
+    ? `${normalizedUsername}:${normalizedSection}`
+    : "";
 }
 
 function supportsProfileView(section, view) {
@@ -465,7 +469,9 @@ function cacheProfileSection(cacheKey, sectionState) {
 function profileSectionCacheKey(username, section) {
   // Diario pasó de títulos deduplicados a registros de historial. Versionar la
   // clave evita restaurar en esta sesión la instantánea anterior al cambio.
-  const version = section === "watched" ? "v2" : "v1";
+  // Pendientes v2 descarta snapshots que todavía podían contener pósters ES.
+  const version =
+    section === "watched" || section === "watchlist" ? "v2" : "v1";
   return `${String(username || "").trim().toLocaleLowerCase()}:${section}:${version}`;
 }
 
@@ -1418,7 +1424,7 @@ function ProfileContentSection({ username, section, actor }) {
   const isBackNav = useIsHistoryNavigation();
   const config = SECTIONS[section];
   const cacheKey = profileSectionCacheKey(username, section);
-  const profileKey = profileViewPreferenceKey(username);
+  const profileKey = profileViewPreferenceKey(username, section);
   // En una vuelta desde DetailsClient la instantánea de la sección debe estar
   // disponible en el primer frame, no esperar a que un efecto vuelva a leerla.
   // La ruta normal continúa usando sólo la caché viva en memoria para mantener
