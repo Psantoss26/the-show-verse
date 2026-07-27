@@ -12,6 +12,8 @@
 // modo que DetailsClient muestra el set completo y el modal el subconjunto que
 // desee, sin re-estilar nada.
 
+import { useState, useRef, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import LiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
@@ -26,6 +28,151 @@ import {
   ListVideo,
   MessageSquare,
 } from "lucide-react";
+
+/**
+ * Botón combinado de Tráiler + Soundtrack para la vista móvil de series.
+ * Muestra el icono de tráiler y, al pulsarlo, cambia su icono a 'X' y despliega
+ * de forma fluida una sección hacia la derecha albergando los botones de Tráiler y Soundtrack.
+ */
+function CombinedMediaButton({
+  onTrailer,
+  trailerAvailable,
+  trailerLoading,
+  trailerPlaying,
+  onSoundtrack,
+  soundtrackAvailable,
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [expanded]);
+
+  const handleMainClick = () => {
+    setExpanded((prev) => !prev);
+  };
+
+  const handleTrailerClick = (e) => {
+    e.stopPropagation();
+    setExpanded(false);
+    if (onTrailer) onTrailer();
+  };
+
+  const handleSoundtrackClick = (e) => {
+    e.stopPropagation();
+    setExpanded(false);
+    if (onSoundtrack) onSoundtrack();
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative block sm:hidden flex-1 min-w-[34px] max-w-[60px] aspect-square"
+    >
+      {/* Sección desplegada HACIA LA DERECHA */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, x: -12, scale: 0.88 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -12, scale: 0.88 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute left-[calc(100%+6px)] top-1/2 -translate-y-1/2 z-[100] flex items-center gap-1.5 p-1 rounded-2xl bg-black/80 bg-gradient-to-r from-white/15 via-white/5 to-black/80 backdrop-blur-xl border border-white/15 shadow-[0_8px_28px_rgba(0,0,0,0.75)]"
+          >
+            {/* Botón Ver Tráiler */}
+            <LiquidButton
+              onClick={handleTrailerClick}
+              disabled={!trailerAvailable}
+              active={!!trailerAvailable}
+              loading={trailerLoading}
+              activeColor="yellow"
+              groupId="details-actions"
+              className={`!w-9 !h-9 aspect-square ${
+                trailerAvailable ? "!bg-white !text-black shadow-md" : ""
+              }`}
+              title={
+                trailerPlaying
+                  ? "Ocultar tráiler"
+                  : trailerAvailable
+                    ? "Ver Tráiler"
+                    : "Sin Tráiler"
+              }
+            >
+              {trailerPlaying ? (
+                <X className="w-4 h-4" />
+              ) : (
+                <Play className={`w-4 h-4 ${trailerAvailable ? "ml-0.5" : ""}`} />
+              )}
+            </LiquidButton>
+
+            {/* Botón Soundtrack */}
+            <LiquidButton
+              onClick={handleSoundtrackClick}
+              disabled={!soundtrackAvailable}
+              active={!!soundtrackAvailable}
+              activeColor="yellow"
+              groupId="details-actions"
+              className={`!w-9 !h-9 aspect-square ${
+                soundtrackAvailable ? "!bg-white !text-black shadow-md" : ""
+              }`}
+              title={
+                soundtrackAvailable
+                  ? "Reproducir soundtrack"
+                  : "Sin soundtrack"
+              }
+            >
+              <Music2 className="w-4 h-4" />
+            </LiquidButton>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Botón principal inicial (Tráiler -> pasa a 'X' al desplegar) */}
+      <LiquidButton
+        onClick={handleMainClick}
+        disabled={!trailerAvailable && !soundtrackAvailable}
+        active={!!trailerAvailable || !!soundtrackAvailable}
+        loading={trailerLoading}
+        activeColor="yellow"
+        groupId="details-actions"
+        className={`!w-full !h-auto aspect-square ${
+          trailerAvailable || soundtrackAvailable ? "!bg-white !text-black" : ""
+        } ${
+          expanded
+            ? "ring-2 ring-yellow-400/90 shadow-[0_0_14px_rgba(250,204,21,0.6)]"
+            : ""
+        }`}
+        title={
+          expanded
+            ? "Cerrar opciones multimedia"
+            : "Opciones multimedia (Tráiler y Soundtrack)"
+        }
+        aria-expanded={expanded}
+        aria-haspopup="true"
+      >
+        {expanded ? (
+          <X />
+        ) : trailerPlaying ? (
+          <X />
+        ) : (
+          <Play className={trailerAvailable ? "ml-0.5" : ""} />
+        )}
+      </LiquidButton>
+    </div>
+  );
+}
 
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
@@ -120,6 +267,8 @@ export default function DetailActionsRow({
   onEpisodeRatings,
   episodeRatingsOpen = false,
 
+  combineTrailerSoundtrack,
+
   trakt,
   rate,
 
@@ -139,6 +288,15 @@ export default function DetailActionsRow({
   commentsActive = false,
   onComments,
 }) {
+  const shouldCombineMedia =
+    (combineTrailerSoundtrack !== undefined
+      ? combineTrailerSoundtrack
+      : Boolean(onEpisodeRatings)) &&
+    Boolean(onTrailer) &&
+    Boolean(onSoundtrack) &&
+    !play &&
+    !trailerLabel;
+
   // Tope de tamaño de botón en móvil: por defecto 60px; con fillMobile sin tope.
   const mobileCapClass = fillMobile
     ? ""
@@ -159,11 +317,10 @@ export default function DetailActionsRow({
   ]
     .filter(Boolean)
     .join(" ");
+
   return (
     <div className={rowClass}>
-      {/* Píldora de REPRODUCCIÓN (Continuar viendo): ocupa el slot del tráiler y
-          reproduce el episodio/película en curso. Mismo estilo que la píldora de
-          tráiler (blanca, icono + etiqueta). */}
+      {/* Píldora de REPRODUCCIÓN (Continuar viendo) */}
       {play && (
         <LiquidButton
           onClick={play.onPlay}
@@ -190,7 +347,19 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {/* Botón de reproducción de tráiler - Solo habilitado si hay video disponible */}
+      {/* Botón combinado Tráiler + Soundtrack para la vista móvil de series */}
+      {shouldCombineMedia && (
+        <CombinedMediaButton
+          onTrailer={onTrailer}
+          trailerAvailable={trailerAvailable}
+          trailerLoading={trailerLoading}
+          trailerPlaying={trailerPlaying}
+          onSoundtrack={onSoundtrack}
+          soundtrackAvailable={soundtrackAvailable}
+        />
+      )}
+
+      {/* Botón de reproducción de tráiler */}
       {onTrailer && (
         <LiquidButton
           onClick={onTrailer}
@@ -200,6 +369,7 @@ export default function DetailActionsRow({
           activeColor="yellow"
           groupId="details-actions"
           className={[
+            shouldCombineMedia ? "hidden sm:block" : "",
             trailerAvailable ? "!bg-white !text-black" : "",
             trailerLabel
               ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none ${
@@ -260,7 +430,12 @@ export default function DetailActionsRow({
           active={!!soundtrackAvailable}
           activeColor="yellow"
           groupId="details-actions"
-          className={soundtrackAvailable ? "!bg-white !text-black" : ""}
+          className={[
+            shouldCombineMedia ? "hidden sm:block" : "",
+            soundtrackAvailable ? "!bg-white !text-black" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           title={
             soundtrackAvailable ? "Reproducir soundtrack" : "Sin soundtrack"
           }
@@ -269,7 +444,6 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {/* Acceso rápido a la tabla de valoraciones, solo para series. */}
       {onEpisodeRatings && (
         <LiquidButton
           onClick={onEpisodeRatings}
@@ -286,7 +460,6 @@ export default function DetailActionsRow({
         </LiquidButton>
       )}
 
-      {/* Separador vertical entre los controles multimedia y Trakt */}
       {showSeparator && (
         <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
       )}

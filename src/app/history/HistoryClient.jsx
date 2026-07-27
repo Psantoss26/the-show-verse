@@ -1346,6 +1346,13 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
   const [expanded, setExpanded] = useState(false);
   const count = entry._group.length;
 
+  // Stills (backdrop) de cada episodio, como en el modal de episodios agrupados.
+  // Solo se piden al desplegar (showId null mientras está colapsado → sin fetch).
+  const episodeStills = useHistoryEpisodeStills(
+    expanded ? getTmdbId(entry) : null,
+    entry._group,
+  );
+
   return (
     <div className="rounded-xl border border-zinc-800/60 overflow-hidden">
       {/* Header del grupo */}
@@ -1399,6 +1406,13 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                   ? getEpisodeMeta(sub)
                   : null;
                 const subHref = getDetailsHref(sub);
+                const stillPath = subMeta
+                  ? episodeStills.get(
+                      historyEpisodeStillKey(subMeta.season, subMeta.episode),
+                    )
+                  : null;
+                const finalStill =
+                  stillPath || sub?.still_path || sub?.stillPath || null;
                 return (
                   <Link
                     // Mismo motivo que en ExpandedGroupView: getHistoryId(sub) puede
@@ -1408,8 +1422,19 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                     href={subHref || "#"} prefetch
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
-                    <div className="w-[44px] h-[66px] shrink-0 rounded-md overflow-hidden bg-zinc-900 border border-white/10 shadow-sm">
-                      <Poster entry={sub} className="w-full h-full" />
+                    <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 shadow-sm">
+                      {finalStill ? (
+                        <OptimizedImage
+                          src={`https://image.tmdb.org/t/p/w780${finalStill}`}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-zinc-700">
+                          <Film className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       {subMeta && (
@@ -2748,16 +2773,6 @@ function MobileCalendarOverlay({
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 12 }}
           transition={{ duration: reduceMotion ? 0 : 0.28, ease: "easeOut" }}
         >
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
-              aria-label="Cerrar calendario"
-            >
-              <X className="w-5 h-5" aria-hidden="true" />
-            </button>
-          </div>
           <CalendarPanel
             monthDate={monthDate}
             onPrev={onPrev}
