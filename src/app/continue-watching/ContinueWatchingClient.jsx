@@ -1041,7 +1041,7 @@ export default function ContinueWatchingClient() {
         {/* Filtros */}
         <motion.div
           ref={filtersRef}
-          className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
+          className="sticky top-14 z-[70] space-y-3 mb-4 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -1099,7 +1099,7 @@ export default function ContinueWatchingClient() {
                     : "relative"
                     }`}
                 >
-                  <div className="space-y-2">
+                  <div className="p-3 rounded-2xl bg-zinc-950/90 backdrop-blur-2xl border border-white/10 shadow-2xl space-y-2.5">
                     {/* Fila 1: ordenar + acción de eliminar. El selector de
                       secciones permanece visible en la barra principal. */}
                     <div className="flex gap-2 items-center">
@@ -1705,7 +1705,7 @@ function Blobs() {
 
 function Header({ stats, loading, onRefresh, refreshing }) {
   return (
-    <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+    <motion.header className="mb-4 sm:mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
       <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
         <div className="shrink-0 min-w-0">
           <div className="flex items-center gap-3 mb-2">
