@@ -5,7 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ChevronDown,
   ChevronLeft,
@@ -25,6 +25,7 @@ import {
   Grid3x3,
   ArrowUpDown,
   Calendar,
+  CalendarDays,
   X,
   LogOut,
   SlidersHorizontal,
@@ -1075,10 +1076,6 @@ function CalendarWithPosters({
   const selectedDayItems = selectedDayKey
     ? itemsByDay[selectedDayKey] || []
     : [];
-  const selectedDayCollapsed = useMemo(
-    () => collapseConsecutive(selectedDayItems),
-    [selectedDayItems],
-  );
 
   const MAX_POSTERS = 8;
 
@@ -1334,68 +1331,7 @@ function CalendarWithPosters({
 
               {/* Lista scrollable de items */}
               <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
-                {selectedDayCollapsed.map((entry, idx) => {
-                  const isGroup = entry._group && entry._group.length > 1;
-                  const title = getMainTitle(entry);
-                  const type = getItemType(entry);
-                  const epMeta = isEpisodeEntry(entry)
-                    ? getEpisodeMeta(entry)
-                    : null;
-                  const href = getDetailsHref(entry);
-
-                  if (isGroup) {
-                    const range = getEpisodeRange(entry._group);
-                    return (
-                      <CalendarDrawerGroup
-                        key={`grp-${getTmdbId(entry)}-${idx}`}
-                        entry={entry}
-                        title={title}
-                        type={type}
-                        range={range}
-                      />
-                    );
-                  }
-
-                  return (
-                    <Link
-                      key={`item-${getHistoryId(entry) || idx}`}
-                      href={href || "#"} prefetch
-                      className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
-                    >
-                      <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
-                        <Poster entry={entry} className="w-full h-full" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[15px] font-bold text-white truncate group-hover/row:text-emerald-300 transition-colors">
-                          {title}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span
-                            className={[
-                              "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
-                              type === "movie"
-                                ? "bg-sky-500/20 text-sky-300"
-                                : "bg-purple-500/20 text-purple-300",
-                            ].join(" ")}
-                          >
-                            {type === "movie" ? "Película" : "Serie"}
-                          </span>
-                          {type === "show" && epMeta && (
-                            <span className="text-[10px] font-semibold text-emerald-400">
-                              {formatEpisodeBadge(epMeta)}
-                            </span>
-                          )}
-                        </div>
-                        {type === "show" && epMeta?.title && (
-                          <p className="text-[10px] text-zinc-500 truncate mt-0.5">
-                            {epMeta.title}
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-zinc-600 group-hover/row:text-emerald-500 transition-colors shrink-0" />
-                    </Link>
-                  );
-                })}
+                <DayItemsList items={selectedDayItems} />
               </div>
             </motion.div>
           </>
@@ -1499,6 +1435,76 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
   );
 }
 
+// Cuerpo compartido: lista de los títulos vistos en un día. Colapsa episodios
+// consecutivos de la misma serie en un grupo desplegable (CalendarDrawerGroup) y
+// muestra películas / episodios sueltos como una fila que enlaza a su ficha.
+// Lo usan tanto el drawer del calendario de escritorio (CalendarWithPosters) como
+// el modal de día en móvil (MobileDayTitlesModal), para no duplicar el render.
+function DayItemsList({ items }) {
+  const collapsed = useMemo(() => collapseConsecutive(items), [items]);
+
+  return collapsed.map((entry, idx) => {
+    const isGroup = entry._group && entry._group.length > 1;
+    const title = getMainTitle(entry);
+    const type = getItemType(entry);
+    const epMeta = isEpisodeEntry(entry) ? getEpisodeMeta(entry) : null;
+    const href = getDetailsHref(entry);
+
+    if (isGroup) {
+      const range = getEpisodeRange(entry._group);
+      return (
+        <CalendarDrawerGroup
+          key={`grp-${getTmdbId(entry)}-${idx}`}
+          entry={entry}
+          title={title}
+          type={type}
+          range={range}
+        />
+      );
+    }
+
+    return (
+      <Link
+        key={`item-${getHistoryId(entry) || idx}`}
+        href={href || "#"} prefetch
+        className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
+      >
+        <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
+          <Poster entry={entry} className="w-full h-full" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-bold text-white truncate group-hover/row:text-emerald-300 transition-colors">
+            {title}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span
+              className={[
+                "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
+                type === "movie"
+                  ? "bg-sky-500/20 text-sky-300"
+                  : "bg-purple-500/20 text-purple-300",
+              ].join(" ")}
+            >
+              {type === "movie" ? "Película" : "Serie"}
+            </span>
+            {type === "show" && epMeta && (
+              <span className="text-[10px] font-semibold text-emerald-400">
+                {formatEpisodeBadge(epMeta)}
+              </span>
+            )}
+          </div>
+          {type === "show" && epMeta?.title && (
+            <p className="text-[10px] text-zinc-500 truncate mt-0.5">
+              {epMeta.title}
+            </p>
+          )}
+        </div>
+        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover/row:text-emerald-500 transition-colors shrink-0" />
+      </Link>
+    );
+  });
+}
+
 function CalendarPanel({
   monthDate,
   onPrev,
@@ -1508,6 +1514,11 @@ function CalendarPanel({
   onSelectYmd,
   onToggleCalendarView,
   showCalendarView,
+  // Móvil: si se pasa, pulsar un día ABRE su modal (onDayOpen(key)) en vez de
+  // filtrar la lista. En ese modo no hay día "seleccionado" ni botón de vista.
+  onDayOpen = null,
+  hideViewToggle = false,
+  className = "",
 }) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
@@ -1519,14 +1530,18 @@ function CalendarPanel({
   const dow = ["L", "M", "X", "J", "V", "S", "D"];
 
   return (
-    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl rounded-3xl p-8 sticky top-6">
+    <div
+      className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl rounded-3xl p-6 sm:p-8 ${
+        className || "sticky top-6"
+      }`}
+    >
       <div className="flex items-center justify-between mb-8">
         <div>
           <h3 className="text-white font-bold capitalize text-2xl tracking-tight">
             {monthLabel}
           </h3>
           <p className="text-sm text-emerald-500/70 mt-1 font-medium">
-            Filtrar por día
+            {onDayOpen ? "Pulsa un día para ver su contenido" : "Filtrar por día"}
           </p>
         </div>
         <div className="flex gap-2 bg-black/20 rounded-xl p-1.5 shadow-inner">
@@ -1567,8 +1582,12 @@ function CalendarPanel({
           return (
             <button
               key={d.toISOString()}
-              onClick={() => key && onSelectYmd(selected ? null : key)}
-              disabled={!inMonth}
+              onClick={() => {
+                if (!key) return;
+                if (onDayOpen) onDayOpen(key);
+                else onSelectYmd(selected ? null : key);
+              }}
+              disabled={!inMonth || (onDayOpen && count === 0)}
               className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200 text-sm font-bold
                 ${!inMonth ? "opacity-0 pointer-events-none" : "text-zinc-200"}
                 ${
@@ -1597,17 +1616,19 @@ function CalendarPanel({
         </button>
       )}
 
-      <button
-        onClick={onToggleCalendarView}
-        className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
-          showCalendarView
-            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-            : "bg-black/20 text-zinc-200 hover:bg-black/30 hover:text-white border border-white/5"
-        }`}
-      >
-        <Calendar className="w-4 h-4" />{" "}
-        {showCalendarView ? "Vista Normal" : "Vista Calendario"}
-      </button>
+      {!hideViewToggle && (
+        <button
+          onClick={onToggleCalendarView}
+          className={`mt-6 w-full py-3 text-sm font-bold flex items-center justify-center gap-2 rounded-xl transition-all ${
+            showCalendarView
+              ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+              : "bg-black/20 text-zinc-200 hover:bg-black/30 hover:text-white border border-white/5"
+          }`}
+        >
+          <Calendar className="w-4 h-4" />{" "}
+          {showCalendarView ? "Vista Normal" : "Vista Calendario"}
+        </button>
+      )}
     </div>
   );
 }
@@ -2601,6 +2622,170 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
   );
 }
 
+// Móvil: modal con los títulos vistos un día concreto. Reutiliza la MISMA
+// carcasa visual que el modal de episodios agrupados (ExpandedGroupView):
+// panel de cristal líquido redondeado, cabecera + cuerpo scrollable, portal a
+// document.body. El contenido es la lista compartida DayItemsList (películas y
+// episodios), así que al pulsar un título se abre su ficha.
+function MobileDayTitlesModal({ dayKey, items, onClose }) {
+  const reduceMotion = useReducedMotion();
+  useModalGuard({ open: true, onClose });
+
+  const dateLabel = formatDateHeader(new Date(dayKey), "day");
+  const count = items.length;
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[130] flex items-center justify-center p-4"
+      data-detail-modal-layer=""
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.3 }}
+    >
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+        aria-hidden="true"
+      />
+
+      <motion.section
+        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Títulos vistos el ${dateLabel}`}
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: reduceMotion ? 0 : 0.3, ease: "easeOut" }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_42%)]"
+          aria-hidden="true"
+        />
+
+        <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-5 py-4 sm:px-8 sm:pb-6 sm:pt-8">
+          <div className="min-w-0">
+            <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">
+              Historial
+            </p>
+            <h2 className="truncate text-lg font-black capitalize tracking-tight text-white sm:text-xl">
+              {dateLabel}
+            </h2>
+            <p className="mt-0.5 text-xs font-medium text-zinc-400 sm:text-sm">
+              {count} {count === 1 ? "visto" : "vistos"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+            title="Cerrar (Esc)"
+            aria-label="Cerrar títulos del día"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-4 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-6 sm:py-5">
+          <DayItemsList items={items} />
+        </div>
+      </motion.section>
+    </motion.div>,
+    document.body,
+  );
+}
+
+// Móvil: overlay a pantalla completa con el calendario de días marcados (mismo
+// CalendarPanel que en escritorio, pero en modo "abrir día"). Al pulsar un día
+// con contenido abre MobileDayTitlesModal encima. Se accede desde el botón del
+// menú móvil del Historial.
+function MobileCalendarOverlay({
+  open,
+  onClose,
+  monthDate,
+  onPrev,
+  onNext,
+  countsByDay,
+  itemsByDay,
+}) {
+  const reduceMotion = useReducedMotion();
+  const [openDayKey, setOpenDayKey] = useState(null);
+
+  // Mientras el modal del día esté abierto, es él quien maneja Esc; así una
+  // sola pulsación no cierra a la vez el día y todo el calendario.
+  useModalGuard({ open, onClose, closeOnEsc: !openDayKey });
+
+  // Al cambiar de mes, cierra el día abierto (ya no está a la vista).
+  useEffect(() => {
+    setOpenDayKey(null);
+  }, [monthDate]);
+
+  if (!open) return null;
+
+  const dayItems = openDayKey ? itemsByDay[openDayKey] || [] : [];
+
+  return createPortal(
+    <>
+      <motion.div
+        className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-4 sm:p-6"
+        onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: reduceMotion ? 0 : 0.25 }}
+      >
+        <div
+          className="absolute inset-0 bg-black/70 backdrop-blur-md"
+          aria-hidden="true"
+        />
+        <motion.div
+          className="relative z-10 my-auto w-full max-w-md"
+          onClick={(e) => e.stopPropagation()}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 12 }}
+          transition={{ duration: reduceMotion ? 0 : 0.28, ease: "easeOut" }}
+        >
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+              aria-label="Cerrar calendario"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </div>
+          <CalendarPanel
+            monthDate={monthDate}
+            onPrev={onPrev}
+            onNext={onNext}
+            countsByDay={countsByDay}
+            selectedYmd={null}
+            onSelectYmd={() => {}}
+            onDayOpen={setOpenDayKey}
+            hideViewToggle
+            className="w-full"
+          />
+        </motion.div>
+      </motion.div>
+
+      <AnimatePresence>
+        {openDayKey && (
+          <MobileDayTitlesModal
+            dayKey={openDayKey}
+            items={dayItems}
+            onClose={() => setOpenDayKey(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>,
+    document.body,
+  );
+}
+
 // ----------------------------
 // MAIN PAGE
 // ----------------------------
@@ -2746,6 +2931,8 @@ export default function HistoryClient() {
   const filtersRef = useRef(null);
   const filtersSticky = useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
+  // Móvil: overlay del calendario de días marcados (se abre desde el menú móvil).
+  const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   useEffect(() => {
@@ -3288,6 +3475,21 @@ export default function HistoryClient() {
     return m;
   }, [raw]);
 
+  // Items agrupados por día para el modal del calendario móvil. Misma fuente que
+  // countsByDay (raw), así un día con punto verde siempre tiene contenido.
+  const itemsByDay = useMemo(() => {
+    const m = {};
+    for (const e of raw || []) {
+      const w = e?.watched_at;
+      if (!w) continue;
+      const k = ymdLocal(new Date(w));
+      if (!k) continue;
+      if (!m[k]) m[k] = [];
+      m[k].push(e);
+    }
+    return m;
+  }, [raw]);
+
   const grouped = useMemo(() => {
     const map = new Map();
     for (const e of sorted) {
@@ -3619,6 +3821,14 @@ export default function HistoryClient() {
                     )}
                   </div>
                   <HistorySectionNav className="h-11 shrink-0" />
+                  <button
+                    type="button"
+                    onClick={() => setMobileCalendarOpen(true)}
+                    aria-label="Abrir calendario"
+                    className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:bg-black/30"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -4372,6 +4582,29 @@ export default function HistoryClient() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Móvil: overlay del calendario de días marcados (solo móvil) */}
+      <AnimatePresence>
+        {mobileCalendarOpen && (
+          <MobileCalendarOverlay
+            open
+            onClose={() => setMobileCalendarOpen(false)}
+            monthDate={monthDate}
+            onPrev={() =>
+              setMonthDate(
+                (d) => new Date(d.getFullYear(), d.getMonth() - 1, 1),
+              )
+            }
+            onNext={() =>
+              setMonthDate(
+                (d) => new Date(d.getFullYear(), d.getMonth() + 1, 1),
+              )
+            }
+            countsByDay={countsByDay}
+            itemsByDay={itemsByDay}
+          />
         )}
       </AnimatePresence>
 
