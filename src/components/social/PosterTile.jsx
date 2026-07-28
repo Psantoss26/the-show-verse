@@ -83,19 +83,32 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
   const hasCollectionIndicator = favorite || watchlist;
   const hasViewerIndicators = isFixedSelfWatchlist || hasCollectionIndicator || watched || hasUserRating;
   const useProfileIndicatorSize = indicatorSize === "profile";
-  const useCompactSize = compactIndicator || Boolean(fixedIndicator);
+  const useCompactSize = compactIndicator;
+  const useResponsiveFixedSize = Boolean(fixedIndicator) && !compactIndicator;
   const indicatorItemClassName = useCompactSize
     ? "h-6 w-7 sm:h-6.5 sm:w-7.5"
+    : useResponsiveFixedSize
+      ? useProfileIndicatorSize
+        ? "h-6 w-7 sm:h-6.5 sm:w-7.5 lg:h-8 lg:w-9"
+        : "h-6 w-7 sm:h-6.5 sm:w-7.5 lg:h-9 lg:w-10"
     : useProfileIndicatorSize
       ? "h-8 w-9"
       : "h-9 w-10";
   const indicatorIconClassName = useCompactSize
     ? "h-3.5 w-3.5 sm:h-4 sm:w-4"
+    : useResponsiveFixedSize
+      ? useProfileIndicatorSize
+        ? "h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-[1.125rem] lg:w-[1.125rem]"
+        : "h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5"
     : useProfileIndicatorSize
       ? "h-[1.125rem] w-[1.125rem]"
       : "h-5 w-5";
   const indicatorRatingClassName = useCompactSize
     ? "h-6 w-7 text-xs sm:h-6.5 sm:w-7.5 sm:text-sm font-black"
+    : useResponsiveFixedSize
+      ? useProfileIndicatorSize
+        ? "h-6 w-7 text-xs font-black sm:h-6.5 sm:w-7.5 sm:text-sm lg:h-8 lg:w-9 lg:text-lg"
+        : "h-6 w-7 text-xs font-black sm:h-6.5 sm:w-7.5 sm:text-sm lg:h-9 lg:w-10 lg:text-xl"
     : useProfileIndicatorSize
       ? "h-8 w-9 text-lg"
       : "h-9 w-10 text-xl";
@@ -139,12 +152,14 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
         {cornerOverlay}
 
-        {/* Estados personales: barra liquid glass en hover (cuando no es fixedIndicator) */}
-        {!fixedIndicator && hasViewerIndicators && (
+        {/* En escritorio todos los estados viven dentro del póster y aparecen
+            únicamente al interactuar. `fixedIndicator` solo mantiene la
+            variante visible bajo la tarjeta en superficies táctiles. */}
+        {hasViewerIndicators && (
           <div
             className={`pointer-events-none absolute ${
               useCompactSize ? "bottom-1.5 px-1 sm:px-1.5" : useProfileIndicatorSize ? "bottom-1.5 px-1.5" : "bottom-2 px-1.5"
-            } left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 will-change-transform transform-gpu`}
+            } left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 lg:group-focus-visible/card:translate-y-0 lg:group-focus-visible/card:scale-100 lg:group-focus-visible/card:opacity-100 will-change-transform transform-gpu`}
             aria-hidden="true"
           >
             {hasCollectionIndicator && (
@@ -171,9 +186,10 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
       </motion.div>
 
-      {/* Indicador fijo en la misma posición inferior que las estrellas de Puntuaciones (debajo del póster) */}
+      {/* La variante fija es exclusivamente táctil. En escritorio no ocupa
+          espacio debajo de la tarjeta: se utiliza el overlay anterior. */}
       {fixedIndicator && hasViewerIndicators ? (
-        <div className="mt-1.5 flex justify-center">
+        <div className="mt-1.5 flex justify-center lg:hidden">
           <div
             className={`inline-flex items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-md`}
             aria-hidden="true"

@@ -14,9 +14,17 @@ import {
   packPage,
   applyEnglishPostersToProfileOverview,
   applyResolvedEnglishPosterPaths,
+  profileEnglishPosterCacheKey,
   pickBestEnglishPosterPath,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
+
+test('English poster decisions use a versioned cache namespace', () => {
+  assert.equal(
+    profileEnglishPosterCacheKey('movie', 121),
+    'profile:english-poster:v2:movie:121',
+  );
+});
 
 function queryRows(rows) {
   const query = {
