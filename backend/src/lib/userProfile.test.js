@@ -12,6 +12,7 @@ import {
   getUserReviews,
   pageParams,
   packPage,
+  applyEnglishPostersToProfileOverview,
   applyResolvedEnglishPosterPaths,
   pickBestEnglishPosterPath,
   PROFILE_FAVORITES_MAX,
@@ -113,6 +114,30 @@ test('Profile title lists never fall back to a persisted Spanish poster after a 
   assert.equal(
     applyResolvedEnglishPosterPaths(items, resolved, { strict: true })[0].posterPath,
     null,
+  );
+});
+
+test('Profile overview emits final English posters for favorites and recent activity in its first payload', () => {
+  const overview = {
+    favoriteMovies: [{ tmdbId: 1, mediaType: 'movie', posterPath: '/pelicula-es.jpg' }],
+    favoriteSeries: [{ tmdbId: 2, mediaType: 'tv', posterPath: '/serie-es.jpg' }],
+    recentWatched: [{ tmdbId: 3, mediaType: 'movie', posterPath: '/reciente-es.jpg' }],
+  };
+  const resolved = new Map([
+    [titleKey('movie', 1), '/movie-en.jpg'],
+    [titleKey('tv', 2), '/show-en.jpg'],
+    [titleKey('movie', 3), '/recent-en.jpg'],
+  ]);
+
+  const result = applyEnglishPostersToProfileOverview(overview, resolved);
+
+  assert.deepEqual(
+    [
+      result.favoriteMovies[0].posterPath,
+      result.favoriteSeries[0].posterPath,
+      result.recentWatched[0].posterPath,
+    ],
+    ['/movie-en.jpg', '/show-en.jpg', '/recent-en.jpg'],
   );
 });
 

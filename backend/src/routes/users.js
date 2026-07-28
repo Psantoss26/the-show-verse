@@ -28,6 +28,8 @@ import {
   getUserRatings,
   getUserLists,
   getUserActivity,
+  applyResolvedEnglishPosterPaths,
+  resolveEnglishPosterPaths,
 } from '../lib/userProfile.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
@@ -258,7 +260,13 @@ export default async function usersRoutes(fastify) {
       .where(eq(profileFavorites.userId, req.user.id))
       .orderBy(profileFavorites.position)
       .limit(PROFILE_FAVORITES_TOTAL_MAX);
-    const { movies, series } = profileFavoritesByType(rows);
+    const englishPosters = await resolveEnglishPosterPaths(db, rows);
+    const resolvedRows = applyResolvedEnglishPosterPaths(
+      rows,
+      englishPosters,
+      { strict: true },
+    );
+    const { movies, series } = profileFavoritesByType(resolvedRows);
     return reply.send({
       movies: movies.map(serializeProfileFavorite),
       series: series.map(serializeProfileFavorite),
@@ -304,7 +312,14 @@ export default async function usersRoutes(fastify) {
       PROFILE_FAVORITES_MAX,
       'tv',
     );
-    const clean = [...movies, ...series];
+    const englishPosters = await resolveEnglishPosterPaths(db, [...movies, ...series]);
+    const clean = applyResolvedEnglishPosterPaths(
+      [...movies, ...series],
+      englishPosters,
+      { strict: true },
+    );
+    const resolvedMovies = clean.filter((item) => item.mediaType === 'movie');
+    const resolvedSeries = clean.filter((item) => item.mediaType === 'tv');
 
     await db.transaction(async (tx) => {
       await tx.delete(profileFavorites).where(eq(profileFavorites.userId, req.user.id));
@@ -316,8 +331,8 @@ export default async function usersRoutes(fastify) {
     });
 
     return reply.send({
-      movies: movies.map(serializeProfileFavorite),
-      series: series.map(serializeProfileFavorite),
+      movies: resolvedMovies.map(serializeProfileFavorite),
+      series: resolvedSeries.map(serializeProfileFavorite),
       favorites: clean.slice(0, PROFILE_FAVORITES_MAX).map(serializeProfileFavorite),
     });
   });
