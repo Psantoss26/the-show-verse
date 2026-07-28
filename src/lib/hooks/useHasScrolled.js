@@ -1,8 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useReducedMotion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  resolveScrollRevealProps,
+  resolveTopResetRevealProps,
+} from "@/lib/motion/scrollRevealState";
+
+const subscribeHydration = () => () => {};
+const readClientHydration = () => true;
+const readServerHydration = () => false;
+
+function useHydrationReady() {
+  return useSyncExternalStore(
+    subscribeHydration,
+    readClientHydration,
+    readServerHydration,
+  );
+}
 
 // Devuelve `true` en cuanto el usuario hace SCROLL VERTICAL (o si la página ya
 // está desplazada al montar, p. ej. al restaurar el scroll en una vuelta atrás).
@@ -68,14 +84,15 @@ export function useScrollRevealProps(margin = "-80px") {
   // montaje, igual que ya se hace en Historial/Favoritos.
   const isBackNav = useIsHistoryNavigation();
   const hasScrolled = useHasScrolled();
+  const hydrationReady = useHydrationReady();
 
-  if (reduceMotion || isBackNav) return { initial: false, animate: "visible" };
-  if (!hasScrolled) return { initial: "hidden", animate: "hidden" };
-  return {
-    initial: "hidden",
-    whileInView: "visible",
-    viewport: { once: true, margin },
-  };
+  return resolveScrollRevealProps({
+    hydrationReady,
+    reduceMotion: Boolean(reduceMotion),
+    isBackNav,
+    hasScrolled,
+    margin,
+  });
 }
 
 // Variante exclusiva para la primera sección de cada dashboard. Al regresar al
@@ -93,6 +110,7 @@ export function useTopResetRevealProps(
   // `false` para siempre (mismo problema que en `useScrollRevealProps`, ver
   // su comentario). Se salta el gateo por scroll en este montaje.
   const isBackNav = useIsHistoryNavigation();
+  const hydrationReady = useHydrationReady();
   const hasScrolled = useHasScrolled(4, {
     resetAtTop: true,
     enabled: enabled && !isBackNav,
@@ -131,18 +149,12 @@ export function useTopResetRevealProps(
     }
   }, [enabled, isBackNav, hasScrolled]);
 
-  if (!enabled) return null;
-  if (isBackNav) return { initial: false, animate: "visible" };
-  if (reduceMotion) {
-    return {
-      initial: false,
-      animate: { opacity: hasScrolled && revealed ? 1 : 0, y: 0 },
-      transition: { duration: 0 },
-    };
-  }
-
-  return {
-    initial: "hidden",
-    animate: hasScrolled && revealed ? "visible" : "hidden",
-  };
+  return resolveTopResetRevealProps({
+    enabled,
+    hydrationReady,
+    reduceMotion: Boolean(reduceMotion),
+    isBackNav,
+    hasScrolled,
+    revealed,
+  });
 }

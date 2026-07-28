@@ -8,6 +8,8 @@ const FINAL_ENGLISH_POSTER_SECTIONS = new Set([
 
 export function profileSectionCacheKey(username, section) {
   const normalizedUsername = String(username || "").trim().toLocaleLowerCase();
-  const version = FINAL_ENGLISH_POSTER_SECTIONS.has(section) ? "v2" : "v1";
+  // v3 invalida las instantáneas que podían contener una decisión de póster
+  // procedente del espacio de caché de artwork anterior.
+  const version = FINAL_ENGLISH_POSTER_SECTIONS.has(section) ? "v3" : "v1";
   return `${normalizedUsername}:${section}:${version}`;
 }

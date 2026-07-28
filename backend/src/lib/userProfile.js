@@ -34,6 +34,7 @@ const DEFAULT_EPISODE_RUNTIME_MINS = 45;
 const PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT = 5000;
 const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
+const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v2';
 const profileEnglishPosterMemory = new Map();
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
@@ -61,8 +62,11 @@ export function titleKey(mediaType, tmdbId) {
   return `${mediaType}:${Number(tmdbId)}`;
 }
 
-function profileEnglishPosterCacheKey(mediaType, tmdbId) {
-  return `profile:english-poster:${titleKey(mediaType, tmdbId)}`;
+export function profileEnglishPosterCacheKey(mediaType, tmdbId) {
+  // La clave forma parte del contrato del selector. Si cambia el criterio de
+  // idioma, una decisión antigua no puede seguir considerándose válida solo
+  // porque aún no haya vencido su TTL.
+  return `profile:english-poster:${PROFILE_ENGLISH_POSTER_POLICY_VERSION}:${titleKey(mediaType, tmdbId)}`;
 }
 
 function pickHighestQualityPoster(posters) {

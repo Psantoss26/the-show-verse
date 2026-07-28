@@ -71,7 +71,9 @@ const RatingsBarChart = dynamic(
 // ficha de título el perfil se pinta de inmediato y se refresca en segundo
 // plano, en lugar de volver a mostrar una pantalla de espera.
 const profileCache = new Map();
-const PROFILE_CACHE_STORAGE_PREFIX = "showverse:profile:snapshot:v2:";
+// v3 descarta instantáneas creadas con decisiones de artwork anteriores a la
+// caché versionada del backend. Así móvil no restaura primero pósters ES.
+const PROFILE_CACHE_STORAGE_PREFIX = "showverse:profile:snapshot:v3:";
 
 function profileCacheKey(username) {
   return String(username || "").trim().toLocaleLowerCase();
