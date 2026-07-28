@@ -13,7 +13,6 @@ import FollowButton from "@/components/social/FollowButton";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
-import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
@@ -72,7 +71,7 @@ const RatingsBarChart = dynamic(
 // ficha de título el perfil se pinta de inmediato y se refresca en segundo
 // plano, en lugar de volver a mostrar una pantalla de espera.
 const profileCache = new Map();
-const PROFILE_CACHE_STORAGE_PREFIX = "showverse:profile:snapshot:v1:";
+const PROFILE_CACHE_STORAGE_PREFIX = "showverse:profile:snapshot:v2:";
 
 function profileCacheKey(username) {
   return String(username || "").trim().toLocaleLowerCase();
@@ -182,11 +181,8 @@ function ProfilePosterGrid({
   viewerTitleStates,
   label,
   prioritizeHorizontalScroll = false,
-  preferEnglishPosters = false,
   fixedIndicator = false,
 }) {
-  const posterItems = useEnglishPosterItems(items, preferEnglishPosters);
-
   return (
     <div
       data-profile-horizontal-scroll
@@ -195,7 +191,7 @@ function ProfilePosterGrid({
       aria-label={label}
       className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0"
     >
-      {posterItems.map((item) => (
+      {items.map((item) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
           className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start sm:w-auto"
@@ -1044,7 +1040,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   viewerTitleStates={viewerTitleStates}
                   label="Películas favoritas"
                   prioritizeHorizontalScroll
-                  preferEnglishPosters
                   fixedIndicator="favorite"
                 />
               ) : (
@@ -1064,7 +1059,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   viewerTitleStates={viewerTitleStates}
                   label="Series favoritas"
                   prioritizeHorizontalScroll
-                  preferEnglishPosters
                   fixedIndicator="favorite"
                 />
               ) : (
@@ -1086,7 +1080,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   viewerTitleStates={viewerTitleStates}
                   label="Actividad reciente"
                   prioritizeHorizontalScroll
-                  preferEnglishPosters
                 />
               ) : (
                 <p className="text-sm text-zinc-600">Sin actividad reciente.</p>

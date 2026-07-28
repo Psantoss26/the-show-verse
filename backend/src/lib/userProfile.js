@@ -108,6 +108,22 @@ export function applyResolvedEnglishPosterPaths(
   });
 }
 
+export function applyEnglishPostersToProfileOverview(
+  { favoriteMovies = [], favoriteSeries = [], recentWatched = [] } = {},
+  resolvedPosters,
+) {
+  const applyFinalPoster = (items) => applyResolvedEnglishPosterPaths(
+    items,
+    resolvedPosters,
+    { strict: true },
+  );
+  return {
+    favoriteMovies: applyFinalPoster(favoriteMovies),
+    favoriteSeries: applyFinalPoster(favoriteSeries),
+    recentWatched: applyFinalPoster(recentWatched),
+  };
+}
+
 async function mapWithConcurrency(values, worker, concurrency = PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY) {
   const results = new Array(values.length);
   let nextIndex = 0;
@@ -731,6 +747,24 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     PROFILE_FAVORITES_MAX,
     'tv',
   ).map(serializeProfileFavorite);
+  // La portada que consume la cabecera de Perfil debe llegar ya decidida desde
+  // la API. Si se envía primero el posterPath persistido y el cliente consulta
+  // /images después, se llega a pintar la portada española antes de sustituirla
+  // por la inglesa. Resolver las tres filas juntas aprovecha la caché compartida
+  // y permite que el primer frame visible contenga únicamente el artwork final.
+  const profileEnglishPosters = await resolveEnglishPosterPaths(db, [
+    ...favoriteMovies,
+    ...favoriteSeries,
+    ...recentWatchedItems,
+  ]);
+  const {
+    favoriteMovies: resolvedFavoriteMovies,
+    favoriteSeries: resolvedFavoriteSeries,
+    recentWatched: resolvedRecentWatched,
+  } = applyEnglishPostersToProfileOverview(
+    { favoriteMovies, favoriteSeries, recentWatched: recentWatchedItems },
+    profileEnglishPosters,
+  );
 
   return {
     user: {
@@ -751,10 +785,10 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     },
     // `favorites` se conserva para clientes anteriores; los nuevos clientes
     // consumen las dos filas explícitas para no mezclar películas y series.
-    favorites: [...favoriteMovies, ...favoriteSeries].slice(0, PROFILE_FAVORITES_MAX),
-    favoriteMovies,
-    favoriteSeries,
-    recentWatched: recentWatchedItems,
+    favorites: [...resolvedFavoriteMovies, ...resolvedFavoriteSeries].slice(0, PROFILE_FAVORITES_MAX),
+    favoriteMovies: resolvedFavoriteMovies,
+    favoriteSeries: resolvedFavoriteSeries,
+    recentWatched: resolvedRecentWatched,
     pendingPreview,
     followingPreview: followingPreviewRows.map((u) => ({
       username: u.username,
@@ -1335,6 +1369,12 @@ export async function getUserActivity(db, targetId, opts = {}) {
     item.rating = reviewRatingByKey.get(titleKey(item.mediaType, item.tmdbId)) ?? null;
   }
   await fillMissingPosters(db, targetId, titleEvents);
+  const englishPosters = await resolveEnglishPosterPaths(db, titleEvents);
+  page.items = applyResolvedEnglishPosterPaths(
+    page.items,
+    englishPosters,
+    { strict: true },
+  );
   return page;
 }
 

@@ -38,7 +38,7 @@ import { useAuth } from "@/context/AuthContext";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import { profileSectionCacheKey } from "@/lib/profile/sectionCache";
 import {
   filterPendingHistoryRemovals,
   getPendingListChanges,
@@ -418,7 +418,7 @@ function getSectionPreference(cacheKey, section, profileKey) {
   };
 }
 const profileSectionCache = new Map();
-const PROFILE_SECTION_CACHE_STORAGE_PREFIX = "showverse:profile:section-snapshot:v1:";
+const PROFILE_SECTION_CACHE_STORAGE_PREFIX = "showverse:profile:section-snapshot:v2:";
 
 function getCachedProfileSection(cacheKey) {
   const memory = profileSectionCache.get(cacheKey);
@@ -464,20 +464,6 @@ function cacheProfileSection(cacheKey, sectionState) {
   } catch {
     // La caché en memoria basta para esta navegación si sessionStorage no cabe.
   }
-}
-
-function profileSectionCacheKey(username, section) {
-  // Diario pasó de títulos deduplicados a registros de historial. Versionar la
-  // clave evita restaurar en esta sesión la instantánea anterior al cambio.
-  // v2 descarta snapshots que todavía podían contener pósters ES.
-  const version =
-    section === "watched" ||
-    section === "watchlist" ||
-    section === "favorites" ||
-    section === "ratings"
-      ? "v2"
-      : "v1";
-  return `${String(username || "").trim().toLocaleLowerCase()}:${section}:${version}`;
 }
 
 function relativeActivityTime(value) {
@@ -1554,8 +1540,8 @@ function ProfileContentSection({ username, section, actor }) {
 
   // El modo con póster es una representación de títulos, no del registro
   // textual de actividad. Las acciones como crear una lista no tienen artwork
-  // asociado y no deben producir una tarjeta vacía. A esos títulos se les
-  // aplica el mismo resolvedor de póster inglés que el resto de Perfil.
+  // asociado y no deben producir una tarjeta vacía. La API entrega aquí la
+  // portada inglesa definitiva para evitar una sustitución visual posterior.
   const activityPosterSourceItems = useMemo(
     () => (
       section === "activity" && controls.view === "poster-list"
@@ -1564,12 +1550,8 @@ function ProfileContentSection({ username, section, actor }) {
     ),
     [controls.view, section, visibleItems],
   );
-  const activityPosterItems = useEnglishPosterItems(
-    activityPosterSourceItems,
-    section === "activity" && controls.view === "poster-list",
-  );
   const displayItems = section === "activity" && controls.view === "poster-list"
-    ? activityPosterItems
+    ? activityPosterSourceItems
     : visibleItems;
 
   const effectiveGroup = controls.group;
