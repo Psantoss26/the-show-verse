@@ -52,7 +52,12 @@ const SLOT_FADE = 0.22;
 // blanco; el retardo por índice hace que la conmutación recorra la fila en orden
 // de izquierda a derecha. La celda mantiene tamaño fijo (aspect-square), así que
 // la fila nunca se deforma ni cambia el tamaño de los botones.
-function ActionSlot({ index = 0, expanded, expandedContent, collapsedContent }) {
+function ActionSlot({
+  index = 0,
+  expanded,
+  expandedContent,
+  collapsedContent,
+}) {
   const delay = index * SLOT_STAGGER;
 
   return (
@@ -139,9 +144,7 @@ export default function DetailActionsRow({
     !trailerLabel;
 
   // Tope de tamaño de botón en móvil: por defecto 60px; con fillMobile sin tope.
-  const mobileCapClass = fillMobile
-    ? ""
-    : "[&>*:not(.separator)]:max-w-[60px]";
+  const mobileCapClass = fillMobile ? "" : "[&>*:not(.separator)]:max-w-[60px]";
   // Tamaño de los botones-icono en labeled-row
   const labeledSizeClass =
     size === "lg"
@@ -265,172 +268,177 @@ export default function DetailActionsRow({
     <>
       {/* VISTA MÓVIL EXCLUSIVA PARA SERIES COMBINADAS (8 SLOTS PERMANENTES PARA ZERO DEFORMACIÓN Y CONMUTACIÓN PERFECTA) */}
       {shouldCombineMedia && (
-        <div className="block sm:hidden w-full">
-          <div
-            className={`flex flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px] ${MOBILE_ACTION_BUTTON_CLASS}`}
-          >
-            {/* Slot 1: Trigger Principal (Play -> X) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+        // Una SOLA capa, sin envoltorio intermedio: la animación de entrada de
+        // la ficha móvil (`.sv-mobile-actions-reveal > * > *`) escalona los
+        // NIETOS del contenedor. Con un div de más, quien recibía la animación
+        // era la fila entera y las series entraban de golpe como un bloque, en
+        // vez de botón a botón como en las películas.
+        <div
+          className={`flex sm:hidden flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px] ${MOBILE_ACTION_BUTTON_CLASS}`}
+        >
+          {/* Slot 1: Trigger Principal (Play -> X) */}
+          <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+            <LiquidButton
+              onClick={() => setMediaExpanded((v) => !v)}
+              disabled={!trailerAvailable && !soundtrackAvailable}
+              active={!!trailerAvailable || !!soundtrackAvailable}
+              loading={trailerLoading}
+              activeColor="yellow"
+              groupId="details-actions"
+              className={`!w-full !h-auto aspect-square ${
+                trailerAvailable || soundtrackAvailable
+                  ? "!bg-white !text-black"
+                  : ""
+              } ${
+                mediaExpanded
+                  ? "ring-2 ring-yellow-400/90 shadow-[0_0_14px_rgba(250,204,21,0.6)]"
+                  : ""
+              }`}
+              title={
+                mediaExpanded
+                  ? "Cerrar opciones multimedia"
+                  : "Opciones multimedia (Tráiler y Soundtrack)"
+              }
+              aria-expanded={mediaExpanded}
+            >
+              {/* Icono Play <-> X: cross-fade solapado (sin `mode="wait"`), así
+                    el botón nunca se queda vacío a mitad de la transición. */}
+              <span className="relative flex w-full h-full items-center justify-center">
+                <AnimatePresence initial={false}>
+                  <motion.span
+                    key={mediaExpanded ? "close" : "play"}
+                    initial={{ opacity: 0, rotate: -30 }}
+                    animate={{ opacity: 1, rotate: 0 }}
+                    exit={{ opacity: 0, rotate: 30 }}
+                    transition={{ duration: SLOT_FADE, ease: "easeOut" }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    {mediaExpanded ? (
+                      <X />
+                    ) : trailerPlaying ? (
+                      <X />
+                    ) : (
+                      <Play className={trailerAvailable ? "ml-0.5" : ""} />
+                    )}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+            </LiquidButton>
+          </div>
+
+          {/* Slot 2: Ver Tráiler (Expandido) <-> Valoración de episodios (Replegado) */}
+          <ActionSlot
+            index={1}
+            expanded={mediaExpanded}
+            expandedContent={
               <LiquidButton
-                onClick={() => setMediaExpanded((v) => !v)}
-                disabled={!trailerAvailable && !soundtrackAvailable}
-                active={!!trailerAvailable || !!soundtrackAvailable}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaExpanded(false);
+                  if (onTrailer) onTrailer();
+                }}
+                disabled={!trailerAvailable}
+                active={!!trailerAvailable}
                 loading={trailerLoading}
                 activeColor="yellow"
                 groupId="details-actions"
                 className={`!w-full !h-auto aspect-square ${
-                  trailerAvailable || soundtrackAvailable
-                    ? "!bg-white !text-black"
-                    : ""
-                } ${
-                  mediaExpanded
-                    ? "ring-2 ring-yellow-400/90 shadow-[0_0_14px_rgba(250,204,21,0.6)]"
-                    : ""
+                  trailerAvailable ? "!bg-white !text-black" : ""
                 }`}
                 title={
-                  mediaExpanded
-                    ? "Cerrar opciones multimedia"
-                    : "Opciones multimedia (Tráiler y Soundtrack)"
+                  trailerPlaying
+                    ? "Ocultar tráiler"
+                    : trailerAvailable
+                      ? "Ver Tráiler"
+                      : "Sin Tráiler"
                 }
-                aria-expanded={mediaExpanded}
               >
-                {/* Icono Play <-> X: cross-fade solapado (sin `mode="wait"`), así
-                    el botón nunca se queda vacío a mitad de la transición. */}
-                <span className="relative flex w-full h-full items-center justify-center">
-                  <AnimatePresence initial={false}>
-                    <motion.span
-                      key={mediaExpanded ? "close" : "play"}
-                      initial={{ opacity: 0, rotate: -30 }}
-                      animate={{ opacity: 1, rotate: 0 }}
-                      exit={{ opacity: 0, rotate: 30 }}
-                      transition={{ duration: SLOT_FADE, ease: "easeOut" }}
-                      className="absolute inset-0 flex items-center justify-center"
-                    >
-                      {mediaExpanded ? (
-                        <X />
-                      ) : trailerPlaying ? (
-                        <X />
-                      ) : (
-                        <Play className={trailerAvailable ? "ml-0.5" : ""} />
-                      )}
-                    </motion.span>
-                  </AnimatePresence>
-                </span>
+                {trailerPlaying ? (
+                  <X />
+                ) : (
+                  <Play className={trailerAvailable ? "ml-0.5" : ""} />
+                )}
               </LiquidButton>
-            </div>
+            }
+            collapsedContent={episodeRatingsButton}
+          />
 
-            {/* Slot 2: Ver Tráiler (Expandido) <-> Valoración de episodios (Replegado) */}
-            <ActionSlot
-              index={1}
-              expanded={mediaExpanded}
-              expandedContent={
-                <LiquidButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMediaExpanded(false);
-                    if (onTrailer) onTrailer();
-                  }}
-                  disabled={!trailerAvailable}
-                  active={!!trailerAvailable}
-                  loading={trailerLoading}
-                  activeColor="yellow"
-                  groupId="details-actions"
-                  className={`!w-full !h-auto aspect-square ${
-                    trailerAvailable ? "!bg-white !text-black" : ""
-                  }`}
-                  title={
-                    trailerPlaying
-                      ? "Ocultar tráiler"
-                      : trailerAvailable
-                        ? "Ver Tráiler"
-                        : "Sin Tráiler"
-                  }
-                >
-                  {trailerPlaying ? (
-                    <X />
-                  ) : (
-                    <Play className={trailerAvailable ? "ml-0.5" : ""} />
-                  )}
-                </LiquidButton>
-              }
-              collapsedContent={episodeRatingsButton}
-            />
+          {/* Slot 3: Soundtrack (Expandido) <-> Episodios vistos / Trakt (Replegado) */}
+          <ActionSlot
+            index={2}
+            expanded={mediaExpanded}
+            expandedContent={
+              <LiquidButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaExpanded(false);
+                  if (onSoundtrack) onSoundtrack();
+                }}
+                disabled={!soundtrackAvailable}
+                active={!!soundtrackAvailable}
+                activeColor="yellow"
+                groupId="details-actions"
+                className={`!w-full !h-auto aspect-square ${
+                  soundtrackAvailable ? "!bg-white !text-black" : ""
+                }`}
+                title={
+                  soundtrackAvailable
+                    ? "Reproducir soundtrack"
+                    : "Sin soundtrack"
+                }
+              >
+                <Music2 />
+              </LiquidButton>
+            }
+            collapsedContent={traktControl}
+          />
 
-            {/* Slot 3: Soundtrack (Expandido) <-> Episodios vistos / Trakt (Replegado) */}
-            <ActionSlot
-              index={2}
-              expanded={mediaExpanded}
-              expandedContent={
-                <LiquidButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMediaExpanded(false);
-                    if (onSoundtrack) onSoundtrack();
-                  }}
-                  disabled={!soundtrackAvailable}
-                  active={!!soundtrackAvailable}
-                  activeColor="yellow"
-                  groupId="details-actions"
-                  className={`!w-full !h-auto aspect-square ${
-                    soundtrackAvailable ? "!bg-white !text-black" : ""
-                  }`}
-                  title={
-                    soundtrackAvailable
-                      ? "Reproducir soundtrack"
-                      : "Sin soundtrack"
-                  }
-                >
-                  <Music2 />
-                </LiquidButton>
-              }
-              collapsedContent={traktControl}
-            />
+          {/* Slot 4: Valoración de episodios (Expandido) <-> Puntuación estrellas (Replegado) */}
+          <ActionSlot
+            index={3}
+            expanded={mediaExpanded}
+            expandedContent={episodeRatingsButton}
+            collapsedContent={rateControl}
+          />
 
-            {/* Slot 4: Valoración de episodios (Expandido) <-> Puntuación estrellas (Replegado) */}
-            <ActionSlot
-              index={3}
-              expanded={mediaExpanded}
-              expandedContent={episodeRatingsButton}
-              collapsedContent={rateControl}
-            />
+          {/* Slot 5: Episodios vistos / Trakt (Expandido) <-> Favorito (Replegado) */}
+          <ActionSlot
+            index={4}
+            expanded={mediaExpanded}
+            expandedContent={traktControl}
+            collapsedContent={favoriteButton}
+          />
 
-            {/* Slot 5: Episodios vistos / Trakt (Expandido) <-> Favorito (Replegado) */}
-            <ActionSlot
-              index={4}
-              expanded={mediaExpanded}
-              expandedContent={traktControl}
-              collapsedContent={favoriteButton}
-            />
+          {/* Slot 6: Puntuación estrellas (Expandido) <-> Pendientes (Replegado) */}
+          <ActionSlot
+            index={5}
+            expanded={mediaExpanded}
+            expandedContent={rateControl}
+            collapsedContent={watchlistButton}
+          />
 
-            {/* Slot 6: Puntuación estrellas (Expandido) <-> Pendientes (Replegado) */}
-            <ActionSlot
-              index={5}
-              expanded={mediaExpanded}
-              expandedContent={rateControl}
-              collapsedContent={watchlistButton}
-            />
+          {/* Slot 7: Favoritos (Expandido) <-> Añadir a lista (Replegado) */}
+          <ActionSlot
+            index={6}
+            expanded={mediaExpanded}
+            expandedContent={favoriteButton}
+            collapsedContent={addToListButton}
+          />
 
-            {/* Slot 7: Favoritos (Expandido) <-> Añadir a lista (Replegado) */}
-            <ActionSlot
-              index={6}
-              expanded={mediaExpanded}
-              expandedContent={favoriteButton}
-              collapsedContent={addToListButton}
-            />
-
-            {/* Slot 8: Pendientes (Expandido) <-> Reseñas (Replegado) */}
-            <ActionSlot
-              index={7}
-              expanded={mediaExpanded}
-              expandedContent={watchlistButton}
-              collapsedContent={commentsButton}
-            />
-          </div>
+          {/* Slot 8: Pendientes (Expandido) <-> Reseñas (Replegado) */}
+          <ActionSlot
+            index={7}
+            expanded={mediaExpanded}
+            expandedContent={watchlistButton}
+            collapsedContent={commentsButton}
+          />
         </div>
       )}
 
       {/* VISTA ESTÁNDAR (ESCRITORIO Y PELÍCULAS) */}
-      <div className={shouldCombineMedia ? `hidden sm:flex ${rowClass}` : rowClass}>
+      <div
+        className={shouldCombineMedia ? `hidden sm:flex ${rowClass}` : rowClass}
+      >
         {/* Píldora de REPRODUCCIÓN (Continuar viendo) */}
         {play && (
           <LiquidButton
