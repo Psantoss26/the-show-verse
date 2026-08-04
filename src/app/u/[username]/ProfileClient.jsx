@@ -184,6 +184,7 @@ function ProfilePosterGrid({
   label,
   prioritizeHorizontalScroll = false,
   fixedIndicator = false,
+  showFixedIndicator = true,
 }) {
   return (
     <div
@@ -204,6 +205,7 @@ function ProfilePosterGrid({
             viewerState={viewerTitleStates[titleStateKey(item)]}
             indicatorSize="profile"
             fixedIndicator={fixedIndicator}
+            showFixedIndicator={showFixedIndicator}
           />
         </div>
       ))}
@@ -1043,6 +1045,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   label="Películas favoritas"
                   prioritizeHorizontalScroll
                   fixedIndicator="favorite"
+                  showFixedIndicator={!isSelf}
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -1062,6 +1065,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   label="Series favoritas"
                   prioritizeHorizontalScroll
                   fixedIndicator="favorite"
+                  showFixedIndicator={!isSelf}
                 />
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -1091,10 +1095,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
 
           {/* ── COLUMNA LATERAL ── */}
           <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 xl:sticky xl:top-24 xl:self-start">
-            {/* Estadísticas */}
+            {/* Resumen del mes actual */}
             <section>
               <SectionHeader
-                label="Estadísticas"
+                label="Este mes"
                 onClick={() => navigateToTab("statistics")}
               />
               <dl className="grid grid-cols-4 gap-2">

@@ -592,12 +592,16 @@ function HistoryHoverIndicator({ type, dateParts, compact = false }) {
       className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
-      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
-        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
+      <span className={`grid ${itemClassName} shrink-0 place-items-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
+        {type === "movie" ? (
+          <Film className={`block ${iconClassName}`} />
+        ) : (
+          <MonitorPlay className={`block ${iconClassName}`} />
+        )}
       </span>
       {dateParts ? (
-        <span className={`flex ${dateClassName} shrink-0 items-center justify-center whitespace-nowrap font-bold uppercase leading-none tracking-wide text-zinc-100 subpixel-antialiased [text-box:trim-both_cap_alphabetic]`}>
-          <span className="tabular-nums leading-none">
+        <span className={`grid ${dateClassName} shrink-0 place-items-center whitespace-nowrap font-bold uppercase leading-none tracking-wide text-zinc-100 subpixel-antialiased`}>
+          <span className="tabular-nums leading-none [text-box:trim-both_cap_alphabetic]">
             {dateParts.day} {dateParts.month}
           </span>
         </span>
@@ -2460,8 +2464,8 @@ function EpisodeSubItem({
           <p className="text-sm font-bold text-emerald-300 sm:text-[15px]">
             {formatEpisodeBadge(meta)}
           </p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-zinc-300 sm:text-sm">
-            {resolvedEpisodeTitle || formatEpisodeBadge(meta)}
+          <p className="mt-0.5 min-h-[1em] line-clamp-1 text-xs text-zinc-300 sm:text-sm">
+            {resolvedEpisodeTitle}
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-zinc-500 group-hover/subitem:text-emerald-400 transition-colors shrink-0" />
