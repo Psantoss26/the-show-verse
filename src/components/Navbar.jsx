@@ -1657,19 +1657,28 @@ export default function Navbar() {
     return `${base} ${active ? t.active : t.hover} ${active ? "" : inactiveColor}${heroShadow}`;
   };
 
-  // Iconos MONOCROMOS, como la barra de iOS de Instagram: la sección activa no
-  // se distingue por color sino por el blanco pleno y la lente de cristal que
-  // hay detrás. Antes cada sección tenía su color con un halo del mismo tono, y
-  // sobre un cristal tan difuminado eso se leía como manchas de color, no como
-  // una barra limpia.
-  const navLinkClassMobileBottom = (href) => {
+  // La sección ACTIVA conserva el color propio de su sección; las inactivas van
+  // en blanco atenuado. Así la barra se lee limpia (un solo color a la vez) pero
+  // la sección en la que estás mantiene su identidad. El halo del mismo tono es
+  // suave a propósito: con uno fuerte, sobre un cristal tan difuminado, el color
+  // se derramaba y ensuciaba la pieza.
+  const MOBILE_BOTTOM_TONES = {
+    red: "text-red-400 drop-shadow-[0_0_10px_rgba(248,113,113,0.35)]",
+    blue: "text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]",
+    purple: "text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,0.35)]",
+    green: "text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.35)]",
+  };
+
+  const navLinkClassMobileBottom = (href, tone = "blue") => {
     const active = isActive(href);
 
     return (
       "relative group flex h-[calc(100%_-_0.25rem)] min-w-0 flex-1 items-center justify-center rounded-full " +
       "transition-[color,transform] duration-300 ease-out " +
       "active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 " +
-      (active ? "text-white" : "text-white/55 hover:text-white/80")
+      (active
+        ? MOBILE_BOTTOM_TONES[tone] || MOBILE_BOTTOM_TONES.blue
+        : "text-white/60 hover:text-white/85")
     );
   };
 
@@ -1679,11 +1688,11 @@ export default function Navbar() {
   const mobileBottomIconSlotClass =
     "relative z-10 flex items-center justify-center";
 
-  // Trazo algo más fino que el de por defecto de lucide (2) y tamaño mayor: es
-  // la proporción de la barra de iOS de Instagram, iconos amplios y de línea
-  // ligera, que sobre un cristal muy difuminado se leen más limpios.
+  // Trazo MÁS GRUESO que el de por defecto de lucide (2): a 24px y sobre un
+  // cristal muy difuminado, una línea fina se diluye y los iconos pierden
+  // presencia. Las puntas redondeadas evitan que ese grosor se vea duro.
   const mobileBottomIconClass = "h-6 w-6 shrink-0";
-  const MOBILE_BOTTOM_ICON_STROKE = 1.75;
+  const MOBILE_BOTTOM_ICON_STROKE = 2.4;
 
   // Lente de la sección activa: un CÍRCULO de luz difusa, no una cápsula del
   // ancho de la celda. En la barra de Instagram el realce es redondo y algo
@@ -2141,7 +2150,7 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/movies")}
           onFocus={() => prefetchNavRoute("/movies")}
           onClick={() => setPendingHref("/movies")}
-          className={navLinkClassMobileBottom("/movies")}
+          className={navLinkClassMobileBottom("/movies", "blue")}
           aria-current={isActive("/movies") ? "page" : undefined}
           aria-label={t("nav_movies", "Películas")}
           title={t("nav_movies", "Películas")}
@@ -2158,7 +2167,7 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/series")}
           onFocus={() => prefetchNavRoute("/series")}
           onClick={() => setPendingHref("/series")}
-          className={navLinkClassMobileBottom("/series")}
+          className={navLinkClassMobileBottom("/series", "purple")}
           aria-current={isActive("/series") ? "page" : undefined}
           aria-label={t("nav_series", "Series")}
           title={t("nav_series", "Series")}
@@ -2173,7 +2182,7 @@ export default function Navbar() {
           href="/in-progress"
           prefetch
           {...navPrefetchHandlers("/in-progress")}
-          className={navLinkClassMobileBottom("/in-progress")}
+          className={navLinkClassMobileBottom("/in-progress", "green")}
           aria-current={isActive("/in-progress") ? "page" : undefined}
           aria-label={t("nav_in_progress_short", "En curso")}
           title={t("nav_in_progress_short", "En curso")}
@@ -2188,7 +2197,7 @@ export default function Navbar() {
           href="/history"
           prefetch
           {...navPrefetchHandlers("/history")}
-          className={navLinkClassMobileBottom("/history")}
+          className={navLinkClassMobileBottom("/history", "green")}
           aria-current={isActive("/history") ? "page" : undefined}
           aria-label={t("nav_history", "Historial")}
           title={t("nav_history", "Historial")}
@@ -2203,7 +2212,7 @@ export default function Navbar() {
           href={favHref}
           prefetch
           {...navPrefetchHandlers(favHref)}
-          className={navLinkClassMobileBottom("/favorites")}
+          className={navLinkClassMobileBottom("/favorites", "red")}
           aria-current={isActive(favHref) ? "page" : undefined}
           aria-label={t("nav_favorites", "Favoritas")}
           title={t("nav_favorites", "Favoritas")}
@@ -2218,7 +2227,7 @@ export default function Navbar() {
           href={watchHref}
           prefetch
           {...navPrefetchHandlers(watchHref)}
-          className={navLinkClassMobileBottom("/watchlist")}
+          className={navLinkClassMobileBottom("/watchlist", "blue")}
           aria-current={isActive(watchHref) ? "page" : undefined}
           aria-label={t("nav_watchlist", "Pendientes")}
           title={t("nav_watchlist", "Pendientes")}

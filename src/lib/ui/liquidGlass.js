@@ -24,18 +24,27 @@ export const LIQUID_GLASS_TOOLTIP =
 
 // Variante para BARRAS FLOTANTES (la barra inferior de móvil - Estilo Instagram iOS Liquid Glass).
 //
-//  - DIFUMINADO AGRESIVO DE 50PX (`backdrop-blur-[50px] backdrop-saturate-[190%]`).
-//  - CRISTAL LÍQUIDO OSCURO (`bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40`):
-//    se distingue perfectamente sobre fondos negros (#000000) adoptando un tono carbón translúcido.
+//  - DIFUMINADO MUY AGRESIVO (72px): a esa distancia lo de detrás deja de tener
+//    forma reconocible y se convierte en una mancha de color, que es lo que hace
+//    que la pieza parezca cristal y no un panel encima.
+//  - TINTE MÍNIMO (`bg-black/25`): el color del fondo TIENE que atravesar. Con
+//    un velo oscuro alto (estaba en `bg-black/60`) el cristal se comporta como
+//    una placa gris: por muy alto que sea el desenfoque, ya no pasa color y el
+//    efecto se pierde. El contraste de los iconos lo sostienen el desenfoque y
+//    la sombra, no el tinte.
+//  - COLOR REALZADO (`backdrop-saturate-[200%] backdrop-brightness-[1.08]`): al
+//    difuminar tanto, el color de fondo se apaga; saturarlo y levantarlo un poco
+//    devuelve la viveza. Esto es lo que diferencia este acabado del navbar
+//    superior, que solo difumina.
 //  - ELEVACIÓN DIFUSA, sin canto: sombra exterior amplia y un halo tenue.
 //
 // SIN BORDES MARCADOS, y esto incluye el reflejo interior: un `inset 0 1px` es
 // justo lo que dibuja un filo de 1px en el borde superior de una píldora que
 // flota sobre el contenido, que es lo que delata la pieza como una caja pegada
-// encima. El volumen lo da el degradado del propio fondo (from-white/[0.14]),
+// encima. El volumen lo da el degradado del propio fondo (from-white/[0.16]),
 // que se apaga hacia dentro en vez de trazar una línea.
 export const LIQUID_GLASS_BAR =
-  "bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40 backdrop-blur-[50px] backdrop-saturate-[190%] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]";
+  "bg-black/25 bg-gradient-to-b from-white/[0.16] via-white/[0.04] to-black/25 backdrop-blur-[72px] backdrop-saturate-[200%] backdrop-brightness-[1.08] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
 
 
 
