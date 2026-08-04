@@ -59,6 +59,10 @@ import {
   selectHistoryCacheEnvelope,
 } from "@/lib/userLists/historyCacheSnapshot";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
+import {
+  buildSeasonEpisodeMetadata,
+  historyEpisodeMetadataKey,
+} from "@/lib/history/episodeSeasonMetadata";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 200;
@@ -68,10 +72,9 @@ const RESTORATION_COMPLETE_KEY = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_EVENT = "showverse:scroll-restoration-complete";
 const RESTORATION_COMPLETE_MAX_AGE_MS = 30_000;
 const RESTORATION_RELEASE_FALLBACK_MS = 5_250;
-// Los stills reales pertenecen a cada episodio, no al backdrop general de la
-// serie. La caché evita repetir consultas de una misma temporada al volver a
-// abrir el modal durante la sesión.
-const historySeasonStillsCache = new Map();
+// Los stills y títulos localizados pertenecen a cada episodio. La caché evita
+// repetir consultas de una misma temporada al volver a abrir el modal.
+const historySeasonMetadataCache = new Map();
 
 function isTraktUnavailableError(error) {
   const status = Number(error?.status || error?.payload?.upstreamStatus || 0);
@@ -291,13 +294,9 @@ function getEpisodeMeta(entry) {
   return { season, episode, title };
 }
 
-function historyEpisodeStillKey(season, episode) {
-  return `${season}:${episode}`;
-}
-
-function loadHistorySeasonStills(showId, season) {
+function loadHistorySeasonMetadata(showId, season) {
   const cacheKey = `${showId}:${season}`;
-  const cached = historySeasonStillsCache.get(cacheKey);
+  const cached = historySeasonMetadataCache.get(cacheKey);
   if (cached) return cached instanceof Promise ? cached : Promise.resolve(cached);
 
   const request = fetch(
@@ -305,31 +304,21 @@ function loadHistorySeasonStills(showId, season) {
   )
     .then((response) => (response.ok ? response.json() : null))
     .then((payload) => {
-      const stills = new Map(
-        (Array.isArray(payload?.episodes) ? payload.episodes : [])
-          .filter((episode) => episode?.still_path)
-          .map((episode) => [
-            historyEpisodeStillKey(
-              Number(episode.season_number),
-              Number(episode.episode_number),
-            ),
-            episode.still_path,
-          ]),
-      );
-      historySeasonStillsCache.set(cacheKey, stills);
-      return stills;
+      const metadata = buildSeasonEpisodeMetadata(payload);
+      historySeasonMetadataCache.set(cacheKey, metadata);
+      return metadata;
     })
     .catch(() => {
-      const stills = new Map();
-      historySeasonStillsCache.set(cacheKey, stills);
-      return stills;
+      const metadata = new Map();
+      historySeasonMetadataCache.set(cacheKey, metadata);
+      return metadata;
     });
 
-  historySeasonStillsCache.set(cacheKey, request);
+  historySeasonMetadataCache.set(cacheKey, request);
   return request;
 }
 
-function useHistoryEpisodeStills(showId, episodes) {
+function useHistoryEpisodeMetadata(showId, episodes) {
   const seasonSignature = useMemo(
     () =>
       [...new Set((episodes || []).map(getEpisodeMeta).filter(Boolean).map((episode) => episode.season))]
@@ -337,26 +326,28 @@ function useHistoryEpisodeStills(showId, episodes) {
         .join(","),
     [episodes],
   );
-  const [stills, setStills] = useState(() => new Map());
+  const [metadata, setMetadata] = useState(() => new Map());
 
   useEffect(() => {
     const seasons = seasonSignature
       ? seasonSignature.split(",").map(Number).filter(Number.isInteger)
       : [];
     if (!showId || !seasons.length) {
-      setStills(new Map());
+      setMetadata(new Map());
       return undefined;
     }
 
     let cancelled = false;
-    Promise.all(seasons.map((season) => loadHistorySeasonStills(showId, season))).then(
+    Promise.all(seasons.map((season) => loadHistorySeasonMetadata(showId, season))).then(
       (results) => {
         if (cancelled) return;
         const next = new Map();
         for (const result of results) {
-          for (const [key, path] of result) next.set(key, path);
+          for (const [key, episodeMetadata] of result) {
+            next.set(key, episodeMetadata);
+          }
         }
-        setStills(next);
+        setMetadata(next);
       },
     );
 
@@ -365,7 +356,7 @@ function useHistoryEpisodeStills(showId, episodes) {
     };
   }, [seasonSignature, showId]);
 
-  return stills;
+  return metadata;
 }
 
 // IMPORTANTE: si es episodio, prioriza el TMDb de la SERIE (show)
@@ -1346,9 +1337,9 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
   const [expanded, setExpanded] = useState(false);
   const count = entry._group.length;
 
-  // Stills (backdrop) de cada episodio, como en el modal de episodios agrupados.
+  // Metadatos localizados de cada episodio, como en el modal agrupado.
   // Solo se piden al desplegar (showId null mientras está colapsado → sin fetch).
-  const episodeStills = useHistoryEpisodeStills(
+  const episodeMetadata = useHistoryEpisodeMetadata(
     expanded ? getTmdbId(entry) : null,
     entry._group,
   );
@@ -1406,13 +1397,18 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                   ? getEpisodeMeta(sub)
                   : null;
                 const subHref = getDetailsHref(sub);
-                const stillPath = subMeta
-                  ? episodeStills.get(
-                      historyEpisodeStillKey(subMeta.season, subMeta.episode),
+                const localizedMetadata = subMeta
+                  ? episodeMetadata.get(
+                      historyEpisodeMetadataKey(subMeta.season, subMeta.episode),
                     )
                   : null;
                 const finalStill =
-                  stillPath || sub?.still_path || sub?.stillPath || null;
+                  localizedMetadata?.stillPath ||
+                  sub?.still_path ||
+                  sub?.stillPath ||
+                  null;
+                const episodeTitle =
+                  subMeta?.title || localizedMetadata?.title || null;
                 return (
                   <Link
                     // Mismo motivo que en ExpandedGroupView: getHistoryId(sub) puede
@@ -1442,9 +1438,9 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                           {formatEpisodeBadge(subMeta)}
                         </p>
                       )}
-                      {subMeta?.title && (
+                      {episodeTitle && (
                         <p className="text-[10px] text-zinc-400 truncate">
-                          {subMeta.title}
+                          {episodeTitle}
                         </p>
                       )}
                     </div>
@@ -2390,8 +2386,15 @@ const HistoryGridCard = memo(function HistoryGridCard({
   );
 });
 
-function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy, stillPath }) {
+function EpisodeSubItem({
+  entry,
+  onRemoveFromHistory,
+  isBusy,
+  stillPath,
+  episodeTitle,
+}) {
   const meta = getEpisodeMeta(entry);
+  const resolvedEpisodeTitle = meta?.title || episodeTitle || null;
   const href = getDetailsHref(entry);
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -2410,7 +2413,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy, stillPath }) {
             showId: showTmdbId,
             seasonNumber: meta.season,
             episodeNumber: meta.episode,
-            name: meta.title ?? null,
+            name: resolvedEpisodeTitle,
             showName: entry?.show?.title ?? entry?.showTitle ?? null,
           }
         : undefined,
@@ -2458,7 +2461,7 @@ function EpisodeSubItem({ entry, onRemoveFromHistory, isBusy, stillPath }) {
             {formatEpisodeBadge(meta)}
           </p>
           <p className="mt-0.5 line-clamp-1 text-xs text-zinc-300 sm:text-sm">
-            {meta.title || "Episodio sin título"}
+            {resolvedEpisodeTitle || formatEpisodeBadge(meta)}
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-zinc-500 group-hover/subitem:text-emerald-400 transition-colors shrink-0" />
@@ -2516,7 +2519,7 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
   const title = getMainTitle(entry);
   const tmdbId = getTmdbId(entry);
   const episodes = Array.isArray(entry?._group) ? entry._group : [];
-  const episodeStills = useHistoryEpisodeStills(tmdbId, episodes);
+  const episodeMetadata = useHistoryEpisodeMetadata(tmdbId, episodes);
   const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
   const [mounted, setMounted] = useState(false);
   // Pulsar el título/póster de la serie abre su PREVIEW (drawer), no navega.
@@ -2623,9 +2626,12 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
           {episodes.map((ep, idx) => {
             const episodeMeta = getEpisodeMeta(ep);
-            const stillPath = episodeMeta
-              ? episodeStills.get(
-                  historyEpisodeStillKey(episodeMeta.season, episodeMeta.episode),
+            const localizedMetadata = episodeMeta
+              ? episodeMetadata.get(
+                  historyEpisodeMetadataKey(
+                    episodeMeta.season,
+                    episodeMeta.episode,
+                  ),
                 )
               : null;
             return <EpisodeSubItem
@@ -2635,7 +2641,8 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
               // ÚNICA y no dispare el aviso de React de keys duplicadas.
               key={`ep-${getHistoryId(ep) ?? "x"}-${idx}`}
               entry={ep}
-              stillPath={stillPath}
+              stillPath={localizedMetadata?.stillPath || null}
+              episodeTitle={localizedMetadata?.title || null}
               onRemoveFromHistory={onRemoveFromHistory}
               isBusy={busyId === `del:${getHistoryId(ep)}`}
             />;
@@ -3752,7 +3759,7 @@ export default function HistoryClient() {
                   className="w-full min-w-0"
                 >
                   <StatCard
-                    label="Títulos Únicos"
+                    label="Títulos"
                     value={stats.unique}
                     loading={false}
                     icon={LayoutList}

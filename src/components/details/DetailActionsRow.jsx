@@ -42,31 +42,37 @@ const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-
                 ${MOBILE_ACTION_BUTTON_CLASS}`;
 
 // Retardo entre celdas para que el cambio se lea de izquierda a derecha, en orden.
-const SLOT_STAGGER = 0.045;
+const SLOT_STAGGER = 0.03;
+const SLOT_FADE = 0.22;
 
 // Una celda de la fila de acciones móvil combinada (solo series). Alterna su
 // contenido según `expanded` con un cross-fade de SOLO opacidad: sin escala, así
-// el botón NO cambia de tamaño. El contenido entrante lleva un retardo por índice
-// (SLOT_STAGGER) → la conmutación avanza en orden de izquierda a derecha, mientras
-// el saliente se desvanece rápido. La celda mantiene tamaño fijo (aspect-square),
-// por lo que la fila nunca se deforma ni cambia el tamaño de los botones.
+// el botón NO cambia de tamaño. Entrante y saliente se solapan (ambos absolutos
+// sobre la misma celda, sin `mode="wait"`), por lo que NO hay ningún instante en
+// blanco; el retardo por índice hace que la conmutación recorra la fila en orden
+// de izquierda a derecha. La celda mantiene tamaño fijo (aspect-square), así que
+// la fila nunca se deforma ni cambia el tamaño de los botones.
 function ActionSlot({ index = 0, expanded, expandedContent, collapsedContent }) {
+  const delay = index * SLOT_STAGGER;
+
   return (
-    <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-      <AnimatePresence mode="wait" initial={false}>
+    <div className="relative flex-1 min-w-[34px] max-w-[60px] aspect-square">
+      <AnimatePresence initial={false}>
         <motion.div
           key={expanded ? "expanded" : "collapsed"}
           initial={{ opacity: 0 }}
           animate={{
             opacity: 1,
-            transition: {
-              duration: 0.2,
-              ease: "easeOut",
-              delay: index * SLOT_STAGGER,
-            },
+            transition: { duration: SLOT_FADE, ease: "easeOut", delay },
           }}
-          exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
-          className="w-full h-full"
+          exit={{
+            opacity: 0,
+            // El saliente deja de recibir clics en cuanto empieza a irse, para
+            // que durante el solape no intercepte pulsaciones del entrante.
+            pointerEvents: "none",
+            transition: { duration: SLOT_FADE, ease: "easeIn", delay },
+          }}
+          className="absolute inset-0"
         >
           {expanded ? expandedContent : collapsedContent}
         </motion.div>
@@ -152,6 +158,109 @@ export default function DetailActionsRow({
     .filter(Boolean)
     .join(" ");
 
+  // Contenidos de la fila móvil combinada. Al expandir, cada control se DESPLAZA
+  // una celda a la derecha para dejar sitio a tráiler y soundtrack, así que el
+  // mismo botón se usa en dos celdas distintas: se define una sola vez aquí.
+  const episodeRatingsButton = onEpisodeRatings ? (
+    <LiquidButton
+      onClick={onEpisodeRatings}
+      active
+      activeColor="yellow"
+      groupId="details-actions"
+      className="!bg-white !text-black !w-full !h-auto aspect-square"
+      title="Valoración de episodios"
+    >
+      <BarChart3 />
+    </LiquidButton>
+  ) : null;
+
+  const traktControl = trakt ? (
+    <TraktWatchedControl
+      connected={trakt.connected}
+      watched={trakt.watched}
+      plays={trakt.plays}
+      badge={trakt.badge}
+      busy={!!trakt.busy}
+      loading={trakt.loading}
+      onOpen={trakt.onOpen}
+      progressOverride={trakt.progressOverride}
+    />
+  ) : null;
+
+  const rateControl = rate ? (
+    <StarRating
+      rating={rate.rating}
+      max={rate.max}
+      loading={rate.loading}
+      onRate={rate.onRate}
+      connected={rate.connected}
+      onConnect={rate.onConnect}
+    />
+  ) : null;
+
+  const favoriteButton = onToggleFavorite ? (
+    <LiquidButton
+      onClick={onToggleFavorite}
+      disabled={favoriteLoading}
+      active={favorite}
+      activeColor="red"
+      groupId="details-actions"
+      className="!w-full !h-auto aspect-square"
+      title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+    >
+      {favoriteLoading ? (
+        <Loader2 className="animate-spin" />
+      ) : (
+        <Heart className={favorite ? "fill-current" : ""} />
+      )}
+    </LiquidButton>
+  ) : null;
+
+  const watchlistButton = onToggleWatchlist ? (
+    <LiquidButton
+      onClick={onToggleWatchlist}
+      disabled={watchlistLoading}
+      active={watchlist}
+      activeColor="blue"
+      groupId="details-actions"
+      className="!w-full !h-auto aspect-square"
+      title={watchlist ? "Quitar de pendientes" : "Añadir a pendientes"}
+    >
+      {watchlistLoading ? (
+        <Loader2 className="animate-spin" />
+      ) : (
+        <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+      )}
+    </LiquidButton>
+  ) : null;
+
+  const addToListButton = onAddToList ? (
+    <LiquidButton
+      onClick={onAddToList}
+      disabled={listBusy}
+      active={listActive}
+      activeColor="purple"
+      groupId="details-actions"
+      className="!w-full !h-auto aspect-square"
+      title={listActive ? "Gestionar en listas" : "Añadir a lista"}
+    >
+      {listBusy ? <Loader2 className="animate-spin" /> : <ListVideo />}
+    </LiquidButton>
+  ) : null;
+
+  const commentsButton = showComments ? (
+    <LiquidButton
+      onClick={onComments}
+      active={commentsActive}
+      activeColor="orange"
+      groupId="details-actions"
+      className="!w-full !h-auto aspect-square"
+      title="Ver reseñas de la comunidad"
+    >
+      <MessageSquare />
+    </LiquidButton>
+  ) : null;
+
   return (
     <>
       {/* VISTA MÓVIL EXCLUSIVA PARA SERIES COMBINADAS (8 SLOTS PERMANENTES PARA ZERO DEFORMACIÓN Y CONMUTACIÓN PERFECTA) */}
@@ -185,24 +294,28 @@ export default function DetailActionsRow({
                 }
                 aria-expanded={mediaExpanded}
               >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={mediaExpanded ? "close" : "play"}
-                    initial={{ opacity: 0, rotate: -30 }}
-                    animate={{ opacity: 1, rotate: 0 }}
-                    exit={{ opacity: 0, rotate: 30 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="flex items-center justify-center w-full h-full"
-                  >
-                    {mediaExpanded ? (
-                      <X />
-                    ) : trailerPlaying ? (
-                      <X />
-                    ) : (
-                      <Play className={trailerAvailable ? "ml-0.5" : ""} />
-                    )}
-                  </motion.div>
-                </AnimatePresence>
+                {/* Icono Play <-> X: cross-fade solapado (sin `mode="wait"`), así
+                    el botón nunca se queda vacío a mitad de la transición. */}
+                <span className="relative flex w-full h-full items-center justify-center">
+                  <AnimatePresence initial={false}>
+                    <motion.span
+                      key={mediaExpanded ? "close" : "play"}
+                      initial={{ opacity: 0, rotate: -30 }}
+                      animate={{ opacity: 1, rotate: 0 }}
+                      exit={{ opacity: 0, rotate: 30 }}
+                      transition={{ duration: SLOT_FADE, ease: "easeOut" }}
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      {mediaExpanded ? (
+                        <X />
+                      ) : trailerPlaying ? (
+                        <X />
+                      ) : (
+                        <Play className={trailerAvailable ? "ml-0.5" : ""} />
+                      )}
+                    </motion.span>
+                  </AnimatePresence>
+                </span>
               </LiquidButton>
             </div>
 
@@ -240,379 +353,78 @@ export default function DetailActionsRow({
                   )}
                 </LiquidButton>
               }
-              collapsedContent={
-                onEpisodeRatings && (
-                  <LiquidButton
-                    onClick={onEpisodeRatings}
-                    active
-                    activeColor="yellow"
-                    groupId="details-actions"
-                    className="!bg-white !text-black !w-full !h-auto aspect-square"
-                    title="Valoración de episodios"
-                  >
-                    <BarChart3 />
-                  </LiquidButton>
-                )
-              }
+              collapsedContent={episodeRatingsButton}
             />
 
             {/* Slot 3: Soundtrack (Expandido) <-> Episodios vistos / Trakt (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot3-soundtrack"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    <LiquidButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMediaExpanded(false);
-                        if (onSoundtrack) onSoundtrack();
-                      }}
-                      disabled={!soundtrackAvailable}
-                      active={!!soundtrackAvailable}
-                      activeColor="yellow"
-                      groupId="details-actions"
-                      className={`!w-full !h-auto aspect-square ${
-                        soundtrackAvailable ? "!bg-white !text-black" : ""
-                      }`}
-                      title={
-                        soundtrackAvailable
-                          ? "Reproducir soundtrack"
-                          : "Sin soundtrack"
-                      }
-                    >
-                      <Music2 />
-                    </LiquidButton>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot3-trakt"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {trakt && (
-                      <TraktWatchedControl
-                        connected={trakt.connected}
-                        watched={trakt.watched}
-                        plays={trakt.plays}
-                        badge={trakt.badge}
-                        busy={!!trakt.busy}
-                        loading={trakt.loading}
-                        onOpen={trakt.onOpen}
-                        progressOverride={trakt.progressOverride}
-                      />
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={2}
+              expanded={mediaExpanded}
+              expandedContent={
+                <LiquidButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMediaExpanded(false);
+                    if (onSoundtrack) onSoundtrack();
+                  }}
+                  disabled={!soundtrackAvailable}
+                  active={!!soundtrackAvailable}
+                  activeColor="yellow"
+                  groupId="details-actions"
+                  className={`!w-full !h-auto aspect-square ${
+                    soundtrackAvailable ? "!bg-white !text-black" : ""
+                  }`}
+                  title={
+                    soundtrackAvailable
+                      ? "Reproducir soundtrack"
+                      : "Sin soundtrack"
+                  }
+                >
+                  <Music2 />
+                </LiquidButton>
+              }
+              collapsedContent={traktControl}
+            />
 
             {/* Slot 4: Valoración de episodios (Expandido) <-> Puntuación estrellas (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot4-ratings"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onEpisodeRatings && (
-                      <LiquidButton
-                        onClick={onEpisodeRatings}
-                        active
-                        activeColor="yellow"
-                        groupId="details-actions"
-                        className="!bg-white !text-black !w-full !h-auto aspect-square"
-                        title="Valoración de episodios"
-                      >
-                        <BarChart3 />
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot4-rate"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {rate && (
-                      <StarRating
-                        rating={rate.rating}
-                        max={rate.max}
-                        loading={rate.loading}
-                        onRate={rate.onRate}
-                        connected={rate.connected}
-                        onConnect={rate.onConnect}
-                      />
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={3}
+              expanded={mediaExpanded}
+              expandedContent={episodeRatingsButton}
+              collapsedContent={rateControl}
+            />
 
             {/* Slot 5: Episodios vistos / Trakt (Expandido) <-> Favorito (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot5-trakt"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {trakt && (
-                      <TraktWatchedControl
-                        connected={trakt.connected}
-                        watched={trakt.watched}
-                        plays={trakt.plays}
-                        badge={trakt.badge}
-                        busy={!!trakt.busy}
-                        loading={trakt.loading}
-                        onOpen={trakt.onOpen}
-                        progressOverride={trakt.progressOverride}
-                      />
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot5-fav"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onToggleFavorite && (
-                      <LiquidButton
-                        onClick={onToggleFavorite}
-                        disabled={favoriteLoading}
-                        active={favorite}
-                        activeColor="red"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title={
-                          favorite
-                            ? "Quitar de favoritos"
-                            : "Añadir a favoritos"
-                        }
-                      >
-                        {favoriteLoading ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <Heart className={favorite ? "fill-current" : ""} />
-                        )}
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={4}
+              expanded={mediaExpanded}
+              expandedContent={traktControl}
+              collapsedContent={favoriteButton}
+            />
 
             {/* Slot 6: Puntuación estrellas (Expandido) <-> Pendientes (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot6-rate"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {rate && (
-                      <StarRating
-                        rating={rate.rating}
-                        max={rate.max}
-                        loading={rate.loading}
-                        onRate={rate.onRate}
-                        connected={rate.connected}
-                        onConnect={rate.onConnect}
-                      />
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot6-watchlist"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onToggleWatchlist && (
-                      <LiquidButton
-                        onClick={onToggleWatchlist}
-                        disabled={watchlistLoading}
-                        active={watchlist}
-                        activeColor="blue"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title={
-                          watchlist
-                            ? "Quitar de pendientes"
-                            : "Añadir a pendientes"
-                        }
-                      >
-                        {watchlistLoading ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <BookmarkPlus
-                            className={watchlist ? "fill-current" : ""}
-                          />
-                        )}
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={5}
+              expanded={mediaExpanded}
+              expandedContent={rateControl}
+              collapsedContent={watchlistButton}
+            />
 
             {/* Slot 7: Favoritos (Expandido) <-> Añadir a lista (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot7-fav"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onToggleFavorite && (
-                      <LiquidButton
-                        onClick={onToggleFavorite}
-                        disabled={favoriteLoading}
-                        active={favorite}
-                        activeColor="red"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title={
-                          favorite
-                            ? "Quitar de favoritos"
-                            : "Añadir a favoritos"
-                        }
-                      >
-                        {favoriteLoading ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <Heart className={favorite ? "fill-current" : ""} />
-                        )}
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot7-list"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onAddToList && (
-                      <LiquidButton
-                        onClick={onAddToList}
-                        disabled={listBusy}
-                        active={listActive}
-                        activeColor="purple"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title={
-                          listActive ? "Gestionar en listas" : "Añadir a lista"
-                        }
-                      >
-                        {listBusy ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <ListVideo />
-                        )}
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={6}
+              expanded={mediaExpanded}
+              expandedContent={favoriteButton}
+              collapsedContent={addToListButton}
+            />
 
             {/* Slot 8: Pendientes (Expandido) <-> Reseñas (Replegado) */}
-            <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
-              <AnimatePresence mode="wait" initial={false}>
-                {mediaExpanded ? (
-                  <motion.div
-                    key="slot8-watchlist"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {onToggleWatchlist && (
-                      <LiquidButton
-                        onClick={onToggleWatchlist}
-                        disabled={watchlistLoading}
-                        active={watchlist}
-                        activeColor="blue"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title={
-                          watchlist
-                            ? "Quitar de pendientes"
-                            : "Añadir a pendientes"
-                        }
-                      >
-                        {watchlistLoading ? (
-                          <Loader2 className="animate-spin" />
-                        ) : (
-                          <BookmarkPlus
-                            className={watchlist ? "fill-current" : ""}
-                          />
-                        )}
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="slot8-comments"
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: "easeOut" }}
-                    className="w-full h-full"
-                  >
-                    {showComments && (
-                      <LiquidButton
-                        onClick={onComments}
-                        active={commentsActive}
-                        activeColor="orange"
-                        groupId="details-actions"
-                        className="!w-full !h-auto aspect-square"
-                        title="Ver reseñas de la comunidad"
-                      >
-                        <MessageSquare />
-                      </LiquidButton>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <ActionSlot
+              index={7}
+              expanded={mediaExpanded}
+              expandedContent={watchlistButton}
+              collapsedContent={commentsButton}
+            />
           </div>
         </div>
       )}
