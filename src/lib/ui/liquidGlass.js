@@ -25,12 +25,17 @@ export const LIQUID_GLASS_TOOLTIP =
 // Variante para BARRAS FLOTANTES (la barra inferior de móvil - Estilo Instagram iOS Liquid Glass).
 //
 //  - DIFUMINADO AGRESIVO DE 50PX (`backdrop-blur-[50px] backdrop-saturate-[190%]`).
-//  - SIN BORDES MARCADOS: cero trazos o bordes duros (`border-none`).
 //  - CRISTAL LÍQUIDO OSCURO (`bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40`):
 //    se distingue perfectamente sobre fondos negros (#000000) adoptando un tono carbón translúcido.
-//  - REFLEJO DIFUSO Y ELEVACIÓN (`shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]`).
+//  - ELEVACIÓN DIFUSA, sin canto: sombra exterior amplia y un halo tenue.
+//
+// SIN BORDES MARCADOS, y esto incluye el reflejo interior: un `inset 0 1px` es
+// justo lo que dibuja un filo de 1px en el borde superior de una píldora que
+// flota sobre el contenido, que es lo que delata la pieza como una caja pegada
+// encima. El volumen lo da el degradado del propio fondo (from-white/[0.14]),
+// que se apaga hacia dentro en vez de trazar una línea.
 export const LIQUID_GLASS_BAR =
-  "bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40 backdrop-blur-[50px] backdrop-saturate-[190%] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]";
+  "bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40 backdrop-blur-[50px] backdrop-saturate-[190%] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]";
 
 
 

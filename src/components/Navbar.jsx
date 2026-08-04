@@ -1657,36 +1657,19 @@ export default function Navbar() {
     return `${base} ${active ? t.active : t.hover} ${active ? "" : inactiveColor}${heroShadow}`;
   };
 
-  const navLinkClassMobileBottom = (href, tone = "blue") => {
+  // Iconos MONOCROMOS, como la barra de iOS de Instagram: la sección activa no
+  // se distingue por color sino por el blanco pleno y la lente de cristal que
+  // hay detrás. Antes cada sección tenía su color con un halo del mismo tono, y
+  // sobre un cristal tan difuminado eso se leía como manchas de color, no como
+  // una barra limpia.
+  const navLinkClassMobileBottom = (href) => {
     const active = isActive(href);
-
-    const tones = {
-      red: {
-        active: "text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.45)]",
-        inactive: "text-zinc-400 hover:text-red-400",
-      },
-      blue: {
-        active: "text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.45)]",
-        inactive: "text-zinc-400 hover:text-sky-400",
-      },
-      purple: {
-        active: "text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.45)]",
-        inactive: "text-zinc-400 hover:text-fuchsia-400",
-      },
-      green: {
-        active: "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.45)]",
-        inactive: "text-zinc-400 hover:text-emerald-400",
-      },
-    };
-
-    const t = tones[tone] || tones.blue;
-    const toneClass = active ? t.active : t.inactive;
 
     return (
       "relative group flex h-[calc(100%_-_0.25rem)] min-w-0 flex-1 items-center justify-center rounded-full " +
       "transition-[color,transform] duration-300 ease-out " +
       "active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 " +
-      `${toneClass}`
+      (active ? "text-white" : "text-white/55 hover:text-white/80")
     );
   };
 
@@ -1696,19 +1679,32 @@ export default function Navbar() {
   const mobileBottomIconSlotClass =
     "relative z-10 flex items-center justify-center";
 
-  const mobileBottomIconClass = "h-[22px] w-[22px] shrink-0";
+  // Trazo algo más fino que el de por defecto de lucide (2) y tamaño mayor: es
+  // la proporción de la barra de iOS de Instagram, iconos amplios y de línea
+  // ligera, que sobre un cristal muy difuminado se leen más limpios.
+  const mobileBottomIconClass = "h-6 w-6 shrink-0";
+  const MOBILE_BOTTOM_ICON_STROKE = 1.75;
 
-  // Cápsula "lente" de la sección activa: cristal claro con borde de luz, al
-  // estilo de la pestaña activa de iOS. Al compartir `layoutId`, se DESLIZA de
-  // una sección a otra en vez de desaparecer y reaparecer.
+  // Lente de la sección activa: un CÍRCULO de luz difusa, no una cápsula del
+  // ancho de la celda. En la barra de Instagram el realce es redondo y algo
+  // menor que la celda, y su suavidad viene de la propia luz, sin ningún canto:
+  // por eso aquí no hay reflejo interior de 1px (dibujaba un borde marcado justo
+  // en lo que debía ser un degradado).
+  //
+  // El `layoutId` va en una capa que ocupa la celda ENTERA y el círculo es un
+  // hijo centrado: así Framer anima la posición de la celda (el deslizamiento
+  // entre secciones) sin pelearse con la transformación que centraría el
+  // círculo, que es lo que pasa al poner `layoutId` sobre un elemento
+  // desplazado con `-translate-x-1/2`.
   const mobileBottomActiveLens = (
     <motion.span
       aria-hidden="true"
       layoutId="mobile-bottom-nav-active"
-      // Lente activa estilo Instagram iOS Liquid Glass: cápsula difuminada más clara, totalmente sin bordes
-      className="absolute inset-y-1 inset-x-0.5 rounded-full bg-white/[0.22] backdrop-blur-md bg-gradient-to-b from-white/[0.15] to-white/[0.04] shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_16px_rgba(0,0,0,0.3)]"
+      className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
       transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
-    />
+    >
+      <span className="block aspect-square h-[88%] rounded-full bg-white/[0.17] bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.16),transparent_70%)] shadow-[0_2px_14px_-2px_rgba(0,0,0,0.4)]" />
+    </motion.span>
   );
 
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
@@ -2145,14 +2141,14 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/movies")}
           onFocus={() => prefetchNavRoute("/movies")}
           onClick={() => setPendingHref("/movies")}
-          className={navLinkClassMobileBottom("/movies", "blue")}
+          className={navLinkClassMobileBottom("/movies")}
           aria-current={isActive("/movies") ? "page" : undefined}
           aria-label={t("nav_movies", "Películas")}
           title={t("nav_movies", "Películas")}
         >
           {isActive("/movies") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <FilmIcon className={mobileBottomIconClass} />
+            <FilmIcon className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
 
@@ -2162,14 +2158,14 @@ export default function Navbar() {
           onTouchStart={() => prefetchNavRoute("/series")}
           onFocus={() => prefetchNavRoute("/series")}
           onClick={() => setPendingHref("/series")}
-          className={navLinkClassMobileBottom("/series", "purple")}
+          className={navLinkClassMobileBottom("/series")}
           aria-current={isActive("/series") ? "page" : undefined}
           aria-label={t("nav_series", "Series")}
           title={t("nav_series", "Series")}
         >
           {isActive("/series") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <TvIcon className={mobileBottomIconClass} />
+            <TvIcon className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
 
@@ -2177,14 +2173,14 @@ export default function Navbar() {
           href="/in-progress"
           prefetch
           {...navPrefetchHandlers("/in-progress")}
-          className={navLinkClassMobileBottom("/in-progress", "green")}
+          className={navLinkClassMobileBottom("/in-progress")}
           aria-current={isActive("/in-progress") ? "page" : undefined}
           aria-label={t("nav_in_progress_short", "En curso")}
           title={t("nav_in_progress_short", "En curso")}
         >
           {isActive("/in-progress") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <Play className={mobileBottomIconClass} fill="currentColor" />
+            <Play className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
 
@@ -2192,14 +2188,14 @@ export default function Navbar() {
           href="/history"
           prefetch
           {...navPrefetchHandlers("/history")}
-          className={navLinkClassMobileBottom("/history", "green")}
+          className={navLinkClassMobileBottom("/history")}
           aria-current={isActive("/history") ? "page" : undefined}
           aria-label={t("nav_history", "Historial")}
           title={t("nav_history", "Historial")}
         >
           {isActive("/history") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <Eye className={mobileBottomIconClass} />
+            <Eye className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
 
@@ -2207,14 +2203,14 @@ export default function Navbar() {
           href={favHref}
           prefetch
           {...navPrefetchHandlers(favHref)}
-          className={navLinkClassMobileBottom("/favorites", "red")}
+          className={navLinkClassMobileBottom("/favorites")}
           aria-current={isActive(favHref) ? "page" : undefined}
           aria-label={t("nav_favorites", "Favoritas")}
           title={t("nav_favorites", "Favoritas")}
         >
           {isActive(favHref) && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <Heart className={mobileBottomIconClass} />
+            <Heart className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
 
@@ -2222,14 +2218,14 @@ export default function Navbar() {
           href={watchHref}
           prefetch
           {...navPrefetchHandlers(watchHref)}
-          className={navLinkClassMobileBottom("/watchlist", "blue")}
+          className={navLinkClassMobileBottom("/watchlist")}
           aria-current={isActive(watchHref) ? "page" : undefined}
           aria-label={t("nav_watchlist", "Pendientes")}
           title={t("nav_watchlist", "Pendientes")}
         >
           {isActive(watchHref) && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
-            <Bookmark className={mobileBottomIconClass} />
+            <Bookmark className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
           </span>
         </Link>
       </nav>
