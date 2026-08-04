@@ -105,13 +105,6 @@ function detailsHref(item) {
   return `/details/${item.mediaType === "tv" ? "tv" : "movie"}/${item.tmdbId}`;
 }
 
-// "Porque viste X": el backend devuelve las semillas que han motivado la
-// recomendación. Es lo que hace entendible por qué aparece cada carta.
-function reasonText(item) {
-  const seed = (item?.reasons || []).find((r) => r?.seedTitle)?.seedTitle;
-  return seed ? `Porque viste ${seed}` : null;
-}
-
 export default function RecommendationsClient() {
   const { session, account, hydrated } = useAuth();
   const reduceMotion = useReducedMotion();
@@ -445,7 +438,7 @@ export default function RecommendationsClient() {
     <div className="fixed inset-0 z-0 flex flex-col overflow-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] sm:static sm:z-auto sm:block sm:overflow-visible sm:pb-32 sm:pt-24">
       {/* En móvil el contenedor no aporta márgenes NI ancho máximo: la portada
           va a sangre hasta los bordes laterales. */}
-      <div className="mx-auto flex w-full min-h-0 max-w-none flex-1 flex-col px-0 sm:block sm:max-w-6xl sm:px-6">
+      <div className="mx-auto flex w-full min-h-0 max-w-none flex-1 flex-col px-0 sm:block sm:max-w-[80rem] sm:px-6">
         {/* Cabecera, con el mismo tratamiento que Historial / Favoritos.
             En MÓVIL no se muestra: la vista es inmersiva como la ficha, solo el
             título en pantalla (póster + logo + puntuaciones + acciones). */}
@@ -548,7 +541,7 @@ export default function RecommendationsClient() {
             {/* ESCRITORIO: hero apaisado con la MISMA proporción y composición
                 que DetailModal (backdrop 16:9 + logo abajo a la izquierda), para
                 que ocupe el espacio como allí en vez de una tarjeta estrecha. */}
-            <div className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:aspect-video sm:h-auto sm:max-w-5xl sm:flex-none">
+            <div className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:aspect-video sm:h-auto sm:w-[min(100%,max(30rem,calc((100dvh-31rem)*16/9)))] sm:max-w-full sm:flex-none">
               {/* Cartas de detrás: dan sensación de pila sin ser interactivas */}
               {upcoming
                 .slice()
@@ -598,7 +591,7 @@ export default function RecommendationsClient() {
                 se reparten el ancho (MOBILE_ACTION_BUTTON_CLASS escala el icono
                 con container queries), con su mismo `gap-1.5`. */}
             <div
-              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-5 sm:gap-3 sm:pt-7 ${MOBILE_ACTION_BUTTON_CLASS}`}
+              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-5 sm:gap-3 sm:pt-10 ${MOBILE_ACTION_BUTTON_CLASS}`}
             >
               <RecommendationActionButton
                 label="Deshacer"
@@ -696,9 +689,6 @@ function SwipeCard({ item, reduceMotion, onAction }) {
         typeof window !== "undefined" ? window.innerWidth : 1024,
       )
     : { x: 0, y: 0 };
-
-  const reason = reasonText(item);
-  const year = item.year || null;
 
   // Póster SIN idioma + logo, igual que el hero de la ficha móvil. Mientras se
   // resuelve se usa el póster que ya venía en la recomendación, para que la
@@ -848,34 +838,13 @@ function SwipeCard({ item, reduceMotion, onAction }) {
           )}
         </Link>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span
-            className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-              item.mediaType === "movie"
-                ? "bg-sky-500/20 text-sky-300"
-                : "bg-purple-500/20 text-purple-300"
-            }`}
-          >
-            {item.mediaType === "movie" ? "Película" : "Serie"}
-          </span>
-          {year && (
-            <span className="text-xs font-semibold text-zinc-300">{year}</span>
-          )}
-
-          {/* Puntuaciones SOBRE la imagen: mismos badges que la ficha, aquí
-              dentro del backdrop en vez de en un panel aparte. */}
-          {(tmdbRating || imdbRating) && (
-            <span className="pointer-events-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
-              <DetailsRatingsBadges tmdb={tmdbRating} imdb={imdbRating} />
-            </span>
-          )}
-
-          {reason && (
-            <span className="truncate text-xs font-medium text-emerald-400/90">
-              {reason}
-            </span>
-          )}
-        </div>
+        {/* Bajo el logo solo van las puntuaciones: mismos badges que la ficha,
+            dentro del backdrop en vez de en un panel aparte. */}
+        {(tmdbRating || imdbRating) && (
+          <div className="pointer-events-none mt-3 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+            <DetailsRatingsBadges tmdb={tmdbRating} imdb={imdbRating} />
+          </div>
+        )}
       </div>
     </motion.div>
   );
