@@ -28,7 +28,6 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
-  Star,
   Undo2,
   X,
 } from "lucide-react";
@@ -446,12 +445,12 @@ export default function RecommendationsClient() {
     <div className="fixed inset-0 z-0 flex flex-col overflow-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] sm:static sm:z-auto sm:block sm:overflow-visible sm:pb-32 sm:pt-24">
       {/* En móvil el contenedor no aporta márgenes NI ancho máximo: la portada
           va a sangre hasta los bordes laterales. */}
-      <div className="mx-auto flex w-full min-h-0 max-w-none flex-1 flex-col px-0 sm:block sm:max-w-5xl sm:px-6">
+      <div className="mx-auto flex w-full min-h-0 max-w-none flex-1 flex-col px-0 sm:block sm:max-w-6xl sm:px-6">
         {/* Cabecera, con el mismo tratamiento que Historial / Favoritos.
             En MÓVIL no se muestra: la vista es inmersiva como la ficha, solo el
             título en pantalla (póster + logo + puntuaciones + acciones). */}
         <motion.header
-          className="mb-4 hidden sm:block lg:mb-8"
+          className="mb-3 hidden sm:block lg:mb-4"
           initial={reduceMotion ? false : { opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -462,7 +461,7 @@ export default function RecommendationsClient() {
               Para ti
             </span>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">
+          <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
             Recomendaciones<span className="text-emerald-500">.</span>
           </h1>
           {/* En pantallas bajas este texto se lleva el espacio de la carta; los
@@ -473,30 +472,32 @@ export default function RecommendationsClient() {
           </p>
         </motion.header>
 
-        {/* Filtro de tipo */}
+        {/* Filtro de tipo: MISMO control segmentado que los selectores de
+            Historial y Continuar viendo (contenedor de cristal con la opción
+            activa en verde), en vez de tres píldoras sueltas. */}
         <motion.div
-          className="mb-4 hidden items-center gap-2 sm:mb-6 sm:flex"
+          className="mb-4 hidden items-center sm:flex"
           initial={reduceMotion ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          {TYPE_FILTERS.map((filter) => {
-            const active = typeFilter === filter.value;
-            return (
+          <div className="flex h-11 shrink-0 items-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
+            {TYPE_FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 type="button"
                 onClick={() => setTypeFilter(filter.value)}
-                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition-all ${
-                  active
-                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
-                    : `${LIQUID_GLASS_PANEL} text-zinc-300 hover:text-white`
+                aria-pressed={typeFilter === filter.value}
+                className={`flex h-full items-center gap-2 rounded-lg px-3 text-sm font-bold transition-all ${
+                  typeFilter === filter.value
+                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                    : "text-zinc-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {filter.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </motion.div>
 
         {needsAuth ? (
@@ -544,7 +545,10 @@ export default function RecommendationsClient() {
             {/* La capa ya es fija a pantalla completa, así que la portada llega
                 sola al borde superior (bajo el navbar transparente) y a los
                 laterales: no hacen falta márgenes negativos. */}
-            <div className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:h-[clamp(300px,44vh,520px)] sm:max-w-sm sm:flex-none">
+            {/* ESCRITORIO: hero apaisado con la MISMA proporción y composición
+                que DetailModal (backdrop 16:9 + logo abajo a la izquierda), para
+                que ocupe el espacio como allí en vez de una tarjeta estrecha. */}
+            <div className="relative mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:aspect-video sm:h-auto sm:max-w-5xl sm:flex-none">
               {/* Cartas de detrás: dan sensación de pila sin ser interactivas */}
               {upcoming
                 .slice()
@@ -594,7 +598,7 @@ export default function RecommendationsClient() {
                 se reparten el ancho (MOBILE_ACTION_BUTTON_CLASS escala el icono
                 con container queries), con su mismo `gap-1.5`. */}
             <div
-              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-3 sm:gap-3 sm:pt-6 ${MOBILE_ACTION_BUTTON_CLASS}`}
+              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-5 sm:gap-3 sm:pt-7 ${MOBILE_ACTION_BUTTON_CLASS}`}
             >
               <RecommendationActionButton
                 label="Deshacer"
@@ -645,7 +649,7 @@ export default function RecommendationsClient() {
               </RecommendationActionButton>
             </div>
 
-            <p className="hidden text-center text-[11px] text-zinc-500 sm:block">
+            <p className="mt-4 hidden text-center text-[11px] text-zinc-500 sm:block">
               También puedes usar las flechas ← → ↑ del teclado
             </p>
           </>
@@ -695,17 +699,15 @@ function SwipeCard({ item, reduceMotion, onAction }) {
 
   const reason = reasonText(item);
   const year = item.year || null;
-  const rating =
-    typeof item.voteAverage === "number" && item.voteAverage > 0
-      ? item.voteAverage.toFixed(1)
-      : null;
 
   // Póster SIN idioma + logo, igual que el hero de la ficha móvil. Mientras se
   // resuelve se usa el póster que ya venía en la recomendación, para que la
   // carta nunca aparezca vacía.
   const artwork = useCardArtwork(item);
   const posterPath = artwork?.posterPath || item.posterPath || null;
+  const backdropPath = artwork?.backdropPath || item.backdropPath || null;
   const logoPath = artwork?.logoPath || null;
+  const backdropLogoPath = artwork?.backdropLogoPath || null;
 
   // TMDb sale del propio item (instantáneo); IMDb necesita red, así que aparece
   // en cuanto se resuelve sin retrasar el pintado de la carta.
@@ -749,20 +751,32 @@ function SwipeCard({ item, reduceMotion, onAction }) {
       }}
       transition={{ duration: reduceMotion ? 0 : 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
+      {/* MÓVIL: portada vertical, fundida por abajo con la máscara compartida de
+          la ficha para que el logo y las puntuaciones queden sobre el fondo de
+          la página y no sobre un corte de imagen. */}
       {posterPath ? (
-        <>
-          {/* MÓVIL: la portada se funde por abajo con la máscara compartida de
-              la ficha, así el logo y las puntuaciones quedan sobre el fondo de
-              la página y no sobre un corte de imagen. */}
-          <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w780${posterPath}`}
-            alt=""
-            className="poster-mobile-fade pointer-events-none h-full w-full select-none object-cover sm:[mask-image:none]"
-            draggable={false}
-          />
-        </>
+        <OptimizedImage
+          src={`https://image.tmdb.org/t/p/w780${posterPath}`}
+          alt=""
+          className="poster-mobile-fade pointer-events-none h-full w-full select-none object-cover sm:hidden"
+          draggable={false}
+        />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-zinc-700">
+        <div className="flex h-full w-full items-center justify-center text-zinc-700 sm:hidden">
+          <Sparkles className="h-10 w-10" />
+        </div>
+      )}
+
+      {/* ESCRITORIO: backdrop apaisado, como el hero de DetailModal. */}
+      {backdropPath ? (
+        <OptimizedImage
+          src={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
+          alt=""
+          className="pointer-events-none hidden h-full w-full select-none object-cover sm:block"
+          draggable={false}
+        />
+      ) : (
+        <div className="hidden h-full w-full items-center justify-center text-zinc-700 sm:flex">
           <Sparkles className="h-10 w-10" />
         </div>
       )}
@@ -807,11 +821,36 @@ function SwipeCard({ item, reduceMotion, onAction }) {
         )}
       </div>
 
-      {/* ---------- ESCRITORIO: ficha compacta sobre la tarjeta ---------- */}
-      <div className="absolute inset-x-0 bottom-0 hidden p-5 sm:block">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+      {/* ---------- ESCRITORIO: logo sobre el backdrop, como DetailModal ------
+          Mismo encuadre y tamaño que allí (abajo a la izquierda, `max-h-36`),
+          con el motivo de la recomendación debajo. Si el título no tiene logo,
+          el texto ocupa su lugar con el mismo peso. */}
+      <div className="absolute inset-x-0 bottom-0 z-10 hidden p-7 sm:block">
+        <Link
+          href={detailsHref(item)}
+          prefetch
+          // El arrastre no debe abrir la ficha: solo un clic limpio navega.
+          onDragStart={(event) => event.preventDefault()}
+          className="inline-block max-w-[85%] transition-opacity hover:opacity-90"
+          aria-label={item.title}
+        >
+          {backdropLogoPath ? (
+            <OptimizedImage
+              src={`https://image.tmdb.org/t/p/w500${backdropLogoPath}`}
+              alt={item.title}
+              draggable={false}
+              className="h-auto max-h-36 w-auto select-none object-contain object-left drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
+            />
+          ) : (
+            <h2 className="text-5xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+              {item.title}
+            </h2>
+          )}
+        </Link>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <span
-            className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+            className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
               item.mediaType === "movie"
                 ? "bg-sky-500/20 text-sky-300"
                 : "bg-purple-500/20 text-purple-300"
@@ -820,30 +859,23 @@ function SwipeCard({ item, reduceMotion, onAction }) {
             {item.mediaType === "movie" ? "Película" : "Serie"}
           </span>
           {year && (
-            <span className="text-[11px] font-semibold text-zinc-300">
-              {year}
+            <span className="text-xs font-semibold text-zinc-300">{year}</span>
+          )}
+
+          {/* Puntuaciones SOBRE la imagen: mismos badges que la ficha, aquí
+              dentro del backdrop en vez de en un panel aparte. */}
+          {(tmdbRating || imdbRating) && (
+            <span className="pointer-events-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+              <DetailsRatingsBadges tmdb={tmdbRating} imdb={imdbRating} />
             </span>
           )}
-          {rating && (
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-300">
-              <Star className="h-3 w-3 fill-current" /> {rating}
+
+          {reason && (
+            <span className="truncate text-xs font-medium text-emerald-400/90">
+              {reason}
             </span>
           )}
         </div>
-        <Link
-          href={detailsHref(item)}
-          prefetch
-          // El arrastre no debe abrir la ficha: solo un toque limpio navega.
-          onDragStart={(event) => event.preventDefault()}
-          className="block text-2xl font-black leading-tight tracking-tight text-white transition-colors hover:text-emerald-300"
-        >
-          {item.title}
-        </Link>
-        {reason && (
-          <p className="mt-1 truncate text-xs font-medium text-emerald-400/90">
-            {reason}
-          </p>
-        )}
       </div>
     </motion.div>
   );

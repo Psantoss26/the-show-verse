@@ -7,25 +7,26 @@ const navbar = readFileSync(
   "utf8",
 );
 
-test("Recomendaciones forma parte de la navegación principal de escritorio", () => {
-  const desktopNav = navbar.slice(
-    navbar.indexOf("{/* ---------------- Desktop ---------------- */}"),
+test("Recomendaciones se muestra como acceso de icono en el lado derecho", () => {
+  const desktopLeft = navbar.slice(
+    navbar.indexOf("{/* Izquierda */}"),
+    navbar.indexOf("{/* Centro:"),
+  );
+  const desktopRight = navbar.slice(
+    navbar.indexOf("{/* Derecha */}"),
     navbar.indexOf("{/* ---------------- Mobile ---------------- */}"),
   );
 
-  assert.match(desktopNav, /href="\/recommendations"/);
-  assert.match(desktopNav, /data-desktop-nav-href="\/recommendations"/);
-  assert.match(desktopNav, /navPrefetchHandlers\("\/recommendations"\)/);
-  assert.match(desktopNav, /nav_recommendations/);
+  assert.doesNotMatch(desktopLeft, /href="\/recommendations"/);
+  assert.match(desktopRight, /href="\/recommendations"/);
+  assert.match(desktopRight, /iconLinkClass\("\/recommendations", "green"\)/);
+  assert.match(desktopRight, /aria-label={t\("nav_recommendations", "Recomendaciones"\)}/);
+  assert.match(desktopRight, /<ThumbsUp/);
 });
 
-test("la pestaña activa de Recomendaciones conserva su identidad verde", () => {
+test("el acceso activo de Recomendaciones conserva su identidad verde", () => {
   assert.match(
     navbar,
-    /href === "\/recommendations"[\s\S]*?text-emerald-300 font-bold/,
-  );
-  assert.match(
-    navbar,
-    /case "\/recommendations":[\s\S]*?from-emerald-500\/25/,
+    /isActive\("\/recommendations"\)[\s\S]*?bg-emerald-500\/20/,
   );
 });

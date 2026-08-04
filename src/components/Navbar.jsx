@@ -1578,11 +1578,9 @@ export default function Navbar() {
           ? "text-fuchsia-300 font-bold"
           : href === "/discover"
             ? "text-indigo-300 font-bold"
-            : href === "/recommendations"
-              ? "text-emerald-300 font-bold"
-              : href === "/biblioteca"
-                ? "text-amber-300 font-bold"
-                : "text-white font-bold";
+            : href === "/biblioteca"
+              ? "text-amber-300 font-bold"
+              : "text-white font-bold";
 
     return `relative px-3.5 py-2 rounded-xl text-sm transition-all duration-300 ease-out ${
       active
@@ -1601,8 +1599,6 @@ export default function Navbar() {
         return "bg-gradient-to-b from-fuchsia-500/25 via-fuchsia-500/15 to-fuchsia-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(217,70,239,0.28)]";
       case "/discover":
         return "bg-gradient-to-b from-indigo-500/25 via-indigo-500/15 to-indigo-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(99,102,241,0.28)]";
-      case "/recommendations":
-        return "bg-gradient-to-b from-emerald-500/25 via-emerald-500/15 to-emerald-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(16,185,129,0.28)]";
       case "/biblioteca":
         return "bg-gradient-to-b from-amber-500/25 via-amber-500/15 to-amber-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(245,158,11,0.28)]";
       default:
@@ -1871,17 +1867,6 @@ export default function Navbar() {
                 <span className="relative z-10">{t("nav_discover", "Descubrir")}</span>
               </Link>
               <Link
-                href="/recommendations"
-                data-desktop-nav-href="/recommendations"
-                prefetch
-                {...navPrefetchHandlers("/recommendations")}
-                className={navLinkClass("/recommendations")}
-              >
-                <span className="relative z-10">
-                  {t("nav_recommendations", "Recomendaciones")}
-                </span>
-              </Link>
-              <Link
                 href="/biblioteca"
                 data-desktop-nav-href="/biblioteca"
                 prefetch
@@ -1933,6 +1918,25 @@ export default function Navbar() {
           >
             <div className="flex items-center gap-2">
               <WatchNextAssistant heroNavMode={heroNavMode} />
+
+              <Link
+                href="/recommendations"
+                prefetch
+                {...navPrefetchHandlers("/recommendations")}
+                className={iconLinkClass("/recommendations", "green")}
+                aria-label={t("nav_recommendations", "Recomendaciones")}
+              >
+                {isActive("/recommendations") && (
+                  <motion.div
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-full border border-emerald-500/10 bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <ThumbsUp className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
+              </Link>
 
               <Link
                 href="/lists"

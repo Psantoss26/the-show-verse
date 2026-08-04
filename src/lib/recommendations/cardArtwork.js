@@ -15,7 +15,10 @@
 
 import { useEffect, useState } from "react";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
-import { pickBestNeutralPosterByResVotes } from "@/lib/details/tmdbImages";
+import {
+  pickBestNeutralPosterByResVotes,
+  resolveNeutralBackdropPath,
+} from "@/lib/details/tmdbImages";
 
 const artworkCache = new Map(); // "movie:123" -> { posterPath, logoPath }
 
@@ -66,10 +69,20 @@ export async function loadCardArtwork(item, { priority = "normal" } = {}) {
   const posterHasBurnedTitle =
     typeof posterLang === "string" && posterLang.trim() !== "";
 
+  // El backdrop (vista de escritorio) también se quiere SIN idioma: encima va el
+  // logo, y un fondo con el título impreso lo duplicaría. Sale de la misma
+  // respuesta, así que no cuesta ninguna petición extra.
+  const neutralBackdrop = resolveNeutralBackdropPath(images?.backdrops || []);
+  const logoPath = pickLogo(images?.logos);
+
   const artwork = {
     posterPath: chosenPoster?.file_path || item.posterPath || null,
-    logoPath:
-      chosenPoster && !posterHasBurnedTitle ? pickLogo(images?.logos) : null,
+    backdropPath: neutralBackdrop || item.backdropPath || null,
+    // En móvil el logo solo se muestra si el póster elegido NO trae el título
+    // impreso; en escritorio el fondo es el backdrop neutro, así que el logo
+    // siempre procede.
+    logoPath: chosenPoster && !posterHasBurnedTitle ? logoPath : null,
+    backdropLogoPath: logoPath,
   };
 
   artworkCache.set(key, artwork);
