@@ -67,6 +67,8 @@ test("las tarjetas de las filas dejan el hover exclusivamente al indicador", () 
   );
 
   assert.match(card, /<ListItemHoverIndicator/);
+  assert.match(card, /aspect-\[2\/3\][^"`]*rounded-xl/);
+  assert.doesNotMatch(card, /aspect-\[2\/3\][^"`]*rounded-2xl/);
   assert.doesNotMatch(card, /group-hover:text-purple-400/);
   assert.doesNotMatch(card, /bg-gradient-to-t from-black\/90/);
 });

@@ -18,4 +18,6 @@ test("las filas enlazan los detalles desde el título y no muestran Ver todo", (
     /<ListNavWrapper[\s\S]*?<h3[\s\S]*?{list\.name}[\s\S]*?<\/h3>[\s\S]*?<\/ListNavWrapper>/,
   );
   assert.doesNotMatch(rowSection, /Ver todo/i);
+  assert.doesNotMatch(rowSection, /Borrar lista/i);
+  assert.doesNotMatch(rowSection, /<Trash2/);
 });
