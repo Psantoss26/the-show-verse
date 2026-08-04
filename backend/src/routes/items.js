@@ -88,7 +88,7 @@ export default async function itemsRoutes(fastify) {
 
     const states = Object.fromEntries(requested.map((item) => [
       itemStateKey(item.mediaType, item.tmdbId),
-      { favorite: false, watchlist: false, watched: false, rating: null },
+      { favorite: false, watchlist: false, watched: false, plays: 0, rating: null },
     ]));
     const update = (row, property, value = true) => {
       const state = states[itemStateKey(row.mediaType, row.tmdbId)];
@@ -97,7 +97,13 @@ export default async function itemsRoutes(fastify) {
 
     favoriteRows.forEach((row) => update(row, 'favorite'));
     watchlistRows.forEach((row) => update(row, 'watchlist'));
-    historyRows.forEach((row) => update(row, 'watched'));
+    historyRows.forEach((row) => {
+      update(row, 'watched');
+      if (row.mediaType === 'movie') {
+        const state = states[itemStateKey(row.mediaType, row.tmdbId)];
+        if (state) state.plays += 1;
+      }
+    });
     ratingRows.forEach((row) => update(row, 'rating', Number(row.rating)));
 
     return reply.send({ states });

@@ -32,6 +32,7 @@ import {
   Play,
   Eye,
   FolderKanban,
+  Sparkles,
   History,
   Trash2,
   Users,
@@ -1469,10 +1470,16 @@ export default function Navbar() {
   const isDetailsRoute =
     /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
     /^\/details\/tv\/[^/]+\/?$/.test(pathname || "");
+  // La baraja de recomendaciones comparte la composición móvil de la ficha: la
+  // portada ocupa desde el borde superior y el navbar va TRANSPARENTE encima.
+  // Se distingue de la ficha porque allí hay además un velo oscuro de
+  // legibilidad; aquí la barra va limpia, sin ningún fondo.
+  const isRecommendationsRoute = /^\/recommendations\/?$/.test(pathname || "");
+  const isImmersiveRoute = isDetailsRoute || isRecommendationsRoute;
   // En escritorio, las fichas comparten la entrada transparente de los
   // dashboards: el glass se reserva para cuando el usuario ya ha empezado a
   // desplazarse. En móvil se mantiene la composición específica de la ficha.
-  const desktopDetailsNavMode = isDetailsRoute && !isScrolled;
+  const desktopDetailsNavMode = isImmersiveRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
@@ -1708,8 +1715,8 @@ export default function Navbar() {
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
   // de rutas active la compactación por scroll.
-  const mobileTopIsCompact = isScrolled || isDetailsRoute;
-  const mobileTopControlScaleClass = isDetailsRoute
+  const mobileTopIsCompact = isScrolled || isImmersiveRoute;
+  const mobileTopControlScaleClass = isImmersiveRoute
     ? "scale-[0.8]"
     : isScrolled
       ? "scale-[0.82]"
@@ -1745,11 +1752,13 @@ export default function Navbar() {
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
             : desktopDetailsNavMode
               ? "lg:bg-gradient-to-b lg:from-black/60 lg:via-black/25 lg:to-transparent"
-            : isDetailsRoute
-              ? // FICHA: escritorio glass tras scroll (lg:); MÓVIL transparente,
-                // compacto y visible/interactivo desde la entrada. El fondo glass y
-                // el crecimiento de altura los aportan la capa interna y la fila
-                // móvil, GRADUALMENTE con el scroll (--sv-hero-scroll).
+            : isImmersiveRoute
+              ? // FICHA / RECOMENDACIONES: escritorio glass tras scroll (lg:);
+                // MÓVIL transparente, compacto y visible/interactivo desde la
+                // entrada. En la ficha el fondo glass y el crecimiento de altura
+                // los aportan la capa interna y la fila móvil, GRADUALMENTE con
+                // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
+                // así que la barra se queda transparente.
                 "lg:bg-black/20 lg:bg-gradient-to-br lg:from-white/10 lg:via-transparent lg:to-black/40 lg:backdrop-blur-[50px] lg:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
               : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
         }`}
@@ -2329,6 +2338,19 @@ export default function Navbar() {
                 >
                   <Compass className={`w-5 h-5 ${isActive("/discover") ? "text-indigo-400" : "text-neutral-400"}`} />
                   <span>{t("nav_discover", "Descubrir")}</span>
+                </Link>
+
+                <Link
+                  href="/recommendations"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    isActive("/recommendations")
+                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Sparkles className={`w-5 h-5 ${isActive("/recommendations") ? "text-emerald-400" : "text-neutral-400"}`} />
+                  <span>{t("nav_recommendations", "Recomendaciones")}</span>
                 </Link>
 
                 <Link

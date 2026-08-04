@@ -18,6 +18,7 @@ import authPlugin from './plugins/auth.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
 import watchlistRoutes from './routes/watchlist.js';
+import recommendationsRoutes from './routes/recommendations.js';
 import historyRoutes from './routes/history.js';
 import progressRoutes from './routes/progress.js';
 import ratingsRoutes from './routes/ratings.js';
@@ -205,6 +206,7 @@ const apiV1 = async (app) => {
   app.register(usersRoutes, { prefix: '/users' });
   app.register(dashboardRoutes, { prefix: '/dashboard' });
   app.register(calendarRoutes, { prefix: '/calendar' });
+  app.register(recommendationsRoutes, { prefix: '/recommendations' });
   app.register(communityRoutes, { prefix: '/community' });
 };
 

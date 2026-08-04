@@ -20,10 +20,17 @@ import "swiper/swiper-bundle.css";
 
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import { getListDetails } from "@/lib/api/backendLists";
-import { getExternalIds } from "@/lib/api/tmdb";
+import { getDetails, getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
 import { formatPageTitle } from "@/lib/pageTitle";
+import LiquidButton from "@/components/LiquidButton";
+import {
+  titleStateKey,
+  useViewerTitleStates,
+} from "@/components/social/useViewerTitleStates";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 
 import {
   Loader2,
@@ -38,14 +45,16 @@ import {
   Rows,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   X,
   Layers,
-  Filter,
   SlidersHorizontal,
   Film,
   Tv,
   MonitorPlay,
+  Users,
+  Heart,
+  BookmarkPlus,
+  Eye,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import ListPosterCard from "@/components/lists/ListPosterCard";
@@ -68,7 +77,11 @@ const VALID_SORT_MODES = new Set([
 ]);
 const VALID_VIEW_MODES = new Set(["grid", "rows", "list"]);
 const VALID_SOURCES = new Set(["personal", "trakt", "collections"]);
-const VALID_TRAKT_MODES = new Set(["trending", "popular"]);
+const LIST_SOURCE_OPTIONS = [
+  { value: "personal", label: "Mis listas", Icon: ListVideo },
+  { value: "trakt", label: "Comunidad", Icon: Users },
+  { value: "collections", label: "Colecciones", Icon: Layers },
+];
 
 const LIST_ROW_ACCENTS = {
   personal: {
@@ -174,9 +187,6 @@ function readListsMenuPrefs() {
         : VALID_SOURCES.has(parsed?.source)
           ? parsed.source
           : "trakt",
-      traktMode: VALID_TRAKT_MODES.has(parsed?.traktMode)
-        ? parsed.traktMode
-        : "popular",
     };
   } catch {
     return null;
@@ -478,6 +488,43 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
+function ListsSourceSelector({ source, onChange, className = "" }) {
+  return (
+    <nav
+      aria-label="Fuente de listas"
+      className={`inline-flex h-11 max-w-full shrink-0 gap-1 overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+    >
+      {LIST_SOURCE_OPTIONS.map(({ value, label, Icon }) => {
+        const active = source === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange(value)}
+            aria-pressed={active}
+            aria-label={label}
+            title={label}
+            className={`flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl py-2 text-sm font-bold transition-all ${
+              active ? "px-2.5 lg:px-3.5" : "px-2.5"
+            } ${
+              active
+                ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                : "text-zinc-400 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {active && (
+              <span className="hidden max-w-24 truncate lg:inline lg:max-w-none">
+                {label}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const [menuMaxHeight, setMenuMaxHeight] = useState(448);
@@ -635,17 +682,101 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
   );
 }
 
+function formatIndicatorScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return null;
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
+}
+
+function ListItemHoverIndicator({ mediaType, viewerState, tmdbScore, imdbScore }) {
+  const indicator = resolveListItemIndicator({
+    mediaType,
+    favorite: viewerState?.favorite,
+    watchlist: viewerState?.watchlist,
+    watched: viewerState?.watched,
+    plays: viewerState?.plays,
+    userRating: viewerState?.rating,
+    tmdbRating: tmdbScore,
+    imdbRating: imdbScore,
+  });
+  const itemClassName = "flex h-9 w-10 shrink-0 items-center justify-center";
+  const scoreClassName = `${itemClassName} text-xl font-black leading-none tabular-nums`;
+
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full px-1.5 opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 lg:group-focus-within:translate-y-0 lg:group-focus-within:scale-100 lg:group-focus-within:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span
+        className={`${itemClassName} ${
+          indicator.leading === "favorite"
+            ? "text-red-400"
+            : indicator.leading === "watchlist" || indicator.leading === "movie"
+              ? "text-sky-400"
+              : "text-violet-400"
+        }`}
+      >
+        {indicator.leading === "favorite" ? (
+          <Heart className="h-5 w-5 fill-current" />
+        ) : indicator.leading === "watchlist" ? (
+          <BookmarkPlus className="h-5 w-5 fill-current" />
+        ) : indicator.leading === "movie" ? (
+          <Film className="h-5 w-5" />
+        ) : (
+          <MonitorPlay className="h-5 w-5" />
+        )}
+      </span>
+
+      {indicator.watched?.kind === "count" ? (
+        <span className={`${scoreClassName} text-emerald-400`}>
+          {indicator.watched.value}
+        </span>
+      ) : indicator.watched?.kind === "watched" ? (
+        <span className={`${itemClassName} text-emerald-400`}>
+          <Eye className="h-5 w-5" />
+        </span>
+      ) : null}
+
+      {indicator.rating ? (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {formatIndicatorScore(indicator.rating.value)}
+        </span>
+      ) : null}
+      {indicator.tmdbRating ? (
+        <span className={`${scoreClassName} text-sky-400`}>
+          {Number(indicator.tmdbRating).toFixed(1)}
+        </span>
+      ) : null}
+      {indicator.imdbRating ? (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {Number(indicator.imdbRating).toFixed(1)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 const ListItemCard = memo(function ListItemCard({
   item,
   isMobile,
   accent = "trakt",
+  viewerState,
 }) {
-  const [imdbScore, setImdbScore] = useState(null);
+  const initialTmdbScore = Number(item?.vote_average ?? item?.voteAverage);
+  const initialImdbScore = Number(item?.imdbRating ?? item?.imdb_rating);
+  const [tmdbScore, setTmdbScore] = useState(
+    Number.isFinite(initialTmdbScore) && initialTmdbScore > 0
+      ? initialTmdbScore
+      : null,
+  );
+  const [imdbScore, setImdbScore] = useState(
+    Number.isFinite(initialImdbScore) && initialImdbScore > 0
+      ? initialImdbScore
+      : null,
+  );
   const [imgFailed, setImgFailed] = useState(false);
 
   const title = item?.title || item?.name || "—";
-  const date = item?.release_date || item?.first_air_date;
-  const year = date ? date.slice(0, 4) : "";
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const posterPath = item?.poster_path || item?.backdrop_path || null;
@@ -658,18 +789,42 @@ const ListItemCard = memo(function ListItemCard({
     `0 10px 24px -18px rgba(${accentStyle.shadowColor}, 0.58)`,
     "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
   ].join(", ");
-  const tmdbScore =
-    typeof item?.vote_average === "number" && item.vote_average > 0
-      ? item.vote_average.toFixed(1)
-      : null;
-
   useEffect(() => {
     setImgFailed(false);
   }, [posterPath]);
 
+  useEffect(() => {
+    setTmdbScore(
+      Number.isFinite(initialTmdbScore) && initialTmdbScore > 0
+        ? initialTmdbScore
+        : null,
+    );
+    setImdbScore(
+      Number.isFinite(initialImdbScore) && initialImdbScore > 0
+        ? initialImdbScore
+        : null,
+    );
+  }, [initialImdbScore, initialTmdbScore, item?.id, mediaType]);
+
   const prefetchImdb = useCallback(async () => {
     if (!item?.id) return;
+    if (viewerState?.favorite || (tmdbScore && imdbScore)) return;
     const key = `${mediaType}:${item.id}`;
+
+    let details = null;
+    if (!tmdbScore) {
+      try {
+        details = await getDetails(mediaType, item.id, {
+          appendToResponse: "external_ids",
+        });
+        const publicScore = Number(details?.vote_average);
+        if (Number.isFinite(publicScore) && publicScore > 0) {
+          setTmdbScore(publicScore);
+        }
+      } catch {
+        // La ausencia de puntuación pública no bloquea el resto del indicador.
+      }
+    }
 
     if (imdbRatingsCache.has(key)) {
       setImdbScore(imdbRatingsCache.get(key));
@@ -677,8 +832,9 @@ const ListItemCard = memo(function ListItemCard({
     }
 
     try {
-      const ext = await getExternalIds(mediaType, item.id);
-      const imdbId = ext?.imdb_id || null;
+      const ext =
+        details?.external_ids || (await getExternalIds(mediaType, item.id));
+      const imdbId = ext?.imdb_id || details?.imdb_id || null;
       if (!imdbId) return;
 
       const cached = readOmdbCache(imdbId);
@@ -703,7 +859,7 @@ const ListItemCard = memo(function ListItemCard({
     } catch {
       // ignore
     }
-  }, [item?.id, mediaType]);
+  }, [imdbScore, item?.id, mediaType, tmdbScore, viewerState?.favorite]);
 
   // En móvil evitamos disparar OMDb por “hover”.
   const prefetchEnabled = !isMobile;
@@ -748,64 +904,12 @@ const ListItemCard = memo(function ListItemCard({
           </div>
         )}
 
-        <div
-          className={`absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 ${
-            mediaType === "movie"
-              ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-              : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-          }`}
-        >
-          {mediaType === "movie" ? (
-            <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          ) : (
-            <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          )}
-        </div>
-
-        <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3 opacity-0 transition-all duration-500 ease-out transform-gpu -translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <div />
-          <div className="flex flex-col items-end gap-1">
-            {tmdbScore ? (
-              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
-                  {tmdbScore}
-                </span>
-                <OptimizedImage
-                  src="/logo-TMDb.png"
-                  alt=""
-                  className="h-2 w-auto sm:h-2.5"
-                />
-              </div>
-            ) : null}
-            {!isMobile && imdbScore ? (
-              <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
-                  {typeof imdbScore === "number"
-                    ? imdbScore.toFixed(1)
-                    : imdbScore}
-                </span>
-                <OptimizedImage
-                  src="/logo-IMDb.svg"
-                  alt=""
-                  className="h-2.5 w-auto sm:h-3"
-                />
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100" />
-
-        <div className="absolute bottom-0 left-0 right-0 z-10 p-3 pb-4 opacity-0 transition-all duration-500 ease-out transform-gpu translate-y-2 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-          <h3 className="line-clamp-2 text-xs font-extrabold leading-tight text-white drop-shadow-sm sm:text-sm">
-            {title}
-          </h3>
-          {year ? (
-            <p className="mt-0.5 text-zinc-300 group-hover:text-purple-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
-              {year}
-            </p>
-          ) : null}
-        </div>
+        <ListItemHoverIndicator
+          mediaType={mediaType}
+          viewerState={viewerState}
+          tmdbScore={tmdbScore}
+          imdbScore={imdbScore}
+        />
       </motion.div>
     </Link>
   );
@@ -898,6 +1002,19 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const { authenticated } = useAuth();
+  const viewerItems = useMemo(
+    () =>
+      (Array.isArray(items) ? items : []).map((item) => ({
+        tmdbId: item?.id,
+        mediaType:
+          item?.media_type === "tv" || (!item?.title && item?.name)
+            ? "tv"
+            : "movie",
+      })),
+    [items],
+  );
+  const viewerStates = useViewerTitleStates(viewerItems, authenticated);
 
   if (!Array.isArray(items) || items.length === 0) return null;
 
@@ -992,6 +1109,10 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
                     item={item}
                     isMobile={isMobile}
                     accent={accent}
+                    viewerState={viewerStates[titleStateKey({
+                      tmdbId: item?.id,
+                      mediaType: mt,
+                    })]}
                   />
                 </SwiperSlide>
               );
@@ -1183,9 +1304,14 @@ const RowListSection = memo(function RowListSection({
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
         <div className="min-w-0">
           <div className="flex items-center gap-3 min-w-0">
-            <h3 className="text-2xl sm:text-3xl font-black text-white truncate">
-              {list.name}
-            </h3>
+            <ListNavWrapper
+              list={list}
+              className="group/title min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              <h3 className="truncate text-2xl font-black text-white transition-colors group-hover/title:text-purple-400 sm:text-3xl">
+                {list.name}
+              </h3>
+            </ListNavWrapper>
 
             <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
@@ -1200,8 +1326,8 @@ const RowListSection = memo(function RowListSection({
           )}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {canUse && (
+        {canUse && (
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               onClick={(e) => onDelete(e, list.id)}
               className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
@@ -1209,28 +1335,8 @@ const RowListSection = memo(function RowListSection({
             >
               <Trash2 className="w-4 h-4" />
             </button>
-          )}
-
-          {/* ✅ antes: Link fijo a /lists/:id */}
-          {list?.internalUrl ? (
-            <Link
-              href={list.internalUrl}
-              scroll
-              className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
-            >
-              Ver todo <ChevronRight className="w-4 h-4" />
-            </Link>
-          ) : list?.externalUrl ? (
-            <a
-              href={list.externalUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600/15 border border-purple-500/30 px-4 text-xs font-black uppercase tracking-wider text-purple-200 hover:bg-purple-600/22 hover:border-purple-500/45 transition flex-1 sm:flex-none"
-            >
-              Ver todo <ChevronRight className="w-4 h-4" />
-            </a>
-          ) : null}
-        </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -1358,10 +1464,9 @@ export default function ListsPage() {
 
   // ✅ NUEVO: selector de fuente
   const [source, setSource] = useState("trakt"); // 'personal' | 'trakt' | 'collections'
-  const [traktMode, setTraktMode] = useState("popular"); // trending | popular
   const [prefsHydrated, setPrefsHydrated] = useState(false);
 
-  const trakt = useTraktLists({ mode: traktMode });
+  const trakt = useTraktLists({ mode: "popular" });
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
@@ -1385,7 +1490,6 @@ export default function ListsPage() {
       setSortMode(prefs.sortMode);
       setViewMode(prefs.viewMode);
       setSource(prefs.source);
-      setTraktMode(prefs.traktMode);
     }
     setPrefsHydrated(true);
   }, []);
@@ -1397,9 +1501,8 @@ export default function ListsPage() {
       sortMode,
       viewMode,
       source,
-      traktMode,
     });
-  }, [prefsHydrated, query, sortMode, viewMode, source, traktMode]);
+  }, [prefsHydrated, query, sortMode, viewMode, source]);
 
   // ✅ Auth
   useEffect(() => {
@@ -1418,12 +1521,12 @@ export default function ListsPage() {
   const activeListsCacheKey = useMemo(() => {
     const scope =
       source === "trakt"
-        ? traktMode
+        ? "popular"
         : source === "collections"
           ? collectionsQueryKey || "featured"
           : "personal";
     return `showverse:lists:index:${source}:${scope}:v1`;
-  }, [source, traktMode, collectionsQueryKey]);
+  }, [source, collectionsQueryKey]);
 
   useEffect(() => {
     const cached = readSessionJsonCache(
@@ -1598,12 +1701,12 @@ export default function ListsPage() {
     [activeLists],
   );
 
-  // ✅ al cambiar de fuente/modo abortamos solicitudes en vuelo, pero conservamos caché resuelta
+  // Al cambiar de fuente abortamos solicitudes en vuelo, pero conservamos caché resuelta.
   useEffect(() => {
     controllersRef.current.forEach((c) => c.abort());
     controllersRef.current.clear();
     inFlight.current.clear();
-  }, [source, traktMode]);
+  }, [source]);
 
   const listsTitle =
     source === "personal"
@@ -1886,14 +1989,35 @@ export default function ListsPage() {
                       : "TUS LISTAS"}
                 </span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                {source === "collections"
-                  ? "Colecciones"
-                  : source === "trakt"
-                    ? "Listas de la comunidad"
-                    : "Mis Listas"}
-                <span className="text-purple-500">.</span>
-              </h1>
+              <div className="flex items-center gap-4 sm:gap-6">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                  {source === "collections"
+                    ? "Colecciones"
+                    : source === "trakt"
+                      ? "Listas de la comunidad"
+                      : "Mis Listas"}
+                  <span className="text-purple-500">.</span>
+                </h1>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.3 }}
+                  className="shrink-0"
+                >
+                  <LiquidButton
+                    onClick={handleRefresh}
+                    disabled={loadingUnified}
+                    loading={loadingUnified}
+                    activeColor="purple"
+                    groupId="lists-header-actions"
+                    title="Sincronizar listas"
+                    className="!h-11 !w-11 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15 sm:!h-12 sm:!w-12"
+                  >
+                    <RefreshCcw className="h-5 w-5" />
+                  </LiquidButton>
+                </motion.div>
+              </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 {source === "collections"
                   ? "Explora colecciones temáticas de películas."
@@ -1915,7 +2039,13 @@ export default function ListsPage() {
         >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
-            <div className="relative flex-1">
+            <ListsSourceSelector
+              source={source}
+              onChange={(nextSource) =>
+                startTransition(() => setSource(nextSource))
+              }
+            />
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
               <input
                 value={query}
@@ -1941,6 +2071,11 @@ export default function ListsPage() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
+              aria-expanded={mobileFiltersOpen}
+              aria-controls="lists-mobile-filters"
+              aria-label={
+                mobileFiltersOpen ? "Cerrar filtros" : "Abrir filtros"
+              }
               className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
@@ -1955,101 +2090,26 @@ export default function ListsPage() {
           <AnimatePresence>
             {mobileFiltersOpen && (
               <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: "auto" }}
-                exit={{ height: 0 }}
+                id="lists-mobile-filters"
+                initial={{ height: 0, overflow: "hidden" }}
+                animate={{
+                  height: "auto",
+                  overflow: "hidden",
+                  transitionEnd: { overflow: "visible" },
+                }}
+                exit={{ height: 0, overflow: "hidden" }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] overflow-visible lg:hidden ${
+                className={`z-[80] mt-2 origin-top space-y-2 lg:hidden ${
                   filtersSticky
-                    ? "absolute left-0 right-0 top-full !mt-2"
-                    : "relative z-10"
+                    ? "absolute left-0 right-0 top-full"
+                    : "relative"
                 }`}
               >
                 <div className="space-y-3 pt-1">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Fuente"
-                        valueLabel={
-                          source === "personal"
-                            ? "Mis listas"
-                            : source === "trakt"
-                              ? "Comunidad"
-                              : "Colecciones"
-                        }
-                        icon={Layers}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={source === "personal"}
-                              onClick={() => {
-                                startTransition(() => setSource("personal"));
-                                close();
-                              }}
-                            >
-                              Mis listas
-                            </DropdownItem>
-                            <DropdownItem
-                              active={source === "trakt"}
-                              onClick={() => {
-                                startTransition(() => setSource("trakt"));
-                                close();
-                              }}
-                            >
-                              Comunidad
-                            </DropdownItem>
-                            <DropdownItem
-                              active={source === "collections"}
-                              onClick={() => {
-                                startTransition(() => setSource("collections"));
-                                close();
-                              }}
-                            >
-                              Colecciones
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-
-                    {source === "trakt" && (
-                      <div className="flex-1">
-                        <InlineDropdown
-                          label="Modo"
-                          valueLabel={
-                            traktMode === "trending" ? "Trending" : "Popular"
-                          }
-                          icon={Filter}
-                        >
-                          {({ close }) => (
-                            <>
-                              <DropdownItem
-                                active={traktMode === "trending"}
-                                onClick={() => {
-                                  setTraktMode("trending");
-                                  close();
-                                }}
-                              >
-                                Trending
-                              </DropdownItem>
-                              <DropdownItem
-                                active={traktMode === "popular"}
-                                onClick={() => {
-                                  setTraktMode("popular");
-                                  close();
-                                }}
-                              >
-                                Popular
-                              </DropdownItem>
-                            </>
-                          )}
-                        </InlineDropdown>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
+                  <div
+                    data-lists-mobile-order-view="true"
+                    className="flex gap-2"
+                  >
                     <div className="flex-1">
                       <InlineDropdown
                         label="Ordenar"
@@ -2132,57 +2192,52 @@ export default function ListsPage() {
                         )}
                       </InlineDropdown>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <div
+                      data-lists-view-selector="true"
+                      className="flex h-11 flex-1 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
+                    >
                       <button
                         onClick={() =>
                           startTransition(() => setViewMode("grid"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
+                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
                           viewMode === "grid"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <LayoutGrid className="w-4 h-4" />
+                        <LayoutGrid className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() =>
                           startTransition(() => setViewMode("rows"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
+                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
                           viewMode === "rows"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <Rows className="w-4 h-4" />
+                        <Rows className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() =>
                           startTransition(() => setViewMode("list"))
                         }
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center focus:outline-none ${
+                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
                           viewMode === "list"
                             ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <StretchHorizontal className="w-4 h-4" />
+                        <StretchHorizontal className="h-4 w-4" />
                       </button>
                     </div>
+                  </div>
 
-                    <button
-                      onClick={handleRefresh}
-                      className="h-11 w-11 rounded-2xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
-                      title="Refrescar"
-                    >
-                      <RefreshCcw className="w-4 h-4" />
-                    </button>
-
-                    {canEdit && (
+                  {canEdit && (
+                    <div className="flex justify-end">
                       <button
                         onClick={() => setCreateOpen(true)}
                         className="h-11 px-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
@@ -2190,8 +2245,8 @@ export default function ListsPage() {
                         <Plus className="w-4 h-4" />
                         <span>Crear</span>
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -2199,6 +2254,12 @@ export default function ListsPage() {
 
           {/* Desktop */}
           <div className="hidden lg:flex gap-3 relative z-10">
+            <ListsSourceSelector
+              source={source}
+              onChange={(nextSource) =>
+                startTransition(() => setSource(nextSource))
+              }
+            />
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
               <input
@@ -2222,81 +2283,6 @@ export default function ListsPage() {
                 </button>
               )}
             </div>
-
-            <InlineDropdown
-              label="Fuente"
-              valueLabel={
-                source === "personal"
-                  ? "Mis listas"
-                  : source === "trakt"
-                    ? "Comunidad"
-                    : "Colecciones"
-              }
-              icon={Layers}
-            >
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={source === "personal"}
-                    onClick={() => {
-                      startTransition(() => setSource("personal"));
-                      close();
-                    }}
-                  >
-                    Mis listas
-                  </DropdownItem>
-                  <DropdownItem
-                    active={source === "trakt"}
-                    onClick={() => {
-                      startTransition(() => setSource("trakt"));
-                      close();
-                    }}
-                  >
-                    Comunidad
-                  </DropdownItem>
-                  <DropdownItem
-                    active={source === "collections"}
-                    onClick={() => {
-                      startTransition(() => setSource("collections"));
-                      close();
-                    }}
-                  >
-                    Colecciones
-                  </DropdownItem>
-                </>
-              )}
-            </InlineDropdown>
-
-            {source === "trakt" && (
-              <InlineDropdown
-                label="Modo"
-                valueLabel={traktMode === "trending" ? "Trending" : "Popular"}
-                icon={Filter}
-              >
-                {({ close }) => (
-                  <>
-                    <DropdownItem
-                      active={traktMode === "trending"}
-                      onClick={() => {
-                        setTraktMode("trending");
-                        close();
-                      }}
-                    >
-                      Trending
-                    </DropdownItem>
-                    <DropdownItem
-                      active={traktMode === "popular"}
-                      onClick={() => {
-                        setTraktMode("popular");
-                        close();
-                      }}
-                    >
-                      Popular
-                    </DropdownItem>
-                  </>
-                )}
-              </InlineDropdown>
-            )}
 
             <InlineDropdown
               label="Ordenar"
@@ -2407,14 +2393,6 @@ export default function ListsPage() {
                 <StretchHorizontal className="w-4 h-4" />
               </button>
             </div>
-
-            <button
-              onClick={handleRefresh}
-              className="h-11 w-11 rounded-2xl transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none"
-              title="Refrescar"
-            >
-              <RefreshCcw className="w-4 h-4" />
-            </button>
 
             {canEdit && (
               <button
