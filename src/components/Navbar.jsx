@@ -2138,10 +2138,38 @@ export default function Navbar() {
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
-        {/* Capa de refracción de luz superior difusa (Estilo Instagram iOS) */}
+        {/* CAPA 1 — REFRACCIÓN DEL CANTO.
+            Es lo que separa un cristal de un simple esmerilado: en una pieza con
+            cuerpo, la luz se DESVÍA y se concentra al llegar al borde curvo, así
+            que el canto distorsiona y aclara más que el centro. Aquí se consigue
+            con un segundo desenfoque, más corto y más luminoso, aplicado SOLO
+            hacia el perímetro mediante una máscara elíptica.
+            La máscara va degradada (no un anillo de grosor fijo) para que la
+            transición sea continua y no dibuje ningún borde marcado. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.14)_0%,transparent_75%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[8px] backdrop-brightness-[1.28] backdrop-saturate-[240%]"
+          style={{
+            WebkitMaskImage:
+              "radial-gradient(115% 135% at 50% 50%, transparent 40%, #000 95%)",
+            maskImage:
+              "radial-gradient(115% 135% at 50% 50%, transparent 40%, #000 95%)",
+          }}
+        />
+
+        {/* CAPA 2 — ESPECULAR.
+            Da el grosor: la luz entra por arriba a la izquierda y vuelve a
+            asomar, más tenue, por el canto inferior derecho (el reflejo que
+            rodea una pieza de vidrio). Sin esto el cristal se ve plano. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.05)_16%,transparent_40%,transparent_60%,rgba(255,255,255,0.05)_86%,rgba(255,255,255,0.13)_100%)]"
+        />
+
+        {/* CAPA 3 — luz difusa superior, que asienta el volumen del conjunto. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.12)_0%,transparent_75%)]"
         />
 
         <Link
