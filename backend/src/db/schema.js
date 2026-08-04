@@ -447,3 +447,25 @@ export const profileFavorites = pgTable('profile_favorites', {
   userIdIdx: index('idx_profile_favorites_user').on(t.userId, t.position),
   mediaTypeCheck: check('chk_profile_favorites_media_type', sql`media_type IN ('movie', 'tv')`),
 }));
+
+// ─────────────────────────────────────────────
+// RECOMMENDATION DISMISSALS (títulos descartados en la sección de
+// Recomendaciones, con su flujo de deslizar). Se guardan en la base de datos y
+// no en el navegador para que un descarte valga en todos los dispositivos: es
+// una decisión del usuario sobre su catálogo, no una preferencia de la sesión.
+// ─────────────────────────────────────────────
+export const recommendationDismissals = pgTable('recommendation_dismissals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),                // 'movie' | 'tv'
+  dismissedAt: timestamp('dismissed_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  // Descartar dos veces el mismo título no debe duplicar filas: el POST hace
+  // upsert sobre esta clave.
+  uniqueDismissal: uniqueIndex('idx_recommendation_dismissals_unique').on(t.userId, t.tmdbId, t.mediaType),
+  // La consulta habitual es "todos los descartes de este usuario" para filtrar
+  // la baraja, ordenados por fecha para poder deshacer el último.
+  userIdIdx: index('idx_recommendation_dismissals_user').on(t.userId, t.dismissedAt),
+  mediaTypeCheck: check('chk_recommendation_dismissals_media_type', sql`media_type IN ('movie', 'tv')`),
+}));

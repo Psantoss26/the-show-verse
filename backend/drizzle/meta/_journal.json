@@ -85,6 +85,13 @@
       "when": 1785074733522,
       "tag": "0011_cultured_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785861109387,
+      "tag": "0012_aromatic_sentinel",
+      "breakpoints": true
     }
   ]
 }
