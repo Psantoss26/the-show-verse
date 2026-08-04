@@ -36,6 +36,7 @@ import {
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidButton from "@/components/LiquidButton";
 import AddToListModal from "@/components/details/AddToListModal";
+import { MOBILE_ACTION_BUTTON_CLASS } from "@/components/details/DetailActionsRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import { formatCountShort } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
@@ -68,6 +69,10 @@ const TYPE_FILTERS = [
 
 // Cuando queden menos cartas que esto, se pide otra tanda por detrás.
 const REFILL_THRESHOLD = 4;
+
+// Referencia estable: como valor inicial y de reinicio de los indicadores, si se
+// creara un objeto nuevo en cada render el efecto de reinicio no pararía.
+const EMPTY_MARKS = { favorite: false, watchlist: false, list: false };
 
 const ACTION_STYLE = {
   [SWIPE_ACTIONS.DISMISS]: {
@@ -241,6 +246,106 @@ export default function RecommendationsClient() {
     setLastAction({ item, action });
   }, []);
 
+  // Efecto de la acción (red + caché optimista), SIN tocar la baraja. Separarlo
+  // del avance permite que los botones marquen la carta dejando su indicador a
+  // la vista, mientras los gestos siguen marcando Y pasando a la siguiente.
+  const applyAction = useCallback(
+    async (item, action, { value = true } = {}) => {
+      if (action === SWIPE_ACTIONS.DISMISS) {
+        await fetch("/api/recommendations/dismiss", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tmdbId: item.tmdbId,
+            mediaType: item.mediaType,
+          }),
+        });
+      } else if (action === SWIPE_ACTIONS.WATCHLIST) {
+        await markInWatchlist({
+          accountId: account?.id,
+          sessionId: session,
+          type: item.mediaType,
+          mediaId: item.tmdbId,
+          watchlist: value,
+          title: item.title,
+          posterPath: item.posterPath,
+        });
+        if (value) {
+          cacheAddWatchlist({
+            type: item.mediaType,
+            mediaId: item.tmdbId,
+            title: item.title,
+            posterPath: item.posterPath,
+          });
+        }
+      } else if (action === SWIPE_ACTIONS.FAVORITE) {
+        await markAsFavorite({
+          accountId: account?.id,
+          sessionId: session,
+          type: item.mediaType,
+          mediaId: item.tmdbId,
+          favorite: value,
+          title: item.title,
+          posterPath: item.posterPath,
+        });
+        if (value) {
+          cacheAddFavorite({
+            type: item.mediaType,
+            mediaId: item.tmdbId,
+            title: item.title,
+            posterPath: item.posterPath,
+          });
+        }
+      }
+    },
+    [account, session],
+  );
+
+  // Indicadores de la carta ACTUAL. El backend nunca sirve en la baraja algo que
+  // ya esté en favoritos o pendientes, así que toda carta empieza sin marcar y
+  // no hace falta consultar su estado.
+  const currentKey = current ? cardKey(current) : null;
+  const [cardMarks, setCardMarks] = useState(EMPTY_MARKS);
+
+  useEffect(() => {
+    setCardMarks(EMPTY_MARKS);
+  }, [currentKey]);
+
+  // Marcar desde los BOTONES no pasa de carta: así el indicador queda a la vista
+  // y se ve qué has hecho con el título. Avanzar es cosa del gesto (o del botón
+  // de descartar). Vuelve a pulsarse para desmarcar, como en la ficha.
+  const toggleMark = useCallback(
+    async (action) => {
+      const item = deck[0];
+      if (!item || busy) return;
+      const mark = action === SWIPE_ACTIONS.FAVORITE ? "favorite" : "watchlist";
+      const next = !cardMarks[mark];
+
+      setCardMarks((prev) => ({ ...prev, [mark]: next }));
+      setBusy(true);
+      try {
+        await applyAction(item, action, { value: next });
+      } catch {
+        setCardMarks((prev) => ({ ...prev, [mark]: !next }));
+        setError("No se pudo guardar la acción. Inténtalo de nuevo.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [deck, busy, cardMarks, applyAction],
+  );
+
+  // El modal de listas no avisa al cerrarse de si se añadió algo: se deduce de
+  // su mapa de pertenencia, que el flujo rellena al añadir.
+  const listAdded = Object.values(listFlow.modalProps.membershipMap).some(
+    Boolean,
+  );
+  useEffect(() => {
+    if (listAdded) setCardMarks((prev) => ({ ...prev, list: true }));
+  }, [listAdded]);
+
+
   const runAction = useCallback(
     async (action) => {
       const item = deck[0];
@@ -251,56 +356,14 @@ export default function RecommendationsClient() {
       advance(item, action);
       setBusy(true);
       try {
-        if (action === SWIPE_ACTIONS.DISMISS) {
-          await fetch("/api/recommendations/dismiss", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tmdbId: item.tmdbId,
-              mediaType: item.mediaType,
-            }),
-          });
-        } else if (action === SWIPE_ACTIONS.WATCHLIST) {
-          await markInWatchlist({
-            accountId: account?.id,
-            sessionId: session,
-            type: item.mediaType,
-            mediaId: item.tmdbId,
-            watchlist: true,
-            title: item.title,
-            posterPath: item.posterPath,
-          });
-          cacheAddWatchlist({
-            type: item.mediaType,
-            mediaId: item.tmdbId,
-            title: item.title,
-            posterPath: item.posterPath,
-          });
-        } else if (action === SWIPE_ACTIONS.FAVORITE) {
-          await markAsFavorite({
-            accountId: account?.id,
-            sessionId: session,
-            type: item.mediaType,
-            mediaId: item.tmdbId,
-            favorite: true,
-            title: item.title,
-            posterPath: item.posterPath,
-          });
-          cacheAddFavorite({
-            type: item.mediaType,
-            mediaId: item.tmdbId,
-            title: item.title,
-            posterPath: item.posterPath,
-          });
-        }
+        await applyAction(item, action);
       } catch {
         setError("No se pudo guardar la acción. Inténtalo de nuevo.");
       } finally {
         setBusy(false);
       }
     },
-    [deck, busy, account, session, advance],
+    [deck, busy, advance, applyAction],
   );
 
   // Deshacer: devuelve la carta al principio de la baraja y revierte lo hecho.
@@ -527,13 +590,12 @@ export default function RecommendationsClient() {
             {/* Fila de acciones: mismos botones que la ficha (LiquidButton con
                 `groupId="details-actions"`), deshacer incluido como uno más.
                 En móvil queda anclada por encima de la barra inferior. */}
-            {/* La fila va CENTRADA, con el ancho acotado en móvil (16rem) en vez
-                de con relleno lateral: así queda simétrica respecto a la pantalla
-                y, aun centrada, su borde derecho no llega a la esquina donde la
-                app fija su botón flotante de "Instalar app" (que además solo
-                aparece a veces, así que descentrar la fila por él dejaba el
-                diseño torcido el resto del tiempo). */}
-            <div className="mx-auto flex w-full max-w-[16rem] shrink-0 items-center justify-center gap-2.5 px-2 pt-3 sm:max-w-sm sm:gap-3 sm:px-4 sm:pt-6">
+            {/* Mismo dimensionado que la fila de la ficha: celdas cuadradas que
+                se reparten el ancho (MOBILE_ACTION_BUTTON_CLASS escala el icono
+                con container queries), con su mismo `gap-1.5`. */}
+            <div
+              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-3 sm:gap-3 sm:pt-6 ${MOBILE_ACTION_BUTTON_CLASS}`}
+            >
               <RecommendationActionButton
                 label="Deshacer"
                 onClick={undoLast}
@@ -550,22 +612,33 @@ export default function RecommendationsClient() {
                 <X />
               </RecommendationActionButton>
               <RecommendationActionButton
-                label="Añadir a favoritos"
-                onClick={() => runAction(SWIPE_ACTIONS.FAVORITE)}
+                label={
+                  cardMarks.favorite ? "Quitar de favoritos" : "Añadir a favoritos"
+                }
+                onClick={() => toggleMark(SWIPE_ACTIONS.FAVORITE)}
+                active={cardMarks.favorite}
                 activeColor="red"
               >
-                <Heart />
+                <Heart className={cardMarks.favorite ? "fill-current" : ""} />
               </RecommendationActionButton>
               <RecommendationActionButton
-                label="Añadir a pendientes"
-                onClick={() => runAction(SWIPE_ACTIONS.WATCHLIST)}
+                label={
+                  cardMarks.watchlist
+                    ? "Quitar de pendientes"
+                    : "Añadir a pendientes"
+                }
+                onClick={() => toggleMark(SWIPE_ACTIONS.WATCHLIST)}
+                active={cardMarks.watchlist}
                 activeColor="blue"
               >
-                <BookmarkPlus />
+                <BookmarkPlus
+                  className={cardMarks.watchlist ? "fill-current" : ""}
+                />
               </RecommendationActionButton>
               <RecommendationActionButton
-                label="Añadir a una lista"
+                label={cardMarks.list ? "Gestionar en listas" : "Añadir a una lista"}
                 onClick={() => current && listFlow.openFor(current)}
+                active={cardMarks.list}
                 activeColor="purple"
               >
                 <ListVideo />
@@ -793,21 +866,24 @@ function SwipeStamp({ action, opacity, className = "" }) {
   );
 }
 
-// Mismo botón de acción que la ficha: LiquidButton compartiendo `groupId`, para
-// que el acabado y los estados sean idénticos a los de DetailsClient. La celda
-// fija (aspect-square) evita que el botón cambie de tamaño según su contenido.
+// Mismo botón de acción que la ficha: LiquidButton compartiendo `groupId` y la
+// MISMA celda (`flex-1 min-w-[34px] max-w-[60px] aspect-square`) que usa la fila
+// móvil de DetailsClient, para que tamaño y acabado sean idénticos. El escalado
+// del icono lo aporta MOBILE_ACTION_BUTTON_CLASS, puesto en la fila.
 function RecommendationActionButton({
   label,
   onClick,
   disabled = false,
+  active = false,
   activeColor = "blue",
   children,
 }) {
   return (
-    <div className="aspect-square min-w-[34px] flex-1 [&_[data-liquid-button]]:!h-auto [&_[data-liquid-button]]:!w-full [&_[data-liquid-button]]:aspect-square [&_[data-liquid-button]_svg]:!h-[46cqw] [&_[data-liquid-button]_svg]:!w-[46cqw] [&_[data-liquid-button]]:[container-type:inline-size] sm:max-w-[56px]">
+    <div className="aspect-square min-w-[34px] max-w-[60px] flex-1">
       <LiquidButton
         onClick={onClick}
         disabled={disabled}
+        active={active}
         activeColor={activeColor}
         groupId="details-actions"
         title={label}

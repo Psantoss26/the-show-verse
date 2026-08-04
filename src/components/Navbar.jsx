@@ -32,7 +32,7 @@ import {
   Play,
   Eye,
   FolderKanban,
-  Sparkles,
+  ThumbsUp,
   History,
   Trash2,
   Users,
@@ -1558,6 +1558,7 @@ export default function Navbar() {
         // móvil, donde no hay hover previo.
         prefetchNavRoute("/movies");
         prefetchNavRoute("/series");
+        prefetchNavRoute("/recommendations");
         prefetchNavRoute("/in-progress");
         prefetchNavRoute("/favorites");
         prefetchNavRoute("/watchlist");
@@ -1577,9 +1578,11 @@ export default function Navbar() {
           ? "text-fuchsia-300 font-bold"
           : href === "/discover"
             ? "text-indigo-300 font-bold"
-            : href === "/biblioteca"
-              ? "text-amber-300 font-bold"
-              : "text-white font-bold";
+            : href === "/recommendations"
+              ? "text-emerald-300 font-bold"
+              : href === "/biblioteca"
+                ? "text-amber-300 font-bold"
+                : "text-white font-bold";
 
     return `relative px-3.5 py-2 rounded-xl text-sm transition-all duration-300 ease-out ${
       active
@@ -1598,6 +1601,8 @@ export default function Navbar() {
         return "bg-gradient-to-b from-fuchsia-500/25 via-fuchsia-500/15 to-fuchsia-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(217,70,239,0.28)]";
       case "/discover":
         return "bg-gradient-to-b from-indigo-500/25 via-indigo-500/15 to-indigo-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(99,102,241,0.28)]";
+      case "/recommendations":
+        return "bg-gradient-to-b from-emerald-500/25 via-emerald-500/15 to-emerald-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(16,185,129,0.28)]";
       case "/biblioteca":
         return "bg-gradient-to-b from-amber-500/25 via-amber-500/15 to-amber-400/20 backdrop-blur-md shadow-[0_4px_20px_-2px_rgba(245,158,11,0.28)]";
       default:
@@ -1864,6 +1869,17 @@ export default function Navbar() {
                 className={navLinkClass("/discover")}
               >
                 <span className="relative z-10">{t("nav_discover", "Descubrir")}</span>
+              </Link>
+              <Link
+                href="/recommendations"
+                data-desktop-nav-href="/recommendations"
+                prefetch
+                {...navPrefetchHandlers("/recommendations")}
+                className={navLinkClass("/recommendations")}
+              >
+                <span className="relative z-10">
+                  {t("nav_recommendations", "Recomendaciones")}
+                </span>
               </Link>
               <Link
                 href="/biblioteca"
@@ -2378,7 +2394,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Sparkles className={`w-5 h-5 ${isActive("/recommendations") ? "text-emerald-400" : "text-neutral-400"}`} />
+                  <ThumbsUp className={`w-5 h-5 ${isActive("/recommendations") ? "text-emerald-400" : "text-neutral-400"}`} />
                   <span>{t("nav_recommendations", "Recomendaciones")}</span>
                 </Link>
 
