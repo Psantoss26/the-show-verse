@@ -1,5 +1,5 @@
 "use client";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -1299,6 +1299,11 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const isScrolledRef = useRef(false);
+  // Barra inferior (móvil): se compacta según la DIRECCIÓN del scroll, no según
+  // la posición. `isScrolled` no sirve aquí porque solo vuelve a false al llegar
+  // arriba del todo, y además lo comparten la barra superior y el fondo del hero.
+  const [bottomNavCompact, setBottomNavCompact] = useState(false);
+  const bottomNavCompactRef = useRef(false);
   // Destino marcado de forma optimista al pulsar un enlace: el indicador del
   // navbar resalta de inmediato la sección a la que vas, sin esperar a que la
   // transición de ruta haga commit (lo que dejaba el indicador en la página de
@@ -1378,6 +1383,62 @@ export default function Navbar() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     updateScrolledState();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (frameId) window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  // Barra inferior: compacta al bajar, completa al subir (en cualquier punto de
+  // la página) y siempre completa junto al inicio.
+  useEffect(() => {
+    // Desplazamiento mínimo acumulado antes de reaccionar: evita que la inercia
+    // o un rebote de 1-2px hagan oscilar la barra.
+    const DELTA = 8;
+    const TOP_ZONE = 48;
+
+    let frameId = 0;
+    let lastY = window.scrollY;
+    let lastHeight = document.documentElement.scrollHeight;
+
+    const updateBottomNav = () => {
+      frameId = 0;
+      const y = Math.max(0, window.scrollY);
+      const height = document.documentElement.scrollHeight;
+      const delta = y - lastY;
+      const heightDelta = height - lastHeight;
+      lastHeight = height;
+
+      // Al asentarse la página (imágenes que cargan, contenido que se recoloca)
+      // el documento encoge y el navegador arrastra `scrollY` con él. Eso NO es
+      // un gesto del usuario, y se reconoce porque el desplazamiento coincide
+      // con lo que ha encogido el documento: se resincroniza la referencia sin
+      // tocar el estado. Sin esto, ese arrastre se acumulaba y expandía la barra
+      // sola a mitad de la animación de compactar.
+      // Solo cubre ese caso concreto: si el usuario desplaza de verdad mientras
+      // el documento crece (scroll infinito), el gesto se procesa con normalidad.
+      if (heightDelta < 0 && delta < 0 && Math.abs(delta - heightDelta) <= 2) {
+        lastY = y;
+        return;
+      }
+
+      // Sin actualizar `lastY`, los desplazamientos lentos se van acumulando
+      // hasta superar el umbral en vez de ignorarse frame a frame.
+      if (Math.abs(delta) < DELTA) return;
+      lastY = y;
+
+      const next = y > TOP_ZONE && delta > 0;
+      if (next === bottomNavCompactRef.current) return;
+
+      bottomNavCompactRef.current = next;
+      setBottomNavCompact(next);
+    };
+
+    const handleScroll = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updateBottomNav);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (frameId) window.cancelAnimationFrame(frameId);
@@ -1622,20 +1683,27 @@ export default function Navbar() {
     );
   };
 
+  // Sin rótulos: el icono va centrado en su celda. La compactación la aplica la
+  // barra entera con un `scale`, así que el icono no lleva animación propia (una
+  // sola transformación compuesta = animación fluida, sin recalcular layout).
   const mobileBottomIconSlotClass =
-    "absolute left-1/2 top-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
-    (isScrolled ? "-translate-y-1/2" : "-translate-y-[85%]");
+    "relative z-10 flex items-center justify-center";
 
-  const mobileBottomIconClass =
-    "h-5 w-5 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
-    (isScrolled ? "scale-90" : "scale-100");
+  const mobileBottomIconClass = "h-[22px] w-[22px] shrink-0";
 
-  const mobileBottomLabelClass =
-    "pointer-events-none absolute inset-x-0 bottom-1.5 z-10 block truncate px-0.5 text-center text-[10px] font-semibold leading-[12px] tracking-tight " +
-    "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none " +
-    (isScrolled
-      ? "translate-y-1 opacity-0"
-      : "translate-y-0 opacity-100");
+  // Cápsula "lente" de la sección activa: cristal claro con borde de luz, al
+  // estilo de la pestaña activa de iOS. Al compartir `layoutId`, se DESLIZA de
+  // una sección a otra en vez de desaparecer y reaparecer.
+  const mobileBottomActiveLens = (
+    <motion.span
+      aria-hidden="true"
+      layoutId="mobile-bottom-nav-active"
+      // Sin cantos de 1px: el relieve lo da un degradado interno suave, para que
+      // la cápsula no dibuje una línea dura dentro de una barra sin bordes.
+      className="absolute inset-y-1 inset-x-0 rounded-full bg-white/[0.13] bg-gradient-to-b from-white/[0.10] to-transparent shadow-[0_2px_10px_-3px_rgba(0,0,0,0.4)]"
+      transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
+    />
+  );
 
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
@@ -2045,20 +2113,25 @@ export default function Navbar() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
+      {/* LayoutGroup acota el `layoutId` de la cápsula activa a esta barra. */}
+      <LayoutGroup id="mobile-bottom-nav">
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        className={`lg:hidden fixed left-1/2 z-30 flex -translate-x-1/2 items-center overflow-visible rounded-full px-2 ${LIQUID_GLASS_PANEL} transform-gpu transition-[width,height,bottom] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-          isScrolled
-            ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))] h-12 w-[min(calc(100%_-_6rem),28rem)]"
-            : "bottom-[calc(0.5rem+env(safe-area-inset-bottom))] h-14 w-[min(calc(100%_-_2rem),32rem)]"
+        // Píldora flotante con margen amplio a los lados. Solo se anima
+        // `transform` (scale desde el borde inferior): al no tocar width/height
+        // no hay recálculo de layout, así la compactación es fluida en todo
+        // momento y en ambos sentidos del scroll.
+        className={`lg:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_4rem),21rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-1.5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
-        {/* iOS 26 Liquid Glass Curve Highlight Overlay */}
-        <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
-        {/* iOS 26 Liquid Glass Sheen Light Overlay */}
-        <div
-          className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/[0.08] via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+        {/* Volumen del cristal SIN filo: una luz difusa que cae desde arriba y
+            se apaga antes de llegar al contorno, en vez de una línea especular
+            en el borde. Así la píldora tiene profundidad pero ningún canto
+            marcado que la recorte contra el fondo. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(125%_100%_at_50%_0%,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.035)_38%,transparent_72%)]"
         />
 
         <Link
@@ -2069,18 +2142,12 @@ export default function Navbar() {
           onClick={() => setPendingHref("/movies")}
           className={navLinkClassMobileBottom("/movies", "blue")}
           aria-current={isActive("/movies") ? "page" : undefined}
+          aria-label={t("nav_movies", "Películas")}
+          title={t("nav_movies", "Películas")}
         >
-          {isActive("/movies") && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[0_4px_14px_rgba(56,189,248,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive("/movies") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <FilmIcon className={mobileBottomIconClass} />
-          </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_movies", "Películas")}
           </span>
         </Link>
 
@@ -2092,18 +2159,12 @@ export default function Navbar() {
           onClick={() => setPendingHref("/series")}
           className={navLinkClassMobileBottom("/series", "purple")}
           aria-current={isActive("/series") ? "page" : undefined}
+          aria-label={t("nav_series", "Series")}
+          title={t("nav_series", "Series")}
         >
-          {isActive("/series") && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-fuchsia-500/20 shadow-[0_4px_14px_rgba(217,70,239,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive("/series") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <TvIcon className={mobileBottomIconClass} />
-          </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_series", "Series")}
           </span>
         </Link>
 
@@ -2113,18 +2174,12 @@ export default function Navbar() {
           {...navPrefetchHandlers("/in-progress")}
           className={navLinkClassMobileBottom("/in-progress", "green")}
           aria-current={isActive("/in-progress") ? "page" : undefined}
+          aria-label={t("nav_in_progress_short", "En curso")}
+          title={t("nav_in_progress_short", "En curso")}
         >
-          {isActive("/in-progress") && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[0_4px_14px_rgba(16,185,129,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive("/in-progress") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <Play className={mobileBottomIconClass} fill="currentColor" />
-          </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_in_progress_short", "En curso")}
           </span>
         </Link>
 
@@ -2134,18 +2189,12 @@ export default function Navbar() {
           {...navPrefetchHandlers("/history")}
           className={navLinkClassMobileBottom("/history", "green")}
           aria-current={isActive("/history") ? "page" : undefined}
+          aria-label={t("nav_history", "Historial")}
+          title={t("nav_history", "Historial")}
         >
-          {isActive("/history") && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-emerald-500/20 shadow-[0_4px_14px_rgba(16,185,129,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive("/history") && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <Eye className={mobileBottomIconClass} />
-          </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_history", "Historial")}
           </span>
         </Link>
 
@@ -2155,18 +2204,12 @@ export default function Navbar() {
           {...navPrefetchHandlers(favHref)}
           className={navLinkClassMobileBottom("/favorites", "red")}
           aria-current={isActive(favHref) ? "page" : undefined}
+          aria-label={t("nav_favorites", "Favoritas")}
+          title={t("nav_favorites", "Favoritas")}
         >
-          {isActive(favHref) && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-red-500/20 shadow-[0_4px_14px_rgba(239,68,68,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive(favHref) && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <Heart className={mobileBottomIconClass} />
-          </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_favorites", "Favoritas")}
           </span>
         </Link>
 
@@ -2176,21 +2219,16 @@ export default function Navbar() {
           {...navPrefetchHandlers(watchHref)}
           className={navLinkClassMobileBottom("/watchlist", "blue")}
           aria-current={isActive(watchHref) ? "page" : undefined}
+          aria-label={t("nav_watchlist", "Pendientes")}
+          title={t("nav_watchlist", "Pendientes")}
         >
-          {isActive(watchHref) && (
-            <motion.div
-              className="absolute inset-0 rounded-full bg-sky-500/20 shadow-[0_4px_14px_rgba(56,189,248,0.18)]"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
-          )}
+          {isActive(watchHref) && mobileBottomActiveLens}
           <span className={mobileBottomIconSlotClass}>
             <Bookmark className={mobileBottomIconClass} />
           </span>
-          <span className={mobileBottomLabelClass}>
-            {t("nav_watchlist", "Pendientes")}
-          </span>
         </Link>
       </nav>
+      </LayoutGroup>
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
       <AnimatePresence>
