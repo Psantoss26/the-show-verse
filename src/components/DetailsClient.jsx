@@ -310,9 +310,30 @@ const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 
-// Referencia estable (no recrear en cada render) para forzar animaciones de
-// Framer Motion por JS en vez de WAAPI acelerado -- ver comentario de uso.
-function NOOP_ON_UPDATE() {}
+// Revelado por posición del bloque secundario en móvil (marcador + pestañas).
+//
+// Mismo lenguaje de movimiento que la barra inferior de navegación: una ÚNICA
+// curva y duración para todo lo que se mueve, de modo que opacidad y
+// desplazamiento empiezan y terminan a la vez, y la transición es SIMÉTRICA (se
+// oculta exactamente igual que aparece). Solo se animan `opacity` y `transform`,
+// las dos propiedades que el compositor puede resolver sin recalcular layout:
+// por eso resulta fluida en todo momento aunque el usuario siga desplazándose.
+//
+// Se hace con transición CSS y no con Framer Motion a propósito: el estado
+// oculto tiene que estar garantizado ya en el primer pintado (antes de que
+// `isMobileViewport` se resuelva) y eso se expresaba con una clase `!important`
+// que PISABA el estilo inline de Framer -- el resultado era que aparecía animado
+// pero se ocultaba de golpe. Con clases, el mismo selector que garantiza el
+// estado oculto es el que se transiciona, así que no hay dos sistemas peleando.
+// `translate` va en la lista de propiedades a propósito: Tailwind v4 no compone
+// `translate-y-*` dentro de `transform`, sino en la propiedad INDEPENDIENTE
+// `translate`. Si solo se transiciona `transform`, la opacidad atenúa suave pero
+// el desplazamiento salta de golpe. (`transition-transform` de Tailwind sí las
+// cubre todas; aquí hay que enumerarlas porque el valor es arbitrario.)
+const MOBILE_REVEAL_BASE =
+  "origin-top transform-gpu transition-[opacity,transform,translate,scale,rotate] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
+const MOBILE_REVEAL_HIDDEN =
+  "max-sm:opacity-0 max-sm:translate-y-3 max-sm:pointer-events-none";
 
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
@@ -1470,7 +1491,7 @@ export default function DetailsClient({
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
-  const mobileScoreboardTriggerRef = useRef(null);
+  const mobileSecondaryTriggerRef = useRef(null);
   const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60);
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
@@ -1558,7 +1579,7 @@ export default function DetailsClient({
   const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
-  const [mobileScoreboardVisible, setMobileScoreboardVisible] =
+  const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(false);
 
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
@@ -1687,28 +1708,28 @@ export default function DetailsClient({
     };
   }, [isMobileViewport]);
 
-  // MÓVIL: el marcador de puntuaciones no compite con la portada al entrar.
-  // Su espacio se reserva para que las pestañas no ocupen su lugar; solo se
-  // revela al cruzar por primera vez el navbar inferior y se oculta al volver
-  // al inicio de la ficha.
+  // MÓVIL: el bloque secundario (marcador de puntuaciones + pestañas de
+  // información) no compite con la portada al entrar. Se revela al cruzar por
+  // primera vez el navbar inferior y se oculta al volver al inicio de la ficha.
+  // Ambos comparten esta señal para aparecer y desaparecer como una sola pieza.
   useEffect(() => {
     if (!isMobileViewport) {
-      setMobileScoreboardVisible(false);
+      setMobileSecondaryVisible(false);
       return undefined;
     }
 
-    setMobileScoreboardVisible(false);
-    const trigger = mobileScoreboardTriggerRef.current;
+    setMobileSecondaryVisible(false);
+    const trigger = mobileSecondaryTriggerRef.current;
     if (!trigger) return undefined;
 
     const hideAtTop = () => {
-      if (window.scrollY <= 4) setMobileScoreboardVisible(false);
+      if (window.scrollY <= 4) setMobileSecondaryVisible(false);
     };
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && window.scrollY > 4) {
-          setMobileScoreboardVisible(true);
+          setMobileSecondaryVisible(true);
         }
       },
       {
@@ -9462,6 +9483,22 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               duration={0.32}
               className="order-3 mb-2 w-full sm:hidden"
             >
+              {/* El revelado por posición va en una capa PROPIA, por dentro del
+                  FadeIn: así la animación de entrada de la ficha (que escribe
+                  opacidad en línea) y este revelado no se pisan, cada uno anima
+                  su propio elemento. Comparte señal con el marcador para que
+                  ambos aparezcan y desaparezcan como una sola pieza. */}
+              <div
+                className={`${MOBILE_REVEAL_BASE} ${
+                  mobileSecondaryVisible
+                    ? "max-sm:will-change-[opacity,transform]"
+                    : MOBILE_REVEAL_HIDDEN
+                }`}
+                inert={isMobileViewport && !mobileSecondaryVisible}
+                aria-hidden={
+                  isMobileViewport && !mobileSecondaryVisible ? true : undefined
+                }
+              >
               <DetailsInfoTabs
                 key={`detailsTabMobile-${id}`}
                 variant={isBackdropPoster ? "backdrop" : "normal"}
@@ -9498,6 +9535,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   isBackdropPoster ? scoreboardExternalLinks : []
                 }
               />
+              </div>
             </FadeIn>
 
             {/* =================================================================
@@ -9511,49 +9549,22 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
             <div className={`order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}>
               <span
-                ref={mobileScoreboardTriggerRef}
+                ref={mobileSecondaryTriggerRef}
                 aria-hidden="true"
                 className="block h-px sm:hidden"
               />
-              <motion.div
-                initial={false}
-                animate={
-                  isMobileViewport && !mobileScoreboardVisible
-                    ? { opacity: 0, y: 12 }
-                    : { opacity: 1, y: 0 }
-                }
-                transition={
-                  prefersReducedMotion
-                    ? { duration: 0 }
-                    : {
-                        opacity: { duration: 0.2, ease: "easeOut" },
-                        y: {
-                          duration: 0.3,
-                          ease: [0.16, 1, 0.3, 1],
-                        },
-                      }
-                }
-                className={`origin-top transform-gpu ${
-                  mobileScoreboardVisible
+              <div
+                className={`${MOBILE_REVEAL_BASE} ${
+                  mobileSecondaryVisible
                     ? "max-sm:will-change-[opacity,transform]"
-                    : "max-sm:!opacity-0 max-sm:pointer-events-none"
+                    : MOBILE_REVEAL_HIDDEN
                 }`}
-                inert={isMobileViewport && !mobileScoreboardVisible}
+                inert={isMobileViewport && !mobileSecondaryVisible}
                 aria-hidden={
-                  isMobileViewport && !mobileScoreboardVisible
+                  isMobileViewport && !mobileSecondaryVisible
                     ? true
                     : undefined
                 }
-                // Sin `onUpdate`, Framer Motion anima opacity/transform por
-                // WAAPI (nativo, acelerado). Al completarse esa animación
-                // nativa el navegador la retira y el elemento vuelve un frame
-                // al estilo inline previo (opacity:0) hasta que Framer escribe
-                // el valor final por JS justo después -> parpadeo real
-                // (opacity 1 -> 0 -> 1) al terminar de revelarse. Pasar un
-                // `onUpdate` desactiva WAAPI (Framer no puede leer valores por
-                // frame desde ahí) y fuerza su animación por JS, sincronizada
-                // con lo pintado. Mismo bug y arreglo que en FadeIn.
-                onUpdate={NOOP_ON_UPDATE}
               >
                 <DetailsScoreboardPanel
                 loading={tScoreboard.loading}
@@ -9631,7 +9642,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }}
                 stats={tScoreboard?.stats}
                 />
-              </motion.div>
+              </div>
             </div>
 
             {/* =================================================================

@@ -50,7 +50,7 @@ function clampScore(score) {
   return Number.isNaN(num) ? null : Math.max(0, Math.min(10, num));
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, onClick }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, showFixedIndicator = true, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -188,7 +188,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
 
       {/* La variante fija es exclusivamente táctil. En escritorio no ocupa
           espacio debajo de la tarjeta: se utiliza el overlay anterior. */}
-      {fixedIndicator && hasViewerIndicators ? (
+      {showFixedIndicator && fixedIndicator && hasViewerIndicators ? (
         <div className="mt-1.5 flex justify-center lg:hidden">
           <div
             className={`inline-flex items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-md`}
