@@ -26,7 +26,10 @@ import {
 // Normaliza cualquier LiquidButton descendiente, incluidos los controles
 // compuestos (TraktWatchedControl y StarRating), para que siempre rellene la
 // celda que le corresponde y escale su icono con el mismo criterio.
-const MOBILE_ACTION_BUTTON_CLASS = `
+// Se exporta para que otras superficies con fila de acciones propia (la baraja
+// de Recomendaciones) usen EXACTAMENTE el mismo dimensionado, en vez de copiar
+// estas clases y que acaben divergiendo.
+export const MOBILE_ACTION_BUTTON_CLASS = `
                 [&_[data-liquid-button]:not(.labeled)]:!w-full [&_[data-liquid-button]:not(.labeled)]:!h-auto [&_[data-liquid-button]:not(.labeled)]:aspect-square [&_[data-liquid-button]:not(.labeled)]:[container-type:inline-size]
                 [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]

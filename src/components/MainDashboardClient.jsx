@@ -3823,23 +3823,15 @@ const RecommendedSection = memo(function RecommendedSection({
 
 /* ---------- Carrusel hero (backdrops) ---------- */
 function TopRatedHero({
-  movieItems,
-  tvItems,
+  items: mixedItems,
   isMobile,
   hydrated,
   backdropOverrides,
 }) {
-  const [activeTab, setActiveTab] = useState("movies");
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
-  const items = activeTab === "movies" ? movieItems : tvItems;
-
-  if (
-    (!movieItems || movieItems.length === 0) &&
-    (!tvItems || tvItems.length === 0)
-  )
-    return null;
+  const items = Array.isArray(mixedItems) ? mixedItems : EMPTY_ARRAY;
 
   const swiperRef = useRef(null);
   const heroRef = useRef(null);
@@ -3853,16 +3845,7 @@ function TopRatedHero({
   const [heroBackdrops, setHeroBackdrops] = useState(null);
   const [heroExtraBackdrops, setHeroExtraBackdrops] = useState(null);
 
-  // Cargar backdrops para AMBAS listas para evitar flash al cambiar de tab
-  const allItems = useMemo(() => {
-    const combined = [...(movieItems || []), ...(tvItems || [])];
-    const seen = new Set();
-    return combined.filter((m) => {
-      if (seen.has(m.id)) return false;
-      seen.add(m.id);
-      return true;
-    });
-  }, [movieItems, tvItems]);
+  const allItems = items;
 
   useEffect(() => {
     if (!allItems || allItems.length === 0) return;
@@ -3887,6 +3870,7 @@ function TopRatedHero({
               movie.first_air_date
                 ? "tv"
                 : "movie";
+            const itemKey = getBackdropCacheKey(movie, mediaType);
 
             const override = backdropOverrides?.[id] || null;
             const { backdrop: userBackdrop } = getArtworkPreference(id);
@@ -3900,7 +3884,7 @@ function TopRatedHero({
 
             if (chosen) await preloadImage(buildImg(chosen, "w780"));
             if (extra) await preloadImage(buildImg(extra, "w780"));
-            return [id, chosen, extra];
+            return [itemKey, chosen, extra];
           }),
         );
 
@@ -3908,10 +3892,10 @@ function TopRatedHero({
 
         const map = {};
         const extraMap = {};
-        for (const [id, path, extraPath] of entries) {
-          if (!id) continue;
-          map[id] = path;
-          if (extraPath) extraMap[id] = extraPath;
+        for (const [itemKey, path, extraPath] of entries) {
+          if (!itemKey) continue;
+          map[itemKey] = path;
+          if (extraPath) extraMap[itemKey] = extraPath;
         }
 
         setHeroBackdrops(map);
@@ -3922,7 +3906,8 @@ function TopRatedHero({
 
         const map = {};
         for (const movie of allItems) {
-          map[movie.id] = movie.backdrop_path || movie.poster_path || null;
+          map[getBackdropCacheKey(movie)] =
+            movie.backdrop_path || movie.poster_path || null;
         }
         setHeroBackdrops(map);
         setHeroExtraBackdrops({});
@@ -3969,13 +3954,9 @@ function TopRatedHero({
   const showPrev = isHoveredHero && canPrev;
   const showNext = isHoveredHero && canNext;
 
-  // Sin `hydrated` en la key (remontaría el Swiper al hidratar y bloquearía el
-  // primer desliz). Solo cambia con el tab y el layout.
-  const heroKey = `hero-${activeTab}-${isMobile ? "m" : "d"}`;
-  const handleTopRatedTabChange = (tab) => {
-    clearHoverBackdrop();
-    setActiveTab(tab);
-  };
+  // Sin `hydrated` en la key: remontaría el Swiper al hidratar y bloquearía el
+  // primer desliz. La clasificación ya es una única lista mixta estable.
+  const heroKey = `hero-mixed-${isMobile ? "m" : "d"}`;
 
   const handleTopRatedCardEnter = (movie) => {
     if (isMobile) return;
@@ -3986,6 +3967,8 @@ function TopRatedHero({
     clearHoverBackdrop(movie);
   };
 
+  if (items.length === 0) return null;
+
   return (
     <motion.div
       ref={heroRef}
@@ -3993,7 +3976,7 @@ function TopRatedHero({
       variants={fadeInUp}
       className="relative group mb-10 sm:mb-14"
     >
-      {/* Título de la sección con selector Películas / Series */}
+      {/* Título de la clasificación mixta */}
       <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
         <div className="flex items-center gap-2 mb-1.5">
           <div className="h-px w-8 bg-amber-500" />
@@ -4001,30 +3984,9 @@ function TopRatedHero({
             DESTACADAS
           </span>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
-            Mejor valoradas<span className="text-amber-500">.</span>
-          </h3>
-
-          <div className={dashboardSegmentGroupClass}>
-            {movieItems?.length > 0 && (
-              <button
-                onClick={() => handleTopRatedTabChange("movies")}
-                className={dashboardSegmentButtonClass(activeTab === "movies")}
-              >
-                Películas
-              </button>
-            )}
-            {tvItems?.length > 0 && (
-              <button
-                onClick={() => handleTopRatedTabChange("series")}
-                className={dashboardSegmentButtonClass(activeTab === "series")}
-              >
-                Series
-              </button>
-            )}
-          </div>
-        </div>
+        <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
+          Mejor valoradas<span className="text-amber-500">.</span>
+        </h3>
       </motion.div>
 
       <div
@@ -4069,24 +4031,24 @@ function TopRatedHero({
               }}
             >
               {items.map((movie, index) => {
-                const heroBackdrop =
-                  heroBackdrops !== null
-                    ? (heroBackdrops[movie.id] ?? null)
-                    : null; // null mientras carga → muestra placeholder neutral
-                const heroExtraBackdrop =
-                  heroExtraBackdrops !== null
-                    ? (heroExtraBackdrops[movie.id] ?? null)
-                    : null;
-                const slideClass = isMobile
-                  ? "!w-full select-none"
-                  : "select-none";
-
                 const mediaType =
                   movie.media_type === "tv" ||
                   (movie.name && !movie.title) ||
                   movie.first_air_date
                     ? "tv"
                     : "movie";
+                const itemBackdropKey = getBackdropCacheKey(movie, mediaType);
+                const heroBackdrop =
+                  heroBackdrops !== null
+                    ? (heroBackdrops[itemBackdropKey] ?? null)
+                    : null; // null mientras carga → muestra placeholder neutral
+                const heroExtraBackdrop =
+                  heroExtraBackdrops !== null
+                    ? (heroExtraBackdrops[itemBackdropKey] ?? null)
+                    : null;
+                const slideClass = isMobile
+                  ? "!w-full select-none"
+                  : "select-none";
 
                   if (!heroBackdrop) {
                     return (
@@ -4358,8 +4320,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
 
   const allMovieIds = useMemo(() => {
     const keys = [
-      "topRatedMovies",
-      "topRatedTV",
+      "topRated",
       "popular",
       "trending",
       "awarded",
@@ -4480,8 +4441,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 en móvil no hay hover-preview, así que el cierre inferior es corto. */}
             <div className="px-4 pb-8 pt-4 sm:px-6 sm:pb-52 sm:pt-11 md:pb-72">
               <TopRatedHero
-                movieItems={dashboardData.topRatedMovies || EMPTY_ARRAY}
-                tvItems={dashboardData.topRatedTV || EMPTY_ARRAY}
+                items={dashboardData.topRated || EMPTY_ARRAY}
                 isMobile={isMobile}
                 hydrated={hydrated}
                 backdropOverrides={backdropOverrides}

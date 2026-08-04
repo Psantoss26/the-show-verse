@@ -15,6 +15,7 @@ import {
 import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
 import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
 import { buildFeatured } from "@/lib/dashboard/featured";
+import { combineTopRatedItems } from "@/lib/dashboard/topRated";
 
 export const dynamic = "force-static";
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
@@ -133,6 +134,10 @@ async function getDashboardData() {
       .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
     const balancedTopRatedTVSSR = balanceSoftLimitedDashboardContent(topRatedTVSSR, "tv")
       .slice(0, 28);
+    const topRatedSSR = combineTopRatedItems(
+      balancedTopRatedMoviesSSR,
+      balancedTopRatedTVSSR,
+    );
 
     const awardedSSR = curateList(awarded, {
       minVotes: 1200,
@@ -142,8 +147,7 @@ async function getDashboardData() {
     });
 
     return {
-      topRatedMovies: balancedTopRatedMoviesSSR,
-      topRatedTV: balancedTopRatedTVSSR,
+      topRated: topRatedSSR,
       featured: buildFeatured(
         {
           trendingMovies,
