@@ -22,19 +22,15 @@ export const LIQUID_GLASS_PANEL =
 export const LIQUID_GLASS_TOOLTIP =
   "bg-zinc-950/85 backdrop-blur-2xl saturate-[140%] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.9)]";
 
-// Variante para BARRAS FLOTANTES (la barra inferior de móvil).
+// Variante para BARRAS FLOTANTES (la barra inferior de móvil - Estilo Instagram iOS Liquid Glass).
 //
-// Se diferencia de LIQUID_GLASS_PANEL en dos cosas, y ambas son deliberadas:
-//
-//  1. SIN BORDES MARCADOS. El panel lleva un reflejo interior superior
-//     (`inset 0 1px 1.5px`) que en un modal recorta bien contra el fondo oscuro,
-//     pero en una píldora que flota sobre el contenido dibuja un filo que la
-//     delata como una caja pegada encima. Aquí no hay reflejo, ni aro, ni borde:
-//     la pieza se separa del fondo solo por el desenfoque y una sombra amplia.
-//  2. DESENFOQUE MÁS PROFUNDO y saturación aplicada al FONDO
-//     (`backdrop-saturate`, no `saturate`): un filtro normal satura el propio
-//     contenido de la barra —los iconos—, mientras que el del cristal real actúa
-//     sobre lo que se ve a través. Con más blur, el color de debajo se funde en
-//     una mancha suave en vez de dejar ver formas reconocibles.
+//  - DIFUMINADO AGRESIVO DE 50PX (`backdrop-blur-[50px] backdrop-saturate-[190%]`).
+//  - SIN BORDES MARCADOS: cero trazos o bordes duros (`border-none`).
+//  - CRISTAL LÍQUIDO OSCURO (`bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40`):
+//    se distingue perfectamente sobre fondos negros (#000000) adoptando un tono carbón translúcido.
+//  - REFLEJO DIFUSO Y ELEVACIÓN (`shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]`).
 export const LIQUID_GLASS_BAR =
-  "bg-black/[0.32] backdrop-blur-[30px] backdrop-saturate-[180%] shadow-[0_12px_40px_-12px_rgba(0,0,0,0.75)]";
+  "bg-black/60 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/40 backdrop-blur-[50px] backdrop-saturate-[190%] shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_16px_40px_-8px_rgba(0,0,0,0.9),0_0_32px_rgba(255,255,255,0.05)]";
+
+
+

@@ -874,7 +874,7 @@ const ListItemCard = memo(function ListItemCard({
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
     >
       <motion.div
-        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-2xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_var(--card-ring-hover)]"
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_var(--card-ring-hover)]"
         whileHover={{
           y: -6,
           zIndex: 50,
@@ -1174,7 +1174,7 @@ function ListItemsRowSkeleton({ isMobile }) {
         {Array.from({ length: n }).map((_, i) => (
           <div
             key={i}
-            className="w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-2xl bg-zinc-900/40 border border-white/5 animate-pulse"
+            className="w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 animate-pulse"
           />
         ))}
       </div>
@@ -1285,8 +1285,6 @@ const RowListSection = memo(function RowListSection({
   itemsState,
   ensureListItems,
   isMobile,
-  canUse,
-  onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
@@ -1326,17 +1324,6 @@ const RowListSection = memo(function RowListSection({
           )}
         </div>
 
-        {canUse && (
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <button
-              onClick={(e) => onDelete(e, list.id)}
-              className="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition"
-              title="Borrar lista"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
 
       {isLoading ? (
@@ -2222,6 +2209,7 @@ export default function ListsPage() {
                         <Rows className="h-4 w-4" />
                       </button>
                       <button
+                        type="button"
                         onClick={() =>
                           startTransition(() => setViewMode("list"))
                         }
@@ -2233,20 +2221,19 @@ export default function ListsPage() {
                       >
                         <StretchHorizontal className="h-4 w-4" />
                       </button>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => setCreateOpen(true)}
+                          aria-label="Crear lista"
+                          title="Crear lista"
+                          className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
-
-                  {canEdit && (
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => setCreateOpen(true)}
-                        className="h-11 px-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Crear</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -2460,15 +2447,13 @@ export default function ListsPage() {
             {viewMode === "rows" && (
               <div className="space-y-12">
                 {filtered.map((l) => (
-                  <RowListSection
-                    key={`${l.source}-${l.id}`}
-                    list={l}
-                    itemsState={itemsMap[getListCacheKey(l)]}
-                    ensureListItems={ensureListItems}
-                    isMobile={isMobile}
-                    canUse={canEdit}
-                    onDelete={handleDelete}
-                  />
+                    <RowListSection
+                      key={`${l.source}-${l.id}`}
+                      list={l}
+                      itemsState={itemsMap[getListCacheKey(l)]}
+                      ensureListItems={ensureListItems}
+                      isMobile={isMobile}
+                    />
                 ))}
               </div>
             )}

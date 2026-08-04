@@ -1662,20 +1662,20 @@ export default function Navbar() {
 
     const tones = {
       red: {
-        active: "text-red-400",
-        inactive: "text-zinc-300 hover:text-red-400",
+        active: "text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.45)]",
+        inactive: "text-zinc-400 hover:text-red-400",
       },
       blue: {
-        active: "text-sky-400",
-        inactive: "text-zinc-300 hover:text-sky-400",
+        active: "text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.45)]",
+        inactive: "text-zinc-400 hover:text-sky-400",
       },
       purple: {
-        active: "text-fuchsia-400",
-        inactive: "text-zinc-300 hover:text-fuchsia-400",
+        active: "text-fuchsia-400 drop-shadow-[0_0_8px_rgba(232,121,249,0.45)]",
+        inactive: "text-zinc-400 hover:text-fuchsia-400",
       },
       green: {
-        active: "text-emerald-400",
-        inactive: "text-zinc-300 hover:text-emerald-400",
+        active: "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.45)]",
+        inactive: "text-zinc-400 hover:text-emerald-400",
       },
     };
 
@@ -1705,9 +1705,8 @@ export default function Navbar() {
     <motion.span
       aria-hidden="true"
       layoutId="mobile-bottom-nav-active"
-      // Sin cantos de 1px: el relieve lo da un degradado interno suave, para que
-      // la cápsula no dibuje una línea dura dentro de una barra sin bordes.
-      className="absolute inset-y-1 inset-x-0 rounded-full bg-white/[0.13] bg-gradient-to-b from-white/[0.10] to-transparent shadow-[0_2px_10px_-3px_rgba(0,0,0,0.4)]"
+      // Lente activa estilo Instagram iOS Liquid Glass: cápsula difuminada más clara, totalmente sin bordes
+      className="absolute inset-y-1 inset-x-0.5 rounded-full bg-white/[0.22] backdrop-blur-md bg-gradient-to-b from-white/[0.15] to-white/[0.04] shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_16px_rgba(0,0,0,0.3)]"
       transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
     />
   );
@@ -2134,13 +2133,10 @@ export default function Navbar() {
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
-        {/* Volumen del cristal SIN filo: una luz difusa que cae desde arriba y
-            se apaga antes de llegar al contorno, en vez de una línea especular
-            en el borde. Así la píldora tiene profundidad pero ningún canto
-            marcado que la recorte contra el fondo. */}
+        {/* Capa de refracción de luz superior difusa (Estilo Instagram iOS) */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(125%_100%_at_50%_0%,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.035)_38%,transparent_72%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.14)_0%,transparent_75%)]"
         />
 
         <Link

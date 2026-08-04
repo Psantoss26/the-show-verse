@@ -188,13 +188,22 @@ export default function RecommendationsClient() {
     if (!root) return undefined;
 
     const media = window.matchMedia("(max-width: 639px)");
+    const html = document.documentElement;
+
     const apply = () => {
       if (media.matches) {
         root.style.minHeight = "0px";
         root.style.paddingBottom = "0px";
+        // El documento reserva SIEMPRE el hueco de la barra de scroll
+        // (`scrollbar-gutter: stable`) para que el layout no salte cuando
+        // aparece. Aquí no hay scroll que estabilizar, y esa reserva encogía la
+        // página 15px: la portada no llegaba al borde derecho y la fila de
+        // acciones quedaba descuadrada respecto al centro de la pantalla.
+        html.style.scrollbarGutter = "auto";
       } else {
         root.style.minHeight = "";
         root.style.paddingBottom = "";
+        html.style.scrollbarGutter = "";
       }
     };
 
@@ -204,6 +213,7 @@ export default function RecommendationsClient() {
       media.removeEventListener("change", apply);
       root.style.minHeight = "";
       root.style.paddingBottom = "";
+      html.style.scrollbarGutter = "";
     };
   }, []);
 
