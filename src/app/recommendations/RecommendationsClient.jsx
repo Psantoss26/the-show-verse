@@ -304,28 +304,19 @@ export default function RecommendationsClient() {
     setCardMarks(EMPTY_MARKS);
   }, [currentKey]);
 
-  // Marcar desde los BOTONES no pasa de carta: así el indicador queda a la vista
-  // y se ve qué has hecho con el título. Avanzar es cosa del gesto (o del botón
-  // de descartar). Vuelve a pulsarse para desmarcar, como en la ficha.
-  const toggleMark = useCallback(
-    async (action) => {
-      const item = deck[0];
-      if (!item || busy) return;
-      const mark = action === SWIPE_ACTIONS.FAVORITE ? "favorite" : "watchlist";
-      const next = !cardMarks[mark];
+  // Un botón hace LO MISMO que su gesto: marca el título (el indicador se
+  // enciende un instante, para que se vea qué has hecho) y acto seguido la carta
+  // sale volando hacia ese lado y entra la siguiente. `pendingExit` le dice a la
+  // carta hacia dónde volar; sin él, al quitarla de la baraja se desvanecía en el
+  // sitio en vez de repetir el gesto.
+  const [pendingExit, setPendingExit] = useState(null);
+  const exitTimerRef = useRef(null);
 
-      setCardMarks((prev) => ({ ...prev, [mark]: next }));
-      setBusy(true);
-      try {
-        await applyAction(item, action, { value: next });
-      } catch {
-        setCardMarks((prev) => ({ ...prev, [mark]: !next }));
-        setError("No se pudo guardar la acción. Inténtalo de nuevo.");
-      } finally {
-        setBusy(false);
-      }
+  useEffect(
+    () => () => {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     },
-    [deck, busy, cardMarks, applyAction],
+    [],
   );
 
   // El modal de listas no avisa al cerrarse de si se añadió algo: se deduce de
@@ -356,6 +347,31 @@ export default function RecommendationsClient() {
       }
     },
     [deck, busy, advance, applyAction],
+  );
+
+  // Acción desde un BOTÓN: enciende su indicador, deja que se vea un instante y
+  // después lanza el mismo vuelo que haría el gesto.
+  const runActionFromButton = useCallback(
+    (action) => {
+      const item = deck[0];
+      if (!item || busy || pendingExit) return;
+
+      const mark =
+        action === SWIPE_ACTIONS.FAVORITE
+          ? "favorite"
+          : action === SWIPE_ACTIONS.WATCHLIST
+            ? "watchlist"
+            : null;
+      if (mark) setCardMarks((prev) => ({ ...prev, [mark]: true }));
+
+      setPendingExit(action);
+      exitTimerRef.current = setTimeout(() => {
+        exitTimerRef.current = null;
+        setPendingExit(null);
+        runAction(action);
+      }, 260);
+    },
+    [deck, busy, pendingExit, runAction],
   );
 
   // Deshacer: devuelve la carta al principio de la baraja y revierte lo hecho.
@@ -408,16 +424,17 @@ export default function RecommendationsClient() {
     const onKeyDown = (event) => {
       if (listFlow.open) return;
       if (event.target?.closest?.("input, textarea, [contenteditable]")) return;
-      if (event.key === "ArrowLeft") runAction(SWIPE_ACTIONS.DISMISS);
-      else if (event.key === "ArrowRight") runAction(SWIPE_ACTIONS.WATCHLIST);
+      if (event.key === "ArrowLeft") runActionFromButton(SWIPE_ACTIONS.DISMISS);
+      else if (event.key === "ArrowRight")
+        runActionFromButton(SWIPE_ACTIONS.WATCHLIST);
       else if (event.key === "ArrowUp") {
         event.preventDefault();
-        runAction(SWIPE_ACTIONS.FAVORITE);
+        runActionFromButton(SWIPE_ACTIONS.FAVORITE);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [runAction, listFlow.open]);
+  }, [runActionFromButton, listFlow.open]);
 
   const showEmpty =
     !loading && !needsAuth && deck.length === 0 && !error;
@@ -443,12 +460,12 @@ export default function RecommendationsClient() {
             En MÓVIL no se muestra: la vista es inmersiva como la ficha, solo el
             título en pantalla (póster + logo + puntuaciones + acciones). */}
         <motion.header
-          className="mb-3 hidden sm:block lg:mb-4"
+          className="mb-3 hidden text-center sm:block lg:mb-4"
           initial={reduceMotion ? false : { opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-2 flex items-center gap-3">
+          <div className="mb-2 flex items-center justify-center gap-3">
             <span className="h-px w-8 bg-emerald-500/70" />
             <span className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-400">
               Para ti
@@ -459,7 +476,7 @@ export default function RecommendationsClient() {
           </h1>
           {/* En pantallas bajas este texto se lleva el espacio de la carta; los
               sellos al arrastrar ya explican cada dirección. */}
-          <p className="mt-2 hidden max-w-xl text-sm text-zinc-400 min-[420px]:block sm:block">
+          <p className="mx-auto mt-2 hidden max-w-xl text-sm text-zinc-400 min-[420px]:block sm:block">
             Desliza para decidir: a la izquierda descartas, a la derecha lo
             guardas en pendientes y hacia arriba lo marcas como favorito.
           </p>
@@ -469,7 +486,7 @@ export default function RecommendationsClient() {
             Historial y Continuar viendo (contenedor de cristal con la opción
             activa en verde), en vez de tres píldoras sueltas. */}
         <motion.div
-          className="mb-4 hidden items-center sm:flex"
+          className="mb-4 hidden items-center justify-center sm:flex"
           initial={reduceMotion ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
@@ -556,13 +573,13 @@ export default function RecommendationsClient() {
                       // muestra ÚNICAMENTE el título actual.
                       className="absolute inset-0 hidden origin-bottom overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900 sm:block"
                       style={{
-                        transform: `translateY(${depth * 12}px) scale(${1 - depth * 0.04})`,
-                        opacity: 1 - depth * 0.35,
+                        transform: `translateY(${depth * 8}px) scale(${1 - depth * 0.03})`,
+                        opacity: 0.5 - depth * 0.18,
                       }}
                     >
-                      {item.posterPath && (
+                      {item.backdropPath && (
                         <OptimizedImage
-                          src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
+                          src={`https://image.tmdb.org/t/p/w780${item.backdropPath}`}
                           alt=""
                           className="h-full w-full object-cover"
                           loading="lazy"
@@ -579,6 +596,7 @@ export default function RecommendationsClient() {
                     item={current}
                     reduceMotion={reduceMotion}
                     onAction={runAction}
+                    forcedExit={pendingExit}
                   />
                 )}
               </AnimatePresence>
@@ -603,7 +621,7 @@ export default function RecommendationsClient() {
               </RecommendationActionButton>
               <RecommendationActionButton
                 label="Descartar"
-                onClick={() => runAction(SWIPE_ACTIONS.DISMISS)}
+                onClick={() => runActionFromButton(SWIPE_ACTIONS.DISMISS)}
                 activeColor="blue"
               >
                 <X />
@@ -612,7 +630,7 @@ export default function RecommendationsClient() {
                 label={
                   cardMarks.favorite ? "Quitar de favoritos" : "Añadir a favoritos"
                 }
-                onClick={() => toggleMark(SWIPE_ACTIONS.FAVORITE)}
+                onClick={() => runActionFromButton(SWIPE_ACTIONS.FAVORITE)}
                 active={cardMarks.favorite}
                 activeColor="red"
               >
@@ -624,7 +642,7 @@ export default function RecommendationsClient() {
                     ? "Quitar de pendientes"
                     : "Añadir a pendientes"
                 }
-                onClick={() => toggleMark(SWIPE_ACTIONS.WATCHLIST)}
+                onClick={() => runActionFromButton(SWIPE_ACTIONS.WATCHLIST)}
                 active={cardMarks.watchlist}
                 activeColor="blue"
               >
@@ -663,7 +681,7 @@ export default function RecommendationsClient() {
 // ----------------------------
 // CARTA DESLIZABLE
 // ----------------------------
-function SwipeCard({ item, reduceMotion, onAction }) {
+function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const [exiting, setExiting] = useState(null);
@@ -683,9 +701,10 @@ function SwipeCard({ item, reduceMotion, onAction }) {
     onAction(action);
   };
 
-  const exitTarget = exiting
+  const exitDirection = exiting || forcedExit;
+  const exitTarget = exitDirection
     ? exitTargetFor(
-        exiting,
+        exitDirection,
         typeof window !== "undefined" ? window.innerWidth : 1024,
       )
     : { x: 0, y: 0 };
