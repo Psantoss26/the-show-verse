@@ -1290,6 +1290,37 @@ function SearchBar({
 /* ====================================================================
  * Navbar principal
  * ==================================================================== */
+// Capas de cristal de la barra SUPERIOR, con el mismo lenguaje que la inferior
+// pero adaptadas a su forma: aquí la pieza es un rectángulo a todo lo ancho, así
+// que la luz entra por el borde de ARRIBA y el canto que refracta es el de
+// ABAJO, que es donde el cristal se encuentra con el contenido. En la píldora,
+// en cambio, la máscara es elíptica porque el canto la rodea entera.
+function TopBarGlassLayers({ className = "" }) {
+  return (
+    <>
+      {/* Refracción del canto inferior: desenfoque distinto del centro, que es
+          la única refracción que el navegador puede dar (los filtros SVG no se
+          aplican al backdrop; ver la nota en liquidGlass.js). */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%] ${className}`}
+        style={{
+          WebkitMaskImage:
+            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.35) 45%, transparent 78%)",
+          maskImage:
+            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.35) 45%, transparent 78%)",
+        }}
+      />
+      {/* Especular: el reflejo que recorre el borde superior y se apaga hacia
+          dentro, sin trazar ninguna línea. */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] ${className}`}
+      />
+    </>
+  );
+}
+
 export default function Navbar() {
   const { account, hydrated } = useAuth();
   const { t } = useTranslation();
@@ -1764,10 +1795,20 @@ export default function Navbar() {
                 // los aportan la capa interna y la fila móvil, GRADUALMENTE con
                 // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
                 // así que la barra se queda transparente.
-                "lg:bg-black/20 lg:bg-gradient-to-br lg:from-white/10 lg:via-transparent lg:to-black/40 lg:backdrop-blur-[50px] lg:shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
-              : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+                "lg:bg-black/15 lg:bg-gradient-to-b lg:from-white/[0.14] lg:via-white/[0.03] lg:to-black/15 lg:backdrop-blur-[7px] lg:backdrop-saturate-[190%] lg:backdrop-brightness-[1.06] lg:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
+              : `${LIQUID_GLASS_BAR}`
         }`}
       >
+        {/* Capas de cristal, solo donde la barra TIENE fondo: en los estados
+            transparentes (sobre el hero o en la entrada de una ficha) añadirían
+            un velo que no debe estar. En rutas inmersivas el cristal es solo de
+            escritorio, así que las capas se limitan a `lg:`. */}
+        {!heroNavMode && !desktopDetailsNavMode && (
+          <TopBarGlassLayers
+            className={isImmersiveRoute ? "hidden lg:block" : ""}
+          />
+        )}
+
         {isDetailsRoute && (
           <>
             {/* MÓVIL ficha: velo sutil SIEMPRE presente para que los iconos se
@@ -1781,10 +1822,14 @@ export default function Navbar() {
                 (--sv-hero-scroll: 0→1) sin afectar a los iconos. */}
             <div
               aria-hidden
-              className={`lg:hidden pointer-events-none absolute inset-0 bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] transition-opacity duration-300 motion-reduce:transition-none ${
+              className={`lg:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR} transition-opacity duration-300 motion-reduce:transition-none ${
                 isScrolled ? "opacity-100" : "[opacity:var(--sv-hero-scroll,0)]"
               }`}
-            />
+            >
+              {/* Dentro de esta capa para que aparezcan y desaparezcan con ella
+                  según el progreso del scroll, no por separado. */}
+              <TopBarGlassLayers />
+            </div>
           </>
         )}
         {/* ---------------- Desktop ---------------- */}
