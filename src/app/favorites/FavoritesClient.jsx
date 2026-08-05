@@ -10,7 +10,6 @@ import {
   useMemo,
   useRef,
   useCallback,
-  useDeferredValue,
   startTransition,
   memo,
 } from "react";
@@ -48,6 +47,7 @@ import {
   MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
@@ -119,6 +119,28 @@ function cancelFavoritesRenderChunk(handle) {
     return;
   }
   window.clearTimeout(handle);
+}
+
+// Cambiar de modo de vista rehace el interior de TODAS las tarjetas pintadas, y
+// con la lista entera en el DOM eso tardaba ~300ms en aplicarse (medido: 324
+// tarjetas). Historial se siente instantáneo porque pinta pocas. La solución es
+// la misma que ya usa la carga inicial: aplicar el modo nuevo solo a las
+// tarjetas que se ven y dejar que el resto vuelva a entrar por tandas en
+// tiempo libre. Esto cuenta cuántas hay que conservar para que no se abra un
+// hueco ni salte el scroll.
+function countFavoriteCardsInView() {
+  if (typeof document === "undefined") return null;
+  const cards = document.querySelectorAll("[data-favorite-card]");
+  if (!cards.length) return null;
+  // Una pantalla y media por debajo del borde: margen para que el usuario no
+  // llegue al final de lo pintado antes de que se rellene.
+  const bottom = window.innerHeight * 1.5;
+  let count = 0;
+  for (const card of cards) {
+    if (card.getBoundingClientRect().top > bottom) break;
+    count += 1;
+  }
+  return count;
 }
 
 function limitFavoriteGroupsForRender(groups, limit) {
@@ -1993,6 +2015,7 @@ const FavoriteCard = memo(function FavoriteCard({
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        data-favorite-card=""
       >
         <Link
           href={href}
@@ -2046,6 +2069,7 @@ const FavoriteCard = memo(function FavoriteCard({
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        data-favorite-card=""
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
@@ -2084,6 +2108,7 @@ const FavoriteCard = memo(function FavoriteCard({
         duration: 0.2,
         delay: shouldAnimate ? animDelay : 0,
       }}
+      data-favorite-card=""
     >
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
@@ -2118,6 +2143,15 @@ export default function FavoritesClient() {
   }));
   const { hasBackNavigationSnapshot, shouldRestoreSnapshot } =
     resolveUserListInitialSnapshot(initialCache.favorites, isBackNav);
+  // El SERVIDOR no ve sessionStorage/localStorage, así que nunca detecta la
+  // vuelta atrás ni la caché: siempre pinta el hueco negro de más abajo. Si el
+  // CLIENTE sí las detecta en su primer render, los dos árboles no coinciden y
+  // React descarta el HTML recibido y reconstruye la página entera (error de
+  // hidratación). Durante ese primer render se pinta lo mismo que el servidor y
+  // la instantánea entra en el siguiente, que React programa de inmediato.
+  const hydrationReady = useHydrationReady();
+  const paintsBackNavigationSnapshot =
+    hasBackNavigationSnapshot && hydrationReady;
   // En una entrada normal solo pintamos caché RECIENTE (`fresh`, < TTL). Al
   // retroceder restauramos también una instantánea válida más antigua: es la vista
   // que el usuario acaba de dejar y permite recuperar contenido + scroll antes de
@@ -2168,16 +2202,23 @@ export default function FavoritesClient() {
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialFavoritesViewMode);
 
-  // Cambiar de modo reconstruye el interior de TODAS las tarjetas pintadas (cada
-  // modo devuelve una maqueta distinta y cambia el tipo de imagen), y eso
-  // bloqueaba el hilo: se pulsaba el botón y no ocurría nada durante un rato.
-  // Medido: reordenar esas mismas tarjetas cuesta 0ms de bloqueo, así que el
-  // coste es específico del cambio de modo, no del tamaño de la lista.
-  // Con valores diferidos el botón responde en el acto y la lista se reconstruye
-  // sin congelar la página.
-  const deferredViewMode = useDeferredValue(viewMode);
+  // Al cambiar de modo, encoge la ventana de render a lo que se ve. Así el modo
+  // nuevo se aplica al instante (unas decenas de tarjetas en vez de cientos) y
+  // el resto vuelve a entrar por tandas con el mismo mecanismo de la carga
+  // inicial. Sin esto, con la lista entera pintada el cambio tardaba ~300ms.
+  const shrinkRenderWindowToView = useCallback(() => {
+    const inView = countFavoriteCardsInView();
+    if (inView == null) return;
+    setRenderLimit((prev) =>
+      Math.max(
+        FAVORITES_INITIAL_RENDER_LIMIT,
+        Math.min(prev, inView + FAVORITES_RENDER_CHUNK_SIZE),
+      ),
+    );
+  }, []);
 
   const setViewMode = useCallback((mode) => {
+    shrinkRenderWindowToView();
     setViewModeState(mode);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("showverse:favorites:viewMode", mode);
@@ -2185,7 +2226,7 @@ export default function FavoritesClient() {
     if (authenticated) {
       updatePreference({ defaultView: mode });
     }
-  }, [authenticated, updatePreference]);
+  }, [authenticated, updatePreference, shrinkRenderWindowToView]);
 
   const [typeFilter, setTypeFilter] = useState(() => {
     if (typeof window === "undefined") return "all";
@@ -2199,12 +2240,16 @@ export default function FavoritesClient() {
     return saved || "title-asc";
   });
 
-  const [imageMode, setImageMode] = useState(() => {
+  const [imageMode, setImageModeState] = useState(() => {
     if (typeof window === "undefined") return "poster";
     const saved = window.localStorage.getItem("showverse:favorites:imageMode");
     return saved === "backdrop" ? "backdrop" : "poster";
   });
-  const deferredImageMode = useDeferredValue(imageMode);
+
+  const setImageMode = useCallback((mode) => {
+    shrinkRenderWindowToView();
+    setImageModeState(mode);
+  }, [shrinkRenderWindowToView]);
 
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
@@ -3232,18 +3277,18 @@ export default function FavoritesClient() {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
       : "";
-    if (deferredViewMode === "list") {
+    if (viewMode === "list") {
       return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
-    if (deferredViewMode === "compact") {
+    if (viewMode === "compact") {
       const compactCols =
-        deferredImageMode === "backdrop"
+        imageMode === "backdrop"
           ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
           : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
       return `grid gap-2 ${compactCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
     const gridCols =
-      deferredImageMode === "backdrop"
+      imageMode === "backdrop"
         ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
         : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
@@ -3253,27 +3298,30 @@ export default function FavoritesClient() {
   // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
   const entranceVisibleCount = estimateVisibleCards({
     columns: pickResponsiveColumns(
-      deferredViewMode === "list"
+      viewMode === "list"
         ? { base: 1, xl: 2 }
-        : deferredViewMode === "compact"
-          ? deferredImageMode === "backdrop"
+        : viewMode === "compact"
+          ? imageMode === "backdrop"
             ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
             : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
-          : deferredImageMode === "backdrop"
+          : imageMode === "backdrop"
             ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
             : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
     ),
     aspect:
-      deferredViewMode === "list" || deferredImageMode === "backdrop"
+      viewMode === "list" || imageMode === "backdrop"
         ? 0.5625
         : 1.5,
   });
 
-  if (!hydrated && !hasBackNavigationSnapshot) {
+  if (!hydrated && !paintsBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if ((!session || !account) && !(hasBackNavigationSnapshot && !hydrated)) {
+  if (
+    (!session || !account) &&
+    !(paintsBackNavigationSnapshot && !hydrated)
+  ) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -4053,7 +4101,7 @@ export default function FavoritesClient() {
                               count={subgroup.items.length}
                             />
                             <div
-                              key={`subgroup-grid-${group.key}-${subgroup.key}`}
+                              key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
                               className={getItemsGridClass(true)}
                             >
                               {subgroup.items.map((item, idx) => {
@@ -4066,8 +4114,8 @@ export default function FavoritesClient() {
                                     index={currentGlobalIdx}
                                     totalItems={sorted.length}
                                     animateWithin={entranceVisibleCount}
-                                    viewMode={deferredViewMode}
-                                    imageMode={deferredImageMode}
+                                    viewMode={viewMode}
+                                    imageMode={imageMode}
                                     watched={watchDates.has(getFavoriteHistoryKey(item))}
                                     watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                                   />
@@ -4079,7 +4127,7 @@ export default function FavoritesClient() {
                       </div>
                     ) : (
                       <div
-                        key={`group-grid-${group.key}`}
+                        key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                         className={getItemsGridClass(true)}
                       >
                         {group.items.map((item, idx) => {
@@ -4092,8 +4140,8 @@ export default function FavoritesClient() {
                               index={currentGlobalIdx}
                               totalItems={sorted.length}
                               animateWithin={entranceVisibleCount}
-                              viewMode={deferredViewMode}
-                              imageMode={deferredImageMode}
+                              viewMode={viewMode}
+                              imageMode={imageMode}
                               watched={watchDates.has(getFavoriteHistoryKey(item))}
                               watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                             />
@@ -4107,6 +4155,7 @@ export default function FavoritesClient() {
             </div>
           ) : (
             <div
+              key={`flat-grid-${viewMode}-${imageMode}`}
               className={getItemsGridClass(false)}
             >
               {renderedSorted.map((item, idx) => (
@@ -4116,8 +4165,8 @@ export default function FavoritesClient() {
                   index={idx}
                   totalItems={sorted.length}
                   animateWithin={entranceVisibleCount}
-                  viewMode={deferredViewMode}
-                  imageMode={deferredImageMode}
+                  viewMode={viewMode}
+                  imageMode={imageMode}
                   watched={watchDates.has(getFavoriteHistoryKey(item))}
                   watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
                 />
