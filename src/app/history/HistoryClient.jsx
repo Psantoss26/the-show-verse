@@ -2955,7 +2955,8 @@ export default function HistoryClient() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [desktopSearchFocused, setDesktopSearchFocused] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
   // Móvil: overlay del calendario de días marcados (se abre desde el menú móvil).
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
@@ -3817,6 +3818,7 @@ export default function HistoryClient() {
             {auth.connected && (
               <motion.div
                 ref={filtersRef}
+                data-menu-pinned={filtersPinned}
                 className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -1788,6 +1788,9 @@ function GroupDivider({
     <motion.div
       ref={ref}
       data-group-divider
+      // Fijada bajo el navbar: sus superficies pasan al cristal del
+      // navbar (regla `[data-menu-pinned]` en globals.css).
+      data-menu-pinned={renderSticky}
       className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${isBackNav ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} lg:top-[136px] ${
         mobileFiltersOpen ? "top-[216px]" : "top-[108px]"
       }`}
@@ -2266,7 +2269,8 @@ export default function FavoritesClient() {
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const tmdbLogoutInFlightRef = useRef(false);
 
   const handleTmdbLogout = useCallback(async () => {
@@ -3508,6 +3512,7 @@ export default function FavoritesClient() {
         {/* Filters */}
         <motion.div
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className={`sticky top-14 z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-20 sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}

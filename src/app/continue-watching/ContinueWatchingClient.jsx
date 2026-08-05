@@ -841,7 +841,8 @@ export default function ContinueWatchingClient() {
   const [viewMode, setViewMode] = useState("cards");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const [editMode, setEditMode] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1041,6 +1042,7 @@ export default function ContinueWatchingClient() {
         {/* Filtros */}
         <motion.div
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className="sticky top-14 z-[70] space-y-3 mb-4 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

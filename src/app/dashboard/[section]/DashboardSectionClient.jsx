@@ -752,7 +752,8 @@ export default function DashboardSectionClient({ section }) {
   const [imageMode, setImageMode] = useState("poster");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState({});
   const [previewBackdropsReady, setPreviewBackdropsReady] = useState(false);
 
@@ -1041,6 +1042,7 @@ export default function DashboardSectionClient({ section }) {
 
         <motion.section
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className="relative sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

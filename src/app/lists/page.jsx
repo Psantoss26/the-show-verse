@@ -1446,7 +1446,8 @@ export default function ListsPage() {
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente
@@ -2019,6 +2020,7 @@ export default function ListsPage() {
         {/* Filtros Sticky */}
         <motion.div
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className="relative sticky top-14 z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-20"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

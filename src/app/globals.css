@@ -886,3 +886,34 @@ svg.recharts-surface *:focus {
   box-shadow: none !important;
   border: none !important;
 }
+
+/* ============================================================================
+   MENÚS Y CABECERAS DE SECCIÓN FIJADOS EN LO ALTO — cristal del navbar
+   ============================================================================
+   Cuando la barra de filtros de una página de usuario (o la cabecera de un
+   grupo) queda FIJADA bajo el navbar, sus superficies pasan al mismo acabado
+   que el navbar superior: el de `LIQUID_GLASS_BAR_FLAT` en
+   `src/lib/ui/liquidGlass.js`. Si cambia allí, hay que cambiarlo aquí.
+
+   POR QUÉ UNA REGLA CSS Y NO CLASES EN CADA CONTROL
+   El acabado en reposo (`bg-gradient-to-br from-white/10 to-white/5
+   backdrop-blur-lg`) está repetido 88 veces en las nueve páginas, y solo una
+   parte vive dentro de las barras: el resto son tarjetas de estadísticas,
+   distintivos, etc. Marcar el CONTENEDOR y dejar que la regla alcance a sus
+   superficies acierta siempre, sin depender de ir localizando cada control ni
+   de pasar el estado de fijado por media docena de subcomponentes.
+
+   POR QUÉ SE ENGANCHA A `.backdrop-blur-lg`
+   Dentro de una de estas barras, ese desenfoque IDENTIFICA a las superficies de
+   cristal: el buscador, los desplegables y los grupos de botones lo llevan; los
+   botones activos (`from-red-500 to-red-600`, `from-blue-500`…) NO, así que
+   conservan su color de acento intacto.
+
+   El selector de atributo tiene más especificidad que la utilidad de Tailwind
+   que pinta el degradado, así que gana sin `!important`. */
+[data-menu-pinned="true"] .backdrop-blur-lg {
+  background-image: none;
+  background-color: rgb(0 0 0 / 0.15);
+  -webkit-backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+  backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+}
