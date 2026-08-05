@@ -17,7 +17,7 @@ import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -57,7 +57,13 @@ import {
   deriveSectionLabel,
   normalizeDashboardSectionTitle,
 } from "@/lib/dashboard/sectionLabel";
-import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
+import {
+  DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
+  DASHBOARD_PREVIEW_ENTER_TRANSITION,
+  DASHBOARD_PREVIEW_EXIT_TRANSITION,
+  DASHBOARD_PREVIEW_OPEN_DELAY_MS,
+  DASHBOARD_PREVIEW_REDUCED_TRANSITION,
+} from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import OptimizedImage from "@/components/OptimizedImage";
 // Fila de acciones + fila meta/géneros + puntuaciones COMPARTIDAS con
@@ -305,6 +311,7 @@ export function BackdropPreviewCard({
   onPreviewMouseLeave,
   onNestedModalOpenChange,
 }) {
+  const reduceMotion = useReducedMotion();
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(item);
@@ -1005,15 +1012,23 @@ export function BackdropPreviewCard({
   return (
     <>
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 0 }}
+      initial={
+        reduceMotion ? false : { opacity: 0, scale: 0.94, y: 8 }
+      }
       animate={{ opacity: 1, scale: previewScale, y: -8 }}
       exit={{
         opacity: 0,
-        scale: 0.9,
-        y: 0,
-        transition: { duration: 0.15, ease: "easeInOut" },
+        scale: 0.97,
+        y: 4,
+        transition: reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
       }}
-      transition={{ type: "spring", stiffness: 180, damping: 20, mass: 0.8 }}
+      transition={
+        reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_ENTER_TRANSITION
+      }
       ref={previewRef}
       className={`absolute top-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414]/95 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
       onClick={() => openDetailModal?.(item)}
@@ -1370,6 +1385,7 @@ export default function DashboardBackdropRow({
   accent = "amber",
   labelText,
 }) {
+  const reduceMotion = useReducedMotion();
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
@@ -1385,6 +1401,7 @@ export default function DashboardBackdropRow({
   const [animatingOutId, setAnimatingOutId] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [perView, setPerView] = useState(6);
+  const hoverOpenTimeoutRef = useRef(null);
   const hoverCloseTimeoutRef = useRef(null);
   const hoveredIdRef = useRef(null);
   // Un modal anidado abierto DESDE la vista previa (p. ej. la tabla de valoraciones
@@ -1399,6 +1416,9 @@ export default function DashboardBackdropRow({
 
   useEffect(() => {
     return () => {
+      if (hoverOpenTimeoutRef.current) {
+        clearTimeout(hoverOpenTimeoutRef.current);
+      }
       if (hoverCloseTimeoutRef.current) {
         clearTimeout(hoverCloseTimeoutRef.current);
       }
@@ -1423,6 +1443,13 @@ export default function DashboardBackdropRow({
     if (hoverCloseTimeoutRef.current) {
       clearTimeout(hoverCloseTimeoutRef.current);
       hoverCloseTimeoutRef.current = null;
+    }
+  };
+
+  const clearHoverOpenTimer = () => {
+    if (hoverOpenTimeoutRef.current) {
+      clearTimeout(hoverOpenTimeoutRef.current);
+      hoverOpenTimeoutRef.current = null;
     }
   };
 
@@ -1456,15 +1483,21 @@ export default function DashboardBackdropRow({
   const handleMouseEnterItem = (itemKey, index) => {
     if (isMobile) return;
     clearHoverCloseTimer();
+    clearHoverOpenTimer();
     prewarmHoverBackdrop(displayItems[index]);
-    openPreview(itemKey, index);
+    hoverOpenTimeoutRef.current = window.setTimeout(() => {
+      hoverOpenTimeoutRef.current = null;
+      openPreview(itemKey, index);
+    }, DASHBOARD_PREVIEW_OPEN_DELAY_MS);
   };
 
   const handleMouseLeaveItem = (itemKey) => {
     if (isMobile) return;
+    clearHoverOpenTimer();
     clearHoverCloseTimer();
+    const activeItemKey = hoveredIdRef.current || itemKey;
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
-      closePreview(itemKey);
+      closePreview(activeItemKey);
     }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
 
@@ -1583,7 +1616,6 @@ export default function DashboardBackdropRow({
           setIsHoveredRow(false);
           const currentHoveredId = hoveredIdRef.current;
           if (currentHoveredId) handleMouseLeaveItem(currentHoveredId);
-          clearHoverBackdrop();
         }}
       >
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
@@ -1627,7 +1659,7 @@ export default function DashboardBackdropRow({
               const backdropOverride = backdropOverrides[item.id];
 
               const base =
-                "relative flex-shrink-0 transition-all duration-300 ease-in-out";
+                "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
 
               return (
                 <SwiperSlide
@@ -1687,17 +1719,22 @@ export default function DashboardBackdropRow({
                       ) : (
                         <motion.div
                           key="base"
-                          initial={{ opacity: 0, scale: 0.95 }}
+                          initial={
+                            reduceMotion ? false : { opacity: 0, scale: 0.97 }
+                          }
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{
                             opacity: 0,
-                            scale: 0.98,
-                            transition: { duration: 0.12 },
+                            scale: 0.97,
+                            transition: reduceMotion
+                              ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                              : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                           }}
-                          transition={{
-                            duration: 0.18,
-                            ease: [0.4, 0, 0.2, 1],
-                            }}
+                          transition={
+                            reduceMotion
+                              ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                              : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                          }
                             className="h-full w-full cursor-pointer"
                             style={{ willChange: "transform, opacity" }}
                             onClick={() => openDetailModal?.(item)}

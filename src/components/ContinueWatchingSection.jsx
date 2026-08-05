@@ -4,7 +4,7 @@
 import { useCallback, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -70,7 +70,13 @@ import {
   preloadImage,
   GENRES,
 } from "@/lib/dashboard/media";
-import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
+import {
+  DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
+  DASHBOARD_PREVIEW_ENTER_TRANSITION,
+  DASHBOARD_PREVIEW_EXIT_TRANSITION,
+  DASHBOARD_PREVIEW_OPEN_DELAY_MS,
+  DASHBOARD_PREVIEW_REDUCED_TRANSITION,
+} from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
 const EMPTY_ARRAY = [];
@@ -848,6 +854,7 @@ function ContinueWatchingPreviewCard({
   onPreviewMouseLeave,
   onNestedModalOpenChange,
 }) {
+  const reduceMotion = useReducedMotion();
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const router = useRouter();
@@ -1547,15 +1554,23 @@ function ContinueWatchingPreviewCard({
   return (
     <>
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 0 }}
+      initial={
+        reduceMotion ? false : { opacity: 0, scale: 0.94, y: 8 }
+      }
       animate={{ opacity: 1, scale: previewScale, y: -8 }}
-      exit={{ opacity: 0, scale: 0.9, y: 0, transition: { duration: 0.15, ease: "easeInOut" } }}
-      transition={{
-        type: "spring",
-        stiffness: 180,
-        damping: 20,
-        mass: 0.8
+      exit={{
+        opacity: 0,
+        scale: 0.97,
+        y: 4,
+        transition: reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
       }}
+      transition={
+        reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_ENTER_TRANSITION
+      }
       ref={previewRef}
       // El ancho se calcula según las tarjetas visibles del breakpoint activo:
       // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
@@ -1975,6 +1990,7 @@ function ContinueWatchingSection({
   externalShows = null,
   mode = "continue",
 }) {
+  const reduceMotion = useReducedMotion();
   const { authenticated, hydrated: authReady } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
@@ -2144,15 +2160,19 @@ function ContinueWatchingSection({
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     prewarmHoverBackdrop(displayShows?.[index]);
-    openPreview(itemKey, index);
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      hoverTimeoutRef.current = null;
+      openPreview(itemKey, index);
+    }, DASHBOARD_PREVIEW_OPEN_DELAY_MS);
   };
 
   const handleMouseLeaveItem = (itemKey) => {
     if (isMobile) return;
     clearHoverOpenTimer();
     clearHoverCloseTimer();
+    const activeItemKey = hoveredIdRef.current || itemKey;
     hoverCloseTimeoutRef.current = window.setTimeout(() => {
-      closePreview(itemKey);
+      closePreview(activeItemKey);
     }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
 
@@ -2373,7 +2393,6 @@ function ContinueWatchingSection({
           if (currentHoveredId) {
             handleMouseLeaveItem(currentHoveredId);
           }
-          clearHoverBackdrop();
         }}
       >
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
@@ -2426,7 +2445,7 @@ function ContinueWatchingSection({
               const isAnimatingOut = animatingOutId === itemKey;
 
               const base =
-                "relative flex-shrink-0 transition-all duration-300 ease-in-out";
+                "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
               // Escritorio: el ancho lo fija Swiper (según breakpoint) y el alto
               // sale del aspect-video. Móvil: 2 por fila (ancho lo fija Swiper)
               // con alto fijo para mantener legible el overlay de progreso.
@@ -2481,14 +2500,22 @@ function ContinueWatchingSection({
                       ) : (
                         <motion.div
                           key="base"
-                          initial={{ opacity: 0, scale: 0.95 }}
+                          initial={
+                            reduceMotion ? false : { opacity: 0, scale: 0.97 }
+                          }
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{
                             opacity: 0,
-                            scale: 0.98,
-                            transition: { duration: 0.12 },
+                            scale: 0.97,
+                            transition: reduceMotion
+                              ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                              : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                           }}
-                            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                            transition={
+                              reduceMotion
+                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                                : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                            }
                             className="h-full w-full cursor-pointer"
                             style={{ willChange: "transform, opacity" }}
                             onClick={() => openDetailModal?.(show)}

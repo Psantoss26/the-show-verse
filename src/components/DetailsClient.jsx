@@ -8973,11 +8973,12 @@ export default function DetailsClient({
                               setPosterResolved(true);
                             }
                           }}
-                          // Entra SIEMPRE con el fundido de 500ms: parte de
-                          // opacity-0 y sube a opacity-100 al cargar. Antes se
-                          // saltaba ese fundido en la primera entrada y por eso
-                          // aparecía de golpe (ver nota donde estaba la bandera
-                          // `shouldRevealCurrentPosterImmediately`, ya retirada).
+                          // Entra SIEMPRE con el fundido inicial, pero permanece
+                          // opaca debajo de HIGH cuando esta carga. Desvanecer
+                          // LOW a la vez que HIGH aparecía dejaba ambas capas
+                          // semitransparentes durante el cruce y el fondo negro
+                          // asomaba como un microparpadeo. HIGH termina cubriendo
+                          // LOW por completo sin necesidad de apagarla.
                           // SIN `transform-gpu`/`will-change:transform`: eso la
                           // promovía a su PROPIA capa, separada de la del wrapper
                           // (la que tiene la máscara). Al hacer tope/overscroll
@@ -8988,7 +8989,7 @@ export default function DetailsClient({
                           // capa del wrapper y la máscara la cubre siempre. La GPU
                           // la sigue aportando el wrapper (`transform-gpu`).
                           className={`absolute inset-0 w-full h-full object-cover transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none
-${currentHighLoaded ? "opacity-0" : currentLowLoaded ? "opacity-100" : "opacity-0"}`}
+${currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           style={{
                             transform: `scale(${posterLowEntranceScale})`,
                           }}
