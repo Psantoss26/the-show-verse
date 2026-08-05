@@ -1582,6 +1582,12 @@ export default function DetailsClient({
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(false);
 
+  // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
+  // portada: la barra ya ocupa esa zona y encadenar las dos cosas amontonaba
+  // información nada más abrir. Espera al primer scroll y aparece con el mismo
+  // revelado que el marcador y las pestañas.
+  const mobileActionsWaitForScroll = inProgressPct != null;
+
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
   const [heroLogoPath, setHeroLogoPath] = useState(null);
@@ -9398,28 +9404,38 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // `animation` se disparaba desde cero sobre botones que YA
                 // se veían -- efecto "aparecen sin imagen y un instante
                 // después vuelven a aparecer con imagen".
-                currentLowLoaded && inProgressChecked ? "" : "max-sm:invisible"
+                //
+                // Con barra de progreso NO se usa `invisible`: ahí la fila la
+                // oculta el revelado por scroll con su propia opacidad, y
+                // `visibility` cortaría esa transición.
+                mobileActionsWaitForScroll ||
+                (currentLowLoaded && inProgressChecked)
+                  ? ""
+                  : "max-sm:invisible"
               }`}
             >
               <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6">
-                {/* Con progreso, la fila se adelanta bajo el navbar para que
-                    quede completamente cubierta por él. Sin progreso conserva
-                    su separación visual normal. Ninguno de los dos ajustes
-                    participa en el flujo, así que logo y resto del detalle no
-                    cambian de posición. */}
-                <div
-                  className={`relative ${
-                    inProgressPct != null
-                      ? "-top-7"
-                      : "-top-2"
-                  } sm:top-0`}
-                >
+                <div className="relative -top-2 sm:top-0">
                   <div
                     ref={mobileActionRowRef}
                     className={
-                      currentLowLoaded && inProgressChecked
-                        ? "sv-mobile-actions-reveal"
-                        : ""
+                      mobileActionsWaitForScroll
+                        ? // CON BARRA DE PROGRESO: la fila no entra con la
+                          // portada. Antes se escondía tirando de ella hacia
+                          // arriba hasta quedar TAPADA por el navbar inferior;
+                          // ahora espera al primer scroll y aparece con el MISMO
+                          // revelado que el marcador y las pestañas, en su sitio.
+                          `${MOBILE_REVEAL_BASE} ${
+                            mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
+                          }`
+                        : currentLowLoaded && inProgressChecked
+                          ? "sv-mobile-actions-reveal"
+                          : ""
+                    }
+                    inert={
+                      isMobileViewport &&
+                      mobileActionsWaitForScroll &&
+                      !mobileSecondaryVisible
                     }
                   >
                   <DetailActionsRow

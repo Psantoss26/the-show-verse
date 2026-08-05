@@ -54,6 +54,15 @@ export const LIQUID_GLASS_TOOLTIP =
 // apreciable (13/255). Los navegadores no aplican filtros SVG al backdrop, así
 // que la ondulación del cristal de iOS NO es reproducible hoy en web; la
 // sensación de vidrio la dan el canto que refracta y el reflejo (ver Navbar).
+// Variante PLANA para franjas fijas a lo ancho de la ventana (la barra
+// superior). Mismo cristal que LIQUID_GLASS_BAR —igual tinte, desenfoque y
+// saturación, así que lo de detrás se ve igual— pero SIN el degradado de luz.
+// En una píldora que flota, ese degradado da volumen; en una franja pegada al
+// borde superior cae justo arriba y se lee como una banda clara cruzando lo alto
+// de la página. Sin él el acabado queda uniforme de lado a lado.
+export const LIQUID_GLASS_BAR_FLAT =
+  "bg-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06]";
+
 export const LIQUID_GLASS_BAR =
   "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
 
