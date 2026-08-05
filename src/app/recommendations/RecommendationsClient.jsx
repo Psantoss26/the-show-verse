@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AnimatePresence,
   motion,
@@ -24,6 +25,7 @@ import {
 import {
   BookmarkPlus,
   Heart,
+  Info,
   ListVideo,
   Loader2,
   RotateCcw,
@@ -107,6 +109,7 @@ function detailsHref(item) {
 
 export default function RecommendationsClient() {
   const { session, account, hydrated } = useAuth();
+  const router = useRouter();
   const reduceMotion = useReducedMotion();
   const listFlow = useAddToListFlow();
 
@@ -125,6 +128,14 @@ export default function RecommendationsClient() {
 
   const current = deck[0] || null;
   const upcoming = deck.slice(1, 3);
+  const currentDetailsHref = current ? detailsHref(current) : null;
+
+  // La ficha de la carta visible queda preparada antes de pulsar Información.
+  // La precarga no modifica el estado de la recomendación ni avanza la baraja.
+  useEffect(() => {
+    if (!currentDetailsHref) return;
+    router.prefetch(currentDetailsHref);
+  }, [currentDetailsHref, router]);
 
   const loadDeck = useCallback(
     async ({ append = false } = {}) => {
@@ -609,7 +620,7 @@ export default function RecommendationsClient() {
                 se reparten el ancho (MOBILE_ACTION_BUTTON_CLASS escala el icono
                 con container queries), con su mismo `gap-1.5`. */}
             <div
-              className={`mx-auto flex w-full max-w-sm shrink-0 items-center justify-center gap-1.5 px-4 pt-5 sm:gap-3 sm:pt-10 ${MOBILE_ACTION_BUTTON_CLASS}`}
+              className={`mx-auto flex w-full max-w-md shrink-0 items-center justify-center gap-1.5 px-4 pt-5 sm:gap-3 sm:pt-10 ${MOBILE_ACTION_BUTTON_CLASS}`}
             >
               <RecommendationActionButton
                 label="Deshacer"
@@ -625,6 +636,16 @@ export default function RecommendationsClient() {
                 activeColor="blue"
               >
                 <X />
+              </RecommendationActionButton>
+              <RecommendationActionButton
+                label="Más información"
+                onClick={() => {
+                  if (currentDetailsHref) router.push(currentDetailsHref);
+                }}
+                disabled={!currentDetailsHref}
+                activeColor="green"
+              >
+                <Info />
               </RecommendationActionButton>
               <RecommendationActionButton
                 label={
@@ -689,6 +710,12 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
   // La carta se inclina según cuánto se ha arrastrado: da la sensación física
   // de estar cogiéndola por el centro.
   const rotate = useTransform(x, [-300, 0, 300], [-14, 0, 14]);
+  // En móvil los indicadores quedan quietos sobre el fondo oscuro mientras la
+  // portada se aparta. Compensar posición y giro evita que el sello acompañe a
+  // la imagen y desaparezca precisamente en la dirección del gesto.
+  const stampX = useTransform(x, (value) => -value);
+  const stampY = useTransform(y, (value) => -value);
+  const stampRotate = useTransform(rotate, (value) => -value);
   // Sellos de intención: se van revelando conforme el gesto se acerca al umbral.
   const dismissOpacity = useTransform(x, [-140, -40, 0], [1, 0, 0]);
   const watchlistOpacity = useTransform(x, [0, 40, 140], [0, 0, 1]);
@@ -760,6 +787,31 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
       }}
       transition={{ duration: reduceMotion ? 0 : 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
+      {/* MÓVIL: los sellos se revelan DETRÁS de la portada, en el lado opuesto
+          a su salida. Van antes que la imagen para que esta los tape hasta que
+          el gesto deja visible la zona oscura. */}
+      <SwipeStamp
+        action={SWIPE_ACTIONS.DISMISS}
+        opacity={dismissOpacity}
+        visibility="mobile"
+        counterMotion={{ x: stampX, y: stampY, rotate: stampRotate }}
+        className="right-5 top-[42%] -translate-y-1/2"
+      />
+      <SwipeStamp
+        action={SWIPE_ACTIONS.WATCHLIST}
+        opacity={watchlistOpacity}
+        visibility="mobile"
+        counterMotion={{ x: stampX, y: stampY, rotate: stampRotate }}
+        className="left-5 top-[42%] -translate-y-1/2"
+      />
+      <SwipeStamp
+        action={SWIPE_ACTIONS.FAVORITE}
+        opacity={favoriteOpacity}
+        visibility="mobile"
+        counterMotion={{ x: stampX, y: stampY, rotate: stampRotate }}
+        className="bottom-6 left-1/2 -translate-x-1/2"
+      />
+
       {/* MÓVIL: portada vertical, fundida por abajo con la máscara compartida de
           la ficha para que el logo y las puntuaciones queden sobre el fondo de
           la página y no sobre un corte de imagen. */}
@@ -794,10 +846,25 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
           máscara, y sumar ambos ensuciaba la parte baja de la imagen. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-2/3 bg-gradient-to-t from-black via-black/70 to-transparent sm:block" />
 
-      {/* Sellos de intención */}
-      <SwipeStamp action={SWIPE_ACTIONS.DISMISS} opacity={dismissOpacity} className="left-5 top-5 -rotate-12" />
-      <SwipeStamp action={SWIPE_ACTIONS.WATCHLIST} opacity={watchlistOpacity} className="right-5 top-5 rotate-12" />
-      <SwipeStamp action={SWIPE_ACTIONS.FAVORITE} opacity={favoriteOpacity} className="left-1/2 top-8 -translate-x-1/2" />
+      {/* ESCRITORIO: conserva los sellos dentro de la propia tarjeta. */}
+      <SwipeStamp
+        action={SWIPE_ACTIONS.DISMISS}
+        opacity={dismissOpacity}
+        visibility="desktop"
+        className="left-5 top-5 -rotate-12"
+      />
+      <SwipeStamp
+        action={SWIPE_ACTIONS.WATCHLIST}
+        opacity={watchlistOpacity}
+        visibility="desktop"
+        className="right-5 top-5 rotate-12"
+      />
+      <SwipeStamp
+        action={SWIPE_ACTIONS.FAVORITE}
+        opacity={favoriteOpacity}
+        visibility="desktop"
+        className="left-1/2 top-8 -translate-x-1/2"
+      />
 
       {/* ---------- MÓVIL: logo + puntuaciones, nada más ---------- */}
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 px-6 pb-2 sm:hidden">
@@ -869,14 +936,27 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
   );
 }
 
-function SwipeStamp({ action, opacity, className = "" }) {
+function SwipeStamp({
+  action,
+  opacity,
+  visibility = "all",
+  counterMotion,
+  className = "",
+}) {
   const style = ACTION_STYLE[action];
   const Icon = style.icon;
+  const visibilityClass =
+    visibility === "mobile"
+      ? "flex sm:hidden"
+      : visibility === "desktop"
+        ? "hidden sm:flex"
+        : "flex";
+
   return (
     <motion.div
       aria-hidden="true"
-      style={{ opacity }}
-      className={`pointer-events-none absolute flex items-center gap-2 rounded-2xl px-4 py-2 ring-4 ${style.ring} ${style.text} ${style.glow} ${LIQUID_GLASS_PANEL} ${className}`}
+      style={{ opacity, ...counterMotion }}
+      className={`${visibilityClass} pointer-events-none absolute items-center gap-2 rounded-2xl px-4 py-2 ring-4 ${style.ring} ${style.text} ${style.glow} ${LIQUID_GLASS_PANEL} ${className}`}
     >
       <Icon className="h-5 w-5" />
       <span className="text-sm font-black uppercase tracking-wider">

@@ -29,9 +29,23 @@ export async function signAccessToken(payload) {
 
 /**
  * Genera un refresh token JWT (vida larga: 30 días).
+ *
+ * IDENTIFICADOR ÚNICO (`jti`) — NO QUITAR.
+ * Sin él, el contenido firmado es `{ sub, iat, exp, iss, aud }`, y `iat` tiene
+ * resolución de SEGUNDOS: dos refrescos del MISMO usuario dentro del mismo
+ * segundo producían un token IDÉNTICO byte a byte (HS256 es determinista) y, por
+ * tanto, el mismo `token_hash`. Como `refresh_tokens.token_hash` es UNIQUE, el
+ * segundo INSERT reventaba con violación de clave y /v1/auth/refresh devolvía
+ * 500.
+ *
+ * Eso es exactamente lo que pasa al caducar el access token (15 min): la página
+ * dispara decenas de peticiones a la vez, todas refrescan en el mismo segundo,
+ * una gana y el resto recibe 500 → el proxy lo traduce a 401/503 → todas las
+ * páginas de usuario se pintan vacías «como si se hubiese cerrado sesión», y
+ * recargar repite la tormenta.
  */
 export async function signRefreshToken(payload) {
-  return new SignJWT(payload)
+  return new SignJWT({ ...payload, jti: crypto.randomUUID() })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(REFRESH_EXPIRY)

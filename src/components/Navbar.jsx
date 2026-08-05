@@ -1703,10 +1703,10 @@ export default function Navbar() {
   // suave a propósito: con uno fuerte, sobre un cristal tan difuminado, el color
   // se derramaba y ensuciaba la pieza.
   const MOBILE_BOTTOM_TONES = {
-    red: "text-red-400 drop-shadow-[0_0_10px_rgba(248,113,113,0.35)]",
-    blue: "text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]",
-    purple: "text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,0.35)]",
-    green: "text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.35)]",
+    red: "text-red-400 drop-shadow-[0_1.5px_4px_rgba(248,113,113,0.5)]",
+    blue: "text-sky-300 drop-shadow-[0_1.5px_4px_rgba(56,189,248,0.5)]",
+    purple: "text-fuchsia-300 drop-shadow-[0_1.5px_4px_rgba(232,121,249,0.5)]",
+    green: "text-emerald-300 drop-shadow-[0_1.5px_4px_rgba(52,211,153,0.5)]",
   };
 
   const navLinkClassMobileBottom = (href, tone = "blue") => {
@@ -1718,43 +1718,60 @@ export default function Navbar() {
       "active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 " +
       (active
         ? MOBILE_BOTTOM_TONES[tone] || MOBILE_BOTTOM_TONES.blue
-        : "text-white/60 hover:text-white/85")
+        : "text-white/70 hover:text-white")
     );
   };
 
-  // Sin rótulos: el icono va centrado en su celda. La compactación la aplica la
-  // barra entera con un `scale`, así que el icono no lleva animación propia (una
-  // sola transformación compuesta = animación fluida, sin recalcular layout).
   const mobileBottomIconSlotClass =
     "relative z-10 flex items-center justify-center";
 
-  // Trazo MÁS GRUESO que el de por defecto de lucide (2): a 24px y sobre un
-  // cristal muy difuminado, una línea fina se diluye y los iconos pierden
-  // presencia. Las puntas redondeadas evitan que ese grosor se vea duro.
-  const mobileBottomIconClass = "h-6 w-6 shrink-0";
-  const MOBILE_BOTTOM_ICON_STROKE = 2.4;
+  const mobileBottomIconClass =
+    "h-6 w-6 shrink-0 transform-gpu transition-all duration-300 ease-out drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]";
+  const MOBILE_BOTTOM_ICON_STROKE = 2.2;
 
-  // Lente de la sección activa: un CÍRCULO de luz difusa, no una cápsula del
-  // ancho de la celda. En la barra de Instagram el realce es redondo y algo
-  // menor que la celda, y su suavidad viene de la propia luz, sin ningún canto:
-  // por eso aquí no hay reflejo interior de 1px (dibujaba un borde marcado justo
-  // en lo que debía ser un degradado).
+  // Lente de la sección activa: un CÍRCULO de cristal líquido (Liquid Glass) con
+  // desenfoque de fondo, iluminación especular en el canto, refracción óptica y
+  // resplandor tonal adaptado a la identidad de cada sección.
   //
   // El `layoutId` va en una capa que ocupa la celda ENTERA y el círculo es un
   // hijo centrado: así Framer anima la posición de la celda (el deslizamiento
   // entre secciones) sin pelearse con la transformación que centraría el
-  // círculo, que es lo que pasa al poner `layoutId` sobre un elemento
-  // desplazado con `-translate-x-1/2`.
-  const mobileBottomActiveLens = (
-    <motion.span
-      aria-hidden="true"
-      layoutId="mobile-bottom-nav-active"
-      className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
-      transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
-    >
-      <span className="block aspect-square h-[88%] rounded-full bg-white/[0.17] bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.16),transparent_70%)] shadow-[0_2px_14px_-2px_rgba(0,0,0,0.4)]" />
-    </motion.span>
-  );
+  // círculo.
+  const getMobileBottomActiveLens = (tone = "blue") => {
+    const TONE_CONFIGS = {
+      blue: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(56,189,248,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-sky-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      purple: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(232,121,249,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-fuchsia-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      green: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(52,211,153,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-emerald-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      red: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(248,113,113,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-red-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+    };
+
+    const config = TONE_CONFIGS[tone] || TONE_CONFIGS.blue;
+
+    return (
+      <motion.span
+        aria-hidden="true"
+        layoutId="mobile-bottom-nav-active"
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+        transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
+      >
+        <span
+          className={`block aspect-square h-[88%] rounded-full backdrop-blur-[14px] backdrop-saturate-[200%] backdrop-contrast-[1.1] ${config.bg} ${config.glow}`}
+        />
+      </motion.span>
+    );
+  };
 
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
@@ -2260,9 +2277,13 @@ export default function Navbar() {
           aria-label={t("nav_movies", "Películas")}
           title={t("nav_movies", "Películas")}
         >
-          {isActive("/movies") && mobileBottomActiveLens}
+          {isActive("/movies") && getMobileBottomActiveLens("blue")}
           <span className={mobileBottomIconSlotClass}>
-            <FilmIcon className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <FilmIcon
+              className={`${mobileBottomIconClass} ${isActive("/movies") ? "fill-sky-400/25" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
 
@@ -2277,9 +2298,13 @@ export default function Navbar() {
           aria-label={t("nav_series", "Series")}
           title={t("nav_series", "Series")}
         >
-          {isActive("/series") && mobileBottomActiveLens}
+          {isActive("/series") && getMobileBottomActiveLens("purple")}
           <span className={mobileBottomIconSlotClass}>
-            <TvIcon className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <TvIcon
+              className={`${mobileBottomIconClass} ${isActive("/series") ? "fill-fuchsia-400/25" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
 
@@ -2292,9 +2317,13 @@ export default function Navbar() {
           aria-label={t("nav_in_progress_short", "En curso")}
           title={t("nav_in_progress_short", "En curso")}
         >
-          {isActive("/in-progress") && mobileBottomActiveLens}
+          {isActive("/in-progress") && getMobileBottomActiveLens("green")}
           <span className={mobileBottomIconSlotClass}>
-            <Play className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <Play
+              className={`${mobileBottomIconClass} ${isActive("/in-progress") ? "fill-emerald-400 text-emerald-300" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
 
@@ -2307,9 +2336,13 @@ export default function Navbar() {
           aria-label={t("nav_history", "Historial")}
           title={t("nav_history", "Historial")}
         >
-          {isActive("/history") && mobileBottomActiveLens}
+          {isActive("/history") && getMobileBottomActiveLens("green")}
           <span className={mobileBottomIconSlotClass}>
-            <Eye className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <Eye
+              className={`${mobileBottomIconClass} ${isActive("/history") ? "fill-emerald-400/25" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
 
@@ -2322,9 +2355,13 @@ export default function Navbar() {
           aria-label={t("nav_favorites", "Favoritas")}
           title={t("nav_favorites", "Favoritas")}
         >
-          {isActive(favHref) && mobileBottomActiveLens}
+          {isActive(favHref) && getMobileBottomActiveLens("red")}
           <span className={mobileBottomIconSlotClass}>
-            <Heart className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <Heart
+              className={`${mobileBottomIconClass} ${isActive(favHref) ? "fill-red-400 text-red-400" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
 
@@ -2337,9 +2374,13 @@ export default function Navbar() {
           aria-label={t("nav_watchlist", "Pendientes")}
           title={t("nav_watchlist", "Pendientes")}
         >
-          {isActive(watchHref) && mobileBottomActiveLens}
+          {isActive(watchHref) && getMobileBottomActiveLens("blue")}
           <span className={mobileBottomIconSlotClass}>
-            <Bookmark className={mobileBottomIconClass} strokeWidth={MOBILE_BOTTOM_ICON_STROKE} />
+            <Bookmark
+              className={`${mobileBottomIconClass} ${isActive(watchHref) ? "fill-sky-400 text-sky-300" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
           </span>
         </Link>
       </nav>

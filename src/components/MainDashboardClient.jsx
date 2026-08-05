@@ -5,7 +5,12 @@ import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useReducedMotion,
+} from "framer-motion";
 import {
   useScrollRevealProps,
   useTopResetRevealProps,
@@ -15,7 +20,13 @@ import {
   normalizeDashboardSectionTitle,
 } from "@/lib/dashboard/sectionLabel";
 import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
-import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
+import {
+  DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
+  DASHBOARD_PREVIEW_ENTER_TRANSITION,
+  DASHBOARD_PREVIEW_EXIT_TRANSITION,
+  DASHBOARD_PREVIEW_OPEN_DELAY_MS,
+  DASHBOARD_PREVIEW_REDUCED_TRANSITION,
+} from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -1939,6 +1950,7 @@ function InlinePreviewCardAnticipated({
   activeIndex,
   alignment,
 }) {
+  const reduceMotion = useReducedMotion();
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const mediaType = getMediaTypeForItem(movie);
@@ -2312,20 +2324,26 @@ function InlinePreviewCardAnticipated({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92, x: alignX }}
-      animate={{ opacity: 1, scale: 1.18, x: alignX }}
+      initial={
+        reduceMotion
+          ? false
+          : { opacity: 0, scale: 0.94, y: 8, x: alignX }
+      }
+      animate={{ opacity: 1, scale: 1.18, y: 0, x: alignX }}
       exit={{
         opacity: 0,
-        scale: 0.92,
+        scale: 0.96,
+        y: 5,
         x: alignX,
-        transition: { duration: 0.14, ease: "easeInOut" },
+        transition: reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
       }}
-      transition={{
-        type: "spring",
-        stiffness: 200,
-        damping: 22,
-        mass: 0.7,
-      }}
+      transition={
+        reduceMotion
+          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+          : DASHBOARD_PREVIEW_ENTER_TRANSITION
+      }
       className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] ${previewAnchorClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
       onClick={openPreviewModal}
       style={{ willChange: "transform, opacity" }}
@@ -2694,6 +2712,7 @@ export function Row({
   showContextBadge = false,
   accent = "amber",
 }) {
+  const reduceMotion = useReducedMotion();
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
   const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
@@ -2790,11 +2809,11 @@ export function Row({
 
     const hoverToken = hoverIntentRef.current + 1;
     hoverIntentRef.current = hoverToken;
-    setHoveredIndex(index);
     prewarmHoverBackdrop(m);
+    const previewReady = preparePreviewBackdrop(m, backdropOverride);
 
     const revealWhenReady = () => {
-      preparePreviewBackdrop(m, backdropOverride).finally(() => {
+      previewReady.finally(() => {
         if (hoverIntentRef.current === hoverToken) {
           setHoveredId(itemKey);
           setHoveredIndex(index);
@@ -2803,19 +2822,21 @@ export function Row({
       });
     };
 
-    if (previewKind === "anticipated") {
-      hoverTimeoutRef.current = setTimeout(revealWhenReady, 120);
-    } else {
+    hoverTimeoutRef.current = setTimeout(() => {
+      hoverTimeoutRef.current = null;
       revealWhenReady();
-    }
+    }, DASHBOARD_PREVIEW_OPEN_DELAY_MS);
   };
 
-  const handleMouseLeaveItem = (itemKey, item) => {
+  const handleMouseLeaveItem = () => {
     if (isMobile) return;
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    // Invalida también una preparación de imagen que ya hubiera empezado para
+    // que nunca pueda abrirse la preview después de abandonar la tarjeta.
+    hoverIntentRef.current += 1;
     // Cierre DIFERIDO: mantenemos abierta la vista previa (y el empuje de las
     // vecinas) durante un instante. Si el cursor entra en otra tarjeta dentro de
     // ese margen, handleMouseEnterItem cancela este cierre y la preview cambia de
@@ -2827,17 +2848,14 @@ export function Row({
       closeTimeoutRef.current = null;
       hoverIntentRef.current += 1;
       setHoveredId((prev) => {
-        if (prev === itemKey) {
-          if (previewKind === "anticipated") {
-            setAnticipatedAnimatingOutId(itemKey);
-          }
-          return null;
+        if (prev && previewKind === "anticipated") {
+          setAnticipatedAnimatingOutId(prev);
         }
-        return prev;
+        return null;
       });
       setHoveredIndex(null);
       setHoveredAlignment("center");
-      clearHoverBackdrop(item);
+      clearHoverBackdrop();
     }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
   };
   // Montamos la fila un poco ANTES de que entre en pantalla (margen positivo) para
@@ -3129,7 +3147,7 @@ export function Row({
               const isNearEnd = isLast || isSecondToLast || isThirdToLast;
 
               const base =
-                "relative flex-shrink-0 transition-all duration-300 ease-in-out";
+                "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
 
               const isStandardPopoverPreview =
                 isActive && previewKind !== "anticipated" && !isSpotlight;
@@ -3275,7 +3293,7 @@ export function Row({
                   <div
                     className={`${base} ${sizeClasses} ${itemBoxClass} ${transformClass} ${zOverflowClasses}`}
                     onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
-                    onMouseLeave={() => handleMouseLeaveItem(itemKey, m)}
+                    onMouseLeave={handleMouseLeaveItem}
                   >
                     <AnimatePresence
                       initial={false}
@@ -3300,35 +3318,43 @@ export function Row({
                             <motion.div
                               key="preview-normal"
                               initial={
-                                isStandardPopoverPreview
+                                reduceMotion
+                                  ? false
+                                  : isStandardPopoverPreview
                                   ? {
                                       opacity: 0,
-                                      scale: 0.92,
+                                      scale: 0.94,
+                                      y: 8,
                                       x: standardPreviewX,
                                     }
-                                  : { opacity: 0, scale: 0.98 }
+                                  : { opacity: 0, scale: 0.96, y: 6 }
                               }
                               animate={
                                 isStandardPopoverPreview
                                   ? {
                                       opacity: 1,
                                       scale: 1,
+                                      y: 0,
                                       x: standardPreviewX,
                                     }
-                                  : { opacity: 1, scale: 1 }
+                                  : { opacity: 1, scale: 1, y: 0 }
                               }
                               exit={{
                                 opacity: 0,
-                                scale: isStandardPopoverPreview ? 0.92 : 0.95,
+                                scale: isStandardPopoverPreview ? 0.96 : 0.97,
+                                y: 5,
                                 ...(isStandardPopoverPreview
                                   ? { x: standardPreviewX }
                                   : {}),
-                                transition: { duration: 0.12 },
+                                transition: reduceMotion
+                                  ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                                  : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                               }}
-                              transition={{
-                                duration: 0.25,
-                                ease: [0.4, 0, 0.2, 1],
-                              }}
+                              transition={
+                                reduceMotion
+                                  ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                                  : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                              }
                               className={
                                 isStandardPopoverPreview
                                   ? `absolute top-0 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} ${standardPreviewAnchorClass} z-[80] hidden sm:block`
@@ -3352,21 +3378,26 @@ export function Row({
                       ) : (
                         <motion.div
                           key="poster"
-                          initial={{ opacity: 0, scale: 0.95 }}
+                          initial={
+                            reduceMotion ? false : { opacity: 0, scale: 0.97 }
+                          }
                           animate={{ opacity: 1, scale: 1 }}
                           exit={
                             previewKind === "anticipated"
                               ? { opacity: 0, transition: { duration: 0 } }
                               : {
                                   opacity: 0,
-                                  scale: 0.98,
-                                  transition: { duration: 0.12 },
+                                  scale: 0.97,
+                                  transition: reduceMotion
+                                    ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                                    : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                                 }
                           }
-                          transition={{
-                            duration: 0.18,
-                            ease: [0.4, 0, 0.2, 1],
-                          }}
+                          transition={
+                            reduceMotion
+                              ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                              : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                          }
                           className="w-full h-full"
                           style={{ willChange: "transform, opacity" }}
                         >

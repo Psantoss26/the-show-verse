@@ -405,24 +405,26 @@ let drawerWidthVarOwner = 0;
 //
 // MÁXIMO: media pantalla.
 //
-// MÍNIMO: el punto exacto en el que la fila de Reparto pasa de 6 a 5 tarjetas.
-// Ese Swiper usa `breakpointsBase="container"`, así que sus breakpoints miden el
-// CONTENEDOR (no la ventana) — por eso el ancho del drawer cambia el número de
-// tarjetas. El breakpoint de 6 tarjetas es 840px de contenedor; por debajo caen
-// a 5. El contenedor es el panel menos el padding horizontal del área de
-// secciones (`p-7` en >=sm = 28px por lado = 56px). Luego:
-//     840 (breakpoint 6 tarjetas) + 56 (padding) = 896px de panel
-// Si se cambia el breakpoint del Swiper o ese padding, hay que recalcular aquí.
-const CAST_SIX_CARDS_CONTAINER_PX = 840;
-const PANEL_SECTIONS_PADDING_X_PX = 56;
-const DRAWER_MIN_PX = CAST_SIX_CARDS_CONTAINER_PX + PANEL_SECTIONS_PADDING_X_PX;
+// MÍNIMO: un ancho al que el panel sigue siendo legible.
+//
+// AQUÍ HABÍA 896px, Y CONGELABA EL REDIMENSIONADO.
+// Ese valor no era un mínimo de usabilidad sino una PREFERENCIA DE MAQUETACIÓN:
+// el punto exacto en el que la fila de Reparto pasa de 6 a 5 tarjetas (su Swiper
+// usa `breakpointsBase="container"`, con el breakpoint de 6 tarjetas en 840px de
+// contenedor, más 56px del padding horizontal del área de secciones).
+// El problema es que el máximo es media pantalla: en cualquier ventana de menos
+// de 1792px el mínimo ALCANZABA al máximo (p. ej. a 1440px: min 896 → acotado a
+// 720, max 720) y el rango se quedaba en cero. Resultado: arrastrar el tirador
+// no hacía absolutamente nada en prácticamente ningún portátil ni monitor.
+// La fila de Reparto ya baja a 5 tarjetas por sí sola —para eso están sus
+// breakpoints—, así que no hay nada que proteger con un mínimo tan alto.
+const DRAWER_MIN_PX = 560;
 
 function clampDrawerWidth(width, viewportWidth) {
   const vw = viewportWidth || 1280;
   const max = Math.round(vw * 0.5);
-  // En pantallas donde media pantalla no llega al mínimo (vw < 1792) el mínimo
-  // cedería por encima del máximo e invertiría el rango, así que se acota. En
-  // esos casos el drawer queda fijado al máximo en lugar de romperse.
+  // Se sigue acotando por si el máximo cayera por debajo del mínimo (ventanas
+  // muy estrechas): ahí el drawer queda fijo al máximo en lugar de romperse.
   const min = Math.min(DRAWER_MIN_PX, max);
   return Math.max(min, Math.min(Math.round(width || 0), max));
 }
@@ -893,9 +895,16 @@ export default function DetailModal({
       const next = clampDrawerWidth(vw - moveEvent.clientX, vw);
       panelWidthRef.current = next;
       if (panelRef.current) panelRef.current.style.width = `${next}px`;
-      // Mantiene la CSS var en vivo durante el arrastre (el efecto solo reconcilia
-      // al soltar), para que un overlay a la izquierda siga el ancho del drawer.
-      document.documentElement.style.setProperty("--sv-drawer-width", `${next}px`);
+      // NO se toca `--sv-drawer-width` aquí. Escribir una custom property en
+      // :root invalida el estilo de TODO el documento, y con la rejilla de una
+      // página de usuario detrás eso costaba 46,7 ms por movimiento (medido),
+      // frente a 0,06 ms del ancho del panel: era el 99 % del coste del gesto y
+      // lo que impedía que el arrastre fuese fluido.
+      // La var se reconcilia al soltar (efecto de `panelWidth`), y no se pierde
+      // nada: sus dos consumidores —el modal de episodios agrupados de Historial
+      // y el de ProfileSection— animan `right` con `transition duration-300`, así
+      // que nunca seguían el puntero fotograma a fotograma; ahora se deslizan a
+      // su sitio al terminar el gesto, que es justo lo que esa transición hace.
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);

@@ -18,7 +18,13 @@ import {
 } from "@/lib/hooks/useHasScrolled";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
-import { DASHBOARD_PREVIEW_CLOSE_DELAY_MS } from "@/lib/dashboard/previewTiming";
+import {
+  DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
+  DASHBOARD_PREVIEW_ENTER_TRANSITION,
+  DASHBOARD_PREVIEW_EXIT_TRANSITION,
+  DASHBOARD_PREVIEW_OPEN_DELAY_MS,
+  DASHBOARD_PREVIEW_REDUCED_TRANSITION,
+} from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
@@ -1359,6 +1365,7 @@ function Row({
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
   const hoverIntentRef = useRef(0);
+  const openTimeoutRef = useRef(null);
   const closeTimeoutRef = useRef(null);
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
@@ -1387,6 +1394,9 @@ function Row({
 
   useEffect(() => {
     return () => {
+      if (openTimeoutRef.current) {
+        clearTimeout(openTimeoutRef.current);
+      }
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current);
       }
@@ -1628,6 +1638,10 @@ function Row({
         }}
         onMouseLeave={() => {
           setIsHoveredRow(false);
+          if (openTimeoutRef.current) {
+            clearTimeout(openTimeoutRef.current);
+            openTimeoutRef.current = null;
+          }
           if (closeTimeoutRef.current) {
             clearTimeout(closeTimeoutRef.current);
           }
@@ -1673,7 +1687,7 @@ function Row({
             const isActive = !isMobile && hoveredId === itemKey;
 
             const base =
-              "relative flex-shrink-0 transition-all duration-300 ease-in-out";
+              "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
             // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
             // en la vista previa destacada. Si la activa usa una altura derivada
             // del aspecto (aspect-video / h-full), al cerrar el `transition-all`
@@ -1720,29 +1734,41 @@ function Row({
                       clearTimeout(closeTimeoutRef.current);
                       closeTimeoutRef.current = null;
                     }
+                    if (openTimeoutRef.current) {
+                      clearTimeout(openTimeoutRef.current);
+                    }
                     const hoverToken = hoverIntentRef.current + 1;
                     hoverIntentRef.current = hoverToken;
-                    setHoveredIndex(i);
-                    if (isTop10) showHoverBackdrop(m);
-                    else prewarmHoverBackdrop(m);
-                    preparePreviewBackdrop(m).finally(() => {
-                      if (hoverIntentRef.current === hoverToken) {
-                        setHoveredId(itemKey);
-                      }
-                    });
+                    prewarmHoverBackdrop(m);
+                    const previewReady = preparePreviewBackdrop(m);
+                    openTimeoutRef.current = window.setTimeout(() => {
+                      openTimeoutRef.current = null;
+                      previewReady.finally(() => {
+                        if (hoverIntentRef.current === hoverToken) {
+                          setHoveredIndex(i);
+                          setHoveredId(itemKey);
+                          if (isTop10) showHoverBackdrop(m);
+                        }
+                      });
+                    }, DASHBOARD_PREVIEW_OPEN_DELAY_MS);
                   }
                 }}
                 onMouseLeave={() => {
                   if (isMobile) return;
+                  if (openTimeoutRef.current) {
+                    clearTimeout(openTimeoutRef.current);
+                    openTimeoutRef.current = null;
+                  }
+                  hoverIntentRef.current += 1;
                   if (closeTimeoutRef.current) {
                     clearTimeout(closeTimeoutRef.current);
                   }
                   closeTimeoutRef.current = window.setTimeout(() => {
                     closeTimeoutRef.current = null;
                     hoverIntentRef.current += 1;
-                    setHoveredId((prev) => (prev === itemKey ? null : prev));
+                    setHoveredId(null);
                     setHoveredIndex(null);
-                    if (isTop10) clearHoverBackdrop();
+                    clearHoverBackdrop();
                   }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                 }}
               >
@@ -1751,18 +1777,24 @@ function Row({
                     <motion.div
                       key="preview"
                       initial={
-                        reduceMotion ? false : { opacity: 0, scale: 0.98 }
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, scale: 0.96, y: 6 }
                       }
-                      animate={{ opacity: 1, scale: 1 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{
                         opacity: 0,
-                        scale: 0.95,
-                        transition: { duration: reduceMotion ? 0.08 : 0.12 },
+                        scale: 0.97,
+                        y: 4,
+                        transition: reduceMotion
+                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                       }}
-                      transition={{
-                        duration: reduceMotion ? 0.08 : 0.25,
-                        ease: [0.4, 0, 0.2, 1],
-                      }}
+                      transition={
+                        reduceMotion
+                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                          : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                      }
                       className="w-full h-full hidden sm:block"
                       style={{ willChange: "transform, opacity" }}
                     >
@@ -1777,6 +1809,10 @@ function Row({
                             if (closeTimeoutRef.current) {
                               clearTimeout(closeTimeoutRef.current);
                               closeTimeoutRef.current = null;
+                            }
+                            if (openTimeoutRef.current) {
+                              clearTimeout(openTimeoutRef.current);
+                              openTimeoutRef.current = null;
                             }
                             hoverIntentRef.current += 1;
                             setHoveredId(itemKey);
@@ -1812,18 +1848,21 @@ function Row({
                     <motion.div
                       key="poster"
                       initial={
-                        reduceMotion ? false : { opacity: 0, scale: 0.95 }
+                        reduceMotion ? false : { opacity: 0, scale: 0.97 }
                       }
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{
                         opacity: 0,
-                        scale: 0.98,
-                        transition: { duration: reduceMotion ? 0.08 : 0.12 },
+                        scale: 0.97,
+                        transition: reduceMotion
+                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
                       }}
-                      transition={{
-                        duration: reduceMotion ? 0.08 : 0.18,
-                        ease: [0.4, 0, 0.2, 1],
-                      }}
+                      transition={
+                        reduceMotion
+                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                          : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                      }
                       className="w-full h-full"
                       style={{ willChange: "transform, opacity" }}
                     >
