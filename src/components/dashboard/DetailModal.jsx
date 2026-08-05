@@ -62,6 +62,7 @@ import {
   addMovieToList as backendAddMovieToList,
   createUserList as backendCreateUserList,
   getListDetails as backendGetListDetails,
+  removeMovieFromList as backendRemoveMovieFromList,
 } from "@/lib/api/backendLists";
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import LiquidButton from "@/components/LiquidButton";
@@ -1461,6 +1462,25 @@ export default function DetailModal({
     }
   };
 
+  const handleRemoveFromSpecificList = async (listId) => {
+    const lid = listId != null ? String(listId) : null;
+    if (!lid || !item || !membershipMap[lid]) return;
+    setBusyListId(lid);
+    setListsError("");
+    try {
+      await backendRemoveMovieFromList({
+        listId: lid,
+        movieId: item.id,
+        mediaType,
+      });
+      setMembershipMap((prev) => ({ ...prev, [lid]: false }));
+    } catch (e) {
+      setListsError(e?.message || "Error quitando de la lista");
+    } finally {
+      setBusyListId(null);
+    }
+  };
+
   const handleCreateListAndAdd = async () => {
     const n = newListName.trim();
     if (!n || !item) return;
@@ -2284,6 +2304,7 @@ export default function DetailModal({
         membershipMap={membershipMap}
         busyListId={busyListId}
         onAddToList={handleAddToSpecificList}
+        onRemoveFromList={handleRemoveFromSpecificList}
         creating={creatingList}
         createOpen={createOpen}
         setCreateOpen={setCreateOpen}
