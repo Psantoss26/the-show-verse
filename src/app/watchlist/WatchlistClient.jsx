@@ -10,7 +10,6 @@ import {
   useMemo,
   useRef,
   useCallback,
-  useDeferredValue,
   startTransition,
   memo,
 } from "react";
@@ -43,6 +42,7 @@ import {
   MonitorPlay,
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
@@ -100,6 +100,25 @@ function readInitialWatchlistViewMode() {
 
 const WATCHLIST_INITIAL_RENDER_LIMIT = 24;
 const WATCHLIST_RENDER_CHUNK_SIZE = 36;
+
+// Cambiar de modo de vista rehace el interior de TODAS las tarjetas pintadas.
+// Con la lista entera en el DOM eso tarda cientos de milisegundos en aplicarse;
+// Historial se siente instantáneo porque pinta pocas. Aquí se aplica el modo
+// nuevo solo a lo que se ve y el resto vuelve a entrar por tandas en tiempo
+// libre, con el mismo mecanismo de la carga inicial. Esto cuenta cuántas
+// tarjetas hay que conservar para que no se abra un hueco ni salte el scroll.
+function countWatchlistCardsInView() {
+  if (typeof document === "undefined") return null;
+  const cards = document.querySelectorAll("[data-watchlist-card]");
+  if (!cards.length) return null;
+  const bottom = window.innerHeight * 1.5;
+  let count = 0;
+  for (const card of cards) {
+    if (card.getBoundingClientRect().top > bottom) break;
+    count += 1;
+  }
+  return count;
+}
 
 function scheduleWatchlistRenderChunk(callback) {
   if (typeof window === "undefined") return null;
@@ -1765,6 +1784,7 @@ const WatchlistCard = memo(function WatchlistCard({
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        data-watchlist-card=""
       >
         <Link
           href={href}
@@ -1818,6 +1838,7 @@ const WatchlistCard = memo(function WatchlistCard({
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        data-watchlist-card=""
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <motion.div
@@ -1854,6 +1875,7 @@ const WatchlistCard = memo(function WatchlistCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
+      data-watchlist-card=""
     >
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
         <div
@@ -1887,6 +1909,15 @@ export default function WatchlistClient() {
   }));
   const { hasBackNavigationSnapshot, shouldRestoreSnapshot } =
     resolveUserListInitialSnapshot(initialCache.watchlist, isBackNav);
+  // El SERVIDOR no ve sessionStorage/localStorage, así que nunca detecta la
+  // vuelta atrás ni la caché: siempre pinta el hueco negro de más abajo. Si el
+  // CLIENTE sí las detecta en su primer render, los dos árboles no coinciden y
+  // React descarta el HTML recibido y reconstruye la página entera (error de
+  // hidratación). Durante ese primer render se pinta lo mismo que el servidor y
+  // la instantánea entra en el siguiente, que React programa de inmediato.
+  const hydrationReady = useHydrationReady();
+  const paintsBackNavigationSnapshot =
+    hasBackNavigationSnapshot && hydrationReady;
   // En una entrada normal solo pintamos caché RECIENTE (`fresh`, < TTL). Al
   // retroceder restauramos también una instantánea válida más antigua: es la vista
   // que el usuario acaba de dejar y permite recuperar contenido + scroll antes de
@@ -1925,13 +1956,21 @@ export default function WatchlistClient() {
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialWatchlistViewMode);
 
-  // Cambiar de modo reconstruye el interior de TODAS las tarjetas pintadas (cada
-  // modo devuelve una maqueta distinta y cambia el tipo de imagen), y eso
-  // bloqueaba el hilo al pulsar el botón. Con valores diferidos el botón
-  // responde en el acto y la lista se reconstruye sin congelar la página.
-  const deferredViewMode = useDeferredValue(viewMode);
+  // Al cambiar de modo, encoge la ventana de render a lo que se ve, para que el
+  // modo nuevo se aplique al instante (decenas de tarjetas en vez de cientos).
+  const shrinkRenderWindowToView = useCallback(() => {
+    const inView = countWatchlistCardsInView();
+    if (inView == null) return;
+    setRenderLimit((prev) =>
+      Math.max(
+        WATCHLIST_INITIAL_RENDER_LIMIT,
+        Math.min(prev, inView + WATCHLIST_RENDER_CHUNK_SIZE),
+      ),
+    );
+  }, []);
 
   const setViewMode = useCallback((mode) => {
+    shrinkRenderWindowToView();
     setViewModeState(mode);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("showverse:watchlist:viewMode", mode);
@@ -1939,7 +1978,7 @@ export default function WatchlistClient() {
     if (authenticated) {
       updatePreference({ defaultView: mode });
     }
-  }, [authenticated, updatePreference]);
+  }, [authenticated, updatePreference, shrinkRenderWindowToView]);
 
   const [typeFilter, setTypeFilter] = useState(() => {
     if (typeof window === "undefined") return "all";
@@ -1953,12 +1992,16 @@ export default function WatchlistClient() {
     return saved || "title-asc";
   });
 
-  const [imageMode, setImageMode] = useState(() => {
+  const [imageMode, setImageModeState] = useState(() => {
     if (typeof window === "undefined") return "poster";
     const saved = window.localStorage.getItem("showverse:watchlist:imageMode");
     return saved === "backdrop" ? "backdrop" : "poster";
   });
-  const deferredImageMode = useDeferredValue(imageMode);
+
+  const setImageMode = useCallback((mode) => {
+    shrinkRenderWindowToView();
+    setImageModeState(mode);
+  }, [shrinkRenderWindowToView]);
 
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
@@ -2783,18 +2826,18 @@ export default function WatchlistClient() {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
       : "";
-    if (deferredViewMode === "list") {
+    if (viewMode === "list") {
       return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
-    if (deferredViewMode === "compact") {
+    if (viewMode === "compact") {
       const compactCols =
-        deferredImageMode === "backdrop"
+        imageMode === "backdrop"
           ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
           : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
       return `grid gap-2 ${compactCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
     const gridCols =
-      deferredImageMode === "backdrop"
+      imageMode === "backdrop"
         ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
         : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
@@ -2804,27 +2847,30 @@ export default function WatchlistClient() {
   // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
   const entranceVisibleCount = estimateVisibleCards({
     columns: pickResponsiveColumns(
-      deferredViewMode === "list"
+      viewMode === "list"
         ? { base: 1, xl: 2 }
-        : deferredViewMode === "compact"
-          ? deferredImageMode === "backdrop"
+        : viewMode === "compact"
+          ? imageMode === "backdrop"
             ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
             : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
-          : deferredImageMode === "backdrop"
+          : imageMode === "backdrop"
             ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
             : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
     ),
     aspect:
-      deferredViewMode === "list" || deferredImageMode === "backdrop"
+      viewMode === "list" || imageMode === "backdrop"
         ? 0.5625
         : 1.5,
   });
 
-  if (!hydrated && !hasBackNavigationSnapshot) {
+  if (!hydrated && !paintsBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if ((!session || !account) && !(hasBackNavigationSnapshot && !hydrated)) {
+  if (
+    (!session || !account) &&
+    !(paintsBackNavigationSnapshot && !hydrated)
+  ) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -3565,7 +3611,7 @@ export default function WatchlistClient() {
                             count={subgroup.items.length}
                           />
                           <div
-                            key={`subgroup-grid-${group.key}-${subgroup.key}`}
+                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
                             className={getItemsGridClass(true)}
                           >
                             {subgroup.items.map((item, idx) => {
@@ -3578,8 +3624,8 @@ export default function WatchlistClient() {
                                   index={currentGlobalIdx}
                                   totalItems={sorted.length}
                                   animateWithin={entranceVisibleCount}
-                                  viewMode={deferredViewMode}
-                                  imageMode={deferredImageMode}
+                                  viewMode={viewMode}
+                                  imageMode={imageMode}
                                   imdbScore={imdbScores.get(getScoreItemKey(item))}
                                 />
                               );
@@ -3590,7 +3636,7 @@ export default function WatchlistClient() {
                     </div>
                   ) : (
                     <div
-                      key={`group-grid-${group.key}`}
+                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                       className={getItemsGridClass(true)}
                     >
                       {group.items.map((item, idx) => {
@@ -3603,8 +3649,8 @@ export default function WatchlistClient() {
                             index={currentGlobalIdx}
                             totalItems={sorted.length}
                             animateWithin={entranceVisibleCount}
-                            viewMode={deferredViewMode}
-                            imageMode={deferredImageMode}
+                            viewMode={viewMode}
+                            imageMode={imageMode}
                             imdbScore={imdbScores.get(getScoreItemKey(item))}
                           />
                         );
@@ -3617,6 +3663,7 @@ export default function WatchlistClient() {
           </div>
         ) : (
           <div
+            key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
           >
             {renderedSorted.map((item, idx) => (
@@ -3626,8 +3673,8 @@ export default function WatchlistClient() {
                 index={idx}
                 totalItems={sorted.length}
                 animateWithin={entranceVisibleCount}
-                viewMode={deferredViewMode}
-                imageMode={deferredImageMode}
+                viewMode={viewMode}
+                imageMode={imageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
               />
             ))}

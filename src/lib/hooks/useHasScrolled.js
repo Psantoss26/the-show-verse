@@ -1,24 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import {
   resolveScrollRevealProps,
   resolveTopResetRevealProps,
 } from "@/lib/motion/scrollRevealState";
-
-const subscribeHydration = () => () => {};
-const readClientHydration = () => true;
-const readServerHydration = () => false;
-
-function useHydrationReady() {
-  return useSyncExternalStore(
-    subscribeHydration,
-    readClientHydration,
-    readServerHydration,
-  );
-}
 
 // Devuelve `true` en cuanto el usuario hace SCROLL VERTICAL (o si la página ya
 // está desplazada al montar, p. ej. al restaurar el scroll en una vuelta atrás).
