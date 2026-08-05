@@ -1189,7 +1189,8 @@ export default function BibliotecaClient() {
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2245,6 +2246,7 @@ export default function BibliotecaClient() {
         {/* ====== FILTERS ====== */}
         <motion.div
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className={`sticky top-14 z-[70] space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}

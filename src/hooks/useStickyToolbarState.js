@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 
+const NOT_STUCK = { isSticky: false, isPinned: false };
+
 /**
- * Reports whether a mobile sticky toolbar has reached its computed `top` offset.
+ * Reports whether a sticky toolbar has reached its computed `top` offset.
  *
- * A toolbar can then keep expandable controls in normal document flow before it
- * sticks, while preserving an overlay once it is pinned below the mobile nav.
+ * - `isPinned`: está fijada, en CUALQUIER tamaño de pantalla. Es lo que activa
+ *   el cristal del navbar sobre las superficies del menú (ver la regla
+ *   `[data-menu-pinned="true"]` en globals.css).
+ * - `isSticky`: está fijada Y la ventana es de móvil. Con eso la barra mantiene
+ *   sus controles desplegables en el flujo normal antes de fijarse, y los pasa a
+ *   overlay una vez fijada bajo el navbar móvil.
  */
 export default function useStickyToolbarState(toolbarRef) {
-  const [isSticky, setIsSticky] = useState(false);
+  const [state, setState] = useState(NOT_STUCK);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -17,19 +23,27 @@ export default function useStickyToolbarState(toolbarRef) {
     const mobileQuery = window.matchMedia("(max-width: 1023px)");
     let frameId = 0;
 
+    const apply = (next) => {
+      setState((current) =>
+        current.isSticky === next.isSticky && current.isPinned === next.isPinned
+          ? current
+          : next,
+      );
+    };
+
     const measure = () => {
       const toolbar = toolbarRef.current;
-      if (!toolbar || !mobileQuery.matches) {
-        setIsSticky((current) => (current ? false : current));
+      if (!toolbar) {
+        apply(NOT_STUCK);
         return;
       }
 
       const topOffset = Number.parseFloat(window.getComputedStyle(toolbar).top);
-      const nextSticky =
+      const isPinned =
         Number.isFinite(topOffset) &&
         toolbar.getBoundingClientRect().top <= topOffset + 1;
 
-      setIsSticky((current) => (current === nextSticky ? current : nextSticky));
+      apply({ isPinned, isSticky: isPinned && mobileQuery.matches });
     };
 
     const scheduleMeasure = () => {
@@ -58,5 +72,5 @@ export default function useStickyToolbarState(toolbarRef) {
     };
   }, [toolbarRef]);
 
-  return isSticky;
+  return state;
 }

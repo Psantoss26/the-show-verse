@@ -1291,7 +1291,8 @@ export default function InProgressClient({
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   const [uiReady, setUiReady] = useState(false);
 
   // Al volver desde una ficha, restauramos la caché antes del primer paint. Así
@@ -2100,6 +2101,7 @@ export default function InProgressClient({
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div
           ref={filtersRef}
+          data-menu-pinned={filtersPinned}
           className={`sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}

@@ -227,7 +227,8 @@ export default function FilterableListItems({
   const [viewMode, setViewMode] = useState("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const filtersSticky = useStickyToolbarState(filtersRef);
+  const { isSticky: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef);
   // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();
@@ -310,6 +311,7 @@ export default function FilterableListItems({
     <div className="space-y-7">
       <motion.div
         ref={filtersRef}
+        data-menu-pinned={filtersPinned}
         className="relative sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20"
         initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
