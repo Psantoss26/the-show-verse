@@ -1,5 +1,9 @@
 "use client";
-import { LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_BAR,
+  LIQUID_GLASS_BAR_FLAT,
+  LIQUID_GLASS_PANEL,
+} from "@/lib/ui/liquidGlass";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -1312,10 +1316,14 @@ function TopBarGlassLayers({ className = "" }) {
         }}
       />
       {/* Especular: el reflejo que recorre el borde superior y se apaga hacia
-          dentro, sin trazar ninguna línea. */}
+          dentro, sin trazar ninguna línea.
+          Solo en MÓVIL (`lg:hidden`): allí la barra flota sobre el contenido y
+          ese reflejo le da cuerpo, pero en escritorio queda pegada al borde de
+          la ventana y el brillo se lee como una franja clara en lo alto de la
+          página, no como el canto de una pieza de vidrio. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] ${className}`}
+        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] lg:hidden ${className}`}
       />
     </>
   );
@@ -1795,18 +1803,22 @@ export default function Navbar() {
                 // los aportan la capa interna y la fila móvil, GRADUALMENTE con
                 // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
                 // así que la barra se queda transparente.
-                "lg:bg-black/15 lg:bg-gradient-to-b lg:from-white/[0.14] lg:via-white/[0.03] lg:to-black/15 lg:backdrop-blur-[7px] lg:backdrop-saturate-[190%] lg:backdrop-brightness-[1.06] lg:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
-              : `${LIQUID_GLASS_BAR}`
+                "lg:bg-black/15 lg:backdrop-blur-[7px] lg:backdrop-saturate-[190%] lg:backdrop-brightness-[1.06] lg:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
+              : // RESTO DE PÁGINAS: el mismo cristal líquido en móvil y en
+                // escritorio, en su variante PLANA. El fondo se sigue viendo a
+                // través igual (mismo tinte, desenfoque y saturación); lo que se
+                // quita es el degradado de luz, que era lo que dibujaba la banda
+                // clara en lo alto.
+                `${LIQUID_GLASS_BAR_FLAT} shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]`
         }`}
       >
-        {/* Capas de cristal, solo donde la barra TIENE fondo: en los estados
-            transparentes (sobre el hero o en la entrada de una ficha) añadirían
-            un velo que no debe estar. En rutas inmersivas el cristal es solo de
-            escritorio, así que las capas se limitan a `lg:`. */}
-        {!heroNavMode && !desktopDetailsNavMode && (
-          <TopBarGlassLayers
-            className={isImmersiveRoute ? "hidden lg:block" : ""}
-          />
+        {/* Capas de cristal (canto y reflejo) SOLO en móvil: ahí la barra es
+            estrecha y el relieve se lee como una pieza de vidrio. En escritorio
+            la franja cruza toda la ventana y cualquier relieve se convierte en
+            una banda; allí el cristal se queda plano y uniforme.
+            Nunca en los estados transparentes, donde añadirían un velo. */}
+        {!heroNavMode && !isImmersiveRoute && (
+          <TopBarGlassLayers className="lg:hidden" />
         )}
 
         {isDetailsRoute && (
