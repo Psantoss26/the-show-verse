@@ -2154,7 +2154,7 @@ export default function Navbar() {
         // `transform` (scale desde el borde inferior): al no tocar width/height
         // no hay recálculo de layout, así la compactación es fluida en todo
         // momento y en ambos sentidos del scroll.
-        className={`lg:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_4rem),21rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-1.5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        className={`lg:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
@@ -2168,7 +2168,7 @@ export default function Navbar() {
             transición sea continua y no dibuje ningún borde marcado. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[8px] backdrop-brightness-[1.28] backdrop-saturate-[240%]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[8px] backdrop-brightness-[1.12] backdrop-saturate-[190%]"
           style={{
             WebkitMaskImage:
               "radial-gradient(115% 135% at 50% 50%, transparent 40%, #000 95%)",
@@ -2183,13 +2183,13 @@ export default function Navbar() {
             rodea una pieza de vidrio). Sin esto el cristal se ve plano. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.05)_16%,transparent_40%,transparent_60%,rgba(255,255,255,0.05)_86%,rgba(255,255,255,0.13)_100%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(125deg,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_40%,transparent_60%,rgba(255,255,255,0.03)_86%,rgba(255,255,255,0.07)_100%)]"
         />
 
         {/* CAPA 3 — luz difusa superior, que asienta el volumen del conjunto. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.12)_0%,transparent_75%)]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.08)_0%,transparent_75%)]"
         />
 
         <Link
