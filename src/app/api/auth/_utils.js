@@ -104,10 +104,7 @@ export async function refreshBackendSession(request) {
   );
 }
 
-export function isBackendSessionUnavailable(result) {
-  const status = Number(result?.status || 0);
-  return status === 0 || status === 429 || status >= 500;
-}
+export { isBackendSessionUnavailable } from "@/lib/backend/sessionAvailability";
 
 export async function fetchBackendMe(accessToken) {
   return backendAuthRequest("/v1/auth/me", {

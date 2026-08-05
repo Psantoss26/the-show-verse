@@ -210,6 +210,7 @@ import {
   fetchUserLists as backendFetchUserLists,
   createUserList as backendCreateUserList,
   addMovieToList as backendAddMovieToList,
+  removeMovieFromList as backendRemoveMovieFromList,
   getListDetails as backendGetListDetails,
 } from "@/lib/api/backendLists";
 
@@ -1992,6 +1993,41 @@ export default function DetailsClient({
       );
     } catch (e) {
       setListsError(e?.message || "Error añadiendo a la lista");
+    } finally {
+      setBusyListId(null);
+    }
+  };
+
+  // Quita el título de una lista desde el mismo selector. El estado local y el
+  // contador se actualizan tras confirmar la eliminación en la BBDD para que el
+  // botón de acción y el modal permanezcan sincronizados.
+  const handleRemoveFromSpecificList = async (listId) => {
+    if (!canUseLists || !movieId) return;
+
+    const lid = getListId(listId);
+    if (!lid || !membershipMap?.[lid]) return;
+
+    setBusyListId(lid);
+    setListsError("");
+
+    try {
+      await backendRemoveMovieFromList({
+        listId: lid,
+        movieId,
+        mediaType: endpointType,
+      });
+
+      setMembershipMap((prev) => ({ ...(prev || {}), [lid]: false }));
+      setUserLists((prev) =>
+        (prev || []).map((list) => {
+          const id = getListId(list);
+          return id === lid
+            ? { ...list, item_count: Math.max(0, (list.item_count || 0) - 1) }
+            : list;
+        }),
+      );
+    } catch (e) {
+      setListsError(e?.message || "Error quitando de la lista");
     } finally {
       setBusyListId(null);
     }
@@ -8522,6 +8558,7 @@ export default function DetailsClient({
         membershipMap={membershipMap}
         busyListId={busyListId}
         onAddToList={handleAddToSpecificList}
+        onRemoveFromList={handleRemoveFromSpecificList}
         creating={creatingList}
         createOpen={createOpen}
         setCreateOpen={setCreateOpen}

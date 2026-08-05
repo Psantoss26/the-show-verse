@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import {
   X,
   Plus,
+  Minus,
   Check,
   Loader2,
   Search,
@@ -28,6 +29,7 @@ export default function AddToListModal(props) {
     membershipMap = {},
     busyListId = null,
     onAddToList = () => {},
+    onRemoveFromList = null,
 
     creating = false,
     createOpen = false,
@@ -266,20 +268,31 @@ export default function AddToListModal(props) {
 
                 const present = !!membershipMap?.[id];
                 const busy = String(busyListId ?? "") === id;
+                const canRemove = typeof onRemoveFromList === "function";
+                const actionLabel = present
+                  ? `Quitar de ${l?.name || "la lista"}`
+                  : `Añadir a ${l?.name || "la lista"}`;
 
                 return (
                   <button
                     key={id}
                     type="button"
-                    onClick={() =>
-                      !present && !busy ? onAddToList(id) : undefined
-                    }
-                    disabled={present || busy}
+                    onClick={() => {
+                      if (busy) return;
+                      if (present) {
+                        if (canRemove) onRemoveFromList(id);
+                        return;
+                      }
+                      onAddToList(id);
+                    }}
+                    disabled={busy || (present && !canRemove)}
+                    aria-pressed={present}
+                    aria-label={actionLabel}
                     className={[
                       "group w-full relative overflow-hidden rounded-2xl border p-4 transition-all duration-300",
                       "flex items-center justify-between gap-4 text-left",
                       present
-                        ? "bg-emerald-500/[0.03] border-emerald-500/20 cursor-default"
+                        ? "bg-emerald-500/[0.03] border-emerald-500/20 hover:bg-red-500/[0.04] hover:border-red-500/25 active:scale-[0.98]"
                         : "bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/10 active:scale-[0.98]",
                     ].join(" ")}
                   >
@@ -288,7 +301,7 @@ export default function AddToListModal(props) {
                         className={[
                           "font-bold truncate transition-colors",
                           present
-                            ? "text-emerald-100"
+                            ? "text-emerald-100 group-hover:text-red-100"
                             : "text-zinc-200 group-hover:text-white",
                         ].join(" ")}
                       >
@@ -313,14 +326,17 @@ export default function AddToListModal(props) {
                           busy
                             ? "bg-white/5 border-white/10"
                             : present
-                              ? "bg-emerald-500 text-black border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                              ? "bg-emerald-500 text-black border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] group-hover:bg-red-500 group-hover:border-red-500 group-hover:text-white group-hover:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
                               : "bg-transparent border-white/10 text-zinc-500 group-hover:border-yellow-500 group-hover:text-yellow-500 group-hover:bg-yellow-500/10",
                         ].join(" ")}
                       >
                         {busy ? (
                           <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
                         ) : present ? (
-                          <Check className="w-5 h-5" />
+                          <span className="relative flex h-5 w-5 items-center justify-center">
+                            <Check className="absolute h-5 w-5 transition-opacity group-hover:opacity-0" />
+                            <Minus className="absolute h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100" />
+                          </span>
                         ) : (
                           <Plus className="w-5 h-5" />
                         )}
