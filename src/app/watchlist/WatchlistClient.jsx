@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useCallback,
+  useDeferredValue,
   startTransition,
   memo,
 } from "react";
@@ -1924,6 +1925,12 @@ export default function WatchlistClient() {
   // Filter states with localStorage persistence
   const [viewMode, setViewModeState] = useState(readInitialWatchlistViewMode);
 
+  // Cambiar de modo reconstruye el interior de TODAS las tarjetas pintadas (cada
+  // modo devuelve una maqueta distinta y cambia el tipo de imagen), y eso
+  // bloqueaba el hilo al pulsar el botón. Con valores diferidos el botón
+  // responde en el acto y la lista se reconstruye sin congelar la página.
+  const deferredViewMode = useDeferredValue(viewMode);
+
   const setViewMode = useCallback((mode) => {
     setViewModeState(mode);
     if (typeof window !== "undefined") {
@@ -1951,6 +1958,7 @@ export default function WatchlistClient() {
     const saved = window.localStorage.getItem("showverse:watchlist:imageMode");
     return saved === "backdrop" ? "backdrop" : "poster";
   });
+  const deferredImageMode = useDeferredValue(imageMode);
 
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
@@ -2775,18 +2783,18 @@ export default function WatchlistClient() {
     const hoverBleedSpace = withTopMargin
       ? " -mx-3 overflow-visible px-3 pb-6 lg:-mx-5 lg:px-5 lg:pb-8"
       : "";
-    if (viewMode === "list") {
+    if (deferredViewMode === "list") {
       return `grid grid-cols-1 xl:grid-cols-2 gap-4${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
-    if (viewMode === "compact") {
+    if (deferredViewMode === "compact") {
       const compactCols =
-        imageMode === "backdrop"
+        deferredImageMode === "backdrop"
           ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"
           : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8";
       return `grid gap-2 ${compactCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
     }
     const gridCols =
-      imageMode === "backdrop"
+      deferredImageMode === "backdrop"
         ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
         : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6";
     return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
@@ -2796,17 +2804,20 @@ export default function WatchlistClient() {
   // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
   const entranceVisibleCount = estimateVisibleCards({
     columns: pickResponsiveColumns(
-      viewMode === "list"
+      deferredViewMode === "list"
         ? { base: 1, xl: 2 }
-        : viewMode === "compact"
-          ? imageMode === "backdrop"
+        : deferredViewMode === "compact"
+          ? deferredImageMode === "backdrop"
             ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
             : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
-          : imageMode === "backdrop"
+          : deferredImageMode === "backdrop"
             ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
             : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
     ),
-    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
+    aspect:
+      deferredViewMode === "list" || deferredImageMode === "backdrop"
+        ? 0.5625
+        : 1.5,
   });
 
   if (!hydrated && !hasBackNavigationSnapshot) {
@@ -3554,7 +3565,7 @@ export default function WatchlistClient() {
                             count={subgroup.items.length}
                           />
                           <div
-                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                            key={`subgroup-grid-${group.key}-${subgroup.key}`}
                             className={getItemsGridClass(true)}
                           >
                             {subgroup.items.map((item, idx) => {
@@ -3567,8 +3578,8 @@ export default function WatchlistClient() {
                                   index={currentGlobalIdx}
                                   totalItems={sorted.length}
                                   animateWithin={entranceVisibleCount}
-                                  viewMode={viewMode}
-                                  imageMode={imageMode}
+                                  viewMode={deferredViewMode}
+                                  imageMode={deferredImageMode}
                                   imdbScore={imdbScores.get(getScoreItemKey(item))}
                                 />
                               );
@@ -3579,7 +3590,7 @@ export default function WatchlistClient() {
                     </div>
                   ) : (
                     <div
-                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                      key={`group-grid-${group.key}`}
                       className={getItemsGridClass(true)}
                     >
                       {group.items.map((item, idx) => {
@@ -3592,8 +3603,8 @@ export default function WatchlistClient() {
                             index={currentGlobalIdx}
                             totalItems={sorted.length}
                             animateWithin={entranceVisibleCount}
-                            viewMode={viewMode}
-                            imageMode={imageMode}
+                            viewMode={deferredViewMode}
+                            imageMode={deferredImageMode}
                             imdbScore={imdbScores.get(getScoreItemKey(item))}
                           />
                         );
@@ -3606,7 +3617,6 @@ export default function WatchlistClient() {
           </div>
         ) : (
           <div
-            key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
           >
             {renderedSorted.map((item, idx) => (
@@ -3616,8 +3626,8 @@ export default function WatchlistClient() {
                 index={idx}
                 totalItems={sorted.length}
                 animateWithin={entranceVisibleCount}
-                viewMode={viewMode}
-                imageMode={imageMode}
+                viewMode={deferredViewMode}
+                imageMode={deferredImageMode}
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
               />
             ))}
