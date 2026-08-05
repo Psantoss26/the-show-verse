@@ -43,8 +43,19 @@ export const LIQUID_GLASS_TOOLTIP =
 // flota sobre el contenido, que es lo que delata la pieza como una caja pegada
 // encima. El volumen lo da el degradado del propio fondo (from-white/[0.16]),
 // que se apaga hacia dentro en vez de trazar una línea.
+// DESENFOQUE Y TINTE CONTENIDOS, a propósito: para que la pieza parezca vidrio
+// y no una placa esmerilada, lo de detrás tiene que seguir siendo RECONOCIBLE.
+// Con 72px de desenfoque y un velo oscuro alto no pasaba nada de fondo.
+//
+// SOBRE LA REFRACCIÓN REAL: se intentó deformar el fondo con un filtro SVG
+// (`feDisplacementMap`), que es lo único capaz de desplazar píxeles. Medido en
+// Chromium: aplicado con `filter` sobre una imagen normal deforma con fuerza
+// (diferencia máxima 153/255), pero aplicado con `backdrop-filter` no hace nada
+// apreciable (13/255). Los navegadores no aplican filtros SVG al backdrop, así
+// que la ondulación del cristal de iOS NO es reproducible hoy en web; la
+// sensación de vidrio la dan el canto que refracta y el reflejo (ver Navbar).
 export const LIQUID_GLASS_BAR =
-  "bg-black/25 bg-gradient-to-b from-white/[0.16] via-white/[0.04] to-black/25 backdrop-blur-[72px] backdrop-saturate-[200%] backdrop-brightness-[1.08] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
+  "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
 
 
 

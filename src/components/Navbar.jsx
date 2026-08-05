@@ -2168,10 +2168,10 @@ export default function Navbar() {
             transición sea continua y no dibuje ningún borde marcado. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[8px] backdrop-brightness-[1.12] backdrop-saturate-[190%]"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
           style={{
             WebkitMaskImage:
-              "radial-gradient(115% 135% at 50% 50%, transparent 40%, #000 95%)",
+              "radial-gradient(112% 128% at 50% 50%, transparent 34%, #000 92%)",
             maskImage:
               "radial-gradient(115% 135% at 50% 50%, transparent 40%, #000 95%)",
           }}
