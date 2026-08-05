@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -145,6 +146,7 @@ import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const DETAILS_ROUTE_REVEAL_MIN_MS = 500;
 const DETAILS_ROUTE_CLEANUP_MS = 420;
+const DETAIL_MODAL_GLASS_CONTROL = `${LIQUID_GLASS_PANEL} border-0 text-white/80 hover:bg-black/[0.34] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:pointer-events-none disabled:opacity-60`;
 
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -2548,7 +2550,7 @@ export default function DetailModal({
             type="button"
             onClick={onClose}
             disabled={navigatingToFullDetails}
-            className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/[0.48] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)] text-white/80 transition-all duration-300 hover:bg-black/65 hover:text-white disabled:pointer-events-none select-none group"
+            className={`absolute left-4 top-4 z-30 flex h-10 w-10 select-none items-center justify-center rounded-full transition-all duration-300 group ${DETAIL_MODAL_GLASS_CONTROL}`}
             aria-label="Cerrar modal"
           >
             <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
@@ -2559,7 +2561,7 @@ export default function DetailModal({
             type="button"
             onClick={goToFullDetails}
             disabled={navigatingToFullDetails}
-            className="absolute right-4 top-4 z-30 group flex h-10 w-10 hover:w-[166px] items-center justify-center gap-0 overflow-hidden rounded-full bg-black/[0.48] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)] px-0 hover:px-3 text-white/80 transition-all duration-300 ease-out hover:gap-1.5 hover:bg-black/65 hover:text-white disabled:pointer-events-none select-none"
+            className={`absolute right-4 top-4 z-30 group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[166px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
             aria-label="Ver ficha completa"
             aria-busy={navigatingToFullDetails ? "true" : undefined}
           >

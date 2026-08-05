@@ -1,3 +1,10 @@
+import { createRefreshCoalescer } from "./refreshCoalescer";
+
+// Un único coalescedor por proceso: todas las rutas proxy que refresquen el
+// mismo refresh token a la vez comparten la llamada y reciben el mismo token
+// nuevo. Ver el porqué en refreshCoalescer.js.
+export const coalesceRefresh = createRefreshCoalescer();
+
 const ACCESS_TOKEN_COOKIE_NAMES = [
   "showverse_access_token",
   "backend_access_token",
@@ -117,23 +124,25 @@ export function mediaTypeFromBackend(mediaType) {
 async function refreshBackendAccessToken(baseUrl, refreshToken) {
   if (!refreshToken) return null;
 
-  const res = await fetch(`${baseUrl}/v1/auth/refresh`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    cache: "no-store",
-    body: JSON.stringify({ refreshToken }),
+  return coalesceRefresh(refreshToken, async () => {
+    const res = await fetch(`${baseUrl}/v1/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      cache: "no-store",
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.accessToken) return null;
+
+    return {
+      accessToken: json.accessToken,
+      refreshToken: json.refreshToken || refreshToken,
+    };
   });
-
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json?.accessToken) return null;
-
-  return {
-    accessToken: json.accessToken,
-    refreshToken: json.refreshToken || refreshToken,
-  };
 }
 
 async function fetchBackendOnce(baseUrl, path, init, accessToken) {

@@ -37,7 +37,6 @@ import {
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
-import { translateGenre } from "@/lib/details/formatters";
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import {
@@ -1103,26 +1102,6 @@ const InProgressCard = memo(function InProgressCard({
             {activeTab === "completed" && (
               <CheckCircle2 className="absolute top-3 left-3 w-7 h-7 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
             )}
-
-            {/* Bottom info on backdrop */}
-            <div className="absolute bottom-0 left-0 right-0 p-4">
-              <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">
-                {title}
-              </h3>
-              {item.year && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-zinc-400">{item.year}</span>
-                  {item.genres && item.genres.length > 0 && (
-                    <>
-                      <span className="text-zinc-600">·</span>
-                      <span className="text-xs text-zinc-500">
-                        {item.genres.slice(0, 2).map(translateGenre).join(", ")}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
 
           </div>
 

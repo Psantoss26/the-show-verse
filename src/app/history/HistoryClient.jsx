@@ -1871,9 +1871,9 @@ const HistoryItemCard = memo(function HistoryItemCard({
           )}
         </div>
       </div>
-      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
         <div className="flex items-center gap-2">
-          <h4 className="text-white font-bold text-base leading-tight truncate">
+          <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-emerald-300">
             {title}
           </h4>
         </div>
@@ -1881,14 +1881,14 @@ const HistoryItemCard = memo(function HistoryItemCard({
         {watchedDate && (
           <time
             dateTime={entry?.watched_at || undefined}
-            className="text-xs font-medium leading-tight text-zinc-400"
+            className="text-xs font-semibold leading-tight text-zinc-300"
           >
             {watchedDate.label}
           </time>
         )}
 
         {(isGroup || (type === "show" && epMeta?.title)) && (
-          <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
             <span className="truncate max-w-[260px]">
               {isGroup ? `${groupCount} episodios agrupados` : epMeta.title}
             </span>

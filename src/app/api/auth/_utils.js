@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   clearBackendAuthCookies,
+  coalesceRefresh,
   getBackendAccessToken,
   getBackendBaseUrl,
   getBackendRefreshToken,
@@ -71,25 +72,36 @@ export async function refreshBackendSession(request) {
   const refreshToken = getBackendRefreshToken(request);
   if (!refreshToken) return null;
 
-  const refreshed = await backendAuthRequest("/v1/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  });
+  // Comparte la llamada con el resto de rutas que estén refrescando este mismo
+  // token ahora mismo, para que todas devuelvan el MISMO token nuevo y da igual
+  // en qué orden lleguen sus Set-Cookie (ver refreshCoalescer.js).
+  return coalesceRefresh(
+    refreshToken,
+    async () => {
+      const refreshed = await backendAuthRequest("/v1/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
 
-  if (!refreshed.ok || !refreshed.json?.accessToken) {
-    return {
-      accessToken: null,
-      refreshToken: null,
-      status: refreshed.status || 0,
-      error: refreshed.error || "Backend session refresh failed",
-    };
-  }
+      if (!refreshed.ok || !refreshed.json?.accessToken) {
+        // Se devuelve el fallo, pero el coalescedor NO lo memoriza (ver el
+        // predicado de abajo): el siguiente intento vuelve a preguntar.
+        return {
+          accessToken: null,
+          refreshToken: null,
+          status: refreshed.status || 0,
+          error: refreshed.error || "Backend session refresh failed",
+        };
+      }
 
-  return {
-    accessToken: refreshed.json.accessToken,
-    refreshToken: refreshed.json.refreshToken || refreshToken,
-    status: refreshed.status,
-  };
+      return {
+        accessToken: refreshed.json.accessToken,
+        refreshToken: refreshed.json.refreshToken || refreshToken,
+        status: refreshed.status,
+      };
+    },
+    (value) => Boolean(value?.accessToken),
+  );
 }
 
 export function isBackendSessionUnavailable(result) {

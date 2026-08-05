@@ -1970,7 +1970,6 @@ const FavoriteCard = memo(function FavoriteCard({
   const title = item.title || item.name || "Sin título";
   const year =
     item.release_date?.slice(0, 4) || item.first_air_date?.slice(0, 4) || "";
-  const rating = item.vote_average ? item.vote_average.toFixed(1) : null;
   const userRating = item.user_rating || null;
 
   const href =
@@ -2034,23 +2033,14 @@ const FavoriteCard = memo(function FavoriteCard({
                 mode={effectiveImageMode}
               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               <div className="flex items-center gap-2">
-                <h4 className="text-white font-bold text-base leading-tight truncate">
+                <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-red-300">
                   {title}
                 </h4>
               </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium leading-tight tracking-[0.08em] text-zinc-400 tabular-nums">
                 {year && <span>{year}</span>}
-                {rating && (
-                  <>
-                    {year && <span>•</span>}
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                      {rating}
-                    </span>
-                  </>
-                )}
               </div>
             </div>
           </div>
