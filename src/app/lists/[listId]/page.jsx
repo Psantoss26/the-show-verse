@@ -21,7 +21,7 @@ import {
     deleteUserList,
     updateUserList,
     addMovieToList,
-    searchMovies,
+    searchTitles,
     fetchMovieCatalogList
 } from '@/lib/api/backendLists'
 
@@ -229,7 +229,15 @@ export default function ListDetailsPage() {
     // pertenece a la sesión actual. Así una caché antigua no expone controles
     // de gestión al abrir una lista desde otro perfil.
     const canManage = Boolean(canUse && data?.canEdit === true)
-    const idsInList = useMemo(() => new Set(items.map((x) => x?.id)), [items])
+    // Clave por TIPO + id: en TMDb una película y una serie pueden compartir el
+    // mismo id, así que con solo el id una serie recién buscada podía aparecer
+    // marcada como "Añadido" por culpa de una película homónima.
+    const listKeyOf = (item) =>
+        `${item?.media_type === 'tv' ? 'tv' : 'movie'}:${item?.id}`
+    const idsInList = useMemo(
+        () => new Set(items.map((x) => listKeyOf(x))),
+        [items]
+    )
     const filterableItems = useMemo(
         () => items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' })),
         [items]
@@ -296,14 +304,17 @@ export default function ListDetailsPage() {
         debounceRef.current = setTimeout(async () => {
             setSearchLoading(true)
             try {
-                const json = await searchMovies({
+                // Películas Y series: las listas admiten ambas, pero el
+                // buscador solo consultaba /search/movie y las series no
+                // aparecían nunca.
+                const json = await searchTitles({
                     query,
                     page: 1,
                     languages: ['es-ES', 'en-US']
                 })
                 setSearchRes(Array.isArray(json?.results) ? json.results : [])
             } catch (e) {
-                setErr(e?.message || 'Error buscando películas')
+                setErr(e?.message || 'Error buscando títulos')
             } finally {
                 setSearchLoading(false)
             }
@@ -372,7 +383,7 @@ export default function ListDetailsPage() {
     const handleAdd = async (movie) => {
         if (!canManage || !listId) return
         if (!movie?.id) return
-        if (idsInList.has(movie.id)) return
+        if (idsInList.has(listKeyOf(movie))) return
 
         setBusyId(movie.id)
         setErr('')
@@ -484,11 +495,6 @@ export default function ListDetailsPage() {
             posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
             badges={data ? [`${items.length} items`, 'The Show Verse'] : ['The Show Verse']}
-            stats={[
-                { label: 'Elementos', value: items.length },
-                { label: 'Fuente', value: 'The Show Verse' },
-                { label: 'Modo', value: tab === 'items' ? 'Lista' : 'Añadir' },
-            ]}
             backHref="/lists"
             rightActions={
                 <>
@@ -544,7 +550,10 @@ export default function ListDetailsPage() {
 
                         {addMode === 'search' ? (
                             <div className="relative w-full">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                <Search
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
+                                />
                                 <input
                                     value={q}
                                     onChange={(e) => setQ(e.target.value)}
@@ -637,7 +646,8 @@ export default function ListDetailsPage() {
             ) : tab === 'items' && items.length > 0 ? (
                 <FilterableListItems
                     items={filterableItems}
-                    renderCard={(it, meta, viewMode) => {
+                    editable={canManage}
+                    renderCard={(it, meta, viewMode, editMode) => {
                         const id = it?.id
                         const posterPath = it?.poster_path || it?.backdrop_path || null
                         const mediaType = it?.media_type || 'movie'
@@ -663,7 +673,14 @@ export default function ListDetailsPage() {
                                         e.stopPropagation()
                                         handleRemove(it)
                                     }}
-                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
+                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white focus:opacity-100 ${
+                                        // En móvil no hay hover: el botón solo
+                                        // se ve con el modo borrar activado
+                                        // desde el menú de filtros.
+                                        editMode
+                                            ? 'opacity-100 bg-red-500/70 text-white'
+                                            : 'opacity-0 group-hover:opacity-100'
+                                    } ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
                                 >
                                     {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                 </button>}
@@ -677,7 +694,7 @@ export default function ListDetailsPage() {
                 <div className={listPosterGridClass}>
                     {gridItems.map((it) => {
                         const id = it?.id
-                        const inList = idsInList.has(id)
+                        const inList = idsInList.has(listKeyOf(it))
                         const posterPath = it?.poster_path || it?.backdrop_path || null
                         const href = `/details/${it?.media_type || 'movie'}/${id}`
                         const mediaType = it?.media_type || 'movie'

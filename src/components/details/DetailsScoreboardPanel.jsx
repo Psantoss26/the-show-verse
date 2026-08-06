@@ -441,7 +441,16 @@ export default function DetailsScoreboardPanel({
   className = "",
   children = null,
 }) {
-  const hasRatings = !!(tmdb || trakt || traktPublic || imdb || rt || mc);
+  // Una puntuación PENDIENTE (objeto presente pero aún sin valor) no pinta
+  // nada: su badge se omite más abajo. Contarla como contenido hacía que, al
+  // recargar la ficha, se dibujara la CÁSCARA del panel —cristal, sombra y
+  // separadores— completamente vacía hasta que llegaban los datos. Aquí solo
+  // cuenta lo que de verdad se va a ver.
+  const hasVisibleScore = (score) =>
+    !!score && !(score.pending === true && score.value == null);
+  const hasRatings = [tmdb, trakt, traktPublic, imdb, rt, mc].some(
+    hasVisibleScore,
+  );
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );

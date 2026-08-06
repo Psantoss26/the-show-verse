@@ -17,6 +17,7 @@ export default function TraktWatchedControl({
   // estado de "visto" de Trakt. Lo usa "Continuar viendo" para reflejar el avance
   // del episodio/película concretos en el propio botón de visionado.
   progressOverride,
+  liquidGlass = false,
 }) {
   // Deshabilitar mientras se está resolviendo el estado o hay una operación en curso
   const disabled = !!loading || !!busy;
@@ -46,6 +47,7 @@ export default function TraktWatchedControl({
   return (
     <div className="relative flex-shrink-0">
       <LiquidButton
+        liquidGlass={liquidGlass}
         onClick={(event) => onOpen?.(event)}
         disabled={disabled}
         active={hasOverride || visibleWatched}

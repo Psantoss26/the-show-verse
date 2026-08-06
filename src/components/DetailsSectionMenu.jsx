@@ -2,6 +2,8 @@
 
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
 
 export default function DetailsSectionMenu({
   items = [],
@@ -103,8 +105,8 @@ export default function DetailsSectionMenu({
 
   return (
     <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={shouldReduceMotion ? false : { y: 10 }}
+      animate={{ y: 0 }}
       transition={{
         duration: shouldReduceMotion ? 0 : 0.4,
         ease: [0.22, 1, 0.36, 1],
@@ -113,15 +115,18 @@ export default function DetailsSectionMenu({
     >
       <nav className={["mx-auto w-full", maxWidthClass].join(" ")}>
         <div
+          // Mismo cristal que el Scoreboard y los paneles de la ficha: base
+          // LIQUID_GLASS_BAR + las capas ópticas en su versión contenida (canto
+          // al brillo del propio cristal, reflejos a la mitad). Con la variante
+          // PLANA la barra se veía transparente y sin cuerpo sobre el backdrop.
           className={[
             "relative isolate overflow-hidden rounded-2xl",
-            "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40",
-            "backdrop-blur-[50px]",
-            "shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
+            LIQUID_GLASS_BAR,
             "transform-gpu",
           ].join(" ")}
           style={{ contain: "layout style" }}
         >
+          <LiquidGlassOpticalLayers />
           <div className="relative">
             <div>
               <div className="py-2.5">
@@ -234,9 +239,15 @@ export default function DetailsSectionMenu({
                                   <Icon
                                     className={[
                                       "h-5 w-5 transition-all duration-300",
+                                      // Halo oscuro: el cristal deja pasar el
+                                      // backdrop, y sobre un fotograma claro un
+                                      // icono gris desaparece. La sombra lo
+                                      // recorta sin ensuciar el fondo oscuro,
+                                      // donde es invisible.
+                                      "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.75))]",
                                       active
                                         ? colors.iconActive
-                                        : "text-zinc-400 group-hover:text-zinc-200",
+                                        : "text-zinc-300 group-hover:text-white",
                                     ].join(" ")}
                                   />
                                 </motion.div>
@@ -250,9 +261,15 @@ export default function DetailsSectionMenu({
                                 className={[
                                   showLabelsOnMobile ? "inline" : "hidden sm:inline",
                                   "text-[11px] sm:text-sm font-semibold tracking-wide sm:tracking-wider uppercase transition-all duration-300",
+                                  // MISMO PROBLEMA QUE EL ICONO. Aclarar el gris
+                                  // no bastaba —sobre un fondo claro empeora—:
+                                  // lo que separa las letras de CUALQUIER fondo
+                                  // es el contorno oscuro. El gris sube de 400 a
+                                  // 300 para ganar algo de peso sobre oscuro.
+                                  "[text-shadow:0_1px_3px_rgba(0,0,0,0.85)]",
                                   active
                                     ? "text-white font-bold"
-                                    : "text-zinc-400 group-hover:text-zinc-200",
+                                    : "text-zinc-300 group-hover:text-white",
                                 ].join(" ")}
                               >
                                 {item.label}
