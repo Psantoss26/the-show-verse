@@ -3802,6 +3802,14 @@ export default function DetailsClient({
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
   const traktStatusRequestIdRef = useRef(0);
+  // Reintento ACOTADO del estado del título. Un fallo transitorio dejaba los
+  // botones desmarcados hasta que el usuario pulsaba uno; con esto el estado
+  // acaba llegando siempre, sin intervención y sin bucles: un intento por
+  // petición fallida, y se cancela si llega otra petición más reciente.
+  const traktStatusRetryRef = useRef({ id: 0, timer: null });
+  // Referencia a la última versión de `reloadTraktStatus`, para poder
+  // reintentar desde dentro de ella sin crear una dependencia circular.
+  const reloadTraktStatusRef = useRef(null);
   const movieWatchedRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -4861,6 +4869,22 @@ export default function DetailsClient({
           (typeof e?.status === "number" && e.status >= 500) ||
           /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
 
+        // REINTENTO: el estado de los botones no puede quedarse sin cargar por
+        // un fallo pasajero. Se reintenta UNA vez por petición fallida, y solo
+        // si esta sigue siendo la más reciente.
+        if (isTransient && requestId === traktStatusRequestIdRef.current) {
+          const retry = traktStatusRetryRef.current;
+          if (retry.id !== requestId) {
+            retry.id = requestId;
+            if (retry.timer) window.clearTimeout(retry.timer);
+            retry.timer = window.setTimeout(() => {
+              retry.timer = null;
+              if (requestId !== traktStatusRequestIdRef.current) return;
+              reloadTraktStatusRef.current?.({ background: true, force: true });
+            }, 900);
+          }
+        }
+
         let nextState = null;
         setTrakt((p) => {
           if (requestId !== traktStatusRequestIdRef.current) {
@@ -4899,6 +4923,23 @@ export default function DetailsClient({
     // parpadeo en el primer acceso. Por eso NO va en las dependencias.
     [traktType, id, endpointType],
   );
+
+  useEffect(() => {
+    reloadTraktStatusRef.current = reloadTraktStatus;
+  }, [reloadTraktStatus]);
+
+  // Al cambiar de título (o al salir) se cancela cualquier reintento pendiente:
+  // resolvería sobre una ficha que ya no está en pantalla.
+  useEffect(() => {
+    const retry = traktStatusRetryRef.current;
+    return () => {
+      if (retry.timer) {
+        window.clearTimeout(retry.timer);
+        retry.timer = null;
+      }
+      retry.id = 0;
+    };
+  }, [traktType, id]);
 
   const loadTraktMovieWatched = useCallback(
     async ({ background = false, force = false } = {}) => {

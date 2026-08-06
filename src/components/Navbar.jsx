@@ -1398,6 +1398,22 @@ export default function Navbar() {
     };
   }, []);
 
+  // AL CAMBIAR DE RUTA se recalcula de inmediato.
+  //
+  // `isScrolled` es global y solo se actualiza con eventos de scroll, así que al
+  // navegar conservaba el valor de la página ANTERIOR. Entrando en una ficha
+  // desde una lista desplazada, la barra superior de móvil aparecía con su
+  // cristal a opacidad 1 durante uno o dos fotogramas —se leía como una barra de
+  // carga en lo alto— hasta que llegaba el primer evento de scroll de la página
+  // nueva. La ruta nueva arranca arriba, así que aquí se lee la posición real y
+  // se corrige sin esperar a ese evento.
+  useEffect(() => {
+    const next = window.scrollY > 40;
+    if (next === isScrolledRef.current) return;
+    isScrolledRef.current = next;
+    setIsScrolled(next);
+  }, [pathname]);
+
   useEffect(() => {
     let frameId = 0;
 

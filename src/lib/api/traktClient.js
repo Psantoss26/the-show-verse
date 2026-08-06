@@ -237,10 +237,28 @@ export async function traktGetItemStatus({
     }
     return json;
   } catch (error) {
-    const auth = await ensureTraktAuthReady().catch(() => ({
-      connected: false,
-    }));
-    if (!auth?.connected) return { connected: false };
+    // SOLO un rechazo de autorización puede interpretarse como "no conectado".
+    //
+    // Antes se consultaba el estado de auth ante CUALQUIER error y, si no había
+    // conexión con Trakt, se devolvía un `{connected:false}` FABRICADO. Para
+    // quien tiene el estado servido por el backend (Trakt desconectado, que es
+    // lo normal), `auth.connected` es siempre false, así que un timeout, un 401
+    // pasajero durante el refresco del token o una petición abortada al
+    // retroceder rápido se convertían en "no conectado". La ficha lo tomaba por
+    // una respuesta buena, no actualizaba favorito/pendiente/visto/puntuación
+    // —solo se rellenan con `source === "backend"`— y TODOS los botones se
+    // quedaban desmarcados hasta pulsar uno o recargar.
+    //
+    // Ahora el fallo se propaga y el llamante lo trata como lo que es: un fallo
+    // transitorio, con reintento y conservando el estado anterior.
+    const status = Number(error?.status || 0);
+    const esRechazoDeAutorizacion = status === 401 || status === 403;
+    if (!esRechazoDeAutorizacion) throw error;
+
+    const auth = await ensureTraktAuthReady().catch(() => null);
+    if (auth && !auth.connected && !auth.unavailable) {
+      return { connected: false };
+    }
     throw error;
   }
 }
