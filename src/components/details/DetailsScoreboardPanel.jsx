@@ -45,9 +45,9 @@ import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      // Ver la nota de DetailAtoms: nada de entrada propia, o el panel se ve
+      // vacío mientras sus estadísticas hacen el fundido.
+      initial={false}
       whileHover={{ y: -1 }}
       className="relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:px-1.5"
       aria-label={tooltip || label}
@@ -284,9 +284,7 @@ function StreamingProviderButton({ provider }) {
       href={provider.href}
       target="_blank"
       rel="noreferrer"
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      initial={false}
       whileHover={{ scale: 1.1 }}
       aria-label={provider.title}
       title={provider.title}

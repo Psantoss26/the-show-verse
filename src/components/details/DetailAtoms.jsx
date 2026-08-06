@@ -1,7 +1,7 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
@@ -14,9 +14,6 @@ export function VisualMetaCard({
   liquidGlass = false,
   className = "",
 }) {
-  const shouldReduceMotion = useReducedMotion();
-  const animateGlassContent = liquidGlass && !shouldReduceMotion;
-
   // Sin valor NO se pinta la tarjeta, ni siquiera cargando. Antes `isLoading`
   // dibujaba el cristal vacío con una barra pulsando dentro, y al recargar la
   // ficha se veía la fila de tarjetas como cajas vacías. Es preferible que
@@ -42,18 +39,17 @@ export function VisualMetaCard({
       )}
 
       <motion.div
-        initial={animateGlassContent ? { opacity: 0, y: 4 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      // SIN entrada propia: el contenido aparece A LA VEZ que su cristal.
+      // Animarlo desde opacity 0 dejaba la cáscara visible y vacía durante ese
+      // cuarto de segundo, que es justo lo que se veía al cargar la ficha.
+        initial={false}
         className="relative z-10 shrink-0 text-zinc-300"
       >
         {iconContent || (Icon ? <Icon className="w-5 h-5" /> : null)}
       </motion.div>
 
       <motion.div
-        initial={animateGlassContent ? { opacity: 0, y: 4 } : false}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
         className="relative z-10 flex min-w-0 flex-1 flex-col"
       >
         <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
