@@ -39,6 +39,7 @@ export default function StarRating({
   onConnect,
 
   disabled = false,
+  liquidGlass = false,
 }) {
   const effectiveDisabled = disabled || loading;
 
@@ -152,6 +153,7 @@ export default function StarRating({
     <>
       {/* --- BOTÓN TRIGGER --- */}
       <LiquidButton
+        liquidGlass={liquidGlass}
         disabled={effectiveDisabled}
         onClick={handleOpen}
         active={hasRating}

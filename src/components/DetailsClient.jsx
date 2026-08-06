@@ -4820,10 +4820,21 @@ export default function DetailsClient({
         const isRateLimit = /rate limit|temporalmente no disponible/i.test(
           e?.message || "",
         );
+        // Un 401/403 aquí NO prueba que la cuenta esté desconectada: basta con
+        // que el access token del backend acabara de caducar con el refresco en
+        // vuelo. Tratarlo como desconexión ponía `connected: false` y los
+        // botones de visionado, puntuación, favorito, pendiente y añadir a
+        // lista perdían su estado (y el de reseña desaparecía) al entrar en la
+        // ficha; volvía al pulsar cualquier botón, porque eso fuerza otra
+        // consulta. La desconexión real la marca /api/trakt/auth/status, que es
+        // la fuente autoritativa.
+        const isAuthRejection =
+          typeof e?.status === "number" && (e.status === 401 || e.status === 403);
         const isTransient =
           e?.code === "TRAKT_TRANSIENT" ||
           isTimeout ||
           isRateLimit ||
+          isAuthRejection ||
           // HTTP 5xx from Vercel (gateway timeout, cold-start failures, etc.)
           (typeof e?.status === "number" && e.status >= 500) ||
           /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
@@ -4838,7 +4849,14 @@ export default function DetailsClient({
           nextState = {
             ...p,
             loading: false,
-            connected: isTransient ? p.connected : false,
+            // Un rechazo de autorización llega hasta aquí SOLO si la cuenta
+            // está conectada de verdad: `traktGetItemStatus` consulta antes
+            // /api/trakt/auth/status (la fuente autoritativa) y, si no lo
+            // estuviera, devuelve `{connected:false}` sin lanzar. Así que aquí
+            // se puede afirmar la conexión en vez de heredar el `false` inicial
+            // del montaje, que era lo que hacía desaparecer el botón de reseña
+            // (`showComments={trakt.connected}`) al entrar en la ficha.
+            connected: isAuthRejection ? true : isTransient ? p.connected : false,
             error: background
               ? p.error
               : isTransient
@@ -8725,7 +8743,7 @@ export default function DetailsClient({
             HEADER HERO SECTION (Diseño Final Solicitado)
            ================================================================= */}
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="-mt-[4.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
@@ -9520,7 +9538,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 onAddToList={canUseLists ? openListsModal : undefined}
                 listBusy={listsPresenceLoading}
                 listActive={listActive}
-                showComments={trakt.connected}
+                // El botón de reseñas depende de tener SESIÓN, no de que la
+                // consulta de estado de este título haya salido bien. Colgarlo
+                // de `trakt.connected` lo hacía desaparecer en cuanto esa
+                // consulta fallaba de forma pasajera (token recién caducado),
+                // aunque la sesión estuviera perfecta. Mismo criterio que usa
+                // el bloque de puntuación unas líneas más arriba.
+                showComments={
+                  trakt.connected || hasBackendSession || !!session
+                }
                 commentsActive={myComments.length > 0}
                 onComments={() => setCommentModalOpen(true)}
                   />
@@ -9532,16 +9558,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <FadeIn
-              delay={0.04}
-              duration={0.32}
-              className="order-3 mb-2 w-full sm:hidden"
-            >
+            <div className="order-3 mb-2 w-full sm:hidden">
               {/* El revelado por posición va en una capa PROPIA, por dentro del
-                  FadeIn: así la animación de entrada de la ficha (que escribe
-                  opacidad en línea) y este revelado no se pisan, cada uno anima
-                  su propio elemento. Comparte señal con el marcador para que
-                  ambos aparezcan y desaparezcan como una sola pieza. */}
+                  contenedor estable. Comparte señal con el marcador para que
+                  ambos aparezcan y desaparezcan como una sola pieza, sin que
+                  una opacidad de carga atenúe el cristal de las tarjetas. */}
               <div
                 className={`${MOBILE_REVEAL_BASE} ${
                   mobileSecondaryVisible
@@ -9590,7 +9611,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
               />
               </div>
-            </FadeIn>
+            </div>
 
             {/* =================================================================
                 PANEL DE PUNTUACIONES Y ESTADÍSTICAS
@@ -9705,7 +9726,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <FadeIn delay={0.24} className="hidden sm:block sm:order-none">
+              <div className="hidden sm:order-none sm:block">
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -9740,14 +9761,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     genres={data.genres}
                   />
                 </div>
-              </FadeIn>
+              </div>
             )}
           </div>
         </motion.div>
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <FadeIn delay={0.24} className="mt-8 hidden w-full sm:block lg:mt-6">
+          <div className="mt-8 hidden w-full sm:block lg:mt-6">
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
@@ -9780,7 +9801,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               genres={data.genres}
             />
           </div>
-        </FadeIn>
+        </div>
       )}
 
         {/* =================================================================

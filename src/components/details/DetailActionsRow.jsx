@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import LiquidButton from "@/components/LiquidButton";
+import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
@@ -22,6 +22,13 @@ import {
   ListVideo,
   MessageSquare,
 } from "lucide-react";
+
+// Limita el nuevo acabado a las acciones de ficha. Así todas sus variantes
+// (DetailsClient, DetailModal, héroes y filas responsive) comparten el mismo
+// cristal sin reestilizar otros LiquidButton de navegación o configuración.
+function LiquidButton(props) {
+  return <BaseLiquidButton {...props} liquidGlass />;
+}
 
 // Normaliza cualquier LiquidButton descendiente, incluidos los controles
 // compuestos (TraktWatchedControl y StarRating), para que siempre rellene la
@@ -182,6 +189,7 @@ export default function DetailActionsRow({
 
   const traktControl = trakt ? (
     <TraktWatchedControl
+      liquidGlass
       connected={trakt.connected}
       watched={trakt.watched}
       plays={trakt.plays}
@@ -195,6 +203,7 @@ export default function DetailActionsRow({
 
   const rateControl = rate ? (
     <StarRating
+      liquidGlass
       rating={rate.rating}
       max={rate.max}
       loading={rate.loading}
@@ -572,6 +581,7 @@ export default function DetailActionsRow({
         {/* Control de visto/no visto en Trakt */}
         {trakt && (
           <TraktWatchedControl
+            liquidGlass
             connected={trakt.connected}
             watched={trakt.watched}
             plays={trakt.plays}
@@ -586,6 +596,7 @@ export default function DetailActionsRow({
         {/* Puntuación con estrellas */}
         {rate && (
           <StarRating
+            liquidGlass
             rating={rate.rating}
             max={rate.max}
             loading={rate.loading}

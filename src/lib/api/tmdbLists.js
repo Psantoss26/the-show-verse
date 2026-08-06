@@ -224,30 +224,35 @@ export async function clearList({ listId, sessionId, confirm = true }) {
 }
 
 /**
- * GET /search/movie
+ * Añade el título localizado y ASEGURA el `media_type`.
+ *
+ * El tipo llega por parámetro porque TMDb no lo devuelve en las búsquedas por
+ * tipo (`/search/movie`, `/search/tv`). Antes se ponía 'movie' fijo, así que los
+ * resultados de series salían marcados como películas: la tarjeta enlazaba a
+ * /details/movie/<id> y al añadirlos a una lista se guardaban como película.
  */
-function addLocalizedMovieTitle(item, language) {
+function addLocalizedMovieTitle(item, language, mediaType = 'movie') {
     const lang = language?.startsWith('en')
         ? 'en'
         : language?.startsWith('es')
             ? 'es'
             : ''
-    if (!lang) return item
+    if (!lang) return { ...item, media_type: item?.media_type || mediaType }
     return {
         ...item,
-        media_type: item?.media_type || 'movie',
+        media_type: item?.media_type || mediaType,
         [`title_${lang}`]: item?.title || item?.[`title_${lang}`],
         [`name_${lang}`]: item?.name || item?.[`name_${lang}`]
     }
 }
 
-function mergeSearchMoviePages(pages) {
+function mergeSearchMoviePages(pages, mediaType = 'movie') {
     const out = []
     const byKey = new Map()
 
     for (const { json, language } of pages) {
         for (const item of json?.results || []) {
-            const next = addLocalizedMovieTitle(item, language)
+            const next = addLocalizedMovieTitle(item, language, mediaType)
             const key = `${next.media_type || 'movie'}:${next.id}`
             const existing = byKey.get(key)
             if (existing) {
@@ -276,26 +281,75 @@ function mergeSearchMoviePages(pages) {
 }
 
 export async function searchMovies({ query, page = 1, language = 'es-ES', languages = null }) {
+    return searchTitles({ query, page, language, languages, mediaTypes: ['movie'] })
+}
+
+/**
+ * Búsqueda de títulos para el selector de "añadir a una lista".
+ *
+ * Consulta /search/movie y /search/tv y FUSIONA los resultados. Antes solo se
+ * consultaba /search/movie, así que al buscar una serie no aparecía nada: las
+ * listas admiten series (el backend guarda `mediaType`), pero no había forma de
+ * encontrarlas desde el buscador.
+ *
+ * TMDb no devuelve `media_type` en las búsquedas por tipo (solo en /search/multi,
+ * que además mezcla personas), así que se marca aquí a mano: es el campo del que
+ * dependen la tarjeta y el alta en la lista para saber si es película o serie.
+ *
+ * El orden final es por POPULARIDAD entre ambos tipos, para que una serie muy
+ * conocida no quede sepultada bajo películas irrelevantes.
+ */
+export async function searchTitles({
+    query,
+    page = 1,
+    language = 'es-ES',
+    languages = null,
+    mediaTypes = ['movie', 'tv']
+}) {
     if (!query?.trim()) {
         return { results: [], page: 1, total_pages: 1, total_results: 0 }
     }
     const searchLanguages = Array.isArray(languages) && languages.length
         ? languages
         : [language]
-    const pages = await Promise.all(
-        searchLanguages.map(async (searchLanguage) => {
-            const url = buildUrl('/search/movie', {
-                query: query.trim(),
-                page,
-                language: searchLanguage,
-                include_adult: 'false'
-            })
-            return { language: searchLanguage, json: await tmdbJson(url) }
+
+    const porTipo = await Promise.all(
+        mediaTypes.map(async (mediaType) => {
+            const pages = await Promise.all(
+                searchLanguages.map(async (searchLanguage) => {
+                    const url = buildUrl(`/search/${mediaType}`, {
+                        query: query.trim(),
+                        page,
+                        language: searchLanguage,
+                        include_adult: 'false'
+                    })
+                    return { language: searchLanguage, json: await tmdbJson(url) }
+                })
+            )
+            const json =
+                pages.length === 1
+                    ? pages[0].json
+                    : mergeSearchMoviePages(pages, mediaType)
+            const results = (json?.results || []).map((item) => ({
+                ...item,
+                media_type: item?.media_type || mediaType
+            }))
+            return { ...json, results }
         })
     )
 
-    if (pages.length === 1) return pages[0].json
-    return mergeSearchMoviePages(pages)
+    if (porTipo.length === 1) return porTipo[0]
+
+    const results = porTipo
+        .flatMap((r) => r.results)
+        .sort((a, b) => (b?.popularity || 0) - (a?.popularity || 0))
+
+    return {
+        results,
+        page,
+        total_pages: Math.max(...porTipo.map((r) => r.total_pages || 1)),
+        total_results: porTipo.reduce((n, r) => n + (r.total_results || 0), 0)
+    }
 }
 
 /**

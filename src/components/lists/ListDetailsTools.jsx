@@ -13,9 +13,12 @@ import {
   List,
   Rows3,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
-import ListPosterCard, { listPosterGridClass } from "@/components/lists/ListPosterCard";
+import ListPosterCard, {
+  listPosterGridClass,
+} from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
@@ -46,7 +49,9 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
           <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">
             {label}:
           </span>
-          <span className="truncate font-semibold text-white">{valueLabel}</span>
+          <span className="truncate font-semibold text-white">
+            {valueLabel}
+          </span>
         </div>
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
@@ -88,13 +93,20 @@ function DropdownItem({ active, onClick, children }) {
 }
 
 export function getListItemMeta(item) {
-  const mediaType = item?.media_type || (item?.name && !item?.title ? "tv" : "movie");
+  const mediaType =
+    item?.media_type || (item?.name && !item?.title ? "tv" : "movie");
   const title = item?.title || item?.name || "Sin título";
   const date = item?.release_date || item?.first_air_date || "";
-  const year = /^\d{4}/.test(date) ? date.slice(0, 4) : item?.year ? String(item.year) : "";
+  const year = /^\d{4}/.test(date)
+    ? date.slice(0, 4)
+    : item?.year
+      ? String(item.year)
+      : "";
   const posterPath = item?.poster_path || item?.backdrop_path || null;
-  const href = item?.href || (item?.id ? `/details/${mediaType}/${item.id}` : null);
-  const voteAverage = typeof item?.vote_average === "number" ? item.vote_average : null;
+  const href =
+    item?.href || (item?.id ? `/details/${mediaType}/${item.id}` : null);
+  const voteAverage =
+    typeof item?.vote_average === "number" ? item.vote_average : null;
   const addedAt = item?.listed_at || item?.created_at || item?.added_at || "";
 
   return {
@@ -149,13 +161,20 @@ function filterAndSortItems(items, getMeta, q, typeFilter, sortBy) {
     })
     .sort((a, b) => {
       if (sortBy === "list-order") return a.index - b.index;
-      if (sortBy === "title-asc") return a.meta.title.localeCompare(b.meta.title);
-      if (sortBy === "title-desc") return b.meta.title.localeCompare(a.meta.title);
-      if (sortBy === "rating-desc") return (b.meta.voteAverage || 0) - (a.meta.voteAverage || 0);
-      if (sortBy === "rating-asc") return (a.meta.voteAverage || 0) - (b.meta.voteAverage || 0);
-      if (sortBy === "year-desc") return Number(b.meta.year || 0) - Number(a.meta.year || 0);
-      if (sortBy === "year-asc") return Number(a.meta.year || 0) - Number(b.meta.year || 0);
-      if (sortBy === "added-asc") return String(a.meta.addedAt).localeCompare(String(b.meta.addedAt));
+      if (sortBy === "title-asc")
+        return a.meta.title.localeCompare(b.meta.title);
+      if (sortBy === "title-desc")
+        return b.meta.title.localeCompare(a.meta.title);
+      if (sortBy === "rating-desc")
+        return (b.meta.voteAverage || 0) - (a.meta.voteAverage || 0);
+      if (sortBy === "rating-asc")
+        return (a.meta.voteAverage || 0) - (b.meta.voteAverage || 0);
+      if (sortBy === "year-desc")
+        return Number(b.meta.year || 0) - Number(a.meta.year || 0);
+      if (sortBy === "year-asc")
+        return Number(a.meta.year || 0) - Number(b.meta.year || 0);
+      if (sortBy === "added-asc")
+        return String(a.meta.addedAt).localeCompare(String(b.meta.addedAt));
       return String(b.meta.addedAt).localeCompare(String(a.meta.addedAt));
     });
 }
@@ -166,7 +185,8 @@ function groupItems(entries, groupBy) {
   const map = new Map();
   for (const entry of entries) {
     let key = "Sin datos";
-    if (groupBy === "type") key = entry.meta.mediaType === "tv" ? "Series" : "Películas";
+    if (groupBy === "type")
+      key = entry.meta.mediaType === "tv" ? "Series" : "Películas";
     if (groupBy === "year") key = entry.meta.year || "Sin año";
     if (groupBy === "decade") {
       const year = Number(entry.meta.year || 0);
@@ -174,7 +194,14 @@ function groupItems(entries, groupBy) {
     }
     if (groupBy === "rating") {
       const rating = Number(entry.meta.voteAverage || 0);
-      key = rating >= 8 ? "Excelente" : rating >= 7 ? "Notable" : rating > 0 ? "Correcta" : "Sin nota";
+      key =
+        rating >= 8
+          ? "Excelente"
+          : rating >= 7
+            ? "Notable"
+            : rating > 0
+              ? "Correcta"
+              : "Sin nota";
     }
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(entry);
@@ -187,9 +214,11 @@ function groupItems(entries, groupBy) {
   }));
 }
 
-function ViewSwitcher({ viewMode, setViewMode }) {
+function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
   return (
-    <div className="flex h-11 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg">
+    <div
+      className={`flex h-11 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg ${className}`}
+    >
       {[
         { id: "grid", icon: Grid3X3, label: "Grid" },
         { id: "compact", icon: Rows3, label: "Compacto" },
@@ -201,6 +230,8 @@ function ViewSwitcher({ viewMode, setViewMode }) {
           onClick={() => setViewMode(id)}
           title={label}
           className={`flex h-full min-w-10 items-center justify-center rounded-lg px-3 transition ${
+            fill ? "flex-1" : ""
+          } ${
             viewMode === id
               ? "bg-white/90 text-black shadow-lg"
               : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -213,18 +244,43 @@ function ViewSwitcher({ viewMode, setViewMode }) {
   );
 }
 
+// Alterna el MODO BORRAR. En escritorio el botón de eliminar de cada tarjeta
+// aparece al pasar el ratón por encima; en un móvil no hay hover, así que sin
+// esto no había forma de quitar títulos de una lista desde el teléfono.
+function DeleteModeToggle({ editMode, setEditMode }) {
+  return (
+    <button
+      type="button"
+      onClick={() => setEditMode(!editMode)}
+      title={editMode ? "Salir del modo borrar" : "Borrar títulos"}
+      aria-label={editMode ? "Salir del modo borrar" : "Borrar títulos"}
+      aria-pressed={editMode}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 text-sm font-bold shadow-lg backdrop-blur-lg transition-all ${
+        editMode
+          ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+          : "text-zinc-200 hover:bg-black/30"
+      }`}
+    >
+      {editMode ? <X className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+    </button>
+  );
+}
+
 export default function FilterableListItems({
   items,
   getMeta = getListItemMeta,
   renderCard,
   emptyTitle = "No hay elementos",
   emptyText = "No se encontraron títulos con estos filtros.",
+  // Solo quien puede gestionar la lista ve el modo borrar.
+  editable = false,
 }) {
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("list-order");
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState("grid");
+  const [editMode, setEditMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
@@ -244,7 +300,10 @@ export default function FilterableListItems({
     () => filterAndSortItems(items, getMeta, q, typeFilter, sortBy),
     [items, getMeta, q, typeFilter, sortBy],
   );
-  const groups = useMemo(() => groupItems(entries, groupBy), [entries, groupBy]);
+  const groups = useMemo(
+    () => groupItems(entries, groupBy),
+    [entries, groupBy],
+  );
   const visibleGroups = useMemo(() => {
     let remaining = visibleCount;
     const nextGroups = [];
@@ -270,6 +329,12 @@ export default function FilterableListItems({
     setVisibleCount(INITIAL_RENDER_COUNT);
   }, [q, typeFilter, sortBy, groupBy, viewMode]);
 
+  // Salir del modo borrar al cerrar el panel: dejarlo activo sin el menú a la
+  // vista haría que un toque en una tarjeta borrara sin contexto.
+  useEffect(() => {
+    if (!mobileFiltersOpen && editMode) setEditMode(false);
+  }, [mobileFiltersOpen, editMode]);
+
   useEffect(() => {
     if (!hasMoreEntries) return;
     const node = loadMoreRef.current;
@@ -291,7 +356,7 @@ export default function FilterableListItems({
   }, [entries.length, hasMoreEntries]);
 
   const renderEntry = (entry) => {
-    if (renderCard) return renderCard(entry.item, entry.meta, viewMode);
+    if (renderCard) return renderCard(entry.item, entry.meta, viewMode, editMode);
     return (
       <ListPosterCard
         key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}`}
@@ -319,7 +384,10 @@ export default function FilterableListItems({
       >
         <div className="flex gap-2 lg:hidden">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
+            />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -362,16 +430,42 @@ export default function FilterableListItems({
                   : "relative"
               }`}
             >
-              <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
-                <FilterDropdowns
-                  typeFilter={typeFilter}
-                  setTypeFilter={setTypeFilter}
-                  sortBy={sortBy}
-                  setSortBy={setSortBy}
-                  groupBy={groupBy}
-                  setGroupBy={setGroupBy}
-                />
-                <ViewSwitcher viewMode={viewMode} setViewMode={setViewMode} />
+              {/* DOS CONTROLES POR FILA, como en Historial: antes iban a uno
+                  por fila hasta 640px, así que en un móvil el panel ocupaba
+                  cuatro filas y dejaba medio ancho sin usar. */}
+              <div className="space-y-2 pt-2">
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <TypeDropdown
+                      typeFilter={typeFilter}
+                      setTypeFilter={setTypeFilter}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+                  </div>
+                </div>
+
+                {/* Última fila: agrupar + modos de vista + borrar */}
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
+                  </div>
+                  <div className="flex min-w-0 flex-1 gap-2">
+                    <ViewSwitcher
+                      viewMode={viewMode}
+                      setViewMode={setViewMode}
+                      className="min-w-0 flex-1"
+                      fill
+                    />
+                    {editable ? (
+                      <DeleteModeToggle
+                        editMode={editMode}
+                        setEditMode={setEditMode}
+                      />
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </motion.div>
           ) : null}
@@ -379,7 +473,10 @@ export default function FilterableListItems({
 
         <div className="hidden gap-3 lg:flex">
           <div className="relative min-w-[260px] flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
+            />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -473,13 +570,96 @@ export default function FilterableListItems({
       )}
 
       {hasMoreEntries ? (
-        <div
-          ref={loadMoreRef}
-          className="h-8 w-full"
-          aria-hidden="true"
-        />
+        <div ref={loadMoreRef} className="h-8 w-full" aria-hidden="true" />
       ) : null}
     </div>
+  );
+}
+
+// Cada filtro por separado para poder COLOCARLOS: el panel de móvil los reparte
+// en filas de dos, y el de escritorio los pone seguidos.
+function TypeDropdown({ typeFilter, setTypeFilter }) {
+  return (
+    <InlineDropdown
+      label="Tipo"
+      valueLabel={typeLabel[typeFilter]}
+      icon={Filter}
+    >
+      {({ close }) => (
+        <>
+          {[
+            ["all", "Todo"],
+            ["movies", "Películas"],
+            ["shows", "Series"],
+          ].map(([value, label]) => (
+            <DropdownItem
+              key={value}
+              active={typeFilter === value}
+              onClick={() => {
+                setTypeFilter(value);
+                close();
+              }}
+            >
+              {label}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </InlineDropdown>
+  );
+}
+
+function SortDropdown({ sortBy, setSortBy }) {
+  return (
+    <InlineDropdown
+      label="Ordenar"
+      valueLabel={sortLabel[sortBy]}
+      icon={ArrowUpDown}
+    >
+      {({ close }) => (
+        <>
+          {Object.entries(sortLabel).map(([value, label]) => (
+            <DropdownItem
+              key={value}
+              active={sortBy === value}
+              onClick={() => {
+                setSortBy(value);
+                close();
+              }}
+            >
+              {label}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </InlineDropdown>
+  );
+}
+
+function GroupDropdown({ groupBy, setGroupBy }) {
+  return (
+    <InlineDropdown
+      label="Agrupar"
+      valueLabel={groupLabel[groupBy]}
+      icon={Layers3}
+    >
+      {({ close }) => (
+        <>
+          {Object.entries(groupLabel).map(([value, label]) => (
+            <DropdownItem
+              key={value}
+              active={groupBy === value}
+              onClick={() => {
+                setGroupBy(value);
+                close();
+              }}
+            >
+              {label}
+            </DropdownItem>
+          ))}
+        </>
+      )}
+    </InlineDropdown>
   );
 }
 
@@ -493,66 +673,9 @@ function FilterDropdowns({
 }) {
   return (
     <>
-      <InlineDropdown label="Tipo" valueLabel={typeLabel[typeFilter]} icon={Filter}>
-        {({ close }) => (
-          <>
-            {[
-              ["all", "Todo"],
-              ["movies", "Películas"],
-              ["shows", "Series"],
-            ].map(([value, label]) => (
-              <DropdownItem
-                key={value}
-                active={typeFilter === value}
-                onClick={() => {
-                  setTypeFilter(value);
-                  close();
-                }}
-              >
-                {label}
-              </DropdownItem>
-            ))}
-          </>
-        )}
-      </InlineDropdown>
-
-      <InlineDropdown label="Ordenar" valueLabel={sortLabel[sortBy]} icon={ArrowUpDown}>
-        {({ close }) => (
-          <>
-            {Object.entries(sortLabel).map(([value, label]) => (
-              <DropdownItem
-                key={value}
-                active={sortBy === value}
-                onClick={() => {
-                  setSortBy(value);
-                  close();
-                }}
-              >
-                {label}
-              </DropdownItem>
-            ))}
-          </>
-        )}
-      </InlineDropdown>
-
-      <InlineDropdown label="Agrupar" valueLabel={groupLabel[groupBy]} icon={Layers3}>
-        {({ close }) => (
-          <>
-            {Object.entries(groupLabel).map(([value, label]) => (
-              <DropdownItem
-                key={value}
-                active={groupBy === value}
-                onClick={() => {
-                  setGroupBy(value);
-                  close();
-                }}
-              >
-                {label}
-              </DropdownItem>
-            ))}
-          </>
-        )}
-      </InlineDropdown>
+      <TypeDropdown typeFilter={typeFilter} setTypeFilter={setTypeFilter} />
+      <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+      <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
     </>
   );
 }

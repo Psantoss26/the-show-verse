@@ -981,6 +981,7 @@ function RecommendationActionButton({
   return (
     <div className="aspect-square min-w-[34px] max-w-[60px] flex-1">
       <LiquidButton
+        liquidGlass
         onClick={onClick}
         disabled={disabled}
         active={active}

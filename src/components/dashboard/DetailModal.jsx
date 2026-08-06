@@ -311,10 +311,11 @@ const backdropVariants = {
 };
 
 // Panel anclado abajo: entra como una hoja de preview y sale hacia la ficha.
-// NO se anima `filter: blur` (re-desenfocaba el panel en cada frame, carísimo):
-// solo opacity + y + scale, que se componen en GPU.
+// NO se anima `filter: blur` ni la opacidad de entrada: ambas propiedades
+// atenuaban el liquid glass durante la carga. La hoja conserva su movimiento
+// mediante y + scale, que se componen en GPU.
 const panelVariants = {
-  hidden: { opacity: 0, y: 86, scale: 0.965 },
+  hidden: { opacity: 1, y: 86, scale: 0.965 },
   visible: {
     opacity: 1,
     y: 0,
@@ -2483,27 +2484,19 @@ export default function DetailModal({
         }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          // El drawer NO anima opacidad (solo `x`), así que anunciar `opacity`
-          // aquí era contraproducente: `will-change: opacity` fuerza por sí solo
-          // una capa con alfa, y esa capa es justo la que encarece el
-          // backdrop-filter en cada frame del recorrido. El centrado sí anima
-          // opacidad, así que ahí se mantiene.
+          // La apertura del drawer y del panel centrado mantiene opacidad 1:
+          // anunciar `opacity` aquí atenuaría el cristal y además crearía una
+          // capa con alfa que encarece el backdrop-filter durante el recorrido.
           // Se RETIRA al asentarse (`auto`), no solo se ajusta por placement.
           //
           // `will-change: opacity` crea un Backdrop Root: los descendientes dejan
-          // de poder muestrear más allá de este panel. Como el centrado sí anima
-          // opacidad, lo declaraba — y `will-change` no se quita solo, así que el
-          // Root quedaba PERMANENTE y las tarjetas de info (casi transparentes,
-          // viven de ver el fondo) se quedaban planas y oscuras. El drawer no lo
-          // declara, y por eso allí sí se veían bien: esa era toda la diferencia.
+          // de poder muestrear más allá de este panel. Las tarjetas de info son
+          // casi transparentes y viven de ver el fondo, por eso solo anticipamos
+          // la transformación geométrica.
           //
           // Mantenerlo tras la animación tampoco aporta nada: `will-change` es
           // una pista para lo que está POR animarse. Ya quieto, sobra.
-          willChange: panelSettled
-            ? "auto"
-            : isRightPlacement
-              ? "transform"
-              : "transform, opacity",
+          willChange: panelSettled ? "auto" : "transform",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
         }}
@@ -3042,12 +3035,7 @@ export default function DetailModal({
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
             {(hasRatings || hasExternalLinks || isEpisode) && (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10px" }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              >
+              <div>
                 <DetailsScoreboardPanel
                   loading={loading}
                   tmdb={{
@@ -3131,7 +3119,7 @@ export default function DetailModal({
                   showFavoritedStat={!isEpisode}
                   className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
                 />
-              </motion.div>
+              </div>
             )}
 
             {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
@@ -3211,12 +3199,7 @@ export default function DetailModal({
                 </div>
               </motion.div>
             ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10px" }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              >
+              <div>
                 <DetailsInfoTabs
                   variant="normal"
                   layoutId="detailModalTab"
@@ -3241,7 +3224,7 @@ export default function DetailModal({
                   genres={data.genres}
                   metadataLoading={metadataLoading}
                 />
-              </motion.div>
+              </div>
             )}
 
             {/* Reparto */}

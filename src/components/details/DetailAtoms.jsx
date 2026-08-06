@@ -1,7 +1,7 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
@@ -14,7 +14,14 @@ export function VisualMetaCard({
   liquidGlass = false,
   className = "",
 }) {
-  if (!value && !isLoading) return null;
+  const shouldReduceMotion = useReducedMotion();
+  const animateGlassContent = liquidGlass && !shouldReduceMotion;
+
+  // Sin valor NO se pinta la tarjeta, ni siquiera cargando. Antes `isLoading`
+  // dibujaba el cristal vacío con una barra pulsando dentro, y al recargar la
+  // ficha se veía la fila de tarjetas como cajas vacías. Es preferible que
+  // aparezcan ya con su contenido.
+  if (!value) return null;
 
   return (
     <div
@@ -34,11 +41,21 @@ export function VisualMetaCard({
         />
       )}
 
-      <div className="relative z-10 shrink-0 text-zinc-300">
+      <motion.div
+        initial={animateGlassContent ? { opacity: 0, y: 4 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 shrink-0 text-zinc-300"
+      >
         {iconContent || (Icon ? <Icon className="w-5 h-5" /> : null)}
-      </div>
+      </motion.div>
 
-      <div className="relative z-10 flex flex-col min-w-0 flex-1">
+      <motion.div
+        initial={animateGlassContent ? { opacity: 0, y: 4 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 flex min-w-0 flex-1 flex-col"
+      >
         <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
           {label}
         </span>
@@ -52,7 +69,7 @@ export function VisualMetaCard({
             {value}
           </span>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -197,7 +214,12 @@ export function StatChip({ icon: Icon, label, value }) {
   );
 }
 
-export function DetailsTabsMenu({ tabs, activeTab, onChangeTab, layoutId = "activeTabIndicator" }) {
+export function DetailsTabsMenu({
+  tabs,
+  activeTab,
+  onChangeTab,
+  layoutId = "activeTabIndicator",
+}) {
   return (
     <div className="flex flex-wrap items-center gap-6 md:gap-8 border-b border-white/10 w-full mb-4 px-2 pb-0 relative">
       {tabs.map((tab) => (
@@ -212,7 +234,7 @@ export function DetailsTabsMenu({ tabs, activeTab, onChangeTab, layoutId = "acti
           }`}
         >
           <span className="relative z-10">{tab.label}</span>
-          
+
           {activeTab === tab.id && (
             <motion.div
               layoutId={layoutId}

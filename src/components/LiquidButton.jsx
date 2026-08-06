@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, Eye } from "lucide-react";
 import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
 /**
  * LiquidButton: Botón con efecto de gotas/cristal líquido
@@ -18,6 +20,7 @@ export default function LiquidButton({
   activeColor = "blue",
   loading = false,
   groupId = "default",
+  liquidGlass = false,
   fillPercentage,
   playsCount,
   progressPercent,
@@ -524,6 +527,9 @@ export default function LiquidButton({
   const proximityScale = proximityGlow > 0 ? 1 + proximityGlow * 0.04 : 1;
   const explosionScale = isExploding ? (isLabeled ? 1.05 : 1.08) : 1;
   const finalScale = Math.max(hoverScale, proximityScale) * explosionScale;
+  const surfaceClass = liquidGlass
+    ? LIQUID_GLASS_CARD
+    : "backdrop-blur-[50px] black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40";
 
   return (
     <button
@@ -540,13 +546,13 @@ export default function LiquidButton({
         relative group/liquid
         w-12 h-12 rounded-full
         flex items-center justify-center text-white
-        backdrop-blur-[50px]
+        ${surfaceClass}
         ${
           disabled
-            ? "black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white/30 cursor-not-allowed"
+            ? "text-white/30 cursor-not-allowed"
             : active
-              ? "black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-              : "black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
+              ? "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+              : "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
         }
         ${isExploding ? "" : "transition-all duration-300"}
         ${className}
@@ -567,6 +573,8 @@ export default function LiquidButton({
     >
       {/* Capa interna con recorte circular para los efectos líquidos */}
       <div className="absolute inset-0 overflow-hidden rounded-full pointer-events-none">
+        {liquidGlass && <LiquidGlassOpticalLayers />}
+
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"

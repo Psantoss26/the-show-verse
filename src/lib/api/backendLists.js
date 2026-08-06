@@ -7,7 +7,7 @@
 //
 // El picker para añadir (searchMovies / fetchMovieCatalogList) sigue siendo TMDb
 // público (no requiere migración) y se reexporta aquí para un único punto de import.
-export { searchMovies, fetchMovieCatalogList } from './tmdbLists';
+export { searchMovies, searchTitles, fetchMovieCatalogList } from './tmdbLists';
 
 async function api(path, init = {}) {
   const res = await fetch(`/api/lists${path}`, {
