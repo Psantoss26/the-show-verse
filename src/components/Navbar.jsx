@@ -2174,7 +2174,7 @@ export default function Navbar() {
           }`}
         >
           {/* Izquierda: en el estado compacto se replica la escala inicial de
-              DetailsClient para que menú y asistente reduzcan presencia sin
+              DetailsClient para que menú y recomendaciones reduzcan presencia sin
               perder su área táctil ni su posición. */}
           <div
             className={`flex flex-shrink-0 origin-left items-center gap-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
@@ -2186,7 +2186,23 @@ export default function Navbar() {
             >
               <MenuIcon className="w-6 h-6" />
             </button>
-            <WatchNextAssistant isMobile heroNavMode={heroNavMode} />
+            <Link
+              href="/recommendations"
+              prefetch
+              {...navPrefetchHandlers("/recommendations")}
+              className={`group relative grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all duration-300 ease-out active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                isActive("/recommendations")
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "text-white hover:bg-white/10 hover:text-emerald-200"
+              }`}
+              aria-label={t("nav_recommendations", "Recomendaciones")}
+              aria-current={isActive("/recommendations") ? "page" : undefined}
+            >
+              <ThumbsUp
+                className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"
+                aria-hidden="true"
+              />
+            </Link>
           </div>
 
           {/* Centro: el logo acompaña la reducción de los controles. */}
@@ -2515,6 +2531,8 @@ export default function Navbar() {
                   <ThumbsUp className={`w-5 h-5 ${isActive("/recommendations") ? "text-emerald-400" : "text-neutral-400"}`} />
                   <span>{t("nav_recommendations", "Recomendaciones")}</span>
                 </Link>
+
+                <WatchNextAssistant isMobile triggerVariant="drawer" />
 
                 <Link
                   href="/biblioteca"

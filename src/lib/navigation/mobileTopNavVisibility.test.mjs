@@ -8,7 +8,7 @@ const assistantPath = new URL(
   import.meta.url,
 );
 
-test("los controles izquierdos del navbar móvil conservan el contraste de la búsqueda", async () => {
+test("el navbar móvil da acceso rápido a Recomendaciones y deja el asistente en el menú", async () => {
   const [navbar, assistant] = await Promise.all([
     readFile(navbarPath, "utf8"),
     readFile(assistantPath, "utf8"),
@@ -29,10 +29,12 @@ test("los controles izquierdos del navbar móvil conservan el contraste de la b�
   );
   assert.match(
     mobileNavbar,
-    /className="p-2 rounded-full transition-colors text-white hover:bg-white\/10"[\s\S]*?aria-label="Buscar"/,
+    /href="\/recommendations"[\s\S]*?aria-label=\{t\("nav_recommendations", "Recomendaciones"\)\}[\s\S]*?<ThumbsUp/,
   );
+  assert.doesNotMatch(mobileNavbar, /<WatchNextAssistant isMobile heroNavMode/);
   assert.match(
-    assistant,
-    /isMobile\s*\? "text-white"[\s\S]*?\? "hover:text-cyan-200 hover:bg-white\/10"/,
+    navbar,
+    /<WatchNextAssistant isMobile triggerVariant="drawer" \/>/,
   );
+  assert.match(assistant, /drawerTrigger \? <span>Qué ver con IA<\/span>/);
 });
