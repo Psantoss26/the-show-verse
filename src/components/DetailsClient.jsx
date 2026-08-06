@@ -3388,10 +3388,32 @@ export default function DetailsClient({
   // - Desktop: usa el backdrop horizontal
   // - Movil: usa un poster neutro (sin texto) para mejor visualizacion vertical
   const heroBackgroundPath = (() => {
-    if (!useBackdrop || !artworkInitialized) return null;
+    if (!useBackdrop) return null;
 
-    // Desktop: usa el backdrop horizontal seleccionado
-    const desktop = displayBackdropPath;
+    // MIENTRAS SE INICIALIZA EL ARTWORK, fondo PROVISIONAL en escritorio.
+    //
+    // Antes esto devolvía `null` durante toda la inicialización para no pintar
+    // una imagen que luego fuese reemplazada. El efecto colateral era peor que
+    // el parpadeo que evitaba: sin nada detrás, el `backdrop-filter` de los
+    // paneles (Scoreboard, InfoTabs, menú de secciones) no tiene nada que
+    // refractar y se ven como CAJAS PLANAS Y VACÍAS; el cristal líquido solo
+    // "aparecía" al final, cuando por fin llegaba la imagen.
+    //
+    // `data.backdrop_path` viene con los datos del servidor, así que está
+    // disponible en el primer render: pintarlo ya da al cristal algo que
+    // difuminar desde el principio, y cuando la selección definitiva resuelve
+    // se sustituye con el mismo fundido que ya usa cualquier cambio de imagen.
+    // En MÓVIL no se hace: allí el héroe es el póster de portada y cambiarlo a
+    // media carga sí se nota como un salto.
+    if (!artworkInitialized) {
+      return isMobileViewport ? null : data?.backdrop_path || null;
+    }
+
+    // Desktop: el backdrop seleccionado y, si en ese instante aún no hay uno,
+    // el de los datos del servidor. Sin este respaldo quedaba un hueco justo al
+    // terminar la inicialización —la selección definitiva todavía sin resolver—
+    // en el que el fondo desaparecía y los paneles volvían a verse planos.
+    const desktop = displayBackdropPath || data?.backdrop_path || null;
 
     // Movil series: usar solo poster con idioma null. Si no existe, no caer
     // al poster base porque puede venir localizado.

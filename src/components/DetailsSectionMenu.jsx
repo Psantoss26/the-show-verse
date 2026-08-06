@@ -158,19 +158,12 @@ export default function DetailsSectionMenu({
                             onClick={() => onChange?.(item.id)}
                             type="button"
                             aria-current={active ? "page" : undefined}
-                            initial={
-                              shouldReduceMotion
-                                ? false
-                                : { opacity: 0, y: 6, scale: 0.99 }
-                            }
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{
-                              duration: shouldReduceMotion ? 0 : 0.32,
-                              delay: shouldReduceMotion
-                                ? 0
-                                : 0.03 + index * 0.035,
-                              ease: [0.22, 1, 0.36, 1],
-                            }}
+                            // Las secciones aparecen CON la barra, no después.
+                            // Entraban una a una desde opacity 0 con retardo
+                            // escalonado, así que durante ~0,3s se veía la barra
+                            // de cristal vacía. El movimiento de entrada lo hace
+                            // el contenedor, que sube con todo dentro.
+                            initial={false}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             className={[

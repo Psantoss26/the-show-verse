@@ -107,11 +107,14 @@ test("cada tarjeta de DetailsInfoTabs comparte el acabado del Scoreboard", async
 });
 
 test("el liquid glass no hereda opacidad de las animaciones de carga", async () => {
-  const [detailsClient, detailModal, detailAtoms] = await Promise.all([
-    readFile(detailsClientPath, "utf8"),
-    readFile(detailModalPath, "utf8"),
-    readFile(detailAtomsPath, "utf8"),
-  ]);
+  const [detailsClient, detailModal, detailAtoms, scoreboardEntrada, sectionMenuEntrada] =
+    await Promise.all([
+      readFile(detailsClientPath, "utf8"),
+      readFile(detailModalPath, "utf8"),
+      readFile(detailAtomsPath, "utf8"),
+      readFile(scoreboardPath, "utf8"),
+      readFile(sectionMenuPath, "utf8"),
+    ]);
 
   const detailsHero = detailsClient.slice(
     detailsClient.indexOf("{/* --- CONTENIDO PRINCIPAL --- */}"),
@@ -159,9 +162,20 @@ test("el liquid glass no hereda opacidad de las animaciones de carga", async () 
     /initial=\{\{ opacity: 0/,
   );
   assert.match(detailModal, /hidden: \{ opacity: 1, y: 86, scale: 0\.965 \}/);
+  // NI el cristal NI su contenido entran con opacidad.
+  //
+  // Antes se animaba solo el contenido para que el cristal no heredara el
+  // fundido. Eso dejaba el problema contrario: la cáscara ya visible y vacía
+  // durante ~0,25s mientras el contenido aparecía, que al cargar la ficha se
+  // veía como cajas de cristal en blanco. Cada pieza se pinta entera de una vez.
+  assert.match(detailAtoms, /initial=\{false\}/);
+  assert.doesNotMatch(detailAtoms, /initial=\{[^}]*opacity: 0/);
+  assert.doesNotMatch(scoreboardEntrada, /initial=\{\{ opacity: 0/);
+  // Los BOTONES de sección no entran con opacidad (el badge que aparece dentro
+  // de una sección ya visible sí puede: no deja ninguna cáscara vacía).
   assert.match(
-    detailAtoms,
-    /initial=\{animateGlassContent \? \{ opacity: 0, y: 4 \} : false\}/,
+    sectionMenuEntrada,
+    /<motion\.button[\s\S]{0,900}?initial=\{false\}/,
   );
 });
 
