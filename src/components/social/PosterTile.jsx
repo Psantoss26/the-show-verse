@@ -7,6 +7,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { BookmarkPlus, Eye, Heart, ImageOff } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { resolvePosterViewerState } from "./posterViewerState.mjs";
 import Stars from "./Stars";
 
 function tmdbPoster(path, size = "w342") {
@@ -57,31 +58,20 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
   const src = tmdbPoster(item?.posterPath || item?.poster_path);
   const title = item?.title || item?.name || "";
 
-  const isFixedSelfWatchlist = fixedIndicator === "watchlist-self";
-  const isFixedFavorite = fixedIndicator === "favorite" || fixedIndicator === "favorites";
-  const isFixedWatchlist = fixedIndicator === "watchlist" || fixedIndicator === "pending";
-
-  const favorite = Boolean(
-    viewerState?.favorite ??
-    item?.isFavorite ??
-    item?.favorite ??
-    (isFixedFavorite && !viewerState ? true : false)
-  );
-  const watchlist = Boolean(
-    viewerState?.watchlist ??
-    item?.isWatchlist ??
-    item?.watchlist ??
-    (isFixedSelfWatchlist ? true : isFixedWatchlist && !viewerState ? true : false)
-  );
-  const watched = Boolean(viewerState?.watched || item?.watched);
-  const userRating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? (!showStars ? item?.rating : undefined);
+  const { favorite, watchlist, watched, userRating } =
+    resolvePosterViewerState({
+      item,
+      viewerState,
+      showStars,
+      fixedIndicator,
+    });
 
   const tmdbScore = clampScore(item?.vote_average ?? item?.voteAverage ?? item?.tmdbScore ?? item?.tmdb_rating ?? item?.rating);
   const imdbScore = clampScore(item?.imdbScore ?? item?.imdb_score ?? item?.imdbRating ?? item?.imdb_rating ?? item?._imdb?.rating);
 
   const hasUserRating = userRating != null && Number(userRating) > 0;
   const hasCollectionIndicator = favorite || watchlist;
-  const hasViewerIndicators = isFixedSelfWatchlist || hasCollectionIndicator || watched || hasUserRating;
+  const hasViewerIndicators = hasCollectionIndicator || watched || hasUserRating;
   const useProfileIndicatorSize = indicatorSize === "profile";
   const useCompactSize = compactIndicator;
   const useResponsiveFixedSize = Boolean(fixedIndicator) && !compactIndicator;
