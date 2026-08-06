@@ -1,8 +1,9 @@
 "use client";
 
-
 import OptimizedImage from "@/components/OptimizedImage";
 import { motion } from "framer-motion";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
 export function VisualMetaCard({
   icon: Icon,
@@ -10,19 +11,28 @@ export function VisualMetaCard({
   label,
   value,
   isLoading = false,
+  liquidGlass = false,
   className = "",
 }) {
   if (!value && !isLoading) return null;
 
   return (
     <div
-      className={`relative isolate flex h-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 p-3.5 pl-4 shadow-none backdrop-blur-[6px] ${className}`}
+      className={`relative isolate flex h-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl p-3.5 pl-4 ${
+        liquidGlass
+          ? LIQUID_GLASS_CARD
+          : "bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px]"
+      } ${className}`}
     >
-      {/* Capa de luz estilo ScoreboardBar */}
-      <div
-        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-      />
+      {liquidGlass ? (
+        <LiquidGlassOpticalLayers />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+        />
+      )}
 
       <div className="relative z-10 shrink-0 text-zinc-300">
         {iconContent || (Icon ? <Icon className="w-5 h-5" /> : null)}

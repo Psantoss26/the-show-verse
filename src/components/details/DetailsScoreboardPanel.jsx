@@ -37,6 +37,8 @@ import {
   ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
+import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
 // Movido VERBATIM desde DetailsClient para compartirlo con el modal.
@@ -458,14 +460,10 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`relative isolate w-full overflow-hidden rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 shadow-none backdrop-blur-[4px] ${className}`}
+      className={`relative isolate w-full overflow-hidden rounded-2xl ${LIQUID_GLASS_BAR} ${className}`}
     >
-      <div
-        className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-        style={{
-          WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-        }}
-      />
+      {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
+      <LiquidGlassOpticalLayers />
 
       {hasToolbar && (
         <div

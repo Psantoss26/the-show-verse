@@ -18,10 +18,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
-import {
-  fetchRatedForUser,
-  getWatchProviders,
-} from "@/lib/api/tmdb";
+import { fetchRatedForUser, getWatchProviders } from "@/lib/api/tmdb";
 import { traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   Heart,
@@ -52,7 +49,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
-import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
+import {
+  pickResponsiveColumns,
+  estimateVisibleCards,
+} from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import { readCachedUserId } from "@/lib/auth/currentUser";
 import {
@@ -885,8 +885,7 @@ function readImageChoiceCache() {
       return imageChoiceCacheMemory;
     }
     const parsed = JSON.parse(raw);
-    imageChoiceCacheMemory =
-      parsed && typeof parsed === "object" ? parsed : {};
+    imageChoiceCacheMemory = parsed && typeof parsed === "object" ? parsed : {};
     return imageChoiceCacheMemory;
   } catch {
     imageChoiceCacheMemory = {};
@@ -912,7 +911,10 @@ function persistImageChoiceCache(cache) {
   const write = () => {
     imageChoicePersistHandle = null;
     try {
-      window.localStorage.setItem(IMAGE_CHOICE_CACHE_KEY, JSON.stringify(cache));
+      window.localStorage.setItem(
+        IMAGE_CHOICE_CACHE_KEY,
+        JSON.stringify(cache),
+      );
     } catch {}
   };
 
@@ -1780,9 +1782,10 @@ function GroupDivider({
   }, [transitioningThreshold]);
 
   const renderSticky = isSticky || forceSticky;
-  const stickyTransitionClass = disableStickyAnimation || isBackNav
-    ? "transition-none"
-    : "transition-all duration-300";
+  const stickyTransitionClass =
+    disableStickyAnimation || isBackNav
+      ? "transition-none"
+      : "transition-all duration-300";
 
   return (
     <motion.div
@@ -1920,7 +1923,13 @@ function GroupDivider({
 }
 
 // ================== CARD COMPONENTS ==================
-function FavoriteHoverIndicator({ type, watched, watchCount = 0, rating, compact = false }) {
+function FavoriteHoverIndicator({
+  type,
+  watched,
+  watchCount = 0,
+  rating,
+  compact = false,
+}) {
   const hasRating = rating != null && Number(rating) > 0;
   const movieWatchCount = Number.isFinite(Number(watchCount))
     ? Math.max(0, Number(watchCount))
@@ -1935,20 +1944,32 @@ function FavoriteHoverIndicator({ type, watched, watchCount = 0, rating, compact
       className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
       aria-hidden="true"
     >
-      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
-        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
+      <span
+        className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
+      >
+        {type === "movie" ? (
+          <Film className={iconClassName} />
+        ) : (
+          <MonitorPlay className={iconClassName} />
+        )}
       </span>
       {type === "movie" ? (
-        <span className={`flex ${countClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}>
+        <span
+          className={`flex ${countClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}
+        >
           {movieWatchCount}
         </span>
       ) : watched ? (
-        <span className={`flex ${itemClassName} shrink-0 items-center justify-center text-emerald-400`}>
+        <span
+          className={`flex ${itemClassName} shrink-0 items-center justify-center text-emerald-400`}
+        >
           <Eye className={iconClassName} />
         </span>
       ) : null}
       {hasRating ? (
-        <span className={`flex ${ratingClassName} shrink-0 items-center justify-center font-black leading-none text-amber-300`}>
+        <span
+          className={`flex ${ratingClassName} shrink-0 items-center justify-center font-black leading-none text-amber-300`}
+        >
           <span className="tabular-nums leading-none">{rating}</span>
         </span>
       ) : null}
@@ -2064,7 +2085,12 @@ const FavoriteCard = memo(function FavoriteCard({
         layout={!isBackNav}
         data-favorite-card=""
       >
-        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
+        <Link
+          href={href}
+          prefetch={false}
+          onClick={onPreviewClick}
+          className="block"
+        >
           <motion.div
             className={`relative ${aspectRatio} group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300`}
             whileHover={{
@@ -2078,12 +2104,14 @@ const FavoriteCard = memo(function FavoriteCard({
               transformOrigin: "center center",
             }}
           >
-            <SmartPoster
-              item={item}
-              title={title}
-              mode={effectiveImageMode}
+            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            <FavoriteHoverIndicator
+              type={type}
+              watched={watched}
+              watchCount={watchCount}
+              rating={userRating}
+              compact
             />
-            <FavoriteHoverIndicator type={type} watched={watched} watchCount={watchCount} rating={userRating} compact />
           </motion.div>
         </Link>
       </motion.div>
@@ -2103,18 +2131,24 @@ const FavoriteCard = memo(function FavoriteCard({
       }}
       data-favorite-card=""
     >
-      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
+      <Link
+        href={href}
+        prefetch={false}
+        onClick={onPreviewClick}
+        className="block"
+      >
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
           <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
-          <SmartPoster
-            item={item}
-            title={title}
-            mode={effectiveImageMode}
+          <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          <FavoriteHoverIndicator
+            type={type}
+            watched={watched}
+            watchCount={watchCount}
+            rating={userRating}
           />
-          <FavoriteHoverIndicator type={type} watched={watched} watchCount={watchCount} rating={userRating} />
         </div>
       </Link>
     </motion.div>
@@ -2123,7 +2157,14 @@ const FavoriteCard = memo(function FavoriteCard({
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
-  const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
+  const {
+    session,
+    account,
+    hydrated,
+    logout,
+    updatePreference,
+    authenticated,
+  } = useAuth();
   const { t } = useTranslation();
   const isBackNav = useIsHistoryNavigation();
   // Read each persistent cache only once on mount. These JSON.parse and build
@@ -2210,16 +2251,19 @@ export default function FavoritesClient() {
     );
   }, []);
 
-  const setViewMode = useCallback((mode) => {
-    shrinkRenderWindowToView();
-    setViewModeState(mode);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("showverse:favorites:viewMode", mode);
-    }
-    if (authenticated) {
-      updatePreference({ defaultView: mode });
-    }
-  }, [authenticated, updatePreference, shrinkRenderWindowToView]);
+  const setViewMode = useCallback(
+    (mode) => {
+      shrinkRenderWindowToView();
+      setViewModeState(mode);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("showverse:favorites:viewMode", mode);
+      }
+      if (authenticated) {
+        updatePreference({ defaultView: mode });
+      }
+    },
+    [authenticated, updatePreference, shrinkRenderWindowToView],
+  );
 
   const [typeFilter, setTypeFilter] = useState(() => {
     if (typeof window === "undefined") return "all";
@@ -2239,10 +2283,13 @@ export default function FavoritesClient() {
     return saved === "backdrop" ? "backdrop" : "poster";
   });
 
-  const setImageMode = useCallback((mode) => {
-    shrinkRenderWindowToView();
-    setImageModeState(mode);
-  }, [shrinkRenderWindowToView]);
+  const setImageMode = useCallback(
+    (mode) => {
+      shrinkRenderWindowToView();
+      setImageModeState(mode);
+    },
+    [shrinkRenderWindowToView],
+  );
 
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
@@ -2363,9 +2410,7 @@ export default function FavoritesClient() {
     let cancelled = false;
     const controller = new AbortController();
     const shouldIgnoreExpectedLogoutError = () =>
-      cancelled ||
-      controller.signal.aborted ||
-      tmdbLogoutInFlightRef.current;
+      cancelled || controller.signal.aborted || tmdbLogoutInFlightRef.current;
 
     const getItemType = (item) =>
       item?.media_type || (item?.title ? "movie" : "tv");
@@ -2383,7 +2428,9 @@ export default function FavoritesClient() {
       const data = await response.json().catch(() => ({}));
       const results = Array.isArray(data?.results) ? data.results : [];
       return results
-        .filter((item) => item?.mediaType === "movie" || item?.mediaType === "tv")
+        .filter(
+          (item) => item?.mediaType === "movie" || item?.mediaType === "tv",
+        )
         .map((item) => ({
           ...item,
           id: item.tmdbId,
@@ -2408,43 +2455,48 @@ export default function FavoritesClient() {
         if (shouldIgnoreExpectedLogoutError()) return;
 
         if (!favResponse.ok) {
-          if (
-            shouldIgnoreExpectedLogoutError() ||
-            favResponse.status === 401 ||
-            !session ||
-            !account?.id
-          ) {
-            setItems([]);
-            setRatedItems([]);
-            return;
+          // NUNCA vaciar la lista porque una petición falle.
+          //
+          // Aquí estaba el fallo de «aparece "No se encontraron ..." aunque la
+          // sesión siga iniciada»: un 401 vaciaba la lista. Y ese 401 no
+          // significa que el usuario no tenga nada: la ruta intenta primero el
+          // backend y, si esa llamada no sale bien (p. ej. el access token
+          // acaba de caducar y el refresco va en vuelo), cae a TMDb y responde
+          // 401 NO_SESSION al no haber cookie de TMDb. Reproducido: un solo 401
+          // pasaba de 321 tarjetas a 0, con la lista intacta en la caché.
+          //
+          // Solo una respuesta CORRECTA define la lista. Una lista realmente
+          // vacía llega como 200 con `[]` y se maneja en el camino de éxito.
+          if (shouldIgnoreExpectedLogoutError()) return;
+          const cached = readFavoritesCache();
+          if (cached?.items?.length) {
+            setItems((prev) => (prev.length ? prev : cached.items));
+            setRatedItems((prev) =>
+              prev.length ? prev : cached.ratedItems || [],
+            );
           }
-          // SERVIDOR CAÍDO (5xx/429, típico del túnel con el NAS apagado): NO
-          // vaciar. Conservamos la lista o la recuperamos de la caché —aunque sea
-          // vieja— para poder seguir usando la app offline.
-          if (isUnavailableStatus(favResponse.status)) {
-            const cached = readFavoritesCache();
-            if (cached?.items?.length) {
-              setItems((prev) => (prev.length ? prev : cached.items));
-              setRatedItems((prev) =>
-                prev.length ? prev : cached.ratedItems || [],
-              );
-            }
-            return;
+          if (!isUnavailableStatus(favResponse.status)) {
+            console.error(
+              "API error:",
+              favResponse.status,
+              favResponse.statusText,
+            );
           }
-          console.error(
-            "API error:",
-            favResponse.status,
-            favResponse.statusText,
-          );
-          setItems([]);
           return;
         }
 
         const text = await favResponse.text();
         if (shouldIgnoreExpectedLogoutError()) return;
         if (!text) {
+          // Cuerpo vacío = respuesta rota, no "el usuario no tiene nada".
           console.error("Empty response from API");
-          setItems([]);
+          const cached = readFavoritesCache();
+          if (cached?.items?.length) {
+            setItems((prev) => (prev.length ? prev : cached.items));
+            setRatedItems((prev) =>
+              prev.length ? prev : cached.ratedItems || [],
+            );
+          }
           return;
         }
 
@@ -2495,7 +2547,8 @@ export default function FavoritesClient() {
           }
           writeFavoritesCache(favoritesWithMeta, []);
 
-          const isShowverse = session === "showverse" || account?.provider === "showverse";
+          const isShowverse =
+            session === "showverse" || account?.provider === "showverse";
           if (!isShowverse && !favoritesListSyncInFlight) {
             favoritesListSyncInFlight = syncOverflowFavoritesToTraktList(
               favoritesWithMeta,
@@ -2519,11 +2572,13 @@ export default function FavoritesClient() {
 
           if (!isShowverse) {
             void loadBackendRatings()
-              .then((backendRated) =>
-                backendRated ?? fetchRatedForUser(account.id, session),
+              .then(
+                (backendRated) =>
+                  backendRated ?? fetchRatedForUser(account.id, session),
               )
               .then((rated) => {
-                if (cancelled || !Array.isArray(rated) || rated.length === 0) return;
+                if (cancelled || !Array.isArray(rated) || rated.length === 0)
+                  return;
                 const ratingMap = new Map();
                 rated.forEach((item) => {
                   ratingMap.set(getRatingKey(item), item.user_rating);
@@ -2532,7 +2587,10 @@ export default function FavoritesClient() {
                 setItems((prev) => {
                   const merged = prev.map((item) => ({
                     ...item,
-                    user_rating: ratingMap.get(getRatingKey(item)) ?? item.user_rating ?? null,
+                    user_rating:
+                      ratingMap.get(getRatingKey(item)) ??
+                      item.user_rating ??
+                      null,
                   }));
                   writeFavoritesCache(merged, rated);
                   return merged;
@@ -2560,9 +2618,9 @@ export default function FavoritesClient() {
                 prev.length ? prev : cached.ratedItems || [],
               );
             }
-          } else {
-            setItems([]);
           }
+          // Cualquier otro error (JSON ilegible, etc.) tampoco significa que la
+          // lista esté vacía: se conserva lo que hubiera.
         }
       } finally {
         if (!cancelled) {
@@ -2584,7 +2642,12 @@ export default function FavoritesClient() {
   useEffect(() => {
     const onChange = (event) => {
       const detail = event?.detail;
-      if (!detail || !Array.isArray(detail.listTypes) || !detail.listTypes.includes("favorites")) return;
+      if (
+        !detail ||
+        !Array.isArray(detail.listTypes) ||
+        !detail.listTypes.includes("favorites")
+      )
+        return;
       const tmdbId = Number(detail.tmdbId);
       if (!Number.isFinite(tmdbId)) return;
       const matches = (it) => {
@@ -2594,7 +2657,8 @@ export default function FavoritesClient() {
       };
       setItems((prev) => {
         const exists = prev.some(matches);
-        if (!detail.added) return exists ? prev.filter((it) => !matches(it)) : prev;
+        if (!detail.added)
+          return exists ? prev.filter((it) => !matches(it)) : prev;
         if (exists || !detail.item) return prev;
         return [detail.item, ...prev];
       });
@@ -2782,7 +2846,9 @@ export default function FavoritesClient() {
 
       try {
         // Fetch all watch history from Trakt
-        const response = await fetch("/api/trakt/history?type=all&limit=all&enrich=0");
+        const response = await fetch(
+          "/api/trakt/history?type=all&limit=all&enrich=0",
+        );
         if (!response.ok) {
           console.warn("Failed to load watch history");
           setLoadingHistory(false);
@@ -3302,20 +3368,14 @@ export default function FavoritesClient() {
             ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
             : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
     ),
-    aspect:
-      viewMode === "list" || imageMode === "backdrop"
-        ? 0.5625
-        : 1.5,
+    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
   });
 
   if (!hydrated && !paintsBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if (
-    (!session || !account) &&
-    !(paintsBackNavigationSnapshot && !hydrated)
-  ) {
+  if ((!session || !account) && !(paintsBackNavigationSnapshot && !hydrated)) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -3393,7 +3453,9 @@ export default function FavoritesClient() {
           className="mb-6 sm:mb-10"
           initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }
+          }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -3413,7 +3475,11 @@ export default function FavoritesClient() {
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
+                    transition={
+                      isBackNav
+                        ? { duration: 0 }
+                        : { duration: 0.4, delay: 0.3 }
+                    }
                   >
                     <LiquidButton
                       onClick={() => window.location.reload()}
@@ -3433,7 +3499,11 @@ export default function FavoritesClient() {
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
+                    transition={
+                      isBackNav
+                        ? { duration: 0 }
+                        : { duration: 0.4, delay: 0.4 }
+                    }
                   >
                     <LiquidButton
                       onClick={handleTmdbLogout}
@@ -3459,7 +3529,9 @@ export default function FavoritesClient() {
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={isBackNav ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+                transition={
+                  isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+                }
               >
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-red-400">
@@ -4031,143 +4103,153 @@ export default function FavoritesClient() {
               </button>
             </div>
           </div>
+        </motion.div>
+
+        {/* Scores load silently in background - no loading indicator */}
+
+        {/* Content */}
+        {loading ? null : sorted.length === 0 ? (
+          <motion.div
+            className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
+            <p className="text-zinc-500 font-medium">
+              No se encontraron favoritos.
+            </p>
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                className="mt-4 text-red-500 text-sm font-bold hover:underline"
+              >
+                Limpiar búsqueda
+              </button>
+            )}
           </motion.div>
-
-          {/* Scores load silently in background - no loading indicator */}
-
-          {/* Content */}
-          {loading ? null : sorted.length === 0 ? (
-            <motion.div
-              className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-            >
-              <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
-              <p className="text-zinc-500 font-medium">
-                No se encontraron favoritos.
-              </p>
-              {q && (
-                <button
-                  onClick={() => setQ("")}
-                  className="mt-4 text-red-500 text-sm font-bold hover:underline"
+        ) : grouped ? (
+          // Grouped view
+          <div className="space-y-8">
+            {(() => {
+              let globalCardIndex = 0;
+              return renderedGrouped.map((group, groupIndex) => (
+                <motion.div
+                  key={group.key}
+                  ref={(node) => setGroupSectionRef(group.key, node)}
+                  className="overflow-visible scroll-mt-[148px]"
+                  initial={isBackNav ? false : { opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
                 >
-                  Limpiar búsqueda
-                </button>
-              )}
-            </motion.div>
-          ) : grouped ? (
-            // Grouped view
-            <div className="space-y-8">
-              {(() => {
-                let globalCardIndex = 0;
-                return renderedGrouped.map((group, groupIndex) => (
-                  <motion.div
-                    key={group.key}
-                    ref={(node) => setGroupSectionRef(group.key, node)}
-                    className="overflow-visible scroll-mt-[148px]"
-                    initial={isBackNav ? false : { opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
-                  >
-                    <GroupDivider
-                      title={group.label}
-                      count={group.items.length}
-                      total={sorted.length}
-                      stats={group.stats}
-                      groupBy={groupBy}
-                      mobileFiltersOpen={mobileFiltersOpen}
-                      forceSticky={forcedStickyGroupKey === group.key}
-                      disableStickyAnimation={forcedStickyGroupKey === group.key}
-                      hasPreviousGroup={groupIndex > 0}
-                      hasNextGroup={groupIndex < renderedGrouped.length - 1}
-                      onPreviousGroup={() => scrollToPreviousGroup(group.key)}
-                      onNextGroup={() => scrollToNextGroup(group.key)}
-                    />
-                    {group.subgroups?.length ? (
-                      <div className="">
-                        {group.subgroups.map((subgroup) => (
+                  <GroupDivider
+                    title={group.label}
+                    count={group.items.length}
+                    total={sorted.length}
+                    stats={group.stats}
+                    groupBy={groupBy}
+                    mobileFiltersOpen={mobileFiltersOpen}
+                    forceSticky={forcedStickyGroupKey === group.key}
+                    disableStickyAnimation={forcedStickyGroupKey === group.key}
+                    hasPreviousGroup={groupIndex > 0}
+                    hasNextGroup={groupIndex < renderedGrouped.length - 1}
+                    onPreviousGroup={() => scrollToPreviousGroup(group.key)}
+                    onNextGroup={() => scrollToNextGroup(group.key)}
+                  />
+                  {group.subgroups?.length ? (
+                    <div className="">
+                      {group.subgroups.map((subgroup) => (
+                        <div
+                          key={`${group.key}-${subgroup.key}`}
+                          className="space-y-1 overflow-visible"
+                        >
+                          <SubGroupDivider
+                            title={subgroup.label}
+                            count={subgroup.items.length}
+                          />
                           <div
-                            key={`${group.key}-${subgroup.key}`}
-                            className="space-y-1 overflow-visible"
+                            key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
+                            className={getItemsGridClass(true)}
                           >
-                            <SubGroupDivider
-                              title={subgroup.label}
-                              count={subgroup.items.length}
-                            />
-                            <div
-                              key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
-                              className={getItemsGridClass(true)}
-                            >
-                              {subgroup.items.map((item, idx) => {
-                                const currentGlobalIdx = globalCardIndex++;
-                                if (currentGlobalIdx >= renderLimit) return null;
-                                return (
-                                  <FavoriteCard
-                                    key={getMediaKey(item)}
-                                    item={item}
-                                    index={currentGlobalIdx}
-                                    totalItems={sorted.length}
-                                    animateWithin={entranceVisibleCount}
-                                    viewMode={viewMode}
-                                    imageMode={imageMode}
-                                    watched={watchDates.has(getFavoriteHistoryKey(item))}
-                                    watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
-                                  />
-                                );
-                              })}
-                            </div>
+                            {subgroup.items.map((item, idx) => {
+                              const currentGlobalIdx = globalCardIndex++;
+                              if (currentGlobalIdx >= renderLimit) return null;
+                              return (
+                                <FavoriteCard
+                                  key={getMediaKey(item)}
+                                  item={item}
+                                  index={currentGlobalIdx}
+                                  totalItems={sorted.length}
+                                  animateWithin={entranceVisibleCount}
+                                  viewMode={viewMode}
+                                  imageMode={imageMode}
+                                  watched={watchDates.has(
+                                    getFavoriteHistoryKey(item),
+                                  )}
+                                  watchCount={
+                                    watchCounts.get(
+                                      getFavoriteHistoryKey(item),
+                                    ) || 0
+                                  }
+                                />
+                              );
+                            })}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
-                        className={getItemsGridClass(true)}
-                      >
-                        {group.items.map((item, idx) => {
-                          const currentGlobalIdx = globalCardIndex++;
-                          if (currentGlobalIdx >= renderLimit) return null;
-                          return (
-                            <FavoriteCard
-                              key={getMediaKey(item)}
-                              item={item}
-                              index={currentGlobalIdx}
-                              totalItems={sorted.length}
-                              animateWithin={entranceVisibleCount}
-                              viewMode={viewMode}
-                              imageMode={imageMode}
-                              watched={watchDates.has(getFavoriteHistoryKey(item))}
-                              watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </motion.div>
-                ));
-              })()}
-            </div>
-          ) : (
-            <div
-              key={`flat-grid-${viewMode}-${imageMode}`}
-              className={getItemsGridClass(false)}
-            >
-              {renderedSorted.map((item, idx) => (
-                <FavoriteCard
-                  key={getMediaKey(item)}
-                  item={item}
-                  index={idx}
-                  totalItems={sorted.length}
-                  animateWithin={entranceVisibleCount}
-                  viewMode={viewMode}
-                  imageMode={imageMode}
-                  watched={watchDates.has(getFavoriteHistoryKey(item))}
-                  watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
-                />
-              ))}
-            </div>
-          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
+                      className={getItemsGridClass(true)}
+                    >
+                      {group.items.map((item, idx) => {
+                        const currentGlobalIdx = globalCardIndex++;
+                        if (currentGlobalIdx >= renderLimit) return null;
+                        return (
+                          <FavoriteCard
+                            key={getMediaKey(item)}
+                            item={item}
+                            index={currentGlobalIdx}
+                            totalItems={sorted.length}
+                            animateWithin={entranceVisibleCount}
+                            viewMode={viewMode}
+                            imageMode={imageMode}
+                            watched={watchDates.has(
+                              getFavoriteHistoryKey(item),
+                            )}
+                            watchCount={
+                              watchCounts.get(getFavoriteHistoryKey(item)) || 0
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              ));
+            })()}
+          </div>
+        ) : (
+          <div
+            key={`flat-grid-${viewMode}-${imageMode}`}
+            className={getItemsGridClass(false)}
+          >
+            {renderedSorted.map((item, idx) => (
+              <FavoriteCard
+                key={getMediaKey(item)}
+                item={item}
+                index={idx}
+                totalItems={sorted.length}
+                animateWithin={entranceVisibleCount}
+                viewMode={viewMode}
+                imageMode={imageMode}
+                watched={watchDates.has(getFavoriteHistoryKey(item))}
+                watchCount={watchCounts.get(getFavoriteHistoryKey(item)) || 0}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

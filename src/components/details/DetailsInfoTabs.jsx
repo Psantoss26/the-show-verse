@@ -29,12 +29,32 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-import { VisualMetaCard, DetailsTabsMenu } from "@/components/details/DetailAtoms";
+import {
+  VisualMetaCard as BaseVisualMetaCard,
+  DetailsTabsMenu,
+} from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
 import { translateGenre } from "@/lib/details/formatters";
 import OptimizedImage from "@/components/OptimizedImage";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+
+function VisualMetaCard(props) {
+  return <BaseVisualMetaCard {...props} liquidGlass />;
+}
+
+function InfoGlassPanel({ children, className = "" }) {
+  return (
+    <div
+      className={`relative isolate overflow-hidden rounded-xl ${LIQUID_GLASS_BAR} ${className}`}
+    >
+      <LiquidGlassOpticalLayers />
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+}
 
 export default function DetailsInfoTabs({
   variant = "normal",
@@ -99,25 +119,16 @@ export default function DetailsInfoTabs({
           {/* ===== TAB: SINOPSIS ===== */}
           {activeTab === "synopsis" && (
             <div key="synopsis">
-              <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                {/* Capa de fondo suave */}
-                <div
-                  className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                  style={{
-                    WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-                  }}
-                />
-                <div className="relative z-10">
-                  {tagline && (
-                    <div className="text-yellow-500/80 text-lg font-serif italic mb-3">
-                      {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
-                    </div>
-                  )}
-                  <p className="text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                    {overview || "No hay descripción disponible."}
-                  </p>
-                </div>
-              </div>
+              <InfoGlassPanel className="p-5 sm:p-6">
+                {tagline && (
+                  <div className="mb-3 font-serif text-lg italic text-yellow-500/80">
+                    {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
+                  </div>
+                )}
+                <p className="whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
+                  {overview || "No hay descripción disponible."}
+                </p>
+              </InfoGlassPanel>
             </div>
           )}
 
@@ -469,39 +480,29 @@ export default function DetailsInfoTabs({
               {awards ? (
                 <AwardsPanel awards={awards} />
               ) : (
-                <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                  <div
-                    className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                    style={{
-                      WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-                    }}
-                  />
-                  <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
-                  <div className="relative z-10">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-xl bg-yellow-500/10 text-yellow-500 shrink-0">
-                        <Trophy className="w-8 h-8" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-bold text-white mb-2">
-                          Premios y nominaciones
-                        </h3>
-                        <p className="text-base leading-relaxed text-zinc-200">
-                          {
-                            awardItems.filter((a) => a.result === "winner")
-                              .length
-                          }{" "}
-                          premios y{" "}
-                          {
-                            awardItems.filter((a) => a.result === "nominee")
-                              .length
-                          }{" "}
-                          nominaciones
-                        </p>
-                      </div>
+                <InfoGlassPanel className="p-5 sm:p-6">
+                  <div className="pointer-events-none absolute -right-6 -top-6 z-10 h-32 w-32 rounded-full bg-yellow-500/10 blur-3xl" />
+                  <div className="flex items-start gap-4">
+                    <div className="shrink-0 rounded-xl bg-yellow-500/10 p-3 text-yellow-500">
+                      <Trophy className="h-8 w-8" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="mb-2 text-lg font-bold text-white">
+                        Premios y nominaciones
+                      </h3>
+                      <p className="text-base leading-relaxed text-zinc-200">
+                        {
+                          awardItems.filter((a) => a.result === "winner").length
+                        }{" "}
+                        premios y{" "}
+                        {
+                          awardItems.filter((a) => a.result === "nominee").length
+                        }{" "}
+                        nominaciones
+                      </p>
                     </div>
                   </div>
-                </div>
+                </InfoGlassPanel>
               )}
             </div>
           )}

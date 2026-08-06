@@ -46,7 +46,10 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
-import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
+import {
+  pickResponsiveColumns,
+  estimateVisibleCards,
+} from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import { readCachedUserId } from "@/lib/auth/currentUser";
 import {
@@ -1055,7 +1058,8 @@ function getStoredImageChoice(kind, key) {
   const cache = readImageChoiceCache();
   const entry = cache[`${kind}:${key}`];
   if (!entry?.path) return null;
-  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS) return null;
+  if (Date.now() - Number(entry.t || 0) > IMAGE_CHOICE_CACHE_TTL_MS)
+    return null;
   return entry.path;
 }
 
@@ -1297,9 +1301,10 @@ function GroupDivider({
   }, [transitioningThreshold]);
 
   const renderSticky = isSticky || forceSticky;
-  const stickyTransitionClass = disableStickyAnimation || isBackNav
-    ? "transition-none"
-    : "transition-all duration-300";
+  const stickyTransitionClass =
+    disableStickyAnimation || isBackNav
+      ? "transition-none"
+      : "transition-all duration-300";
 
   return (
     <motion.div
@@ -1660,8 +1665,10 @@ function WatchlistHoverIndicator({
 }) {
   const normalizedTmdbScore = Number(tmdbScore);
   const normalizedImdbScore = Number(imdbScore);
-  const hasTmdbScore = Number.isFinite(normalizedTmdbScore) && normalizedTmdbScore > 0;
-  const hasImdbScore = Number.isFinite(normalizedImdbScore) && normalizedImdbScore > 0;
+  const hasTmdbScore =
+    Number.isFinite(normalizedTmdbScore) && normalizedTmdbScore > 0;
+  const hasImdbScore =
+    Number.isFinite(normalizedImdbScore) && normalizedImdbScore > 0;
   const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
   const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
   const scoreClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
@@ -1671,16 +1678,26 @@ function WatchlistHoverIndicator({
       className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
       aria-hidden="true"
     >
-      <span className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
-        {type === "movie" ? <Film className={iconClassName} /> : <MonitorPlay className={iconClassName} />}
+      <span
+        className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
+      >
+        {type === "movie" ? (
+          <Film className={iconClassName} />
+        ) : (
+          <MonitorPlay className={iconClassName} />
+        )}
       </span>
       {hasTmdbScore ? (
-        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400`}>
+        <span
+          className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400`}
+        >
           {normalizedTmdbScore.toFixed(1)}
         </span>
       ) : null}
       {hasImdbScore ? (
-        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300`}>
+        <span
+          className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300`}
+        >
           {normalizedImdbScore.toFixed(1)}
         </span>
       ) : null}
@@ -1757,7 +1774,6 @@ const WatchlistCard = memo(function WatchlistCard({
           }
         }
       }
-
     } finally {
       setLoadingScores(false);
     }
@@ -1832,7 +1848,12 @@ const WatchlistCard = memo(function WatchlistCard({
         layout={!isBackNav}
         data-watchlist-card=""
       >
-        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
+        <Link
+          href={href}
+          prefetch={false}
+          onClick={onPreviewClick}
+          className="block"
+        >
           <motion.div
             className={`relative ${aspectRatio} group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300`}
             whileHover={{
@@ -1869,7 +1890,12 @@ const WatchlistCard = memo(function WatchlistCard({
       transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
       data-watchlist-card=""
     >
-      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
+      <Link
+        href={href}
+        prefetch={false}
+        onClick={onPreviewClick}
+        className="block"
+      >
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-blue-900/20 transition-shadow duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
           onMouseEnter={handleHover}
@@ -1888,7 +1914,14 @@ const WatchlistCard = memo(function WatchlistCard({
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
-  const { session, account, hydrated, logout, updatePreference, authenticated } = useAuth();
+  const {
+    session,
+    account,
+    hydrated,
+    logout,
+    updatePreference,
+    authenticated,
+  } = useAuth();
   const { t } = useTranslation();
   const isBackNav = useIsHistoryNavigation();
   // Read each persistent cache only once on mount. These JSON.parse and build
@@ -1961,16 +1994,19 @@ export default function WatchlistClient() {
     );
   }, []);
 
-  const setViewMode = useCallback((mode) => {
-    shrinkRenderWindowToView();
-    setViewModeState(mode);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("showverse:watchlist:viewMode", mode);
-    }
-    if (authenticated) {
-      updatePreference({ defaultView: mode });
-    }
-  }, [authenticated, updatePreference, shrinkRenderWindowToView]);
+  const setViewMode = useCallback(
+    (mode) => {
+      shrinkRenderWindowToView();
+      setViewModeState(mode);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("showverse:watchlist:viewMode", mode);
+      }
+      if (authenticated) {
+        updatePreference({ defaultView: mode });
+      }
+    },
+    [authenticated, updatePreference, shrinkRenderWindowToView],
+  );
 
   const [typeFilter, setTypeFilter] = useState(() => {
     if (typeof window === "undefined") return "all";
@@ -1990,10 +2026,13 @@ export default function WatchlistClient() {
     return saved === "backdrop" ? "backdrop" : "poster";
   });
 
-  const setImageMode = useCallback((mode) => {
-    shrinkRenderWindowToView();
-    setImageModeState(mode);
-  }, [shrinkRenderWindowToView]);
+  const setImageMode = useCallback(
+    (mode) => {
+      shrinkRenderWindowToView();
+      setImageModeState(mode);
+    },
+    [shrinkRenderWindowToView],
+  );
 
   const [groupBy, setGroupBy] = useState(() => {
     if (typeof window === "undefined") return "none";
@@ -2113,9 +2152,7 @@ export default function WatchlistClient() {
     let cancelled = false;
     const controller = new AbortController();
     const shouldIgnoreExpectedLogoutError = () =>
-      cancelled ||
-      controller.signal.aborted ||
-      tmdbLogoutInFlightRef.current;
+      cancelled || controller.signal.aborted || tmdbLogoutInFlightRef.current;
 
     const loadWatchlist = async () => {
       if (!session || !account?.id) {
@@ -2132,35 +2169,38 @@ export default function WatchlistClient() {
         if (shouldIgnoreExpectedLogoutError()) return;
 
         if (!response.ok) {
-          if (
-            shouldIgnoreExpectedLogoutError() ||
-            response.status === 401 ||
-            !session ||
-            !account?.id
-          ) {
-            setItems([]);
-            return;
+          // NUNCA vaciar la lista porque una petición falle.
+          //
+          // Aquí estaba el fallo de «aparece "No se encontraron ..." aunque la
+          // sesión siga iniciada»: un 401 vaciaba la lista. Y ese 401 no
+          // significa que el usuario no tenga nada: la ruta intenta primero el
+          // backend y, si esa llamada no sale bien (p. ej. el access token
+          // acaba de caducar y el refresco va en vuelo), cae a TMDb y responde
+          // 401 NO_SESSION al no haber cookie de TMDb. Reproducido: un solo 401
+          // pasaba de 321 tarjetas a 0, con la lista intacta en la caché.
+          //
+          // Solo una respuesta CORRECTA define la lista. Una lista realmente
+          // vacía llega como 200 con `[]` y se maneja en el camino de éxito.
+          if (shouldIgnoreExpectedLogoutError()) return;
+          const cached = readWatchlistCache();
+          if (cached?.items?.length) {
+            setItems((prev) => (prev.length ? prev : cached.items));
           }
-          // SERVIDOR CAÍDO (5xx/429, túnel con el NAS apagado): NO vaciar.
-          // Conservamos/recuperamos la caché —aunque sea vieja— para seguir usando
-          // la app offline.
-          if (isUnavailableStatus(response.status)) {
-            const cached = readWatchlistCache();
-            if (cached?.items?.length) {
-              setItems((prev) => (prev.length ? prev : cached.items));
-            }
-            return;
+          if (!isUnavailableStatus(response.status)) {
+            console.error("API error:", response.status, response.statusText);
           }
-          console.error("API error:", response.status, response.statusText);
-          setItems([]);
           return;
         }
 
         const text = await response.text();
         if (shouldIgnoreExpectedLogoutError()) return;
         if (!text) {
+          // Cuerpo vacío = respuesta rota, no "el usuario no tiene nada".
           console.error("Empty response from API");
-          setItems([]);
+          const cached = readWatchlistCache();
+          if (cached?.items?.length) {
+            setItems((prev) => (prev.length ? prev : cached.items));
+          }
           return;
         }
 
@@ -2218,9 +2258,9 @@ export default function WatchlistClient() {
           if (cached?.items?.length) {
             setItems((prev) => (prev.length ? prev : cached.items));
           }
-        } else {
-          setItems([]);
         }
+        // Cualquier otro error (JSON ilegible, etc.) tampoco significa que la
+        // lista esté vacía: se conserva lo que hubiera.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -2238,7 +2278,12 @@ export default function WatchlistClient() {
   useEffect(() => {
     const onChange = (event) => {
       const detail = event?.detail;
-      if (!detail || !Array.isArray(detail.listTypes) || !detail.listTypes.includes("watchlist")) return;
+      if (
+        !detail ||
+        !Array.isArray(detail.listTypes) ||
+        !detail.listTypes.includes("watchlist")
+      )
+        return;
       const tmdbId = Number(detail.tmdbId);
       if (!Number.isFinite(tmdbId)) return;
       const matches = (it) => {
@@ -2248,7 +2293,8 @@ export default function WatchlistClient() {
       };
       setItems((prev) => {
         const exists = prev.some(matches);
-        if (!detail.added) return exists ? prev.filter((it) => !matches(it)) : prev;
+        if (!detail.added)
+          return exists ? prev.filter((it) => !matches(it)) : prev;
         if (exists || !detail.item) return prev;
         return [detail.item, ...prev];
       });
@@ -2850,20 +2896,14 @@ export default function WatchlistClient() {
             ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
             : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
     ),
-    aspect:
-      viewMode === "list" || imageMode === "backdrop"
-        ? 0.5625
-        : 1.5,
+    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
   });
 
   if (!hydrated && !paintsBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
   }
 
-  if (
-    (!session || !account) &&
-    !(paintsBackNavigationSnapshot && !hydrated)
-  ) {
+  if ((!session || !account) && !(paintsBackNavigationSnapshot && !hydrated)) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30 pb-20">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -2911,7 +2951,8 @@ export default function WatchlistClient() {
                 Inicia sesión
               </h2>
               <p className="text-zinc-400 text-xs font-medium max-w-sm mb-6 leading-relaxed">
-                Inicia sesión para ver y gestionar tu lista de títulos pendientes.
+                Inicia sesión para ver y gestionar tu lista de títulos
+                pendientes.
               </p>
               <Link
                 href="/login?next=/watchlist"
@@ -2941,7 +2982,9 @@ export default function WatchlistClient() {
           className="mb-6 sm:mb-10"
           initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }
+          }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -2961,7 +3004,11 @@ export default function WatchlistClient() {
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
+                    transition={
+                      isBackNav
+                        ? { duration: 0 }
+                        : { duration: 0.4, delay: 0.3 }
+                    }
                   >
                     <LiquidButton
                       onClick={() => window.location.reload()}
@@ -2981,7 +3028,11 @@ export default function WatchlistClient() {
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
+                    transition={
+                      isBackNav
+                        ? { duration: 0 }
+                        : { duration: 0.4, delay: 0.4 }
+                    }
                   >
                     <LiquidButton
                       onClick={handleTmdbLogout}
@@ -3007,7 +3058,9 @@ export default function WatchlistClient() {
                 className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={isBackNav ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+                transition={
+                  isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+                }
               >
                 <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
                   <div className="relative z-10 mb-1 text-blue-400">
@@ -3620,7 +3673,9 @@ export default function WatchlistClient() {
                                   animateWithin={entranceVisibleCount}
                                   viewMode={viewMode}
                                   imageMode={imageMode}
-                                  imdbScore={imdbScores.get(getScoreItemKey(item))}
+                                  imdbScore={imdbScores.get(
+                                    getScoreItemKey(item),
+                                  )}
                                 />
                               );
                             })}
