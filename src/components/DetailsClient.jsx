@@ -1287,6 +1287,17 @@ export default function DetailsClient({
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
 
+  // ¿Se pueden MOSTRAR los botones de acción con estado (visto, puntuación,
+  // favorito, pendiente, listas, reseña)?
+  //
+  // Depende de tener SESIÓN, no de cómo haya ido la consulta de estado de este
+  // título. Colgarlo de `trakt.connected` hacía que un fallo pasajero en esa
+  // consulta —un 401 durante el refresco del token, un timeout, una petición
+  // abortada al retroceder rápido— dejara los botones sin dibujar o
+  // desmarcados, y encima en un montaje nuevo no hay estado previo que
+  // conservar. El estado de estos botones lo sirve el backend; la conexión con
+  // Trakt es otra cosa.
+
   // -- Estado de favoritos y watchlist (TMDb) --
   const [favLoading, setFavLoading] = useState(false); // Cargando accion de favorito
   const [wlLoading, setWlLoading] = useState(false); // Cargando accion de watchlist
@@ -1312,6 +1323,14 @@ export default function DetailsClient({
       })),
     [recommendations, type],
   );
+  // Espejo en ref para poder consultarlo desde los `catch` sin añadirlo a las
+  // dependencias de los callbacks (cambiarían de identidad y re-dispararían la
+  // carga inicial).
+  const hasBackendSessionRef = useRef(false);
+  useEffect(() => {
+    hasBackendSessionRef.current = !!session || hasBackendSession;
+  }, [session, hasBackendSession]);
+
   const recommendationViewerStates = useViewerTitleStates(
     recommendationViewerItems,
     authenticated || hasBackendSession,
@@ -3778,6 +3797,12 @@ export default function DetailsClient({
   const [trakt, setTrakt] = useState(buildInitialTraktState);
   const [traktUsername, setTraktUsername] = useState(null);
 
+  // Ver la nota de `hasBackendSessionRef`: disponibilidad por SESIÓN, no por el
+  // resultado de la consulta de estado de este título. Va aquí, después del
+  // estado `trakt`, porque lo lee.
+  const actionsConnected =
+    authHydrated && (!!session || trakt?.connected || hasBackendSession);
+
   useEffect(() => {
     if (!trakt.connected) {
       setTraktUsername(null);
@@ -5053,7 +5078,9 @@ export default function DetailsClient({
           nextState = {
             ...prev,
             loading: false,
-            connected: isTransient ? prev.connected : false,
+            // Igual que en `reloadTraktStatus`: un fallo transitorio no prueba
+            // desconexión, y en un montaje nuevo `prev.connected` es false.
+            connected: isTransient ? prev.connected || hasBackendSessionRef.current : false,
             error: background
               ? prev.error
               : isTransient
@@ -9570,7 +9597,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
                 episodeRatingsOpen={episodeRatingsModalOpen}
                 trakt={{
-                  connected: trakt.connected,
+                  connected: actionsConnected,
                   watched: watchedActionValue,
                   plays: watchedActionPlays,
                   badge: watchedActionBadge,

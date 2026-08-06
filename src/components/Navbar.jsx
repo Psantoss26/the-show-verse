@@ -2181,7 +2181,7 @@ export default function Navbar() {
           >
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-2 rounded-full text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+              className="p-2 rounded-full text-white hover:bg-white/10 transition-colors"
               aria-label="Abrir menú"
             >
               <MenuIcon className="w-6 h-6" />
