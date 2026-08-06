@@ -2,11 +2,13 @@
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import {
   X,
   Plus,
   Minus,
   Check,
+  ArrowUpRight,
   Loader2,
   Search,
   ListPlus,
@@ -274,38 +276,34 @@ export default function AddToListModal(props) {
                   : `Añadir a ${l?.name || "la lista"}`;
 
                 return (
-                  <button
+                  <div
                     key={id}
-                    type="button"
-                    onClick={() => {
-                      if (busy) return;
-                      if (present) {
-                        if (canRemove) onRemoveFromList(id);
-                        return;
-                      }
-                      onAddToList(id);
-                    }}
-                    disabled={busy || (present && !canRemove)}
-                    aria-pressed={present}
-                    aria-label={actionLabel}
                     className={[
-                      "group w-full relative overflow-hidden rounded-2xl border p-4 transition-all duration-300",
+                      "w-full relative overflow-hidden rounded-2xl border transition-all duration-300",
                       "flex items-center justify-between gap-4 text-left",
                       present
-                        ? "bg-emerald-500/[0.03] border-emerald-500/20 hover:bg-red-500/[0.04] hover:border-red-500/25 active:scale-[0.98]"
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/10 active:scale-[0.98]",
+                        ? "bg-emerald-500/[0.03] border-emerald-500/20 hover:bg-emerald-500/[0.05]"
+                        : "bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/10",
                     ].join(" ")}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={[
-                          "font-bold truncate transition-colors",
-                          present
-                            ? "text-emerald-100 group-hover:text-red-100"
-                            : "text-zinc-200 group-hover:text-white",
-                        ].join(" ")}
-                      >
-                        {l?.name || "Sin nombre"}
+                    <Link
+                      href={`/lists/${encodeURIComponent(id)}`}
+                      onClick={onClose}
+                      aria-label={`Abrir lista ${l?.name || "Sin nombre"}`}
+                      className="group/list min-w-0 flex-1 p-4 pr-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-white/70"
+                    >
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div
+                          className={[
+                            "truncate font-bold transition-colors",
+                            present
+                              ? "text-emerald-100 group-hover/list:text-white"
+                              : "text-zinc-200 group-hover/list:text-white",
+                          ].join(" ")}
+                        >
+                          {l?.name || "Sin nombre"}
+                        </div>
+                        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition-[color,transform] group-hover/list:-translate-y-0.5 group-hover/list:translate-x-0.5 group-hover/list:text-white" />
                       </div>
 
                       <div className="text-xs text-zinc-500 mt-1 truncate pr-4">
@@ -317,32 +315,46 @@ export default function AddToListModal(props) {
                           ? `${l.item_count} ITEMS`
                           : "—"}
                       </div>
-                    </div>
+                    </Link>
 
-                    <div className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (busy) return;
+                        if (present) {
+                          if (canRemove) onRemoveFromList(id);
+                          return;
+                        }
+                        onAddToList(id);
+                      }}
+                      disabled={busy || (present && !canRemove)}
+                      aria-pressed={present}
+                      aria-label={actionLabel}
+                      className="group/action mr-4 shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:pointer-events-none"
+                    >
                       <div
                         className={[
                           "w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300",
                           busy
                             ? "bg-white/5 border-white/10"
                             : present
-                              ? "bg-emerald-500 text-black border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] group-hover:bg-red-500 group-hover:border-red-500 group-hover:text-white group-hover:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
-                              : "bg-transparent border-white/10 text-zinc-500 group-hover:border-yellow-500 group-hover:text-yellow-500 group-hover:bg-yellow-500/10",
+                              ? "bg-emerald-500 text-black border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] group-hover/action:bg-red-500 group-hover/action:border-red-500 group-hover/action:text-white group-hover/action:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                              : "bg-transparent border-white/10 text-zinc-500 group-hover/action:border-yellow-500 group-hover/action:text-yellow-500 group-hover/action:bg-yellow-500/10",
                         ].join(" ")}
                       >
                         {busy ? (
                           <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
                         ) : present ? (
                           <span className="relative flex h-5 w-5 items-center justify-center">
-                            <Check className="absolute h-5 w-5 transition-opacity group-hover:opacity-0" />
-                            <Minus className="absolute h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100" />
+                            <Check className="absolute h-5 w-5 transition-opacity group-hover/action:opacity-0" />
+                            <Minus className="absolute h-5 w-5 opacity-0 transition-opacity group-hover/action:opacity-100" />
                           </span>
                         ) : (
                           <Plus className="w-5 h-5" />
                         )}
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 );
               })}
             </div>

@@ -21,6 +21,9 @@ test("el selector de listas permite añadir y quitar un título", async () => {
   assert.match(source, /aria-pressed=\{present\}/);
   assert.doesNotMatch(source, /Añadida · pulsa para quitar/);
   assert.match(source, /l\?\.description \|\| "Sin descripción"/);
+  assert.match(source, /href=\{`\/lists\/\$\{encodeURIComponent\(id\)\}`\}/);
+  assert.match(source, /aria-label=\{`Abrir lista /);
+  assert.match(source, /group\/action/);
 });
 
 test("DetailsClient y DetailModal conectan la eliminación persistente", async () => {
