@@ -237,9 +237,9 @@ export async function traktGetItemStatus({
     }
     return json;
   } catch (error) {
-    // SOLO un rechazo de autorización puede interpretarse como "no conectado".
+    // NINGÚN error puede interpretarse como "no conectado".
     //
-    // Antes se consultaba el estado de auth ante CUALQUIER error y, si no había
+    // Antes se consultaba el estado de auth ante cualquier error y, si no había
     // conexión con Trakt, se devolvía un `{connected:false}` FABRICADO. Para
     // quien tiene el estado servido por el backend (Trakt desconectado, que es
     // lo normal), `auth.connected` es siempre false, así que un timeout, un 401
@@ -249,16 +249,14 @@ export async function traktGetItemStatus({
     // —solo se rellenan con `source === "backend"`— y TODOS los botones se
     // quedaban desmarcados hasta pulsar uno o recargar.
     //
-    // Ahora el fallo se propaga y el llamante lo trata como lo que es: un fallo
-    // transitorio, con reintento y conservando el estado anterior.
-    const status = Number(error?.status || 0);
-    const esRechazoDeAutorizacion = status === 401 || status === 403;
-    if (!esRechazoDeAutorizacion) throw error;
-
-    const auth = await ensureTraktAuthReady().catch(() => null);
-    if (auth && !auth.connected && !auth.unavailable) {
-      return { connected: false };
-    }
+    // NI SIQUIERA UN 401 vale: ese rechazo lo emite el proxy del backend (por
+    // ejemplo con el access token recién caducado y el refresco en vuelo) y no
+    // dice nada sobre si la cuenta de Trakt está vinculada. La única fuente
+    // autoritativa de eso es /api/trakt/auth/status, que la ficha consulta por
+    // su cuenta.
+    //
+    // Ahora el fallo se PROPAGA y el llamante lo trata como lo que es: algo
+    // transitorio, conservando el estado anterior y reintentando.
     throw error;
   }
 }
