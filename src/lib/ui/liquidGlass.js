@@ -63,6 +63,18 @@ export const LIQUID_GLASS_TOOLTIP =
 export const LIQUID_GLASS_BAR_FLAT =
   "bg-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06]";
 
+// Variante para TARJETAS que van en grupo (las de información de
+// DetailsInfoTabs). Mismo cristal que LIQUID_GLASS_BAR pero SIN SOMBRA.
+//
+// La sombra de la barra (`0 16px 40px -8px rgba(0,0,0,0.75)` más un halo blanco
+// de 32px) está pensada para UNA pieza que flota sola. Puestas varias tarjetas
+// en fila, esas sombras se solapan entre sí y con el fondo y forman una banda
+// oscura difuminada detrás de todo el grupo: deja de leerse como cristal sobre
+// la imagen y parece un panel con fondo propio. Sin sombra, cada tarjeta se
+// sostiene por su propio cristal y entre ellas se ve la imagen limpia.
+export const LIQUID_GLASS_CARD =
+  "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06]";
+
 export const LIQUID_GLASS_BAR =
   "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
 

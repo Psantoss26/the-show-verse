@@ -8,7 +8,7 @@ import {
   setTraktCookies,
   clearTraktCookies,
 } from '@/lib/trakt/server'
-import { backendFetchJson, setBackendAuthCookies } from '@/lib/backend/server'
+import { backendFetchJson, hasBackendCredentials, setBackendAuthCookies } from '@/lib/backend/server'
 
 const TMDB = 'https://api.themoviedb.org/3'
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
@@ -88,6 +88,17 @@ export async function GET(req) {
   const sessionId = cookieStore.get('tmdb_session_id')?.value
 
   if (!sessionId) {
+    // OJO CON EL 401 DE AQUÍ.
+    // Si el usuario SÍ traía credenciales del backend, que hayamos llegado a
+    // este punto significa que la llamada al backend falló (p. ej. su access
+    // token acaba de caducar y el refresco iba en vuelo), NO que no tenga
+    // sesión. Devolver 401 hacía que la página lo interpretara como "no hay
+    // nada" y vaciara la lista: de 321 títulos a "No se encontraron favoritos"
+    // con la sesión perfectamente iniciada. Un 503 dice la verdad —no se pudo
+    // determinar— y el cliente conserva lo que ya tenía.
+    if (hasBackendCredentials(req)) {
+      return NextResponse.json({ error: 'BACKEND_UNAVAILABLE' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'NO_SESSION' }, { status: 401 })
   }
 

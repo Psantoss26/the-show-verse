@@ -31,6 +31,8 @@ import {
 } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
+import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 
 import {
   Loader2,
@@ -300,9 +302,8 @@ function TmdbImg({ filePath, size = "w780", alt, className = "" }) {
     );
   }
 
-  // previewPosters (comunidad) llegan como URL absoluta ya construida por el
-  // backend (ver posterUrl() en backend/src/community/normalize.js); el resto
-  // de fuentes pasan un path fragment ("/xxxx.jpg") que hay que prefijar.
+  // Algunas fuentes pueden devolver una URL absoluta ya construida; el resto
+  // pasa un path fragment ("/xxxx.jpg") que hay que prefijar.
   const src = /^https?:\/\//i.test(filePath)
     ? filePath
     : `https://image.tmdb.org/t/p/${size}${filePath}`;
@@ -325,7 +326,7 @@ function ListCoverBackdropCollage({ items = [], alt = "" }) {
   const backdrops = [];
   const seen = new Set();
   for (const item of items) {
-    const p = item.backdrop_path || item.poster_path;
+    const p = item?._listPreviewBackdrop || item?.backdrop_path;
     if (!p || seen.has(p)) continue;
     seen.add(p);
     backdrops.push(p);
@@ -346,7 +347,7 @@ function ListCoverBackdropCollage({ items = [], alt = "" }) {
         filePath={backdrops[0]}
         size="w780"
         alt={alt}
-        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
       />
     );
   }
@@ -358,14 +359,14 @@ function ListCoverBackdropCollage({ items = [], alt = "" }) {
           <TmdbImg
             filePath={backdrops[0]}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
           />
         </div>
         <div className="overflow-hidden h-full">
           <TmdbImg
             filePath={backdrops[1]}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
           />
         </div>
       </div>
@@ -379,21 +380,21 @@ function ListCoverBackdropCollage({ items = [], alt = "" }) {
           <TmdbImg
             filePath={backdrops[0]}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
           />
         </div>
         <div className="overflow-hidden w-full h-full">
           <TmdbImg
             filePath={backdrops[1]}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
           />
         </div>
         <div className="overflow-hidden w-full h-full">
           <TmdbImg
             filePath={backdrops[2]}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
           />
         </div>
       </div>
@@ -410,7 +411,37 @@ function ListCoverBackdropCollage({ items = [], alt = "" }) {
           <TmdbImg
             filePath={p}
             alt={alt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ListPreviewPosterStrip({ items = [], alt = "" }) {
+  const previewItems = items.slice(0, 5);
+
+  if (!previewItems.length) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-zinc-700">
+        <ListVideo className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-stretch justify-center gap-px bg-black/35 p-0.5">
+      {previewItems.map((item, index) => (
+        <div
+          key={`${item?.media_type || "movie"}:${item?.id || index}`}
+          className="min-w-0 flex-1 overflow-hidden rounded-[3px] bg-zinc-950"
+        >
+          <TmdbImg
+            filePath={item?._listPreviewPoster || item?.poster_path}
+            size="w154"
+            alt={`${alt}: título ${index + 1}`}
+            className="h-full w-full object-contain"
           />
         </div>
       ))}
@@ -1220,7 +1251,7 @@ const GridListCard = memo(function GridListCard({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState === null;
+  const isLoading = itemsState == null;
   const items = Array.isArray(itemsState) ? itemsState : [];
 
   return (
@@ -1229,17 +1260,7 @@ const GridListCard = memo(function GridListCard({
       <ListNavWrapper list={list} className="group block h-full">
         <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden md:hover:border-white/10 md:hover:bg-zinc-900/60 transition-all flex flex-col relative">
           <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden md:group-hover:opacity-90 transition-opacity">
-            {list?.source === "trakt" ? (
-              // Comunidad: portada viene ya resuelta en list.previewPosters
-              // (URLs absolutas), no depende de ensureListItems/itemsState.
-              <ListCoverBackdropCollage
-                items={(Array.isArray(list?.previewPosters)
-                  ? list.previewPosters
-                  : []
-                ).map((url) => ({ backdrop_path: url }))}
-                alt={list.name}
-              />
-            ) : isLoading ? (
+            {isLoading ? (
               <div className="w-full h-full animate-pulse bg-zinc-900/40" />
             ) : (
               <ListCoverBackdropCollage items={items} alt={list.name} />
@@ -1353,29 +1374,19 @@ const ListModeRow = memo(function ListModeRow({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState === null;
+  const isLoading = itemsState == null;
   const items = Array.isArray(itemsState) ? itemsState : [];
-  const firstItem = items[0];
 
   return (
     <div ref={ref}>
       {/* ✅ antes: Link fijo a /lists/:id */}
       <ListNavWrapper list={list} className="group block">
         <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
-          <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-950 border border-white/5 relative">
+          <div className="h-16 w-40 shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:w-[13.5rem]">
             {isLoading ? (
               <div className="w-full h-full animate-pulse bg-zinc-900/40" />
-            ) : firstItem ? (
-              <TmdbImg
-                filePath={firstItem.poster_path || firstItem.backdrop_path}
-                size="w92"
-                alt={list.name}
-                className="w-full h-full object-cover"
-              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-zinc-700">
-                <ListVideo className="w-6 h-6" />
-              </div>
+              <ListPreviewPosterStrip items={items} alt={list.name} />
             )}
           </div>
 
@@ -1728,7 +1739,9 @@ export default function ListsPage() {
       if (inFlight.current.has(cacheKey)) return;
 
       const src = listObj?.source || source;
-      const previewCacheKey = `showverse:lists:preview:${cacheKey}:v1`;
+      // v2 contiene el backdrop inglés/neutro y el póster inglés ya resueltos;
+      // no reutilizamos la antigua caché de pósteres para evitar un flash previo.
+      const previewCacheKey = `showverse:lists:preview:${cacheKey}:v2`;
       const cachedPreview = readSessionJsonCache(
         previewCacheKey,
         LIST_PREVIEW_CACHE_TTL_MS,
@@ -1740,10 +1753,23 @@ export default function ListsPage() {
           ...prev,
           [cacheKey]: cachedPreview,
         }));
+      } else {
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: null }));
       }
 
       const ctrl = new AbortController();
       controllersRef.current.set(cacheKey, ctrl);
+
+      const resolveAndStorePreview = async (rawItems) => {
+        const deduped = dedupePreviewItems(rawItems);
+        const items = await enrichListPreviewArtwork(deduped, {
+          resolveImages: fetchTmdbImages,
+          limit: 5,
+        });
+        if (ctrl.signal.aborted) return;
+        writeSessionJsonCache(previewCacheKey, items);
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
+      };
 
       try {
         if (src === "personal") {
@@ -1753,38 +1779,32 @@ export default function ListsPage() {
             language: "es-ES",
             signal: ctrl.signal,
           });
-          const items = dedupePreviewItems(
+          await resolveAndStorePreview(
             Array.isArray(json?.items) ? json.items : [],
           );
-          writeSessionJsonCache(previewCacheKey, items);
-          setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
 
         if (src === "trakt") {
           // Comunidad: traemos una muestra de items de la lista desde nuestro
-          // backend (que hidrata los posters bajo demanda) y los mapeamos a la
-          // forma TMDb que consumen las tarjetas de fila/lista ({id, media_type,
-          // poster_path, title}). GridListCard sigue usando list.previewPosters.
+          // backend y resolvemos el artwork final antes de pintar la tarjeta.
           const res = await fetch(
             `/api/community/lists/${encodeURIComponent(listId)}?limit=12`,
             { signal: ctrl.signal, cache: "no-store" },
           );
           const j = await res.json().catch(() => ({}));
-          const items = dedupePreviewItems(
+          await resolveAndStorePreview(
             (Array.isArray(j?.items) ? j.items : [])
               .filter((it) => it?.tmdbId)
               .map((it) => ({
                 id: it.tmdbId,
                 media_type: it.mediaType === "tv" ? "tv" : "movie",
                 poster_path: it.posterPath || null,
-                backdrop_path: null,
+                backdrop_path: it.backdropPath || null,
                 title: it.title || null,
                 name: it.title || null,
               })),
           );
-          writeSessionJsonCache(previewCacheKey, items);
-          setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
           return;
         }
 
@@ -1797,11 +1817,9 @@ export default function ListsPage() {
           },
         );
         const j = await res.json().catch(() => ({}));
-        const items = dedupePreviewItems(
+        await resolveAndStorePreview(
           Array.isArray(j?.items) ? j.items : [],
         );
-        writeSessionJsonCache(previewCacheKey, items);
-        setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
       } catch (e) {
         if (e?.name === "AbortError") {
           // vuelve a “no pedido” para que pueda pedirse después

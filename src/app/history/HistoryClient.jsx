@@ -76,9 +76,23 @@ const RESTORATION_RELEASE_FALLBACK_MS = 5_250;
 // repetir consultas de una misma temporada al volver a abrir el modal.
 const historySeasonMetadataCache = new Map();
 
+function historyErrorStatus(error) {
+  return Number(error?.status || error?.payload?.upstreamStatus || 0);
+}
+
+// 401/403: la petición fue RECHAZADA. Puede ser una desconexión real de Trakt…
+// o algo pasajero (el access token del backend acaba de caducar y el refresco
+// iba en vuelo). Sirve para actualizar el indicador de conexión, NUNCA para
+// destruir datos: ver el manejo del error más abajo.
+function isTraktAuthError(error) {
+  const status = historyErrorStatus(error);
+  return status === 401 || status === 403;
+}
+
+// 429 y 5xx no dicen nada sobre la sesión: el servicio no está disponible.
 function isTraktUnavailableError(error) {
-  const status = Number(error?.status || error?.payload?.upstreamStatus || 0);
-  return status === 429 || status === 401 || status === 403 || status >= 500;
+  const status = historyErrorStatus(error);
+  return status === 429 || status >= 500;
 }
 
 // ----------------------------
@@ -3259,14 +3273,23 @@ export default function HistoryClient() {
         // SERVIDOR CAÍDO (5xx/429/red, túnel con el NAS apagado): NO desconectar ni
         // borrar la caché. Conservamos lo cacheado (sembrado al montar) para seguir
         // usando el historial offline.
-        if (isServerUnavailable(error)) {
+        if (isServerUnavailable(error) || isTraktUnavailableError(error)) {
+          // Red caída, 429 o 5xx: no dicen nada del historial del usuario.
           setHistoryError("");
-        } else if (isTraktUnavailableError(error)) {
-          // 401/403: desconexión real de Trakt → limpiar.
+        } else if (isTraktAuthError(error)) {
+          // NUNCA borrar aquí.
+          //
+          // Antes, un 401/403 hacía `setRaw([])` + `clearHistoryCache()`. Ese
+          // rechazo NO prueba que Trakt esté desconectado: basta con que el
+          // access token del backend acabara de caducar con el refresco en
+          // vuelo. El resultado era "No se encontraron resultados" con la
+          // sesión iniciada, y como además se borraba la caché, recargar
+          // tampoco lo recuperaba. El indicador de conexión sí se actualiza (lo
+          // confirma /api/trakt/auth/status, que es la fuente autoritativa);
+          // los datos se quedan donde están, y si el rechazo era pasajero
+          // reaparecen en el siguiente refresco.
           setAuth({ loading: false, connected: false });
-          setRaw([]);
           setHistoryError("");
-          clearHistoryCache();
         } else {
           setHistoryError("No se pudo cargar el historial.");
         }

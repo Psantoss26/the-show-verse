@@ -7,17 +7,17 @@
 
 import { Trophy } from "lucide-react";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
 
 export default function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
-    <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-      {/* Capa de fondo suave */}
-      <div
-        className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-      />
+    <div
+      className={`relative isolate overflow-hidden rounded-xl p-5 sm:p-6 ${LIQUID_GLASS_BAR}`}
+    >
+      <LiquidGlassOpticalLayers />
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />
 
       <div className="relative z-10">
