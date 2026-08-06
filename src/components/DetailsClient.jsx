@@ -3831,7 +3831,11 @@ export default function DetailsClient({
   // botones desmarcados hasta que el usuario pulsaba uno; con esto el estado
   // acaba llegando siempre, sin intervención y sin bucles: un intento por
   // petición fallida, y se cancela si llega otra petición más reciente.
-  const traktStatusRetryRef = useRef({ id: 0, timer: null });
+  const traktStatusRetryRef = useRef({ id: 0, intentos: 0, timer: null });
+  // Tres intentos con espera creciente. Con uno solo bastaba que el reintento
+  // pillara otro fallo para que el estado se quedara sin cargar: los botones se
+  // quedaban en "Cargando estado…" indefinidamente.
+  const REINTENTOS_ESTADO_MS = [900, 2200, 4500];
   // Referencia a la última versión de `reloadTraktStatus`, para poder
   // reintentar desde dentro de ella sin crear una dependencia circular.
   const reloadTraktStatusRef = useRef(null);
@@ -4868,6 +4872,11 @@ export default function DetailsClient({
         });
         if (requestId === traktStatusRequestIdRef.current) {
           setActionStateReady(true);
+          // Respuesta buena: se cierra la serie de reintentos.
+          const retry = traktStatusRetryRef.current;
+          if (retry.timer) window.clearTimeout(retry.timer);
+          retry.timer = null;
+          retry.intentos = 0;
         }
         return nextState;
       } catch (e) {
@@ -4899,14 +4908,21 @@ export default function DetailsClient({
         // si esta sigue siendo la más reciente.
         if (isTransient && requestId === traktStatusRequestIdRef.current) {
           const retry = traktStatusRetryRef.current;
+          // Cada petición fallida continúa la serie de intentos del título; no
+          // se reinicia el contador, para que una racha de fallos no encadene
+          // reintentos sin fin.
           if (retry.id !== requestId) {
             retry.id = requestId;
+            retry.intentos = (retry.intentos || 0) + 1;
+          }
+          const espera = REINTENTOS_ESTADO_MS[retry.intentos - 1];
+          if (espera != null) {
             if (retry.timer) window.clearTimeout(retry.timer);
             retry.timer = window.setTimeout(() => {
               retry.timer = null;
               if (requestId !== traktStatusRequestIdRef.current) return;
               reloadTraktStatusRef.current?.({ background: true, force: true });
-            }, 900);
+            }, espera);
           }
         }
 
@@ -4963,6 +4979,7 @@ export default function DetailsClient({
         retry.timer = null;
       }
       retry.id = 0;
+      retry.intentos = 0;
     };
   }, [traktType, id]);
 

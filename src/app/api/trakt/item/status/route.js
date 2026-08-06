@@ -13,6 +13,7 @@ import {
 import { resolveTraktEntityFromTmdb } from "@/lib/trakt/resolve";
 import {
   backendFetchJson,
+  hasBackendCredentials,
   mediaTypeToBackend,
   normalizeBackendStatus,
   setBackendAuthCookies,
@@ -84,6 +85,12 @@ export async function GET(request) {
     );
   }
 
+  // ¿El backend —que es de donde sale el estado de esta app— pudo contestar?
+  // Un 404 SÍ es autoritativo: el título no está en las listas del usuario. El
+  // resto de fallos (sin access token disponible durante el refresco, 401
+  // pasajero, 5xx, red) NO dicen nada del estado real.
+  let backendNoConcluyente = false;
+
   if (tmdbId) {
     try {
       const backend = await backendFetchJson(
@@ -95,12 +102,35 @@ export async function GET(request) {
         setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
         return noCacheHeaders(res);
       }
+      if (backend.status !== 404) backendNoConcluyente = true;
       if (!backend.skipped && backend.status !== 401 && backend.status !== 404) {
         console.warn("Backend item status failed; falling back to Trakt", backend.error);
       }
     } catch (e) {
+      backendNoConcluyente = true;
       console.warn("Backend item status failed; falling back to Trakt", e);
     }
+  }
+
+  // NO CONTESTAR "sin estado" CUANDO NO SE SABE.
+  //
+  // Aquí estaba el fallo de "los botones se quedan vacíos al entrar y salir de
+  // la ficha repetidamente". Si el backend no pudo responder y no hay sesión de
+  // Trakt (lo normal: esta app no usa Trakt, el estado es del backend), abajo se
+  // devolvía `{connected:false}` con **status 200**. Al cliente le parecía una
+  // respuesta buena: no rellenaba favorito, pendiente, visto ni puntuación
+  // —solo se rellenan con el estado del backend— y los botones quedaban
+  // desmarcados hasta pulsar uno o recargar.
+  //
+  // `degraded` es la señal que el cliente ya entiende como "transitorio":
+  // conserva el estado que tuviera y reintenta.
+  if (backendNoConcluyente && hasBackendCredentials(request)) {
+    return noCacheHeaders(
+      NextResponse.json(
+        { connected: false, degraded: true, error: "Backend status unavailable" },
+        { status: 503 },
+      ),
+    );
   }
 
   const cookieStore = request.cookies;
