@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compilación de DEBUG: se permite HTTP en claro para poder apuntar la app a un
+  servidor de la red local (el NAS por IP, `next dev` en el portátil…). Este
+  fichero SUSTITUYE al de `main` solo en debug; la app de release sigue siendo
+  HTTPS-only.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

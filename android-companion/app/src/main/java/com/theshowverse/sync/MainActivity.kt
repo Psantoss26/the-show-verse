@@ -22,6 +22,14 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.theshowverse.sync.databinding.ActivityMainBinding
 
+/**
+ * PANEL NATIVO DE SINCRONIZACIÓN (permisos, apps a sincronizar, registro).
+ *
+ * Ya NO es la pantalla de inicio: desde que la app incluye The Show Verse
+ * completo, el punto de entrada es [WebAppActivity] y aquí se llega desde
+ * Ajustes de la web (puente JS) o al emparejar por enlace. El nombre de la clase
+ * se mantiene para no romper referencias antiguas.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding

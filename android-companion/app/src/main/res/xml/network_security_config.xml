@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compilación de RELEASE: solo HTTPS. La app publicada carga theshowverse.com por
+  TLS y no debe aceptar tráfico en claro (además es lo que espera la revisión de
+  Play). Las únicas excepciones son las direcciones de bucle local, que sirven
+  para probar con `adb reverse tcp:3000 tcp:3000` sin sacar tráfico del cable.
+
+  Para apuntar la app al NAS por IP en la LAN (http://192.168.x.x:3000) usa la
+  variante de DEBUG, que sí permite tráfico en claro: app/src/debug/res/xml/.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Emulador: la máquina anfitriona. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Dispositivo por cable con `adb reverse tcp:3000 tcp:3000`. -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

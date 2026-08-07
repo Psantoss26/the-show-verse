@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -64,9 +63,10 @@ object QuickAccessNotifier {
 
     private fun notifyNow(app: Context, contentTitle: String, url: String, poster: Bitmap?) {
         ensureChannel(app)
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        // Intent EXPLÍCITO a la propia app: antes era un ACTION_VIEW genérico que
+        // acababa en el navegador. Ahora la ficha se abre dentro de The Show
+        // Verse, que es de lo que va tener una app y no dos.
+        val intent = WebAppActivity.intentFor(app, url)
         val pi = PendingIntent.getActivity(
             app,
             0,

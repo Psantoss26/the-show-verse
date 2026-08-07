@@ -8,3 +8,8 @@
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# Firma de release: NUNCA en el repositorio.
+/keystore.properties
+*.jks
+*.keystore

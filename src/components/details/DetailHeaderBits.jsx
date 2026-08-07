@@ -5,6 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
+import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
 
 export function CompactBadge({
   logo,
@@ -289,6 +290,15 @@ export function ActionShareButton({ title, text, url }) {
     const finalUrl =
       url || (typeof window !== "undefined" ? window.location.href : "");
     if (!finalUrl) return;
+
+    // Dentro de la app de Android no existe navigator.share: el WebView no
+    // implementa la Web Share API, así que sin esto compartir se quedaba en
+    // copiar el enlace. El puente abre el selector del sistema, que es lo que
+    // espera cualquiera desde una app.
+    if (isAndroidApp()) {
+      shareFromApp(text || title, finalUrl);
+      return;
+    }
 
     if (navigator.share) {
       try {

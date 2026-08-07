@@ -1726,6 +1726,7 @@ export default function Navbar() {
   // suave a propósito: con uno fuerte, sobre un cristal tan difuminado, el color
   // se derramaba y ensuciaba la pieza.
   const MOBILE_BOTTOM_TONES = {
+    gold: "text-amber-300 drop-shadow-[0_1.5px_4px_rgba(252,211,77,0.5)]",
     red: "text-red-400 drop-shadow-[0_1.5px_4px_rgba(248,113,113,0.5)]",
     blue: "text-sky-300 drop-shadow-[0_1.5px_4px_rgba(56,189,248,0.5)]",
     purple: "text-fuchsia-300 drop-shadow-[0_1.5px_4px_rgba(232,121,249,0.5)]",
@@ -1764,6 +1765,10 @@ export default function Navbar() {
   // círculo.
   const getMobileBottomActiveLens = (tone = "blue") => {
     const TONE_CONFIGS = {
+      gold: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(252,211,77,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-amber-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
       blue: {
         glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(56,189,248,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
         bg: "bg-black/25 bg-sky-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
@@ -2330,41 +2335,18 @@ export default function Navbar() {
         />
 
         <Link
-          href="/movies"
+          href="/"
           prefetch
-          onTouchStart={() => prefetchNavRoute("/movies")}
-          onFocus={() => prefetchNavRoute("/movies")}
-          onClick={() => setPendingHref("/movies")}
-          className={navLinkClassMobileBottom("/movies", "blue")}
-          aria-current={isActive("/movies") ? "page" : undefined}
-          aria-label={t("nav_movies", "Películas")}
-          title={t("nav_movies", "Películas")}
+          {...navPrefetchHandlers("/")}
+          className={navLinkClassMobileBottom("/", "gold")}
+          aria-current={isActive("/") ? "page" : undefined}
+          aria-label={t("nav_home", "Inicio")}
+          title={t("nav_home", "Inicio")}
         >
-          {isActive("/movies") && getMobileBottomActiveLens("blue")}
+          {isActive("/") && getMobileBottomActiveLens("gold")}
           <span className={mobileBottomIconSlotClass}>
-            <FilmIcon
-              className={`${mobileBottomIconClass} ${isActive("/movies") ? "fill-sky-400/25" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href="/series"
-          prefetch
-          onTouchStart={() => prefetchNavRoute("/series")}
-          onFocus={() => prefetchNavRoute("/series")}
-          onClick={() => setPendingHref("/series")}
-          className={navLinkClassMobileBottom("/series", "purple")}
-          aria-current={isActive("/series") ? "page" : undefined}
-          aria-label={t("nav_series", "Series")}
-          title={t("nav_series", "Series")}
-        >
-          {isActive("/series") && getMobileBottomActiveLens("purple")}
-          <span className={mobileBottomIconSlotClass}>
-            <TvIcon
-              className={`${mobileBottomIconClass} ${isActive("/series") ? "fill-fuchsia-400/25" : ""}`}
+            <HomeIcon
+              className={`${mobileBottomIconClass} ${isActive("/") ? "fill-amber-400/25 text-amber-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
@@ -2377,8 +2359,8 @@ export default function Navbar() {
           {...navPrefetchHandlers("/in-progress")}
           className={navLinkClassMobileBottom("/in-progress", "green")}
           aria-current={isActive("/in-progress") ? "page" : undefined}
-          aria-label={t("nav_in_progress_short", "En curso")}
-          title={t("nav_in_progress_short", "En curso")}
+          aria-label={t("nav_in_progress", "En Progreso")}
+          title={t("nav_in_progress", "En Progreso")}
         >
           {isActive("/in-progress") && getMobileBottomActiveLens("green")}
           <span className={mobileBottomIconSlotClass}>
@@ -2403,6 +2385,25 @@ export default function Navbar() {
           <span className={mobileBottomIconSlotClass}>
             <Eye
               className={`${mobileBottomIconClass} ${isActive("/history") ? "fill-emerald-400/25" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
+          </span>
+        </Link>
+
+        <Link
+          href="/social"
+          prefetch
+          {...navPrefetchHandlers("/social")}
+          className={navLinkClassMobileBottom("/social", "pink")}
+          aria-current={isActive("/social") ? "page" : undefined}
+          aria-label={t("nav_social", "Social")}
+          title={t("nav_social", "Social")}
+        >
+          {isActive("/social") && getMobileBottomActiveLens("pink")}
+          <span className={mobileBottomIconSlotClass}>
+            <Users
+              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
@@ -2441,25 +2442,6 @@ export default function Navbar() {
           <span className={mobileBottomIconSlotClass}>
             <Bookmark
               className={`${mobileBottomIconClass} ${isActive(watchHref) ? "fill-sky-400 text-sky-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href="/social"
-          prefetch
-          {...navPrefetchHandlers("/social")}
-          className={navLinkClassMobileBottom("/social", "pink")}
-          aria-current={isActive("/social") ? "page" : undefined}
-          aria-label={t("nav_social", "Social")}
-          title={t("nav_social", "Social")}
-        >
-          {isActive("/social") && getMobileBottomActiveLens("pink")}
-          <span className={mobileBottomIconSlotClass}>
-            <Users
-              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
