@@ -73,6 +73,20 @@ class WebOriginTest {
     }
 
     @Test
+    fun `el login de otros proveedores se queda dentro de la app`() {
+        assertTrue(WebOrigin.isProviderLogin("https://trakt.tv/oauth/authorize?client_id=x"))
+        assertTrue(WebOrigin.isProviderLogin("https://app.plex.tv/auth"))
+        assertTrue(WebOrigin.isProviderLogin("https://auth.plex.tv/sign-in"))
+        assertTrue(WebOrigin.isProviderLogin("https://www.themoviedb.org/authenticate/abc"))
+        // Google NO: rechaza los WebViews, tiene su propio camino nativo.
+        assertFalse(WebOrigin.isProviderLogin("https://accounts.google.com/o/oauth2/v2/auth"))
+        // Y nada de dominios que solo terminen parecido.
+        assertFalse(WebOrigin.isProviderLogin("https://trakt.tv.evil.net/"))
+        assertFalse(WebOrigin.isProviderLogin("https://youtube.com/watch?v=1"))
+        assertFalse(WebOrigin.isProviderLogin(null))
+    }
+
+    @Test
     fun `url de acceso privado`() {
         assertEquals(
             "https://theshowverse.com/api/private-access?key=cla+ve%2F1",

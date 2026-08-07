@@ -76,6 +76,41 @@ object WebOrigin {
     }
 
     /**
+     * Proveedores cuyo login SÍ debe abrirse DENTRO del WebView.
+     *
+     * La regla general manda todo lo externo al navegador, y para un enlace
+     * cualquiera está bien. Pero un OAuth abierto fuera termina creando la
+     * sesión en las cookies DEL NAVEGADOR, no en las de la app: la conexión con
+     * Trakt o Plex se quedaría a medias. Estos proveedores no tienen problema
+     * con los WebViews, así que quedándose dentro el flujo funciona igual que en
+     * la web —el proveedor redirige de vuelta a nuestro dominio y la sesión ya
+     * está donde tiene que estar—.
+     *
+     * GOOGLE NO ESTÁ EN LA LISTA a propósito: rechaza su formulario en un
+     * WebView (`disallowed_useragent`). Su caso lo resuelve [GoogleSignIn] con
+     * el selector de cuentas del sistema, y si eso no está disponible, el flujo
+     * por navegador con vuelta por `theshowverse://open`.
+     */
+    private val HOSTS_DE_LOGIN = setOf(
+        "trakt.tv",
+        "api.trakt.tv",
+        "plex.tv",
+        "app.plex.tv",
+        "themoviedb.org",
+        "www.themoviedb.org",
+        "accounts.spotify.com",
+        "open.spotify.com",
+    )
+
+    /** ¿Es el login de un proveedor que debe abrirse dentro de la app? */
+    fun isProviderLogin(url: String?): Boolean {
+        val host = hostOf(url) ?: return false
+        if (HOSTS_DE_LOGIN.contains(host)) return true
+        // Subdominios de los mismos sitios (p. ej. auth.plex.tv).
+        return HOSTS_DE_LOGIN.any { host.endsWith(".$it") }
+    }
+
+    /**
      * ¿Es un esquema que debe delegarse al sistema (tienda, correo, teléfono,
      * intent://…)? Todo lo que no sea http(s) sale de la app.
      */

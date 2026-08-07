@@ -49,6 +49,7 @@ Lo que la carcasa resuelve y un WebView "pelado" no:
 | Servidor caído / sin red | pantalla propia con reintento |
 | Web con acceso privado (404) | pantalla propia + clave en `ServerActivity` |
 | Volver donde lo dejaste | `Prefs.lastUrl` |
+| Entrar con Google sin salir a Chrome | `GoogleSignIn` (Credential Manager) |
 
 La decisión de qué es "de casa" y qué es externo está en `WebOrigin`, que es
 código puro y con tests: de ahí depende quién puede usar el puente.
@@ -83,6 +84,21 @@ gate de acceso privado, se mete la clave (equivale a abrir
 Ver [`docs/android-play-store.md`](../docs/android-play-store.md): firma, AAB,
 App Links y —lo importante— las declaraciones que Play exige por usar acceso a
 notificaciones y accesibilidad.
+
+## Login con Google
+
+Google rechaza su formulario dentro de un WebView (`disallowed_useragent`), así
+que un WebView "pelado" siempre acaba mandándote a Chrome. La app usa el selector
+de cuentas del sistema (`GoogleSignIn.kt` → Credential Manager), le pasa el
+`idToken` a la web y esta lo canjea en `/api/auth/google/native` contra el mismo
+endpoint del backend que el login por navegador: **cero navegador y la sesión
+queda en las cookies del WebView**.
+
+Requiere un cliente OAuth de tipo **Android** en Google Cloud (paquete
+`com.theshowverse.app` + huella SHA-1 de cada certificado de firma). Sin él,
+Android responde `no_credentials` y la web cae automáticamente al flujo por
+navegador, que vuelve a la app por `theshowverse://open`. Los pasos exactos están
+en [`docs/android-play-store.md`](../docs/android-play-store.md#3bis-login-con-google-dentro-de-la-app).
 
 ## Emparejamiento y permisos
 

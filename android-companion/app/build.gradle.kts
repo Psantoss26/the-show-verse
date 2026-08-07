@@ -21,6 +21,14 @@ fun signingSecret(property: String, environment: String): String? =
 
 val appVersionName = "1.1"
 
+// Cliente OAuth WEB de Google (el mismo que usa la web). Es el `serverClientId`
+// que se le pasa a Credential Manager, y es lo que hace que el `aud` del token
+// coincida con lo que valida el backend. No es un secreto: viaja en la URL de
+// autorización de cualquier login por navegador. Se puede sobrescribir con
+// -Ptsv.googleWebClientId=… sin tocar el fichero.
+val googleWebClientId: String = (findProperty("tsv.googleWebClientId") as String?)
+    ?: "84707825765-o0kokgcqiqouq1fjhm7i5l0oldd5kaqp.apps.googleusercontent.com"
+
 android {
     // OJO: `namespace` (paquete del código, R y ViewBinding) NO es lo mismo que
     // `applicationId` (identidad de instalación y URL en Play). El código sigue
@@ -43,6 +51,7 @@ android {
         // Sufijo de User-Agent: es cómo la web sabe que se está ejecutando
         // dentro de la app (además del puente JS).
         buildConfigField("String", "UA_SUFFIX", "\"TheShowVerseApp/$appVersionName\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     signingConfigs {
@@ -103,6 +112,11 @@ dependencies {
     implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.activity:activity-ktx:1.9.3")
+
+    // Inicio de sesión con Google SIN navegador (selector de cuentas del sistema).
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
 }

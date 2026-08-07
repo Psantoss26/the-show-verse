@@ -29,6 +29,7 @@ class WebAppBridge(
     private val prefs: Prefs,
     private val currentOrigin: () -> String,
     private val currentUrl: () -> String,
+    private val evaluarJs: (String) -> Unit,
 ) {
 
     /**
@@ -65,6 +66,44 @@ class WebAppBridge(
         json.put("version", appVersion())
         return json.toString()
     }
+
+    // ------------------------------------------------------ sesión con Google
+
+    /**
+     * ¿Puede la app ofrecer el login nativo? La web lo consulta para decidir si
+     * enseña su botón normal (que acaba en el navegador) o el nativo.
+     */
+    @JavascriptInterface
+    fun canSignInWithGoogle(): Boolean = propio() && GoogleSignIn.configurado()
+
+    /**
+     * Abre el selector de cuentas de Android. Es ASÍNCRONO: devuelve enseguida y
+     * el resultado llega por `window.__tsvGoogleSignInResult(peticion, json)`,
+     * porque un método del puente no puede bloquear esperando a una pantalla del
+     * sistema (colgaría el hilo del WebView).
+     */
+    @JavascriptInterface
+    fun signInWithGoogle(peticion: String?): Boolean {
+        if (!propio()) return false
+        val id = peticion?.takeIf { it.isNotBlank() } ?: return false
+        activity.runOnUiThread {
+            GoogleSignIn.solicitar(activity) { resultado ->
+                val json = JSONObject()
+                    .put("ok", resultado.ok)
+                    .put("cancelled", resultado.cancelled)
+                    .put("idToken", resultado.idToken ?: JSONObject.NULL)
+                    .put("error", resultado.error ?: JSONObject.NULL)
+                evaluarJs(
+                    "window.__tsvGoogleSignInResult && " +
+                        "window.__tsvGoogleSignInResult(${cadenaJs(id)}, ${cadenaJs(json.toString())})",
+                )
+            }
+        }
+        return true
+    }
+
+    /** Literal JS seguro: el token y los mensajes van dentro de una cadena. */
+    private fun cadenaJs(valor: String): String = JSONObject.quote(valor)
 
     // ---------------------------------------------------------- emparejamiento
 

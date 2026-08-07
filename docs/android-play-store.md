@@ -85,6 +85,60 @@ lo verifique, el dominio tiene que servir la huella del certificado.
 Hasta que esto esté, los enlaces siguen abriéndose en el navegador; la app
 funciona igual.
 
+## 3.bis Login con Google dentro de la app
+
+Google **rechaza su formulario de acceso dentro de un WebView embebido**
+(`disallowed_useragent`). Por eso la app no puede limitarse a cargar
+accounts.google.com: hay dos caminos y la app usa el primero, con el segundo
+como red de seguridad.
+
+**1) Nativo, sin navegador (el que se ve bien).** Credential Manager abre el
+selector de cuentas de Android, devuelve un `idToken` y la web lo canjea en
+`/api/auth/google/native`; el backend lo valida contra Google igual que en el
+flujo web y las cookies quedan en el WebView. Requiere registrar un cliente
+**OAuth de tipo Android** en Google Cloud:
+
+1. Google Cloud Console → *APIs y servicios → Credenciales → Crear credenciales
+   → ID de cliente de OAuth → Android*.
+2. Nombre del paquete: `com.theshowverse.app`.
+3. Huella SHA-1 del certificado que firma la app. Hacen falta las de **todos**
+   los certificados con los que se instale:
+   - Depuración (la de esta máquina, ya calculada):
+     `D4:72:46:A2:11:94:DC:64:52:E4:5E:BF:11:D4:A7:F9:E3:BB:05:85`
+     ```bash
+     keytool -list -v -keystore ~/.android/debug.keystore \
+       -storepass android -alias androiddebugkey | grep SHA1
+     ```
+   - Release: la de tu keystore de subida.
+   - Play App Signing: la que aparece en Play Console → *Integridad de la
+     aplicación* (es la que de verdad firma lo que instalan los usuarios).
+4. No hay que tocar el `client_id` de la app: el que se le pasa a Credential
+   Manager es el **cliente WEB** (`GOOGLE_WEB_CLIENT_ID` en `build.gradle.kts`),
+   porque es el `aud` que valida el backend. El cliente Android solo autoriza al
+   paquete a pedir tokens.
+
+Hasta que ese cliente exista, el sistema responde `no_credentials` y la app cae
+sola al camino 2.
+
+**2) Navegador + vuelta a la app (respaldo).** El botón navega a
+`/api/auth/google/start`, que detecta la app por el User-Agent
+(`TheShowVerseApp/`) y marca el `state` con el prefijo `android.`. Al volver de
+Google, el callback devuelve `theshowverse://open?url=…&app_handoff=1`, la app
+recoge ese enlace y recarga el callback **dentro del WebView**, que es donde vive
+la cookie `state`. Comprobado en producción:
+
+```bash
+curl -s -D - -o /dev/null -A "…TheShowVerseApp/1.1" \
+  "https://theshowverse.com/api/auth/google/start?next=/"   # state=android.…
+curl -s -D - -o /dev/null \
+  "https://theshowverse.com/api/auth/google/callback?code=X&state=android.<64hex>"
+# location: theshowverse://open?url=…app_handoff=1
+```
+
+Si este camino no vuelve a la app, mira en este orden: que el APK instalado
+registre el esquema (`adb shell dumpsys package com.theshowverse.app | grep -A3
+theshowverse`), y el log del intento (`adb logcat | grep -i theshowverse`).
+
 ## 4. Declaraciones obligatorias (la parte delicada)
 
 Esta app usa **dos permisos que Play revisa a mano**. Es el motivo más probable
