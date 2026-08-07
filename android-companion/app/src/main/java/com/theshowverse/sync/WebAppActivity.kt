@@ -180,7 +180,7 @@ class WebAppActivity : AppCompatActivity() {
         }
 
         web.addJavascriptInterface(
-            WebAppBridge(this, prefs, { origin }, { currentUrl }),
+            WebAppBridge(this, prefs, { origin }, { currentUrl }, ::evaluarJs),
             WebAppBridge.NAME,
         )
 
@@ -198,6 +198,10 @@ class WebAppActivity : AppCompatActivity() {
             val url = request.url?.toString() ?: return false
             return when {
                 WebOrigin.isInternal(url, origin) -> false // se queda dentro
+                // El login de Trakt/Plex/TMDb TAMBIÉN se queda dentro: sacarlo
+                // al navegador dejaría su sesión en las cookies de Chrome y la
+                // conexión no llegaría a completarse en la app.
+                WebOrigin.isProviderLogin(url) -> false
                 WebOrigin.isExternalScheme(url) -> {
                     abrirConElSistema(url)
                     true
@@ -344,6 +348,15 @@ class WebAppActivity : AppCompatActivity() {
         } catch (e: Exception) {
             abrirEnNavegador(url)
         }
+    }
+
+    /**
+     * Ejecuta JS en la página. Lo usa el puente para devolver resultados
+     * ASÍNCRONOS (el login de Google), que es lo único que no cabe en el
+     * valor de retorno de un método del puente.
+     */
+    private fun evaluarJs(codigo: String) {
+        runOnUiThread { binding.webView.evaluateJavascript(codigo, null) }
     }
 
     // ------------------------------------------------------------- navegación

@@ -105,6 +105,87 @@ export function shareFromApp(text, url) {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Inicio de sesión con Google, nativo.
+//
+// El botón normal navega a accounts.google.com, y Google RECHAZA su formulario
+// dentro de un WebView (`disallowed_useragent`), así que la app no tiene más
+// remedio que abrir el navegador: se ve el salto a Chrome y la sesión se crea
+// en las cookies del navegador, no en las de la app. Con el puente, el sistema
+// devuelve el idToken sin salir de la app y aquí se canjea por la sesión.
+//
+// El nativo no puede devolver el token en el propio `return` (el selector de
+// cuentas tarda lo que tarde el usuario), así que responde llamando a
+// `window.__tsvGoogleSignInResult(peticion, json)`. Esto lo envuelve en promesa.
+const peticionesGoogle = new Map();
+
+function instalarReceptor() {
+  if (typeof window === "undefined" || window.__tsvGoogleSignInResult) return;
+  window.__tsvGoogleSignInResult = (peticion, payload) => {
+    const resolver = peticionesGoogle.get(peticion);
+    if (!resolver) return;
+    peticionesGoogle.delete(peticion);
+    try {
+      resolver(JSON.parse(payload));
+    } catch {
+      resolver({ ok: false, error: "bad_payload" });
+    }
+  };
+}
+
+/** ¿Puede la app hacer el login sin navegador? */
+export function canNativeGoogleSignIn() {
+  return call("canSignInWithGoogle", false) === true;
+}
+
+/**
+ * Pide el idToken al sistema. Resuelve con
+ * `{ ok, idToken?, cancelled?, error? }`; nunca rechaza.
+ */
+export function requestNativeGoogleIdToken() {
+  if (!canNativeGoogleSignIn()) {
+    return Promise.resolve({ ok: false, error: "unavailable" });
+  }
+  instalarReceptor();
+  const peticion = `g${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return new Promise((resolve) => {
+    peticionesGoogle.set(peticion, resolve);
+    const lanzada = call("signInWithGoogle", false, peticion);
+    if (lanzada !== true) {
+      peticionesGoogle.delete(peticion);
+      resolve({ ok: false, error: "unavailable" });
+    }
+    // Red de seguridad: si el nativo no contestara nunca, la promesa no se
+    // queda colgada y la web puede ofrecer el flujo por navegador.
+    setTimeout(() => {
+      if (peticionesGoogle.delete(peticion)) resolve({ ok: false, error: "timeout" });
+    }, 120000);
+  });
+}
+
+/**
+ * Login completo dentro de la app: token del sistema → canje en el servidor
+ * (mismo endpoint del backend que usa el flujo web) → cookies en el WebView.
+ */
+export async function signInWithGoogleNative() {
+  const nativo = await requestNativeGoogleIdToken();
+  if (!nativo?.ok || !nativo?.idToken) return nativo || { ok: false };
+
+  try {
+    const res = await fetch("/api/auth/google/native", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ idToken: nativo.idToken }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: json?.error || "exchange_failed" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
 export function appVersion() {
   return call("appVersion", null);
 }

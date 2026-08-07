@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  canNativeGoogleSignIn,
+  signInWithGoogleNative,
+  useAndroidApp,
+} from "@/lib/android/appBridge";
 
 function sanitizeNextPath(value) {
   const next = value || "/";
@@ -78,7 +83,9 @@ function getGoogleErrorMessage(value) {
 export default function LoginForm({ next: nextProp }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, register } = useAuth();
+  const { login, register, refreshMe } = useAuth();
+  const inAndroidApp = useAndroidApp();
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
@@ -97,6 +104,36 @@ export default function LoginForm({ next: nextProp }) {
   const googleError = getGoogleErrorMessage(searchParams?.get("google_error"));
   const visibleError = err || googleError;
   const googleAuthHref = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
+
+  // DENTRO DE LA APP DE ANDROID el enlace de arriba acaba en el navegador:
+  // Google rechaza su formulario en un WebView, así que la carcasa lo manda a
+  // Chrome y la sesión se crearía en las cookies del navegador, no en las de la
+  // app. Aquí se pide el token al selector de cuentas del sistema y se canjea
+  // sin salir de la aplicación. Si el nativo no está disponible (dispositivo sin
+  // servicios de Google, cliente OAuth sin configurar) se cae al enlace normal,
+  // que sigue funcionando gracias al handoff `theshowverse://open`.
+  const handleGoogleNative = async (event) => {
+    if (!inAndroidApp || !canNativeGoogleSignIn()) return; // sigue el href
+    event.preventDefault();
+    if (googleLoading) return;
+
+    setGoogleLoading(true);
+    setErr("");
+    try {
+      const resultado = await signInWithGoogleNative();
+      if (resultado?.ok) {
+        await refreshMe?.();
+        router.replace(next);
+        router.refresh();
+        return;
+      }
+      if (resultado?.cancelled) return; // cancelación deliberada: sin ruido
+      // Cualquier otro fallo: se usa el camino por navegador.
+      window.location.href = googleAuthHref;
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -158,6 +195,8 @@ export default function LoginForm({ next: nextProp }) {
 
       <a
         href={googleAuthHref}
+        onClick={handleGoogleNative}
+        aria-busy={googleLoading}
         className="mb-5 flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-sm font-semibold text-white transition-all active:scale-[0.99] shadow-sm cursor-pointer"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24">
