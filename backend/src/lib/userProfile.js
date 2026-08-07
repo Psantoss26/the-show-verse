@@ -1382,6 +1382,138 @@ export async function getUserActivity(db, targetId, opts = {}) {
   return page;
 }
 
+// Máximo de cuentas seguidas que aporta eventos al feed. Cota defensiva: el
+// feed reutiliza `getUserActivity` por cada cuenta, así que sin tope una cuenta
+// que siga a miles convertiría una sola petición en miles de consultas.
+export const FEED_FOLLOWING_MAX = 50;
+
+/**
+ * Feed social: la actividad de las cuentas que sigue `viewerId`, fusionada por
+ * fecha y con el autor de cada evento.
+ *
+ * Reutiliza `getUserActivity` por cada cuenta en vez de reimplementar la
+ * consulta: así el feed hereda gratis el tipado de eventos, la agrupación de
+ * episodios vistos, las puntuaciones de las reseñas y la resolución de carteles.
+ * Cada cuenta aporta hasta `limit + offset` eventos, que es lo máximo que puede
+ * necesitar la página pedida.
+ */
+export async function getFollowingActivity(db, viewerId, opts = {}) {
+  const { limit, offset } = pageParams(opts);
+  if (!viewerId) return { items: [], hasMore: false, offset };
+
+  const siguiendo = await db
+    .select({ id: users.id, username: users.username, displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .from(follows)
+    .innerJoin(users, eq(users.id, follows.followingId))
+    .where(and(eq(follows.followerId, viewerId), eq(users.isActive, true)))
+    .orderBy(desc(follows.createdAt))
+    .limit(FEED_FOLLOWING_MAX);
+
+  if (!siguiendo.length) return { items: [], hasMore: false, offset };
+
+  const porCuenta = await Promise.all(
+    siguiendo.map(async (autor) => {
+      const page = await getUserActivity(db, autor.id, { limit: limit + offset, offset: 0 });
+      return page.items.map((item) => ({
+        ...item,
+        // El id del evento solo era único DENTRO de una cuenta; al fusionar hay
+        // que prefijarlo o dos usuarios con el mismo tipo e id colisionarían.
+        id: `${autor.id}:${item.id}`,
+        author: {
+          username: autor.username,
+          displayName: autor.displayName || autor.username,
+          avatarUrl: autor.avatarUrl || null,
+        },
+      }));
+    }),
+  );
+
+  const eventos = porCuenta.flat();
+  eventos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return packPage(eventos.slice(offset, offset + limit + 1), limit, offset);
+}
+
+// Ventana que define "activo" en el resumen de la sección social.
+export const SOCIAL_ACTIVE_WINDOW_DAYS = 7;
+
+/**
+ * Resumen de la cabecera de /social: seguidores, seguidos y cuántas de las
+ * cuentas que sigo han hecho algo en la última semana.
+ *
+ * Seguidores y seguidos se cuentan EXACTAMENTE igual que en el perfil
+ * (`buildUserProfile`), sin filtros añadidos, para que las dos páginas nunca
+ * muestren cifras distintas de lo mismo.
+ *
+ * "Activos" no se deduce del feed ya cargado: el feed está paginado, así que un
+ * recuento sacado de él dependería de cuánto hubiera bajado el usuario. Se
+ * consulta una vez por tabla de actividad —siete consultas en total, no siete
+ * por cuenta— filtrando por fecha, y se unen los ids en memoria.
+ */
+export async function getSocialSummary(db, viewerId) {
+  const vacio = {
+    followers: 0,
+    following: 0,
+    activeWeek: 0,
+    windowDays: SOCIAL_ACTIVE_WINDOW_DAYS,
+  };
+  if (!viewerId) return vacio;
+
+  const [followersRows, followingRows, seguidasActivas] = await Promise.all([
+    db.select({ n: count() }).from(follows).where(eq(follows.followingId, viewerId)),
+    db.select({ n: count() }).from(follows).where(eq(follows.followerId, viewerId)),
+    db
+      .select({ id: follows.followingId })
+      .from(follows)
+      .innerJoin(users, eq(users.id, follows.followingId))
+      .where(and(eq(follows.followerId, viewerId), eq(users.isActive, true)))
+      .limit(FEED_FOLLOWING_MAX),
+  ]);
+
+  const resumen = {
+    ...vacio,
+    followers: followersRows[0]?.n || 0,
+    following: followingRows[0]?.n || 0,
+  };
+
+  const ids = seguidasActivas.map((row) => row.id);
+  if (!ids.length) return resumen;
+
+  const desde = new Date(Date.now() - SOCIAL_ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const recientes = (tabla, userCol, fechaCol, extra) =>
+    db
+      .select({ userId: userCol })
+      .from(tabla)
+      .where(and(inArray(userCol, ids), gte(fechaCol, desde), extra))
+      .groupBy(userCol);
+
+  const porTabla = await Promise.all([
+    recientes(titleComments, titleComments.userId, titleComments.createdAt, eq(titleComments.source, 'native')),
+    recientes(watchHistory, watchHistory.userId, watchHistory.watchedAt),
+    recientes(watchlist, watchlist.userId, watchlist.addedAt),
+    recientes(favorites, favorites.userId, favorites.addedAt),
+    recientes(userRatings, userRatings.userId, userRatings.ratedAt),
+    recientes(userLists, userLists.userId, userLists.createdAt, eq(userLists.isPublic, true)),
+    // Los elementos de lista cuelgan de la lista, así que el autor sale del join.
+    db
+      .select({ userId: userLists.userId })
+      .from(userListItems)
+      .innerJoin(userLists, eq(userLists.id, userListItems.listId))
+      .where(and(
+        inArray(userLists.userId, ids),
+        eq(userLists.isPublic, true),
+        gte(userListItems.addedAt, desde),
+      ))
+      .groupBy(userLists.userId),
+  ]);
+
+  const activos = new Set();
+  for (const filas of porTabla) {
+    for (const fila of filas) if (fila.userId) activos.add(fila.userId);
+  }
+  resumen.activeWeek = activos.size;
+  return resumen;
+}
+
 // Busca usuarios por username/displayName para el descubrimiento de miembros.
 export async function searchUsers(db, { query, viewerId, limit = 20 }) {
   const q = String(query || '').trim();

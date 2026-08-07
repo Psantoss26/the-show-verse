@@ -21,6 +21,8 @@ import {
   normalizeProfileFavorites,
   PROFILE_FAVORITES_MAX,
   PROFILE_FAVORITES_TOTAL_MAX,
+  getFollowingActivity,
+  getSocialSummary,
   getUserReviews,
   getUserWatched,
   getUserWatchlist,
@@ -185,6 +187,33 @@ async function updateArtworkPreferences(userId, changes) {
 
 export default async function usersRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
+
+  // GET /users/feed?scope=following|me — feed de la sección social.
+  //
+  // `following` fusiona la actividad de las cuentas que sigo; `me`, la mía. Es
+  // el mismo tipo de evento en ambos casos (visto, reseña, favorito, pendiente,
+  // puntuación, lista), así que la página los pinta con un solo componente.
+  fastify.get('/feed', async (req, reply) => {
+    const scope = req.query?.scope === 'me' ? 'me' : 'following';
+    const opts = { limit: req.query?.limit, offset: req.query?.offset };
+
+    const page =
+      scope === 'me'
+        ? await getUserActivity(db, req.user.id, opts)
+        : await getFollowingActivity(db, req.user.id, opts);
+
+    return reply.send({ ...page, scope });
+  });
+
+  // GET /users/feed/summary — cifras de la cabecera de la sección social.
+  //
+  // Va aparte del feed a propósito: la cabecera no cambia al paginar ni al
+  // alternar entre "siguiendo" y "yo", así que se pide una sola vez y no se
+  // recalcula en cada página del feed.
+  fastify.get('/feed/summary', async (req, reply) => {
+    const summary = await getSocialSummary(db, req.user.id);
+    return reply.send({ summary });
+  });
 
   fastify.get('/preferences', async (req, reply) => {
     const preferences = await ensurePreferences(req.user.id);

@@ -1614,6 +1614,7 @@ export default function Navbar() {
         prefetchNavRoute("/movies");
         prefetchNavRoute("/series");
         prefetchNavRoute("/recommendations");
+        prefetchNavRoute("/social");
         prefetchNavRoute("/in-progress");
         prefetchNavRoute("/favorites");
         prefetchNavRoute("/watchlist");
@@ -1700,6 +1701,12 @@ export default function Navbar() {
           "hover:text-indigo-300 hover:bg-indigo-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(99,102,241,0.15)]",
         active: "text-indigo-200",
       },
+      // Rosa: la sección Social.
+      pink: {
+        hover:
+          "hover:text-pink-300 hover:bg-pink-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(236,72,153,0.15)]",
+        active: "text-pink-200",
+      },
     };
 
     const t = tones[tone] || tones.amber;
@@ -1723,6 +1730,8 @@ export default function Navbar() {
     blue: "text-sky-300 drop-shadow-[0_1.5px_4px_rgba(56,189,248,0.5)]",
     purple: "text-fuchsia-300 drop-shadow-[0_1.5px_4px_rgba(232,121,249,0.5)]",
     green: "text-emerald-300 drop-shadow-[0_1.5px_4px_rgba(52,211,153,0.5)]",
+    // Rosa: el color propio de la sección Social (ver SocialClient).
+    pink: "text-pink-300 drop-shadow-[0_1.5px_4px_rgba(244,114,182,0.5)]",
   };
 
   const navLinkClassMobileBottom = (href, tone = "blue") => {
@@ -1770,6 +1779,10 @@ export default function Navbar() {
       red: {
         glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(248,113,113,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
         bg: "bg-black/25 bg-red-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      pink: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(244,114,182,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-pink-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
       },
     };
 
@@ -2025,6 +2038,24 @@ export default function Navbar() {
                 )}
                 <span className="relative z-10 flex items-center justify-center">
                   <ThumbsUp className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                </span>
+              </Link>
+
+              <Link
+                href="/social"
+                prefetch
+                {...navPrefetchHandlers("/social")}
+                className={iconLinkClass("/social", "pink")}
+                aria-label={t("nav_social", "Social")}
+              >
+                {isActive("/social") && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full border border-pink-500/10 bg-pink-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(236,72,153,0.08)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center">
+                  <Users className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
                 </span>
               </Link>
 
@@ -2415,6 +2446,25 @@ export default function Navbar() {
             />
           </span>
         </Link>
+
+        <Link
+          href="/social"
+          prefetch
+          {...navPrefetchHandlers("/social")}
+          className={navLinkClassMobileBottom("/social", "pink")}
+          aria-current={isActive("/social") ? "page" : undefined}
+          aria-label={t("nav_social", "Social")}
+          title={t("nav_social", "Social")}
+        >
+          {isActive("/social") && getMobileBottomActiveLens("pink")}
+          <span className={mobileBottomIconSlotClass}>
+            <Users
+              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
+          </span>
+        </Link>
       </nav>
       </LayoutGroup>
 
@@ -2604,6 +2654,19 @@ export default function Navbar() {
                 </Link>
 
                 <div className="my-2.5 h-px bg-white/5" />
+
+                <Link
+                  href="/social"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    isActive("/social")
+                      ? "bg-pink-500/20 text-pink-300 font-bold"
+                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Users className={`w-5 h-5 ${isActive("/social") ? "text-pink-400" : "text-neutral-400"}`} />
+                  <span>{t("nav_social", "Social")}</span>
+                </Link>
 
                 <Link
                   href="/lists"
