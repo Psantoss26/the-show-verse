@@ -2228,7 +2228,7 @@ export default function Navbar() {
           >
             <LayoutGroup id="mobile-top-dashboards">
               <div
-                className={`flex items-center gap-0.5 rounded-full p-[3px] ${LIQUID_GLASS_BAR}`}
+                className={`flex items-center rounded-full p-[3px] ${LIQUID_GLASS_BAR}`}
                 role="navigation"
                 aria-label={t("nav_dashboards", "Secciones principales")}
               >
@@ -2243,7 +2243,9 @@ export default function Navbar() {
                       aria-label={label}
                       aria-current={active ? "page" : undefined}
                       className={`relative flex h-8 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-                        active ? `px-2.5 ${tone}` : "w-8 text-white/70 hover:text-white"
+                        active
+                          ? `px-2 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
+                          : "w-8 text-white/70 hover:text-white"
                       }`}
                     >
                       {active && (
@@ -2257,17 +2259,21 @@ export default function Navbar() {
                           transition={{ type: "spring", stiffness: 420, damping: 34 }}
                         />
                       )}
-                      {active ? (
-                        <span className="relative z-10 whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                      {/* En pantallas de menos de 360px el rótulo no cabe sin
+                          empujar al logo: ahí la sección activa se queda con su
+                          icono, resaltado por la cápsula. */}
+                      {active && (
+                        <span className="relative z-10 hidden whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] min-[360px]:inline">
                           {label}
                         </span>
-                      ) : (
-                        <Icon
-                          className="relative z-10 h-5 w-5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
-                          strokeWidth={2.2}
-                          aria-hidden="true"
-                        />
                       )}
+                      <Icon
+                        className={`relative z-10 h-5 w-5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${
+                          active ? "min-[360px]:hidden" : ""
+                        }`}
+                        strokeWidth={2.2}
+                        aria-hidden="true"
+                      />
                     </Link>
                   );
                 })}
@@ -2292,13 +2298,20 @@ export default function Navbar() {
             aria-haspopup="dialog"
             className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass}`}
           >
-            <span className="flex h-10 w-[76px] items-center justify-center overflow-hidden">
+            {/* TAMAÑO REAL DEL LOGO. El PNG lleva mucho margen transparente: su
+                tinta ocupa el 39,6% del ancho y el 34,2% del alto. Por eso la
+                imagen se amplía ×2.8 sobre una caja de 40px —la tinta acaba
+                midiendo ~44×38px, que es el tamaño con el que se diseñó la
+                barra— y el contenedor la RECORTA a 56px: así el botón no invade
+                el sitio del selector aunque la imagen escalada sea mucho más
+                ancha que su marco. */}
+            <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden">
               <OptimizedImage
                 src="/logo-TSV-sinFondo.png"
                 alt="The Show Verse"
-                width={32}
-                height={32}
-                className="h-full w-[32px] object-contain scale-[2.3] origin-center"
+                width={40}
+                height={40}
+                className="h-full w-[40px] object-contain scale-[2.8] origin-center"
               />
             </span>
           </button>
@@ -2379,25 +2392,6 @@ export default function Navbar() {
         />
 
         <Link
-          href="/"
-          prefetch
-          {...navPrefetchHandlers("/")}
-          className={navLinkClassMobileBottom("/", "gold")}
-          aria-current={isActive("/") ? "page" : undefined}
-          aria-label={t("nav_home", "Inicio")}
-          title={t("nav_home", "Inicio")}
-        >
-          {isActive("/") && getMobileBottomActiveLens("gold")}
-          <span className={mobileBottomIconSlotClass}>
-            <HomeIcon
-              className={`${mobileBottomIconClass} ${isActive("/") ? "fill-amber-400/25 text-amber-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
           href="/social"
           prefetch
           {...navPrefetchHandlers("/social")}
@@ -2410,6 +2404,25 @@ export default function Navbar() {
           <span className={mobileBottomIconSlotClass}>
             <Users
               className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
+          </span>
+        </Link>
+
+        <Link
+          href="/recommendations"
+          prefetch
+          {...navPrefetchHandlers("/recommendations")}
+          className={navLinkClassMobileBottom("/recommendations", "green")}
+          aria-current={isActive("/recommendations") ? "page" : undefined}
+          aria-label={t("nav_recommendations", "Recomendaciones")}
+          title={t("nav_recommendations", "Recomendaciones")}
+        >
+          {isActive("/recommendations") && getMobileBottomActiveLens("green")}
+          <span className={mobileBottomIconSlotClass}>
+            <ThumbsUp
+              className={`${mobileBottomIconClass} ${isActive("/recommendations") ? "fill-emerald-400/25 text-emerald-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
