@@ -11,7 +11,9 @@
  *     con fallback a caché SOLO si la red falla o el origen devuelve 5xx (el túnel
  *     Cloudflare responde 5xx cuando el NAS está caído: hay que tratarlo como
  *     "offline", no como contenido válido).
- *   - Estáticos con hash (/_next/static, fuentes, iconos) → CACHE-FIRST (inmutables).
+ *   - Estáticos con hash (/_next/static) → CACHE-FIRST (inmutables).
+ *   - Recursos públicos sin hash (logos, iconos, imágenes) → NETWORK-FIRST:
+ *     deben actualizarse al mismo tiempo en PWA y WebView.
  *   - /api/* y CUALQUIER petición cross-origin → PASSTHROUGH: el SW no las toca
  *     (los datos los resuelve la app vía localStorage; las imágenes/tráilers de
  *     TMDb/YouTube cargan por internet). Así el SW no puede "bloquear" nada.
@@ -21,9 +23,9 @@
  * o servir /sw.js?kill — pero la vía soportada es el flag de PwaManager.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `showverse-shell-${VERSION}`; // documentos HTML + RSC
-const ASSET_CACHE = `showverse-assets-${VERSION}`; // /_next/static, fuentes, iconos
+const ASSET_CACHE = `showverse-assets-${VERSION}`; // solo /_next/static con hash
 const OFFLINE_URL = "/offline.html";
 const APP_SHELL_URL = "/"; // último recurso de navegación si no hay documento cacheado
 
@@ -31,12 +33,10 @@ const APP_SHELL_URL = "/"; // último recurso de navegación si no hay documento
 // visitarse online (cache-as-you-browse), que es justo "el último contenido cargado".
 const PRECACHE_URLS = [OFFLINE_URL, APP_SHELL_URL];
 
-const isStaticAsset = (url) =>
-  url.pathname.startsWith("/_next/static/") ||
-  url.pathname.startsWith("/fonts/") ||
-  /\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|gif|svg|webp|avif|ico)$/.test(
-    url.pathname,
-  );
+// Next cambia la URL de estos recursos cuando cambia su contenido. Los assets
+// de `public/` conservan, en cambio, nombres como `/logo.png`; tratarlos como
+// inmutables dejaba versiones distintas en la PWA y el WebView de Android.
+const isImmutableAsset = (url) => url.pathname.startsWith("/_next/static/");
 
 const isRscRequest = (request, url) =>
   url.searchParams.has("_rsc") ||
@@ -137,8 +137,8 @@ self.addEventListener("fetch", (event) => {
   // cacheamos API para no servir datos obsoletos online).
   if (url.pathname.startsWith("/api/")) return;
 
-  // Estáticos inmutables (hash) → cache-first.
-  if (isStaticAsset(url)) {
+  // Estáticos inmutables de Next (con hash) → cache-first.
+  if (isImmutableAsset(url)) {
     event.respondWith(cacheFirst(request).catch(() => fetch(request)));
     return;
   }

@@ -141,9 +141,14 @@ class WebAppActivity : AppCompatActivity() {
             databaseEnabled = true
             // Los tráileres deben poder arrancar al pulsar sin un gesto extra.
             mediaPlaybackRequiresUserGesture = false
-            // La web es responsive y ya trae su propio viewport.
+            // La web es responsive y ya trae `width=device-width`. Chrome/PWA
+            // respeta ese viewport sin volver a escalar toda la página; el modo
+            // "overview" del WebView sí podría encoger botones, logos y texto si
+            // detecta cualquier desbordamiento horizontal.
             useWideViewPort = true
-            loadWithOverviewMode = true
+            loadWithOverviewMode = false
+            textZoom = 100
+            setSupportZoom(false)
             builtInZoomControls = false
             displayZoomControls = false
             // Nada de acceso al sistema de ficheros: la app solo carga red.
@@ -154,10 +159,19 @@ class WebAppActivity : AppCompatActivity() {
             userAgentString = "$userAgentString ${BuildConfig.UA_SUFFIX}"
         }
 
-        // Tema oscuro del propio WebView (fondos por defecto, formularios) para
-        // que no haya destellos blancos con la interfaz oscura de la web.
+        // The Show Verse ya pinta su tema oscuro y su liquid glass en CSS. Si el
+        // WebView vuelve a oscurecer la página de forma algorítmica modifica los
+        // colores, transparencias, botones e imágenes respecto a Chrome/PWA.
+        // Se desactiva tanto la API actual como el respaldo de WebView antiguos.
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-            WebSettingsCompat.setAlgorithmicDarkeningAllowed(web.settings, true)
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(web.settings, false)
+        }
+        @Suppress("DEPRECATION")
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+            WebSettingsCompat.setForceDark(
+                web.settings,
+                WebSettingsCompat.FORCE_DARK_OFF,
+            )
         }
 
         CookieManager.getInstance().apply {
