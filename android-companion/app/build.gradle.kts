@@ -19,7 +19,7 @@ fun signingSecret(property: String, environment: String): String? =
     (keystoreProperties.getProperty(property) ?: System.getenv(environment))
         ?.takeIf { it.isNotBlank() }
 
-val appVersionName = "1.0"
+val appVersionName = "1.1"
 
 android {
     // OJO: `namespace` (paquete del código, R y ViewBinding) NO es lo mismo que
@@ -35,7 +35,7 @@ android {
         targetSdk = 35
         // App oficial: numeración nueva. La APK sideload anterior era
         // com.theshowverse.sync 2.2 (versionCode 13) y es otro paquete.
-        versionCode = 1
+        versionCode = 2
         versionName = appVersionName
 
         // Origen que carga el shell mientras el usuario no configure otro.
