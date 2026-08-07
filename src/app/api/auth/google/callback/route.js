@@ -8,11 +8,13 @@ import {
   setBackendTokenCookies,
 } from "@/lib/backend/server";
 import {
+  buildAndroidOauthHandoffUrl,
   clearGoogleOauthCookies,
   getGoogleRedirectUri,
   getRequestOrigin,
   GOOGLE_OAUTH_NEXT_COOKIE,
   GOOGLE_OAUTH_STATE_COOKIE,
+  isAndroidOauthState,
   sanitizeNextPath,
 } from "../_utils";
 
@@ -79,13 +81,28 @@ async function exchangeCodeForTokens(request, code) {
 }
 
 export async function GET(request) {
+  const state = request.nextUrl.searchParams.get("state");
+  const code = request.nextUrl.searchParams.get("code");
+  const error = request.nextUrl.searchParams.get("error");
+  const appHandoff = request.nextUrl.searchParams.get("app_handoff") === "1";
+
+  // La primera llegada ocurre en la Custom Tab de Google, que no comparte las
+  // cookies del WebView. Solo se transportan `code` y `state` a la app; allí se
+  // vuelve a cargar este callback y se ejecuta la validación normal de abajo.
+  if (isAndroidOauthState(state) && !appHandoff) {
+    return NextResponse.redirect(
+      buildAndroidOauthHandoffUrl(getRequestOrigin(request), {
+        code,
+        state,
+        error,
+      }),
+    );
+  }
+
   const expectedState = request.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
   const next = sanitizeNextPath(
     request.cookies.get(GOOGLE_OAUTH_NEXT_COOKIE)?.value || "/",
   );
-  const state = request.nextUrl.searchParams.get("state");
-  const code = request.nextUrl.searchParams.get("code");
-  const error = request.nextUrl.searchParams.get("error");
 
   if (error) return redirectToLogin(request, next, error);
   if (!code) return redirectToLogin(request, next, "missing_code");
