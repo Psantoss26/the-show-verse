@@ -2354,6 +2354,25 @@ export default function Navbar() {
         </Link>
 
         <Link
+          href="/social"
+          prefetch
+          {...navPrefetchHandlers("/social")}
+          className={navLinkClassMobileBottom("/social", "pink")}
+          aria-current={isActive("/social") ? "page" : undefined}
+          aria-label={t("nav_social", "Social")}
+          title={t("nav_social", "Social")}
+        >
+          {isActive("/social") && getMobileBottomActiveLens("pink")}
+          <span className={mobileBottomIconSlotClass}>
+            <Users
+              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
+              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+              style={{ shapeRendering: "geometricPrecision" }}
+            />
+          </span>
+        </Link>
+
+        <Link
           href="/in-progress"
           prefetch
           {...navPrefetchHandlers("/in-progress")}
@@ -2385,25 +2404,6 @@ export default function Navbar() {
           <span className={mobileBottomIconSlotClass}>
             <Eye
               className={`${mobileBottomIconClass} ${isActive("/history") ? "fill-emerald-400/25" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href="/social"
-          prefetch
-          {...navPrefetchHandlers("/social")}
-          className={navLinkClassMobileBottom("/social", "pink")}
-          aria-current={isActive("/social") ? "page" : undefined}
-          aria-label={t("nav_social", "Social")}
-          title={t("nav_social", "Social")}
-        >
-          {isActive("/social") && getMobileBottomActiveLens("pink")}
-          <span className={mobileBottomIconSlotClass}>
-            <Users
-              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
