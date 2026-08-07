@@ -30,7 +30,6 @@ import {
   ListVideo,
   Search as SearchIcon,
   X as XIcon,
-  Menu as MenuIcon,
   HomeIcon,
   Compass,
   Play,
@@ -1811,6 +1810,15 @@ export default function Navbar() {
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
   // de rutas active la compactación por scroll.
   const mobileTopIsCompact = isScrolled || isImmersiveRoute;
+  // Los tres dashboards del selector superior en móvil. El color del rótulo es
+  // el de la sección (el mismo criterio que la barra inferior): solo se ve uno
+  // a la vez, así que tiñe sin ensuciar.
+  const MOBILE_DASHBOARDS = [
+    { href: "/", label: t("nav_home", "Inicio"), Icon: HomeIcon, tone: "text-amber-200" },
+    { href: "/movies", label: t("nav_movies", "Películas"), Icon: FilmIcon, tone: "text-sky-200" },
+    { href: "/series", label: t("nav_series", "Series"), Icon: TvIcon, tone: "text-fuchsia-200" },
+  ];
+
   const mobileTopControlScaleClass = isImmersiveRoute
     ? "scale-[0.8]"
     : isScrolled
@@ -2209,55 +2217,91 @@ export default function Navbar() {
             mobileTopIsCompact ? "h-12" : "h-16"
           }`}
         >
-          {/* Izquierda: en el estado compacto se replica la escala inicial de
-              DetailsClient para que menú y recomendaciones reduzcan presencia sin
-              perder su área táctil ni su posición. */}
+          {/* Izquierda: SELECTOR DE DASHBOARD.
+              El destino en el que estás muestra su NOMBRE y los otros dos solo
+              su icono. Es lo que permite meter tres secciones en menos espacio
+              del que ocupaban antes dos botones sueltos, y de paso la barra dice
+              siempre dónde estás sin gastar una línea de título.
+              La escala en compacto se hereda del resto de controles. */}
           <div
-            className={`flex flex-shrink-0 origin-left items-center gap-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
+            className={`flex flex-shrink-0 origin-left items-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-2 rounded-full text-white hover:bg-white/10 transition-colors"
-              aria-label="Abrir menú"
-            >
-              <MenuIcon className="w-6 h-6" />
-            </button>
-            <Link
-              href="/recommendations"
-              prefetch
-              {...navPrefetchHandlers("/recommendations")}
-              className={`group relative grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all duration-300 ease-out active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-                isActive("/recommendations")
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "text-white hover:bg-white/10 hover:text-emerald-200"
-              }`}
-              aria-label={t("nav_recommendations", "Recomendaciones")}
-              aria-current={isActive("/recommendations") ? "page" : undefined}
-            >
-              <ThumbsUp
-                className="h-5 w-5 transition-transform duration-200 group-hover:scale-110"
-                aria-hidden="true"
-              />
-            </Link>
+            <LayoutGroup id="mobile-top-dashboards">
+              <div
+                className={`flex items-center gap-0.5 rounded-full p-[3px] ${LIQUID_GLASS_BAR}`}
+                role="navigation"
+                aria-label={t("nav_dashboards", "Secciones principales")}
+              >
+                {MOBILE_DASHBOARDS.map(({ href, label, Icon, tone }) => {
+                  const active = isActive(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      prefetch
+                      {...navPrefetchHandlers(href)}
+                      aria-label={label}
+                      aria-current={active ? "page" : undefined}
+                      className={`relative flex h-8 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                        active ? `px-2.5 ${tone}` : "w-8 text-white/70 hover:text-white"
+                      }`}
+                    >
+                      {active && (
+                        // La cápsula viaja de una sección a otra en vez de
+                        // aparecer y desaparecer: es lo que hace que el cambio se
+                        // lea como UN selector y no como tres botones.
+                        <motion.span
+                          aria-hidden="true"
+                          layoutId="mobile-top-dashboard"
+                          className="absolute inset-0 rounded-full bg-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.22)]"
+                          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                        />
+                      )}
+                      {active ? (
+                        <span className="relative z-10 whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                          {label}
+                        </span>
+                      ) : (
+                        <Icon
+                          className="relative z-10 h-5 w-5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+                          strokeWidth={2.2}
+                          aria-hidden="true"
+                        />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </LayoutGroup>
           </div>
 
-          {/* Centro: el logo acompaña la reducción de los controles. */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <Link
-              href="/"
-              className={`block h-10 overflow-hidden transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
-            >
-              <div className="h-full w-[140px] flex items-center justify-center overflow-hidden">
-                <OptimizedImage
-                  src="/logo-TSV-sinFondo.png"
-                  alt="The Show Verse"
-                  width={40}
-                  height={40}
-                  className="h-full w-[40px] object-contain scale-[2.8] origin-center"
-                />
-              </div>
-            </Link>
-          </div>
+          {/* Centro: el logo ABRE EL MENÚ LATERAL.
+              Ya no hace falta que lleve a Inicio —eso lo cubre el selector— así
+              que hereda el papel del botón de hamburguesa sin ocupar un hueco
+              propio.
+
+              Va CENTRADO EN LA PANTALLA (posición absoluta), no repartiendo el
+              hueco sobrante: como el rótulo del selector cambia de ancho según
+              la sección, con un centrado por flex el logo se desplazaba unos
+              píxeles al navegar. El ancho del selector está ajustado para que
+              ni con «Películas» —el rótulo más largo— llegue a tocarlo. */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label={t("open_menu", "Abrir menú")}
+            aria-haspopup="dialog"
+            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass}`}
+          >
+            <span className="flex h-10 w-[76px] items-center justify-center overflow-hidden">
+              <OptimizedImage
+                src="/logo-TSV-sinFondo.png"
+                alt="The Show Verse"
+                width={32}
+                height={32}
+                className="h-full w-[32px] object-contain scale-[2.3] origin-center"
+              />
+            </span>
+          </button>
 
           {/* Derecha: búsqueda y perfil mantienen la misma escala que el resto. */}
           <div
