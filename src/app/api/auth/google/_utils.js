@@ -2,6 +2,8 @@ import { randomBytes } from "crypto";
 
 export const GOOGLE_OAUTH_STATE_COOKIE = "showverse_google_oauth_state";
 export const GOOGLE_OAUTH_NEXT_COOKIE = "showverse_google_oauth_next";
+export const ANDROID_APP_USER_AGENT_TOKEN = "TheShowVerseApp/";
+export const ANDROID_OAUTH_STATE_PREFIX = "android.";
 
 export function sanitizeNextPath(value) {
   const next = typeof value === "string" ? value : "/";
@@ -13,8 +15,36 @@ export function sanitizeNextPath(value) {
   return next;
 }
 
-export function createOauthState() {
-  return randomBytes(32).toString("hex");
+export function isAndroidAppUserAgent(userAgent) {
+  return String(userAgent || "").includes(ANDROID_APP_USER_AGENT_TOKEN);
+}
+
+export function createOauthState({ android = false } = {}) {
+  const token = randomBytes(32).toString("hex");
+  return android ? `${ANDROID_OAUTH_STATE_PREFIX}${token}` : token;
+}
+
+export function isAndroidOauthState(value) {
+  return new RegExp(`^${ANDROID_OAUTH_STATE_PREFIX}[a-f0-9]{64}$`).test(
+    String(value || ""),
+  );
+}
+
+/**
+ * El navegador del proveedor no comparte cookies con el WebView. Devuelve el
+ * código OAuth a la app mediante su esquema propio; WebAppActivity abrirá la
+ * URL HTTPS interna en el WebView, donde sí vive la cookie `state` original.
+ */
+export function buildAndroidOauthHandoffUrl(origin, { code, state, error } = {}) {
+  const callbackUrl = new URL("/api/auth/google/callback", origin);
+  if (code) callbackUrl.searchParams.set("code", code);
+  if (state) callbackUrl.searchParams.set("state", state);
+  if (error) callbackUrl.searchParams.set("error", error);
+  callbackUrl.searchParams.set("app_handoff", "1");
+
+  const appUrl = new URL("theshowverse://open");
+  appUrl.searchParams.set("url", callbackUrl.toString());
+  return appUrl;
 }
 
 export function getRequestOrigin(request) {

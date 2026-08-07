@@ -4,6 +4,7 @@ import {
   getGoogleRedirectUri,
   GOOGLE_OAUTH_NEXT_COOKIE,
   GOOGLE_OAUTH_STATE_COOKIE,
+  isAndroidAppUserAgent,
   sanitizeNextPath,
 } from "../_utils";
 
@@ -20,7 +21,9 @@ export async function GET(request) {
     );
   }
 
-  const state = createOauthState();
+  const state = createOauthState({
+    android: isAndroidAppUserAgent(request.headers.get("user-agent")),
+  });
   const redirectUri = getGoogleRedirectUri(request);
   const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleUrl.searchParams.set("client_id", clientId);
