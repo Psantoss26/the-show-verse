@@ -2,8 +2,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Necesario en Android 13+ para poder mostrar la notificación de estado. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Android 11+ filtra qué apps puede "ver" la nuestra. Sin esto no se
+         pueden resolver los enlaces externos (abrir en el navegador) ni las
+         pestañas personalizadas de Chrome. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -11,17 +25,65 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="true"
+        android:enableOnBackInvokedCallback="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.TSVSync">
 
+        <!-- LA APP: The Show Verse completo dentro de una carcasa nativa.
+             `singleTask` para que los enlaces (App Links, notificaciones) reusen
+             la instancia en vez de apilar copias. `configChanges` evita recrear
+             la actividad al girar o al abrir el teclado: el WebView conserva la
+             página, el scroll y el estado del formulario. -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".WebAppActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density|navigation|fontScale|layoutDirection|locale"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.TSV.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- App Links: los enlaces a theshowverse.com abren la app en vez del
+                 navegador. Requiere publicar /.well-known/assetlinks.json con la
+                 huella SHA-256 del certificado de firma (ver docs). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="theshowverse.com" />
+                <data android:scheme="https" android:host="www.theshowverse.com" />
+            </intent-filter>
+
+            <!-- Esquema propio: sirve como respaldo cuando la verificación de
+                 App Links no está disponible (servidor propio, LAN…). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="theshowverse" android:host="open" />
+            </intent-filter>
         </activity>
+
+        <!-- Panel NATIVO de sincronización (permisos, apps, registro). Ya no es el
+             punto de entrada: se abre desde la propia web (puente JS) o desde el
+             enlace de emparejamiento. El nombre de clase se conserva para no
+             romper referencias históricas. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/sync_panel_title"
+            android:parentActivityName=".WebAppActivity" />
+
+        <!-- Ajustes de servidor: origen que carga la app y clave de acceso
+             privado. Pensado para probar contra el NAS o localhost. -->
+        <activity
+            android:name=".ServerActivity"
+            android:exported="false"
+            android:label="@string/server_title"
+            android:parentActivityName=".WebAppActivity" />
 
         <!-- Recibe el deep link de emparejamiento: theshowverse://pair?token=&origin= -->
         <activity

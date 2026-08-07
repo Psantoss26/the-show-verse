@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
+import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
+import { pairDevice, useSyncStatus } from "@/lib/android/appBridge";
 import { useTranslation } from "@/lib/i18n";
 import {
   getPlexConnection,
@@ -1379,12 +1381,19 @@ function ProfileSettingsClient() {
   const [connectedEmail, setConnectedEmail] = useState("");
   // Esperando a que el usuario instale la extensión desde la Chrome Web Store.
   const [awaitingInstall, setAwaitingInstall] = useState(false);
-  // Emparejamiento de la app companion de Android (deep link theshowverse://pair).
+  // Emparejamiento de la sincronización de streaming. Dos caminos:
+  //  - Dentro de la app de Android: se pasa el token al nativo por el puente.
+  //  - En el navegador: deep link theshowverse://pair para la APK instalada.
   const [androidPair, setAndroidPair] = useState({
     loading: false,
     link: "",
     error: "",
   });
+  const {
+    inApp: inAndroidApp,
+    status: androidSyncStatus,
+    refresh: refreshAndroidSync,
+  } = useSyncStatus();
 
   const handlePairAndroid = useCallback(async () => {
     setAndroidPair({ loading: true, link: "", error: "" });
@@ -1399,6 +1408,20 @@ function ProfileSettingsClient() {
       }
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+
+      // Dentro de la app no hay deep link que valga: el token se guarda en el
+      // nativo directamente, sin salir de la pantalla.
+      if (inAndroidApp) {
+        const ok = pairDevice(json.syncToken, origin);
+        setAndroidPair({
+          loading: false,
+          link: "",
+          error: ok ? "" : "No se pudo guardar el emparejamiento en la app.",
+        });
+        refreshAndroidSync();
+        return;
+      }
+
       const link = `theshowverse://pair?token=${encodeURIComponent(json.syncToken)}&origin=${encodeURIComponent(origin)}`;
       setAndroidPair({ loading: false, link, error: "" });
       // Abre la app companion (mismo dispositivo). Si no está instalada, el enlace
@@ -1411,7 +1434,7 @@ function ProfileSettingsClient() {
         error: err?.message || "Error al emparejar.",
       });
     }
-  }, []);
+  }, [inAndroidApp, refreshAndroidSync]);
 
   const fetchConnections = useCallback(async () => {
     if (!authenticated) return;
@@ -2128,36 +2151,52 @@ function ProfileSettingsClient() {
                             </span>
                           </div>
                           <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                            Sincroniza automáticamente lo que ves en las apps oficiales de streaming del móvil. Instala la app companion y pulsa Vincular.
+                            {inAndroidApp
+                              ? "Sincroniza automáticamente lo que ves en las apps oficiales de streaming de este dispositivo. Ya viene incluido en la app: solo hay que vincularlo y conceder los permisos."
+                              : "Sincroniza automáticamente lo que ves en las apps oficiales de streaming del móvil. Instala la app companion y pulsa Vincular."}
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handlePairAndroid}
-                        disabled={androidPair.loading}
-                        aria-label="Vincular app Android"
-                        title="Vincular app Android"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60 self-start sm:self-auto"
-                      >
-                        {androidPair.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-                        ) : (
-                          <>
-                            <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                            <span className="hidden sm:inline">Vincular app Android</span>
-                          </>
-                        )}
-                      </button>
+                      {/* Dentro de la app el botón vive en el panel nativo de
+                          abajo, junto al resto del estado. */}
+                      {!inAndroidApp && (
+                        <button
+                          type="button"
+                          onClick={handlePairAndroid}
+                          disabled={androidPair.loading}
+                          aria-label="Vincular app Android"
+                          title="Vincular app Android"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60 self-start sm:self-auto"
+                        >
+                          {androidPair.loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                          ) : (
+                            <>
+                              <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                              <span className="hidden sm:inline">Vincular app Android</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
-                    {androidPair.error && (
+                    {inAndroidApp && (
+                      <AndroidSyncPanel
+                        status={androidSyncStatus}
+                        onRefresh={refreshAndroidSync}
+                        onPair={handlePairAndroid}
+                        pairing={androidPair.loading}
+                        error={androidPair.error}
+                      />
+                    )}
+
+                    {!inAndroidApp && androidPair.error && (
                       <p className="text-xs text-red-400 bg-red-500/5 border border-red-500/20 p-2.5 rounded-xl">
                         {androidPair.error}
                       </p>
                     )}
 
-                    {androidPair.link && (
+                    {!inAndroidApp && androidPair.link && (
                       <div className="space-y-2 pt-2 border-t border-white/5">
                         <p className="text-xs text-emerald-300 font-semibold">
                           Emparejamiento generado. Si la app no se abrió sola, usa el enlace:

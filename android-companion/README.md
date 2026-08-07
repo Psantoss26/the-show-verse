@@ -1,60 +1,111 @@
-# The Show Verse Sync — Android companion app
+# The Show Verse — app oficial de Android
 
-Automatic streaming-activity sync from the **official native apps** on Android
-(Netflix, Disney+, Prime Video, Max, Crunchyroll, Movistar+, …). It reads the
-"now playing" media metadata those apps publish (for lock-screen / Android Auto
-controls) and sends it to your existing backend — the **same** endpoint the
-browser extension uses (`/api/netflix/extension-sync`), so the whole
-resolver / confidence / history pipeline is reused.
+**Una sola app**: The Show Verse completo (lo mismo que la web, en móvil y
+tablet) más la sincronización automática de lo que ves en las apps de streaming.
+Antes eran dos cosas —la PWA por un lado y la APK "The Show Verse Sync" por
+otro—; ahora se instalan juntas en un único paquete, que es lo que se publica en
+Play Store.
 
-> A PWA/browser cannot read what other apps play; only a native app with
-> **Notification access** can. That's what this app is.
+- **applicationId:** `com.theshowverse.app` (la APK anterior era
+  `com.theshowverse.sync`; son paquetes distintos y conviven).
+- **Mínimo:** Android 8.0 (API 26). **Objetivo:** API 35.
+- **Tablets:** soportadas; la interfaz es la web responsive, sin bloqueo de
+  orientación.
 
-## How it works
+## Cómo está montada
 
-`NotificationListenerService` (the permission that unlocks
-`MediaSessionManager.getActiveSessions()`) observes active media sessions →
-`SignalBuilder` turns the metadata into a `PlaybackSignal` (same shape as the
-extension) → `SyncClient` POSTs it with your device sync token.
+```
+WebAppActivity  ── carcasa: WebView a pantalla completa con theshowverse.com
+      │              (sesión, tráileres, enlaces externos, offline, recarga)
+      │
+      ├── WebAppBridge  ── window.TSVAndroidBridge: la web habla con el nativo
+      │                     (emparejar, ver permisos, abrir ajustes, compartir)
+      │
+      ├── MainActivity  ── panel nativo de sincronización (permisos, apps, log)
+      ├── ServerActivity ─ servidor propio y clave de acceso privado
+      │
+      └── servicios que ya existían, intactos:
+          MediaListenerService          (sesiones multimedia → historial)
+          AccessibilityStreamingService (ficha abierta sin reproducir)
+```
 
-## Build
+### Por qué WebView y no una TWA
 
-You need Android Studio (Giraffe+) or a local JDK 17 + Android SDK.
+Una Trusted Web Activity delega la web a Chrome. Desde ahí **no** se puede
+hablar con el servicio de sincronización ni abrir su pantalla, así que harían
+falta dos aplicaciones otra vez. Con WebView la web y el nativo comparten
+proceso y se comunican por el puente: emparejar el dispositivo o conceder un
+permiso se hace desde Ajustes de la propia web, sin salir de la app.
 
-- **Android Studio:** `File → Open` this `android-companion/` folder, let it sync,
-  then `Build → Build APK(s)` (or Run on a connected device).
-- **CLI:** from `android-companion/`, first generate the Gradle wrapper if it's
-  missing, then build:
-  ```bash
-  gradle wrapper            # one-time, if ./gradlew is absent
-  ./gradlew assembleDebug   # APK at app/build/outputs/apk/debug/app-debug.apk
-  ./gradlew test            # runs the SignalBuilder unit tests
-  ```
+Lo que la carcasa resuelve y un WebView "pelado" no:
 
-## Install & pair
+| Cosa | Dónde |
+|---|---|
+| Sesión que sobrevive a cerrar la app | cookies persistentes + `flush()` al pausar |
+| Tráileres a pantalla completa | `onShowCustomView` en `WebAppActivity` |
+| Subir foto de perfil (`<input type=file>`) | `onShowFileChooser` |
+| Enlaces a TMDb, YouTube… | pestaña personalizada del navegador |
+| `market://`, `mailto:`… | los resuelve el sistema |
+| Servidor caído / sin red | pantalla propia con reintento |
+| Web con acceso privado (404) | pantalla propia + clave en `ServerActivity` |
+| Volver donde lo dejaste | `Prefs.lastUrl` |
 
-1. Sideload the debug APK (`adb install app-debug.apk`, or copy + open on device).
-2. On the **same device**, open The Show Verse (your PWA) →
-   `Perfil → Ajustes → Plataformas de streaming → Vincular app Android`. Tapping
-   it opens this app via the `theshowverse://pair` deep link and stores your
-   device sync token (separate from the browser-extension token).
-3. In the app, tap **Conceder acceso a notificaciones** and enable
-   "The Show Verse Sync" in the system list.
-4. Leave sync enabled. Play something for ≥15s in a streaming app.
+La decisión de qué es "de casa" y qué es externo está en `WebOrigin`, que es
+código puro y con tests: de ahí depende quién puede usar el puente.
 
-## App list
+## Compilar
 
-Known streaming apps are enabled by default; music apps (e.g. Spotify) are not.
-Any other app that emits a media session appears in the app list after you play
-in it — toggle it on to sync it too. (Package names for niche apps can vary; the
-toggle list covers whatever your device actually reports.)
+Hace falta JDK 17 y el SDK de Android (o Android Studio Giraffe+).
+`local.properties` apunta al SDK; no está en git.
 
-## Notes / limits
+```bash
+cd android-companion
+gradle wrapper            # una vez, si no existe ./gradlew
+./gradlew assembleDebug   # APK: app/build/outputs/apk/debug/app-debug.apk
+./gradlew test            # tests unitarios (WebOrigin, SignalBuilder, …)
+```
 
-- Requires the streaming app to publish media metadata + a known playback
-  position (most do). Apps that report no position won't sync until they do.
-- Detection accuracy depends on the metadata the app exposes; when the exact
-  episode can't be determined the backend records a show-level entry
-  (confidence `low`), exactly like the extension.
-- No launcher icon asset is bundled (uses the system default); add one under
-  `res/mipmap-*` if you want a custom icon.
+### Probar contra tu propio servidor
+
+La app apunta a `https://theshowverse.com`. Para probar cambios sin recompilar:
+abre la app → si no carga, **Servidor**; o desde la web, Ajustes → Conexiones →
+*Panel de sincronización*. Ahí se cambia el origen y, si el servidor tiene el
+gate de acceso privado, se mete la clave (equivale a abrir
+`/api/private-access?key=…` una vez).
+
+- Emulador: `http://10.0.2.2:3000`
+- Dispositivo por cable: `adb reverse tcp:3000 tcp:3000` → `http://localhost:3000`
+- NAS en la LAN: `http://192.168.x.x:3000` — **solo en la build de debug**, que
+  es la única que permite HTTP en claro (`app/src/debug/res/xml/`).
+
+## Publicar en Play
+
+Ver [`docs/android-play-store.md`](../docs/android-play-store.md): firma, AAB,
+App Links y —lo importante— las declaraciones que Play exige por usar acceso a
+notificaciones y accesibilidad.
+
+## Emparejamiento y permisos
+
+Dentro de la app: **Perfil → Ajustes → Conexiones → The Show Verse Sync**. Ahí se
+ve, en una sola pantalla, si el dispositivo está vinculado y qué permisos faltan,
+con su botón para concederlos. El deep link `theshowverse://pair` sigue
+funcionando para quien tenga instalada la APK antigua desde el navegador.
+
+Para que la sincronización funcione hacen falta dos cosas:
+
+1. **Vincular** el dispositivo (guarda un token propio del móvil, distinto del de
+   la extensión del navegador).
+2. **Acceso a notificaciones**, que es lo que permite leer las sesiones
+   multimedia de Netflix, Prime Video, Disney+, Max, Crunchyroll…
+
+La **detección de fichas** (accesibilidad) es opcional: detecta el título que
+abres en una app de streaming sin darle a reproducir, para ofrecerte su ficha.
+
+## Límites conocidos
+
+- La app necesita servidor: no hay modo offline propio más allá del service
+  worker de la web (shell + último contenido cargado).
+- No hay notificaciones push nativas (haría falta FCM y trabajo en el backend).
+- La precisión de la detección depende de los metadatos que publique cada app de
+  streaming; cuando no se puede saber el episodio exacto se registra a nivel de
+  serie, igual que la extensión.

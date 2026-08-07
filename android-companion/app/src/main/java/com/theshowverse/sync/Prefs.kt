@@ -49,6 +49,26 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_A11Y, true)
         set(value) = prefs.edit().putBoolean(KEY_A11Y, value).apply()
 
+    /**
+     * Origen que carga la app. Vacío = el de fábrica (BuildConfig.DEFAULT_ORIGIN).
+     * Es independiente de [origin], que es el servidor con el que se emparejó la
+     * sincronización: normalmente coinciden, pero no tienen por qué (se puede
+     * estar viendo la web de producción con la sincronización apuntando al NAS).
+     */
+    var webOrigin: String?
+        get() = prefs.getString(KEY_WEB_ORIGIN, null)
+        set(value) = prefs.edit().putString(KEY_WEB_ORIGIN, value).apply()
+
+    /** Clave del gate de acceso privado de la web, si el servidor lo tiene puesto. */
+    var accessKey: String?
+        get() = prefs.getString(KEY_ACCESS_KEY, null)
+        set(value) = prefs.edit().putString(KEY_ACCESS_KEY, value).apply()
+
+    /** Última página vista, para reabrir la app donde se dejó. */
+    var lastUrl: String?
+        get() = prefs.getString(KEY_LAST_URL, null)
+        set(value) = prefs.edit().putString(KEY_LAST_URL, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -102,5 +122,8 @@ class Prefs(context: Context) {
         private const val KEY_ENABLED = "enabled_packages"
         private const val KEY_SEEN = "seen_packages"
         private const val KEY_LOGS = "event_logs"
+        private const val KEY_WEB_ORIGIN = "web_origin"
+        private const val KEY_ACCESS_KEY = "private_access_key"
+        private const val KEY_LAST_URL = "last_url"
     }
 }

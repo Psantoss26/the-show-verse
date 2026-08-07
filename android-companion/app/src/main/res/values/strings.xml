@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">The Show Verse Sync</string>
+    <!-- La app oficial se llama como la web; el panel de sincronización es una
+         pantalla dentro de ella. -->
+    <string name="app_name">The Show Verse</string>
+    <string name="sync_panel_title">Sincronización de streaming</string>
     <string name="grant_access">Conceder acceso a notificaciones</string>
     <string name="pause_sync">Pausar sincronización</string>
     <string name="apps_header">Apps a sincronizar</string>
@@ -31,4 +34,23 @@
     <string name="a11y_open_settings">Activar detección de fichas (Accesibilidad)</string>
     <string name="a11y_status_on">Detección de fichas activa.</string>
     <string name="a11y_status_off">Detección de fichas desactivada. Actívala en Ajustes → Accesibilidad → The Show Verse.</string>
+
+    <!-- Carcasa web -->
+    <string name="web_error_title">Sin conexión con el servidor</string>
+    <string name="web_error_body">No se ha podido cargar %1$s. Comprueba tu conexión y vuelve a intentarlo.</string>
+    <string name="web_private_title">Dispositivo no autorizado</string>
+    <string name="web_private_body">Este servidor tiene el acceso privado activado y no reconoce este dispositivo. Introduce la clave de acceso en los ajustes de servidor.</string>
+    <string name="web_retry">Reintentar</string>
+    <string name="download_started">Descargando…</string>
+    <string name="no_app_for_link">No hay ninguna app que pueda abrir este enlace.</string>
+
+    <!-- Ajustes de servidor -->
+    <string name="server_title">Servidor</string>
+    <string name="server_origin_label">Dirección de The Show Verse</string>
+    <string name="server_origin_hint">Déjalo como está para usar el servidor oficial. Cámbialo solo si quieres apuntar la app a tu propio servidor (por ejemplo http://192.168.1.50:3000).</string>
+    <string name="server_key_label">Clave de acceso privado</string>
+    <string name="server_key_hint">Solo si tu servidor tiene el acceso restringido por dispositivo. Se usa una vez para autorizar este móvil.</string>
+    <string name="server_save">Guardar y recargar</string>
+    <string name="server_reset">Restablecer el servidor oficial</string>
+    <string name="server_invalid">Dirección no válida. Usa algo como https://theshowverse.com</string>
 </resources>

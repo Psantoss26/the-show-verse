@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import { useAndroidApp } from "@/lib/android/appBridge";
 
 // Kill-switch de escape: si el SW diera problemas, poner en localStorage
 //   showverse:sw:disabled = "1"   (o abrir la app con ?nosw en la URL)
@@ -43,6 +44,9 @@ function swDisabled() {
 export default function PwaManager() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  // Dentro de la app de Android ya ESTÁS en la app: ofrecer "instalar la PWA"
+  // ahí sería instalar una segunda copia de lo mismo.
+  const inAndroidApp = useAndroidApp();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -127,7 +131,7 @@ export default function PwaManager() {
     if (choice?.outcome === "accepted") setInstallPrompt(null);
   }
 
-  const showInstall = installPrompt && !isInstalled;
+  const showInstall = installPrompt && !isInstalled && !inAndroidApp;
   if (!showInstall) return null;
 
   return (
