@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 import { getValidTraktToken, setTraktCookies, traktFetch } from "@/lib/trakt/server";
+import {
+  backendFetchJson,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
+import {
+  buildBackendWatchedMap,
+  buildTraktWatchedMap,
+  watchedKey,
+} from "@/lib/actor/watchedCredits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,10 +83,6 @@ function creditKey(item) {
   return `${item?.media_type || "movie"}:${item?.id}`;
 }
 
-function watchedKey(type, tmdbId) {
-  return `${type}:${tmdbId}`;
-}
-
 function mergeText(a, b) {
   const parts = [a, b]
     .map((value) => String(value || "").trim())
@@ -118,22 +123,6 @@ function dedupeCredits(cast = [], crew = []) {
   return Array.from(byKey.values());
 }
 
-function buildWatchedMap(items = [], mediaType) {
-  const map = new Map();
-  for (const item of Array.isArray(items) ? items : []) {
-    const entity = mediaType === "movie" ? item?.movie : item?.show;
-    const tmdbId = entity?.ids?.tmdb;
-    if (!tmdbId) continue;
-
-    map.set(watchedKey(mediaType, tmdbId), {
-      plays: Number(item?.plays || 0),
-      last_watched_at: item?.last_watched_at || null,
-      collected_at: item?.collected_at || null,
-    });
-  }
-  return map;
-}
-
 async function fetchTmdbPersonCredits(personId) {
   if (!TMDB_API_KEY || !personId) return null;
 
@@ -149,8 +138,76 @@ async function fetchTmdbPersonCredits(personId) {
   return safeJson(res);
 }
 
+const BACKEND_HISTORY_PAGE_SIZE = 2000;
+const BACKEND_HISTORY_MAX_PAGES = 100;
+
+async function fetchBackendWatched(request) {
+  const rows = [];
+  let lastBackend = null;
+
+  for (let page = 1; page <= BACKEND_HISTORY_MAX_PAGES; page += 1) {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(BACKEND_HISTORY_PAGE_SIZE),
+    });
+    const backend = await backendFetchJson(
+      request,
+      `/v1/history?${query.toString()}`,
+    );
+
+    if (!backend.ok || !Array.isArray(backend.json?.results)) {
+      return { available: false, backend };
+    }
+
+    lastBackend = backend;
+    rows.push(...backend.json.results);
+    if (backend.json.results.length < BACKEND_HISTORY_PAGE_SIZE) break;
+  }
+
+  return {
+    available: true,
+    backend: lastBackend,
+    watched: buildBackendWatchedMap(rows),
+  };
+}
+
+function selectWatchedCredits(credits, watched) {
+  return dedupeCredits(credits?.cast || [], credits?.crew || [])
+    .map((item) => {
+      const key = watchedKey(item.media_type, item.id);
+      const meta = key ? watched.get(key) : null;
+      if (!meta) return null;
+      return {
+        ...item,
+        watchedPlays: meta.plays,
+        lastWatchedAt: meta.last_watched_at,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const dateA = new Date(a.lastWatchedAt || 0).getTime();
+      const dateB = new Date(b.lastWatchedAt || 0).getTime();
+      if (dateA !== dateB) return dateB - dateA;
+      return Number(b.popularity || 0) - Number(a.popularity || 0);
+    });
+}
+
+function watchedResponse(items, source) {
+  return NextResponse.json({
+    connected: true,
+    items,
+    source,
+    stats: {
+      total: items.length,
+      movies: items.filter((item) => item.media_type === "movie").length,
+      shows: items.filter((item) => item.media_type === "tv").length,
+    },
+  });
+}
+
 export async function GET(_request, { params }) {
   const { personId } = await params;
+  let refreshedTraktTokens = null;
 
   if (!personId) {
     return noCache(
@@ -158,15 +215,40 @@ export async function GET(_request, { params }) {
     );
   }
 
-  const cookieStore = _request.cookies;
-  const { token, refreshedTokens } = await getValidTraktToken(cookieStore);
-
-  if (!token) {
-    return noCache(NextResponse.json({ connected: false, items: [] }));
-  }
-
   try {
-    // Solo hace falta `movie.ids.tmdb`/`show.ids.tmdb` (ver `buildWatchedMap`),
+    const [creditsResult, backendResult] = await Promise.allSettled([
+      fetchTmdbPersonCredits(personId),
+      fetchBackendWatched(_request),
+    ]);
+    const credits =
+      creditsResult.status === "fulfilled" ? creditsResult.value : null;
+    const backendWatched =
+      backendResult.status === "fulfilled" ? backendResult.value : null;
+
+    // PostgreSQL es la fuente de verdad del historial. Una cuenta iniciada no
+    // debe necesitar una conexión activa con Trakt para ver esta sección.
+    if (backendWatched?.available) {
+      const response = watchedResponse(
+        selectWatchedCredits(credits, backendWatched.watched),
+        "backend",
+      );
+      setBackendAuthCookies(response, backendWatched.backend, {
+        secure: _request.nextUrl.protocol === "https:",
+      });
+      return noCache(response);
+    }
+
+    const cookieStore = _request.cookies;
+    const { token, refreshedTokens } = await getValidTraktToken(cookieStore);
+    refreshedTraktTokens = refreshedTokens;
+    if (!token) {
+      return noCache(
+        NextResponse.json({ connected: false, items: [], source: "none" }),
+      );
+    }
+
+    // Solo hace falta `movie.ids.tmdb`/`show.ids.tmdb` (ver
+    // `buildTraktWatchedMap`),
     // que YA viene en la respuesta mínima de Trakt. Pedir `extended=full` en
     // movies traía metadatos completos por cada película vista (potencialmente
     // miles, en un historial largo) que se descartaban al instante: más peso,
@@ -174,8 +256,7 @@ export async function GET(_request, { params }) {
     // cuentas con mucho historial -- justo cuando eso pasa, `Promise.allSettled`
     // descarta esa rama silenciosamente y la sección de "Vistos" se queda vacía
     // sin ningún aviso.
-    const [creditsRes, watchedMoviesRes, watchedShowsRes] = await Promise.allSettled([
-      fetchTmdbPersonCredits(personId),
+    const [watchedMoviesRes, watchedShowsRes] = await Promise.allSettled([
       traktFetch("/sync/watched/movies", {
         token,
         timeoutMs: 9000,
@@ -188,10 +269,6 @@ export async function GET(_request, { params }) {
       }),
     ]);
 
-    const credits =
-      creditsRes.status === "fulfilled" && creditsRes.value
-        ? creditsRes.value
-        : null;
     const moviesPayload =
       watchedMoviesRes.status === "fulfilled" && watchedMoviesRes.value?.ok
         ? watchedMoviesRes.value.json
@@ -205,10 +282,12 @@ export async function GET(_request, { params }) {
     // sección quedaba vacía en silencio, indistinguible de "sin coincidencias".
     // Se registran aquí para poder diagnosticar (timeout, 401 tras refresco,
     // TMDB caído...) la próxima vez que ocurra en vez de solo ver "0 items".
-    if (creditsRes.status === "rejected" || !credits) {
+    if (!credits) {
       console.error(
         `[trakt/person/watched] TMDB combined_credits falló para person ${personId}:`,
-        creditsRes.status === "rejected" ? creditsRes.reason : "respuesta vacía",
+        creditsResult.status === "rejected"
+          ? creditsResult.reason
+          : "respuesta vacía",
       );
     }
     if (
@@ -232,39 +311,18 @@ export async function GET(_request, { params }) {
     }
 
     const watched = new Map([
-      ...buildWatchedMap(moviesPayload, "movie"),
-      ...buildWatchedMap(showsPayload, "tv"),
+      ...buildTraktWatchedMap(moviesPayload, "movie"),
+      ...buildTraktWatchedMap(showsPayload, "tv"),
     ]);
 
-    const items = dedupeCredits(credits?.cast || [], credits?.crew || [])
-      .map((item) => {
-        const meta = watched.get(watchedKey(item.media_type, item.id));
-        if (!meta) return null;
-        return {
-          ...item,
-          watchedPlays: meta.plays,
-          lastWatchedAt: meta.last_watched_at,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => {
-        const dateA = new Date(a.lastWatchedAt || 0).getTime();
-        const dateB = new Date(b.lastWatchedAt || 0).getTime();
-        if (dateA !== dateB) return dateB - dateA;
-        return Number(b.popularity || 0) - Number(a.popularity || 0);
-      });
+    const response = watchedResponse(
+      selectWatchedCredits(credits, watched),
+      "trakt",
+    );
 
-    const response = NextResponse.json({
-      connected: true,
-      items,
-      stats: {
-        total: items.length,
-        movies: items.filter((item) => item.media_type === "movie").length,
-        shows: items.filter((item) => item.media_type === "tv").length,
-      },
-    });
-
-    if (refreshedTokens) setTraktCookies(response, refreshedTokens);
+    if (refreshedTraktTokens) {
+      setTraktCookies(response, refreshedTraktTokens);
+    }
     return noCache(response);
   } catch (error) {
     console.error(
@@ -279,7 +337,9 @@ export async function GET(_request, { params }) {
       },
       { status: 200 },
     );
-    if (refreshedTokens) setTraktCookies(response, refreshedTokens);
+    if (refreshedTraktTokens) {
+      setTraktCookies(response, refreshedTraktTokens);
+    }
     return noCache(response);
   }
 }
