@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { abrirEntrega, asociarEstado } from "../handoffStore";
 import {
   createOauthState,
   getGoogleRedirectUri,
@@ -21,9 +22,18 @@ export async function GET(request) {
     );
   }
 
-  const state = createOauthState({
-    android: isAndroidAppUserAgent(request.headers.get("user-agent")),
-  });
+  // La app manda su propio identificador (`app`). Es lo que le permitirá
+  // reclamar la sesión después, sin depender de cookies que no comparte con el
+  // navegador ni de que este le devuelva el control.
+  const appId = request.nextUrl.searchParams.get("app") || "";
+  const esApp =
+    Boolean(appId) || isAndroidAppUserAgent(request.headers.get("user-agent"));
+
+  const state = createOauthState({ android: esApp });
+  if (appId) {
+    abrirEntrega(appId, { next });
+    asociarEstado(appId, state);
+  }
   const redirectUri = getGoogleRedirectUri(request);
   const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleUrl.searchParams.set("client_id", clientId);

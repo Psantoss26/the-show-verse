@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   canNativeGoogleSignIn,
+  empezarLoginPorNavegador,
+  entregaPendiente,
   logToApp,
+  reclamarLoginPorNavegador,
   signInWithGoogleNative,
   useAndroidApp,
 } from "@/lib/android/appBridge";
@@ -114,7 +117,14 @@ export default function LoginForm({ next: nextProp }) {
   // servicios de Google, cliente OAuth sin configurar) se cae al enlace normal,
   // que sigue funcionando gracias al handoff `theshowverse://open`.
   const handleGoogleNative = async (event) => {
-    if (!inAndroidApp || !canNativeGoogleSignIn()) return; // sigue el href
+    // Dentro de la app SIEMPRE se pasa por aquí: si el nativo no está
+    // disponible, se abre el navegador con una entrega abierta en el servidor.
+    if (inAndroidApp && !canNativeGoogleSignIn()) {
+      event.preventDefault();
+      abrirLoginEnNavegador();
+      return;
+    }
+    if (!inAndroidApp) return; // navegador normal: sigue el href de siempre
     event.preventDefault();
     if (googleLoading) return;
 
@@ -123,9 +133,7 @@ export default function LoginForm({ next: nextProp }) {
     try {
       const resultado = await signInWithGoogleNative();
       if (resultado?.ok) {
-        await refreshMe?.();
-        router.replace(next);
-        router.refresh();
+        await entrarEn(next);
         return;
       }
       if (resultado?.cancelled) return; // cancelación deliberada: sin ruido
@@ -134,14 +142,101 @@ export default function LoginForm({ next: nextProp }) {
       // el salto era mudo y, si el navegador tampoco volvía, la pantalla se
       // quedaba igual y parecía que el botón no hacía nada.
       logToApp(`Google: nativo no disponible (${resultado?.error || "desconocido"}), abriendo navegador`);
-      setErr(
-        "No se ha podido usar la cuenta del dispositivo. Continuando en el navegador…",
-      );
-      window.location.href = googleAuthHref;
+      setErr("Continuando en el navegador. Vuelve a la app al terminar.");
+      abrirLoginEnNavegador();
     } finally {
       setGoogleLoading(false);
     }
   };
+
+  // Tras instalar la sesión se navega SIEMPRE, pase lo que pase con el refresco
+  // del contexto: las cookies ya están puestas y una navegación completa hace
+  // que el servidor las lea. Si `refreshMe` fallara y de eso dependiera el
+  // salto, el usuario se quedaría mirando el login estando ya dentro.
+  const entrarEn = useCallback(
+    async (destino) => {
+      try {
+        await refreshMe?.();
+      } catch {
+        /* da igual: la sesión vive en las cookies, no en este contexto */
+      }
+      window.location.replace(sanitizeNextPath(destino || next));
+    },
+    [refreshMe, next],
+  );
+
+  // Abre el login en el navegador dejando abierta una ENTREGA en el servidor:
+  // al volver a la app, la sesión se recoge de ahí. No depende de que el
+  // navegador consiga devolver el control.
+  const abrirLoginEnNavegador = useCallback(() => {
+    const id = empezarLoginPorNavegador();
+    const url = `/api/auth/google/start?next=${encodeURIComponent(next)}${
+      id ? `&app=${encodeURIComponent(id)}` : ""
+    }`;
+    window.location.href = url;
+  }, [next]);
+
+  // Recogida de la sesión: al montar (por si se vuelve con la app ya abierta),
+  // cada vez que la app pasa a primer plano, y con reintentos cortos mientras
+  // el navegador aún no ha terminado.
+  useEffect(() => {
+    if (!inAndroidApp) return undefined;
+
+    let vivo = true;
+    let temporizador = null;
+
+    const intentar = async (reintentosRestantes) => {
+      if (!vivo || !entregaPendiente()) return;
+      const resultado = await reclamarLoginPorNavegador();
+      if (!vivo) return;
+
+      if (resultado.status === "ready") {
+        setErr("");
+        await entrarEn(resultado.next);
+        return;
+      }
+      if (resultado.status === "error") {
+        setErr("No se pudo completar el acceso con Google. Inténtalo de nuevo.");
+        return;
+      }
+      // "pending" o problema de red: se reintenta un rato, no eternamente.
+      if (reintentosRestantes > 0) {
+        temporizador = window.setTimeout(
+          () => intentar(reintentosRestantes - 1),
+          1500,
+        );
+      }
+    };
+
+    const alVolver = () => {
+      if (document.visibilityState === "visible") intentar(20);
+    };
+
+    intentar(3);
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("focus", alVolver);
+    return () => {
+      vivo = false;
+      if (temporizador) window.clearTimeout(temporizador);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("focus", alVolver);
+    };
+  }, [inAndroidApp, entrarEn]);
+
+  // El deep link de vuelta trae `?google_claim=<id>`: si llega, se recoge ya.
+  useEffect(() => {
+    const claim = searchParams?.get("google_claim");
+    if (!claim) return;
+    let vivo = true;
+    (async () => {
+      const resultado = await reclamarLoginPorNavegador(claim);
+      if (!vivo || resultado.status !== "ready") return;
+      await entrarEn(resultado.next);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [searchParams, entrarEn]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

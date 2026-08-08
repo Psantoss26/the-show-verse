@@ -197,6 +197,80 @@ export function logToApp(mensaje) {
   call("log", undefined, String(mensaje || "").slice(0, 200));
 }
 
+// ---------------------------------------------------------------------------
+// Login por navegador con recogida posterior.
+//
+// El navegador y el WebView no comparten cookies, así que la sesión que crea
+// Chrome no llega a la app por sí sola, y el salto de vuelta por `theshowverse://`
+// lo bloquea Chrome cuando no nace de un gesto del usuario. La app abre el login
+// con un identificador propio y luego RECLAMA la sesión: las cookies se escriben
+// en la respuesta de esa reclamación, que sí va a su almacén.
+const CLAVE_ENTREGA = "tsv:google:app";
+
+/** Identificador de la entrega en curso, creándolo si hace falta. */
+export function empezarLoginPorNavegador() {
+  if (typeof window === "undefined") return "";
+  const id =
+    window.crypto?.randomUUID?.() ||
+    `a${Date.now()}${Math.random().toString(36).slice(2)}`;
+  try {
+    window.sessionStorage.setItem(CLAVE_ENTREGA, id);
+  } catch {
+    /* sin sessionStorage se pierde la recogida, pero el flujo sigue */
+  }
+  return id;
+}
+
+export function entregaPendiente() {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.sessionStorage.getItem(CLAVE_ENTREGA) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function olvidarEntrega() {
+  try {
+    window.sessionStorage.removeItem(CLAVE_ENTREGA);
+  } catch {
+    /* nada que hacer */
+  }
+}
+
+/**
+ * Pregunta por la entrega. Devuelve `{ status }` con:
+ *   "ready" (sesión ya instalada en esta respuesta) | "pending" | "unknown" |
+ *   "error" | "network".
+ */
+export async function reclamarLoginPorNavegador(appId) {
+  const id = appId || entregaPendiente();
+  if (!id) return { status: "unknown" };
+  try {
+    const res = await fetch("/api/auth/google/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ app: id }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json?.status === "ready") {
+      olvidarEntrega();
+      logToApp("Google: ✓ sesión recogida del navegador");
+      return { status: "ready", next: json.next };
+    }
+    if (json?.status === "pending") return { status: "pending" };
+    olvidarEntrega();
+    if (json?.status === "error") {
+      logToApp(`Google: ✗ el navegador devolvió un error (${json.error})`);
+      return { status: "error", error: json.error };
+    }
+    return { status: "unknown" };
+  } catch {
+    return { status: "network" };
+  }
+}
+
 export function appVersion() {
   return call("appVersion", null);
 }
