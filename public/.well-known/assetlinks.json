@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.theshowverse.app",
+      "sha256_cert_fingerprints": [
+        "7C:1D:EB:7C:4F:B0:95:A9:A6:FA:C1:17:DB:1F:A4:F5:48:5E:C5:D8:F8:BF:67:83:C0:40:26:07:06:DC:E8:29"
+      ]
+    }
+  }
+]

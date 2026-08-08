@@ -159,11 +159,21 @@ export async function GET(request) {
       }
     }
 
-    const enlace = buildAndroidOauthHandoffUrl(origen, { claim: entrega.appId }).toString();
-    return new NextResponse(buildAndroidHandoffPage(enlace), {
-      status: 200,
-      headers: cabecerasHtml,
-    });
+    // VUELTA AUTOMÁTICA. Se redirige a una URL **https** del propio dominio, no
+    // al esquema `theshowverse://`: con los App Links verificados
+    // (`/.well-known/assetlinks.json`), Android intercepta esa navegación y la
+    // entrega a la app sin pedir nada al usuario. El esquema propio necesitaba
+    // un gesto —el botón— porque Chrome bloquea el salto a otra app cuando
+    // llega por redirección.
+    //
+    // Si los App Links todavía no están verificados, el navegador se queda en
+    // /login: ahí no se reclama nada (la recogida solo actúa dentro de la app) y
+    // la sesión se recupera en cuanto se vuelve a la aplicación.
+    const vuelta = new URL(
+      `/login?google_claim=${encodeURIComponent(entrega.appId)}`,
+      origen,
+    );
+    return NextResponse.redirect(vuelta, { status: 303 });
   }
 
   const expectedState = request.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
