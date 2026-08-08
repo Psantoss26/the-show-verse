@@ -7,13 +7,14 @@ import { fileURLToPath } from "node:url";
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const loginForm = path.join(directory, "LoginForm.jsx");
 
-test("native Google login redirects without waiting for auth hydration", async () => {
+test("Android starts Google OAuth through the browser handoff instead of the native token flow", async () => {
   const source = await readFile(loginForm, "utf8");
 
   assert.doesNotMatch(
     source,
-    /await refreshMe\?\.\(\)/,
-    "a stalled /api/auth/me request must not keep Android users on the login screen after cookies are installed",
+    /const resultado = await signInWithGoogleNative\(\)/,
+    "the APK must not depend on a Credential Manager token that requires a separately configured Android OAuth certificate",
   );
-  assert.match(source, /window\.location\.replace\(sanitizeNextPath\(destino \|\| next\)\)/);
+  assert.match(source, /if \(!inAndroidApp\) return;/);
+  assert.match(source, /abrirLoginEnNavegador\(\);/);
 });
