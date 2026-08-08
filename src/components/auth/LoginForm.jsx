@@ -6,10 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  canNativeGoogleSignIn,
   empezarLoginPorNavegador,
-  logToApp,
-  signInWithGoogleNative,
   useAndroidApp,
 } from "@/lib/android/appBridge";
 
@@ -87,7 +84,6 @@ export default function LoginForm({ next: nextProp }) {
   const searchParams = useSearchParams();
   const { login, register } = useAuth();
   const inAndroidApp = useAndroidApp();
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
@@ -107,56 +103,16 @@ export default function LoginForm({ next: nextProp }) {
   const visibleError = err || googleError;
   const googleAuthHref = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 
-  // DENTRO DE LA APP DE ANDROID el enlace de arriba acaba en el navegador:
-  // Google rechaza su formulario en un WebView, así que la carcasa lo manda a
-  // Chrome y la sesión se crearía en las cookies del navegador, no en las de la
-  // app. Aquí se pide el token al selector de cuentas del sistema y se canjea
-  // sin salir de la aplicación. Si el nativo no está disponible (dispositivo sin
-  // servicios de Google, cliente OAuth sin configurar) se cae al enlace normal,
-  // que sigue funcionando gracias al handoff `theshowverse://open`.
-  const handleGoogleNative = async (event) => {
-    // Dentro de la app SIEMPRE se pasa por aquí: si el nativo no está
-    // disponible, se abre el navegador con una entrega abierta en el servidor.
-    if (inAndroidApp && !canNativeGoogleSignIn()) {
-      event.preventDefault();
-      abrirLoginEnNavegador();
-      return;
-    }
-    if (!inAndroidApp) return; // navegador normal: sigue el href de siempre
+  // Google no garantiza que Credential Manager pueda emitir un token para una
+  // APK cuyo certificado no esté registrado en Google Cloud. La PWA sí funciona
+  // con el OAuth web, así que la APK usa el mismo camino en una Custom Tab y
+  // recoge la sesión al volver mediante su entrega `app`.
+  const handleGoogleLogin = (event) => {
+    if (!inAndroidApp) return; // navegador y PWA: sigue el enlace normal
     event.preventDefault();
-    if (googleLoading) return;
-
-    setGoogleLoading(true);
     setErr("");
-    try {
-      const resultado = await signInWithGoogleNative();
-      if (resultado?.ok) {
-        await entrarEn(next);
-        return;
-      }
-      if (resultado?.cancelled) return; // cancelación deliberada: sin ruido
-
-      // Cualquier otro fallo cae al camino por navegador, PERO diciéndolo: antes
-      // el salto era mudo y, si el navegador tampoco volvía, la pantalla se
-      // quedaba igual y parecía que el botón no hacía nada.
-      logToApp(`Google: nativo no disponible (${resultado?.error || "desconocido"}), abriendo navegador`);
-      setErr("Continuando en el navegador. Vuelve a la app al terminar.");
-      abrirLoginEnNavegador();
-    } finally {
-      setGoogleLoading(false);
-    }
+    abrirLoginEnNavegador();
   };
-
-  // Las cookies llegan con la respuesta del canje. No esperamos a /api/auth/me:
-  // tras volver del selector nativo ese fetch puede quedar pendiente y dejar al
-  // usuario atrapado en el modal aun teniendo sesión. La carga siguiente lee
-  // las cookies directamente en servidor.
-  const entrarEn = useCallback(
-    (destino) => {
-      window.location.replace(sanitizeNextPath(destino || next));
-    },
-    [next],
-  );
 
   // Abre el login en el navegador dejando abierta una ENTREGA en el servidor:
   // al volver a la app, la sesión se recoge de ahí. No depende de que el
@@ -229,8 +185,7 @@ export default function LoginForm({ next: nextProp }) {
 
       <a
         href={googleAuthHref}
-        onClick={handleGoogleNative}
-        aria-busy={googleLoading}
+        onClick={handleGoogleLogin}
         className="mb-5 flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-sm font-semibold text-white transition-all active:scale-[0.99] shadow-sm cursor-pointer"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24">
