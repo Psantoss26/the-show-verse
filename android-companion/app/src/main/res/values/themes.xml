@@ -10,9 +10,9 @@
          que las barras del sistema y el fondo del WebView parpadearan en blanco
          al abrir y al navegar. -->
     <style name="Theme.TSV.Web" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="android:windowBackground">@color/tsv_bg</item>
-        <item name="android:statusBarColor">@color/tsv_bg</item>
-        <item name="android:navigationBarColor">@color/tsv_bg</item>
+        <item name="android:windowBackground">@color/tsv_black</item>
+        <item name="android:statusBarColor">@color/tsv_black</item>
+        <item name="android:navigationBarColor">@color/tsv_black</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="colorPrimary">@color/tsv_amber</item>
@@ -21,10 +21,15 @@
     <!-- Pantalla de arranque (androidx.core:core-splashscreen). Se mantiene hasta
          que la web tiene algo pintado, y da paso a Theme.TSV.Web. -->
     <style name="Theme.TSV.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/tsv_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenBackground">@color/tsv_black</item>
+        <!-- El logotipo SIN FONDO. El icono del launcher no vale aquí: es el
+             maskable de la PWA, que es un PNG opaco, y sobre el splash se veía
+             como un cuadro negro recortado en vez de solo el logo.
+             Tampoco se define windowSplashScreenIconBackgroundColor: sin él, el
+             sistema no dibuja ningún disco detrás del icono. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/tsv_splash_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.TSV.Web</item>
-        <item name="android:statusBarColor" tools:targetApi="l">@color/tsv_bg</item>
-        <item name="android:navigationBarColor" tools:targetApi="l">@color/tsv_bg</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/tsv_black</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@color/tsv_black</item>
     </style>
 </resources>

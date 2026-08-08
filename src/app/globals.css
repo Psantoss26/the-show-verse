@@ -29,6 +29,29 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* …pero SOLO donde hay barra de scroll clásica, es decir, donde se navega con
+   ratón. En táctil no hay salto que corregir —el navegador superpone la barra y
+   la desvanece— y reservar el hueco solo resta ancho.
+
+   Además se apaga la barra del scroller raíz en táctil. El WebView de Android
+   llega a pintarla al cargar o al restaurar la posición de una página (entrar
+   en una ficha, por ejemplo), y en la app se ve como una barra gris encima del
+   contenido que ninguna app nativa muestra. En un navegador móvil la barra ya
+   era superpuesta y efímera, así que no se pierde nada. */
+@media (pointer: coarse) {
+  html {
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
+
 html,
 body {
   max-width: 100vw;

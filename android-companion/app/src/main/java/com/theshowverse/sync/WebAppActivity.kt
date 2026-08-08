@@ -133,7 +133,7 @@ class WebAppActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun configurarWebView() {
         val web = binding.webView
-        web.setBackgroundColor(ContextCompat.getColor(this, R.color.tsv_bg))
+        web.setBackgroundColor(ContextCompat.getColor(this, R.color.tsv_black))
 
         web.settings.apply {
             javaScriptEnabled = true
@@ -173,6 +173,16 @@ class WebAppActivity : AppCompatActivity() {
                 WebSettingsCompat.FORCE_DARK_OFF,
             )
         }
+
+        // SIN BARRAS DE SCROLL. En una app nativa no pintan nada, y el WebView
+        // las "despierta" solo con cargar o restaurar la posición: aparece una
+        // barra gris sobre el contenido justo al abrir una ficha. Con
+        // SCROLLBARS_INSIDE_OVERLAY, además, el contenido no se estrecha para
+        // dejarles hueco. La barra CSS de la propia web se apaga aparte, en
+        // globals.css, para los dispositivos táctiles.
+        web.isVerticalScrollBarEnabled = false
+        web.isHorizontalScrollBarEnabled = false
+        web.scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
@@ -407,7 +417,7 @@ class WebAppActivity : AppCompatActivity() {
         binding.refresh.setOnChildScrollUpCallback { _, _ -> binding.webView.scrollY > 0 }
         binding.refresh.setColorSchemeColors(ContextCompat.getColor(this, R.color.tsv_amber))
         binding.refresh.setProgressBackgroundColorSchemeColor(
-            ContextCompat.getColor(this, R.color.tsv_bg),
+            ContextCompat.getColor(this, R.color.tsv_black),
         )
         binding.refresh.setOnRefreshListener {
             ocultarError()

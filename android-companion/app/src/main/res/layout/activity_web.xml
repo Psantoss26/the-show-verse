@@ -8,7 +8,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/tsv_bg">
+    android:background="@color/tsv_black">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/refresh"
@@ -45,7 +45,7 @@
         android:id="@+id/errorPanel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/tsv_bg"
+        android:background="@color/tsv_black"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="32dp"
