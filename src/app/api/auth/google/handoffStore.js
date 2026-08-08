@@ -85,6 +85,18 @@ export function reclamarEntrega(appId, { ahora = Date.now() } = {}) {
   return { estado: "lista", tokens: dato.tokens, next: dato.next };
 }
 
+/**
+ * Estado de la entrega SIN consumirla: "pendiente" | "lista" | "desconocida".
+ * Lo consulta el nativo mientras el usuario está en el navegador, para saber
+ * cuándo traer la app al frente.
+ */
+export function estadoEntrega(appId, { ahora = Date.now() } = {}) {
+  limpiarCaducados(ahora);
+  const dato = pendientes.get(appId);
+  if (!dato) return "desconocida";
+  return dato.tokens ? "lista" : "pendiente";
+}
+
 /** Solo para los tests. */
 export function __vaciar() {
   pendientes.clear();

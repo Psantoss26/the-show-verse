@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   abrirEntrega,
+  estadoEntrega,
   asociarEstado,
   buscarPorEstado,
   completarEntrega,
@@ -49,4 +50,22 @@ test("an unknown app id claims nothing", () => {
   __vaciar();
   assert.equal(reclamarEntrega("no-existe").estado, "desconocida");
   assert.equal(completarEntrega("no-existe", { accessToken: "a" }), false);
+});
+
+test("the status check never consumes the delivery", () => {
+  __vaciar();
+  abrirEntrega("app-3", { next: "/" });
+  asociarEstado("app-3", "android.zzz");
+
+  assert.equal(estadoEntrega("app-3"), "pendiente");
+  completarEntrega("app-3", { accessToken: "a", refreshToken: "r" });
+
+  // Se puede consultar tantas veces como haga falta: el nativo sondea mientras
+  // el usuario está en el navegador.
+  assert.equal(estadoEntrega("app-3"), "lista");
+  assert.equal(estadoEntrega("app-3"), "lista");
+
+  // Y quien consume sigue siendo /claim, desde el WebView.
+  assert.equal(reclamarEntrega("app-3").estado, "lista");
+  assert.equal(estadoEntrega("app-3"), "desconocida");
 });

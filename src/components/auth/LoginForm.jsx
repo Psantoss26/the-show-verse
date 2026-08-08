@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
+  abrirLoginEnNavegadorNativo,
   empezarLoginPorNavegador,
   useAndroidApp,
 } from "@/lib/android/appBridge";
@@ -122,6 +123,13 @@ export default function LoginForm({ next: nextProp }) {
     const url = `/api/auth/google/start?next=${encodeURIComponent(next)}${
       id ? `&app=${encodeURIComponent(id)}` : ""
     }`;
+
+    // Lo abre el NATIVO, que se queda vigilando y devuelve la app al frente en
+    // cuanto la sesión está lista: así no hay que pulsar nada para volver. Si la
+    // app instalada no conoce el método, se navega como siempre.
+    if (abrirLoginEnNavegadorNativo(new URL(url, window.location.origin).toString(), id)) {
+      return;
+    }
     window.location.href = url;
   }, [next]);
 
