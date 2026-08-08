@@ -1043,7 +1043,7 @@ export default function ContinueWatchingClient() {
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="sticky top-14 z-[70] space-y-3 mb-4 transition-all duration-300 sm:top-20 lg:mb-6"
+          className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
@@ -1101,10 +1101,9 @@ export default function ContinueWatchingClient() {
                     : "relative"
                     }`}
                 >
-                  <div className="p-3 rounded-2xl bg-zinc-950/90 backdrop-blur-2xl border border-white/10 shadow-2xl space-y-2.5">
-                    {/* Fila 1: ordenar + acción de eliminar. El selector de
-                      secciones permanece visible en la barra principal. */}
-                    <div className="flex gap-2 items-center">
+                  <div className="space-y-2">
+                    {/* Fila 1: Ordenar y acciones de añadir y eliminar. */}
+                    <div className="flex gap-2">
                       <div className="flex-1 min-w-0">
                         <InlineDropdown
                           label="Ordenar"
@@ -1129,6 +1128,7 @@ export default function ContinueWatchingClient() {
                           )}
                         </InlineDropdown>
                       </div>
+
                       <button
                         type="button"
                         onClick={openAddModal}
@@ -1161,8 +1161,8 @@ export default function ContinueWatchingClient() {
                       </button>
                     </div>
 
-                    {/* Fila 2: Tipo + botones de vista */}
-                    <div className="flex gap-2 items-center">
+                    {/* Fila 2: Tipo y modos de vista compactos. */}
+                    <div className="flex gap-2">
                       <div className="flex-1 min-w-0">
                         <InlineDropdown
                           label="Tipo"
@@ -1187,14 +1187,15 @@ export default function ContinueWatchingClient() {
                           )}
                         </InlineDropdown>
                       </div>
-                      {/* Grupo de vista: misma estructura que la navegación de
-                        (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
-                        para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
-                        de sección de la fila de arriba y las dos filas se alineen. */}
+
                       <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                         <button
+                          type="button"
                           onClick={() => setViewMode("cards")}
-                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "cards"
+                          title="Vista de tarjetas"
+                          aria-label="Vista de tarjetas"
+                          aria-pressed={viewMode === "cards"}
+                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                             }`}
@@ -1202,8 +1203,12 @@ export default function ContinueWatchingClient() {
                           <Film className="w-4 h-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => setViewMode("poster")}
-                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "poster"
+                          title="Vista de portadas"
+                          aria-label="Vista de portadas"
+                          aria-pressed={viewMode === "poster"}
+                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                             }`}
@@ -1211,8 +1216,12 @@ export default function ContinueWatchingClient() {
                           <LayoutGrid className="w-4 h-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => setViewMode("compact")}
-                          className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${viewMode === "compact"
+                          title="Vista compacta"
+                          aria-label="Vista compacta"
+                          aria-pressed={viewMode === "compact"}
+                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
                             ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                             : "text-zinc-400 hover:text-white hover:bg-white/10"
                             }`}

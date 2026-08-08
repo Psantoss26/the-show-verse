@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mismo recurso maskable que instala la PWA. Su margen interno mantiene el
-     logotipo completo con cualquier máscara de launcher compatible. -->
+<!--
+  Capa frontal del icono adaptativo: SOLO el logotipo, sobre fondo transparente
+  (el negro lo pone la capa de fondo, @color/ic_launcher_background).
+
+  POR QUÉ NO SE USA DIRECTAMENTE EL PNG MASKABLE DE LA PWA. Ese fichero está
+  pensado para ocupar el lienzo entero de un icono maskable, y aquí el lienzo son
+  108dp de los que el launcher solo enseña los 72dp centrales: estirándolo, el
+  logotipo se comía el 86% del círculo visible. Chrome, al instalar la PWA, hace
+  justo lo contrario —encaja el icono dentro de la zona segura—, y de ahí sale el
+  46,3% de lienzo que usa `tsv_launcher_logo`: el MISMO tamaño relativo que se ve
+  en el icono de la PWA instalada.
+-->
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     android:antialias="true"
     android:filter="true"
     android:gravity="fill"
-    android:src="@drawable/tsv_pwa_launcher" />
+    android:src="@drawable/tsv_launcher_logo" />

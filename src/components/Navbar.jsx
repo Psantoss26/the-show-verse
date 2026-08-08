@@ -1810,6 +1810,13 @@ export default function Navbar() {
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
   // de rutas active la compactación por scroll.
   const mobileTopIsCompact = isScrolled || isImmersiveRoute;
+  // ¿La barra superior está pintando ya su cristal? Es transparente sobre un
+  // hero sin desplazar y en las rutas inmersivas hasta que se hace scroll; en el
+  // resto de páginas siempre lo lleva. Lo usa el selector para NO poner su propio
+  // fondo encima de otro: dos cristales superpuestos se leen como un parche.
+  const mobileTopBarHasGlass =
+    !heroNavMode && (!isImmersiveRoute || isScrolled);
+
   // Los tres dashboards del selector superior en móvil. El color del rótulo es
   // el de la sección (el mismo criterio que la barra inferior): solo se ve uno
   // a la vez, así que tiñe sin ensuciar.
@@ -2228,7 +2235,9 @@ export default function Navbar() {
           >
             <LayoutGroup id="mobile-top-dashboards">
               <div
-                className={`flex items-center rounded-full p-[3px] ${LIQUID_GLASS_BAR}`}
+                className={`flex items-center rounded-full p-[3px] transition-colors duration-300 motion-reduce:transition-none ${
+                  mobileTopBarHasGlass ? "" : LIQUID_GLASS_BAR
+                }`}
                 role="navigation"
                 aria-label={t("nav_dashboards", "Secciones principales")}
               >
@@ -2267,8 +2276,13 @@ export default function Navbar() {
                           {label}
                         </span>
                       )}
+                      {/* Mismo tamaño que el resto de iconos de la barra
+                          (buscar, perfil): así el selector pesa lo mismo que
+                          ellos en los dos estados, porque todos escalan juntos.
+                          La caja del botón sigue siendo de 32px, de modo que el
+                          selector no gana ancho. */}
                       <Icon
-                        className={`relative z-10 h-5 w-5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${
+                        className={`relative z-10 h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${
                           active ? "min-[360px]:hidden" : ""
                         }`}
                         strokeWidth={2.2}
