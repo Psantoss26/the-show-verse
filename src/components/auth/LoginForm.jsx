@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
@@ -8,9 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   canNativeGoogleSignIn,
   empezarLoginPorNavegador,
-  entregaPendiente,
   logToApp,
-  reclamarLoginPorNavegador,
   signInWithGoogleNative,
   useAndroidApp,
 } from "@/lib/android/appBridge";
@@ -175,68 +173,6 @@ export default function LoginForm({ next: nextProp }) {
     }`;
     window.location.href = url;
   }, [next]);
-
-  // Recogida de la sesión: al montar (por si se vuelve con la app ya abierta),
-  // cada vez que la app pasa a primer plano, y con reintentos cortos mientras
-  // el navegador aún no ha terminado.
-  useEffect(() => {
-    if (!inAndroidApp) return undefined;
-
-    let vivo = true;
-    let temporizador = null;
-
-    const intentar = async (reintentosRestantes) => {
-      if (!vivo || !entregaPendiente()) return;
-      const resultado = await reclamarLoginPorNavegador();
-      if (!vivo) return;
-
-      if (resultado.status === "ready") {
-        setErr("");
-        await entrarEn(resultado.next);
-        return;
-      }
-      if (resultado.status === "error") {
-        setErr("No se pudo completar el acceso con Google. Inténtalo de nuevo.");
-        return;
-      }
-      // "pending" o problema de red: se reintenta un rato, no eternamente.
-      if (reintentosRestantes > 0) {
-        temporizador = window.setTimeout(
-          () => intentar(reintentosRestantes - 1),
-          1500,
-        );
-      }
-    };
-
-    const alVolver = () => {
-      if (document.visibilityState === "visible") intentar(20);
-    };
-
-    intentar(3);
-    document.addEventListener("visibilitychange", alVolver);
-    window.addEventListener("focus", alVolver);
-    return () => {
-      vivo = false;
-      if (temporizador) window.clearTimeout(temporizador);
-      document.removeEventListener("visibilitychange", alVolver);
-      window.removeEventListener("focus", alVolver);
-    };
-  }, [inAndroidApp, entrarEn]);
-
-  // El deep link de vuelta trae `?google_claim=<id>`: si llega, se recoge ya.
-  useEffect(() => {
-    const claim = searchParams?.get("google_claim");
-    if (!claim) return;
-    let vivo = true;
-    (async () => {
-      const resultado = await reclamarLoginPorNavegador(claim);
-      if (!vivo || resultado.status !== "ready") return;
-      await entrarEn(resultado.next);
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, [searchParams, entrarEn]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

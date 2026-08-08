@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
+import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineBanner from "@/components/OfflineBanner";
 import OfflineQueueBadge from "@/components/OfflineQueueBadge";
 import ScrollRestoration from "@/components/ScrollRestoration";
@@ -76,6 +77,7 @@ export default function RootLayout({ children }) {
               {children}
             </div>
             <PwaManager />
+            <AndroidSessionClaim />
             <OfflineBanner />
             <OfflineQueueBadge />
             <Analytics />
