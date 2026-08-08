@@ -1888,9 +1888,11 @@ export default function InProgressClient({
             </p>
           </motion.header>
 
-          <div className="mb-8">
-            <WatchingSectionNav />
-          </div>
+          {/* Sin sesión NO se ofrece el conmutador En progreso / Completadas:
+              ambas secciones piden lo mismo —iniciar sesión—, así que cambiar
+              entre ellas solo lleva a la misma pantalla con otro título. Mismo
+              criterio que Historial, que oculta su navegación de sección
+              mientras no hay cuenta. */}
 
           <div className="flex items-center justify-center py-12 lg:py-24">
             <motion.div
