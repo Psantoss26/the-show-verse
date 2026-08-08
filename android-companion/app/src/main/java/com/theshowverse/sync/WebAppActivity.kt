@@ -190,7 +190,14 @@ class WebAppActivity : AppCompatActivity() {
         }
 
         web.addJavascriptInterface(
-            WebAppBridge(this, prefs, { origin }, { currentUrl }, ::evaluarJs),
+            WebAppBridge(
+                this,
+                prefs,
+                { origin },
+                { currentUrl },
+                ::evaluarJs,
+                ::abrirEnNavegador,
+            ),
             WebAppBridge.NAME,
         )
 
@@ -509,6 +516,9 @@ class WebAppActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.webView.onResume()
+        // Estando delante, la vigilancia del login sobra: la web reclama la
+        // sesión al recuperar el foco.
+        LoginWatcher.cancelar()
         // Volver de los ajustes nativos (permisos, servidor) puede haber cambiado
         // el origen: se comprueba sin recargar si no ha cambiado nada.
         val configurado = WebOrigin.normalize(prefs.webOrigin) ?: BuildConfig.DEFAULT_ORIGIN

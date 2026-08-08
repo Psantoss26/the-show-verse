@@ -30,6 +30,7 @@ class WebAppBridge(
     private val currentOrigin: () -> String,
     private val currentUrl: () -> String,
     private val evaluarJs: (String) -> Unit,
+    private val abrirEnNavegador: (String) -> Unit,
 ) {
 
     /**
@@ -101,6 +102,38 @@ class WebAppBridge(
             }
         }
         return true
+    }
+
+    /**
+     * Abre el login de Google en el navegador Y SE QUEDA VIGILANDO: cuando el
+     * servidor dice que la sesión está lista, la app vuelve al frente sola.
+     *
+     * Es lo que evita tener que pulsar "Abrir The Show Verse": ni el esquema
+     * propio (Chrome lo bloquea sin gesto) ni los App Links (hay que verificar el
+     * dominio) garantizan la vuelta, pero la pestaña se abre dentro de la tarea
+     * de la app, y desde ahí sí se puede volver.
+     */
+    @JavascriptInterface
+    fun openLoginInBrowser(url: String?, appId: String?): Boolean {
+        if (!propio()) return false
+        val destino = url?.takeIf { it.isNotBlank() } ?: return false
+        // Solo URLs del propio origen: esto abre un navegador, no vale para
+        // mandar al usuario a cualquier sitio.
+        if (!WebOrigin.isInternal(destino, currentOrigin())) return false
+
+        activity.runOnUiThread {
+            abrirEnNavegador(destino)
+            appId?.takeIf { it.isNotBlank() }?.let {
+                LoginWatcher.vigilar(activity, currentOrigin(), it)
+            }
+        }
+        return true
+    }
+
+    /** Deja de vigilar (el usuario volvió por su cuenta o canceló). */
+    @JavascriptInterface
+    fun stopLoginWatch() {
+        LoginWatcher.cancelar()
     }
 
     /**

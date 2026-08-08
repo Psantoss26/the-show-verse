@@ -287,6 +287,23 @@ export function entregaPendiente() {
   }
 }
 
+/**
+ * Abre el login en el navegador POR EL NATIVO, que además se queda vigilando y
+ * devuelve la app al frente en cuanto el servidor tiene la sesión lista. Es lo
+ * que evita el botón "Abrir The Show Verse".
+ *
+ * Devuelve false si la app instalada es anterior y no conoce el método; entonces
+ * la web navega ella misma y la vuelta depende del enlace o de volver a mano.
+ */
+export function abrirLoginEnNavegadorNativo(url, appId) {
+  return call("openLoginInBrowser", false, url, appId) === true;
+}
+
+/** El usuario ya está de vuelta: no hace falta seguir vigilando. */
+export function pararVigilanciaDeLogin() {
+  call("stopLoginWatch", undefined);
+}
+
 export function olvidarEntrega() {
   try {
     window.sessionStorage.removeItem(CLAVE_ENTREGA);
@@ -313,6 +330,7 @@ export async function reclamarLoginPorNavegador(appId) {
     const json = await res.json().catch(() => ({}));
     if (json?.status === "ready") {
       olvidarEntrega();
+      pararVigilanciaDeLogin();
       logToApp("Google: ✓ sesión recogida del navegador");
       return { status: "ready", next: json.next };
     }
