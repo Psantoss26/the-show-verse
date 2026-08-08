@@ -60,8 +60,11 @@ lo verifique, el dominio tiene que servir la huella del certificado.
    ```bash
    keytool -list -v -keystore ~/keys/theshowverse-upload.jks -alias theshowverse
    ```
-2. Crea `public/.well-known/assetlinks.json` en la web con las **dos** huellas
-   (subida y distribución) mientras convivan:
+2. `public/.well-known/assetlinks.json` **ya existe** con la huella del
+   certificado de DEPURACIÓN (la de esta máquina), que es con la que se firma el
+   APK que se instala por `adb`. Antes de publicar hay que **añadir** las otras
+   dos —la de tu keystore de subida y la de Play App Signing—, porque una app
+   firmada con otro certificado no verifica:
    ```json
    [{
      "relation": ["delegate_permission/common.handle_all_urls"],
@@ -79,11 +82,20 @@ lo verifique, el dominio tiene que servir la huella del certificado.
    `https://theshowverse.com/.well-known/assetlinks.json` y sin redirecciones.
    `middleware.js` no lo bloquea (`.json` está exento del gate), pero verifícalo
    igualmente desde fuera de tu red.
-4. En el dispositivo: `adb shell pm verify-app-links --re-verify com.theshowverse.app`
-   y luego `adb shell pm get-app-links com.theshowverse.app`.
+4. En el dispositivo, tras desplegar la web:
+   ```bash
+   adb shell pm verify-app-links --re-verify com.theshowverse.app
+   adb shell pm get-app-links com.theshowverse.app     # debe decir "verified"
+   ```
+   La verificación también ocurre sola al instalar o actualizar la app, pero si
+   el fichero se publicó DESPUÉS de instalarla hay que forzarla con el comando
+   de arriba (o reinstalar).
 
-Hasta que esto esté, los enlaces siguen abriéndose en el navegador; la app
-funciona igual.
+**De esto depende que el login de Google vuelva solo a la app.** Al terminar en
+el navegador, el servidor redirige a `https://theshowverse.com/login?google_claim=…`;
+con los App Links verificados Android entrega esa navegación a la app sin pedir
+nada. Sin verificar, el navegador se queda en esa página y la sesión se recupera
+al volver manualmente a la app (funciona, pero no es automático).
 
 ## 3.bis Login con Google dentro de la app
 
