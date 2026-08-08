@@ -71,6 +71,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 
 // ================== UTILS & CACHE ==================
 
@@ -2066,9 +2067,7 @@ export default function WatchlistClient() {
     sortBy === "rating-desc";
   const needsTraktScores =
     groupBy === "trakt_rating" ||
-    subGroupBy === "trakt_rating" ||
-    sortBy === "rating-asc" ||
-    sortBy === "rating-desc";
+    subGroupBy === "trakt_rating";
 
   // Al VOLVER (atrás/adelante) el orden se mantiene CONGELADO —tal cual lo dejó el
   // usuario— hasta que cambie la ordenación: se saltan los refrescos asíncronos de
@@ -2503,34 +2502,14 @@ export default function WatchlistClient() {
       });
     }
     if (sortBy === "rating-desc" || sortBy === "rating-asc") {
-      const getRating = (item) => {
-        if (groupBy === "imdb_rating")
-          return layoutImdbScores.get(getScoreItemKey(item)) || 0;
-        if (groupBy === "tmdb_rating") return item.vote_average || 0;
-        if (groupBy === "trakt_rating")
-          return layoutTraktScores.get(getScoreItemKey(item)) || 0;
-        // Default: average of available ratings (IMDb, TMDb, Trakt)
-        const tmdb = item.vote_average || 0;
-        const imdb = layoutImdbScores.get(getScoreItemKey(item)) || 0;
-        const trakt = layoutTraktScores.get(getScoreItemKey(item)) || 0;
-        let sum = 0,
-          count = 0;
-        if (tmdb > 0) {
-          sum += tmdb;
-          count++;
-        }
-        if (imdb > 0) {
-          sum += imdb;
-          count++;
-        }
-        if (trakt > 0) {
-          sum += trakt;
-          count++;
-        }
-        return count > 0 ? sum / count : 0;
-      };
-      const dir = sortBy === "rating-desc" ? -1 : 1;
-      return arr.sort((a, b) => dir * (getRating(a) - getRating(b)));
+      const direction = sortBy === "rating-desc" ? "desc" : "asc";
+      return arr.sort((a, b) =>
+        compareImdbRatings(
+          layoutImdbScores.get(getScoreItemKey(a)),
+          layoutImdbScores.get(getScoreItemKey(b)),
+          direction,
+        ),
+      );
     }
     if (sortBy === "added-desc") {
       // Most recent added first (lower index = more recent)
@@ -2541,7 +2520,7 @@ export default function WatchlistClient() {
       return arr.sort((a, b) => (b._addedIndex || 0) - (a._addedIndex || 0));
     }
     return arr;
-  }, [filtered, sortBy, groupBy, layoutImdbScores, layoutTraktScores]);
+  }, [filtered, sortBy, layoutImdbScores]);
 
   useEffect(() => {
     if (
