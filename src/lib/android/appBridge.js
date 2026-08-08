@@ -179,11 +179,22 @@ export async function signInWithGoogleNative() {
       body: JSON.stringify({ idToken: nativo.idToken }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: json?.error || "exchange_failed" };
+    if (!res.ok) {
+      const error = json?.error || "exchange_failed";
+      logToApp(`Google: ✗ el servidor rechazó el token (${res.status} ${error})`);
+      return { ok: false, error };
+    }
+    logToApp("Google: ✓ sesión iniciada en la app");
     return { ok: true };
   } catch {
+    logToApp("Google: ✗ sin red al canjear el token");
     return { ok: false, error: "network" };
   }
+}
+
+/** Deja una línea en el registro nativo (visible en el panel de sincronización). */
+export function logToApp(mensaje) {
+  call("log", undefined, String(mensaje || "").slice(0, 200));
 }
 
 export function appVersion() {

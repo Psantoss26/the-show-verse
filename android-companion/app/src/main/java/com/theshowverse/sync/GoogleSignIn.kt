@@ -54,12 +54,20 @@ object GoogleSignIn {
     /**
      * Lanza el selector de cuentas. [alTerminar] se invoca SIEMPRE, en el hilo
      * principal, con el resultado (token, cancelación o error).
+     *
+     * Todo lo que pasa queda anotado en el registro de la app (panel de
+     * sincronización): cuando esto falla, el usuario solo ve que "no pasa nada",
+     * y sin rastro no hay forma de saber si faltó el cliente de Google Cloud, si
+     * canceló o si el sistema devolvió otra cosa.
      */
     fun solicitar(activity: Activity, alTerminar: (Result) -> Unit) {
+        val prefs = Prefs(activity)
         if (!configurado()) {
+            prefs.addLog("Google: ✗ sin cliente configurado en la app")
             alTerminar(Result(ok = false, error = "google_client_not_configured"))
             return
         }
+        prefs.addLog("Google: pidiendo cuenta al sistema…")
 
         // `GetSignInWithGoogleOption` es el flujo de BOTÓN: muestra todas las
         // cuentas del dispositivo aunque nunca se haya entrado en la app. La
@@ -86,13 +94,13 @@ object GoogleSignIn {
                         null
                     }
                     principal.post {
-                        alTerminar(
-                            if (token.isNullOrBlank()) {
-                                Result(ok = false, error = "unexpected_credential")
-                            } else {
-                                Result(ok = true, idToken = token)
-                            },
-                        )
+                        if (token.isNullOrBlank()) {
+                            prefs.addLog("Google: ✗ credencial inesperada (${credencial.type})")
+                            alTerminar(Result(ok = false, error = "unexpected_credential"))
+                        } else {
+                            prefs.addLog("Google: ✓ cuenta seleccionada")
+                            alTerminar(Result(ok = true, idToken = token))
+                        }
                     }
                 }
 
@@ -108,6 +116,17 @@ object GoogleSignIn {
                             Result(ok = false, error = "no_credentials")
                         else ->
                             Result(ok = false, error = e.type.ifBlank { "credential_error" })
+                    }
+                    // El caso típico: el selector aparece, eliges cuenta y el
+                    // sistema no puede emitir el token porque en Google Cloud no
+                    // existe el cliente OAuth de Android para este paquete y esta
+                    // huella de firma. Se anota para que el flujo por navegador
+                    // no tenga que adivinarlo.
+                    if (resultado.cancelled) {
+                        prefs.addLog("Google: cancelado por el usuario")
+                    } else {
+                        prefs.addLog("Google: ✗ ${e.type.ifBlank { e.javaClass.simpleName }} — ${e.message ?: "sin detalle"}")
+                        prefs.nativeGoogleUnavailable = true
                     }
                     principal.post { alTerminar(resultado) }
                 }

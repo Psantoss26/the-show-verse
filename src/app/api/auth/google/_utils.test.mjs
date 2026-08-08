@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   createOauthState,
   isAndroidAppUserAgent,
@@ -41,4 +42,22 @@ test("returns the Google callback to the app without changing its public origin"
   assert.equal(callback.searchParams.get("code"), "google-code");
   assert.equal(callback.searchParams.get("state"), state);
   assert.equal(callback.searchParams.get("app_handoff"), "1");
+});
+
+test("the return page carries the deep link and cannot break out of the markup", () => {
+  const enlace =
+    'theshowverse://open?url=https://theshowverse.com/cb?code=a&state=b"><script>x()</script>';
+  const html = buildAndroidHandoffPage(enlace);
+
+  // El botón es lo que garantiza la vuelta cuando el navegador bloquea el salto
+  // automático: pulsarlo es un gesto del usuario.
+  assert.match(html, /<a class="boton" id="volver" href="theshowverse:/);
+
+  // Ni las comillas ni el `<` del enlace pueden cerrar el atributo ni inyectar
+  // etiquetas: van escapados.
+  assert.equal(html.includes('&quot;&gt;&lt;script&gt;'), true);
+  assert.equal(html.includes('"><script>x()</script>'), false);
+
+  // Y el salto automático viaja como literal JS válido.
+  assert.match(html, /window\.location\.replace\("theshowverse:/);
 });
