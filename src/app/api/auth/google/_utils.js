@@ -78,39 +78,54 @@ function escaparHtml(valor) {
  * gesto del usuario, y con gesto el navegador siempre abre la app.
  */
 export function buildAndroidHandoffPage(deepLink, opciones = {}) {
-  const {
-    mensaje = "Sesión iniciada. Volviendo a The Show Verse…",
-    textoBoton = "Abrir The Show Verse",
-  } = opciones;
+  const { claim = "", mensaje = "", textoBoton = "Abrir The Show Verse" } = opciones;
   const seguro = escaparHtml(deepLink);
+  const enApp = claim
+    ? `/login?google_claim=${encodeURIComponent(claim)}`
+    : "";
+
   return `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Volviendo a The Show Verse…</title>
+<meta name="color-scheme" content="dark">
+<title>The Show Verse</title>
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column;
-         align-items:center; justify-content:center; gap:1.25rem; padding:2rem;
-         background:#000; color:#fff; text-align:center;
+  html,body { height:100%; }
+  body { margin:0; display:flex; flex-direction:column; align-items:center;
+         justify-content:center; gap:1.5rem; background:#000; color:#fff;
          font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  p { margin:0; color:#a1a1aa; font-size:.95rem; line-height:1.5; }
-  a.boton { display:inline-block; padding:.9rem 1.5rem; border-radius:1rem;
-            background:linear-gradient(135deg,#f59e0b,#d97706); color:#000;
-            font-weight:800; text-decoration:none; }
+  img { width:112px; height:112px; object-fit:contain;
+        animation:latido 1.6s ease-in-out infinite; }
+  @keyframes latido { 0%,100% { opacity:.85 } 50% { opacity:.35 } }
+  @media (prefers-reduced-motion: reduce) { img { animation:none } }
+  p { margin:0; color:#71717a; font-size:.85rem; }
+  a.boton { display:none; padding:.85rem 1.4rem; border-radius:1rem;
+            background:#eab308; color:#000; font-weight:800; text-decoration:none; }
+  a.boton.visible { display:inline-block; }
 </style>
 </head>
 <body>
-  <p>${escaparHtml(mensaje)}</p>
+  <img src="/logo-final-sinFondo.png" alt="">
+  ${mensaje ? `<p>${escaparHtml(mensaje)}</p>` : ""}
   <a class="boton" id="volver" href="${seguro}">${escaparHtml(textoBoton)}</a>
-  <p style="font-size:.8rem;color:#71717a">Puedes cerrar esta pestaña: la app recogerá la sesión sola.</p>
   <script>
-    // Salto automático; si el navegador lo bloquea, queda el botón de arriba.
-    // El "<" va escapado: JSON.stringify NO protege dentro de un <script>, y un
-    // "</script>" en el enlace cerraría la etiqueta. Los parámetros code y state
-    // llegan por la URL: esto es la diferencia entre una página y un XSS.
-    window.location.replace(${JSON.stringify(deepLink).replace(/</g, "\\u003C")});
+    // 1) Dentro de la app: a por la sesión y listo.
+    if (navigator.userAgent.indexOf("TheShowVerseApp/") !== -1 && ${JSON.stringify(enApp)}) {
+      location.replace(${JSON.stringify(enApp)});
+    } else {
+      // 2) En el navegador: intento de salto a la app. Si Chrome lo bloquea —lo
+      //    hace cuando no nace de un gesto— la app se trae al frente sola en
+      //    cuanto detecta que la sesión está lista; el botón solo aparece si eso
+      //    tampoco ocurre, para no dejar a nadie sin salida.
+      // El "<" va escapado: JSON.stringify no protege dentro de un <script>.
+      setTimeout(function () { location.replace(${JSON.stringify(deepLink).replace(/</g, "\\u003C")}); }, 60);
+      setTimeout(function () {
+        var b = document.getElementById("volver");
+        if (b) b.className = "boton visible";
+      }, 4000);
+    }
   </script>
 </body>
 </html>`;

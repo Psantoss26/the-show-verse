@@ -30,7 +30,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object LoginWatcher {
 
-    private const val INTERVALO_MS = 1500L
+    // Corto a propósito: es el tiempo que el usuario ve la pantalla negra del
+    // navegador antes de que la app vuelva al frente. Son consultas diminutas
+    // contra el propio servidor.
+    private const val INTERVALO_MS = 400L
     private const val LIMITE_MS = 3 * 60 * 1000L // un login que tarde más, se abandona
 
     private val cliente = OkHttpClient.Builder()
@@ -56,7 +59,7 @@ object LoginWatcher {
         // Una sola vigilancia a la vez: si se reintenta el login, la anterior se
         // descarta.
         enMarcha.set(false)
-        principal.postDelayed({ arrancar(activity, origen, appId) }, 300)
+        principal.post { arrancar(activity, origen, appId) }
     }
 
     private fun arrancar(activity: Activity, origen: String, appId: String) {

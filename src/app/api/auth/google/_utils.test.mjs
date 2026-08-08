@@ -59,5 +59,5 @@ test("the return page carries the deep link and cannot break out of the markup",
   assert.equal(html.includes('"><script>x()</script>'), false);
 
   // Y el salto automático viaja como literal JS válido.
-  assert.match(html, /window\.location\.replace\("theshowverse:/);
+  assert.match(html, /location\.replace\("theshowverse:/);
 });
