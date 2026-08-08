@@ -15,6 +15,7 @@ import { useEffect } from "react";
 import {
   canjearIdTokenDeGoogle,
   entregaPendiente,
+  hasNativeGoogleSignInInFlight,
   isAndroidApp,
   logToApp,
   reclamarLoginPorNavegador,
@@ -46,6 +47,11 @@ export default function AndroidSessionClaim() {
     //    recarga y quien esperaba la respuesta desaparece. El token sigue en el
     //    buzón del nativo, así que se canjea aquí y la sesión entra igual.
     const recogerLoginNativo = async () => {
+      // Cuando el formulario que inició el selector sigue montado, su promesa
+      // posee ese resultado. No se puede leer también desde este efecto global:
+      // al volver al WebView ambos reciben el foco y dos canjes concurrentes
+      // dejan la sesión y la UI en estados distintos.
+      if (hasNativeGoogleSignInInFlight()) return false;
       const pendiente = tomarResultadoNativoPendiente();
       if (!vivo || !pendiente) return false;
       if (pendiente.cancelled) return false;
