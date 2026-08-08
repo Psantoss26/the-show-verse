@@ -108,14 +108,21 @@ export async function GET(request) {
     const entrega = buscarPorEstado(state);
     const origen = getRequestOrigin(request);
 
+    // SIN ENTREGA: se hace lo de siempre, que ya funcionaba. Devolver el código
+    // a la app para que complete el canje con SU cookie de `state`. Pasa cuando
+    // el login lo arranca una versión anterior de la app, o cuando se pulsa el
+    // botón antes de que la web detecte que está dentro de ella. Exigir aquí una
+    // entrega dejaba tirados esos casos.
     if (!entrega) {
-      return new NextResponse(
-        buildAndroidHandoffPage(`${origen}/login?google_error=invalid_state`, {
-          mensaje: "La sesión de acceso ha caducado. Vuelve a intentarlo desde la app.",
-          textoBoton: "Volver a The Show Verse",
-        }),
-        { status: 400, headers: cabecerasHtml },
-      );
+      const clasico = buildAndroidOauthHandoffUrl(origen, {
+        code,
+        state,
+        error,
+      }).toString();
+      return new NextResponse(buildAndroidHandoffPage(clasico), {
+        status: 200,
+        headers: cabecerasHtml,
+      });
     }
 
     if (error) {
@@ -160,13 +167,19 @@ export async function GET(request) {
   }
 
   const expectedState = request.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
+  // El `state` vale si coincide con la cookie O si corresponde a una entrega
+  // abierta en /start. Lo segundo cubre a la app: al mandar Google al navegador
+  // se cancela la navegación, y con ella se puede perder la cookie.
+  const entregaDelEstado = state ? buscarPorEstado(state) : null;
   const next = sanitizeNextPath(
-    request.cookies.get(GOOGLE_OAUTH_NEXT_COOKIE)?.value || "/",
+    request.cookies.get(GOOGLE_OAUTH_NEXT_COOKIE)?.value ||
+      entregaDelEstado?.next ||
+      "/",
   );
 
   if (error) return redirectToLogin(request, next, error);
   if (!code) return redirectToLogin(request, next, "missing_code");
-  if (!expectedState || !state || expectedState !== state) {
+  if (!state || (expectedState !== state && !entregaDelEstado)) {
     return redirectToLogin(request, next, "invalid_state");
   }
 
