@@ -166,11 +166,12 @@ export async function GET(request) {
     // un gesto —el botón— porque Chrome bloquea el salto a otra app cuando
     // llega por redirección.
     //
-    // Si los App Links todavía no están verificados, el navegador se queda en
-    // /login: ahí no se reclama nada (la recogida solo actúa dentro de la app) y
-    // la sesión se recupera en cuanto se vuelve a la aplicación.
+    // El destino es una pantalla MÍNIMA (negra, con el logotipo), no /login: si
+    // los App Links no están verificados, el navegador la pinta durante el
+    // instante que tarda la app en traerse al frente, y así no se ve la web
+    // entera —ni una sesión iniciada en el navegador— en mitad del proceso.
     const vuelta = new URL(
-      `/login?google_claim=${encodeURIComponent(entrega.appId)}`,
+      `/api/auth/google/done?claim=${encodeURIComponent(entrega.appId)}`,
       origen,
     );
     return NextResponse.redirect(vuelta, { status: 303 });
