@@ -35,15 +35,22 @@ export function isAndroidOauthState(value) {
  * código OAuth a la app mediante su esquema propio; WebAppActivity abrirá la
  * URL HTTPS interna en el WebView, donde sí vive la cookie `state` original.
  */
-export function buildAndroidOauthHandoffUrl(origin, { code, state, error } = {}) {
-  const callbackUrl = new URL("/api/auth/google/callback", origin);
-  if (code) callbackUrl.searchParams.set("code", code);
-  if (state) callbackUrl.searchParams.set("state", state);
-  if (error) callbackUrl.searchParams.set("error", error);
-  callbackUrl.searchParams.set("app_handoff", "1");
+export function buildAndroidOauthHandoffUrl(origin, { code, state, error, claim } = {}) {
+  // Con `claim`, la app no tiene que reprocesar nada: solo volver al login, que
+  // recogerá la sesión ya preparada en el servidor.
+  const destino = claim
+    ? new URL(`/login?google_claim=${encodeURIComponent(claim)}`, origin)
+    : (() => {
+        const callbackUrl = new URL("/api/auth/google/callback", origin);
+        if (code) callbackUrl.searchParams.set("code", code);
+        if (state) callbackUrl.searchParams.set("state", state);
+        if (error) callbackUrl.searchParams.set("error", error);
+        callbackUrl.searchParams.set("app_handoff", "1");
+        return callbackUrl;
+      })();
 
   const appUrl = new URL("theshowverse://open");
-  appUrl.searchParams.set("url", callbackUrl.toString());
+  appUrl.searchParams.set("url", destino.toString());
   return appUrl;
 }
 
@@ -70,7 +77,11 @@ function escaparHtml(valor) {
  * navegadores que sí lo permiten) y, si no ocurre, deja un BOTÓN: pulsarlo es un
  * gesto del usuario, y con gesto el navegador siempre abre la app.
  */
-export function buildAndroidHandoffPage(deepLink) {
+export function buildAndroidHandoffPage(deepLink, opciones = {}) {
+  const {
+    mensaje = "Sesión iniciada. Volviendo a The Show Verse…",
+    textoBoton = "Abrir The Show Verse",
+  } = opciones;
   const seguro = escaparHtml(deepLink);
   return `<!doctype html>
 <html lang="es">
@@ -91,8 +102,9 @@ export function buildAndroidHandoffPage(deepLink) {
 </style>
 </head>
 <body>
-  <p>Sesión iniciada. Volviendo a The Show Verse…</p>
-  <a class="boton" id="volver" href="${seguro}">Abrir The Show Verse</a>
+  <p>${escaparHtml(mensaje)}</p>
+  <a class="boton" id="volver" href="${seguro}">${escaparHtml(textoBoton)}</a>
+  <p style="font-size:.8rem;color:#71717a">Puedes cerrar esta pestaña: la app recogerá la sesión sola.</p>
   <script>
     // Salto automático; si el navegador lo bloquea, queda el botón de arriba.
     // El "<" va escapado: JSON.stringify NO protege dentro de un <script>, y un

@@ -7,6 +7,7 @@ import {
   getCookieSecure,
   setBackendTokenCookies,
 } from "@/lib/backend/server";
+import { buscarPorEstado, completarEntrega } from "../handoffStore";
 import {
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
@@ -21,6 +22,11 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const cabecerasHtml = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "no-store",
+};
 
 function redirectToLogin(request, next, reason) {
   const url = new URL("/login", getRequestOrigin(request));
@@ -90,23 +96,66 @@ export async function GET(request) {
   // La primera llegada ocurre en la Custom Tab de Google, que no comparte las
   // cookies del WebView. Solo se transportan `code` y `state` a la app; allí se
   // vuelve a cargar este callback y se ejecuta la validación normal de abajo.
+  // ---- LOGIN VENIDO DE LA APP DE ANDROID ----
+  //
+  // Esta petición la hace CHROME, que no comparte cookies con el WebView: aquí
+  // no existe la cookie de `state` ni serviría de nada dejar las de sesión. Se
+  // valida el `state` contra la entrega abierta en /start, se canjea el código y
+  // los tokens quedan guardados para que la app los reclame. La página de vuelta
+  // sigue intentando devolver el control por el enlace de la app, pero ya no es
+  // imprescindible: aunque el navegador lo bloquee, la app recogerá la sesión.
   if (isAndroidOauthState(state) && !appHandoff) {
-    // Se devuelve una PÁGINA, no un 307: Chrome bloquea los saltos a otra app
-    // que llegan por redirección sin gesto del usuario, y ahí es donde el login
-    // se quedaba colgado. La página lo intenta sola y deja un botón por si el
-    // navegador lo impide.
-    const enlace = buildAndroidOauthHandoffUrl(getRequestOrigin(request), {
-      code,
-      state,
-      error,
-    }).toString();
+    const entrega = buscarPorEstado(state);
+    const origen = getRequestOrigin(request);
 
+    if (!entrega) {
+      return new NextResponse(
+        buildAndroidHandoffPage(`${origen}/login?google_error=invalid_state`, {
+          mensaje: "La sesión de acceso ha caducado. Vuelve a intentarlo desde la app.",
+          textoBoton: "Volver a The Show Verse",
+        }),
+        { status: 400, headers: cabecerasHtml },
+      );
+    }
+
+    if (error) {
+      completarEntrega(entrega.appId, { error });
+    } else if (!code) {
+      completarEntrega(entrega.appId, { error: "missing_code" });
+    } else {
+      const googleTokens = await exchangeCodeForTokens(request, code);
+      if (!googleTokens.ok || !googleTokens.json?.id_token) {
+        completarEntrega(entrega.appId, {
+          error: googleTokens.error || "token_exchange_failed",
+        });
+      } else {
+        let backend;
+        try {
+          backend = await backendAuthRequest("/v1/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ idToken: googleTokens.json.id_token }),
+          });
+        } catch (e) {
+          backend = { ok: false, error: "backend_unavailable" };
+        }
+
+        if (!backend.ok || !backend.json?.accessToken || !backend.json?.refreshToken) {
+          completarEntrega(entrega.appId, {
+            error: normalizeBackendGoogleError(backend.error, backend.status),
+          });
+        } else {
+          completarEntrega(entrega.appId, {
+            accessToken: backend.json.accessToken,
+            refreshToken: backend.json.refreshToken,
+          });
+        }
+      }
+    }
+
+    const enlace = buildAndroidOauthHandoffUrl(origen, { claim: entrega.appId }).toString();
     return new NextResponse(buildAndroidHandoffPage(enlace), {
       status: 200,
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-      },
+      headers: cabecerasHtml,
     });
   }
 
