@@ -47,7 +47,6 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
-import { LIQUID_GLASS_BAR_FLAT } from "@/lib/ui/liquidGlass";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
@@ -274,6 +273,9 @@ export default function SocialClient() {
   // carteles. Antes "compact" y "grid" se diferenciaban solo en el relleno.
   const [vista, setVista] = useState("list");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Buscador de escritorio enfocado: mientras lo está, los desplegables sueltan
+  // su rótulo y su ancho mínimo para dejarle sitio (comportamiento de Historial).
+  const [desktopSearchFocused, setDesktopSearchFocused] = useState(false);
 
   const filtersRef = useRef(null);
   const listaRef = useRef(null);
@@ -540,6 +542,16 @@ export default function SocialClient() {
                 </button>
               ) : null}
             </div>
+            {/* Alcance entre el buscador y el botón de filtros, SOLO iconos: es
+                el control que más se usa —decide qué feed estás viendo— y así
+                está a un toque sin desplegar nada ni gastar ancho en rótulos. */}
+            <SelectorAlcance
+              scope={scope}
+              setScope={setScope}
+              controlGlass={controlGlass}
+              activo={activo}
+              soloIconos
+            />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -554,6 +566,11 @@ export default function SocialClient() {
             </button>
           </div>
 
+          {/* MISMO DESPLEGABLE QUE LAS PÁGINAS DE USUARIO (Favoritos, Pendientes,
+              Historial): despliegue por alto con la misma curva, y sin fondo
+              propio —cada control lleva su cristal—. Antes de fijarse forma
+              parte del flujo y empuja el contenido; al fijarse pasa a overlay
+              para no desplazar nada. */}
           <AnimatePresence>
             {mobileFiltersOpen ? (
               <motion.div
@@ -562,30 +579,12 @@ export default function SocialClient() {
                 animate={{ height: "auto" }}
                 exit={{ height: 0 }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                // SUPERFICIE PROPIA. Sin ella, el desplegable es transparente
-                // y por los huecos entre controles y entre filas se ve el
-                // contenido de la página: al abrir el menú parecía que se
-                // difuminaba lo de fuera. Se estira hasta los márgenes del
-                // contenedor (`px-4` de la página) para leerse como una sola
-                // pieza colgada de la barra.
-                className={`z-[80] mt-2 origin-top space-y-2 overflow-hidden lg:hidden ${LIQUID_GLASS_BAR_FLAT} ${
-                  filtersSticky
-                    ? "absolute -left-4 -right-4 top-full rounded-b-2xl px-4 pb-3 sm:-left-6 sm:-right-6 sm:px-6"
-                    : "relative -mx-4 rounded-2xl px-4 pb-3 sm:-mx-6 sm:px-6"
+                className={`z-[80] mt-2 origin-top space-y-2 overflow-hidden lg:hidden ${
+                  filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
                 }`}
               >
-                {/* Dos controles por fila, como en Historial */}
-                {/* Fila 1 — el selector de alcance a la IZQUIERDA */}
+                {/* Dos controles por fila, como en las páginas de usuario. */}
                 <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SelectorAlcance
-                      scope={scope}
-                      setScope={setScope}
-                      controlGlass={controlGlass}
-                      activo={activo}
-                      fill
-                    />
-                  </div>
                   <div className="min-w-0 flex-1">
                     <SelectorSimple
                       icon={Filter}
@@ -595,8 +594,6 @@ export default function SocialClient() {
                       onChange={setFiltro}
                     />
                   </div>
-                </div>
-                <div className="flex gap-2">
                   <div className="min-w-0 flex-1">
                     <SelectorSimple
                       icon={ArrowUpDown}
@@ -609,15 +606,15 @@ export default function SocialClient() {
                       onChange={setOrden}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-1 gap-2">
-                    <SelectorVista
-                      vista={vista}
-                      setVista={setVista}
-                      controlGlass={controlGlass}
-                      activo={activo}
-                      fill
-                    />
-                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <SelectorVista
+                    vista={vista}
+                    setVista={setVista}
+                    controlGlass={controlGlass}
+                    activo={activo}
+                    fill
+                  />
                 </div>
               </motion.div>
             ) : null}
@@ -638,6 +635,8 @@ export default function SocialClient() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
+                onFocus={() => setDesktopSearchFocused(true)}
+                onBlur={() => setDesktopSearchFocused(false)}
                 placeholder="Buscar en la actividad..."
                 className={`h-11 w-full rounded-2xl py-2.5 pl-10 pr-10 text-sm text-white transition-all placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 ${controlGlass}`}
               />
@@ -648,6 +647,7 @@ export default function SocialClient() {
               opciones={FILTROS}
               valor={filtro}
               onChange={setFiltro}
+              compact={desktopSearchFocused}
             />
             <SelectorSimple
               icon={ArrowUpDown}
@@ -658,6 +658,7 @@ export default function SocialClient() {
               ]}
               valor={orden}
               onChange={setOrden}
+              compact={desktopSearchFocused}
             />
             <SelectorVista
               vista={vista}
@@ -737,10 +738,19 @@ export default function SocialClient() {
 }
 
 // Botón Siguiendo / Yo: el control que pide la sección.
-function SelectorAlcance({ scope, setScope, controlGlass, activo, fill = false }) {
+function SelectorAlcance({
+  scope,
+  setScope,
+  controlGlass,
+  activo,
+  fill = false,
+  soloIconos = false,
+}) {
   return (
     <div
-      className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}
+      className={`flex h-11 items-center rounded-2xl p-1 ${
+        fill ? "min-w-0 flex-1" : "shrink-0"
+      } ${controlGlass}`}
     >
       {[
         ["following", "Siguiendo", Users],
@@ -751,14 +761,20 @@ function SelectorAlcance({ scope, setScope, controlGlass, activo, fill = false }
           type="button"
           onClick={() => setScope(valor)}
           aria-pressed={scope === valor}
-          className={`flex h-full flex-1 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition-all ${
+          // En la barra móvil va solo el icono: el rótulo se lo comería el
+          // buscador. El nombre sigue estando para lectores de pantalla.
+          aria-label={soloIconos ? etiqueta : undefined}
+          title={soloIconos ? etiqueta : undefined}
+          className={`flex h-full items-center justify-center rounded-lg text-sm font-bold transition-all ${
+            soloIconos ? "w-9" : "flex-1 gap-2 px-3"
+          } ${
             scope === valor
               ? activo
               : "text-zinc-400 hover:bg-white/10 hover:text-white"
           }`}
         >
           <Icono className="h-4 w-4 shrink-0" />
-          <span className="truncate">{etiqueta}</span>
+          {soloIconos ? null : <span className="truncate">{etiqueta}</span>}
         </button>
       ))}
     </div>
@@ -771,7 +787,7 @@ function SelectorAlcance({ scope, setScope, controlGlass, activo, fill = false }
 // desde el botón: el panel de filtros tiene `backdrop-filter`, que crea un
 // contexto de apilamiento, y un menú `absolute` dentro quedaría recortado por
 // él. Con el portal siempre se ve por encima de todo.
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+function InlineDropdown({ label, valueLabel, icon: Icon, children, compact = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -829,11 +845,22 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition-[min-width,background-color,color] hover:from-white/15 hover:to-white/10 lg:w-auto lg:min-w-[140px] lg:max-w-none"
+        // Al enfocar el buscador de escritorio, el rótulo se pliega y el botón
+        // suelta su ancho mínimo: es lo que permite que la fila entera quepa en
+        // 1024px sin desbordar (mismo mecanismo que Historial).
+        aria-label={compact ? `${label}: ${valueLabel}` : undefined}
+        className={`inline-flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition-[min-width,background-color,color] hover:from-white/15 hover:to-white/10 lg:w-auto lg:max-w-none ${
+          compact ? "lg:min-w-0" : "lg:min-w-[140px]"
+        }`}
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-pink-500" /> : null}
-          <span className="shrink-0 overflow-hidden whitespace-nowrap text-xs font-bold uppercase tracking-wider text-zinc-500">
+          <span
+            aria-hidden={compact}
+            className={`shrink-0 overflow-hidden whitespace-nowrap text-xs font-bold uppercase tracking-wider text-zinc-500 transition-[max-width,opacity] duration-200 ${
+              compact ? "max-w-0 opacity-0" : "max-w-24 opacity-100"
+            }`}
+          >
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
@@ -891,10 +918,10 @@ function DropdownItem({ active, onClick, children }) {
 }
 
 // Envoltorio: mismo desplegable con una lista simple de opciones.
-function SelectorSimple({ icon, label, opciones, valor, onChange }) {
+function SelectorSimple({ icon, label, opciones, valor, onChange, compact = false }) {
   const actual = opciones.find(([v]) => v === valor)?.[1] || opciones[0][1];
   return (
-    <InlineDropdown label={label} valueLabel={actual} icon={icon}>
+    <InlineDropdown label={label} valueLabel={actual} icon={icon} compact={compact}>
       {({ close }) => (
         <>
           {opciones.map(([v, etiqueta]) => (
