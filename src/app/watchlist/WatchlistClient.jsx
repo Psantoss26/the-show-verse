@@ -2015,10 +2015,18 @@ export default function WatchlistClient() {
     return saved || "all";
   });
 
+  // Orden por AÑADIDO RECIENTE por defecto: lo último que apuntas para ver es
+  // lo que quieres encontrar arriba.
+  //
+  // La clave lleva sufijo `:v2` a propósito. El valor se persiste en cuanto se
+  // monta la página, así que TODO el que la haya abierto alguna vez tiene
+  // guardado el antiguo "title-asc" sin haberlo elegido nunca, y ese valor
+  // ganaría al nuevo valor por defecto. Con una clave nueva, el cambio se nota;
+  // quien sí había elegido un orden lo pierde una vez, y solo una.
   const [sortBy, setSortBy] = useState(() => {
-    if (typeof window === "undefined") return "title-asc";
-    const saved = window.localStorage.getItem("showverse:watchlist:sortBy");
-    return saved || "title-asc";
+    if (typeof window === "undefined") return "added-desc";
+    const saved = window.localStorage.getItem("showverse:watchlist:sortBy:v2");
+    return saved || "added-desc";
   });
 
   const [imageMode, setImageModeState] = useState(() => {
@@ -2090,7 +2098,7 @@ export default function WatchlistClient() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem("showverse:watchlist:sortBy", sortBy);
+    window.localStorage.setItem("showverse:watchlist:sortBy:v2", sortBy);
   }, [sortBy]);
 
   useEffect(() => {

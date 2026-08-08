@@ -2,8 +2,10 @@
 <!--
   Carcasa de la app: el WebView ocupa todo, con
    - `videoContainer` encima para los tráileres a pantalla completa,
-   - `errorPanel` para los fallos de red y el gate de acceso privado,
-   - una barra de progreso fina arriba mientras carga.
+   - `errorPanel` para los fallos de red y el gate de acceso privado.
+
+  SIN barra de progreso: una app nativa no enseña una franja de carga cada vez
+  que se navega, y la web ya tiene sus propios estados de carga.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -29,17 +31,6 @@
         android:background="@android:color/black"
         android:visibility="gone" />
 
-    <ProgressBar
-        android:id="@+id/progress"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:layout_gravity="top"
-        android:indeterminate="false"
-        android:max="100"
-        android:progressTint="@color/tsv_amber"
-        android:progressBackgroundTint="@android:color/transparent"
-        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/errorPanel"

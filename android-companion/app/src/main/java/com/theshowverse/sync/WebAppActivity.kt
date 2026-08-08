@@ -232,12 +232,10 @@ class WebAppActivity : AppCompatActivity() {
 
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
             currentUrl = url.orEmpty()
-            binding.progress.visibility = View.VISIBLE
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
             currentUrl = url.orEmpty()
-            binding.progress.visibility = View.GONE
             binding.refresh.isRefreshing = false
             listoParaPintar = true
             // Guardar la última ruta permite volver donde estabas si el sistema
@@ -285,11 +283,6 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     private inner class ClienteChrome : WebChromeClient() {
-
-        override fun onProgressChanged(view: WebView, newProgress: Int) {
-            binding.progress.progress = newProgress
-            if (newProgress >= 100) binding.progress.visibility = View.GONE
-        }
 
         /** Tráileres a pantalla completa. */
         override fun onShowCustomView(view: View, callback: CustomViewCallback) {
@@ -413,9 +406,31 @@ class WebAppActivity : AppCompatActivity() {
                         WindowInsetsCompat.Type.displayCutout(),
                 )
                 view.setPadding(barras.left, barras.top, barras.right, barras.bottom)
+                if (view === binding.refresh) bajarIndicadorDeRecarga(barras.top)
                 insets
             }
         }
+    }
+
+    /**
+     * Baja el círculo de "deslizar para recargar" por debajo de la barra de
+     * estado.
+     *
+     * SwipeRefreshLayout coloca ese círculo tomando como referencia su BORDE
+     * SUPERIOR, sin tener en cuenta el relleno. Como aquí el relleno es el hueco
+     * de la barra de estado, el círculo aparecía metido debajo del reloj y se
+     * veía cortado por el borde. Se desplazan su posición inicial y su destino
+     * justo esos píxeles.
+     */
+    private var desplazamientoIndicador = -1
+
+    private fun bajarIndicadorDeRecarga(insetSuperior: Int) {
+        if (desplazamientoIndicador == insetSuperior) return
+        desplazamientoIndicador = insetSuperior
+        val enDp = (insetSuperior / resources.displayMetrics.density).toInt()
+        // Valores por defecto de SwipeRefreshLayout: empieza oculto justo encima
+        // del borde (-40dp) y baja hasta 64dp.
+        binding.refresh.setProgressViewOffset(false, INICIO_INDICADOR_DP + enDp, FIN_INDICADOR_DP + enDp)
     }
 
     private fun configurarRefresco() {
@@ -493,7 +508,6 @@ class WebAppActivity : AppCompatActivity() {
         binding.errorBody.text = cuerpo
         binding.errorPanel.visibility = View.VISIBLE
         binding.refresh.isRefreshing = false
-        binding.progress.visibility = View.GONE
     }
 
     private fun ocultarError() {
@@ -542,6 +556,9 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val INICIO_INDICADOR_DP = -40
+        private const val FIN_INDICADOR_DP = 64
+
         /** Intent explícito para abrir una URL de la web DENTRO de la app. */
         fun intentFor(context: Context, url: String): Intent =
             Intent(context, WebAppActivity::class.java).apply {
