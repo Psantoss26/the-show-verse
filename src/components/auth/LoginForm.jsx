@@ -7,6 +7,7 @@ import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye
 import { useAuth } from "@/context/AuthContext";
 import {
   canNativeGoogleSignIn,
+  logToApp,
   signInWithGoogleNative,
   useAndroidApp,
 } from "@/lib/android/appBridge";
@@ -128,7 +129,14 @@ export default function LoginForm({ next: nextProp }) {
         return;
       }
       if (resultado?.cancelled) return; // cancelación deliberada: sin ruido
-      // Cualquier otro fallo: se usa el camino por navegador.
+
+      // Cualquier otro fallo cae al camino por navegador, PERO diciéndolo: antes
+      // el salto era mudo y, si el navegador tampoco volvía, la pantalla se
+      // quedaba igual y parecía que el botón no hacía nada.
+      logToApp(`Google: nativo no disponible (${resultado?.error || "desconocido"}), abriendo navegador`);
+      setErr(
+        "No se ha podido usar la cuenta del dispositivo. Continuando en el navegador…",
+      );
       window.location.href = googleAuthHref;
     } finally {
       setGoogleLoading(false);

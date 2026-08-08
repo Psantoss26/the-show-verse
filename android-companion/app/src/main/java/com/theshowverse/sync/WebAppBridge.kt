@@ -74,7 +74,8 @@ class WebAppBridge(
      * enseña su botón normal (que acaba en el navegador) o el nativo.
      */
     @JavascriptInterface
-    fun canSignInWithGoogle(): Boolean = propio() && GoogleSignIn.configurado()
+    fun canSignInWithGoogle(): Boolean =
+        propio() && GoogleSignIn.configurado() && !prefs.nativeGoogleUnavailable
 
     /**
      * Abre el selector de cuentas de Android. Es ASÍNCRONO: devuelve enseguida y
@@ -104,6 +105,13 @@ class WebAppBridge(
 
     /** Literal JS seguro: el token y los mensajes van dentro de una cadena. */
     private fun cadenaJs(valor: String): String = JSONObject.quote(valor)
+
+    /** Deja una línea en el registro de la app desde la web. */
+    @JavascriptInterface
+    fun log(mensaje: String?) {
+        if (!propio()) return
+        mensaje?.takeIf { it.isNotBlank() }?.let { prefs.addLog(it.take(200)) }
+    }
 
     // ---------------------------------------------------------- emparejamiento
 

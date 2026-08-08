@@ -47,6 +47,63 @@ export function buildAndroidOauthHandoffUrl(origin, { code, state, error } = {})
   return appUrl;
 }
 
+/** Escapa para poder incrustar la URL en HTML y en un literal JS sin romperlos. */
+function escaparHtml(valor) {
+  return String(valor)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Página de vuelta a la app tras el login de Google.
+ *
+ * POR QUÉ NO BASTA UN 307 al esquema `theshowverse://`. Chrome bloquea los
+ * saltos a otra aplicación que llegan como REDIRECCIÓN, sin que el usuario haya
+ * tocado nada: es una protección suya contra webs que secuestran la navegación.
+ * Resultado: la pestaña se quedaba en blanco y la sesión no volvía nunca — "elijo
+ * mi cuenta y no pasa nada".
+ *
+ * Esta página intenta el salto automático igualmente (funciona en los
+ * navegadores que sí lo permiten) y, si no ocurre, deja un BOTÓN: pulsarlo es un
+ * gesto del usuario, y con gesto el navegador siempre abre la app.
+ */
+export function buildAndroidHandoffPage(deepLink) {
+  const seguro = escaparHtml(deepLink);
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volviendo a The Show Verse…</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; gap:1.25rem; padding:2rem;
+         background:#000; color:#fff; text-align:center;
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  p { margin:0; color:#a1a1aa; font-size:.95rem; line-height:1.5; }
+  a.boton { display:inline-block; padding:.9rem 1.5rem; border-radius:1rem;
+            background:linear-gradient(135deg,#f59e0b,#d97706); color:#000;
+            font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+  <p>Sesión iniciada. Volviendo a The Show Verse…</p>
+  <a class="boton" id="volver" href="${seguro}">Abrir The Show Verse</a>
+  <script>
+    // Salto automático; si el navegador lo bloquea, queda el botón de arriba.
+    // El "<" va escapado: JSON.stringify NO protege dentro de un <script>, y un
+    // "</script>" en el enlace cerraría la etiqueta. Los parámetros code y state
+    // llegan por la URL: esto es la diferencia entre una página y un XSS.
+    window.location.replace(${JSON.stringify(deepLink).replace(/</g, "\\u003C")});
+  </script>
+</body>
+</html>`;
+}
+
 export function getRequestOrigin(request) {
   // Origen público forzado (autoalojado tras proxy/túnel, donde request.url usa
   // el HOSTNAME interno). En Vercel no se define → cae a las cabeceras.

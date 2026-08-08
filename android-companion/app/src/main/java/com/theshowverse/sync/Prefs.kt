@@ -64,6 +64,15 @@ class Prefs(context: Context) {
         get() = prefs.getString(KEY_ACCESS_KEY, null)
         set(value) = prefs.edit().putString(KEY_ACCESS_KEY, value).apply()
 
+    /**
+     * El login nativo de Google falló por configuración (no por cancelación).
+     * Se recuerda para no volver a enseñar un selector de cuentas que acaba en
+     * nada: a partir de entonces se va directo al flujo por navegador.
+     */
+    var nativeGoogleUnavailable: Boolean
+        get() = prefs.getBoolean(KEY_NO_NATIVE_GOOGLE, false)
+        set(value) = prefs.edit().putBoolean(KEY_NO_NATIVE_GOOGLE, value).apply()
+
     /** Última página vista, para reabrir la app donde se dejó. */
     var lastUrl: String?
         get() = prefs.getString(KEY_LAST_URL, null)
@@ -125,5 +134,6 @@ class Prefs(context: Context) {
         private const val KEY_WEB_ORIGIN = "web_origin"
         private const val KEY_ACCESS_KEY = "private_access_key"
         private const val KEY_LAST_URL = "last_url"
+        private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
     }
 }

@@ -8,6 +8,7 @@ import {
   setBackendTokenCookies,
 } from "@/lib/backend/server";
 import {
+  buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   clearGoogleOauthCookies,
   getGoogleRedirectUri,
@@ -90,13 +91,23 @@ export async function GET(request) {
   // cookies del WebView. Solo se transportan `code` y `state` a la app; allí se
   // vuelve a cargar este callback y se ejecuta la validación normal de abajo.
   if (isAndroidOauthState(state) && !appHandoff) {
-    return NextResponse.redirect(
-      buildAndroidOauthHandoffUrl(getRequestOrigin(request), {
-        code,
-        state,
-        error,
-      }),
-    );
+    // Se devuelve una PÁGINA, no un 307: Chrome bloquea los saltos a otra app
+    // que llegan por redirección sin gesto del usuario, y ahí es donde el login
+    // se quedaba colgado. La página lo intenta sola y deja un botón por si el
+    // navegador lo impide.
+    const enlace = buildAndroidOauthHandoffUrl(getRequestOrigin(request), {
+      code,
+      state,
+      error,
+    }).toString();
+
+    return new NextResponse(buildAndroidHandoffPage(enlace), {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
   }
 
   const expectedState = request.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
