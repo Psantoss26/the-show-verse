@@ -139,6 +139,15 @@ export function canNativeGoogleSignIn() {
 }
 
 /**
+ * El formulario que abrió el selector sigue vivo y será quien complete el
+ * canje. El recolector global debe esperar en ese caso para no consumir el
+ * mismo resultado desde el buzón nativo.
+ */
+export function hasNativeGoogleSignInInFlight() {
+  return peticionesGoogle.size > 0;
+}
+
+/**
  * Pide el idToken al sistema. Resuelve con
  * `{ ok, idToken?, cancelled?, error? }`; nunca rechaza.
  */
@@ -166,15 +175,23 @@ export function requestNativeGoogleIdToken() {
     let resuelto = false;
     let sondeo = null;
 
-    const terminar = (valor) => {
+    const terminar = (valor, { vaciarBuzonNativo = false } = {}) => {
       if (resuelto) return;
       resuelto = true;
       peticionesGoogle.delete(peticion);
       if (sondeo) window.clearInterval(sondeo);
+
+      // GoogleSignIn deposita el resultado antes de ejecutar el callback. Si
+      // este callback directo gana la carrera, retiramos su copia del buzón:
+      // de lo contrario AndroidSessionClaim podría leerla al recuperar el foco
+      // y canjear el mismo idToken por segunda vez.
+      if (vaciarBuzonNativo) tomarResultadoNativoPendiente();
       resolve(valor);
     };
 
-    peticionesGoogle.set(peticion, terminar);
+    peticionesGoogle.set(peticion, (valor) =>
+      terminar(valor, { vaciarBuzonNativo: true }),
+    );
     const lanzada = call("signInWithGoogle", false, peticion);
     if (lanzada !== true) {
       terminar({ ok: false, error: "unavailable" });
