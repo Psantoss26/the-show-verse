@@ -142,24 +142,60 @@ export function canNativeGoogleSignIn() {
  * Pide el idToken al sistema. Resuelve con
  * `{ ok, idToken?, cancelled?, error? }`; nunca rechaza.
  */
+export function tomarResultadoNativoPendiente() {
+  const crudo = call("takeGoogleSignInResult", "");
+  if (!crudo) return null;
+  try {
+    return JSON.parse(crudo);
+  } catch {
+    return null;
+  }
+}
+
+const ESPERA_MAX_MS = 25000; // de sobra para elegir una cuenta
+const SONDEO_MS = 400;
+
 export function requestNativeGoogleIdToken() {
   if (!canNativeGoogleSignIn()) {
     return Promise.resolve({ ok: false, error: "unavailable" });
   }
   instalarReceptor();
   const peticion = `g${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   return new Promise((resolve) => {
-    peticionesGoogle.set(peticion, resolve);
+    let resuelto = false;
+    let sondeo = null;
+
+    const terminar = (valor) => {
+      if (resuelto) return;
+      resuelto = true;
+      peticionesGoogle.delete(peticion);
+      if (sondeo) window.clearInterval(sondeo);
+      resolve(valor);
+    };
+
+    peticionesGoogle.set(peticion, terminar);
     const lanzada = call("signInWithGoogle", false, peticion);
     if (lanzada !== true) {
-      peticionesGoogle.delete(peticion);
-      resolve({ ok: false, error: "unavailable" });
+      terminar({ ok: false, error: "unavailable" });
+      return;
     }
-    // Red de seguridad: si el nativo no contestara nunca, la promesa no se
-    // queda colgada y la web puede ofrecer el flujo por navegador.
-    setTimeout(() => {
-      if (peticionesGoogle.delete(peticion)) resolve({ ok: false, error: "timeout" });
-    }, 120000);
+
+    // SONDEO DEL BUZÓN. El aviso directo del nativo puede perderse —por ejemplo
+    // si Android recrea la actividad mientras el selector de cuentas está
+    // encima— y entonces esta promesa se quedaba colgada: el modal se cerraba y
+    // la pantalla seguía "cargando" para siempre. Preguntando por el buzón, el
+    // resultado aparece igual, y si no aparece se corta a los 25 segundos para
+    // poder ofrecer el flujo por navegador.
+    const desde = Date.now();
+    sondeo = window.setInterval(() => {
+      const pendiente = tomarResultadoNativoPendiente();
+      if (pendiente) {
+        terminar(pendiente);
+        return;
+      }
+      if (Date.now() - desde > ESPERA_MAX_MS) terminar({ ok: false, error: "timeout" });
+    }, SONDEO_MS);
   });
 }
 
@@ -167,16 +203,14 @@ export function requestNativeGoogleIdToken() {
  * Login completo dentro de la app: token del sistema → canje en el servidor
  * (mismo endpoint del backend que usa el flujo web) → cookies en el WebView.
  */
-export async function signInWithGoogleNative() {
-  const nativo = await requestNativeGoogleIdToken();
-  if (!nativo?.ok || !nativo?.idToken) return nativo || { ok: false };
-
+/** Canjea un idToken ya obtenido por una sesión dentro del WebView. */
+export async function canjearIdTokenDeGoogle(idToken) {
   try {
     const res = await fetch("/api/auth/google/native", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ idToken: nativo.idToken }),
+      body: JSON.stringify({ idToken }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -190,6 +224,12 @@ export async function signInWithGoogleNative() {
     logToApp("Google: ✗ sin red al canjear el token");
     return { ok: false, error: "network" };
   }
+}
+
+export async function signInWithGoogleNative() {
+  const nativo = await requestNativeGoogleIdToken();
+  if (!nativo?.ok || !nativo?.idToken) return nativo || { ok: false };
+  return canjearIdTokenDeGoogle(nativo.idToken);
 }
 
 /** Deja una línea en el registro nativo (visible en el panel de sincronización). */

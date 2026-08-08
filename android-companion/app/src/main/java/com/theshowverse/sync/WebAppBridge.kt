@@ -103,6 +103,22 @@ class WebAppBridge(
         return true
     }
 
+    /**
+     * Recoge el resultado del login nativo que quedó en el buzón, y lo borra.
+     *
+     * Es la red que hace que el login no se pueda quedar a medias: si el aviso
+     * directo al WebView se pierde —o Android recrea la actividad mientras el
+     * selector de cuentas está encima, recargando la página—, la web pregunta
+     * por aquí y lo encuentra igual.
+     */
+    @JavascriptInterface
+    fun takeGoogleSignInResult(): String {
+        if (!propio()) return ""
+        val pendiente = prefs.pendingGoogleResult ?: return ""
+        prefs.pendingGoogleResult = null
+        return pendiente
+    }
+
     /** Literal JS seguro: el token y los mensajes van dentro de una cadena. */
     private fun cadenaJs(valor: String): String = JSONObject.quote(valor)
 

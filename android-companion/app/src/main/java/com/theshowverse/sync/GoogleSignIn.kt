@@ -43,7 +43,14 @@ object GoogleSignIn {
         val idToken: String? = null,
         val cancelled: Boolean = false,
         val error: String? = null,
-    )
+    ) {
+        fun aJson(): String = org.json.JSONObject()
+            .put("ok", ok)
+            .put("cancelled", cancelled)
+            .put("idToken", idToken ?: org.json.JSONObject.NULL)
+            .put("error", error ?: org.json.JSONObject.NULL)
+            .toString()
+    }
 
     private val ejecutor = Executors.newSingleThreadExecutor()
     private val principal = Handler(Looper.getMainLooper())
@@ -62,9 +69,16 @@ object GoogleSignIn {
      */
     fun solicitar(activity: Activity, alTerminar: (Result) -> Unit) {
         val prefs = Prefs(activity)
+
+        // Todo resultado se DEPOSITA antes de avisar. El aviso directo al WebView
+        // es la vía rápida; el buzón es la que garantiza que no se pierda.
+        val entregar: (Result) -> Unit = { resultado ->
+            prefs.pendingGoogleResult = resultado.aJson()
+            alTerminar(resultado)
+        }
         if (!configurado()) {
             prefs.addLog("Google: ✗ sin cliente configurado en la app")
-            alTerminar(Result(ok = false, error = "google_client_not_configured"))
+            entregar(Result(ok = false, error = "google_client_not_configured"))
             return
         }
         prefs.addLog("Google: pidiendo cuenta al sistema…")
@@ -96,10 +110,10 @@ object GoogleSignIn {
                     principal.post {
                         if (token.isNullOrBlank()) {
                             prefs.addLog("Google: ✗ credencial inesperada (${credencial.type})")
-                            alTerminar(Result(ok = false, error = "unexpected_credential"))
+                            entregar(Result(ok = false, error = "unexpected_credential"))
                         } else {
                             prefs.addLog("Google: ✓ cuenta seleccionada")
-                            alTerminar(Result(ok = true, idToken = token))
+                            entregar(Result(ok = true, idToken = token))
                         }
                     }
                 }
@@ -128,7 +142,7 @@ object GoogleSignIn {
                         prefs.addLog("Google: ✗ ${e.type.ifBlank { e.javaClass.simpleName }} — ${e.message ?: "sin detalle"}")
                         prefs.nativeGoogleUnavailable = true
                     }
-                    principal.post { alTerminar(resultado) }
+                    principal.post { entregar(resultado) }
                 }
             },
         )

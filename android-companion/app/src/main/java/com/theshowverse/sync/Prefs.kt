@@ -73,6 +73,17 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_NO_NATIVE_GOOGLE, false)
         set(value) = prefs.edit().putBoolean(KEY_NO_NATIVE_GOOGLE, value).apply()
 
+    /**
+     * Resultado del último login con Google, en JSON, a la espera de que la web
+     * lo recoja. Existe porque el aviso directo al WebView se puede perder: si
+     * Android recrea la actividad mientras el selector de cuentas está encima,
+     * la página se recarga y con ella desaparece quien esperaba la respuesta.
+     * Guardado aquí, la web lo encuentra cuando vuelve a estar viva.
+     */
+    var pendingGoogleResult: String?
+        get() = prefs.getString(KEY_GOOGLE_RESULT, null)
+        set(value) = prefs.edit().putString(KEY_GOOGLE_RESULT, value).apply()
+
     /** Última página vista, para reabrir la app donde se dejó. */
     var lastUrl: String?
         get() = prefs.getString(KEY_LAST_URL, null)
@@ -135,5 +146,6 @@ class Prefs(context: Context) {
         private const val KEY_ACCESS_KEY = "private_access_key"
         private const val KEY_LAST_URL = "last_url"
         private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
+        private const val KEY_GOOGLE_RESULT = "google_result"
     }
 }

@@ -13,9 +13,12 @@
 import { useEffect } from "react";
 
 import {
+  canjearIdTokenDeGoogle,
   entregaPendiente,
   isAndroidApp,
+  logToApp,
   reclamarLoginPorNavegador,
+  tomarResultadoNativoPendiente,
 } from "@/lib/android/appBridge";
 
 const REINTENTOS_AL_VOLVER = 20; // ~30 s: lo que tarda un login normal
@@ -38,8 +41,27 @@ export default function AndroidSessionClaim() {
       window.location.replace(limpio);
     };
 
+    // 1) ¿Quedó un resultado del selector de cuentas sin recoger? Pasa si Android
+    //    recreó la actividad mientras el selector estaba encima: la página se
+    //    recarga y quien esperaba la respuesta desaparece. El token sigue en el
+    //    buzón del nativo, así que se canjea aquí y la sesión entra igual.
+    const recogerLoginNativo = async () => {
+      const pendiente = tomarResultadoNativoPendiente();
+      if (!vivo || !pendiente) return false;
+      if (pendiente.cancelled) return false;
+      if (!pendiente.ok || !pendiente.idToken) {
+        logToApp(`Google: resultado pendiente sin token (${pendiente.error || "?"})`);
+        return false;
+      }
+      const canje = await canjearIdTokenDeGoogle(pendiente.idToken);
+      if (!vivo || !canje.ok) return false;
+      entrar("/");
+      return true;
+    };
+
     const intentar = async (restantes, idExplicito) => {
       if (!vivo) return;
+      if (await recogerLoginNativo()) return;
       const id = idExplicito || entregaPendiente();
       if (!id) return;
 
