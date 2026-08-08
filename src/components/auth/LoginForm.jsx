@@ -85,7 +85,7 @@ function getGoogleErrorMessage(value) {
 export default function LoginForm({ next: nextProp }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, register, refreshMe } = useAuth();
+  const { login, register } = useAuth();
   const inAndroidApp = useAndroidApp();
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -147,20 +147,15 @@ export default function LoginForm({ next: nextProp }) {
     }
   };
 
-  // Tras instalar la sesión se navega SIEMPRE, pase lo que pase con el refresco
-  // del contexto: las cookies ya están puestas y una navegación completa hace
-  // que el servidor las lea. Si `refreshMe` fallara y de eso dependiera el
-  // salto, el usuario se quedaría mirando el login estando ya dentro.
+  // Las cookies llegan con la respuesta del canje. No esperamos a /api/auth/me:
+  // tras volver del selector nativo ese fetch puede quedar pendiente y dejar al
+  // usuario atrapado en el modal aun teniendo sesión. La carga siguiente lee
+  // las cookies directamente en servidor.
   const entrarEn = useCallback(
-    async (destino) => {
-      try {
-        await refreshMe?.();
-      } catch {
-        /* da igual: la sesión vive en las cookies, no en este contexto */
-      }
+    (destino) => {
       window.location.replace(sanitizeNextPath(destino || next));
     },
-    [refreshMe, next],
+    [next],
   );
 
   // Abre el login en el navegador dejando abierta una ENTREGA en el servidor:
