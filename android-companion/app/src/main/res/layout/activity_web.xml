@@ -12,7 +12,11 @@
     android:layout_height="match_parent"
     android:background="@color/tsv_black">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    <!-- Variante que cede los gestos HORIZONTALES a la página: sin ella, el
+         contenedor se apropiaba del arrastre, el WebView mandaba un touchcancel
+         y se rompía el deslizar entre secciones del perfil y las filas de
+         carteles. -->
+    <com.theshowverse.sync.HorizontalAwareSwipeRefresh
         android:id="@+id/refresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -21,7 +25,7 @@
             android:id="@+id/webView"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </com.theshowverse.sync.HorizontalAwareSwipeRefresh>
 
     <!-- Vídeo a pantalla completa (lo rellena onShowCustomView). -->
     <FrameLayout

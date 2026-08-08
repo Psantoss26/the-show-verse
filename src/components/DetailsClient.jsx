@@ -1573,6 +1573,20 @@ export default function DetailsClient({
 
   const canUseLists = authenticated || hasBackendSession;
 
+  /**
+   * Lleva al login recordando la ficha desde la que se salió, para volver aquí
+   * al entrar. Lo usan los botones que se muestran SIN sesión: enseñar lo que la
+   * app puede hacer y pedir la cuenta al pulsar es mejor que esconderlos, que
+   * deja la fila de acciones incompleta y sin explicación.
+   */
+  const irAlLogin = useCallback(() => {
+    const destino =
+      typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : "/";
+    router.push(`/login?next=${encodeURIComponent(destino)}`);
+  }, [router]);
+
   // -- Estado del modal de listas --
   const [listModalOpen, setListModalOpen] = useState(false);
   const [listsLoading, setListsLoading] = useState(false);
@@ -9642,20 +9656,20 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 watchlist={watchlistActionValue}
                 watchlistLoading={watchlistActionLoading}
                 onToggleWatchlist={toggleWatchlist}
-                onAddToList={canUseLists ? openListsModal : undefined}
+                onAddToList={canUseLists ? openListsModal : irAlLogin}
                 listBusy={listsPresenceLoading}
                 listActive={listActive}
-                // El botón de reseñas depende de tener SESIÓN, no de que la
-                // consulta de estado de este título haya salido bien. Colgarlo
-                // de `trakt.connected` lo hacía desaparecer en cuanto esa
-                // consulta fallaba de forma pasajera (token recién caducado),
-                // aunque la sesión estuviera perfecta. Mismo criterio que usa
-                // el bloque de puntuación unas líneas más arriba.
-                showComments={
-                  trakt.connected || hasBackendSession || !!session
-                }
+                // Listas y reseñas se muestran SIEMPRE, con o sin sesión: son
+                // dos de las cosas que la app hace, y esconderlas deja la fila
+                // de acciones coja y sin explicar por qué. Sin sesión, pulsar
+                // lleva al login y se vuelve a esta misma ficha.
+                showComments
                 commentsActive={myComments.length > 0}
-                onComments={() => setCommentModalOpen(true)}
+                onComments={
+                  trakt.connected || hasBackendSession || !!session
+                    ? () => setCommentModalOpen(true)
+                    : irAlLogin
+                }
                   />
                   </div>
                 </div>
