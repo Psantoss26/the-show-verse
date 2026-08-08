@@ -2272,10 +2272,17 @@ export default function FavoritesClient() {
     return saved || "all";
   });
 
+  // Orden por AÑADIDO RECIENTE por defecto, igual que Pendientes: lo último que
+  // marcas es lo que quieres ver arriba.
+  //
+  // Clave versionada (`:v2`) por lo mismo que allí: el valor se persiste nada
+  // más montar la página, así que quien la haya abierto alguna vez tiene
+  // guardado el antiguo "title-asc" sin haberlo elegido, y ese valor ganaría al
+  // nuevo por defecto.
   const [sortBy, setSortBy] = useState(() => {
-    if (typeof window === "undefined") return "title-asc";
-    const saved = window.localStorage.getItem("showverse:favorites:sortBy");
-    return saved || "title-asc";
+    if (typeof window === "undefined") return "added-desc";
+    const saved = window.localStorage.getItem("showverse:favorites:sortBy:v2");
+    return saved || "added-desc";
   });
 
   const [imageMode, setImageModeState] = useState(() => {
@@ -2369,7 +2376,7 @@ export default function FavoritesClient() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem("showverse:favorites:sortBy", sortBy);
+    window.localStorage.setItem("showverse:favorites:sortBy:v2", sortBy);
   }, [sortBy]);
 
   useEffect(() => {

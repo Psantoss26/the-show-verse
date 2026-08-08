@@ -2936,7 +2936,10 @@ export default function HistoryClient() {
     }
   }, []);
 
-  const [groupBy, setGroupBy] = useState(() => backNavInit?.groupBy || "day");
+  // Por MES por defecto: el historial de alguien que ve series a diario se
+  // convierte en decenas de cabeceras de un solo título si se agrupa por día.
+  // Al retroceder se respeta lo que estuvieras usando (backNavInit).
+  const [groupBy, setGroupBy] = useState(() => backNavInit?.groupBy || "month");
   const [typeFilter, setTypeFilter] = useState(
     () => backNavInit?.typeFilter || "all",
   );
