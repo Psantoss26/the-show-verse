@@ -244,6 +244,39 @@
     }
   }
 
+  // Decide QUÉ punto de reproducción enviar, a partir de la lectura viva del
+  // <video> y del último punto conocido del mismo contenido.
+  //
+  // POR QUÉ. Al encadenar el siguiente episodio, o al desaparecer el reproductor,
+  // el <video> ya no describe lo que estábamos viendo: su currentTime vuelve a 0 o
+  // el elemento se va del DOM. Enviar esa lectura hacía RETROCEDER el progreso
+  // guardado (media película veía "Continuar viendo" desde el principio) y dejaba
+  // al episodio anterior congelado, sin llegar nunca al 90% ni salir de la lista.
+  //
+  // Regla: la posición nunca baja, y la duración se toma de la lectura viva solo
+  // si es válida. Devuelve null cuando no hay nada que enviar.
+  function pickProgressPoint(live, cached) {
+    const l = live || {};
+    const c = cached || {};
+    const livePos = Number(l.positionSec);
+    const liveDur = Number(l.durationSec);
+    const cachedPos = Number(c.positionSec);
+    const cachedDur = Number(c.durationSec);
+
+    const pos = Math.max(
+      isFinite(livePos) && livePos > 0 ? livePos : 0,
+      isFinite(cachedPos) && cachedPos > 0 ? cachedPos : 0,
+    );
+    const dur =
+      isFinite(liveDur) && liveDur > 0
+        ? liveDur
+        : isFinite(cachedDur) && cachedDur > 0
+          ? cachedDur
+          : 0;
+    if (pos <= 0 || dur <= 0) return null;
+    return { positionSec: Math.round(pos), durationSec: Math.round(dur) };
+  }
+
   // Construye la URL de la página de detalles de The Show Verse a partir de lo que
   // devuelve el sync ({tmdbId, mediaType, season, episode}). Serie con episodio →
   // página del episodio; serie sin episodio → página de la serie; película → su
@@ -271,6 +304,7 @@
     findSeasonEpisodeBadge,
     largestArtwork,
     buildPlaybackSignal,
+    pickProgressPoint,
     buildDetailsUrl,
     detectFromJsonLd,
     detectFromMeta,

@@ -194,3 +194,35 @@ test("findSeasonEpisodeBadge combina temporada y episodio en nodos separados", (
   assert.match(badge, /T4/);
   assert.match(badge, /E5/);
 });
+
+test("pickProgressPoint nunca deja retroceder la posición", () => {
+  // El <video> ya reproduce el episodio SIGUIENTE (currentTime bajo) pero aún
+  // estamos volcando el anterior: manda lo último que sabíamos de él.
+  assert.deepEqual(
+    D.pickProgressPoint({ positionSec: 3, durationSec: 2700 }, { positionSec: 2500, durationSec: 2700 }),
+    { positionSec: 2500, durationSec: 2700 },
+  );
+  // Avanzando con normalidad: manda la lectura viva.
+  assert.deepEqual(
+    D.pickProgressPoint({ positionSec: 2600, durationSec: 2700 }, { positionSec: 2500, durationSec: 2700 }),
+    { positionSec: 2600, durationSec: 2700 },
+  );
+});
+
+test("pickProgressPoint funciona sin reproductor y descarta lo inservible", () => {
+  // El reproductor ya no está en el DOM: queda lo cacheado.
+  assert.deepEqual(
+    D.pickProgressPoint(null, { positionSec: 1200, durationSec: 3600 }),
+    { positionSec: 1200, durationSec: 3600 },
+  );
+  // La duración la aporta la lectura viva y la posición el caché.
+  assert.deepEqual(
+    D.pickProgressPoint({ positionSec: 0, durationSec: 3600 }, { positionSec: 1200, durationSec: 0 }),
+    { positionSec: 1200, durationSec: 3600 },
+  );
+  // Sin posición o sin duración no hay nada que enviar.
+  assert.equal(D.pickProgressPoint(null, null), null);
+  assert.equal(D.pickProgressPoint({ positionSec: 0, durationSec: 3600 }, null), null);
+  assert.equal(D.pickProgressPoint({ positionSec: 100, durationSec: 0 }, null), null);
+  assert.equal(D.pickProgressPoint({ positionSec: NaN, durationSec: NaN }, null), null);
+});

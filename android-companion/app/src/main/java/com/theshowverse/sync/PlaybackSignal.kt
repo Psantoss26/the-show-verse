@@ -26,6 +26,10 @@ data class PlaybackSignal(
     val artworkUrl: String? = null,
     val durationSec: Long? = null,
     val positionSec: Long? = null,
+    // El nombre de la serie viene de la FICHA que se vio antes (RecentDetail), no
+    // de la propia reproducción. El servidor lo usa para bajar la confianza: un
+    // dato prestado no puede valer lo mismo que uno que da la MediaSession.
+    val seriesFromHint: Boolean = false,
 ) {
     /** Título principal (para retrocompat con el endpoint: mainTitle). */
     val mainTitle: String?

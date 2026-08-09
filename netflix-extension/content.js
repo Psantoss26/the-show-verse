@@ -632,6 +632,12 @@
   let currentSynced = null;
   let currentSyncedKey = null;
   let lastProgressPingAt = 0;
+  // Último punto VISTO del contenido en curso ({key, positionSec, durationSec}).
+  // Hace falta para dos cosas: volcar el punto del episodio ANTERIOR cuando
+  // encadena el siguiente (para entonces el <video> ya marca el nuevo, así que su
+  // currentTime no sirve), y evitar que una lectura peor haga retroceder el
+  // progreso al salir.
+  let lastSeenProgress = null;
   // Vídeo al que ya hemos enganchado los listeners de pausa/fin (para guardar el
   // punto exacto al salir sin duplicar listeners).
   let listenedVideo = null;
@@ -765,6 +771,9 @@
     const dur = Number(signal.durationSec);
     const pos = Number(signal.positionSec);
     if (!isFinite(dur) || dur <= 0 || !isFinite(pos) || pos < 0) return;
+    // Se recuerda SIEMPRE, aunque el ping se corte por cadencia: es el punto que
+    // se volcará si el contenido cambia antes del siguiente envío.
+    lastSeenProgress = { key, positionSec: pos, durationSec: dur };
     const now = Date.now();
     if (now - lastProgressPingAt < PROGRESS_PING_MS) return;
     lastProgressPingAt = now;
@@ -782,6 +791,7 @@
           platform: platformId,
           positionSeconds: Math.round(pos),
           runtimeSeconds: Math.round(dur),
+          confidence: synced.confidence,
         },
         (resp) => {
           if (!extensionAlive()) return;
@@ -808,12 +818,37 @@
   function flushProgress() {
     if (syncPaused || !currentSynced || !currentSyncedKey) return;
     const video = getMainVideo();
-    if (!video) return;
-    const dur = isFinite(video.duration) ? Math.round(video.duration) : 0;
-    const pos = Math.round(video.currentTime || 0);
-    if (dur <= 0 || pos < 0) return;
+    const cache =
+      lastSeenProgress && lastSeenProgress.key === currentSyncedKey
+        ? lastSeenProgress
+        : null;
+    const point = D.pickProgressPoint(
+      video
+        ? {
+            positionSec: video.currentTime,
+            durationSec: isFinite(video.duration) ? video.duration : 0,
+          }
+        : null,
+      cache,
+    );
+    if (!point) return;
     lastProgressPingAt = 0; // salta el throttle
-    maybeSendProgress({ durationSec: dur, positionSec: pos }, currentSyncedKey);
+    maybeSendProgress(point, currentSyncedKey);
+  }
+
+  // Vuelca el punto del contenido que se DEJA de ver al encadenar el siguiente.
+  // Sin esto, el episodio anterior se quedaba congelado en el último ping (hasta
+  // 30 s antes de terminarlo): nunca cruzaba el 90%, así que ni se marcaba como
+  // visto ni salía de "Continuar viendo". No sirve mirar el <video>: cuando
+  // detectamos el cambio ya está reproduciendo el episodio nuevo.
+  function flushPreviousProgress() {
+    if (!currentSynced || !currentSyncedKey) return;
+    const cache = lastSeenProgress;
+    if (!cache || cache.key !== currentSyncedKey) return;
+    const point = D.pickProgressPoint(null, cache);
+    if (!point) return;
+    lastProgressPingAt = 0; // salta el throttle
+    maybeSendProgress(point, currentSyncedKey);
   }
 
   // Engancha (una sola vez por elemento) los listeners de pausa/fin del vídeo
@@ -878,6 +913,10 @@
 
     if (key === lastKey) return;
 
+    // El contenido cambia (normalmente, el siguiente episodio que arranca solo):
+    // primero se guarda el punto al que se dejó el anterior.
+    flushPreviousProgress();
+
     // Optimista: marcamos el contenido como intentado ANTES de enviar para no
     // reintentar en bucle títulos que no resuelvan (el servidor deduplica igual).
     lastKey = key;
@@ -885,6 +924,7 @@
     currentSynced = null;
     currentSyncedKey = null;
     lastProgressPingAt = 0;
+    lastSeenProgress = null;
 
     try {
       chrome.runtime.sendMessage(

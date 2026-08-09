@@ -130,16 +130,38 @@ class AccessibilityStreamingService : AccessibilityService() {
             notifText = analysis.candidates.getOrNull(2),
             notifSubText = analysis.candidates.getOrNull(3),
         )
+        val textosDePantalla = analysis.candidates
         SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced ->
             handler.post {
-                if (ok && synced != null) {
-                    // Recuerda la serie de esta ficha: si el usuario reproduce a
-                    // continuación y la app no expone la serie en la MediaSession
-                    // (Netflix), MediaListenerService la usará como nombre de serie.
-                    RecentDetail.remember(pkg, synced)
-                    QuickAccessNotifier.show(this, p, synced, R.string.notif_browsing)
-                    p.addLog("Ficha detectada: ${synced.title ?: primary}")
+                if (!ok || synced == null) return@post
+
+                // CORROBORACIÓN. Resolver contra TMDb es BUSCAR, y una búsqueda casi
+                // siempre devuelve algo: el nombre de un carrusel o una etiqueta de la
+                // interfaz acababan resolviendo un título real que no estaba en
+                // pantalla. Ese título se notificaba (Prime Video) y, peor, se
+                // recordaba como "la serie que estoy viendo", con lo que el episodio
+                // que se reprodujera después se atribuía a esa serie ajena y entraba
+                // en el Historial (Netflix).
+                //
+                // Solo se acepta si lo que ha devuelto TMDb se PARECE a algo que de
+                // verdad se leyó en la pantalla.
+                if (!TitleMatch.corroborates(synced.title, textosDePantalla)) {
+                    p.addLog(
+                        "Ficha descartada (${Platforms.nameFor(pkg)}): TMDb devolvió " +
+                            "«${synced.title}» y en pantalla ponía «$primary»",
+                    )
+                    // Se olvida el texto para poder reintentar cuando la pantalla
+                    // cambie: si no, este título quedaría bloqueado DEDUP_MS.
+                    lastText = null
+                    return@post
                 }
+
+                // Recuerda la serie de esta ficha: si el usuario reproduce a
+                // continuación y la app no expone la serie en la MediaSession
+                // (Netflix), MediaListenerService la usará como nombre de serie.
+                RecentDetail.remember(pkg, synced)
+                QuickAccessNotifier.show(this, p, synced, R.string.notif_browsing)
+                p.addLog("Ficha detectada: ${synced.title ?: primary}")
             }
         }
     }

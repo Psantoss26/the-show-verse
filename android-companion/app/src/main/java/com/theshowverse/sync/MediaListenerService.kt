@@ -38,6 +38,9 @@ class MediaListenerService : NotificationListenerService() {
     // Última posición/duración conocida por paquete (segundos): sirve para volcar
     // el punto EXACTO al salir cuando la sesión ya no puede leerse.
     private val lastPosByPackage = HashMap<String, Pair<Long, Long>>()
+    // ¿La posición de este paquete es estimada (la app no la publica)? El servidor
+    // la acepta para "Continuar viendo" pero nunca da nada por visto con ella.
+    private val estimatedByPackage = HashMap<String, Boolean>()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
@@ -137,6 +140,7 @@ class MediaListenerService : NotificationListenerService() {
             syncedByPackage.remove(pkg)
             lastProgressAtByPackage.remove(pkg)
             lastPosByPackage.remove(pkg)
+            estimatedByPackage.remove(pkg)
             lastKeyByPackage.remove(pkg)
         }
 
@@ -163,7 +167,21 @@ class MediaListenerService : NotificationListenerService() {
             noteOnce("nometa:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin metadatos")
             return
         }
-        val posMs = livePositionMs(controller, pkg)
+        // Posición REAL o, si la app no la publica, ESTIMADA por reloj desde que
+        // empezamos a mirar. La estimación sirve para que el título aparezca en
+        // "Continuar viendo", pero se marca como tal: no vale para dar nada por
+        // visto ni para pisar una posición mejor (ver `estimatedPosition`).
+        val realPosMs = livePositionMs(controller)
+        val posMs = realPosMs ?: (now - since).coerceAtLeast(0L)
+        val posicionEstimada = realPosMs == null
+        if (posicionEstimada) {
+            noteOnce(
+                "nopos:$pkg",
+                "${Platforms.nameFor(pkg)} no publica la posición: se estima para " +
+                    "Continuar viendo, pero no se marcará como visto",
+            )
+        }
+        estimatedByPackage[pkg] = posicionEstimada
         val notif = notifExtrasFor(pkg)
         val raw = RawMetadata(
             packageName = pkg,
@@ -236,10 +254,21 @@ class MediaListenerService : NotificationListenerService() {
 
         val key = signal.dedupKey
         if (lastKeyByPackage[pkg] == key) return
+
+        // CAMBIO DE CONTENIDO (el típico "siguiente episodio" que arranca solo).
+        // Antes se olvidaba el anterior sin más, así que su último punto conocido
+        // era el del ping de hacía hasta 30 s y se quedaba ahí para siempre en
+        // "Continuar viendo": nunca llegaba al 90% ni salía de la lista. Se vuelca
+        // ANTES de cambiar de título.
+        if (lastKeyByPackage[pkg] != null) {
+            volcarProgreso(pkg, controller)
+        }
+
         lastKeyByPackage[pkg] = key
         // Contenido nuevo: reiniciamos el estado de progreso de este paquete.
         syncedByPackage.remove(pkg)
         lastProgressAtByPackage.remove(pkg)
+        lastPosByPackage.remove(pkg)
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
@@ -266,25 +295,28 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
-    // Posición VIVA de la reproducción. `PlaybackState.position` es una foto tomada
-    // en `lastPositionUpdateTime`, así que suele estar estancada (a menudo 0): hay
-    // que extrapolar con el tiempo transcurrido × velocidad. Si la app no da una
-    // posición útil, se estima por reloj de pared desde que empezamos a verla, para
-    // que al menos entre en "Continuar viendo".
-    private fun livePositionMs(controller: MediaController, pkg: String): Long {
-        val ps = controller.playbackState
-        if (ps != null) {
-            val base = ps.position
-            val updated = ps.lastPositionUpdateTime
-            if (ps.state == PlaybackState.STATE_PLAYING && updated > 0 && base >= 0) {
-                val speed = if (ps.playbackSpeed > 0f) ps.playbackSpeed else 1f
-                val live = base + ((SystemClock.elapsedRealtime() - updated) * speed).toLong()
-                if (live > 0) return live
-            }
-            if (base > 0) return base
+    // Posición VIVA de la reproducción, o null si la app NO la publica.
+    //
+    // `PlaybackState.position` es una foto tomada en `lastPositionUpdateTime`, así
+    // que suele estar estancada: hay que extrapolar con el tiempo transcurrido ×
+    // velocidad.
+    //
+    // Y si la app no publica posición, se devuelve NULL. Antes se estimaba con el
+    // reloj de pared desde que empezamos a mirar, y eso no es una posición: al
+    // retomar un episodio por el minuto 40 se enviaba "15 s" y "Continuar viendo"
+    // lo mandaba al principio; y como el porcentaje se calcula contra la duración
+    // de TMDb, un rato largo de reproducción cruzaba el 90% y marcaba como visto
+    // algo que no se había terminado. Mejor no enviar progreso que enviarlo mal.
+    private fun livePositionMs(controller: MediaController): Long? {
+        val ps = controller.playbackState ?: return null
+        val base = ps.position
+        val updated = ps.lastPositionUpdateTime
+        if (ps.state == PlaybackState.STATE_PLAYING && updated > 0 && base >= 0) {
+            val speed = if (ps.playbackSpeed > 0f) ps.playbackSpeed else 1f
+            val live = base + ((SystemClock.elapsedRealtime() - updated) * speed).toLong()
+            if (live > 0) return live
         }
-        val since = playingSince[pkg]
-        return if (since != null) (SystemClock.elapsedRealtime() - since).coerceAtLeast(0L) else 0L
+        return if (base > 0) base else null
     }
 
     // Envía el progreso del contenido ya resuelto, como mucho una vez cada
@@ -295,7 +327,15 @@ class MediaListenerService : NotificationListenerService() {
         // Mantiene viva la pista de la serie durante la reproducción (y la actualiza
         // a lo realmente resuelto): así el episodio que auto-reproduce a continuación
         // sigue resolviéndose con la serie correcta aunque la MediaSession no la dé.
-        RecentDetail.remember(pkg, synced)
+        //
+        // PERO no si la serie salió de la propia pista: reescribirla con lo que ella
+        // misma produjo la volvía indefinida —una ficha mal resuelta se
+        // realimentaba y se aplicaba a todo lo que se reprodujera después, que es
+        // como acababan series ajenas en el Historial—. Una pista solo se renueva
+        // con datos que vengan de fuera de ella.
+        if (!signal.seriesFromHint) {
+            RecentDetail.remember(pkg, synced)
+        }
         // Solo se exige POSICIÓN (casi siempre disponible ya, viva o estimada). La
         // DURACIÓN es opcional: si la app no la da, se envía 0 y el backend la
         // rellena desde TMDb. Así el título entra en "Continuar viendo" aunque la
@@ -312,6 +352,7 @@ class MediaListenerService : NotificationListenerService() {
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(
             origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
+            estimated = estimatedByPackage[pkg] == true,
         ) { ok, completed ->
             handler.post {
                 when {
@@ -334,25 +375,42 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
-    // Volcado inmediato al SALIR (pausa/stop): guarda el punto exacto usando la
-    // posición viva de la sesión (si sigue activa aunque pausada) o la última
-    // conocida. Ignora la cadencia de PROGRESS_PING_MS.
+    // Volcado inmediato al SALIR (pausa/stop). Ignora la cadencia de
+    // PROGRESS_PING_MS: es la última oportunidad de guardar el punto exacto.
     private fun flushProgressOnStop(pkg: String, sessions: List<MediaController>) {
+        volcarProgreso(pkg, sessions.firstOrNull { it.packageName == pkg })
+    }
+
+    /**
+     * Guarda el punto de reproducción de [pkg] AHORA, sin esperar al siguiente
+     * ping. Se usa al parar y al cambiar de contenido.
+     *
+     * La posición sale de la misma extrapolación que durante la reproducción. Antes
+     * se leía `playbackState.position` en crudo, que es una foto vieja —a menudo 0—
+     * y podía sobrescribir hacia ATRÁS un progreso bueno: se veía media película y
+     * al salir "Continuar viendo" la mandaba al principio. Por eso, además, nunca se
+     * envía una posición MENOR que la última conocida de este mismo contenido.
+     */
+    private fun volcarProgreso(pkg: String, controller: MediaController?) {
         val synced = syncedByPackage[pkg] ?: return
-        val controller = sessions.firstOrNull { it.packageName == pkg }
-        val md = controller?.metadata
-        val liveDur = md?.getLong(MediaMetadata.METADATA_KEY_DURATION)
-            ?.let { if (it > 0) it / 1000 else null }
-        val livePos = controller?.playbackState?.position
-            ?.let { if (it > 0) it / 1000 else null }
         val cached = lastPosByPackage[pkg]
-        val pos = livePos ?: cached?.first ?: return
-        // Duración opcional (0 = desconocida): el backend la completa desde TMDb.
-        val dur = liveDur ?: cached?.second ?: 0L
-        if (pos < 0) return
+        val liveSec = controller?.let { livePositionMs(it) }?.let { it / 1000 }
+        val dur = controller?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)
+            ?.let { if (it > 0) it / 1000 else null }
+            ?: cached?.second
+            ?: 0L
+
+        // El mayor entre lo que dice la sesión y lo último que vimos: una foto
+        // obsoleta no puede hacer retroceder el progreso.
+        val pos = maxOf(liveSec ?: 0L, cached?.first ?: 0L)
+        if (pos <= 0L) return
+
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
-        SyncClient.sendProgress(origin, token, synced, pos, dur, Platforms.idFor(pkg)) { ok, completed ->
+        SyncClient.sendProgress(
+            origin, token, synced, pos, dur, Platforms.idFor(pkg),
+            estimated = estimatedByPackage[pkg] == true,
+        ) { ok, completed ->
             handler.post {
                 if (ok && completed) {
                     prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")

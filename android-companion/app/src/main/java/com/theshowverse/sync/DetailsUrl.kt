@@ -8,6 +8,11 @@ data class SyncedInfo(
     val episode: Int? = null,
     val title: String? = null,
     val posterPath: String? = null,
+    // Confianza con la que el servidor resolvió el título ("high" | "medium" |
+    // "low"). Viaja de vuelta en los pings de progreso: sin ella el backend daba
+    // por "high" cualquier cosa que llegara a completarse y una resolución dudosa
+    // acababa en el Historial igual que una segura.
+    val confidence: String? = null,
 )
 
 /**

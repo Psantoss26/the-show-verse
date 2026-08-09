@@ -30,7 +30,7 @@ import {
   REWATCH_COMPLETION_COOLDOWN_MS,
 } from '../lib/rewatchCompletion.js';
 import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
-import { eq, and, gt, lt, isNull } from 'drizzle-orm';
+import { eq, and, gt, lt, isNull, sql } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
 const EMAIL_CHANGE_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -110,6 +110,10 @@ const netflixSyncSchema = z.object({
   netflixTitle: z.string().max(300).optional(),
   platform: z.string().max(40).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
+  // La posición no la publica el reproductor: está DEDUCIDA por reloj desde que
+  // se empezó a mirar (algunas apps de Android). Sirve para que el título salga
+  // en "Continuar viendo", pero no para dar nada por visto.
+  estimated: z.boolean().optional(),
 });
 
 // Progreso de reproducción en curso (position/duration) desde la extensión o la
@@ -124,6 +128,11 @@ const netflixProgressSchema = z.object({
   platform: z.string().max(40).optional(),
   title: z.string().max(300).optional(),
   posterPath: z.string().max(300).nullable().optional(),
+  // Con qué seguridad se resolvió el título (lo devuelve /extension-sync). Viaja
+  // en cada ping para poder guardarlo TAL CUAL al completar: antes se escribía
+  // 'high' a ciegas y una resolución dudosa quedaba en el historial indistinguible
+  // de una segura.
+  confidence: z.enum(['high', 'medium', 'low']).optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -1322,7 +1331,10 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
     }
 
-    const { tmdbId, mediaType, positionSeconds, runtimeSeconds, platform, title, posterPath } = parsed.data;
+    const {
+      tmdbId, mediaType, positionSeconds, runtimeSeconds, platform, title, posterPath,
+      confidence, estimated,
+    } = parsed.data;
     const isTv = mediaType === 'tv';
     // Clave del índice único: 0 para película o episodio desconocido.
     const season = isTv ? (parsed.data.season ?? 0) : 0;
@@ -1352,7 +1364,11 @@ export default async function authRoutes(fastify) {
     // cola (95%, 98%…) de una misma sesión ya no tienen fila y se colapsan por el
     // cooldown. Esto permite re-sincronizar el mismo episodio el mismo día como un
     // rewatch (antes: bucket de 12 h que lo descartaba).
-    if (effectiveRuntime > 0 && percent >= COMPLETE_AT) {
+    // Con posición DEDUCIDA no se completa nunca: el porcentaje saldría de
+    // comparar el rato que llevamos mirando contra la duración de TMDb, y eso daba
+    // por vistos episodios que no se habían terminado. Se sigue actualizando
+    // "Continuar viendo" más abajo.
+    if (effectiveRuntime > 0 && percent >= COMPLETE_AT && !estimated) {
       const now = new Date();
       // Valores tal y como se guardan en watch_history (null para película o
       // episodio desconocido); watch_progress usa el sentinel 0 (season/episode).
@@ -1408,7 +1424,8 @@ export default async function authRoutes(fastify) {
             runtimeMins: effectiveRuntime ? Math.round(effectiveRuntime / 60) : null,
             title: title || null,
             posterPath: posterPath || null,
-            confidence: 'high',
+            // La que traiga el cliente; 'high' solo si no la manda (clientes viejos).
+            confidence: confidence || 'high',
           })
           .returning();
       }
@@ -1442,9 +1459,17 @@ export default async function authRoutes(fastify) {
           watchProgress.episode,
         ],
         set: {
-          positionSeconds,
+          // Una posición DEDUCIDA no puede hacer retroceder una real ya guardada:
+          // al retomar por el minuto 40, la estimación empieza en 0 y mandaba
+          // "Continuar viendo" al principio. Con posición real se guarda tal cual
+          // (un rebobinado del usuario es legítimo).
+          positionSeconds: estimated
+            ? sql`GREATEST(${watchProgress.positionSeconds}, ${positionSeconds})`
+            : positionSeconds,
           runtimeSeconds: effectiveRuntime,
-          percent,
+          percent: estimated
+            ? sql`GREATEST(${watchProgress.percent}, ${percent})`
+            : percent,
           platform: platform || null,
           title: title || null,
           posterPath: posterPath || null,

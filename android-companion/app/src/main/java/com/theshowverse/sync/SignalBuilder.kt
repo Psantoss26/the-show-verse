@@ -98,20 +98,37 @@ object SignalBuilder {
             subtitleCore != null &&
             !subtitleCore.equals(title, ignoreCase = true)
 
+        // ¿Se puede usar la pista de la ficha? Es un dato de FUERA de la sesión —lo
+        // que el usuario tenía abierto antes de darle a reproducir—, así que se
+        // exige: número de episodio (señal fuerte de que esto es un episodio), que
+        // la sesión no traiga ya la serie, y que la pista no sea el propio episodio.
+        val hintUsable = hint != null &&
+            hasEpisodeNumber &&
+            TitleMatch.hintIsUsable(
+                hint = hint,
+                episodeTitle = title,
+                seriesFromSession = if (hasArtistAlbum) (artist ?: album) else null,
+            )
+
         // Nombre de la SERIE, por prioridad:
         //   1) artist/album de la MediaSession (lo más fiable cuando existe),
-        //   2) la pista de la FICHA de accesibilidad (hint) —solo si hay nº de
-        //      episodio, señal fuerte de que es un episodio—, para cubrir Netflix y
-        //      demás apps que no exponen la serie en la MediaSession,
-        //   3) el subtítulo cuando es un nombre de serie válido.
+        //   2) el subtítulo cuando es un nombre de serie válido,
+        //   3) la pista de la FICHA de accesibilidad (hint), para cubrir Netflix y
+        //      demás apps que no exponen la serie en la MediaSession.
+        // La pista va LA ÚLTIMA a propósito: los dos primeros describen lo que se
+        // está reproduciendo AHORA, mientras que la pista es un recuerdo de otra
+        // pantalla y puede haber quedado desfasada.
         val showTitle: String? = when {
             hasArtistAlbum -> artist ?: album
-            hint != null && hasEpisodeNumber -> hint
             subtitleIsSeries -> subtitle
+            hintUsable -> hint
             else -> null
         }
         val hasSeries = showTitle != null
         val episodeTitle = if (hasArtistAlbum) (title ?: subtitle) else title
+        // ¿La serie sale SOLO de la pista? El servidor lo usa para no dar por bueno
+        // con máxima confianza algo que no ha dicho la propia reproducción.
+        val seriesFromHint = hasSeries && showTitle === hint
 
         return PlaybackSignal(
             host = raw.packageName,
@@ -134,6 +151,7 @@ object SignalBuilder {
             artworkUrl = raw.artUri.clean(),
             durationSec = if (raw.durationMs > 0) raw.durationMs / 1000 else null,
             positionSec = if (raw.positionMs > 0) raw.positionMs / 1000 else null,
+            seriesFromHint = seriesFromHint,
         )
     }
 }

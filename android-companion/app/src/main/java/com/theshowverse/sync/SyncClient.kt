@@ -54,6 +54,9 @@ object SyncClient {
             putOpt("artworkUrl", signal.artworkUrl)
             signal.durationSec?.let { put("durationSec", it) }
             signal.positionSec?.let { put("positionSec", it) }
+            // El nombre de la serie sale de una ficha vista antes, no de lo que
+            // suena: el servidor rebaja la confianza en consecuencia.
+            if (signal.seriesFromHint) put("seriesFromHint", true)
             if (resolveOnly) put("resolveOnly", true)
         }
 
@@ -110,6 +113,7 @@ object SyncClient {
         positionSeconds: Long,
         runtimeSeconds: Long,
         platform: String?,
+        estimated: Boolean = false,
         onResult: (Boolean, Boolean) -> Unit,
     ) {
         val json = JSONObject().apply {
@@ -122,6 +126,10 @@ object SyncClient {
             putOpt("platform", platform)
             putOpt("title", synced.title)
             putOpt("posterPath", synced.posterPath)
+            putOpt("confidence", synced.confidence)
+            // Posición deducida por reloj (la app no la publica): el servidor la
+            // usa solo para Continuar viendo, nunca para marcar como visto.
+            if (estimated) put("estimated", true)
         }
 
         val url = origin.trimEnd('/') + "/api/netflix/extension-progress"
@@ -178,6 +186,7 @@ object SyncClient {
                 episode = if (synced.has("episode") && !synced.isNull("episode")) synced.optInt("episode") else null,
                 title = synced.optString("title").ifBlank { null },
                 posterPath = synced.optString("posterPath").ifBlank { null },
+                confidence = synced.optString("confidence").ifBlank { null },
             )
         } catch (e: Exception) {
             null

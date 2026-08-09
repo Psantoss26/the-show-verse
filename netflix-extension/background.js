@@ -706,6 +706,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       platform,
       positionSeconds,
       runtimeSeconds,
+      confidence,
     } = message;
 
     chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
@@ -736,6 +737,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           platform: platform || undefined,
           positionSeconds,
           runtimeSeconds,
+          // Con qué seguridad se resolvió el título: el backend la guarda tal cual
+          // si el contenido llega a completarse.
+          confidence: confidence || undefined,
         }),
         credentials: "omit",
       })
