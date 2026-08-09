@@ -2234,8 +2234,13 @@ export default function Navbar() {
             className={`flex flex-shrink-0 origin-left items-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             <LayoutGroup id="mobile-top-dashboards">
+              {/* `gap-1` separa los tres destinos: pegados, los iconos de 24px
+                  dentro de cajas de 32px dejaban solo 8px entre ellos y el
+                  grupo se leía como un bloque. El hueco se paga recortando el
+                  relleno de la cápsula activa (abajo), porque el ancho
+                  disponible lo marca el logo centrado. */}
               <div
-                className={`flex items-center rounded-full p-[3px] transition-colors duration-300 motion-reduce:transition-none ${
+                className={`flex items-center gap-1 rounded-full p-[3px] transition-colors duration-300 motion-reduce:transition-none ${
                   mobileTopBarHasGlass ? "" : LIQUID_GLASS_BAR
                 }`}
                 role="navigation"
@@ -2253,7 +2258,7 @@ export default function Navbar() {
                       aria-current={active ? "page" : undefined}
                       className={`relative flex h-8 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
                         active
-                          ? `px-2 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
+                          ? `px-1.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
                           : "w-8 text-white/70 hover:text-white"
                       }`}
                     >
