@@ -28,14 +28,15 @@ import {
   ArrowUpDown,
   CheckCircle2,
   ChevronDown,
+  Columns3,
   Eye,
   Filter,
   Heart,
+  Layers3,
   LayoutGrid,
   LayoutList,
   ListVideo,
   MessageSquare,
-  Rows3,
   Search,
   SlidersHorizontal,
   Star,
@@ -49,6 +50,11 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  SOCIAL_GROUP_OPTIONS,
+  SOCIAL_GROUP_SHORT_LABELS,
+  groupSocialFeed,
+} from "@/lib/social/feedGrouping";
 
 const PAGE_SIZE = 30;
 
@@ -74,6 +80,24 @@ const FILTROS = [
   ["list", "Listas"],
 ];
 
+// Vista y agrupado se RECUERDAN entre visitas, como en las páginas de usuario:
+// quien elige tarjetas espera encontrárselas la próxima vez.
+const CLAVE_VISTA = "showverse:social:viewMode";
+const CLAVE_AGRUPADO = "showverse:social:groupBy";
+const VISTAS = new Set(["list", "compact", "grid"]);
+
+function leerVistaGuardada() {
+  if (typeof window === "undefined") return "list";
+  const guardada = window.localStorage.getItem(CLAVE_VISTA);
+  return VISTAS.has(guardada) ? guardada : "list";
+}
+
+function leerAgrupadoGuardado() {
+  if (typeof window === "undefined") return "none";
+  const guardado = window.localStorage.getItem(CLAVE_AGRUPADO);
+  return SOCIAL_GROUP_OPTIONS.some(([v]) => v === guardado) ? guardado : "none";
+}
+
 function tiempoRelativo(fecha) {
   const ms = Date.now() - new Date(fecha).getTime();
   if (!Number.isFinite(ms)) return "";
@@ -96,8 +120,16 @@ function tipoDeFiltro(evento) {
   return evento.type;
 }
 
+// Anillo de hover de la sección, con la receta de las páginas de usuario: nada
+// en reposo y un aro de 2,5px del color de la página al pasar por encima. OJO:
+// va con `hover:after`, no con `group-hover:after` —el pseudoelemento es del
+// propio `.group`, y `group-hover:` apunta a sus DESCENDIENTES—.
+const ANILLO_HOVER =
+  "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(236,72,153,0.95)]";
+
 function EventoTarjeta({ evento, mostrarAutor, vista }) {
-  const soloCartel = vista === "posters";
+  const soloCartel = vista === "grid";
+  const compacta = vista === "compact";
   const meta = EVENTOS[evento.type] || {
     verbo: "ha actualizado",
     icon: ListVideo,
@@ -105,19 +137,28 @@ function EventoTarjeta({ evento, mostrarAutor, vista }) {
   };
   const Icono = meta.icon;
   const titulo = evento.title || evento.name || "Sin título";
+  // TAMAÑO DE LA PORTADA SEGÚN LA VISTA. En las filas el cartel mide 44-56px,
+  // así que w185 sobra; en la vista de tarjetas ocupa el ancho de la columna
+  // (~210px en escritorio) y con w185 se veía pastoso al ampliarlo, más aún en
+  // pantallas de 2x y 3x. w500 cubre esos casos sin traerse el original, que
+  // pesa varios megas por cartel.
   const poster = evento.posterPath
-    ? `https://image.tmdb.org/t/p/w185${evento.posterPath}`
+    ? `https://image.tmdb.org/t/p/${soloCartel ? "w500" : "w185"}${evento.posterPath}`
     : null;
   const href =
     evento.tmdbId && evento.mediaType
       ? `/details/${evento.mediaType === "tv" ? "tv" : "movie"}/${evento.tmdbId}`
       : null;
 
-  // Muro de carteles: solo la portada, con la acción sobreimpresa. Es la vista
-  // que de verdad se diferencia de las otras dos (fila completa y rejilla de 3).
+  // VISTA DE TARJETAS: solo la portada, con la acción sobreimpresa. Es la que
+  // se corresponde con el "grid" de las páginas de usuario —mismo formato de
+  // cartel, mismas esquinas y mismo anillo de hover—, y la que de verdad se
+  // diferencia de las dos de lista.
   if (soloCartel) {
     const contenido = (
-      <div className="group relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-lg">
+      <div
+        className={`group relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 ${ANILLO_HOVER}`}
+      >
         {poster ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={poster} alt={titulo} loading="lazy" className="h-full w-full object-cover" />
@@ -146,11 +187,18 @@ function EventoTarjeta({ evento, mostrarAutor, vista }) {
     );
   }
 
+  // VISTAS DE LISTA: la misma fila para las dos. La única diferencia es el
+  // tamaño —"compact" mete tres por fila— porque son la MISMA vista con más o
+  // menos densidad, igual que en las páginas de usuario.
   const cuerpo = (
-    <div className="relative isolate flex items-center gap-3.5 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-3 shadow-lg backdrop-blur-lg transition-colors hover:from-white/15 hover:to-white/10">
+    <div
+      className={`relative isolate flex items-center overflow-hidden rounded-xl bg-zinc-900/40 shadow-md transition-colors duration-300 hover:bg-zinc-900/65 ${ANILLO_HOVER} ${
+        compacta ? "gap-2.5 p-2" : "gap-3.5 p-3"
+      }`}
+    >
       <div
-        className={`relative shrink-0 overflow-hidden rounded-xl bg-zinc-900 ${
-          vista === "grid" ? "h-16 w-11" : "h-20 w-14"
+        className={`relative shrink-0 overflow-hidden rounded-lg bg-zinc-900 ${
+          compacta ? "h-16 w-11" : "h-20 w-14"
         }`}
       >
         {poster ? (
@@ -185,7 +233,11 @@ function EventoTarjeta({ evento, mostrarAutor, vista }) {
           </span>
         </div>
 
-        <p className="truncate text-sm font-bold leading-tight text-white sm:text-base">
+        <p
+          className={`truncate font-bold leading-tight text-white ${
+            compacta ? "text-sm" : "text-sm sm:text-base"
+          }`}
+        >
           {titulo}
         </p>
 
@@ -269,9 +321,13 @@ export default function SocialClient() {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("all");
   const [orden, setOrden] = useState("recent");
-  // Tres vistas REALMENTE distintas: fila completa, rejilla de 3 y muro de
-  // carteles. Antes "compact" y "grid" se diferenciaban solo en el relleno.
-  const [vista, setVista] = useState("list");
+  // Las MISMAS tres vistas que las páginas de usuario: una fila por evento,
+  // tres por fila, y tarjetas de cartel.
+  const [vista, setVistaState] = useState(leerVistaGuardada);
+  // Agrupado, como en Historial/Favoritos/Pendientes. Por defecto sin agrupar:
+  // un muro de actividad se lee en orden, y quien quiera cortarlo por días lo
+  // pide.
+  const [agrupar, setAgruparState] = useState(leerAgrupadoGuardado);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   // Buscador de escritorio enfocado: mientras lo está, los desplegables sueltan
   // su rótulo y su ancho mínimo para dejarle sitio (comportamiento de Historial).
@@ -282,6 +338,20 @@ export default function SocialClient() {
   const panelRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
+
+  const setVista = useCallback((modo) => {
+    setVistaState(modo);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CLAVE_VISTA, modo);
+    }
+  }, []);
+
+  const setAgrupar = useCallback((modo) => {
+    setAgruparState(modo);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CLAVE_AGRUPADO, modo);
+    }
+  }, []);
 
   // REANCLAJE DE LA LISTA AL USAR EL MENÚ.
   //
@@ -390,7 +460,7 @@ export default function SocialClient() {
       return;
     }
     reanclajePendiente.current = true;
-  }, [vista, filtro, orden, scope]);
+  }, [vista, agrupar, filtro, orden, scope]);
 
   // Se reancla en cuanto hay lista que reanclar. Sin lista de dependencias a
   // propósito: al cambiar de alcance el feed se recarga y en ese commit todavía
@@ -419,6 +489,13 @@ export default function SocialClient() {
     }
     return lista;
   }, [items, q, filtro, orden]);
+
+  // `null` cuando no hay que agrupar: quien pinta decide entre una sola rejilla
+  // y una cabecera por grupo sin mirar longitudes.
+  const grupos = useMemo(
+    () => groupSocialFeed(visibles, agrupar, { orden }),
+    [visibles, agrupar, orden],
+  );
 
   if (!hydrated) return <div className="min-h-screen bg-black" />;
 
@@ -579,42 +656,79 @@ export default function SocialClient() {
                 animate={{ height: "auto" }}
                 exit={{ height: 0 }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] mt-2 origin-top space-y-2 overflow-hidden lg:hidden ${
-                  filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+                className={`z-[80] origin-top overflow-hidden lg:hidden ${
+                  // Fijado, el panel arranca A RAS del buscador: el hueco de
+                  // 8px dejaba ver por debajo la tarjeta que hubiera detrás. La
+                  // separación se recupera dentro de la superficie.
+                  filtersSticky
+                    ? "absolute left-0 right-0 top-full"
+                    : "relative mt-2"
                 }`}
               >
-                {/* Dos controles por fila, como en las páginas de usuario. */}
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SelectorSimple
-                      icon={Filter}
-                      label="Acción"
-                      opciones={FILTROS}
-                      valor={filtro}
-                      onChange={setFiltro}
+                {/* SUPERFICIE PROPIA cuando el panel es overlay.
+                    Cada control lleva su cristal, pero entre ellos quedaban
+                    huecos por los que se veía —difuminada por el desenfoque de
+                    los controles— la tarjeta que hubiera detrás: esa era la
+                    "banda difuminada sobre el contenido" al abrir el menú. Con
+                    una superficie única el menú tapa lo que cubre. Al principio
+                    de la página el panel va en el flujo y no hay nada detrás,
+                    así que ahí no hace falta. */}
+                <div
+                  className={`space-y-2 ${
+                    filtersSticky
+                      ? "rounded-b-3xl bg-black/90 px-2 pb-2 pt-2 shadow-2xl backdrop-blur-2xl"
+                      : ""
+                  }`}
+                >
+                  {/* Dos controles por fila, como en las páginas de usuario. */}
+                  <div className="flex gap-2">
+                    <div className="min-w-0 flex-1">
+                      <SelectorSimple
+                        icon={Filter}
+                        label="Acción"
+                        opciones={FILTROS}
+                        valor={filtro}
+                        onChange={setFiltro}
+                        compactMobile
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <SelectorSimple
+                        icon={Layers3}
+                        label="Agrupar"
+                        opciones={SOCIAL_GROUP_OPTIONS}
+                        etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
+                        valor={agrupar}
+                        onChange={setAgrupar}
+                        compactMobile
+                      />
+                    </div>
+                  </div>
+
+                  {/* Segunda fila: orden y vistas, para que el menú quede en dos
+                      filas de dos como en las demás páginas. */}
+                  <div className="flex gap-2">
+                    <div className="min-w-0 flex-1">
+                      <SelectorSimple
+                        icon={ArrowUpDown}
+                        label="Orden"
+                        opciones={[
+                          ["recent", "Reciente"],
+                          ["oldest", "Antiguo"],
+                        ]}
+                        valor={orden}
+                        onChange={setOrden}
+                        compactMobile
+                      />
+                    </div>
+                    <SelectorVista
+                      vista={vista}
+                      setVista={setVista}
+                      controlGlass={controlGlass}
+                      activo={activo}
+                      fill
                     />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <SelectorSimple
-                      icon={ArrowUpDown}
-                      label="Orden"
-                      opciones={[
-                        ["recent", "Reciente"],
-                        ["oldest", "Antiguo"],
-                      ]}
-                      valor={orden}
-                      onChange={setOrden}
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <SelectorVista
-                    vista={vista}
-                    setVista={setVista}
-                    controlGlass={controlGlass}
-                    activo={activo}
-                    fill
-                  />
                 </div>
               </motion.div>
             ) : null}
@@ -647,6 +761,14 @@ export default function SocialClient() {
               opciones={FILTROS}
               valor={filtro}
               onChange={setFiltro}
+              compact={desktopSearchFocused}
+            />
+            <SelectorSimple
+              icon={Layers3}
+              label="Agrupar"
+              opciones={SOCIAL_GROUP_OPTIONS}
+              valor={agrupar}
+              onChange={setAgrupar}
               compact={desktopSearchFocused}
             />
             <SelectorSimple
@@ -697,26 +819,45 @@ export default function SocialClient() {
           </motion.div>
         ) : (
           <>
-            <div
-              ref={listaRef}
-              className={
-                vista === "grid"
-                  // 3 por fila en escritorio (que es la vista que se pidió
-                  // conservar) y 2 en móvil, para que se distinga de la lista.
-                  ? "grid grid-cols-2 gap-3 lg:grid-cols-3"
-                  : vista === "posters"
-                    ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8"
-                    : "flex flex-col gap-3"
-              }
-            >
-              {visibles.map((evento) => (
-                <EventoTarjeta
-                  key={evento.id}
-                  evento={evento}
-                  mostrarAutor={scope === "following"}
-                  vista={vista}
-                />
-              ))}
+            {/* Con agrupado, una cabecera por grupo y su propia rejilla debajo,
+                igual que en las páginas de usuario. Sin agrupado, una sola. */}
+            <div ref={listaRef}>
+              {grupos ? (
+                <div className="space-y-8">
+                  {grupos.map((grupo, indice) => (
+                    <div key={grupo.key}>
+                      <GrupoDivisor
+                        titulo={grupo.label}
+                        cuenta={grupo.items.length}
+                        total={visibles.length}
+                        primero={indice === 0}
+                        isBackNav={isBackNav}
+                      />
+                      <div className={clasesDeRejilla(vista)}>
+                        {grupo.items.map((evento) => (
+                          <EventoTarjeta
+                            key={evento.id}
+                            evento={evento}
+                            mostrarAutor={scope === "following"}
+                            vista={vista}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={clasesDeRejilla(vista)}>
+                  {visibles.map((evento) => (
+                    <EventoTarjeta
+                      key={evento.id}
+                      evento={evento}
+                      mostrarAutor={scope === "following"}
+                      vista={vista}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {hasMore ? (
@@ -765,7 +906,7 @@ function SelectorAlcance({
           // buscador. El nombre sigue estando para lectores de pantalla.
           aria-label={soloIconos ? etiqueta : undefined}
           title={soloIconos ? etiqueta : undefined}
-          className={`flex h-full items-center justify-center rounded-lg text-sm font-bold transition-all ${
+          className={`flex h-full items-center justify-center rounded-xl text-sm font-bold transition-all ${
             soloIconos ? "w-9" : "flex-1 gap-2 px-3"
           } ${
             scope === valor
@@ -787,7 +928,15 @@ function SelectorAlcance({
 // desde el botón: el panel de filtros tiene `backdrop-filter`, que crea un
 // contexto de apilamiento, y un menú `absolute` dentro quedaría recortado por
 // él. Con el portal siempre se ve por encima de todo.
-function InlineDropdown({ label, valueLabel, icon: Icon, children, compact = false }) {
+function InlineDropdown({
+  label,
+  valueLabel,
+  mobileValueLabel = null,
+  icon: Icon,
+  children,
+  compact = false,
+  compactMobile = false,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -855,16 +1004,28 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children, compact = fal
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-pink-500" /> : null}
+          {/* En el móvil, con el botón a media fila, el rótulo se lleva el sitio
+              que necesita el valor ("ORDEN: Re…"): ahí se esconde y manda el
+              icono, igual que hacen las páginas de usuario. */}
           <span
             aria-hidden={compact}
             className={`shrink-0 overflow-hidden whitespace-nowrap text-xs font-bold uppercase tracking-wider text-zinc-500 transition-[max-width,opacity] duration-200 ${
               compact ? "max-w-0 opacity-0" : "max-w-24 opacity-100"
-            }`}
+            } ${compactMobile ? "hidden sm:inline" : ""}`}
           >
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
-            {valueLabel}
+            {/* En móvil, donde el botón ocupa media fila, se usa la versión
+                abreviada; a partir de `lg` cabe entera. */}
+            {mobileValueLabel ? (
+              <>
+                <span className="lg:hidden">{mobileValueLabel}</span>
+                <span className="hidden lg:inline">{valueLabel}</span>
+              </>
+            ) : (
+              valueLabel
+            )}
           </span>
         </div>
         <ChevronDown
@@ -918,10 +1079,31 @@ function DropdownItem({ active, onClick, children }) {
 }
 
 // Envoltorio: mismo desplegable con una lista simple de opciones.
-function SelectorSimple({ icon, label, opciones, valor, onChange, compact = false }) {
+//
+// `etiquetasCortas` da una versión abreviada del valor para cuando el botón va
+// a media fila en el móvil ("Sin agr." en vez de "Sin agrupar"), igual que hace
+// el desplegable de agrupar de las páginas de usuario.
+function SelectorSimple({
+  icon,
+  label,
+  opciones,
+  valor,
+  onChange,
+  compact = false,
+  compactMobile = false,
+  etiquetasCortas = null,
+}) {
   const actual = opciones.find(([v]) => v === valor)?.[1] || opciones[0][1];
+  const corta = etiquetasCortas?.[valor];
   return (
-    <InlineDropdown label={label} valueLabel={actual} icon={icon} compact={compact}>
+    <InlineDropdown
+      label={label}
+      valueLabel={actual}
+      mobileValueLabel={corta}
+      icon={icon}
+      compact={compact}
+      compactMobile={compactMobile}
+    >
       {({ close }) => (
         <>
           {opciones.map(([v, etiqueta]) => (
@@ -942,6 +1124,53 @@ function SelectorSimple({ icon, label, opciones, valor, onChange, compact = fals
   );
 }
 
+// Cómo se reparte cada vista. Fuera del componente porque la usan los dos
+// caminos de pintado (con grupos y sin ellos) y así no pueden divergir.
+function clasesDeRejilla(vista) {
+  if (vista === "grid") {
+    // Tarjetas de cartel, con el mismo escalado por ancho que las páginas de
+    // usuario: más pequeñas en el móvil, sin llegar nunca al muro diminuto.
+    return "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6";
+  }
+  if (vista === "compact") {
+    // TRES POR FILA en escritorio, que es lo que distingue esta vista de la de
+    // una fila. En el móvil no caben tres filas con texto: van dos.
+    return "grid grid-cols-2 gap-3 lg:grid-cols-3";
+  }
+  return "flex flex-col gap-3";
+}
+
+// Cabecera de grupo con la misma forma que la de las páginas de usuario:
+// pastilla de cristal, barra de color de la sección, título y recuento.
+function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
+  const porcentaje = total > 0 ? Math.round((cuenta / total) * 100) : 0;
+  return (
+    <motion.div
+      className={primero ? "mb-4 mt-0 sm:mb-6" : "mb-4 sm:mb-6"}
+      initial={isBackNav ? false : { opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={isBackNav ? { duration: 0 } : { duration: 0.4, ease: "easeOut" }}
+    >
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 shadow-xl backdrop-blur-lg">
+        <div className="relative flex items-center gap-2 px-3 py-2.5 sm:gap-4 sm:px-6 sm:py-5">
+          <div className="h-8 w-1 shrink-0 rounded-full bg-gradient-to-b from-pink-500 to-fuchsia-600 shadow-[0_0_15px_rgba(236,72,153,0.4)] sm:h-12 sm:w-1.5" />
+          <div className="min-w-0 flex-1">
+            <h2 className="line-clamp-1 text-base font-black leading-tight tracking-tight text-white sm:text-2xl">
+              {titulo}
+            </h2>
+            <div className="mt-0.5 flex items-center gap-x-1.5 text-[10px] font-medium text-zinc-500 sm:mt-1 sm:gap-x-2 sm:text-sm">
+              <span className="font-bold text-zinc-300">{cuenta}</span>
+              <span>{cuenta === 1 ? "actividad" : "actividades"}</span>
+              <span className="h-0.5 w-0.5 rounded-full bg-zinc-700 sm:h-1 sm:w-1" />
+              <span className="opacity-90">{porcentaje}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) {
   return (
     <div
@@ -949,8 +1178,8 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) 
     >
       {[
         ["list", LayoutList, "Lista"],
-        ["grid", LayoutGrid, "Rejilla"],
-        ["posters", Rows3, "Carteles"],
+        ["compact", Columns3, "Tres por fila"],
+        ["grid", LayoutGrid, "Tarjetas"],
       ].map(([valor, Icono, etiqueta]) => (
         <button
           key={valor}
