@@ -232,6 +232,10 @@ export async function POST(request) {
       // `resolveStreamingEntity`/`decideByDuration`) -- p. ej. "X-Men" existe
       // como película Y como serie animada con el mismo título exacto.
       durationSec,
+      // El nombre de la SERIE no lo ha dicho la reproducción: viene de la ficha que
+      // el usuario tenía abierta antes (app Android, apps que no exponen la serie en
+      // la MediaSession). Es un dato prestado, así que rebaja la confianza.
+      seriesFromHint,
       // Modo "solo resolver": para el indicador en la FICHA del título (navegando,
       // sin reproducir). Resuelve el título pero NO lo inserta en el historial.
       resolveOnly,
@@ -454,6 +458,11 @@ export async function POST(request) {
       }
     }
 
+    // Serie tomada de una ficha ajena a la reproducción: por buena que fuera la
+    // coincidencia en TMDb, el dato de partida no lo dio el reproductor. Nunca
+    // "high", para que el historial distinga lo seguro de lo deducido.
+    if (seriesFromHint && confidence === "high") confidence = "medium";
+
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
       return respond({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
@@ -473,6 +482,10 @@ export async function POST(request) {
           title: resolvedTitle,
           episodeName: isTv ? (tmdbEpisodeName || episodeName || null) : null,
           posterPath,
+          // La confianza viaja también en modo "solo resolver": el cliente la
+          // devuelve en los pings de progreso y es la que se guarda si el
+          // contenido llega a completarse.
+          confidence,
         },
       });
     }

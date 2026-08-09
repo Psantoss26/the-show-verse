@@ -1,6 +1,8 @@
 package com.theshowverse.sync
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -163,5 +165,61 @@ class SignalBuilderTest {
         val sig = SignalBuilder.build(raw, "Crunchyroll")
         assertEquals(1, sig.season)
         assertEquals(4, sig.episode)
+    }
+
+    @Test
+    fun marksWhenTheSeriesNameCameOnlyFromTheHint() {
+        // La serie sale de la ficha vista antes, no de la sesión: se marca para que
+        // el servidor no le dé la misma confianza que a un dato de la reproducción.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "A ti, dentro de 2000 años",
+            displaySubtitle = "T1:E1 - A ti, dentro de 2000 años",
+        )
+        val sig = SignalBuilder.build(raw, "Netflix", hintShowName = "Ataque a los Titanes")
+        assertEquals("Ataque a los Titanes", sig.showName)
+        assertTrue(sig.seriesFromHint)
+
+        // Con la serie en la propia sesión, la pista ni se toca.
+        val conArtista = SignalBuilder.build(
+            raw.copy(artist = "Peaky Blinders"),
+            "Netflix",
+            hintShowName = "Ataque a los Titanes",
+        )
+        assertEquals("Peaky Blinders", conArtista.showName)
+        assertFalse(conArtista.seriesFromHint)
+    }
+
+    @Test
+    fun sessionSubtitleBeatsTheRememberedHint() {
+        // El subtítulo describe lo que suena AHORA; la pista es un recuerdo de otra
+        // pantalla. Si los dos aportan serie, manda la sesión.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "El trato",
+            displaySubtitle = "La casa del dragón",
+            album = null,
+        )
+        val sig = SignalBuilder.build(
+            raw.copy(displaySubtitle = "La casa del dragón · E3"),
+            "Netflix",
+            hintShowName = "Ataque a los Titanes",
+        )
+        assertEquals("La casa del dragón · E3", sig.showName)
+        assertFalse(sig.seriesFromHint)
+    }
+
+    @Test
+    fun ignoresHintWhenItIsTheEpisodeItself() {
+        // Ficha del EPISODIO (no de la serie): usarla como nombre de serie manda a
+        // TMDb el episodio y devuelve un título sin relación.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "A ti, dentro de 2000 años",
+            displaySubtitle = "T1:E1 - A ti, dentro de 2000 años",
+        )
+        val sig = SignalBuilder.build(raw, "Netflix", hintShowName = "A ti, dentro de 2000 años")
+        assertNull(sig.showName)
+        assertFalse(sig.seriesFromHint)
     }
 }
