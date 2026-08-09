@@ -50,6 +50,8 @@ import {
 import useAddToListFlow from "@/lib/recommendations/useAddToListFlow";
 import {
   prefetchCardArtwork,
+  preloadCardImages,
+  preloadStackImages,
   useCardArtwork,
 } from "@/lib/recommendations/cardArtwork";
 import {
@@ -158,6 +160,22 @@ export default function RecommendationsClient() {
         const incoming = (json.items || []).filter(
           (item) => item?.tmdbId && !consumedRef.current.has(cardKey(item)),
         );
+
+        // La PRIMERA carta se enseña ya terminada. Si no, se veía la baraja
+        // montarse por partes: el marco vacío, después el póster que venía en la
+        // recomendación y encima el arte neutro y el logo al llegar. Con el
+        // spinner aguantando hasta aquí, aparece de una pieza.
+        //
+        // Solo al abrir o al cambiar de filtro: en los rellenos por detrás
+        // (`append`) no hay nada que esperar, porque la carta visible no cambia.
+        if (!append && incoming.length > 0) {
+          // Las de detrás se piden A LA VEZ pero sin esperarlas: son
+          // decorativas y solo asoman unos píxeles, así que no deben retrasar
+          // la aparición de la baraja. Lanzarlas ya, y no después de pintar,
+          // hace que en escritorio lleguen casi siempre a tiempo.
+          preloadStackImages(incoming.slice(1, 3));
+          await preloadCardImages(incoming[0]);
+        }
 
         setDeck((prev) => {
           if (!append) return incoming;

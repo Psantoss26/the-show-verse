@@ -89,6 +89,84 @@ export async function loadCardArtwork(item, { priority = "normal" } = {}) {
   return artwork;
 }
 
+/**
+ * Espera a que la carta esté LISTA PARA ENSEÑARSE: su arte resuelto y sus
+ * imágenes descargadas y decodificadas.
+ *
+ * Sin esto, al entrar en Recomendaciones se veía la baraja montarse a trozos:
+ * primero los marcos vacíos, luego el póster que traía la recomendación, y
+ * encima el arte neutro y el logo según iban llegando. Aquí se aguanta el
+ * spinner hasta que la primera carta puede aparecer entera.
+ *
+ * Con TOPE de tiempo a propósito: si TMDb va lento, más vale enseñar la carta
+ * aunque le falte una imagen que dejar la página en blanco indefinidamente.
+ */
+export async function preloadCardImages(item, { limiteMs = 3000 } = {}) {
+  if (!item?.tmdbId) return null;
+
+  const artwork = await conTope(
+    loadCardArtwork(item, { priority: "high" }).catch(() => null),
+    limiteMs,
+  );
+
+  const esEscritorio =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(min-width: 640px)")?.matches;
+
+  // Solo lo que se va a ver: en escritorio manda el backdrop; en móvil, el
+  // póster. El logo va encima en ambos casos.
+  const rutas = [
+    esEscritorio
+      ? artwork?.backdropPath && `https://image.tmdb.org/t/p/w1280${artwork.backdropPath}`
+      : artwork?.posterPath && `https://image.tmdb.org/t/p/w780${artwork.posterPath}`,
+    esEscritorio
+      ? artwork?.backdropLogoPath && `https://image.tmdb.org/t/p/w500${artwork.backdropLogoPath}`
+      : artwork?.logoPath && `https://image.tmdb.org/t/p/w500${artwork.logoPath}`,
+  ].filter(Boolean);
+
+  // El tope se cuenta APARTE para la consulta y para las imágenes: si se
+  // compartiera, una consulta lenta se comería el presupuesto entero y la
+  // portada volvería a aparecer sin descargar, que es justo lo que se evita.
+  await conTope(Promise.all(rutas.map(descargarImagen)), limiteMs);
+  return artwork;
+}
+
+/**
+ * Precarga las portadas de las cartas de la pila (las de detrás). Usan el
+ * backdrop QUE YA TRAE la recomendación en w780 —no el arte neutro—, así que su
+ * URL se construye aquí igual que en la baraja; pedir otra no calentaría nada.
+ */
+export function preloadStackImages(items = []) {
+  for (const item of items) {
+    if (!item?.backdropPath) continue;
+    descargarImagen(`https://image.tmdb.org/t/p/w780${item.backdropPath}`);
+  }
+}
+
+/** Resuelve con lo que haya si [promesa] tarda más de [ms]. */
+function conTope(promesa, ms) {
+  return Promise.race([
+    promesa,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+/** Descarga y decodifica una imagen. Nunca falla: un error no debe bloquear. */
+function descargarImagen(src) {
+  if (typeof window === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.decoding = "async";
+    img.onload = () => {
+      // `decode` evita el parpadeo de pintar mientras aún se descomprime.
+      if (typeof img.decode === "function") img.decode().then(resolve, resolve);
+      else resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
 /** Precarga el arte de las siguientes cartas para que no aparezcan "desnudas". */
 export function prefetchCardArtwork(items = []) {
   for (const item of items) {
