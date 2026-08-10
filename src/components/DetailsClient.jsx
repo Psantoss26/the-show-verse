@@ -113,7 +113,12 @@ import {
   useViewerTitleStates,
 } from "@/components/social/useViewerTitleStates";
 import { isOwnedComment } from "@/lib/community/commentOwnership";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import {
+  LIQUID_GLASS_BAR,
+  LIQUID_GLASS_CARD,
+  LIQUID_GLASS_PANEL,
+} from "@/lib/ui/liquidGlass";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   getImages,
@@ -11385,7 +11390,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           icon={Sparkles}
                         />
 
-                        <div className="mt-3 sm:mt-4 relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
+                        {/* Panel de sección con el cristal COMPARTIDO
+                            (`LIQUID_GLASS_BAR` + capas ópticas), el mismo que
+                            AwardsPanel, DetailsInfoTabs y el marcador. Antes
+                            llevaba una copia a mano del acabado que se había
+                            quedado atrás: `backdrop-blur-lg` sin saturación ni
+                            brillo, con lo que no dejaba pasar el color del fondo
+                            y se leía como un panel gris. */}
+                        <div
+                          className={`mt-3 sm:mt-4 relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_BAR}`}
+                        >
+                          <LiquidGlassOpticalLayers />
                           {/* Header del bloque */}
                           <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-6 py-4">
                             <div className="flex items-center gap-4">
@@ -11415,8 +11430,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* Sin mostrar error, directamente el contenido */}
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                               {/* Columna Positiva */}
-                              <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5 sm:border-emerald-500/5">
-                                <div className="mb-4 flex items-center gap-3">
+                              {/* Las dos columnas van con el cristal de TARJETA
+                                  (sin sombra: en grupo las sombras se solapan y
+                                  forman una banda oscura). El tinte de color se
+                                  pinta encima, para no tener que tocar la receta. */}
+                              {/* SIN cristal propio: el de la sección ya está debajo.
+                                  Repetir el acabado por columna añadía un canto
+                                  luminoso en cada una y el conjunto dejaba de
+                                  leerse como UNA superficie de vidrio. Aquí solo
+                                  queda el tinte de color. */}
+                              <div
+                                className="relative isolate overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/15 via-emerald-500/[0.04] to-transparent"
+                              >
+                                <div className="relative z-10 mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
                                     <ThumbsUp className="h-4 w-4" />
                                   </div>
@@ -11426,7 +11452,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 </div>
 
                                 {tSentiment.pros?.length ? (
-                                  <ul className="space-y-3">
+                                  <ul className="relative z-10 space-y-3">
                                     {tSentiment.pros.map((s, i) => (
                                       <li
                                         key={i}
@@ -11438,15 +11464,22 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ))}
                                   </ul>
                                 ) : (
-                                  <div className="text-sm italic text-zinc-500">
+                                  <div className="relative z-10 text-sm italic text-zinc-500">
                                     No hay suficientes datos positivos.
                                   </div>
                                 )}
                               </div>
 
                               {/* Columna Negativa */}
-                              <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-gradient-to-br from-rose-500/10 via-transparent to-transparent backdrop-blur-md shadow-sm transform-gpu p-5 sm:border-rose-500/5">
-                                <div className="mb-4 flex items-center gap-3">
+                              {/* SIN cristal propio: el de la sección ya está debajo.
+                                  Repetir el acabado por columna añadía un canto
+                                  luminoso en cada una y el conjunto dejaba de
+                                  leerse como UNA superficie de vidrio. Aquí solo
+                                  queda el tinte de color. */}
+                              <div
+                                className="relative isolate overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-rose-500/15 via-rose-500/[0.04] to-transparent"
+                              >
+                                <div className="relative z-10 mb-4 flex items-center gap-3">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
                                     <ThumbsDown className="h-4 w-4" />
                                   </div>
@@ -11456,7 +11489,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 </div>
 
                                 {tSentiment.cons?.length ? (
-                                  <ul className="space-y-3">
+                                  <ul className="relative z-10 space-y-3">
                                     {tSentiment.cons.map((s, i) => (
                                       <li
                                         key={i}
@@ -11468,7 +11501,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     ))}
                                   </ul>
                                 ) : (
-                                  <div className="text-sm italic text-zinc-500">
+                                  <div className="relative z-10 text-sm italic text-zinc-500">
                                     No hay suficientes datos negativos.
                                   </div>
                                 )}
@@ -11549,7 +11582,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   onMouseEnter={() => prefetchSeasonDetails(sn)}
                                   onFocus={() => prefetchSeasonDetails(sn)}
                                   onTouchStart={() => prefetchSeasonDetails(sn)}
-                                  className="group relative isolate overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:-translate-y-1 hover:bg-white/5 hover:shadow-2xl after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)] text-left w-full"
+                                  // Cristal de TARJETA compartido: van en rejilla,
+                                  // así que sin sombra propia (varias sombras
+                                  // juntas forman una banda oscura detrás del
+                                  // grupo). Se conserva el anillo ámbar de hover
+                                  // de las páginas de la ficha.
+                                  className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]`}
                                   aria-label={`Ver ${titleSeason}`}
                                 >
                                   {/* Fondo decorativo del número de temporada */}
@@ -11712,7 +11750,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             return (
                               <div
                                 key={r.id}
-                                className="relative isolate flex flex-col p-6 overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all hover:border-white/5 gap-4"
+                                className={`relative isolate flex flex-col gap-4 overflow-hidden rounded-2xl p-6 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
                               >
                                 <div className="relative z-10 flex items-center gap-4">
                                   <OptimizedImage
@@ -11759,7 +11797,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={MessageSquareIcon}
                       />
 
-                      <div className="relative isolate overflow-hidden rounded-2xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu">
+                      <div
+                        className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_BAR}`}
+                      >
+                        <LiquidGlassOpticalLayers />
                         {/* Filtros estilo Tabs Modernos */}
                         <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -11772,10 +11813,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={t.id}
                                 type="button"
                                 onClick={() => setTCommentsTab(t.id)}
-                                className={`relative isolate transform-gpu rounded-xl px-4 py-1.5 text-xs font-bold transition-all flex items-center justify-center border ${
+                                className={`relative isolate flex transform-gpu items-center justify-center rounded-xl px-4 py-1.5 text-xs font-bold transition-all ${
                                   tCommentsTab === t.id
-                                    ? "border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-sm text-white"
-                                    : "border-transparent bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
+                                    ? `${LIQUID_GLASS_CARD} text-white`
+                                    : "bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
                                 }`}
                               >
                                 {t.label}
@@ -11828,10 +11869,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   key={String(
                                     c?.id || `${user?.username}-${created}`,
                                   )}
-                                  className="group relative flex gap-4 rounded-2xl border border-transparent bg-white/5 p-5 transition-all hover:bg-white/10 hover:border-white/5 shadow-sm"
+                                  className={`group relative isolate flex gap-4 overflow-hidden rounded-2xl p-5 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
                                 >
                                   {/* Avatar */}
-                                  <div className="shrink-0">
+                                  <div className="relative z-10 shrink-0">
                                     <OptimizedImage
                                       src={avatar}
                                       alt={user?.username}
@@ -11840,7 +11881,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
 
                                   {/* Content */}
-                                  <div className="min-w-0 flex-1">
+                                  <div className="relative z-10 min-w-0 flex-1">
                                     <div className="mb-1 flex items-baseline justify-between gap-2">
                                       <div className="flex items-center gap-2">
                                         {profileUsername ? (
