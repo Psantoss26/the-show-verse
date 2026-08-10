@@ -135,6 +135,14 @@ class WebAppActivity : AppCompatActivity() {
         val web = binding.webView
         web.setBackgroundColor(ContextCompat.getColor(this, R.color.tsv_black))
 
+        // MENOS RELLENOS A PANTALLA COMPLETA POR FOTOGRAMA. El WebView ya es
+        // opaco (línea de arriba) y cubre toda la ventana, así que el fondo de la
+        // ventana se pinta debajo para nada. Con la interfaz llena de
+        // `backdrop-filter` —que ya es cara de por sí— ese relleno de más se paga
+        // en cada fotograma. Se quita aquí, no en el tema, porque el tema es quien
+        // pinta la pantalla de arranque antes de que exista el WebView.
+        window.setBackgroundDrawable(null)
+
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -157,6 +165,13 @@ class WebAppActivity : AppCompatActivity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
             userAgentString = "$userAgentString ${BuildConfig.UA_SUFFIX}"
+            // FLUIDEZ AL DESPLAZARSE. Por defecto el WebView solo rasteriza lo
+            // que se ve: al desplazar tiene que rasterizar la franja que entra,
+            // en el mismo fotograma, y ahí es donde se notan los tirones frente a
+            // Chrome/PWA (que mantiene rasterizada un área mayor). Con esto el
+            // WebView sigue rasterizando fuera de la ventana visible. Cuesta
+            // memoria, que es justo lo que sobra en una app de una sola pantalla.
+            setOffscreenPreRaster(true)
         }
 
         // The Show Verse ya pinta su tema oscuro y su liquid glass en CSS. Si el
@@ -437,6 +452,22 @@ class WebAppActivity : AppCompatActivity() {
         // Deslizar para recargar SOLO cuando la página está arriba del todo: si
         // no, el gesto compite con el scroll y con los carruseles horizontales.
         binding.refresh.setOnChildScrollUpCallback { _, _ -> binding.webView.scrollY > 0 }
+
+        // Y, ADEMÁS, se APAGA mientras no estás arriba del todo.
+        //
+        // El callback de arriba evita que el gesto dispare la recarga, pero el
+        // contenedor sigue en el camino del táctil: cada movimiento del dedo pasa
+        // por su `onInterceptTouchEvent` antes de llegar al WebView. Chrome/PWA no
+        // tiene ningún contenedor así, y esa diferencia se nota como un arranque
+        // del desplazamiento menos inmediato. Desactivado, Android se lo salta
+        // entero y los eventos van directos al WebView.
+        binding.refresh.isEnabled = true
+        binding.webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            val arriba = scrollY <= 0
+            if (binding.refresh.isEnabled != arriba && !binding.refresh.isRefreshing) {
+                binding.refresh.isEnabled = arriba
+            }
+        }
         binding.refresh.setColorSchemeColors(ContextCompat.getColor(this, R.color.tsv_amber))
         binding.refresh.setProgressBackgroundColorSchemeColor(
             ContextCompat.getColor(this, R.color.tsv_black),
