@@ -554,7 +554,16 @@ export default function LiquidButton({
               ? "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
               : "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
         }
-        ${isExploding ? "" : "transition-all duration-300"}
+        ${
+          isExploding
+            ? ""
+            // `transition-all` incluía `backdrop-filter` y `box-shadow`, que en
+            // una fila de botones de cristal son de lo más caro que hay: cada
+            // cambio de estado (o de cualquier propiedad heredada durante la
+            // entrada) obligaba a recalcular el desenfoque de fondo de los nueve
+            // botones a la vez. Se transiciona solo lo que de verdad cambia aquí.
+            : "transition-[transform,background-color,color,opacity] duration-300"
+        }
         ${className}
       `}
       style={{

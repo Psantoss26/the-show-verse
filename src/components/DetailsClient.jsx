@@ -9257,12 +9257,21 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       !mobilePosterHasBurnedTitle &&
                       (displayHeroLogoPath || heroLogoResolved) && (
                       <motion.div
+                        // SIN `filter: blur` animado. Era lo más caro de toda la
+                        // entrada: un desenfoque no lo puede resolver el
+                        // compositor, así que el navegador tenía que recalcular
+                        // el gaussiano del logo EN CADA FOTOGRAMA, y encima
+                        // mientras la capa cambiaba de tamaño por el `scale` (o
+                        // sea, rasterizando de nuevo cada vez). Justo en la
+                        // carga, que es cuando el hilo principal está más
+                        // ocupado. `opacity` y `transform` los compone la GPU
+                        // sin volver a rasterizar; la entrada se lee igual.
                         initial={
                           prefersReducedMotion
                             ? false
-                            : { opacity: 0, y: 18, scale: 0.94, filter: "blur(8px)" }
+                            : { opacity: 0, y: 18, scale: 0.94 }
                         }
-                        animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{
                           duration: prefersReducedMotion ? 0 : 0.48,
                           delay: prefersReducedMotion ? 0 : 0.14,
