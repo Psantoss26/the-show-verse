@@ -3,6 +3,8 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { AnimatePresence, motion } from 'framer-motion'
 import { ExternalLink, X } from 'lucide-react'
 
@@ -32,36 +34,40 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                     role="dialog"
                     aria-labelledby="external-links-title"
                 >
-                    {/* Overlay */}
+                    {/* Velo. El mismo que el resto de modales de la ficha
+                        (`bg-black/60 backdrop-blur-lg`). El anterior, `black/70` con
+                        apenas 2px de desenfoque, tapaba el cartel casi del todo: el
+                        cristal de la hoja quedaba sobre una lámina negra y por muy
+                        buena que fuera la receta no tenía color que atravesar. */}
                     <button
                         type="button"
-                        className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
+                        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
                         onClick={onClose}
                         aria-label="Cerrar"
                     />
 
-                    {/* Sheet */}
+                    {/* Hoja.
+                        MISMO CRISTAL QUE LOS PANELES DE LA FICHA. Antes llevaba su
+                        propia copia del acabado y se había desviado: 34px de
+                        desenfoque y un velo negro fuerte no dejaban pasar el color
+                        del cartel, así que se leía como una placa gris en vez de
+                        cristal. `LIQUID_GLASS_PANEL` es la receta que usan
+                        AddToListModal, SoundtrackModal, VideoModal… La FORMA (hoja
+                        abajo en móvil, tarjeta centrada en escritorio) sigue siendo
+                        de este componente. */}
                     <motion.div
                         initial={{ y: 28, opacity: 0, scale: 0.98 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 28, opacity: 0, scale: 0.98 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className="
+                        className={`
               absolute bottom-0 left-0 right-0 isolate overflow-hidden
-              rounded-t-[1.75rem] ring-1 ring-inset ring-white/[0.08]
-              bg-black/[0.28] bg-gradient-to-br from-white/[0.16] via-white/[0.06] to-black/[0.34]
-              shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(255,255,255,0.03),0_28px_70px_-18px_rgba(0,0,0,0.9)]
-              backdrop-blur-[34px]
+              rounded-t-[2rem] ${LIQUID_GLASS_PANEL}
               px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]
-              sm:left-1/2 sm:right-auto sm:bottom-6 sm:w-[min(440px,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-3xl
-            "
+              sm:left-1/2 sm:right-auto sm:bottom-6 sm:w-[min(440px,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-[2rem]
+            `}
                     >
-                        <div
-                            className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                            style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-                        />
-                        <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-yellow-400/10 blur-3xl" />
-                        <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-white/5 blur-3xl" />
+                        <LiquidGlassOpticalLayers />
 
                         <div className="relative z-10 mx-auto mb-3 h-1.5 w-11 rounded-full bg-white/25 shadow-[0_1px_0_rgba(255,255,255,0.18)_inset]" />
 
@@ -90,8 +96,13 @@ export default function ExternalLinksModal({ open, onClose, links }) {
 
                         <div className="relative z-10">
                             {items.length === 0 ? (
-                                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-7 text-center text-sm font-semibold text-zinc-400">
-                                    No hay enlaces disponibles para este título.
+                                <div
+                                    className={`relative isolate overflow-hidden rounded-xl ${LIQUID_GLASS_CARD} px-4 py-7 text-center text-sm font-semibold text-zinc-400`}
+                                >
+                                    <LiquidGlassOpticalLayers />
+                                    <span className="relative z-10">
+                                        No hay enlaces disponibles para este título.
+                                    </span>
                                 </div>
                             ) : (
                                 <ul className="grid grid-cols-1 gap-2.5">
@@ -106,28 +117,31 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                                 ease: [0.22, 1, 0.36, 1],
                                             }}
                                         >
+                                            {/* Misma tarjeta de cristal que las de
+                                                información de la ficha (VisualMetaCard
+                                                con `liquidGlass`): LIQUID_GLASS_CARD
+                                                —sin sombra, para que en grupo no formen
+                                                una banda oscura detrás— y las capas
+                                                ópticas, que son las que dan el canto y
+                                                el relieve. */}
                                             <a
                                                 href={it.href}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 onClick={() => {
-                                            onClose?.()
-                                        }}
+                                                    onClose?.()
+                                                }}
                                                 aria-label={`Abrir ${it.label || 'enlace externo'}`}
-                                                className="
-                        group/link relative isolate flex min-h-[4.5rem] w-full items-center gap-3.5
-                        overflow-hidden rounded-2xl ring-1 ring-inset ring-white/[0.07]
-                        bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10
-                        px-3.5 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_0_rgba(255,255,255,0.025)] backdrop-blur-[6px]
+                                                className={`
+                        group/link relative isolate flex min-h-[4.5rem] w-full transform-gpu items-center gap-3.5
+                        overflow-hidden rounded-xl ${LIQUID_GLASS_CARD}
+                        p-3.5 pl-4 text-left
                         transition duration-300
-                        hover:-translate-y-0.5 hover:bg-white/[0.08] hover:ring-white/[0.11]
+                        hover:-translate-y-0.5 hover:brightness-110
                         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400
-                      "
+                      `}
                                             >
-                                                <span
-                                                    className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] opacity-90"
-                                                    style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-                                                />
+                                                <LiquidGlassOpticalLayers />
 
                                                 <span className="relative z-10 grid h-11 w-11 shrink-0 place-items-center overflow-visible">
                                                     {it.icon ? (
