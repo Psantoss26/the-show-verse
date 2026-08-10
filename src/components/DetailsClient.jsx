@@ -11869,7 +11869,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   key={String(
                                     c?.id || `${user?.username}-${created}`,
                                   )}
-                                  className={`group relative isolate flex gap-4 overflow-hidden rounded-2xl p-5 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
+                                  // DENTRO del panel de cristal: la tarjeta NO
+                                  // lleva desenfoque propio. Al apilar un
+                                  // backdrop-filter sobre otro se difumina lo ya
+                                  // difuminado y la pieza se vuelve una caja gris
+                                  // plana, justo lo contrario del efecto. Aquí
+                                  // basta un velo translúcido: el cristal que se
+                                  // ve es el del panel, continuo bajo todas.
+                                  className="group relative isolate flex gap-4 overflow-hidden rounded-2xl bg-white/[0.06] p-5 transform-gpu transition-colors duration-300 hover:bg-white/[0.1]"
                                 >
                                   {/* Avatar */}
                                   <div className="relative z-10 shrink-0">
@@ -11985,12 +11992,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   href={internalUrl || "#"}
                                   aria-disabled={disabled}
                                   className={[
+                                    // Cristal COMPARTIDO, el mismo que las tarjetas
+                                    // de Temporadas: van en rejilla sobre el fondo
+                                    // de la página, así que llevan el acabado
+                                    // completo y sin sombra (varias sombras juntas
+                                    // forman una banda oscura detrás del grupo).
+                                    "group relative isolate flex flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500",
+                                    LIQUID_GLASS_CARD,
                                     // Conserva su acento índigo propio (no el amarillo
                                     // de la ficha): aquí solo cambia la CALIDAD del
                                     // borde, no el color que ya tenía.
-                                    "group relative isolate flex flex-col overflow-hidden rounded-3xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-lg shadow-lg transform-gpu transition-all duration-500",
                                     "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(99,102,241,0.95)]",
-                                    "hover:bg-white/5",
+                                    "hover:brightness-110",
                                     disabled
                                       ? "pointer-events-none opacity-60"
                                       : "",
@@ -12010,7 +12023,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
 
                                   {/* 2. CONTENIDO DE TEXTO */}
-                                  <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/20 p-5 backdrop-blur-md">
+                                  {/* Sin desenfoque propio: iría sobre el de la
+                                      tarjeta y apagaría el cristal. Solo un velo
+                                      para que el texto tenga contraste. */}
+                                  <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 p-5">
                                     <div>
                                       <h4 className="line-clamp-1 text-lg font-bold text-white transition-colors group-hover:text-indigo-400">
                                         {name}
