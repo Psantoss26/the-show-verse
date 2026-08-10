@@ -27,7 +27,6 @@ import {
   Heart,
   Info,
   ListVideo,
-  Loader2,
   RotateCcw,
   Sparkles,
   Undo2,
@@ -553,11 +552,7 @@ export default function RecommendationsClient() {
               </Link>
             }
           />
-        ) : loading ? (
-          <div className="flex min-h-[420px] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-          </div>
-        ) : showEmpty ? (
+        ) : loading ? null : showEmpty ? (
           <EmptyState
             icon={Sparkles}
             title="No quedan recomendaciones por ahora"
