@@ -822,39 +822,49 @@ html {
   .sv-mobile-actions-reveal > * > :nth-child(10) { animation-delay: 630ms; }
 }
 
+/* SIN `filter` ANIMADO. Era el mayor coste de la entrada en móvil: un
+   `blur(18px)` sobre una imagen a pantalla completa no lo puede componer la GPU
+   —hay que recalcular el gaussiano en CADA fotograma— y encima la capa estaba
+   cambiando de tamaño con el `scale`, así que se rasterizaba de nuevo cada vez.
+   Todo ello justo en la carga, que es cuando el hilo principal está más ocupado.
+   La sensación de "enfocarse" la da ahora el propio zoom que se asienta, con
+   `opacity` para la aparición: las dos son propiedades que la GPU compone sin
+   volver a rasterizar nada. */
 @keyframes sv-mobile-detail-poster-reveal {
   from {
-    filter: blur(18px) saturate(1.08);
+    opacity: 0;
     transform: scale(1.065);
   }
 
   70% {
-    filter: blur(2px) saturate(1.02);
+    opacity: 1;
     transform: scale(1.028);
   }
 
   to {
-    filter: blur(0) saturate(1);
+    opacity: 1;
     transform: scale(1.02);
   }
 }
 
+/* Ídem, y aquí multiplicado por OCHO: cada botón de acción animaba su propio
+   `blur(6px)`, encima de un botón que YA lleva `backdrop-filter` (el cristal).
+   Es un desenfoque sobre otro desenfoque, ocho veces a la vez y escalonados, de
+   modo que el navegador tenía blurs activos durante medio segundo seguido. El
+   rebote de `opacity` + `transform` mantiene el mismo carácter sin ese coste. */
 @keyframes sv-mobile-detail-action-reveal {
   from {
     opacity: 0;
-    filter: blur(6px);
     transform: translate3d(0, 14px, 0) scale(0.88);
   }
 
   72% {
     opacity: 1;
-    filter: blur(0);
     transform: translate3d(0, -1px, 0) scale(1.025);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
