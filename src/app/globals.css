@@ -343,6 +343,48 @@ body {
   }
 }
 
+/* Entrada del contenido de la FICHA (DetailsClient): el marcador y las pestañas
+   de información aparecen como el título y los botones, con un desplazamiento
+   corto hacia arriba.
+   POR CSS, NO POR JS, a propósito. La entrada del título/botones va con Framer
+   Motion partiendo de `opacity: 0`, y en una carga lenta se midió que esa
+   animación puede no llegar a ejecutarse: el estilo inicial se queda pegado y la
+   pieza permanece INVISIBLE (así aparecía el marcador como una barra de cristal
+   vacía). Una animación CSS la arranca el propio navegador al pintar y termina
+   siempre; además se compone fuera del hilo principal por limitarse a
+   opacity/transform. Misma curva y recorrido que el resto de la ficha. */
+@keyframes sv-details-entry {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 1.25rem, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.sv-details-entry {
+  animation: sv-details-entry 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Escalonado: el marcador entra justo después del bloque de acciones y las
+   pestañas van detrás, para que la columna se lea de arriba abajo. */
+.sv-details-entry--scoreboard {
+  animation-delay: 60ms;
+}
+
+.sv-details-entry--tabs {
+  animation-delay: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-details-entry {
+    animation: none;
+  }
+}
+
 /* =========================
    Enhanced hover effects
    ========================= */

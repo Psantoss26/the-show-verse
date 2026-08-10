@@ -9684,7 +9684,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <div className="order-3 mb-2 w-full sm:hidden">
+            <div className="sv-details-entry sv-details-entry--tabs order-3 mb-2 w-full sm:hidden">
               {/* El revelado por posición va en una capa PROPIA, por dentro del
                   contenedor estable. Comparte señal con el marcador para que
                   ambos aparezcan y desaparezcan como una sola pieza, sin que
@@ -9748,7 +9748,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* Panel de puntuaciones + barra de acciones (ratings, enlaces
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
-            <div className={`order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}>
+            <div
+              className={`sv-details-entry sv-details-entry--scoreboard order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}
+            >
               <span
                 ref={mobileSecondaryTriggerRef}
                 aria-hidden="true"
@@ -9852,7 +9854,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <div className="hidden sm:order-none sm:block">
+              <div className="sv-details-entry sv-details-entry--tabs hidden sm:order-none sm:block">
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -9894,7 +9896,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <div className="mt-8 hidden w-full sm:block lg:mt-6">
+          <div className="sv-details-entry sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6">
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
