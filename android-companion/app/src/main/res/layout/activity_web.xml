@@ -7,10 +7,12 @@
   SIN barra de progreso: una app nativa no enseña una franja de carga cada vez
   que se navega, y la web ya tiene sus propios estados de carga.
 -->
+<!-- SIN fondo en la raíz: el WebView es opaco y la cubre entera, así que este
+     relleno a pantalla completa solo añadía trabajo por fotograma. Los paneles
+     que sí pueden quedar sobre nada (vídeo, error) llevan el suyo propio. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/tsv_black">
+    android:layout_height="match_parent">
 
     <!-- Variante que cede los gestos HORIZONTALES a la página: sin ella, el
          contenedor se apropiaba del arrastre, el WebView mandaba un touchcancel
