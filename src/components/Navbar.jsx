@@ -2221,10 +2221,10 @@ export default function Navbar() {
 
         {/* ---------------- Mobile ---------------- */}
         <div
-          className={`desktop:hidden relative flex items-center justify-between px-2 md:px-5 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          className={`desktop:hidden relative flex items-center justify-between px-2 md:px-3 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
             // Tablet: la barra gana alto para que los controles no queden
             // flotando en una franja pensada para 390px de ancho.
-            mobileTopIsCompact ? "h-12 md:h-16" : "h-16 md:h-20"
+            mobileTopIsCompact ? "h-12 md:h-16" : "h-16 md:h-[4.5rem]"
           }`}
         >
           {/* Izquierda: SELECTOR DE DASHBOARD.
