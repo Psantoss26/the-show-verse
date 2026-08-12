@@ -1735,6 +1735,23 @@ function FeaturedSlide({
           }
         }
 
+        /* SOLO ESCRITORIO. En tablet el hero ya se lee con titulo, metadatos y
+           acciones; la sinopsis obligaba a comprimir todo lo demas. Va como
+           regla propia y no con utilidades de Tailwind porque line-clamp fija
+           tambien el display y, al emitirse despues, ganaba a hidden. Misma
+           condicion que el navbar: ancho de escritorio Y puntero fino con
+           hover, de modo que una tablet grande no cuenta.
+           OJO: esto es un template literal, aqui NO pueden ir acentos graves. */
+        .hero-info-overview {
+          display: none;
+        }
+
+        @media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+          .hero-info-overview {
+            display: -webkit-box;
+          }
+        }
+
         /* Si aun así el conjunto sigue sin caber (ventanas muy bajas), se
            retira directamente la sinopsis: es el bloque menos esencial y el
            que más alto ocupa. */
