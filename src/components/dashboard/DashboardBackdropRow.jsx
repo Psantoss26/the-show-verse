@@ -1454,7 +1454,15 @@ export default function DashboardBackdropRow({
     }
   };
 
+  const puedePosarPuntero = useHoverCapable();
+
   const openPreview = (itemKey, index) => {
+    // Puerta ÚNICA: aquí pasan TODOS los caminos que abren la vista previa
+    // (el temporizador del hover, el propio panel al mantener el puntero
+    // encima, y el reenganche del vecino). Guardar solo los manejadores no
+    // bastaba: en tablet el toque sintetiza `mouseenter` y algunas rutas
+    // llamaban aquí directamente, saltándose la comprobación.
+    if (!puedePosarPuntero) return;
     clearHoverCloseTimer();
     const item = displayItems[index];
     const prev = hoveredIdRef.current;
@@ -1480,8 +1488,6 @@ export default function DashboardBackdropRow({
     setHoveredIndex(null);
     clearHoverBackdrop(item);
   };
-
-  const puedePosarPuntero = useHoverCapable();
 
   const handleMouseEnterItem = (itemKey, index) => {
     // No basta con descartar el móvil por ancho: en una tablet el toque genera

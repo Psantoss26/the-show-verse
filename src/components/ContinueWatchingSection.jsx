@@ -1,6 +1,7 @@
 // /src/components/ContinueWatchingSection.jsx
 "use client";
 
+import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import { useCallback, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -2094,7 +2095,14 @@ function ContinueWatchingSection({
     }
   };
 
+  const puedePosarPuntero = useHoverCapable();
+
   const openPreview = (itemKey, index) => {
+    // Puerta ÚNICA para la vista previa por hover. En una pantalla táctil el
+    // toque sintetiza `mouseenter`, así que sin esto la previa se abría al
+    // tocar una tarjeta en tablet. Misma condición que el navbar.
+    if (!puedePosarPuntero) return;
+
     clearHoverCloseTimer();
     const show = displayShows?.[index];
     const prev = hoveredIdRef.current;

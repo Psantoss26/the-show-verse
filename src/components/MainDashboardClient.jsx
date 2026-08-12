@@ -46,6 +46,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 
 import {
   markAsFavorite,
@@ -2776,8 +2777,13 @@ export function Row({
     };
   }, [clearHoverBackdrop]);
 
+  const puedePosarPuntero = useHoverCapable();
+
   const handleMouseEnterItem = (e, itemKey, index, m, backdropOverride) => {
-    if (isMobile) return;
+    // `isMobile` va por ANCHO, así que una tablet no entraba y la vista previa
+    // se abría al tocar (el toque sintetiza `mouseenter`). Se exige además que
+    // el dispositivo pueda posar el puntero de verdad, igual que el navbar.
+    if (isMobile || !puedePosarPuntero) return;
     // Cancela cualquier cierre diferido pendiente: al entrar en otra tarjeta la
     // vista previa se mueve directamente de una a otra sin pasar por "cerrada",
     // manteniendo el empuje de las vecinas (sin salto).
