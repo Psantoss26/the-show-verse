@@ -446,18 +446,27 @@ body {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+/* Los efectos de hover escritos a mano se limitan a dispositivos que DE VERDAD
+   pueden posar el puntero. Las utilidades `hover:` de Tailwind v4 ya vienen
+   envueltas en `@media (hover: hover)`, pero estas reglas propias no, así que en
+   una tablet se disparaban al tocar (el navegador sintetiza el hover en el
+   toque) y la tarjeta se quedaba levantada. Misma condición que el navbar. */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  }
 }
 
 .hover-glow {
   transition: box-shadow 0.3s ease, filter 0.3s ease;
 }
 
-.hover-glow:hover {
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
-  filter: brightness(1.1);
+@media (hover: hover) and (pointer: fine) {
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    filter: brightness(1.1);
+  }
 }
 
 /* =========================
