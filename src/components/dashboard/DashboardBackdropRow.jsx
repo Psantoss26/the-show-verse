@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
+import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -1480,8 +1481,12 @@ export default function DashboardBackdropRow({
     clearHoverBackdrop(item);
   };
 
+  const puedePosarPuntero = useHoverCapable();
+
   const handleMouseEnterItem = (itemKey, index) => {
-    if (isMobile) return;
+    // No basta con descartar el móvil por ancho: en una tablet el toque genera
+    // un `mouseenter` sintético y la vista previa se abría sola.
+    if (isMobile || !puedePosarPuntero) return;
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     prewarmHoverBackdrop(displayItems[index]);
@@ -1492,7 +1497,7 @@ export default function DashboardBackdropRow({
   };
 
   const handleMouseLeaveItem = (itemKey) => {
-    if (isMobile) return;
+    if (isMobile || !puedePosarPuntero) return;
     clearHoverOpenTimer();
     clearHoverCloseTimer();
     const activeItemKey = hoveredIdRef.current || itemKey;

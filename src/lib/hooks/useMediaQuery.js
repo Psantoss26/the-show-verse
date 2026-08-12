@@ -27,3 +27,15 @@ export function useMediaQuery(query) {
 export function useIsMobile() {
   return useMediaQuery("(max-width: 767px)");
 }
+
+// ¿El dispositivo PUEDE de verdad posar el puntero?
+//
+// Es la misma condición que decide el navbar de escritorio (ver la variante
+// `desktop:` en globals.css). Hace falta en JS porque los efectos de hover
+// movidos por código —las vistas previas de los dashboards, sobre todo— se
+// disparan con `onMouseEnter`, y al tocar en una pantalla táctil el navegador
+// SINTETIZA ese evento: la vista previa se abría en tablets con solo tocar.
+// Comprobarlo por ancho no vale: hay tablets con más resolución que un monitor.
+export function useHoverCapable() {
+  return useMediaQuery("(hover: hover) and (pointer: fine)");
+}
