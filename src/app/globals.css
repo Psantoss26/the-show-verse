@@ -420,12 +420,20 @@ body {
 @keyframes sv-hero-art-in {
   from {
     opacity: 0;
-    transform: scale(1.04);
+    transform: scale(1.045);
   }
 
   to {
     opacity: 1;
-    transform: scale(1);
+    /* NO se baja hasta 1 exacto: se queda un 1% por encima.
+       Mientras dura el fundido la imagen va en su propia capa de composición, y
+       al terminar en escala 1 su borde inferior coincidía EXACTAMENTE con el del
+       contenedor; con alturas fraccionarias el redondeo de subpíxel dejaba
+       asomar una línea justo ahí, antes de que la máscara del contenedor
+       volviera a fundirla. Con este margen la imagen siempre desborda su caja,
+       así que el canto queda recortado en todo momento y no puede dibujarse. El
+       1% no se aprecia: el recorte ya era mayor por el `object-cover`. */
+    transform: scale(1.01);
   }
 }
 
