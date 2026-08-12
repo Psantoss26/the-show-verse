@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* VARIANTE `desktop:` — "esto es un ordenador de verdad".
+ *
+ * EL PROBLEMA CON `lg:`. El navbar conmutaba entre la versión móvil y la de
+ * escritorio solo por ANCHO (1024px). Pero una tablet tiene tanta resolución
+ * como un monitor —o más—, así que acababa con el navbar de ratón: enlaces
+ * pequeños, estados de hover que en táctil no existen y ningún acceso a los
+ * paneles inferiores. El ancho no distingue un portátil de un iPad.
+ *
+ * LO QUE SÍ LOS DISTINGUE es el puntero. `pointer: fine` significa que hay un
+ * dispositivo señalador preciso (ratón, trackpad, lápiz de precisión) y
+ * `hover: hover` que puede posarse sin pulsar. Un panel táctil no cumple
+ * ninguna de las dos: informa `pointer: coarse` y `hover: none`, mida lo que
+ * mida la pantalla.
+ *
+ * La regla es por tanto: escritorio = ANCHO >= 64rem **Y** puntero fino con
+ * hover. Todo lo demás —móviles, tablets de cualquier tamaño y pantallas
+ * táctiles— usa la barra superior e inferior táctiles. Las dos condiciones son
+ * complementarias y no dejan hueco: lo que no es `desktop:` es táctil.
+ *
+ * Un portátil con pantalla táctil Y trackpad sigue siendo escritorio, que es lo
+ * correcto: el usuario tiene un puntero preciso disponible.
+ */
+@custom-variant desktop {
+  @media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+    @slot;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

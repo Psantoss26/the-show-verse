@@ -72,7 +72,7 @@ export default function RootLayout({ children }) {
             <Navbar />
             <div
               data-scroll-restoration-root
-              className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
+              className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
             >
               {children}
             </div>
