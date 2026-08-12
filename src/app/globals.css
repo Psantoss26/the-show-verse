@@ -437,6 +437,40 @@ body {
   }
 }
 
+/* El canto inferior de la imagen del hero muere en TRANSPARENTE.
+   Medido: ese borde no cae al final del contenedor, sino ~640px por dentro, en
+   plena zona difuminada, donde la mascara del contenedor todavia es bastante
+   opaca. Al componerse la imagen en su propia capa durante el fundido, ese corte
+   duro se rasterizaba y se veia como una linea. Con esta mascara la imagen no
+   TIENE borde duro que dibujar: sus ultimos pixeles ya son transparentes, asi
+   que no hay nada que pueda marcarse, se componga como se componga.
+   Franja corta (40px) y solo en el eje vertical: no cambia el encuadre ni pisa
+   la fusion que ya hace .sv-hero-fade, solo suaviza el corte. */
+.sv-hero-art-edge {
+  /* !important y ademas la variable propia de Tailwind v4: su capa de utilidades
+     declara `mask-image: var(--tw-mask-...)` sobre todos los elementos, y sin
+     esto ganaba y dejaba la mascara en `none` (comprobado en el navegador). */
+  --tw-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 40px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 40px),
+    transparent 100%
+  ) !important;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 40px),
+    transparent 100%
+  ) !important;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
 .sv-hero-art-in {
   animation: sv-hero-art-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

@@ -2665,7 +2665,7 @@ export default function DetailModal({
                       key={`desktop-${desktopHeroSrc}`}
                       src={desktopHeroSrc}
                       alt={title}
-                      className={`sv-hero-art-in h-full w-full ${
+                      className={`sv-hero-art-in sv-hero-art-edge h-full w-full ${
                         mobileHeroSrc
                           ? "hidden object-cover sm:block"
                           : backdropPath
