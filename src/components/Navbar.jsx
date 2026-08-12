@@ -2379,7 +2379,7 @@ export default function Navbar() {
         // (donde ya no hay móviles en vertical) crece de alto y de ancho y se
         // separa algo más del borde: en una pantalla de 10" la de 21,5rem se
         // veía como una pastilla diminuta perdida abajo.
-        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[4.25rem] md:w-[min(calc(100%_-_8rem),34rem)] md:px-5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-16 md:w-[min(calc(100%_-_8rem),30rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
