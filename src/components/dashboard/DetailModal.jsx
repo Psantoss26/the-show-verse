@@ -700,8 +700,12 @@ export default function DetailModal({
   // una única vez y YA PRECARGADO en useDetailModalData. Nunca la semilla del item:
   // hasta que el arte final existe se muestra el esqueleto, así se ve una sola
   // imagen (sin el parpadeo de cargar antes otra backdrop).
+  // `original` (y no w1280): el hero ocupa ~1080px CSS, que en pantallas de alta
+  // densidad pedía más resolución de la que daba el w1280. Se pide el MISMO
+  // tamaño que precargó el hook, para reutilizar esa descarga y que la imagen
+  // aparezca ya pintada.
   const heroBackdropSrc = data.heroBackdropPath
-    ? buildImg(data.heroBackdropPath, "w1280")
+    ? buildImg(data.heroBackdropPath, "original")
     : null;
   const heroPosterSrc = data.heroPosterPath
     ? buildImg(data.heroPosterPath, "w780")
@@ -2650,7 +2654,7 @@ export default function DetailModal({
                       key={`mobile-${mobileHeroSrc}`}
                       src={mobileHeroSrc}
                       alt={title}
-                      className="block h-full w-full object-contain sm:hidden"
+                      className="sv-hero-art-in block h-full w-full object-contain sm:hidden"
                       loading="eager"
                       fetchPriority="high"
                     />
@@ -2661,7 +2665,7 @@ export default function DetailModal({
                       key={`desktop-${desktopHeroSrc}`}
                       src={desktopHeroSrc}
                       alt={title}
-                      className={`h-full w-full ${
+                      className={`sv-hero-art-in h-full w-full ${
                         mobileHeroSrc
                           ? "hidden object-cover sm:block"
                           : backdropPath

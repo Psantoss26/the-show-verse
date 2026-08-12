@@ -48,6 +48,12 @@ import {
 } from "@/lib/dashboard/media";
 import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
+// TAMAÑO DEL BACKDROP DEL HERO. `original` es el archivo tal cual lo subió TMDb.
+// El w1280 se veía reescalado en pantallas de alta densidad, y este hero ocupa
+// todo el ancho del modal. No retrasa la aparición: para cuando termina de
+// descargarse ya se está viendo el provisional, y el salto entra con un fundido.
+const HERO_BACKDROP_SIZE = "original";
+
 // Mapa estado (TMDb) -> etiqueta ES, espejo de `getStatusLabel` en DetailsClient.
 function statusLabelEs(status) {
   const map = {
@@ -176,9 +182,9 @@ const EMPTY_DATA = {
   backdropPath: null,
   posterPath: null,
   heroPosterPath: null,
-  // Backdrop FINAL del hero (textless), fijado UNA sola vez y ya precargado. El
-  // hero lo usa en exclusiva: hasta que existe muestra el esqueleto (nunca la
-  // backdrop de la semilla), así se ve solo la imagen final (sin parpadeo).
+  // Backdrop del hero: SOLO el definitivo (textless), fijado una única vez y ya
+  // precargado. Hasta que existe se muestra el esqueleto, nunca una imagen
+  // intermedia: así el usuario ve aparecer una sola imagen.
   heroBackdropPath: null,
   year: null,
   runtime: null,
@@ -998,6 +1004,13 @@ export function useDetailModalData(item) {
     // del propio item. Se PRECARGA y se fija en `heroBackdropPath` (que el hero usa
     // en exclusiva), así aparece de una sola vez, sin parpadeo de una imagen previa.
     (async () => {
+      // UNA SOLA IMAGEN, la definitiva. Se probó enseñar antes la backdrop que
+      // trae la tarjeta pulsada para que el hero no estuviera vacío mientras se
+      // resolvía la buena, pero eso hace visibles DOS imágenes seguidas —una
+      // que aparece y se sustituye—, que es peor que esperar. El criterio es el
+      // de siempre: se resuelve la textless (el logo va superpuesto, un fondo
+      // con el título impreso lo duplicaría), se PRECARGA entera y solo
+      // entonces se anuncia, así se ve aparecer una única vez.
       try {
         const [detailsForArt, bestBackdrop] = await Promise.all([
           detailsPromise,
@@ -1010,7 +1023,7 @@ export function useDetailModalData(item) {
           detailsForArt?.backdrop_path ||
           null;
         if (cancelled || !finalBackdrop) return;
-        await preloadImage(buildImg(finalBackdrop, "w1280"));
+        await preloadImage(buildImg(finalBackdrop, HERO_BACKDROP_SIZE));
         if (cancelled) return;
         setData((prev) => ({ ...prev, heroBackdropPath: finalBackdrop }));
       } catch {
