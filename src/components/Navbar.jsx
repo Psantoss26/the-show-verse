@@ -1316,13 +1316,13 @@ function TopBarGlassLayers({ className = "" }) {
       />
       {/* Especular: el reflejo que recorre el borde superior y se apaga hacia
           dentro, sin trazar ninguna línea.
-          Solo en MÓVIL (`lg:hidden`): allí la barra flota sobre el contenido y
+          Solo en MÓVIL (`desktop:hidden`): allí la barra flota sobre el contenido y
           ese reflejo le da cuerpo, pero en escritorio queda pegada al borde de
           la ventana y el brillo se lee como una franja clara en lo alto de la
           página, no como el canto de una pieza de vidrio. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] lg:hidden ${className}`}
+        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] desktop:hidden ${className}`}
       />
     </>
   );
@@ -1751,7 +1751,8 @@ export default function Navbar() {
     "relative z-10 flex items-center justify-center";
 
   const mobileBottomIconClass =
-    "h-6 w-6 shrink-0 transform-gpu transition-all duration-300 ease-out drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]";
+    // Iconos mayores en tablet, en proporción con la píldora (ver más abajo).
+    "h-6 w-6 md:h-7 md:w-7 shrink-0 transform-gpu transition-all duration-300 ease-out drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]";
   const MOBILE_BOTTOM_ICON_STROKE = 2.2;
 
   // Lente de la sección activa: un CÍRCULO de cristal líquido (Liquid Glass) con
@@ -1861,15 +1862,15 @@ export default function Navbar() {
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
             : desktopDetailsNavMode
-              ? "lg:bg-gradient-to-b lg:from-black/60 lg:via-black/25 lg:to-transparent"
+              ? "desktop:bg-gradient-to-b desktop:from-black/60 desktop:via-black/25 desktop:to-transparent"
             : isImmersiveRoute
-              ? // FICHA / RECOMENDACIONES: escritorio glass tras scroll (lg:);
+              ? // FICHA / RECOMENDACIONES: escritorio glass tras scroll (desktop:);
                 // MÓVIL transparente, compacto y visible/interactivo desde la
                 // entrada. En la ficha el fondo glass y el crecimiento de altura
                 // los aportan la capa interna y la fila móvil, GRADUALMENTE con
                 // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
                 // así que la barra se queda transparente.
-                "lg:bg-black/15 lg:backdrop-blur-[7px] lg:backdrop-saturate-[190%] lg:backdrop-brightness-[1.06] lg:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
+                "desktop:bg-black/15 desktop:backdrop-blur-[7px] desktop:backdrop-saturate-[190%] desktop:backdrop-brightness-[1.06] desktop:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
               : // RESTO DE PÁGINAS: el mismo cristal líquido en móvil y en
                 // escritorio, en su variante PLANA. El fondo se sigue viendo a
                 // través igual (mismo tinte, desenfoque y saturación); lo que se
@@ -1884,7 +1885,7 @@ export default function Navbar() {
             una banda; allí el cristal se queda plano y uniforme.
             Nunca en los estados transparentes, donde añadirían un velo. */}
         {!heroNavMode && !isImmersiveRoute && (
-          <TopBarGlassLayers className="lg:hidden" />
+          <TopBarGlassLayers className="desktop:hidden" />
         )}
 
         {isDetailsRoute && (
@@ -1894,13 +1895,13 @@ export default function Navbar() {
                 el scroll queda bajo el glass. */}
             <div
               aria-hidden
-              className="lg:hidden pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-transparent"
+              className="desktop:hidden pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-transparent"
             />
             {/* Fondo GLASS que aparece GRADUALMENTE con el scroll
                 (--sv-hero-scroll: 0→1) sin afectar a los iconos. */}
             <div
               aria-hidden
-              className={`lg:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR} transition-opacity duration-300 motion-reduce:transition-none ${
+              className={`desktop:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR} transition-opacity duration-300 motion-reduce:transition-none ${
                 isScrolled ? "opacity-100" : "[opacity:var(--sv-hero-scroll,0)]"
               }`}
             >
@@ -1913,7 +1914,7 @@ export default function Navbar() {
         {/* ---------------- Desktop ---------------- */}
         <div
           ref={desktopHeaderRef}
-          className="hidden h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 lg:grid"
+          className="hidden h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 desktop:grid"
         >
           {/* Izquierda */}
           <div
@@ -2220,8 +2221,10 @@ export default function Navbar() {
 
         {/* ---------------- Mobile ---------------- */}
         <div
-          className={`lg:hidden relative flex items-center justify-between px-2 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            mobileTopIsCompact ? "h-12" : "h-16"
+          className={`desktop:hidden relative flex items-center justify-between px-2 md:px-5 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            // Tablet: la barra gana alto para que los controles no queden
+            // flotando en una franja pensada para 390px de ancho.
+            mobileTopIsCompact ? "h-12 md:h-16" : "h-16 md:h-20"
           }`}
         >
           {/* Izquierda: SELECTOR DE DASHBOARD.
@@ -2372,7 +2375,11 @@ export default function Navbar() {
         // `transform` (scale desde el borde inferior): al no tocar width/height
         // no hay recálculo de layout, así la compactación es fluida en todo
         // momento y en ambos sentidos del scroll.
-        className={`lg:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        // AJUSTE PARA TABLET: la misma píldora, con cuerpo. A partir de 768px
+        // (donde ya no hay móviles en vertical) crece de alto y de ancho y se
+        // separa algo más del borde: en una pantalla de 10" la de 21,5rem se
+        // veía como una pastilla diminuta perdida abajo.
+        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[4.25rem] md:w-[min(calc(100%_-_8rem),34rem)] md:px-5 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
