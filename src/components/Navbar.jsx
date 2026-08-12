@@ -42,6 +42,7 @@ import {
   Check,
   SlidersHorizontal,
   UserRoundSearch,
+  ChevronDown,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -60,6 +61,30 @@ import {
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
+// Secciones del desplegable del PERFIL, en dos columnas. Antes eran una fila de
+// nueve iconos sueltos en la barra: sin rotulo, habia que adivinarlos o pasar el
+// raton por encima de uno en uno.
+const PROFILE_MENU_GROUPS = [
+  {
+    titulo: "Descubrir",
+    items: [
+      { href: "/recommendations", label: "Recomendaciones", Icon: ThumbsUp },
+      { href: "/social", label: "Social", Icon: Users },
+      { href: "/lists", label: "Listas", Icon: ListVideo },
+      { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon },
+    ],
+  },
+  {
+    titulo: "Lo tuyo",
+    items: [
+      { href: "/in-progress", label: "En Progreso", Icon: Play },
+      { href: "/history", label: "Historial", Icon: History },
+      { href: "/favorites", label: "Favoritas", Icon: Heart },
+      { href: "/watchlist", label: "Pendientes", Icon: Bookmark },
+    ],
+  },
+];
+
 const FUZZY_MIN_QUERY_LEN = 4;
 // Similitud mínima [0,1] para dar puntos fuzzy (~1-2 letras de diferencia).
 const FUZZY_MIN_SIMILARITY = 0.7;
@@ -338,10 +363,20 @@ function SearchBar({
     };
 
     updatePosition();
+    // El desplegable copia el ANCHO de la barra, y en escritorio la barra se
+    // ensancha con una animacion de 300ms al desplegarse. Con solo resize/scroll
+    // la medida se tomaba a mitad de esa transicion y el panel quedaba mas
+    // estrecho que la barra. Un ResizeObserver lo sigue fotograma a fotograma.
+    let observador = null;
+    if (typeof ResizeObserver !== "undefined" && searchRef.current) {
+      observador = new ResizeObserver(schedulePositionUpdate);
+      observador.observe(searchRef.current);
+    }
     window.addEventListener("resize", schedulePositionUpdate);
     window.addEventListener("scroll", schedulePositionUpdate, true);
     return () => {
       window.cancelAnimationFrame(frameId);
+      observador?.disconnect();
       window.removeEventListener("resize", schedulePositionUpdate);
       window.removeEventListener("scroll", schedulePositionUpdate, true);
     };
@@ -844,7 +879,7 @@ function SearchBar({
 
   return (
     <div
-      className={`relative min-w-0 w-full ${isMobile ? "max-w-full" : "max-w-lg"}`}
+      className={`relative min-w-0 w-full ${isMobile ? "max-w-full" : "max-w-none"}`}
       ref={searchRef}
     >
       <form
@@ -862,7 +897,10 @@ function SearchBar({
             rounded-full group
             ${
               isMobile
-                ? `${LIQUID_GLASS_PANEL} border border-white/[0.1] hover:bg-black/[0.34] focus-within:bg-black/[0.38] focus-within:ring-2 focus-within:ring-white/[0.12]`
+                ? // Sin borde ni anillo al enfocar: marcaban un canto duro sobre el
+                // cristal y la pieza se leia como una caja pegada encima. El foco
+                // se nota por el tinte, que ya se aclara.
+                `${LIQUID_GLASS_PANEL} hover:bg-black/[0.34]`
                 : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10"
             }
             ${isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"}
@@ -870,7 +908,7 @@ function SearchBar({
         >
           {/* Lupa siempre blanca y visible */}
           <SearchIcon
-            className="w-5 h-5 text-white flex-shrink-0 opacity-100 group-focus-within:scale-110 transition-transform duration-300"
+            className="w-5 h-5 text-white flex-shrink-0 opacity-100"
             strokeWidth={2.5}
           />
 
@@ -967,6 +1005,7 @@ function SearchBar({
                 aria-hidden="true"
               />
             </button>
+
           </div>
         </div>
       </form>
@@ -1810,6 +1849,39 @@ export default function Navbar() {
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
   // de rutas active la compactación por scroll.
+  // La barra de busqueda de escritorio se repliega al pulsar FUERA de ella:
+  // en el navbar, en la pagina, donde sea. Al desplegarse en linea no hay un
+  // velo que capture el clic, asi que se escucha en el documento.
+  const desktopSearchRef = useRef(null);
+  useEffect(() => {
+    if (!desktopSearchOpen) return undefined;
+    const fuera = (e) => {
+      if (!desktopSearchRef.current?.contains(e.target)) setDesktopSearchOpen(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => document.removeEventListener("pointerdown", fuera);
+  }, [desktopSearchOpen]);
+
+  // Desplegable del perfil: se cierra al pulsar fuera y con Escape, como
+  // cualquier menú del sistema.
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+    const fuera = (e) => {
+      if (!profileMenuRef.current?.contains(e.target)) setProfileMenuOpen(false);
+    };
+    const escape = (e) => {
+      if (e.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", fuera);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [profileMenuOpen]);
+
   const mobileTopIsCompact = isScrolled || isImmersiveRoute;
   // ¿La barra superior está pintando ya su cristal? Es transparente sobre un
   // hero sin desplazar y en las rutas inmersivas hasta que se hace scroll; en el
@@ -2000,202 +2072,53 @@ export default function Navbar() {
                 <span className="relative z-10">{t("nav_library", "Biblioteca")}</span>
               </Link>
 
-              {desktopSearchCompact && (
-                <button
-                  type="button"
-                  data-desktop-nav-href="/__search"
-                  onClick={() => setDesktopSearchOpen(true)}
-                  aria-label={t("search_input_label", "Buscar en The Show Verse")}
-                  aria-expanded={desktopSearchOpen}
-                  className={`${navLinkClass("/__search")} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80`}
-                >
-                  <span className="relative z-10">{t("nav_search", "Buscar")}</span>
-                </button>
-              )}
             </div>
           </div>
 
-          {/* Centro: en modo compacto la búsqueda se abre únicamente en el
-              carril libre entre ambos grupos; en modo normal permanece visible. */}
-          <div className="flex min-w-0 items-center justify-center">
-            {(!desktopSearchCompact || desktopSearchOpen) && (
-              <SearchBar
-                autoFocus={desktopSearchCompact && desktopSearchOpen}
-                onEscape={
-                  desktopSearchCompact
-                    ? () => setDesktopSearchOpen(false)
-                    : undefined
-                }
-                onResultClick={
-                  desktopSearchCompact
-                    ? () => setDesktopSearchOpen(false)
-                    : undefined
-                }
-              />
-            )}
-          </div>
+          {/* Centro: carril vacío a propósito. El buscador se mudó a la
+              derecha, como icono que despliega el campo; este hueco flexible es
+              lo que mantiene las secciones a la izquierda y el perfil pegado al
+              borde, sin que ninguno de los dos se mueva al desplegarlo. */}
+          <div aria-hidden="true" className="min-w-0" />
 
-          {/* Derecha */}
+          {/* DERECHA — al estilo Netflix: solo buscar y perfil.
+              Las secciones que antes vivían aquí como una fila de nueve iconos
+              (indescifrables sin pasar el ratón por encima) se han mudado al
+              desplegable del perfil, en dos columnas. */}
           <div
             ref={desktopRightRef}
             className="flex shrink-0 items-center gap-2 pr-12"
           >
-            <div className="flex items-center gap-2">
-              <WatchNextAssistant heroNavMode={heroNavMode} />
-
-              <Link
-                href="/recommendations"
-                prefetch
-                {...navPrefetchHandlers("/recommendations")}
-                className={iconLinkClass("/recommendations", "green")}
-                aria-label={t("nav_recommendations", "Recomendaciones")}
-              >
-                {isActive("/recommendations") && (
-                  <motion.div
-                    aria-hidden="true"
-                    className="absolute inset-0 rounded-full border border-emerald-500/10 bg-emerald-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <ThumbsUp className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/social"
-                prefetch
-                {...navPrefetchHandlers("/social")}
-                className={iconLinkClass("/social", "pink")}
-                aria-label={t("nav_social", "Social")}
-              >
-                {isActive("/social") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full border border-pink-500/10 bg-pink-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(236,72,153,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <Users className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/lists"
-                prefetch
-                {...navPrefetchHandlers("/lists")}
-                className={iconLinkClass("/lists", "purple")}
-                aria-label="Listas"
-              >
-                {isActive("/lists") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(217,70,239,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <ListVideo className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/calendar"
-                prefetch
-                {...navPrefetchHandlers("/calendar")}
-                className={iconLinkClass("/calendar", "amber")}
-                aria-label="Calendario"
-              >
-                {isActive("/calendar") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-amber-500/20 border border-amber-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(245,158,11,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <CalendarDaysIcon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/in-progress"
-                prefetch
-                {...navPrefetchHandlers("/in-progress")}
-                className={iconLinkClass("/in-progress", "green")}
-                aria-label="En Progreso"
-              >
-                {isActive("/in-progress") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <Play
-                    className="w-5 h-5 transition-transform duration-200 group-hover:scale-110"
-                    fill="currentColor"
-                  />
-                </span>
-              </Link>
-
-              <Link
-                href="/history"
-                prefetch
-                {...navPrefetchHandlers("/history")}
-                className={iconLinkClass("/history", "green")}
-                aria-label="Historial"
-              >
-                {isActive("/history") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-emerald-500/20 border border-emerald-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(16,185,129,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <Eye className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/favorites"
-                prefetch
-                {...navPrefetchHandlers("/favorites")}
-                className={iconLinkClass("/favorites", "red")}
-                aria-label="Favoritas"
-              >
-                {isActive("/favorites") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-red-500/20 border border-red-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(239,68,68,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <Heart className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
-
-              <Link
-                href="/watchlist"
-                prefetch
-                {...navPrefetchHandlers("/watchlist")}
-                className={iconLinkClass("/watchlist", "blue")}
-                aria-label="Pendientes"
-              >
-                {isActive("/watchlist") && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-sky-500/20 border border-sky-500/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(56,189,248,0.08)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center justify-center">
-                  <Bookmark className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                </span>
-              </Link>
+            {/* Buscar va PRIMERO en esta zona: es la acción más frecuente y así
+                queda pegada al contenido, no escondida entre los extremos.
+                El ancho es lo único que se anima, así que la barra no salta. */}
+            <div
+              ref={desktopSearchRef}
+              className={`flex items-center overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                desktopSearchOpen ? "w-[34rem]" : "w-10"
+              }`}
+            >
+              {desktopSearchOpen ? (
+                <SearchBar
+                  autoFocus
+                  onEscape={() => setDesktopSearchOpen(false)}
+                  onResultClick={() => setDesktopSearchOpen(false)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDesktopSearchOpen(true)}
+                  className="grid h-10 w-10 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  aria-label={t("search_input_label", "Buscar en The Show Verse")}
+                >
+                  <SearchIcon className="h-5 w-5" />
+                </button>
+              )}
             </div>
 
+            <WatchNextAssistant heroNavMode={heroNavMode} />
+
             {profileAuthLoading ? (
-              // Durante la hidratación conservamos la huella circular del avatar.
-              // Así una sesión ya iniciada nunca parece convertirse por un instante
-              // en el botón ancho de acceso antes de recuperar la cuenta cacheada.
               <div
                 aria-hidden="true"
                 className="ml-2 h-9 w-9 rounded-full bg-neutral-800/80 animate-pulse"
@@ -2208,12 +2131,73 @@ export default function Navbar() {
                 {t("nav_login", "Iniciar sesión")}
               </a>
             ) : (
-              <UserAvatar
-                account={account}
-                className={
-                  heroNavMode ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]" : ""
-                }
-              />
+              <div ref={profileMenuRef} className="relative ml-2">
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                  aria-label={t("nav_profile", "Perfil")}
+                  className="flex items-center gap-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  <UserAvatar
+                    account={account}
+                    className={
+                      heroNavMode ? "drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]" : ""
+                    }
+                  />
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+                      profileMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {profileMenuOpen ? (
+                    <motion.div
+                      role="menu"
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      className={`absolute right-0 top-full z-[100] mt-3 w-[34rem] overflow-hidden rounded-3xl p-3 ${LIQUID_GLASS_PANEL}`}
+                    >
+                      {/* DOS COLUMNAS: descubrir a la izquierda, lo que es tuyo
+                          a la derecha. Con nueve entradas una lista sola queda
+                          larguísima y obliga a recorrerla entera. */}
+                      <div className="grid grid-cols-2 gap-x-2">
+                        {PROFILE_MENU_GROUPS.map((grupo) => (
+                          <div key={grupo.titulo} className="min-w-0">
+                            <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                              {grupo.titulo}
+                            </p>
+                            {grupo.items.map(({ href, label, Icon }) => (
+                              <Link
+                                key={href}
+                                href={href}
+                                prefetch
+                                {...navPrefetchHandlers(href)}
+                                role="menuitem"
+                                onClick={() => setProfileMenuOpen(false)}
+                                aria-current={isActive(href) ? "page" : undefined}
+                                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                  isActive(href)
+                                    ? "bg-white/10 font-bold text-white"
+                                    : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                                }`}
+                              >
+                                <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                                <span className="truncate">{label}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
             )}
           </div>
 
