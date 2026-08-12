@@ -897,10 +897,15 @@ function SearchBar({
             rounded-full group
             ${
               isMobile
-                ? // Sin borde ni anillo al enfocar: marcaban un canto duro sobre el
-                // cristal y la pieza se leia como una caja pegada encima. El foco
-                // se nota por el tinte, que ya se aclara.
-                `${LIQUID_GLASS_PANEL} hover:bg-black/[0.34]`
+                ? // SIN FONDO PROPIO. Medido en el navegador: de toda la cadena de
+                // contenedores, la unica pieza con fondo era esta pildora
+                // (`LIQUID_GLASS_PANEL`), y al recortarse contra el cristal del
+                // navbar se veia como un bloque mas oscuro con sus cuatro bordes
+                // marcados. La barra se apoya ahora en el cristal del navbar: solo
+                // aporta la lupa, el campo y el boton de filtros. Y al no haber
+                // fondo tampoco hay estados que lo cambien, asi que se ve IGUAL en
+                // reposo, al pasar el raton y al escribir.
+                "bg-transparent"
                 : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10"
             }
             ${isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"}
@@ -2138,7 +2143,12 @@ export default function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={profileMenuOpen}
                   aria-label={t("nav_profile", "Perfil")}
-                  className="flex items-center gap-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  // ZONA DE ACTUACION MAS AMPLIA. Antes el area util era la del
+                  // avatar mas una flecha diminuta: para abrir el menu habia que
+                  // apuntar. Con relleno propio el boton pasa a ~52x44px, se
+                  // ilumina al pasar por encima —asi se lee como pulsable— y el
+                  // margen negativo evita que ese relleno desplace al avatar.
+                  className="-mr-1.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                 >
                   <UserAvatar
                     account={account}
@@ -2147,7 +2157,7 @@ export default function Navbar() {
                     }
                   />
                   <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+                    className={`h-[18px] w-[18px] shrink-0 text-zinc-300 transition-transform duration-200 ${
                       profileMenuOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -2161,7 +2171,12 @@ export default function Navbar() {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.98 }}
                       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                      className={`absolute right-0 top-full z-[100] mt-3 w-[34rem] overflow-hidden rounded-3xl p-3 ${LIQUID_GLASS_PANEL}`}
+                      // MISMO CRISTAL Y MISMA FORMA que el desplegable de la barra de
+                      // busqueda: identico `LIQUID_GLASS_PANEL`, mismo radio
+                      // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
+                      // z-index mucho mas bajo, asi que se leian como dos piezas
+                      // distintas.
+                      className={`absolute right-0 top-full z-[99999] mt-3 w-[34rem] overflow-hidden rounded-2xl p-3 text-white ${LIQUID_GLASS_PANEL}`}
                     >
                       {/* DOS COLUMNAS: descubrir a la izquierda, lo que es tuyo
                           a la derecha. Con nueve entradas una lista sola queda
