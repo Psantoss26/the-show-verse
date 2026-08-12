@@ -1503,7 +1503,12 @@ export default function DashboardBackdropRow({
   };
 
   const handleMouseLeaveItem = (itemKey) => {
-    if (isMobile || !puedePosarPuntero) return;
+    // El CIERRE nunca se bloquea. Guardar tambien esta salida fue un error mio:
+    // si algo llegaba a marcar el hover (el propio panel, el foco, un evento
+    // sintetico del toque), este manejador salia antes de limpiarlo y el estado
+    // se quedaba a medias — de ahi el parpadeo al abrir y al cerrar el modal en
+    // tablet. La puerta va solo en los caminos que ABREN.
+    if (isMobile) return;
     clearHoverOpenTimer();
     clearHoverCloseTimer();
     const activeItemKey = hoveredIdRef.current || itemKey;
