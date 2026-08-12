@@ -588,7 +588,12 @@ export function useDetailModalData(item) {
     const logoOverride = artworkPreference.logo;
     const backdropOverride = artworkPreference.backdrop;
     const seedLogoPath = logoOverride || item.logoPath || item.logo_path || null;
-    const detailsPromise = getDetails(mediaType, id).catch(() => null);
+    // `external_ids` va aquí porque en SERIES el imdb_id no viene en los detalles
+    // (en películas sí): lo necesita la consulta a Plex para emparejar por id en
+    // vez de por título. Es el mismo viaje a TMDb, no una petición extra.
+    const detailsPromise = getDetails(mediaType, id, {
+      append_to_response: "external_ids",
+    }).catch(() => null);
 
     setLoading(true);
     // Semilla inmediata con lo que ya trae el item (evita salto en cabecera).
@@ -1066,16 +1071,41 @@ export function useDetailModalData(item) {
     // muchos providers externos.
     (async () => {
       try {
-        const streamTitle = (item.title || item.name || "").trim();
+        // MISMAS SEÑAS QUE DetailsClient. Antes se preguntaba con lo que traía la
+        // TARJETA (la semilla), y los listados de TMDb NO devuelven `imdb_id`:
+        // solo aparece al pedir los detalles. Sin él la búsqueda caía en emparejar
+        // por título, que falla en cuanto el de tu servidor no coincide con el de
+        // la semilla (traducciones, subtítulos, años distintos) — de ahí que el
+        // icono de Plex saliera en la ficha completa y no aquí.
+        // Se espera a los detalles, que ya se están pidiendo para el resto del
+        // modal, y se usan su título, su año y su imdb_id.
+        const detailsForPlex = await detailsPromise.catch(() => null);
+        if (cancelled) return;
+
+        const streamTitle = (
+          detailsForPlex?.title ||
+          detailsForPlex?.name ||
+          item.title ||
+          item.name ||
+          ""
+        ).trim();
         if (!streamTitle) return;
         const params = new URLSearchParams({
           title: streamTitle,
           type: mediaType === "tv" ? "tv" : "movie",
           tmdbId: String(id),
         });
-        const y = yearOf(item);
+        const fecha =
+          detailsForPlex?.release_date || detailsForPlex?.first_air_date || null;
+        const y = (fecha && Number(String(fecha).slice(0, 4))) || yearOf(item);
         if (y) params.append("year", String(y));
-        if (item.imdb_id) params.append("imdbId", item.imdb_id);
+        // En películas TMDb da `imdb_id` directo; en series vive en external_ids.
+        const imdbId =
+          detailsForPlex?.imdb_id ||
+          detailsForPlex?.external_ids?.imdb_id ||
+          item.imdb_id ||
+          null;
+        if (imdbId) params.append("imdbId", imdbId);
 
         const res = await fetch(`/api/plex?${params.toString()}`);
         if (!res.ok || cancelled) return;
