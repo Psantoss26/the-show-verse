@@ -33,6 +33,8 @@ import {
   HomeIcon,
   Compass,
   Play,
+  CheckCircle2,
+  MonitorPlay,
   Eye,
   FolderKanban,
   ThumbsUp,
@@ -73,7 +75,9 @@ import {
 const PROFILE_MENU_GROUPS = [
   [
     { href: "/in-progress", label: "En Progreso", Icon: Play, tone: "text-emerald-400" },
+    { href: "/completed", label: "Completadas", Icon: CheckCircle2, tone: "text-emerald-400" },
     { href: "/history", label: "Historial", Icon: History, tone: "text-emerald-400" },
+    { href: "/continue-watching", label: "Continuar viendo", Icon: MonitorPlay, tone: "text-emerald-400" },
   ],
   [
     { href: "/favorites", label: "Favoritas", Icon: Heart, tone: "text-red-400" },
