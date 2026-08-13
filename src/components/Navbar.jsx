@@ -43,6 +43,7 @@ import {
   SlidersHorizontal,
   UserRoundSearch,
   ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -1870,6 +1871,12 @@ export default function Navbar() {
   // Desplegable del perfil: se cierra al pulsar fuera y con Escape, como
   // cualquier menú del sistema.
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  // El asistente se abre desde DOS sitios (su icono de la barra y la fila del
+  // desplegable de Perfil), así que su estado vive aquí y el componente se monta
+  // una sola vez, FUERA del desplegable. Si viviera dentro, al cerrarse el menú
+  // se desmontaría su panel -- y el menú se cierra en cuanto se pulsa fuera, que
+  // es justo lo que pasa al usar el asistente.
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const profileMenuRef = useRef(null);
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
@@ -2132,7 +2139,11 @@ export default function Navbar() {
               )}
             </div>
 
-            <WatchNextAssistant heroNavMode={heroNavMode} />
+            <WatchNextAssistant
+              heroNavMode={heroNavMode}
+              open={assistantOpen}
+              onOpenChange={setAssistantOpen}
+            />
 
             {profileAuthLoading ? (
               <div
@@ -2223,6 +2234,34 @@ export default function Navbar() {
                             ))}
                           </div>
                         ))}
+
+                        {/* ASISTENTE. Es una sección más del panel, pero NO un
+                            enlace: no lleva a ninguna ruta, abre el recomendador
+                            sobre la página. Por eso va aparte de
+                            `PROFILE_MENU_GROUPS`, que son destinos.
+                            El componente NO se monta aquí dentro (está junto a
+                            su icono de la barra): esta fila solo pide que se
+                            abra y cierra el menú. Montarlo aquí lo desmontaría
+                            justo al empezar a usarlo -- el panel se pinta por
+                            portal, fuera de este desplegable, y el desplegable
+                            se cierra al pulsar fuera. */}
+                        <div className="min-w-0">
+                          <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                            Asistente
+                          </p>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setProfileMenuOpen(false);
+                              setAssistantOpen(true);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                          >
+                            <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
+                            <span className="truncate">Qué ver con IA</span>
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   ) : null}

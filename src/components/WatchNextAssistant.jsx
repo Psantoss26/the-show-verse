@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -243,9 +243,29 @@ export default function WatchNextAssistant({
   isMobile = false,
   heroNavMode = false,
   triggerVariant = "icon",
+  open: openProp,
+  onOpenChange,
 }) {
   const [mounted, setMounted] = useState(false);
-  const [open, setOpen] = useState(false);
+  // ESTADO OPCIONALMENTE CONTROLADO.
+  //
+  // El panel se pinta con `createPortal`, pero en el árbol de React sigue
+  // siendo hijo de ESTE componente: si quien lo renderiza se desmonta, el panel
+  // se va con él. Por eso quien lo abre desde un menú que se cierra solo -- el
+  // desplegable de Perfil se cierra al pulsar fuera, y el panel está fuera --
+  // necesita poder tener el componente montado en otro sitio y solo mandarle
+  // abrirse. Sin `open`, se sigue gobernando a sí mismo como hasta ahora.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+  const setOpen = useCallback(
+    (value) => {
+      const next = typeof value === "function" ? value(open) : value;
+      if (!isControlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange, open],
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState([
